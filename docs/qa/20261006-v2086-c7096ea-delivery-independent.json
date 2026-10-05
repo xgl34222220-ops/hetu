@@ -1,0 +1,2612 @@
+{
+  "schema": 2,
+  "expectedRunId": 37381538358,
+  "expectedRunAttempt": 1,
+  "expectedSourceCommit": "c7096ea25cf1e150a1297859f8ec53d137327c47",
+  "checkedAtUtc": "2026-10-05T22:47:16.944344+00:00",
+  "result": "PASS",
+  "scope": "independent byte, testcase identity, immutable source guard and fixture checks of every required supplied artifact",
+  "artifactProviderIdentityVerified": false,
+  "artifacts": {
+    "function_inputs": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/hetu/updates/v2086-functionfix/inputs.json",
+      "bytes": 63671,
+      "sha256": "796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22"
+    },
+    "ui_zip": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/function-verification/c7096ea/Hetu-V20.86-UI-verification.zip",
+      "bytes": 14702218,
+      "sha256": "8388b0e572a6433b068276fbc7c9e2a990bf3cae78a149f67110d1dbe8e7da22"
+    },
+    "apk_manifest_zip": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/function-verification/c7096ea/Hetu-V20.86-APK-manifest.zip",
+      "bytes": 2305,
+      "sha256": "ea51461d813031189ff6f7de6ab4f5bd83ddfdd858db7ce48d1ab89559d64562"
+    },
+    "apk": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/deliverables/Hetu-v20.86-function-c7096ea.apk",
+      "bytes": 134858259,
+      "sha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835"
+    },
+    "api35_zip": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/function-verification/c7096ea/Hetu-V20.86-Android-35-smoke.zip",
+      "bytes": 3367856,
+      "sha256": "597e275a97a157de4126dff1d3db413eec05efc96908c67c8735fc707cba3eab"
+    },
+    "api36_zip": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/function-verification/c7096ea/Hetu-V20.86-Android-36-smoke.zip",
+      "bytes": 3796613,
+      "sha256": "0d80705d9190950536d91aade6bce2d56f4c0455eab71ccfae397a8feaa6ed71"
+    },
+    "baseline_ui_zip": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/function-verification/baseline-ec211b9-ui.zip",
+      "bytes": 14683610,
+      "sha256": "1d4dd82a05cc3e8e2d38d209104deaa1fbe2f7a9daf547d475e152314f59ea18"
+    }
+  },
+  "passedEvidenceChecks": 180,
+  "failedEvidenceChecks": [],
+  "checks": [
+    {
+      "name": "expected-workflow-identity-argument-format",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-full-original-guard",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-fixed-base-version-and-baseline",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-dynamic-test-count-and-56XML",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-patch-actual-bytes",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-all-history-actual-bytes",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-complete-historical-inventory",
+      "result": "PASS"
+    },
+    {
+      "name": "function-layer-386-distinct-complete-inputs",
+      "result": "PASS"
+    },
+    {
+      "name": "checkout-input-inventory-386-except-four-restored-payloads",
+      "result": "PASS",
+      "detail": {
+        "present": 382,
+        "absentUnchangedNativePayloads": [
+          "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo",
+          "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo",
+          "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so",
+          "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"
+        ]
+      }
+    },
+    {
+      "name": "checkout-all-available-input-bytes-match-layer",
+      "result": "PASS",
+      "detail": []
+    },
+    {
+      "name": "function-root-only-runtime-payload-change",
+      "result": "PASS"
+    },
+    {
+      "name": "fixed-original-payload-provenance-and23-current-payloads",
+      "result": "PASS"
+    },
+    {
+      "name": "expected-commit-all-source-and-layer-blob-digests",
+      "result": "PASS",
+      "detail": []
+    },
+    {
+      "name": "original-runtime-contract-only-revision-and-start-protocol-preserved",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-files-match-function-inputs",
+      "result": "PASS",
+      "detail": 56
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AdblockSnifferTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AppCrashReportTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationConceptParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationToolsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.BootStartup60Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptRemainingCoverageTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptStateCoverageTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.CoreManagerConcept57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.DocumentPickerSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.JournalReliabilityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.LargeTitleParity59Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.MainLanguageBindingTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NativeConceptScreenshotTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NetworkDiagnosticsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NetworkRecoveryStressTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewHomePanelInteractionTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewUiIntegrationTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewUiShell83Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelActionSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelConceptModelTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelLayoutDefaultsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelModel11Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyNetworkJournalTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyScriptSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootAutostartTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootNetworkRecoveryTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.Runtime146ContractTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RuntimeStartup15Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RuntimeYaml15Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsBackupParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ToastFeedbackTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ToolsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.UI83EditorHistoryTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.UI83ToolsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.WanDetails61Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "unchanged-original487-wrapper-chain-pass",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-function-testcases-zero-failure",
+      "result": "PASS",
+      "detail": {
+        "tests": 545,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ToastFeedbackTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+      "result": "PASS",
+      "detail": {
+        "tests": 49,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 16,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "retained-original51XML-and487-actual-testcases",
+      "result": "PASS"
+    },
+    {
+      "name": "pinned-ec211b9-original-baseline-ZIP-byte-digest",
+      "result": "PASS"
+    },
+    {
+      "name": "every-original487-case-identity-retained",
+      "result": "PASS",
+      "detail": {
+        "original": 487,
+        "actualOriginal": 487,
+        "missing": [],
+        "unexpected": []
+      }
+    },
+    {
+      "name": "function-report-equals-full-original-wrapper-result",
+      "result": "PASS"
+    },
+    {
+      "name": "effective-source-original-integration-proof",
+      "result": "PASS"
+    },
+    {
+      "name": "effective-source-presentationLayer",
+      "result": "PASS",
+      "detail": {
+        "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+        "baseRun": 37211142058,
+        "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+        "changedOrAddedFiles": 68,
+        "protectedRuntimeUnchanged": true
+      }
+    },
+    {
+      "name": "effective-source-controllerAuthenticationLayer",
+      "result": "PASS",
+      "detail": {
+        "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+        "baseRun": 37240041766,
+        "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+        "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+        "changedOrAddedFiles": 17,
+        "runtimePayloadsUnchanged": true,
+        "dependenciesUnchanged": true,
+        "manifestAndPermissionsUnchanged": true,
+        "unchangedOutsideAuthScope": true,
+        "baselineUnitTests": 392,
+        "expectedUnitTests": 422,
+        "newTestCounts": {
+          "ToastFeedbackTest": 6,
+          "ControllerAuthenticationTest": 11,
+          "LegacyControllerCredentialTest": 3,
+          "ControllerReadStateTest": 6,
+          "PanelControllerErrorTest": 4
+        }
+      }
+    },
+    {
+      "name": "effective-source-pdfReferenceLayer",
+      "result": "PASS",
+      "detail": {
+        "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+        "frozenInputs": 332,
+        "homeAndPanelUnchanged": true,
+        "runtimePayloadsUnchanged": true,
+        "manifestDependenciesAndSigningUnchanged": true,
+        "expectedUnitTests": 479
+      }
+    },
+    {
+      "name": "effective-source-toolsIntakeLayer",
+      "result": "PASS",
+      "detail": {
+        "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+        "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+        "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+        "changedOrAddedFiles": 5,
+        "frozenInputs": 374,
+        "homeAndPanelUnchanged": true,
+        "runtimePayloadsUnchanged": true,
+        "manifestDependenciesAndSigningUnchanged": true,
+        "baselineUnitTests": 479,
+        "expectedUnitTests": 487,
+        "newTestCounts": {
+          "tools.ToolsDnsConsentIntakeTest": 5,
+          "tools.ToolsDiagIntakeTest": 3
+        }
+      }
+    },
+    {
+      "name": "effective-source-finalPdfGeometryLayer",
+      "result": "PASS",
+      "detail": {
+        "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+        "changedOrAddedFiles": 4,
+        "frozenInputs": 375,
+        "expectedUnitTests": 487,
+        "exactWholeFilePresentationTransforms": true,
+        "priorLayersUnchanged": true
+      }
+    },
+    {
+      "name": "effective-source-functionFixLayer",
+      "result": "PASS",
+      "detail": {
+        "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+        "patchSha256": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
+        "changedOrAddedFiles": 16,
+        "frozenInputs": 370,
+        "baselineUnitTests": 487,
+        "expectedUnitTests": 545,
+        "expectedTestXmlFiles": 56,
+        "newTestCounts": {
+          "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
+          "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 13,
+          "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
+          "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
+          "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
+        },
+        "allOriginal487TestsPreserved": true,
+        "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+        "runtimePayloadCount": 23
+      }
+    },
+    {
+      "name": "effective-source-proof-no-missing-or-extra-layers",
+      "result": "PASS"
+    },
+    {
+      "name": "consolidation-173-and-current-test-count-zero-failure",
+      "result": "PASS"
+    },
+    {
+      "name": "consolidation-retains-visual-review-limits",
+      "result": "PASS"
+    },
+    {
+      "name": "artifact-all-reported-current-and-frozen-source-digests",
+      "result": "PASS",
+      "detail": {
+        "expectedReportedInputs": 359,
+        "mismatches": []
+      }
+    },
+    {
+      "name": "runtime-report-23-exact-pinned-payloads",
+      "result": "PASS"
+    },
+    {
+      "name": "runtime-report-apk-sha-format",
+      "result": "PASS"
+    },
+    {
+      "name": "ABI-687-zero-missing",
+      "result": "PASS"
+    },
+    {
+      "name": "ABI-runtime-apk-sha-consistent",
+      "result": "PASS"
+    },
+    {
+      "name": "lint-zero-error-fatal",
+      "result": "PASS",
+      "detail": {
+        "Warning": 299,
+        "Hint": 7
+      }
+    },
+    {
+      "name": "APK-manifest-schema",
+      "result": "PASS"
+    },
+    {
+      "name": "APK-manifest-parts-complete",
+      "result": "PASS"
+    },
+    {
+      "name": "APK-metadata-package-and-version",
+      "result": "PASS"
+    },
+    {
+      "name": "APK-fixed-certificate-report",
+      "result": "PASS",
+      "detail": {
+        "reportedCertificateSha256": [
+          "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad"
+        ],
+        "acceptedReportForms": [
+          "Signer #N",
+          "V2 Signer:"
+        ]
+      }
+    },
+    {
+      "name": "APK-manifest-runtime-sha-consistent",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-whole-APK-manifest-byte-verification",
+      "result": "PASS",
+      "detail": {
+        "sha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835",
+        "bytes": 134858259
+      }
+    },
+    {
+      "name": "actual-APK-part-part00.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-part-part01.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-part-part02.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-part-part03.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-part-part04.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-part-part05.bin",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-no-trailing-bytes",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-runtime-report-sha",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-APK-no-duplicate-members",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-lib/arm64-v8a/libhetu_core.so",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-lib/x86_64/libhetu_core.so",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/ADGUARD-LICENSE",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/MIHOMO-LICENSE",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/cnip/hetu-cn-v4.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/cnip/hetu-cn-v6.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/hetu-root.sh",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/hetu-route.sh",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/licenses/lucide.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/licenses/reference-ui-GPL-3.0.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/mihomo-revision.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/mihomo-root/arm64-v8a/mihomo",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/mihomo-root/x86_64/mihomo",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/adaway.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/adguard.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/checksums.sha256",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/china.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/hagezi.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/snapshot.json",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/rules/tracking.txt",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/schema/sing-box-official.json",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/sources.tsv",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-payload-assets/hetu-autostart.sh",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-64-equals59plus5-and21-palettes",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-fixture-and-zero-root-mutations",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-five-auth-checks-match",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-auth-fixture-pass",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-auth-no-health-or-exclusive-retry-claim",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-retry-ready-before-200",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-preference-and-reverse-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-actual401-after-retry",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-actual-authorized200-controller-paths",
+      "result": "PASS",
+      "detail": [
+        "/configs",
+        "/connections",
+        "/providers/proxies",
+        "/proxies",
+        "/rules",
+        "/version"
+      ]
+    },
+    {
+      "name": "api35-owned-nonroot-AOSP-target",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-runner-cleanup-and-KVM-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-owned-emulator-reaped",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-webview-forward-cleanup",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-installed-candidate-version",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-five-distinct-native-webview-frame-bytes",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-64-equals59plus5-and21-palettes",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-fixture-and-zero-root-mutations",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-five-auth-checks-match",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-auth-fixture-pass",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-auth-no-health-or-exclusive-retry-claim",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-retry-ready-before-200",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-preference-and-reverse-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-actual401-after-retry",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-actual-authorized200-controller-paths",
+      "result": "PASS",
+      "detail": [
+        "/configs",
+        "/connections",
+        "/providers/proxies",
+        "/proxies",
+        "/rules",
+        "/version"
+      ]
+    },
+    {
+      "name": "api36-owned-nonroot-AOSP-target",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-runner-cleanup-and-KVM-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-owned-emulator-reaped",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-webview-forward-cleanup",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-installed-candidate-version",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-five-distinct-native-webview-frame-bytes",
+      "result": "PASS"
+    }
+  ],
+  "details": {
+    "functionInputs": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/hetu/updates/v2086-functionfix/inputs.json",
+      "sha256": "796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22",
+      "expectedUnitTests": 545,
+      "expectedTestXmlFiles": 56,
+      "changedOrAddedFiles": 16,
+      "frozenInputs": 370,
+      "completeInputs": 386,
+      "historicalFilesSha256": {
+        "updates/v2082-new-ui/inputs.json": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+        "updates/v2082-new-ui/integration.patch": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+        "updates/v2083-ui-polish/inputs.json": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+        "updates/v2083-ui-polish/ui.patch": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+        "updates/v2084-controller-auth/inputs.json": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+        "updates/v2084-controller-auth/runtime.patch": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+        "updates/v2085-pdf-tools-settings/inputs.json": "46cbff55a3621b544acb10bd72c0fffe1ffd17469bb856630ea32683ae08024f",
+        "updates/v2085-pdf-tools-settings/runtime.patch": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+        "updates/v2085-tools-intake/inputs.json": "7604e646cad209c2fc2a606196d478f76cd41005f5d47ad3e37dbc84ac58339c",
+        "updates/v2085-tools-intake/runtime.patch": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+        "updates/v2085-pdf-final-geometry/inputs.json": "2707c22d2d27110e204777b04eb97223769ca6721c214ea58cbb763c0888c7ce",
+        "updates/v2085-pdf-final-geometry/runtime.patch": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+        ".github/scripts/pdf85_final_transforms.json": "fe4b7fbfb049ba2bf1ec2dca129bdd7c69ace73d2069dcc1e3d01b6a9479626d"
+      }
+    },
+    "unitTests": {
+      "xmlFiles": 56,
+      "actualTestcases": {
+        "tests": 545,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": {
+        "io.github.xgl34222220.hetu.AdblockSnifferTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AppCrashReportTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationConceptParity57Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.BootStartup60Test": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptParity57Test": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptStateCoverageTest": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ControllerAuthenticationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ControllerReadStateTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.DocumentPickerSafetyTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.JournalReliabilityTest": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.LargeTitleParity59Test": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.LegacyControllerCredentialTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.MainLanguageBindingTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NativeConceptScreenshotTest": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NetworkDiagnosticsTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NetworkRecoveryStressTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewHomePanelInteractionTest": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewUiIntegrationTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewUiShell83Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelActionSafetyTest": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelConceptModelTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelControllerErrorTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelModel11Test": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyAdblockExportTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyNetworkJournalTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyScriptSafetyTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootAutostartTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootHealthUpgradeTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootNetworkRecoveryTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.Runtime146ContractTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RuntimeStartup15Test": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RuntimeYaml15Test": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsBackupParity57Test": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsConceptParityTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsPickerParity58Test": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ToastFeedbackTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ToolsConceptParityTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.UI83EditorHistoryTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.UI83ToolsTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.WanDetails61Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "originalCaseIdentitiesChecked": 487,
+      "originalWrapperResult": {
+        "baseline": {
+          "baseline": {
+            "baseline": {
+              "baseline": {
+                "tests": 392,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              "baselineXmlFiles": 42,
+              "authentication": {
+                "tests": 30,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              "authenticationSuites": {
+                "ControllerAuthenticationTest": {
+                  "tests": 11,
+                  "failures": 0,
+                  "errors": 0,
+                  "skipped": 0
+                },
+                "ControllerReadStateTest": {
+                  "tests": 6,
+                  "failures": 0,
+                  "errors": 0,
+                  "skipped": 0
+                },
+                "LegacyControllerCredentialTest": {
+                  "tests": 3,
+                  "failures": 0,
+                  "errors": 0,
+                  "skipped": 0
+                },
+                "PanelControllerErrorTest": {
+                  "tests": 4,
+                  "failures": 0,
+                  "errors": 0,
+                  "skipped": 0
+                },
+                "ToastFeedbackTest": {
+                  "tests": 6,
+                  "failures": 0,
+                  "errors": 0,
+                  "skipped": 0
+                }
+              },
+              "totalTests": 422,
+              "xmlFiles": 47
+            },
+            "newSuites": {
+              "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+                "tests": 49,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              },
+              "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+                "tests": 8,
+                "failures": 0,
+                "errors": 0,
+                "skipped": 0
+              }
+            },
+            "totalTests": 479,
+            "xmlFiles": 49
+          },
+          "newSuites": {
+            "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest": {
+              "tests": 3,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest": {
+              "tests": 5,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            }
+          },
+          "totalTests": 487,
+          "xmlFiles": 51
+        },
+        "newSuites": {
+          "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+            "tests": 13,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+            "tests": 12,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+            "tests": 16,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        "totalTests": 545,
+        "xmlFiles": 56,
+        "allOriginal487TestsPreserved": true
+      }
+    },
+    "sourceProof": {
+      "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+      "baseRun": 37171744564,
+      "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+      "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "baselineFiles": 307,
+      "changedOrAddedFiles": 31,
+      "checkoutMatchesGeneratedSource": true,
+      "historicPatchesAppliedToCheckout": false,
+      "presentationLayer": {
+        "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+        "baseRun": 37211142058,
+        "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+        "changedOrAddedFiles": 68,
+        "protectedRuntimeUnchanged": true
+      },
+      "controllerAuthenticationLayer": {
+        "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+        "baseRun": 37240041766,
+        "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+        "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+        "changedOrAddedFiles": 17,
+        "runtimePayloadsUnchanged": true,
+        "dependenciesUnchanged": true,
+        "manifestAndPermissionsUnchanged": true,
+        "unchangedOutsideAuthScope": true,
+        "baselineUnitTests": 392,
+        "expectedUnitTests": 422,
+        "newTestCounts": {
+          "ToastFeedbackTest": 6,
+          "ControllerAuthenticationTest": 11,
+          "LegacyControllerCredentialTest": 3,
+          "ControllerReadStateTest": 6,
+          "PanelControllerErrorTest": 4
+        }
+      },
+      "pdfReferenceLayer": {
+        "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+        "frozenInputs": 332,
+        "homeAndPanelUnchanged": true,
+        "runtimePayloadsUnchanged": true,
+        "manifestDependenciesAndSigningUnchanged": true,
+        "expectedUnitTests": 479
+      },
+      "toolsIntakeLayer": {
+        "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+        "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+        "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+        "changedOrAddedFiles": 5,
+        "frozenInputs": 374,
+        "homeAndPanelUnchanged": true,
+        "runtimePayloadsUnchanged": true,
+        "manifestDependenciesAndSigningUnchanged": true,
+        "baselineUnitTests": 479,
+        "expectedUnitTests": 487,
+        "newTestCounts": {
+          "tools.ToolsDnsConsentIntakeTest": 5,
+          "tools.ToolsDiagIntakeTest": 3
+        }
+      },
+      "finalPdfGeometryLayer": {
+        "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+        "changedOrAddedFiles": 4,
+        "frozenInputs": 375,
+        "expectedUnitTests": 487,
+        "exactWholeFilePresentationTransforms": true,
+        "priorLayersUnchanged": true
+      },
+      "functionFixLayer": {
+        "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+        "patchSha256": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
+        "changedOrAddedFiles": 16,
+        "frozenInputs": 370,
+        "baselineUnitTests": 487,
+        "expectedUnitTests": 545,
+        "expectedTestXmlFiles": 56,
+        "newTestCounts": {
+          "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
+          "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 13,
+          "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
+          "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
+          "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
+        },
+        "allOriginal487TestsPreserved": true,
+        "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+        "runtimePayloadCount": 23
+      }
+    },
+    "payloadReport": {
+      "expected": {
+        "lib/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+        "lib/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+        "assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+        "assets/cnip/hetu-cn-v4.txt": "88ea1e3bc89ee5966cc66cb2b6b7b8c4993a84bcfa04fe880750e1ec6bae0fa9",
+        "assets/cnip/hetu-cn-v6.txt": "4a3cccf5497148a20a24df381db0ef1a9d114a27441e29b04246f06fc349f03b",
+        "assets/hetu-root.sh": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+        "assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
+        "assets/licenses/lucide.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+        "assets/licenses/reference-ui-GPL-3.0.txt": "b276bbecaa68377ce9fae470024428aaf90d4b395fee090752d19debab9c7bee",
+        "assets/mihomo-revision.txt": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+        "assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+        "assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+        "assets/rules/adaway.txt": "8c925c37a5eaa5e1c582c76e12301797861addee5ad0fa0e6e46c9dd0136fe55",
+        "assets/rules/adguard.txt": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+        "assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
+        "assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
+        "assets/rules/hagezi.txt": "8846bfdda6fc630d81d2c10181cadc451f099cb7b32474682fc2122b7430cc53",
+        "assets/rules/snapshot.json": "799e1341e6df634a71cb487a11ff9b6847c628310b4f1810c1eeab6f4666cd72",
+        "assets/rules/tracking.txt": "4dd3290bb52e2975f556c33adf081b3430f4e0dc8a75af9841c48def524444c9",
+        "assets/schema/sing-box-official.json": "641f9bb28af79e014afe8a781140b40d357c7adf8fcb5fe5e23b7971a62fa52d",
+        "assets/sources.tsv": "13779a44e0f5493d0f9923eeb341cd496327a068a622751906bdedbe3ccaf420",
+        "assets/hetu-autostart.sh": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+      },
+      "originalPayloadCount": 22,
+      "editedPayloads": [
+        "assets/hetu-root.sh"
+      ],
+      "addedPayloads": [
+        "assets/hetu-autostart.sh"
+      ],
+      "apkVerified": true,
+      "apkSha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835"
+    },
+    "ABI": {
+      "apkSha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835",
+      "dexCount": 12,
+      "constructorReferences": 687,
+      "missingConstructors": [],
+      "compatible": true,
+      "expectedIncompatibleBaseline": false
+    },
+    "lintSeverities": {
+      "Warning": 299,
+      "Hint": 7
+    },
+    "APKManifest": {
+      "schema": 1,
+      "apkName": "Hetu-0.12.16-v20-fix.apk",
+      "apkBytes": 134858259,
+      "apkSha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835",
+      "chunkBytes": 25165824,
+      "partCount": 6,
+      "parts": [
+        {
+          "index": 0,
+          "name": "part00.bin",
+          "bytes": 25165824,
+          "sha256": "fd7cde3f92ba313efa0e0e26c2533dbd8af5d5057bb62b7378489a8c1790b652"
+        },
+        {
+          "index": 1,
+          "name": "part01.bin",
+          "bytes": 25165824,
+          "sha256": "4472dbfa473d1bc22a9cb4f395b6254238bb6443d3be4d1567806e0a6e83f9f4"
+        },
+        {
+          "index": 2,
+          "name": "part02.bin",
+          "bytes": 25165824,
+          "sha256": "b5775390f17e8481e700a5e59ce7824892a524242ef37be2716fe7c9a4a471d3"
+        },
+        {
+          "index": 3,
+          "name": "part03.bin",
+          "bytes": 25165824,
+          "sha256": "544c9213b14adaacf5d0e48c5f8d26c8a147ac4562985969dcaaac74cd03c2db"
+        },
+        {
+          "index": 4,
+          "name": "part04.bin",
+          "bytes": 25165824,
+          "sha256": "91419fbefdbfe65cb61df78064f6c55394fa774d7e40cae784212494b412104a"
+        },
+        {
+          "index": 5,
+          "name": "part05.bin",
+          "bytes": 9029139,
+          "sha256": "7f0169816192f99a027cb7e50a0596a1d860716cbaddff046d39faf4e2a8192b"
+        }
+      ]
+    },
+    "actualAPK": {
+      "path": "/workspace/scratch/ffcd4c4ec4d2/deliverables/Hetu-v20.86-function-c7096ea.apk",
+      "sha256": "91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835",
+      "bytes": 134858259,
+      "pinnedPayloads": 23
+    },
+    "api35": {
+      "checksPassed": 64,
+      "paletteCasesPassed": 21,
+      "authorizationPaths200": [
+        "/configs",
+        "/connections",
+        "/providers/proxies",
+        "/proxies",
+        "/rules",
+        "/version"
+      ],
+      "requests401": 15,
+      "requests200": 19,
+      "target": {
+        "avd": "hetu-smoke",
+        "apiLevel": 35,
+        "ownedSession": "33b2739dc04347ab83aa6467fc0d6b67",
+        "runnerPid": 2598,
+        "launcherPid": 2612,
+        "launcherStartTicks": 51023,
+        "supervisorPid": 2614,
+        "emulatorPids": [
+          2615
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      },
+      "runner": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      },
+      "cleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2615,
+        "returncode": 0
+      },
+      "frameHashes": {
+        "reference-03B-040-native-overview.png": "1dec7b3a61117de70b663ceaf75f64d3f1afa96d8e5eec83f53040d0537323e6",
+        "reference-03B-041-native-groups.png": "e803c60facfae56ac1a13a12cf4c65c7ea92586d8680323ad60228ecf3738805",
+        "reference-03B-042-native-connections.png": "e7dae5ecfac02e60a47e5e277e31a6eded6da9ba7fa2271a1825fdf9a6743885",
+        "reference-03B-043-native-node-dialog.png": "2d18d43b1ca998ea0bd02d50511f8deed818afc1f42ba1cbea6143fca127442d",
+        "reference-03B-044-native-switch-failure.png": "b01ec80a6b6415be385337dbffec4ce20ddbde0010934a42f0e354b8d9759437"
+      }
+    },
+    "api36": {
+      "checksPassed": 64,
+      "paletteCasesPassed": 21,
+      "authorizationPaths200": [
+        "/configs",
+        "/connections",
+        "/providers/proxies",
+        "/proxies",
+        "/rules",
+        "/version"
+      ],
+      "requests401": 15,
+      "requests200": 19,
+      "target": {
+        "avd": "hetu-smoke",
+        "apiLevel": 36,
+        "ownedSession": "196130fb26924f0887c8441aec95edd8",
+        "runnerPid": 2377,
+        "launcherPid": 2391,
+        "launcherStartTicks": 20279,
+        "supervisorPid": 2393,
+        "emulatorPids": [
+          2394
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      },
+      "runner": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      },
+      "cleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2394,
+        "returncode": 0
+      },
+      "frameHashes": {
+        "reference-03B-040-native-overview.png": "d6403c46b77c56a7c2bb5d4a2414fda751d1c261ac21654ec649eca3c9574935",
+        "reference-03B-041-native-groups.png": "8ca03be6df4bc39ce47f65534109eceef89679db95671ec6d31d80294935eabf",
+        "reference-03B-042-native-connections.png": "bfd2a144bca0802a8614ed9be717782f59bc1c195b6dee76750c3e5213d16322",
+        "reference-03B-043-native-node-dialog.png": "186813c2fbb7dca2bc1e1a6d947b37818dfdc4b400ee38471b53cfcbcc3e5336",
+        "reference-03B-044-native-switch-failure.png": "d53a59bb5b40c2eab1cf718538a280fcf209df3799162ff34940e9069b4828dc"
+      }
+    }
+  },
+  "notExecuted": [
+    "Rehash all 386 effective-source tarball members: no source-tar argument supplied; source guards and reported hashes are not a tarball rehash.",
+    "Cryptographic apksigner verification on actual APK is not run by this Python verifier; fixed certificate report is checked, not substituted for cryptographic verification.",
+    "GitHub provider/run/head/attempt ownership is not verified by this offline script. Expected identity arguments must be bound to actual CI API responses by the caller.",
+    "Real-phone Root networking, Google Play account authentication, long-running stability and exhaustive bug absence are not verified by fixture artifacts."
+  ]
+}

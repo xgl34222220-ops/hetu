@@ -1,4 +1,18 @@
-# V20.86 功能修复（进行中，未验收）
+# V20.86 功能修复（已完成隔离验收）
+
+## 已完成：c7096ea 独立 CI、545项及双 API 验收
+
+本轮受测应用 c7096ea25cf1e150a1297859f8ec53d137327c47 / Actions37381538358 attempt1 整轮 completed/success，四个自己的job全部success；build112004483283、历史崩溃对照112004483856、当前API35安装112009969762、API36安装112009969868。严格对应本次源，7b8/3b68原失败及274/ec旧成功均保留，不替代本次验收。
+
+实际56份原XML545项、0失败/错误/跳过。原51XML487项的全部用例身份逐个与真实ec成功ZIP核对一致；新增58项为策略展开4、代理探测13、订阅12、fake-IP13、请求归属16。完整180项交付核验PASS，另限定UI/源码170项独立复核PASS（两者重合，不相加）。CI实际386有效输入重建一致，16变更/370冻结、六历史层原字节不变；本地382与四个原native缺失边界仍明确。687构造ABI零缺失、lint Error/Fatal0、299Warning/7Hint、23载荷及固定签名通过；原22项载荷清单完整保留，其中Root脚本按本轮修复替换，其余21项与自启字节保持。
+
+API35/36各实际64=59导航+5控制器认证及21配色，Root mutation0。401先读、重试入口在200前可用、恢复200、Bearer六路径实HTTP200、原偏好/forward/reverse/KVM/模拟器PID/session清理和隔离安全门禁均通过。前台轮询存在，不将200独占归因于重试按钮；控制器认证不等于Google帐号认证。
+
+真实APK六ZIP、六part及整包逐SHA核验，双方独立重组一致：134858259字节，SHA256 91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835。交付文件 Hetu-v20.86-function-c7096ea.apk 已准备并保存，versionCode2086/versionName0.12.16-v20-fix。自己的build日志直接记录apksigner验证及固定证书701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad，并绑定同一整包SHA；离线Python不冒称重新执行apksigner。10实际下载ZIP逐provider digest、run/head绑定均通过；94MB完整源归档未在本地下载/重哈希，CI386证明及Git源/实际APK载荷分别核验，不伪称本地完整源归档验收。
+
+覆盖安装后点击一次代理「重启」应用部署revision152及新Root脚本；未强停用户核心、未操作用户设备/帐号或清数据、无hook、未合并main或正式发布。此轮确认的源码缺陷及隔离回归已完成；真实GooglePlay账号认证、真机Root/OEM切网、长期稳定性与未知缺陷不存在仍未验证，不能把截图的唯一根因或手机修复写成已确定。
+
+本次完整交付报告 docs/qa/20261006-v2086-c7096ea-delivery-independent.json SHA256 15fb9c8b0e6d538e1fd7de6094243b44ad3c1096f50fbd4f498ece06a5096cac；真实provider绑定 docs/qa/20261006-v2086-c7096ea-provider-binding.json；独立UI报告 docs/qa/20261006-v2086-c7096ea-ui-independent.json。以下是本轮首轮、失败和续验历史，历史未执行陈述不代表上述最终完成状态。
 
 用户于2026-10-06提供Google Play身份验证错误与切换BoxProxy后正常加载的截图，并明确要求修复功能缺陷及策略组展开上跳。继续原仓库 `xgl34222220-ops/hetu`、原分支 `test/v20.76-new-ui`，本轮基底 `1dbe40cc4e312c230524092dfe32a2c6cfb5f25d`，Android树与PDF候选274aa0d相同。原PDF运行37366522056保留，不取消、不重复实现其四处呈现改动。原工具接入ec211b9的487项成功只属于其自身源码。
 
@@ -50,3 +64,5 @@
 恢复后沿真实调用链复审确认批量缺口：快节点已取得结果、慢节点仍阻塞时成功切换节点或刷新订阅，慢节点的旧身份异常被当作无测量保留，整波却能返回先前快节点结果；VM的运行身份没有私有mutation epoch，会接纳该旧map并刷新时间戳。因此在measureSnapshot与非Selector groupDelay的整波返回前各追加一次现有身份检查。身份未变时保留同批成功及明确超时/失败；身份改变时整波拒绝发布。新增一个真实HTTP快/慢阻塞用例分别验证global与非Selector group，原12测试完整保留，Probe共13。下一最终目标原487+58=545项/56XML；上文544与a980报告是该追加修复前的待验候选，仅保留其历史实物host事实，不能验证新增批量检查。
 
 最终batch候选67host已全部通过且层逐字节复现：patch ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a、inputs 796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22；545/56，local382/required386。独立报告 docs/qa/20261006-v2086-batch-epoch-source-host-proof.json SHA49f1cc67cf4deb944141f4735f98c37c4cbc5d4a3012118f187a1e0c704aad27。此时新Android验收仍未执行。
+
+本次API独立追加复核75/75通过：docs/qa/20261006-v2086-c7096ea-api-independent.json SHA24e237656113b21f380ca78ba32451353bf3abda4b2ebb1c0b76deb7028da0d4。每API34请求（15×401/19×200），200六路径configs/proxies/providers-proxies/connections/rules/version计数3/3/8/3/1/1，首retry后仍有4×401；恢复与fixture切换/后续retry、前台poll的阶段分别记录，不写独占恢复。各63实PNG/394×852核验；启动前AVD副本与live preflight config的不同阶段SHA、既有host privileged supervisor与guest non-root、偏好/reverse清理receipt边界不冒称离线活体复测。本报告与其他复核重合，不相加，真实Google验证仍false。

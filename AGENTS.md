@@ -1,3 +1,9 @@
+## 本轮功能收口：c7096ea 新545/56与双API安装均通过，APK已保存
+
+截至2026-10-05T22:51:44.426776+00:00，原test/v20.76-new-ui受测应用c7096ea25cf1e150a1297859f8ec53d137327c47 /run37381538358 attempt1整体completed/success，自己的build/历史对照/API35/API36四jobs全success。实际56XML545项零失败/错误/跳过，原487身份逐一保留、新58执行；386完整CI输入/16变化/370冻结、六历史层原SHA、23载荷（原22项清单保留，除Root脚本外21项及自启字节保持）、687ABI零缺失、lint0 Error/Fatal/299Warn7Hint及固定签名通过。本地382及未本地重哈希94MB源归档边界不冒称完整。完整交付180检查PASS、UI170另核非相加；真实MCP run/head/job和10实际ZIP摘要另绑，不以离线调用参数自证producer。
+
+两API各64=59+auth5、21palette、Root mutation0、401→enabledretrybefore200→200、Bearer六路径实200、偏好/端口/KVM/PID/session隔离清理通过；前台poll存在，不能独占归因按钮，不能当Google验证。真实六part APK134858259 bytes/SHA91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835已核验并保存交付。覆盖安装后用户点一次代理「重启」部署revision152。未操作手机/帐号/清数据/no hook/未合并main或正式发布；真实Google唯一根因与真机修复仍未验证，不保证未知缺陷全部不存在。详情docs/FUNCTION_FIX_20261006.md及c7096ea四份独立/producer QA证据。7b8/3b68原失败、其他PDF任务全部证据/成功、原功能/设计/权限/签名/历史层继续保留。下文待验状态是此前历史。
+
 ## 最终功能候选：整波返回前身份检查，目标545/56
 
 已确认成功PUT时批量快结果/慢阻塞的迟到map会被VM接纳，measureSnapshot及非Selector groupDelay返回前各补现有identity guard；原稳定身份partial成功继续保留。追加1真实HTTP测试覆盖global/group两条路径，Probe原12完整保留共13，新增58/原487总545、56XML。此前544/a980报告对应该追加前候选，保留历史事实但不代替新源验收；等待新层/67host与自己的新CI。其余所有前述授权及保留边界保持，不扩大review、不取消旧CI。
