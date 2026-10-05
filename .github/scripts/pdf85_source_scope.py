@@ -67,14 +67,14 @@ def validate_shared_page(before,after):
 
 
 def validate_webui_reference_header(before,after):
-    """Only the tools WebUI status placement; API/auth/error/pending logic unchanged."""
-    extra = '.endpoint{display:flex;align-items:center;justify-content:center;gap:4px}\n.status.in-proxies:not(.error),.status.in-connections:not(.error){position:static;border:0;background:none;padding:0;gap:0}\n.status.in-proxies:not(.error) #status-label,.status.in-connections:not(.error) #status-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}\n.status.in-proxies:not(.error) .mark{width:10px;height:10px}.status.in-proxies:not(.error) .mark:after{font-size:8px;line-height:10px}\n.status.in-connections:not(.error){order:-1}.status.in-connections:not(.error) .mark{width:7px;height:7px}.status.in-connections:not(.error) .mark:after{content:none}\n'
+    """Tools WebUI status/glyph and PDF44 notice footer only; behavior stays exact."""
+    extra = '.endpoint{display:flex;align-items:center;justify-content:center;gap:4px}\n.status.in-proxies:not(.error),.status.in-connections:not(.error){position:static;border:0;background:none;padding:0;gap:0}\n.status.in-proxies:not(.error) #status-label,.status.in-connections:not(.error) #status-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}\n.status.in-proxies:not(.error) .mark{width:10px;height:10px}.status.in-proxies:not(.error) .mark:after{font-size:8px;line-height:10px}\n.status.in-connections:not(.error){order:-1}.status.in-connections:not(.error) .mark{width:7px;height:7px}.status.in-connections:not(.error) .mark:after{content:none}\n#notice .dialog-footer{padding:3px 13px}\n'
     old = '<div><h1>河图 WebUI</h1><small id="backend">127.0.0.1:__PORT__</small></div><div id="status" class="status" role="status"><span class="mark"></span><span id="status-label">连接中</span></div>'
     new = '<div><h1>河图 WebUI</h1><div class="endpoint"><small id="backend">127.0.0.1:__PORT__</small><div id="status" class="status" role="status"><span class="mark"></span><span id="status-label">连接中</span></div></div></div>'
     render = ' const statusView=document.getElementById("status");\n statusView.classList.toggle("in-proxies",current==="proxies");statusView.classList.toggle("in-connections",current==="connections");\n'
     expected=before.replace('.tabs{display:grid;',extra+'.tabs{display:grid;',1).replace(old,new,1).replace('function render(){\n','function render(){\n'+render,1)
     expected=expected.replace("type==='Fallback'?'shield':'layers'", "type==='Fallback'?(['AI 稳定','AI稳定'].includes(name)?'bolt':'shield'):'layers'",1)
-    assert old in before and after==expected, 'Only reference WebUI status and named group glyph presentation may change'
+    assert old in before and after==expected, 'Only reference WebUI status, named group glyph and notice footer presentation may change'
 
 
 NATIVE_SUBTITLE_HELPER = '    private TextView settingsSubtitle(String value){\n        return settingsSubtitle(value,14);\n    }\n\n    private TextView settingsSubtitle(String value,float size){\n        TextView text=u.text(value,size,u.muted,false);\n        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.P)text.setTypeface(android.graphics.Typeface.create(text.getTypeface(),600,false));\n        else text.setFontVariationSettings("\'wght\' 600");\n        return text;\n    }\n\n'

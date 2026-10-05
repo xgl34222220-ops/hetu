@@ -1114,11 +1114,11 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                             enabled = on
                         }
                     }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted,
-                        subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)
+                        subtitleFontSizeSp = 13f, rowMinHeight = 71.dp)
                     SettingsDivider()
-                    SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
+                    SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true, rowMinHeight = 63.dp) { picker = "refresh" to -1 }
                     SettingsDivider()
-                    SettingsNavRow("点击通知打开", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true) {
+                    SettingsNavRow("点击通知打开", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true, rowMinHeight = 60.dp) {
                         picker = "target" to -1
                     }
                 }

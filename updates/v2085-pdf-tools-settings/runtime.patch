@@ -183,10 +183,10 @@ index 3f7ba83..33bfa6e 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
-index 5581d10..17c3223 100644
+index 5581d10..a155c6d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
-@@ -103,6 +103,11 @@ main{max-width:900px;margin:auto;padding:0 14px calc(20px + env(safe-area-inset-
+@@ -103,6 +103,12 @@ main{max-width:900px;margin:auto;padding:0 14px calc(20px + env(safe-area-inset-
  header{height:88px;position:relative;display:flex;align-items:center;justify-content:center;text-align:center;margin-bottom:5px}h1{font-size:22px;line-height:28px;margin:0;font-weight:750}header small{display:block;color:var(--muted);font-size:12.5px;line-height:18px}
  .back{position:absolute;left:-5px;top:22px;width:40px;height:44px;display:grid;place-items:center;color:var(--text);text-decoration:none}.back svg{width:23px;height:23px}
  .status{position:absolute;right:0;top:28px;display:flex;align-items:center;gap:4px;border:1px solid #b4dfd0;border-radius:999px;padding:4px 7px;color:#269f7b;background:#edf9f4;font-size:10px;line-height:15px;font-weight:650}.status .mark{border-radius:50%;background:currentColor;width:15px;height:15px;position:relative}.status .mark:after{content:'✓';position:absolute;inset:0;color:white;text-align:center;font-size:11px;line-height:15px}.status.error{color:var(--red);border-color:var(--red);background:var(--surface)}.status.error .mark:after{content:'!'}
@@ -195,10 +195,11 @@ index 5581d10..17c3223 100644
 +.status.in-proxies:not(.error) #status-label,.status.in-connections:not(.error) #status-label{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 +.status.in-proxies:not(.error) .mark{width:10px;height:10px}.status.in-proxies:not(.error) .mark:after{font-size:8px;line-height:10px}
 +.status.in-connections:not(.error){order:-1}.status.in-connections:not(.error) .mark{width:7px;height:7px}.status.in-connections:not(.error) .mark:after{content:none}
++#notice .dialog-footer{padding:3px 13px}
  .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 1px 12px}.tabs button{border:1px solid #d1d7ee;border-radius:14px;padding:10px 8px;background:#e7eafb;color:var(--muted);font-size:15px;line-height:18px;font-weight:650}.tabs button.active{background:var(--surface);color:var(--text)}
  .card{background:var(--surface);border-radius:20px;margin-bottom:12px;overflow:hidden}.metric{display:flex;align-items:center;min-height:80px;padding:17px 18px;gap:26px}.glyph{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
  .title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:14px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:14.5px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:13px;line-height:18px;font-weight:650}
-@@ -116,7 +121,7 @@ dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);w
+@@ -116,7 +122,7 @@ dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);w
  </head>
  <body>
  <main>
@@ -207,7 +208,7 @@ index 5581d10..17c3223 100644
  <nav class="tabs" aria-label="面板页面"><button data-tab="overview" class="active" aria-selected="true">概览</button><button data-tab="proxies" aria-selected="false">策略组</button><button data-tab="connections" aria-selected="false">连接</button></nav>
  <section id="content"><div class="card"><div class="empty">正在连接 Mihomo 控制器…</div></div></section>
  </main>
-@@ -143,6 +148,8 @@ async function refresh(){
+@@ -143,6 +149,8 @@ async function refresh(){
  function groups(){const p=(cache.proxies&&cache.proxies.proxies)||{};return Object.entries(p).filter(([,v])=>Array.isArray(v.all)&&v.all.length)}
  function metric(symbol,label,value){return '<div class="card metric">'+icon(symbol)+'<div><div class="title">'+label+'</div><div class="sub">'+esc(value)+'</div></div></div>'}
  function render(){
@@ -216,7 +217,7 @@ index 5581d10..17c3223 100644
   const content=document.getElementById("content");
   if(!connected){content.innerHTML='<div class="card"><div class="empty error">'+(lastError?'控制器未连接：'+esc(lastError):'正在连接 Mihomo 控制器…')+(lastError?'<button class="retry" id="retry">重试</button>':'')+'</div></div>';const retry=document.getElementById("retry");if(retry)retry.onclick=refresh;return;}
   const c=cache.connections||{},gs=groups();
-@@ -150,7 +157,7 @@ function render(){
+@@ -150,7 +158,7 @@ function render(){
    const raw=cache.version?.version,version=raw?(String(raw).toLowerCase().startsWith('mihomo')?raw:'Mihomo '+raw):'—';
    content.innerHTML=metric('cube','核心版本',version)+metric('link','当前连接',(c.connections||[]).length)+metric('layers','策略组',gs.length)+metric('traffic','累计流量','↑ '+fmt(c.uploadTotal)+' · ↓ '+fmt(c.downloadTotal));
   }else if(current==="proxies"){
@@ -1427,7 +1428,7 @@ index ddc05df..1d8602b 100644
                      }
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..c6bd3ea 100644
+index b68a65b..5c92504 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -1566,16 +1567,22 @@ index b68a65b..c6bd3ea 100644
          title = "通知详细设置",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
-@@ -1106,7 +1113,8 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1106,11 +1113,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          } else {
                              enabled = on
                          }
 -                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted)
 +                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted,
-+                        subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)
++                        subtitleFontSizeSp = 13f, rowMinHeight = 71.dp)
                      SettingsDivider()
-                     SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
+-                    SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
++                    SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true, rowMinHeight = 63.dp) { picker = "refresh" to -1 }
                      SettingsDivider()
+-                    SettingsNavRow("点击通知打开", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true) {
++                    SettingsNavRow("点击通知打开", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true, rowMinHeight = 60.dp) {
+                         picker = "target" to -1
+                     }
+                 }
 @@ -1171,6 +1179,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  presentation = HxChoicePresentation.Notification,
                  title = "点击通知打开",
@@ -1585,7 +1592,7 @@ index b68a65b..c6bd3ea 100644
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index 97cc0f0..6493aad 100644
+index 97cc0f0..ebd1beb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 @@ -21,17 +21,23 @@ import androidx.compose.foundation.verticalScroll
@@ -1661,33 +1668,36 @@ index 97cc0f0..6493aad 100644
          iconTint = if (ok) c.good else c.t3,
          subtitle = detail, compact = true,
      )
-@@ -223,14 +232,18 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
+@@ -223,14 +232,20 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
  private fun LevelCard(state: ToolsAdblockState, idle: Boolean, onLevelChange: (ToolsAdLevel) -> Unit) {
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
 -        ToolsCardTitle("拦截强度")
-+        ToolsCardTitle("拦截强度", minHeight = 42.dp, topPadding = 0.dp)
-         Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
 -            HomeSegmented<ToolsAdLevel?>(
 -                options = ToolsAdLevel.entries.map { it to it.label },
 -                selected = state.level,
 -                onSelect = { if (it != null) onLevelChange(it) },
 -                enabled = idle,
 -            )
++        ToolsCardTitle("拦截强度", minHeight = 49.dp, topPadding = 6.dp)
++        Column(Modifier.padding(start = 15.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
 +            CompositionLocalProvider(LocalHomeColors provides c.copy(surface = if (c.dark) c.sunken else Color(0xFFF1F1FB))) {
 +                HomeSegmented<ToolsAdLevel?>(
 +                    options = ToolsAdLevel.entries.map { it to it.label },
 +                    selected = state.level,
 +                    onSelect = { if (it != null) onLevelChange(it) },
 +                    enabled = idle,
-+                    referenceVisualInset = 3.5.dp,
-+                    referenceOuterPadding = 2.dp,
++                    referenceVisualInset = 4.5.dp,
++                    referenceOuterPadding = 6.dp,
++                    referenceVisualHeight = 42.dp,
++                    referenceTouchHeight = 47.dp,
 +                )
 +            }
              Text(state.note, color = c.t2, style = HomeType.note)
          }
      }
-@@ -241,18 +254,20 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
+@@ -241,18 +256,20 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
          ToolsCardTitle("规则源") {
@@ -1710,7 +1720,7 @@ index 97cc0f0..6493aad 100644
      }
  }
  
-@@ -260,12 +275,12 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
+@@ -260,12 +277,12 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
  private fun DomainCard(title: String, addLabel: String, domains: List<String>, idle: Boolean, onAdd: () -> Unit, onRemove: (String) -> Unit) {
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
@@ -1726,7 +1736,7 @@ index 97cc0f0..6493aad 100644
              }
          }
      }
-@@ -278,13 +293,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
+@@ -278,13 +295,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
  @Composable
  internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
@@ -1744,7 +1754,7 @@ index 97cc0f0..6493aad 100644
          }
      }
  }
-@@ -305,9 +320,9 @@ internal fun ToolsAddDomainDialogCard(
+@@ -305,9 +322,9 @@ internal fun ToolsAddDomainDialogCard(
      ToolsDialogCard(
          title = if (overlay.allow) "添加白名单" else "添加黑名单",
          text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
@@ -1756,7 +1766,7 @@ index 97cc0f0..6493aad 100644
  }
  
  /** Page 49: reached by tapping a row of 最近拦截. */
-@@ -315,10 +330,10 @@ internal fun ToolsAddDomainDialogCard(
+@@ -315,10 +332,10 @@ internal fun ToolsAddDomainDialogCard(
  internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      ToolsDialogCard(
@@ -1888,7 +1898,7 @@ index 6125191..b3c1459 100644
      )
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..ab730da 100644
+index e3bff78..3f759f1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 @@ -8,19 +8,25 @@ import io.github.xgl34222220.hetu.hxPressScale
@@ -2039,7 +2049,7 @@ index e3bff78..ab730da 100644
      }
  }
  
-@@ -267,26 +290,65 @@ internal fun ToolsField(
+@@ -267,26 +290,67 @@ internal fun ToolsField(
      monospace: Boolean = false,
      readOnly: Boolean = false,
      keyboardType: KeyboardType = KeyboardType.Text,
@@ -2052,6 +2062,8 @@ index e3bff78..ab730da 100644
 +    inputVerticalPadding: Dp? = null,
 +    errorStyle: TextStyle? = null,
 +    errorSpacing: Dp? = null,
++    errorIcon: ImageVector? = null,
++    errorIconSize: Dp? = null,
  ) {
      val c = LocalHomeColors.current
 -    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -2094,8 +2106,9 @@ index e3bff78..ab730da 100644
          if (error != null) {
 +            if (errorSpacing != null) Spacer(Modifier.height(errorSpacing))
              Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                 Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
+-                Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
 -                Text(error, color = c.bad, style = HomeType.caption)
++                Icon(errorIcon ?: HomeIcons.CircleAlert, null, Modifier.size(errorIconSize ?: 13.dp), tint = c.bad)
 +                Text(error, color = c.bad, style = errorStyle ?: HomeType.caption)
              }
          }
@@ -2112,7 +2125,7 @@ index e3bff78..ab730da 100644
  @Composable
  internal fun ToolsSearchField(
      value: String,
-@@ -313,7 +375,7 @@ internal fun ToolsSearchField(
+@@ -313,7 +377,7 @@ internal fun ToolsSearchField(
          cursorBrush = SolidColor(c.accent),
          decorationBox = { inner ->
              Row(
@@ -2121,7 +2134,7 @@ index e3bff78..ab730da 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(8.dp),
              ) {
-@@ -326,7 +388,11 @@ internal fun ToolsSearchField(
+@@ -326,7 +390,11 @@ internal fun ToolsSearchField(
                      Box(
                          Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
                          contentAlignment = Alignment.Center,
@@ -2134,7 +2147,7 @@ index e3bff78..ab730da 100644
                  }
              }
          },
-@@ -343,11 +409,12 @@ internal fun ToolsEmpty(
+@@ -343,11 +411,12 @@ internal fun ToolsEmpty(
      title: String,
      modifier: Modifier = Modifier,
      subtitle: String? = null,
@@ -2148,7 +2161,7 @@ index e3bff78..ab730da 100644
          Text(ht(title), color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
          if (subtitle != null) Text(subtitle, Modifier.padding(top = 4.dp), color = c.t2, style = HomeType.note, textAlign = TextAlign.Center)
          if (action != null) Box(Modifier.padding(top = 16.dp)) { action() }
-@@ -396,6 +463,7 @@ internal fun ToolsDangerButton(
+@@ -396,6 +465,7 @@ internal fun ToolsDangerButton(
  /* ------------------------------------------------------------------ */
  
  internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
@@ -2156,7 +2169,7 @@ index e3bff78..ab730da 100644
  
  /**
   * The inside of a confirmation dialog: centred title and message, optional form content,
-@@ -411,30 +479,47 @@ internal fun ToolsDialogCard(
+@@ -411,30 +481,47 @@ internal fun ToolsDialogCard(
      modifier: Modifier = Modifier,
      text: String? = null,
      confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
@@ -2223,7 +2236,7 @@ index e3bff78..ab730da 100644
              }
          }
      }
-@@ -456,12 +541,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
+@@ -456,12 +543,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
  
  /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
  @Composable
@@ -2238,7 +2251,7 @@ index e3bff78..ab730da 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
-@@ -469,17 +554,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -469,17 +556,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
              .padding(4.dp),
      ) {
          if (title != null) {
@@ -2259,7 +2272,7 @@ index e3bff78..ab730da 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(10.dp),
              ) {
-@@ -495,7 +580,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -495,7 +582,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
   * Place it inside the Box that wraps the «⋯» button.
   */
  @Composable
@@ -2313,7 +2326,7 @@ index e3bff78..ab730da 100644
      Popup(
          alignment = Alignment.TopEnd,
          offset = IntOffset(0, offsetY),
-@@ -504,3 +634,10 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
+@@ -504,3 +636,10 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
          content = content,
      )
  }
@@ -2545,7 +2558,7 @@ index 8ac0639..d8e467e 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-index 7e58000..b0328ff 100644
+index 7e58000..eaec16f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 @@ -18,7 +18,12 @@ import androidx.compose.ui.Alignment
@@ -2662,13 +2675,15 @@ index 7e58000..b0328ff 100644
              Column(Modifier.weight(1f)) {
                  Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
                  if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
-@@ -259,16 +290,35 @@ internal fun <T> ToolsSegmented(
+@@ -259,17 +290,54 @@ internal fun <T> ToolsSegmented(
      onSelect: (T) -> Unit,
      modifier: Modifier = Modifier,
      enabled: Boolean = true,
 +    icons: Map<T, ImageVector> = emptyMap(),
 +    referenceVisualInset: Dp? = null,
 +    referenceOuterPadding: Dp? = null,
++    referenceVisualHeight: Dp? = null,
++    referenceTouchHeight: Dp? = null,
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -2676,7 +2691,7 @@ index 7e58000..b0328ff 100644
 +    val outerModifier = if (referenceOuterPadding == null)
 +        modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()
 +    else modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(referenceOuterPadding).selectableGroup()
-+    Row(outerModifier) {
++    val optionContent: @Composable RowScope.() -> Unit = {
          options.forEach { (key, label) ->
 -            Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
 +            val itemModifier = if (referenceVisualInset == null) Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
@@ -2693,15 +2708,32 @@ index 7e58000..b0328ff 100644
 +                    .clip(ToolsDesignDims.segmentShape)
 +                    .background(if (selected == key) c.accentSoft else Color.Transparent)
 +                    .padding(vertical = 9.dp - inset)
-+            }
+             }
 +            Box(itemModifier, contentAlignment = Alignment.Center) {
 +                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
 +                    icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }
 +                    Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)
 +                }
-             }
++            }
++        }
++    }
++    if (referenceVisualHeight == null) {
++        Row(outerModifier, content = optionContent)
++    } else {
++        // Keep the PDF-sized track separate from the unchanged larger selectable row.
++        Box(
++            modifier.fillMaxWidth().height(referenceVisualHeight)
++                .background(c.surface, ToolsDesignDims.cardShape).selectableGroup(),
++            contentAlignment = Alignment.Center,
++        ) {
++            Row(
++                Modifier.fillMaxWidth().requiredHeight(referenceTouchHeight ?: 44.dp)
++                    .padding(horizontal = referenceOuterPadding ?: 8.dp),
++                content = optionContent,
++            )
          }
      }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 index 556dff0..77f1c83 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
@@ -3026,7 +3058,7 @@ index a60a9d7..a32893f 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
-index 9b0a4af..fe14046 100644
+index 9b0a4af..78d8102 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 @@ -1,8 +1,9 @@
@@ -3052,7 +3084,7 @@ index 9b0a4af..fe14046 100644
      val Activity: ImageVector by lazy { vector("Activity",
          "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
      ) }
-@@ -198,4 +204,68 @@ internal object ToolsIcons {
+@@ -198,4 +204,78 @@ internal object ToolsIcons {
          "M12 9v4",
          "M12 17h.01",
      ) }
@@ -3119,6 +3151,16 @@ index 9b0a4af..fe14046 100644
 +     */
 +    val AdblockDocumentPdf44: ImageVector by lazy { pdfAdblockSilhouette("AdblockDocumentPdf44", 56f,
 +        "M14,6.5 L15,6.5 L16,6.5 L17,6.5 L18,6.5 L19,6.5 L20,6.5 L21,6.5 L22,6.5 L23,6.5 L24,6.5 L25,6.5 L26,6.5 L27,6.5 L28,6.5 L29,6.5 L30,6.5 L31,6.5 L32,6.5 L33,6.5 L34,6.5 L35,6.5 L36,6.5 L37,6.5 L38,6.5 L39,6.5 L40,6.5 L41,6.5 L41.5,7 L42,7.5 L43,7.5 L43.5,8 L44,8.5 L44.5,9 L45,9.5 L45.5,10 L45.5,11 L46,11.5 L46.5,12 L46.5,13 L46.5,14 L46.5,15 L46.5,16 L46.5,17 L46.5,18 L46.5,19 L46.5,20 L46.5,21 L46.5,22 L46.5,23 L46.5,24 L46.5,25 L46.5,26 L46.5,27 L46.5,28 L46.5,29 L46.5,30 L46.5,31 L46.5,32 L46.5,33 L46.5,34 L46.5,35 L46.5,36 L46.5,37 L46.5,38 L46.5,39 L46.5,40 L46.5,41 L46.5,42 L46.5,43 L46.5,44 L46,44.5 L45.5,45 L45.5,46 L45.5,47 L45,47.5 L44.5,48 L44,48.5 L43.5,49 L43,49.5 L42.5,50 L42,50.5 L41,50.5 L40,50.5 L39.5,51 L39,51.5 L38,51.5 L37,51.5 L36,51.5 L35,51.5 L34,51.5 L33,51.5 L32,51.5 L31,51.5 L30,51.5 L29,51.5 L28,51.5 L27,51.5 L26,51.5 L25,51.5 L24,51.5 L23,51.5 L22,51.5 L21,51.5 L20,51.5 L19,51.5 L18,51.5 L17,51.5 L16,51.5 L15,51.5 L14,51.5 L13.5,51 L13,50.5 L12,50.5 L11.5,50 L11,49.5 L10.5,49 L10,48.5 L9.5,48 L9.5,47 L9,46.5 L8.5,46 L8.5,45 L8.5,44 L8.5,43 L8.5,42 L8.5,41 L8.5,40 L8.5,39 L8.5,38 L8.5,37 L8.5,36 L8.5,35 L8.5,34 L8.5,33 L8.5,32 L8.5,31 L8.5,30 L8.5,29 L8.5,28 L8.5,27 L8.5,26 L8.5,25 L8.5,24 L8.5,23 L8.5,22 L8.5,21 L8.5,20 L8.5,19 L8.5,18 L8.5,17 L8.5,16 L8.5,15 L8.5,14 L8.5,13 L8.5,12 L9,11.5 L9.5,11 L9.5,10 L10,9.5 L10.5,9 L11,8.5 L11.5,8 L12,7.5 L13,7.5 L13.5,7 Z M15,10.5 L14.5,11 L14,11.5 L13.5,12 L13,12.5 L12.5,13 L12.5,14 L12.5,15 L12.5,16 L12.5,17 L12.5,18 L12.5,19 L12.5,20 L12.5,21 L12.5,22 L12.5,23 L12.5,24 L12.5,25 L12.5,26 L12.5,27 L12.5,28 L12.5,29 L12.5,30 L12.5,31 L12.5,32 L12.5,33 L12.5,34 L12.5,35 L12.5,36 L12.5,37 L12.5,38 L12.5,39 L12.5,40 L12.5,41 L12.5,42 L12.5,43 L12.5,44 L12.5,45 L13,45.5 L13.5,46 L14,46.5 L14.5,47 L15,47.5 L16,47.5 L17,47.5 L18,47.5 L19,47.5 L20,47.5 L21,47.5 L22,47.5 L23,47.5 L24,47.5 L25,47.5 L26,47.5 L27,47.5 L28,47.5 L29,47.5 L30,47.5 L31,47.5 L32,47.5 L33,47.5 L34,47.5 L35,47.5 L36,47.5 L37,47.5 L38,47.5 L39,47.5 L39.5,47 L40,46.5 L40.5,46 L41,45.5 L41.5,45 L42,44.5 L42.5,44 L42.5,43 L42.5,42 L42.5,41 L42.5,40 L42.5,39 L42.5,38 L42.5,37 L42.5,36 L42.5,35 L42.5,34 L42.5,33 L42.5,32 L42.5,31 L42.5,30 L42.5,29 L42.5,28 L42.5,27 L42.5,26 L42.5,25 L42.5,24 L42.5,23 L42.5,22 L42.5,21 L42.5,20 L42.5,19 L42.5,18 L42.5,17 L42.5,16 L42.5,15 L42.5,14 L42.5,13 L42.5,12 L42,11.5 L41.5,11 L41,10.5 L40,10.5 L39,10.5 L38,10.5 L37,10.5 L36,10.5 L35,10.5 L34,10.5 L33,10.5 L32,10.5 L31,10.5 L30,10.5 L29,10.5 L28,10.5 L27,10.5 L26,10.5 L25,10.5 L24,10.5 L23,10.5 L22,10.5 L21,10.5 L20,10.5 L19,10.5 L18,10.5 L17,10.5 L16,10.5 Z M19,17.5 L20,17.5 L21,17.5 L22,17.5 L23,17.5 L24,17.5 L25,17.5 L26,17.5 L27,17.5 L28,17.5 L29,17.5 L30,17.5 L31,17.5 L32,17.5 L33,17.5 L34,17.5 L35,17.5 L36,17.5 L36.5,18 L36.5,19 L36.5,20 L36,20.5 L35.5,21 L35,21.5 L34,21.5 L33,21.5 L32,21.5 L31,21.5 L30,21.5 L29,21.5 L28,21.5 L27,21.5 L26,21.5 L25,21.5 L24,21.5 L23,21.5 L22,21.5 L21,21.5 L20,21.5 L19,21.5 L18.5,21 L18,20.5 L17.5,20 L17.5,19 L18,18.5 L18.5,18 Z M27,26.5 L28,26.5 L29,26.5 L30,26.5 L31,26.5 L32,26.5 L33,26.5 L34,26.5 L35,26.5 L35.5,27 L36,27.5 L36.5,28 L36.5,29 L36.5,30 L36,30.5 L35,30.5 L34,30.5 L33,30.5 L32,30.5 L31,30.5 L30,30.5 L29,30.5 L28,30.5 L27,30.5 L26,30.5 L25,30.5 L24,30.5 L23,30.5 L22,30.5 L21,30.5 L20,30.5 L19,30.5 L18.5,30 L18,29.5 L17.5,29 L18,28.5 L18.5,28 L19,27.5 L20,27.5 L21,27.5 L22,27.5 L23,27.5 L24,27.5 L25,27.5 L26,27.5 L26.5,27 Z M19,36.5 L20,36.5 L21,36.5 L22,36.5 L23,36.5 L24,36.5 L25,36.5 L26,36.5 L27,36.5 L28,36.5 L29,36.5 L29.5,37 L29.5,38 L29.5,39 L29,39.5 L28.5,40 L28,40.5 L27,40.5 L26,40.5 L25,40.5 L24,40.5 L23,40.5 L22,40.5 L21,40.5 L20,40.5 L19.5,40 L19,39.5 L18.5,39 L18,38.5 L17.5,38 L18,37.5 L18.5,37 Z", sourceDocumentPage = "03A44",
++    ) }
++
++    /**
++     * Red annulus and positive exclamation traced from PDF03A21 JPEG xref45.
++     * Crop (64,442)-(100,478), R>200/G<130/B<150, unsimplified 0.5 contours.
++     * EvenOdd preserves the white interior; stem and dot remain positive components.
++     * This glyph is PDF-derived, not Lucide, and used only for Add name errors.
++     */
++    val SubscriptionNameErrorPdf21: ImageVector by lazy { pdfAdblockSilhouette("SubscriptionNameErrorPdf21", 36f,
++        "M1.5,14 L2,13.5 L2.5,13 L2.5,12 L2.5,11 L3,10.5 L3.5,10 L3.5,9 L4,8.5 L4.5,8 L5,7.5 L5.5,7 L6,6.5 L6.5,6 L7,5.5 L7.5,5 L8,4.5 L8.5,4 L9,3.5 L10,3.5 L10.5,3 L11,2.5 L12,2.5 L13,2.5 L13.5,2 L14,1.5 L15,1.5 L16,1.5 L17,1.5 L18,1.5 L19,1.5 L20,1.5 L21,1.5 L22,1.5 L23,1.5 L23.5,2 L24,2.5 L25,2.5 L25.5,3 L26,3.5 L27,3.5 L27.5,4 L28,4.5 L28.5,5 L29,5.5 L30,5.5 L30.5,6 L31,6.5 L31.5,7 L31.5,8 L32,8.5 L32.5,9 L33,9.5 L33.5,10 L33.5,11 L34,11.5 L34.5,12 L34.5,13 L34.5,14 L34.5,15 L35,15.5 L35.5,16 L35.5,17 L35.5,18 L35.5,19 L35,19.5 L34.5,20 L34.5,21 L34.5,22 L34.5,23 L34.5,24 L34,24.5 L33.5,25 L33.5,26 L33,26.5 L32.5,27 L32,27.5 L31.5,28 L31.5,29 L31,29.5 L30.5,30 L30,30.5 L29,30.5 L28.5,31 L28,31.5 L27.5,32 L27,32.5 L26,32.5 L25.5,33 L25,33.5 L24,33.5 L23,33.5 L22.5,34 L22,34.5 L21,34.5 L20,34.5 L19,34.5 L18,34.5 L17,34.5 L16,34.5 L15,34.5 L14,34.5 L13,34.5 L12.5,34 L12,33.5 L11,33.5 L10.5,33 L10,32.5 L9,32.5 L8.5,32 L8,31.5 L7.5,31 L7,30.5 L6.5,30 L6,29.5 L5.5,29 L5,28.5 L4.5,28 L4,27.5 L3.5,27 L3.5,26 L3,25.5 L2.5,25 L2.5,24 L2.5,23 L2,22.5 L1.5,22 L1.5,21 L1.5,20 L1.5,19 L1.5,18 L1.5,17 L1.5,16 L1.5,15 L1.5,14 Z M7.5,14 L8,13.5 L8.5,13 L8.5,12 L9,11.5 L9.5,11 L10,10.5 L10.5,10 L11,9.5 L11.5,9 L12,8.5 L13,8.5 L13.5,8 L14,7.5 L15,7.5 L15.5,7 L16,6.5 L17,6.5 L18,6.5 L19,6.5 L19.5,7 L20,7.5 L21,7.5 L22,7.5 L22.5,8 L23,8.5 L24,8.5 L24.5,9 L25,9.5 L25.5,10 L26,10.5 L26.5,11 L27,11.5 L27.5,12 L28,12.5 L28.5,13 L28.5,14 L28.5,15 L29,15.5 L29.5,16 L29.5,17 L29.5,18 L29.5,19 L29.5,20 L29,20.5 L28.5,21 L28.5,22 L28.5,23 L28,23.5 L27.5,24 L27,24.5 L26.5,25 L26,25.5 L25.5,26 L25,26.5 L24.5,27 L24,27.5 L23.5,28 L23,28.5 L22,28.5 L21.5,29 L21,29.5 L20,29.5 L19,29.5 L18,29.5 L17,29.5 L16.5,29 L16,28.5 L15,28.5 L14,28.5 L13.5,28 L13,27.5 L12,27.5 L11.5,27 L11,26.5 L10.5,26 L10,25.5 L9.5,25 L9,24.5 L8.5,24 L8.5,23 L8,22.5 L7.5,22 L7.5,21 L7.5,20 L7.5,19 L7.5,18 L7.5,17 L7.5,16 L7.5,15 L7.5,14 Z M16.5,10 L17,9.5 L18,9.5 L19,9.5 L19.5,10 L20,10.5 L20.5,11 L20.5,12 L20,12.5 L19.5,13 L19.5,14 L19.5,15 L20,15.5 L20.5,16 L20.5,17 L20.5,18 L20,18.5 L19.5,19 L19.5,20 L19,20.5 L18,20.5 L17,20.5 L16.5,20 L16.5,19 L16.5,18 L16.5,17 L16.5,16 L16.5,15 L16.5,14 L16.5,13 L16.5,12 L16.5,11 L16.5,10 Z M16.5,23 L17,22.5 L18,22.5 L19,22.5 L19.5,23 L19.5,24 L19.5,25 L19.5,26 L19,26.5 L18,26.5 L17.5,26 L17,25.5 L16.5,25 L16.5,24 L16.5,23 Z", sourceDocumentPage = "03A21",
 +    ) }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
@@ -3209,7 +3251,7 @@ index 7a05ec8..e0545b4 100644
              )
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
-index c5175b2..e11edaf 100644
+index c5175b2..a840def 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
 @@ -2,12 +2,16 @@ package io.github.xgl34222220.hetu.tools
@@ -3229,7 +3271,7 @@ index c5175b2..e11edaf 100644
  import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
  import io.github.xgl34222220.hetu.home.HomeButtonKind
  import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
-@@ -38,18 +42,27 @@ internal fun ToolsSubscriptionScreen(
+@@ -38,18 +42,29 @@ internal fun ToolsSubscriptionScreen(
      val adding = form.mode is ToolsSubscriptionMode.Add
      ToolsPage(title = if (adding) "添加订阅" else "编辑订阅", onBack = onBack, modifier = modifier) {
          HomeCard(Modifier.fillMaxWidth()) {
@@ -3240,7 +3282,9 @@ index c5175b2..e11edaf 100644
 +                    ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError,
 +                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
 +                        errorStyle = if (form.nameError != null) ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 14.sp, letterSpacing = 0.4.sp) else null,
-+                        errorSpacing = if (form.nameError != null) 3.dp else null)
++                        errorSpacing = if (form.nameError != null) 3.dp else null,
++                        errorIcon = if (form.nameError != null) ToolsIcons.SubscriptionNameErrorPdf21 else null,
++                        errorIconSize = if (form.nameError != null) 17.dp else null)
                  } else {
 -                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。")
 +                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。",
@@ -3261,7 +3305,7 @@ index c5175b2..e11edaf 100644
                      HomeButton("保存", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)
                      HomeButton("取消", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)
                  }
-@@ -62,6 +75,7 @@ internal fun ToolsSubscriptionScreen(
+@@ -62,6 +77,7 @@ internal fun ToolsSubscriptionScreen(
  @Composable
  internal fun ToolsDiscardFormDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      ToolsDialogCard(

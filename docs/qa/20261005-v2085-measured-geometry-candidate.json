@@ -1,0 +1,59 @@
+{
+  "parentApplication": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "candidateOwnBuildAndCaptures": "not executed yet",
+  "literal130PagePixelParityAccepted": false,
+  "changedInputs": 40,
+  "frozenInputs": 332,
+  "totalInputs": 372,
+  "patchSha256": "457dfc776e84529be99af8b1d7f0eecf8c36681e126f755dd5d16e08b1a116e9",
+  "exactReconstructionAll372Inputs": true,
+  "fullSharedDefaultsGuard": true,
+  "fullNativeSettingsCallbackGuard": true,
+  "fullSettingsPickerTestGuard": true,
+  "fullWebuiAuthBehaviorGuard": true,
+  "boundedRootDiagnosticOnlyGuard": true,
+  "manifestDependenciesSigningCoreAndHomePanelFrozen": true,
+  "productionSourceUnchangedExcept": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt"
+  ],
+  "runtimePresentationOnly": "PDF-measured A21 opt-in traced glyph, A44 Level visual frame with preserved47dp touch, B44 notice-only footer, 04/11 three caller row heights; defaults and all callbacks preserved",
+  "testChangesSinceParent": [],
+  "historicalLayers": [
+    {
+      "path": "updates/v2082-new-ui/inputs.json",
+      "sha256": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2082-new-ui/integration.patch",
+      "sha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/inputs.json",
+      "sha256": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/ui.patch",
+      "sha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/inputs.json",
+      "sha256": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/runtime.patch",
+      "sha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "byteEqualHistoricalBase": true
+    }
+  ]
+}

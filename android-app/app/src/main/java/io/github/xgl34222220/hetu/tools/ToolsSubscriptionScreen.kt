@@ -47,7 +47,9 @@ internal fun ToolsSubscriptionScreen(
                     ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError,
                         inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
                         errorStyle = if (form.nameError != null) ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 14.sp, letterSpacing = 0.4.sp) else null,
-                        errorSpacing = if (form.nameError != null) 3.dp else null)
+                        errorSpacing = if (form.nameError != null) 3.dp else null,
+                        errorIcon = if (form.nameError != null) ToolsIcons.SubscriptionNameErrorPdf21 else null,
+                        errorIconSize = if (form.nameError != null) 17.dp else null)
                 } else {
                     ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。",
                         readOnlyValueStyle = ToolsType.readOnlyValue.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),

@@ -1,0 +1,840 @@
+{
+  "schemaVersion": 1,
+  "createdUtc": "2026-10-05T18:06:28.419412+00:00",
+  "status": "IMPLEMENTED_SOURCE_CANDIDATE_NOT_NEW_BUILD_OR_UI_ACCEPTANCE",
+  "baselineApplicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "source_edits_stopped": true,
+  "parentConfirmedScope": "Only these five existing tools sources; no Home/panel/default/business/fixture/CI/layer edits by this agent. Parent will submit one combined batch and run its own fresh acceptance.",
+  "sourceFiles": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+      "ca60825SHA256": "3d286031438b5b6e404127d84ec4d9a18e96a0a45401cba517a1c6045dcedffc",
+      "candidateSHA256": "2a351e7bc775f11ee01da6d944a16429a4bbf7f401e93a5badebdd0fcbed497f",
+      "wholeFileInverseEqualsCa60825": true,
+      "legacyRemainderByteEqual": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+      "ca60825SHA256": "d46342ad474475caf826e9eb742e46e3971e3449f942d0255d7206786aacb5b2",
+      "candidateSHA256": "022b9719d120ae51d59ff3102d3f0a30b54f58a22fc18496841db613c942def9",
+      "wholeFileInverseEqualsCa60825": true,
+      "legacyRemainderByteEqual": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+      "ca60825SHA256": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+      "candidateSHA256": "506ac22816e0cd84a277e609112cd19650499819605ed3c1f4602aad4b3252c5",
+      "wholeFileInverseEqualsCa60825": true,
+      "legacyRemainderByteEqual": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+      "ca60825SHA256": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+      "candidateSHA256": "af5ce76a084b900157203798452e4745d9a383c7092098e4b6c9a52b29a002ec",
+      "wholeFileInverseEqualsCa60825": true,
+      "legacyRemainderByteEqual": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+      "ca60825SHA256": "db63a5968aaf03c3cd19ed47cf186e74797216f77cd511252e6040c6638e07ce",
+      "candidateSHA256": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+      "wholeFileInverseEqualsCa60825": true,
+      "legacyRemainderByteEqual": true
+    }
+  ],
+  "A44SourceMeasurements": {
+    "referencePDF": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+    "referencePDFSHA256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+    "xref": 91,
+    "JPEG_SHA256": "55df2610b74c14c2df003df37825a55dbf7b651e3ad8cc8b275a4243cfa12da6",
+    "JPEG_Size": [
+      850,
+      1850
+    ],
+    "mapping": "PageX=JPEG_X/2;PageY=25+JPEG_Y/2; lengths normalized393/850",
+    "referenceAndCaMeasurement": {
+      "selectedFillReferenceRaw425": [
+        117,
+        40
+      ],
+      "selectedFillReferenceNormalized": [
+        108.19058823529411,
+        36.98823529411764
+      ],
+      "selectedFillNative": [
+        110,
+        39
+      ],
+      "LevelCardReferenceRawHeight": 146,
+      "LevelCardReferenceNormalizedHeight": 135.0070588235294,
+      "LevelCardNativeHeight": 137
+    },
+    "independentCompleteTrackAndTitle": {
+      "trackJPEGbboxExclusive": [
+        62,
+        331,
+        789,
+        422
+      ],
+      "trackNormalizedBBox": [
+        28.665882352941175,
+        153.03882352941176,
+        364.7964705882353,
+        195.1129411764706
+      ],
+      "trackNormalizedSize": [
+        336.1305882352941,
+        42.07411764705882
+      ],
+      "selectedJPEGbboxExclusive": [
+        309,
+        336,
+        542,
+        417
+      ],
+      "selectedNormalizedBBox": [
+        142.86705882352942,
+        155.3505882352941,
+        250.59529411764706,
+        192.80117647058825
+      ],
+      "selectedNormalizedSize": [
+        107.72823529411765,
+        37.45058823529412
+      ],
+      "cardTopJPEGThreshold": "226 transition /227 stable light card surface",
+      "cardTopUsedJPEG": 226,
+      "trackTopMinusCardTopNormalized": 48.54705882352941,
+      "titleJPEGbboxExclusive": [
+        64,
+        271,
+        208,
+        305
+      ],
+      "titleFirstMinusCardTopNormalized": 20.805882352941175,
+      "titleCenterMinusCardTopNormalized": 28.665882352941175,
+      "titleNativeBBoxExclusive": [
+        31,
+        91,
+        102,
+        109
+      ],
+      "titleNativeCardTop": 78,
+      "titleNativeFirstMinusCardTop": 13,
+      "titleNativeCenterMinusCardTop": 22
+    },
+    "nativeCaUnselectedVisualTrack": {
+      "bboxExclusive": [
+        30,
+        120,
+        363,
+        171
+      ],
+      "size": [
+        333,
+        51
+      ]
+    },
+    "measurementsWereActualCaAndPDFNotNewCandidateCapture": true
+  },
+  "A44ImplementedRecipe": {
+    "ToolsCardTitle": "minHeight49dp / topPadding6dp only LevelCard",
+    "LevelBodyPadding": "start15dp / end14dp / bottom14dp",
+    "gap": "10dp unchanged",
+    "newNullableSegmentParams": "referenceVisualHeight:Dp?=null / referenceTouchHeight:Dp?=null",
+    "onlyLevelCallerOverrides": {
+      "referenceVisualHeightDp": 42,
+      "referenceTouchHeightDp": 47,
+      "referenceVisualInsetDp": 4.5,
+      "referenceOuterPaddingDp": 6
+    },
+    "architecture": "One existing options loop is hoisted unchanged into a RowScope content lambda. Null visual-height path uses the identical original outer modifier. Only the new nonnull path creates a42dp background frame without clipping the child and naturally centers a requiredHeight47dp Row, using6dp horizontal padding. No offsets or negative padding.",
+    "hapticsStatesCallbacksAndDefaults": {
+      "sharedOptionLoopByteEqual": true,
+      "sharedOptionLoopSHA256": "a26c19e8c6ff50c0c7c082809e8a9a23530a1913771e091cf1d5f9a178541c90",
+      "legacyOuterRecipesByteEqual": true,
+      "legacyReferenceVisualInsetBranchesByteEqual": true,
+      "minItemHeight44ByteEqual": true,
+      "selectedRoleEnabledCallbackHapticWholeLoopIdentical": true,
+      "onlyNewFrameOptsNamedOnLevelCaller": true,
+      "newRequiredTouchHeight47SourceDeclared": true,
+      "paint42HasBackgroundWithoutEnclosingClip": true,
+      "sourceConstraintProofNotNewNativeTouchAcceptance": true,
+      "noExplicitOffsetOrNegativePaddingAdded": true,
+      "source_edits_stopped": true
+    },
+    "horizontalDerivation": {
+      "mdpiDensityRounding": "14.5dp rounds to15 on each side and would give335px, so actual start15/end14 use measured native card365 to create336px visible width. This is Level-local; global tool/home gutters unchanged.",
+      "framePredictedXExclusive": [
+        29,
+        365
+      ],
+      "PDFFrameNormalizedXExclusive": [
+        28.665882352941175,
+        364.7964705882353
+      ],
+      "innerRow": "336−2×6=324; three existing equal options108 each",
+      "selectedPredictedXExclusive": [
+        143,
+        251
+      ],
+      "PDFSelectedNormalizedXExclusive": [
+        142.86705882352942,
+        250.59529411764706
+      ]
+    },
+    "inversePlan": "Remove only2 nullable params and the new wrapper branch; restore old Row(outerModifier) around the exact shared options body. Restore LevelCard49/top6 to42/top0, body15/14 to16/16, inset4.5 to3.5, outer6 to2, remove visual42/touch47 arguments. Whole files then exactly equal ca60825.",
+    "predictionsOnly": {
+      "visibleTrackSize": [
+        336,
+        42
+      ],
+      "selectedFillSize": [
+        108,
+        37
+      ],
+      "LevelCardHeight": 135,
+      "titleInkCenterRelativeCardApprox": 28,
+      "selectableRowHeight": 47,
+      "notActualNewScreenshotOrNativeHitTest": true,
+      "allNewUIAndSemanticsStillRequireOwnFreshCI": true
+    }
+  },
+  "A21SourceProvenanceAndActualRead": {
+    "phase": "Read-only originalPDF21 icon provenance and candidate derivation; no source authorization applied",
+    "source_edits_stopped": true,
+    "baseline_application": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "source_pdf": {
+      "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+      "sha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+      "page_one_based": 21,
+      "page_rect": [
+        0,
+        0,
+        425,
+        950
+      ],
+      "embedded_xref": 45,
+      "filter": "DCTDecode JPEG",
+      "embedded_size": [
+        850,
+        1850
+      ],
+      "embedded_image_sha256": "45ef71d42c6e45599732134d021118847c3545cdc7de9d142aee4466a1f61690",
+      "embedded_image_path": "/tmp/hetu_A21_xref45.jpg",
+      "placement_bbox_page": [
+        0,
+        25,
+        425,
+        950
+      ],
+      "transform": [
+        425,
+        0,
+        0,
+        925,
+        0,
+        25
+      ],
+      "mapping": "pageX=rawX/2;pageY=25+rawY/2; normalized393 perrawpixel=393/850"
+    },
+    "actual_view": {
+      "native_icon_ROI": [
+        60,
+        435,
+        106,
+        484
+      ],
+      "native_ROI_path": "/tmp/hetu_A21_xref45_icon_ROI.png",
+      "nearest10x_path": "/tmp/hetu_A21_xref45_icon_ROI_10x.png",
+      "zoom_was_actually_opened": true,
+      "zoom_detail": "original"
+    },
+    "original_shape": {
+      "topology": "Thick positive red annulus, white interior, positive red exclamation stem and separate positive red dot. Not solidfilleddisc and not negative-spacewhiteexclamation.",
+      "segmentation": "R>200,G<130,B<150;8-connected foreground",
+      "components": [
+        {
+          "pixel_count": 503,
+          "native_bbox_inclusive": [
+            66,
+            444,
+            99,
+            476
+          ]
+        },
+        {
+          "pixel_count": 38,
+          "native_bbox_inclusive": [
+            81,
+            452,
+            84,
+            462
+          ]
+        },
+        {
+          "pixel_count": 11,
+          "native_bbox_inclusive": [
+            81,
+            465,
+            83,
+            468
+          ]
+        }
+      ],
+      "white_enclosed_region": [
+        {
+          "pixel_count": 341,
+          "native_bbox_inclusive": [
+            72,
+            449,
+            93,
+            471
+          ]
+        }
+      ],
+      "positive_pixel_count": 552,
+      "square36_positive_fraction": 0.42592592592592593,
+      "raw_ring_bbox": [
+        66,
+        444,
+        99,
+        476
+      ],
+      "raw_text_bbox": [
+        116,
+        448,
+        273,
+        472
+      ],
+      "render425_ring_bbox": [
+        33,
+        247,
+        49,
+        263
+      ],
+      "render425_text_bbox": [
+        58,
+        249,
+        136,
+        260
+      ],
+      "render425_ink_size17x17_normalized393": 15.72,
+      "raw_bbox_size34x33_normalized393": [
+        15.72,
+        15.25764705882353
+      ],
+      "relative_render_ring_above_text_normalized393": 1.8494117647058823,
+      "relative_render_ring_below_text_normalized393": 2.7741176470588234,
+      "row460_red_runs": [
+        [
+          66,
+          71
+        ],
+        [
+          81,
+          84
+        ],
+        [
+          94,
+          99
+        ]
+      ],
+      "column82_red_runs": [
+        [
+          444,
+          448
+        ],
+        [
+          452,
+          462
+        ],
+        [
+          465,
+          468
+        ],
+        [
+          472,
+          476
+        ]
+      ],
+      "ring_central_horizontal_thickness_raw": 6,
+      "ring_central_horizontal_thickness_normalized393": 2.7741176470588234,
+      "JPEG_RGB_note": "JPEG has color variation; no single exactflatfillRGB is inferable. Samples are exactdecodedpixel values, not proposedtint.",
+      "exact_RGB_samples": [
+        {
+          "native_xy": [
+            68,
+            460
+          ],
+          "exact_RGB": [
+            239,
+            62,
+            68
+          ]
+        },
+        {
+          "native_xy": [
+            71,
+            460
+          ],
+          "exact_RGB": [
+            240,
+            123,
+            141
+          ]
+        },
+        {
+          "native_xy": [
+            74,
+            460
+          ],
+          "exact_RGB": [
+            255,
+            246,
+            249
+          ]
+        },
+        {
+          "native_xy": [
+            78,
+            456
+          ],
+          "exact_RGB": [
+            252,
+            243,
+            246
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            454
+          ],
+          "exact_RGB": [
+            255,
+            61,
+            58
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            457
+          ],
+          "exact_RGB": [
+            247,
+            41,
+            61
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            462
+          ],
+          "exact_RGB": [
+            233,
+            73,
+            109
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            465
+          ],
+          "exact_RGB": [
+            253,
+            50,
+            70
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            469
+          ],
+          "exact_RGB": [
+            253,
+            222,
+            220
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            472
+          ],
+          "exact_RGB": [
+            242,
+            42,
+            52
+          ]
+        },
+        {
+          "native_xy": [
+            96,
+            460
+          ],
+          "exact_RGB": [
+            241,
+            75,
+            87
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            444
+          ],
+          "exact_RGB": [
+            238,
+            61,
+            79
+          ]
+        },
+        {
+          "native_xy": [
+            82,
+            449
+          ],
+          "exact_RGB": [
+            252,
+            144,
+            157
+          ]
+        }
+      ],
+      "segmented_red_RGB_median": [
+        243.0,
+        57.0,
+        68.0
+      ],
+      "segmented_RGB_mode_count_max": 2
+    },
+    "existing_icon": {
+      "source": "home/HomeIcons.kt CircleAlert",
+      "viewport": [
+        24,
+        24
+      ],
+      "stroke": 1.75,
+      "fill": null,
+      "round_caps_and_joins": true,
+      "outer_bounds": [
+        1.125,
+        1.125,
+        22.875,
+        22.875
+      ],
+      "painted_outer_span_ratio": 0.90625,
+      "at13dp_outer_diameter": 11.78125,
+      "at13dp_stroke": 0.9479166666666666,
+      "ca_actual_ink_bbox": [
+        32,
+        163,
+        43,
+        173
+      ],
+      "ca_actual_ink_width_height": [
+        12,
+        11
+      ],
+      "same_vector_size_for15_72_ink": 17.346206896551724,
+      "why_size_only_insufficient": "Sizingoldthin1.75stroke vector to17.346dp matchesouterdiameter but strokeonly1.2648dp, farthinner than originalcentralstroke2.7741normalizeddp."
+    },
+    "trace_asset_candidate": {
+      "status": "Derived asset only; not an implemented/renderedUI",
+      "svg_path": "/tmp/hetu_A21_xref45_trace.svg",
+      "svg_sha256": "b1f1baf91cdd94eda4c41432dc794596c282131a596e4f9c127c6a44700c503e",
+      "source_crop_path": "/tmp/hetu_A21_xref45_trace_source36.png",
+      "source_crop_sha256": "7ddb149c3f7b6796df2bd638a204074d6e9ae078c8c17dbe80fdc025b820b60b",
+      "crop_native_exclusive": [
+        64,
+        442,
+        100,
+        478
+      ],
+      "viewport": [
+        36,
+        36
+      ],
+      "contour_algorithm": "Unsimplified binarymarching-squares0.5, foregrounddiagonalconnectivity",
+      "closed_contour_count": 4,
+      "contour_point_counts": [
+        135,
+        91,
+        33,
+        15
+      ],
+      "path_fill_type": "EvenOdd",
+      "local_painted_bounds": [
+        1.5,
+        1.5,
+        35.5,
+        34.5
+      ],
+      "unsimplified_path": "M1.5,14 L2,13.5 L2.5,13 L2.5,12 L2.5,11 L3,10.5 L3.5,10 L3.5,9 L4,8.5 L4.5,8 L5,7.5 L5.5,7 L6,6.5 L6.5,6 L7,5.5 L7.5,5 L8,4.5 L8.5,4 L9,3.5 L10,3.5 L10.5,3 L11,2.5 L12,2.5 L13,2.5 L13.5,2 L14,1.5 L15,1.5 L16,1.5 L17,1.5 L18,1.5 L19,1.5 L20,1.5 L21,1.5 L22,1.5 L23,1.5 L23.5,2 L24,2.5 L25,2.5 L25.5,3 L26,3.5 L27,3.5 L27.5,4 L28,4.5 L28.5,5 L29,5.5 L30,5.5 L30.5,6 L31,6.5 L31.5,7 L31.5,8 L32,8.5 L32.5,9 L33,9.5 L33.5,10 L33.5,11 L34,11.5 L34.5,12 L34.5,13 L34.5,14 L34.5,15 L35,15.5 L35.5,16 L35.5,17 L35.5,18 L35.5,19 L35,19.5 L34.5,20 L34.5,21 L34.5,22 L34.5,23 L34.5,24 L34,24.5 L33.5,25 L33.5,26 L33,26.5 L32.5,27 L32,27.5 L31.5,28 L31.5,29 L31,29.5 L30.5,30 L30,30.5 L29,30.5 L28.5,31 L28,31.5 L27.5,32 L27,32.5 L26,32.5 L25.5,33 L25,33.5 L24,33.5 L23,33.5 L22.5,34 L22,34.5 L21,34.5 L20,34.5 L19,34.5 L18,34.5 L17,34.5 L16,34.5 L15,34.5 L14,34.5 L13,34.5 L12.5,34 L12,33.5 L11,33.5 L10.5,33 L10,32.5 L9,32.5 L8.5,32 L8,31.5 L7.5,31 L7,30.5 L6.5,30 L6,29.5 L5.5,29 L5,28.5 L4.5,28 L4,27.5 L3.5,27 L3.5,26 L3,25.5 L2.5,25 L2.5,24 L2.5,23 L2,22.5 L1.5,22 L1.5,21 L1.5,20 L1.5,19 L1.5,18 L1.5,17 L1.5,16 L1.5,15 L1.5,14 Z M7.5,14 L8,13.5 L8.5,13 L8.5,12 L9,11.5 L9.5,11 L10,10.5 L10.5,10 L11,9.5 L11.5,9 L12,8.5 L13,8.5 L13.5,8 L14,7.5 L15,7.5 L15.5,7 L16,6.5 L17,6.5 L18,6.5 L19,6.5 L19.5,7 L20,7.5 L21,7.5 L22,7.5 L22.5,8 L23,8.5 L24,8.5 L24.5,9 L25,9.5 L25.5,10 L26,10.5 L26.5,11 L27,11.5 L27.5,12 L28,12.5 L28.5,13 L28.5,14 L28.5,15 L29,15.5 L29.5,16 L29.5,17 L29.5,18 L29.5,19 L29.5,20 L29,20.5 L28.5,21 L28.5,22 L28.5,23 L28,23.5 L27.5,24 L27,24.5 L26.5,25 L26,25.5 L25.5,26 L25,26.5 L24.5,27 L24,27.5 L23.5,28 L23,28.5 L22,28.5 L21.5,29 L21,29.5 L20,29.5 L19,29.5 L18,29.5 L17,29.5 L16.5,29 L16,28.5 L15,28.5 L14,28.5 L13.5,28 L13,27.5 L12,27.5 L11.5,27 L11,26.5 L10.5,26 L10,25.5 L9.5,25 L9,24.5 L8.5,24 L8.5,23 L8,22.5 L7.5,22 L7.5,21 L7.5,20 L7.5,19 L7.5,18 L7.5,17 L7.5,16 L7.5,15 L7.5,14 Z M16.5,10 L17,9.5 L18,9.5 L19,9.5 L19.5,10 L20,10.5 L20.5,11 L20.5,12 L20,12.5 L19.5,13 L19.5,14 L19.5,15 L20,15.5 L20.5,16 L20.5,17 L20.5,18 L20,18.5 L19.5,19 L19.5,20 L19,20.5 L18,20.5 L17,20.5 L16.5,20 L16.5,19 L16.5,18 L16.5,17 L16.5,16 L16.5,15 L16.5,14 L16.5,13 L16.5,12 L16.5,11 L16.5,10 Z M16.5,23 L17,22.5 L18,22.5 L19,22.5 L19.5,23 L19.5,24 L19.5,25 L19.5,26 L19,26.5 L18,26.5 L17.5,26 L17,25.5 L16.5,25 L16.5,24 L16.5,23 Z",
+      "future_tools_icon_name": "SubscriptionNameErrorPdf21",
+      "future_helper": "ExistingpdfAdblockSilhouette(name,36f,path,sourceDocumentPage=\"03A21\") mayappendonevalue withoutalteringhelper/otherpaths"
+    },
+    "narrow_candidate": {
+      "not_implemented": true,
+      "new_nullable_ToolsField_parameters": [
+        "errorIcon:ImageVector?=null",
+        "errorIconSize:Dp?=null"
+      ],
+      "default_expression": "Icon(errorIcon ?: HomeIcons.CircleAlert,null,Modifier.size(errorIconSize ?:13.dp),tint=c.bad)",
+      "only_Add_nameError_caller": "errorIcon=if(form.nameError!=null)ToolsIcons.SubscriptionNameErrorPdf21 else null;errorIconSize=if(form.nameError!=null)17.dp else null",
+      "layout_size_dp": 17,
+      "layout_reason": "17<actualText/Row18; naturalflowRow18 andURLorigin164 preserved withoutoffset/clipping. Iconbox+4 advancesbodyinkx50→54, reference58×393/425=53.647059.",
+      "reference_body_x_normalized393": 53.63294117647059,
+      "expected_body_x": 54,
+      "geometric_outer_width_height_at17dp": [
+        16.055555555555557,
+        15.583333333333334
+      ],
+      "geometric_ring_central_stroke_at17dp": 2.8333333333333335,
+      "actual_error_Row_y_interval": [
+        159,
+        177
+      ],
+      "natural_17dp_box_y_interval": [
+        159.5,
+        176.5
+      ],
+      "continuous_traced_ink_y_bounds_at17dp": [
+        160.20833333333334,
+        175.79166666666666
+      ],
+      "expected_all_error_input_after_gaps": "Approximately5–6px before/25–26px after; cannotretainall-ink7/28 onceglyphenlarges. Rasterdependsantialiasing.",
+      "preserved_body_ink_y": [
+        162,
+        173
+      ],
+      "preserved_body_input_after_gaps": [
+        7,
+        28
+      ],
+      "preserved_layout_gaps": [
+        3,
+        19
+      ],
+      "unchanged": "12/14/.4errorbody,font/label/inputstyles,validator,errorstrings,AddURLorder,footer/hints/callbacks/c.bad tint,default13icon;Home/panel/HomeIcons remainbytefrozen",
+      "next_validation": "Freshindependentcapture mustverify enlargedring/bodyalignment,Row18,URL164 andbody7/28; no newUIverifiedclaim."
+    },
+    "future_whole_file_inverse_plan": [
+      "ToolsIcons:removeonlynewPDF21comment/value;existinghelperandallpathsbyteequalbaseline.",
+      "ToolsComponents:removetwonullableparams andrestoreexactoriginalIcon(HomeIcons.CircleAlert,null,Modifier.size(13.dp),tint=c.bad)line;wholefileequalsca60825.",
+      "Subscription:removeonlyAddnameErrornamedicon/sizearguments;wholefileequalsca60825.",
+      "HomeIcons:noedit;SHAremainsexactbaseline.",
+      "Recordallbefore/candidateSHAandprotectedcallbacks/defaults;sourceeditonlyafterparent/rootconfirmation."
+    ],
+    "baseline_file_SHA256": {
+      "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+      "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+      "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt": "db63a5968aaf03c3cd19ed47cf186e74797216f77cd511252e6040c6638e07ce",
+      "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIcons.kt": "75e8fe14ba6ab540062301c3d734682c9d6529f7267e7cf550ed92eb6a31d5b7"
+    }
+  },
+  "A21ImplementedRecipeAndProof": {
+    "kind": "ConfirmedAdd-name-error PDF21 icon implementation candidate",
+    "baseline_application": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "source_edits_stopped": true,
+    "exclusive_sources": [
+      "ToolsComponents.kt",
+      "ToolsSubscriptionScreen.kt",
+      "ToolsIcons.kt"
+    ],
+    "implementation": "NullableerrorIcon/errorIconSize defaultnull;defaultCircleAlert13dp. OnlyAddnameError!=null passesPDF21tracedvectorand17dp. Existinghelperunchanged.",
+    "not_fresh_UI_validated": true,
+    "source_provenance": {
+      "pdf_sha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+      "xref": 45,
+      "JPEG_sha256": "45ef71d42c6e45599732134d021118847c3545cdc7de9d142aee4466a1f61690",
+      "crop": [
+        64,
+        442,
+        100,
+        478
+      ],
+      "viewport": 36,
+      "contours": 4,
+      "fill_rule": "EvenOdd",
+      "topology": "Positiveannuluswithpositiveexclamationstem/dot,whiteinterior; notLucideorfilleddisc",
+      "SVG_sha256": "b1f1baf91cdd94eda4c41432dc794596c282131a596e4f9c127c6a44700c503e"
+    },
+    "files": [
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "baseline_sha256": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+        "candidate_sha256": "506ac22816e0cd84a277e609112cd19650499819605ed3c1f4602aad4b3252c5",
+        "whole_file_inverse_equals_ca60825": true,
+        "explicit_inverse_steps": [
+          {
+            "candidate_fragment": "    errorIcon: ImageVector? = null,\n    errorIconSize: Dp? = null,\n",
+            "baseline_fragment": "",
+            "occurrences": 1
+          },
+          {
+            "candidate_fragment": "Icon(errorIcon ?: HomeIcons.CircleAlert, null, Modifier.size(errorIconSize ?: 13.dp), tint = c.bad)",
+            "baseline_fragment": "Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)",
+            "occurrences": 1
+          }
+        ],
+        "protected_callback_default_checks": [
+          {
+            "literal": "                value = value, onValueChange = onValueChange,\n                modifier = Modifier.fillMaxWidth(), singleLine = true,\n                textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium,\n                    fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),\n                keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),",
+            "sha256": "26433cb4e49f1067217b52668c860dc0601a1fbaab3170c01ce5e003ce9c1c0e",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "                            if (clearable && value.isNotEmpty()) Box(Modifier.size(20.dp).clip(CircleShape)\n                                .background(c.t3.copy(alpha = .14f)).clickable(role = Role.Button, onClickLabel = ht(\"清除输入\")) { onValueChange(\"\") },\n                                contentAlignment = Alignment.Center) { Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = c.t3) }",
+            "sha256": "15b44b1a9a1212714d39cd49739434fedbb208ccf3bb2c89ddb0aa1acaa25d55",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "    val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }",
+            "sha256": "6540f2186309714995586eae351b701eb791e6dbfb02cdc7abeb7b4ed1653d9d",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "entire_function": "ToolsRow",
+            "sha256": "7db98ca39cc66de65d9c1cd7afcbe0f56e0803aae3b655c777c5a1893c16411a",
+            "byte_equal": true
+          },
+          {
+            "literal": "                Text(error, color = c.bad, style = errorStyle ?: HomeType.caption)",
+            "byte_equal_present_ca_and_candidate": true
+          }
+        ]
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+        "baseline_sha256": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+        "candidate_sha256": "af5ce76a084b900157203798452e4745d9a383c7092098e4b6c9a52b29a002ec",
+        "whole_file_inverse_equals_ca60825": true,
+        "explicit_inverse_steps": [
+          {
+            "candidate_fragment": "                        errorSpacing = if (form.nameError != null) 3.dp else null,\n                        errorIcon = if (form.nameError != null) ToolsIcons.SubscriptionNameErrorPdf21 else null,\n                        errorIconSize = if (form.nameError != null) 17.dp else null)",
+            "baseline_fragment": "                        errorSpacing = if (form.nameError != null) 3.dp else null)",
+            "occurrences": 1
+          }
+        ],
+        "protected_callback_default_checks": [
+          {
+            "literal": "    onNameChange: (String) -> Unit,\n    onUrlChange: (String) -> Unit,\n    onSave: () -> Unit,\n    onBack: () -> Unit,",
+            "sha256": "3c64a612f9c18bb392f3be3e82c232e7f33029492f4f78b98e8bd031c160f15d",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "ToolsField(\"订阅名称\", form.name, onNameChange, placeholder = \"例如 主订阅\", error = form.nameError",
+            "sha256": "8c9e9b1b1bba0668af6641937f345f7b46c144cdc20f2e3ba1c0588f6aa176f2",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "ToolsField(\"订阅名称\", form.name, {}, readOnly = true, hint = \"名称用于策略组引用，可在 YAML 编辑器中统一修改。\"",
+            "sha256": "d46489782a067c30ef9be63a9931c1125540eae13e799a89eae72579b6a7ec9c",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "                    \"订阅链接\", form.url, onUrlChange,\n                    placeholder = \"https://\", monospace = true, keyboardType = KeyboardType.Uri,\n                    error = form.urlError, hint = \"保存到当前配置，运行时会尝试应用。\",\n                    errorAfterHint = adding,",
+            "sha256": "9c6efab2ef13a669ee7aca630f1b9ab7644e02ed846c5516b7a68a6178b4c846",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "literal": "                Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                    HomeButton(\"保存\", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)\n                    HomeButton(\"取消\", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)",
+            "sha256": "f7486ecaa7ebc081b37534657f0e429d936edba45e98f08cb64c501ca264b0af",
+            "byte_equal_present_ca_and_candidate": true
+          },
+          {
+            "entire_function": "ToolsDiscardFormDialogCard",
+            "sha256": "54d43f5f57bc77576fe1b1ea10f292b3aecf079b99851f8ae854c971d2254276",
+            "byte_equal": true
+          }
+        ]
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+        "baseline_sha256": "db63a5968aaf03c3cd19ed47cf186e74797216f77cd511252e6040c6638e07ce",
+        "candidate_sha256": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+        "whole_file_inverse_equals_ca60825": true,
+        "explicit_inverse_steps": [
+          {
+            "candidate_fragment": "\n    /**\n     * Red annulus and positive exclamation traced from PDF03A21 JPEG xref45.\n     * Crop (64,442)-(100,478), R>200/G<130/B<150, unsimplified 0.5 contours.\n     * EvenOdd preserves the white interior; stem and dot remain positive components.\n     * This glyph is PDF-derived, not Lucide, and used only for Add name errors.\n     */\n    val SubscriptionNameErrorPdf21: ImageVector by lazy { pdfAdblockSilhouette(\"SubscriptionNameErrorPdf21\", 36f,\n        \"M1.5,14 L2,13.5 L2.5,13 L2.5,12 L2.5,11 L3,10.5 L3.5,10 L3.5,9 L4,8.5 L4.5,8 L5,7.5 L5.5,7 L6,6.5 L6.5,6 L7,5.5 L7.5,5 L8,4.5 L8.5,4 L9,3.5 L10,3.5 L10.5,3 L11,2.5 L12,2.5 L13,2.5 L13.5,2 L14,1.5 L15,1.5 L16,1.5 L17,1.5 L18,1.5 L19,1.5 L20,1.5 L21,1.5 L22,1.5 L23,1.5 L23.5,2 L24,2.5 L25,2.5 L25.5,3 L26,3.5 L27,3.5 L27.5,4 L28,4.5 L28.5,5 L29,5.5 L30,5.5 L30.5,6 L31,6.5 L31.5,7 L31.5,8 L32,8.5 L32.5,9 L33,9.5 L33.5,10 L33.5,11 L34,11.5 L34.5,12 L34.5,13 L34.5,14 L34.5,15 L35,15.5 L35.5,16 L35.5,17 L35.5,18 L35.5,19 L35,19.5 L34.5,20 L34.5,21 L34.5,22 L34.5,23 L34.5,24 L34,24.5 L33.5,25 L33.5,26 L33,26.5 L32.5,27 L32,27.5 L31.5,28 L31.5,29 L31,29.5 L30.5,30 L30,30.5 L29,30.5 L28.5,31 L28,31.5 L27.5,32 L27,32.5 L26,32.5 L25.5,33 L25,33.5 L24,33.5 L23,33.5 L22.5,34 L22,34.5 L21,34.5 L20,34.5 L19,34.5 L18,34.5 L17,34.5 L16,34.5 L15,34.5 L14,34.5 L13,34.5 L12.5,34 L12,33.5 L11,33.5 L10.5,33 L10,32.5 L9,32.5 L8.5,32 L8,31.5 L7.5,31 L7,30.5 L6.5,30 L6,29.5 L5.5,29 L5,28.5 L4.5,28 L4,27.5 L3.5,27 L3.5,26 L3,25.5 L2.5,25 L2.5,24 L2.5,23 L2,22.5 L1.5,22 L1.5,21 L1.5,20 L1.5,19 L1.5,18 L1.5,17 L1.5,16 L1.5,15 L1.5,14 Z M7.5,14 L8,13.5 L8.5,13 L8.5,12 L9,11.5 L9.5,11 L10,10.5 L10.5,10 L11,9.5 L11.5,9 L12,8.5 L13,8.5 L13.5,8 L14,7.5 L15,7.5 L15.5,7 L16,6.5 L17,6.5 L18,6.5 L19,6.5 L19.5,7 L20,7.5 L21,7.5 L22,7.5 L22.5,8 L23,8.5 L24,8.5 L24.5,9 L25,9.5 L25.5,10 L26,10.5 L26.5,11 L27,11.5 L27.5,12 L28,12.5 L28.5,13 L28.5,14 L28.5,15 L29,15.5 L29.5,16 L29.5,17 L29.5,18 L29.5,19 L29.5,20 L29,20.5 L28.5,21 L28.5,22 L28.5,23 L28,23.5 L27.5,24 L27,24.5 L26.5,25 L26,25.5 L25.5,26 L25,26.5 L24.5,27 L24,27.5 L23.5,28 L23,28.5 L22,28.5 L21.5,29 L21,29.5 L20,29.5 L19,29.5 L18,29.5 L17,29.5 L16.5,29 L16,28.5 L15,28.5 L14,28.5 L13.5,28 L13,27.5 L12,27.5 L11.5,27 L11,26.5 L10.5,26 L10,25.5 L9.5,25 L9,24.5 L8.5,24 L8.5,23 L8,22.5 L7.5,22 L7.5,21 L7.5,20 L7.5,19 L7.5,18 L7.5,17 L7.5,16 L7.5,15 L7.5,14 Z M16.5,10 L17,9.5 L18,9.5 L19,9.5 L19.5,10 L20,10.5 L20.5,11 L20.5,12 L20,12.5 L19.5,13 L19.5,14 L19.5,15 L20,15.5 L20.5,16 L20.5,17 L20.5,18 L20,18.5 L19.5,19 L19.5,20 L19,20.5 L18,20.5 L17,20.5 L16.5,20 L16.5,19 L16.5,18 L16.5,17 L16.5,16 L16.5,15 L16.5,14 L16.5,13 L16.5,12 L16.5,11 L16.5,10 Z M16.5,23 L17,22.5 L18,22.5 L19,22.5 L19.5,23 L19.5,24 L19.5,25 L19.5,26 L19,26.5 L18,26.5 L17.5,26 L17,25.5 L16.5,25 L16.5,24 L16.5,23 Z\", sourceDocumentPage = \"03A21\",\n    ) }\n",
+            "baseline_fragment": "",
+            "occurrences": 1
+          }
+        ],
+        "protected_callback_default_checks": [
+          {
+            "previous_helper_and_every_prior_glyph_bytes_unchanged": true,
+            "evidence": "Completefileinverseequalsbaseline; onlynewcomment/valueblockappended"
+          }
+        ]
+      }
+    ],
+    "predictions_only": {
+      "row18_URL164_body7_28": "Expectednaturalflowretained:17dpicon<Text18px,source3/19/24gapsandfontunchanged. Nooffset/negativepadding. Requiresfreshcapture.",
+      "horizontal_body_x": "Expectedx50→54,matchingreference53.647",
+      "whole_error_ink_gaps": "Expectedaround5–6/25–26afterenlargedglyph; doNOTclaimwholeerror7/28.7/28describesexistingbodyinkonly.",
+      "next_validation": "IndependentnewCIandfreshA21 capture; noexistingca60825tests/screenshotsvalidatecandidate."
+    },
+    "verification": {
+      "git_diff_check": "passed",
+      "whole_file_explicit_inverse": "Eachofthreecompletefilesbyte-equalsca60825afterremovingonlynarrowedits",
+      "callback_default_proof": "ProtectedliteralsplusunchangedToolsRow/discardfunctions,unchangedallPDFhelper/previouspaths,anddefaultIconexpressioninverse"
+    },
+    "no_test_CI_commit_patch_docs_fixture_actions": true,
+    "HomeIcons_byte_frozen": {
+      "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIcons.kt",
+      "sha256": "75e8fe14ba6ab540062301c3d734682c9d6529f7267e7cf550ed92eb6a31d5b7",
+      "equals_ca60825": true
+    },
+    "three_file_numstat": "3\t1\tandroid-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt\n10\t0\tandroid-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt\n3\t1\tandroid-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt"
+  },
+  "A21ParentIndependentTraceCheck": {
+    "metrics": {
+      "mask": "R>200 G<130 B<150",
+      "loops": 4,
+      "sourceForeground": 552,
+      "pathForegroundAtSourceCenters": 552,
+      "differentPixels": 0,
+      "binaryIoU": 1.0
+    },
+    "sourceCrop": "/tmp/hetu_A21_xref45_trace_source36.png",
+    "sourceCropSHA256": "7ddb149c3f7b6796df2bd638a204074d6e9ae078c8c17dbe80fdc025b820b60b",
+    "comparisonActuallyOpened": "/tmp/hetu_A21_pdf_vs_trace_centers.png",
+    "comparisonSHA256": "2c4c5ff8096e199af749b0d50d5b6c1912baa7e06879c50708cca3b0ae0ef085",
+    "viewMethod": "Actual original JPEG36px crop versus reconstructed four EvenOdd contours at source pixel centers,10x display with view_image detail original. No source pixel mismatches in the chosen binary mask. JPEG antialiasing is not falsely declared vector-identical.",
+    "pathAddedToToolsIconsEqualsOriginalTrace": true
+  },
+  "verification": {
+    "wholeFileInverseToCa60825": "PASS for all5 files; independently repeated by parent task and child for its3 files",
+    "sourceFileSHAsStillMatchFinalSnapshots": true,
+    "gitDiffCheck": "PASS",
+    "A44OptionLoopWholeBytesIdenticalToCa60825": true,
+    "HomeAndPanelSourceNotModifiedByThisBatch": true,
+    "HomeIconsWholeFileFrozenEvidence": {
+      "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIcons.kt",
+      "sha256": "75e8fe14ba6ab540062301c3d734682c9d6529f7267e7cf550ed92eb6a31d5b7",
+      "equals_ca60825": true
+    },
+    "coreIOandDNSBusinessAndSignaturePermissionsNotModified": true,
+    "fixturesNotChangedByThisBatch": true,
+    "thisAgentRanTestsOrCI": false,
+    "thisAgentSubmittedOrCancelledCI": false,
+    "thisAgentCommittedOrPushed": false,
+    "newCompilation": "NOT_EXECUTED_BY_THIS_AGENT; parent own new commit/CI required",
+    "newVisualGeometryAndTouchAcceptance": "NOT_EXECUTED; recipe predictions are not passed captures",
+    "ca60825SuccessEvidencePreserved": "Parent confirmed ca success; not reused as candidate success"
+  },
+  "remainingLimits": [
+    "The new A21 glyph is a thick annulus with positive exclamation stem/dot, not a filled disc with white exclamation. Its4 unsimplified binary contours use existing EvenOdd helper and caller tint.",
+    "A21 font12/14/.4, spacing3/19/24 and source Row18 remain. Expected URL164 and正文ink7/28 need fresh confirmation; enlarged overall error-ink top/bottom are expected to change to about5–6/25–26 and must not be mislabeled7/28.",
+    "A44 selected37/frame42/card135 and47 selectable are source predictions until this batch produces its own fresh capture and actual bounds evidence.",
+    "Strict literal all49/all130 pixel parity is not declared passed by this source candidate.",
+    "No device/account/network security setting operation; Google account authentication diagnosis is owned by root evidence and is not inferred from these presentation edits."
+  ]
+}

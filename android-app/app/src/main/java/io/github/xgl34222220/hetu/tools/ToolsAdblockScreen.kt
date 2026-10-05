@@ -232,16 +232,18 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
 private fun LevelCard(state: ToolsAdblockState, idle: Boolean, onLevelChange: (ToolsAdLevel) -> Unit) {
     val c = LocalHomeColors.current
     HomeCard(Modifier.fillMaxWidth()) {
-        ToolsCardTitle("拦截强度", minHeight = 42.dp, topPadding = 0.dp)
-        Column(Modifier.padding(start = 16.dp, end = 16.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        ToolsCardTitle("拦截强度", minHeight = 49.dp, topPadding = 6.dp)
+        Column(Modifier.padding(start = 15.dp, end = 14.dp, bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             CompositionLocalProvider(LocalHomeColors provides c.copy(surface = if (c.dark) c.sunken else Color(0xFFF1F1FB))) {
                 HomeSegmented<ToolsAdLevel?>(
                     options = ToolsAdLevel.entries.map { it to it.label },
                     selected = state.level,
                     onSelect = { if (it != null) onLevelChange(it) },
                     enabled = idle,
-                    referenceVisualInset = 3.5.dp,
-                    referenceOuterPadding = 2.dp,
+                    referenceVisualInset = 4.5.dp,
+                    referenceOuterPadding = 6.dp,
+                    referenceVisualHeight = 42.dp,
+                    referenceTouchHeight = 47.dp,
                 )
             }
             Text(state.note, color = c.t2, style = HomeType.note)

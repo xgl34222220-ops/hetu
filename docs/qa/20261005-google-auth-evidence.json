@@ -64,10 +64,10 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "9399121212b68a5f6422170e00835095218c2f8e",
+    "applicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
     "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
-    "currentChanges": "Latest939912 tools/settings presentation preserves bounded Google metadata classifier and underlying DNS/route/credential/hook/permission behavior. Its isolated controller401→200 tests do not locate or fix user Google Play account authentication.",
+    "currentChanges": "Latest ca60825 tools/settings presentation preserves bounded Google metadata classifier and underlying DNS, routing, credentials, hooks and permissions. The frozen-source gates passed. Its isolated Mihomo controller401→200 results do not locate or fix user Google Play account authentication.",
     "dnsPolicy": "install_dns_redirect4/6 use mark,uid0,interface,blacklist returns and scoped TCP/UDP:53 redirect; neither accepts DUIDS nor calls direct_uid_returns. Actual resolver/packet UID and failure-time answers unavailable.",
     "defaultGoogleProbeTarget": {
       "source": "ProxyLatencyTargets.kt",
@@ -76,9 +76,12 @@
     },
     "previousApplicationCommits": [
       "270f559424f3ef6e3503d2431ea24f81d295d3d7",
-      "7cfdf426400026c06a997f09d3b7eb4defad852b"
+      "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "9399121212b68a5f6422170e00835095218c2f8e",
+      "936ffac87a81ef056e3c006987667e9d56baf5bc",
+      "26a0906ed9765c04de1316cdcf99cd0460d9d276"
     ],
-    "workflowRun": 37330392252
+    "workflowRun": 37346239863
   },
   "proved": [
     "Some historical GMS connections reached the core and had bidirectional counters",
@@ -106,40 +109,94 @@
       37312432198,
       37317099530,
       37322190390,
-      37330392252
+      37330392252,
+      37342421613,
+      37346239863
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",
     "aospGoogleAccount": "No user account or actual GMS authentication in AOSP fixture",
     "latestVerifiedApplication": {
-      "commit": "9399121212b68a5f6422170e00835095218c2f8e",
-      "runId": 37330392252,
+      "commit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+      "runId": 37346239863,
       "runConclusion": "success",
-      "artifactEvidence": "docs/qa/20261005-v2085-939912-installation-success.json",
+      "completedAtUtc": "2026-10-05T17:36:08Z",
+      "artifactEvidence": "docs/qa/20261005-v2085-ca60825-installation-success.json",
+      "strictEvidenceChecksPassed": 53,
       "runtimeUnitTests": 479,
       "runtimeUnitXmlFiles": 49,
       "googleConnectionClassifierTests": 8,
-      "api35": {
-        "jobId": 111838721878,
-        "artifactId": 11355736445,
-        "checksPassed": 64,
-        "newControllerAuthenticationChecks": 5,
-        "rootMutationActions": 0,
-        "validBearerHTTP200": 25
+      "googleConnectionClassifierXml": {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+        "sha256": "353e6ba297ddf2a42d6c1c22d9f6b33c813db1a3680d511983b86da2e8ed3a2d",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
       },
-      "api36": {
-        "jobId": 111838722206,
-        "artifactId": 11355491962,
-        "checksPassed": 64,
-        "newControllerAuthenticationChecks": 5,
-        "rootMutationActions": 0,
-        "validBearerHTTP200": 19
-      },
-      "apkBytes": 134804906,
-      "apkSha256": "e23997fa0af6f78e310983a05a9514b21749067090585caa9ad8d65c9cf9b0fb",
+      "apkBytes": 134819453,
+      "apkSha256": "f5d1382e55438aaf2f09524c34d59c2d84a730338de6881f04633780a8f13ef7",
       "controllerLoopbackOnly": true,
       "GooglePlayAccountAuthenticationProved": false,
-      "nextSourceCandidateAccepted": false
+      "nextSourceCandidateAccepted": false,
+      "api35": {
+        "jobId": 111891459466,
+        "artifactId": 11361598722,
+        "checksPassed": 64,
+        "newControllerAuthenticationChecks": 5,
+        "paletteCasesPassed": 21,
+        "rootMutationActions": 0,
+        "validBearerHTTP200": 19,
+        "bearerPaths": [
+          "/configs",
+          "/connections",
+          "/providers/proxies",
+          "/proxies",
+          "/rules",
+          "/version"
+        ],
+        "retryWhile401AtMonotonic": 732.918883233,
+        "retryReadyAtMonotonic": 737.701738644,
+        "fixture200AtMonotonic": 737.70173951,
+        "retryAfterFixture200AtMonotonic": 737.701773927,
+        "first200AtMonotonic": 737.746569605,
+        "exclusiveRetryRecoveryClaimed": false,
+        "preferencesSha256Restored": true,
+        "reverseRestored": true,
+        "kvmRestored": true,
+        "launcherReaped": true,
+        "emulatorReaped": true,
+        "forwardsRemoved": true
+      },
+      "api36": {
+        "jobId": 111891459484,
+        "artifactId": 11361977828,
+        "checksPassed": 64,
+        "newControllerAuthenticationChecks": 5,
+        "paletteCasesPassed": 21,
+        "rootMutationActions": 0,
+        "validBearerHTTP200": 19,
+        "bearerPaths": [
+          "/configs",
+          "/connections",
+          "/providers/proxies",
+          "/proxies",
+          "/rules",
+          "/version"
+        ],
+        "retryWhile401AtMonotonic": 778.921563058,
+        "retryReadyAtMonotonic": 786.476337419,
+        "fixture200AtMonotonic": 786.476338491,
+        "retryAfterFixture200AtMonotonic": 786.476386851,
+        "first200AtMonotonic": 786.514226784,
+        "exclusiveRetryRecoveryClaimed": false,
+        "preferencesSha256Restored": true,
+        "reverseRestored": true,
+        "kvmRestored": true,
+        "launcherReaped": true,
+        "emulatorReaped": true,
+        "forwardsRemoved": true
+      }
     },
     "historicalVerifiedApplications": [
       {
@@ -178,6 +235,59 @@
         "controllerLoopbackOnly": true,
         "GooglePlayAccountAuthenticationProved": false,
         "nextSourceCandidateAccepted": false
+      },
+      {
+        "commit": "9399121212b68a5f6422170e00835095218c2f8e",
+        "runId": 37330392252,
+        "runConclusion": "success",
+        "artifactEvidence": "docs/qa/20261005-v2085-939912-installation-success.json",
+        "runtimeUnitTests": 479,
+        "runtimeUnitXmlFiles": 49,
+        "googleConnectionClassifierTests": 8,
+        "api35": {
+          "jobId": 111838721878,
+          "artifactId": 11355736445,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 25
+        },
+        "api36": {
+          "jobId": 111838722206,
+          "artifactId": 11355491962,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 19
+        },
+        "apkBytes": 134804906,
+        "apkSha256": "e23997fa0af6f78e310983a05a9514b21749067090585caa9ad8d65c9cf9b0fb",
+        "controllerLoopbackOnly": true,
+        "GooglePlayAccountAuthenticationProved": false,
+        "nextSourceCandidateAccepted": false
+      },
+      {
+        "commit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "runId": 37342421613,
+        "runConclusion": "success",
+        "artifactEvidence": "docs/qa/20261005-v2085-26a0906-installation-success.json",
+        "strictEvidenceChecksPassed": 53,
+        "runtimeUnitTests": 479,
+        "googleConnectionClassifierTests": 8,
+        "controllerLoopbackOnly": true,
+        "GooglePlayAccountAuthenticationProved": false
+      }
+    ],
+    "historicalFailedApplications": [
+      {
+        "commit": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+        "runId": 37338269235,
+        "runConclusion": "failure",
+        "artifactEvidence": "docs/qa/20261005-v2085-936ffac-acceptance-failure.json",
+        "runtimeUnitTests": 479,
+        "runtimeFailures": 1,
+        "failedTest": "SettingsPickerParity58Test.rootSettingsChoiceWidthsStayCompact",
+        "installedNavigationAndControllerAuthentication": "NOT_EXECUTED"
       }
     ]
   },
@@ -199,5 +309,6 @@
     "actuallyOpened": true,
     "text": "Mihomo 控制接口返回401: {\"message\":\"Unauthorized\"}",
     "scope": "Old app controller read error, already addressed in V20.84/controller tests; different from Play Store Google account authentication. This image supplies no Play fault-time HTTP/TLS/DNS evidence."
-  }
+  },
+  "currentSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
 }

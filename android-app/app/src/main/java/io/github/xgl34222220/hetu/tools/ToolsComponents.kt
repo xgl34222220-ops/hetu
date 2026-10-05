@@ -299,6 +299,8 @@ internal fun ToolsField(
     inputVerticalPadding: Dp? = null,
     errorStyle: TextStyle? = null,
     errorSpacing: Dp? = null,
+    errorIcon: ImageVector? = null,
+    errorIconSize: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = if (errorSpacing == null) Arrangement.spacedBy(8.dp) else Arrangement.Top) {
@@ -337,7 +339,7 @@ internal fun ToolsField(
         if (error != null) {
             if (errorSpacing != null) Spacer(Modifier.height(errorSpacing))
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
+                Icon(errorIcon ?: HomeIcons.CircleAlert, null, Modifier.size(errorIconSize ?: 13.dp), tint = c.bad)
                 Text(error, color = c.bad, style = errorStyle ?: HomeType.caption)
             }
         }

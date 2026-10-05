@@ -293,13 +293,15 @@ internal fun <T> ToolsSegmented(
     icons: Map<T, ImageVector> = emptyMap(),
     referenceVisualInset: Dp? = null,
     referenceOuterPadding: Dp? = null,
+    referenceVisualHeight: Dp? = null,
+    referenceTouchHeight: Dp? = null,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val outerModifier = if (referenceOuterPadding == null)
         modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()
     else modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(referenceOuterPadding).selectableGroup()
-    Row(outerModifier) {
+    val optionContent: @Composable RowScope.() -> Unit = {
         options.forEach { (key, label) ->
             val itemModifier = if (referenceVisualInset == null) Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
                 .background(if (selected == key) c.accentSoft else Color.Transparent)
@@ -320,6 +322,22 @@ internal fun <T> ToolsSegmented(
                     Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)
                 }
             }
+        }
+    }
+    if (referenceVisualHeight == null) {
+        Row(outerModifier, content = optionContent)
+    } else {
+        // Keep the PDF-sized track separate from the unchanged larger selectable row.
+        Box(
+            modifier.fillMaxWidth().height(referenceVisualHeight)
+                .background(c.surface, ToolsDesignDims.cardShape).selectableGroup(),
+            contentAlignment = Alignment.Center,
+        ) {
+            Row(
+                Modifier.fillMaxWidth().requiredHeight(referenceTouchHeight ?: 44.dp)
+                    .padding(horizontal = referenceOuterPadding ?: 8.dp),
+                content = optionContent,
+            )
         }
     }
 }
