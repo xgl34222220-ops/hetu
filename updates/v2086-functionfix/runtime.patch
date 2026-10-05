@@ -336,7 +336,7 @@ index af2174a..34aa171 100644
 -    private static String trimTerminal(String s){while(s.endsWith("\n\n"))s=s.substring(0,s.length()-1);return s;}
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index cf707aa..5778b82 100644
+index cf707aa..e968e48 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
@@ -347,33 +347,35 @@ index cf707aa..5778b82 100644
  import kotlinx.coroutines.withContext
  import kotlinx.coroutines.sync.Mutex
  import kotlinx.coroutines.sync.withLock
-@@ -14,7 +15,10 @@ import java.io.IOException
+@@ -14,7 +15,11 @@ import java.io.IOException
  import org.json.JSONArray
  import org.json.JSONObject
  import java.net.HttpURLConnection
 +import java.net.InetSocketAddress
 +import java.net.Proxy
  import java.net.URL
++import java.util.concurrent.atomic.AtomicLong
 +import kotlin.coroutines.coroutineContext
 
  internal data class DashboardProviderUi(
      val name: String,
-@@ -47,24 +51,81 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -47,24 +52,82 @@ internal class ProxyDashboardRepository(context: Context) {
      private val app = context.applicationContext
      private val api = MihomoControllerClient(app)
      private val controller = ProxyComposeController(app)
 -    private data class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>)
 +    // Keep credentials private and out of generated data-class toString output.
-+    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long) {
++    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
 +        val stable: Boolean get() = runtimeEpoch >= 0L
 +        override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
-+            settings == other.settings && runtimeEpoch == other.runtimeEpoch
-+        override fun hashCode(): Int = 31 * settings.hashCode() + runtimeEpoch.hashCode()
++            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch
++        override fun hashCode(): Int = 31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) + mutationEpoch.hashCode()
 +    }
 +    private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
      private val probeSnapshotMutex = Mutex()
      private var cachedProbeSnapshot: ProbeSnapshot? = null
      private var probeSnapshotAt = 0L
++    private val probeMutationEpoch = AtomicLong()
 +    private val probeIdentityKeys = setOf(
 +        "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
 +        "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
@@ -394,7 +396,7 @@ index cf707aa..5778b82 100644
 +                ProxyConfigLibrary.BUNDLED_NAME else ""
 +        }
 +        // Ordinary status/health reads do not change this nonblocking control epoch.
-+        return ProbeIdentity(settings, RootProxyManager.observationTicket())
++        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get())
 +    }
 +
 +    private fun requireCurrentProbe(identity: ProbeIdentity) {
@@ -444,7 +446,7 @@ index cf707aa..5778b82 100644
          val leaf = selectedProxyName(snapshot.proxies, node)
          val entry = snapshot.proxies.optJSONObject(leaf) ?: throw IOException("节点已更新，请刷新策略组")
          val provider = snapshot.providers.firstOrNull { it.name == entry.optString("provider-name") }
-@@ -77,8 +138,10 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -77,8 +140,10 @@ internal class ProxyDashboardRepository(context: Context) {
                  }
          val testUrl = provider?.testUrl?.takeIf { it.isNotBlank() } ?: group?.optString("testUrl").orEmpty()
          val expected = provider?.expectedStatus ?: group?.optString("expectedStatus", "200-399") ?: "200-399"
@@ -457,7 +459,29 @@ index cf707aa..5778b82 100644
      }
 
      private fun measuredProbe(node: String, snapshot: ProbeSnapshot): Long = try { probe(node, snapshot) }
-@@ -191,8 +254,14 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -95,6 +160,9 @@ internal class ProxyDashboardRepository(context: Context) {
+         val oldIds = if (disconnectPrevious && previous.isNotBlank() && previous != node)
+             selectionConnectionIds(api.connections(), group) else emptyList()
+         api.select(group, node)
++        // Successful core mutations invalidate both cached metadata and in-flight
++        // observations immediately, without waiting behind a blocking snapshot read.
++        probeMutationEpoch.incrementAndGet()
+         // A failed switch never reaches cleanup. Missing/unknown chains are retained.
+         var failed = 0
+         for (id in oldIds) {
+@@ -140,7 +208,10 @@ internal class ProxyDashboardRepository(context: Context) {
+             coroutineScope {
+                 chunk.map { provider ->
+                     async {
+-                        try { api.updateProxyProvider(provider.name) }
++                        try {
++                            api.updateProxyProvider(provider.name)
++                            probeMutationEpoch.incrementAndGet()
++                        }
+                         catch (cancel: CancellationException) { throw cancel }
+                         catch (_: Exception) { }
+                     }
+@@ -191,9 +262,16 @@ internal class ProxyDashboardRepository(context: Context) {
          val results = LinkedHashMap<String, Long>()
          for (chunk in targets.distinct().chunked(6)) {
              coroutineScope {
@@ -472,9 +496,19 @@ index cf707aa..5778b82 100644
 +                } }.awaitAll()
 +            }.forEach { (node, value) -> if (value != null) results[node] = value }
          }
++        requireCurrentProbe(snapshot.identity)
          return results
      }
-@@ -257,14 +326,22 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+
+@@ -234,6 +312,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+             }
+             measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
+         }
++        requireCurrentProbe(snapshot.identity)
+         results
+     }
+
+@@ -257,20 +336,29 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
@@ -499,7 +533,14 @@ index cf707aa..5778b82 100644
              }.awaitAll().toMap()
          }
      }
-@@ -279,10 +356,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+
+     suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {
+         api.updateProxyProvider(name)
++        probeMutationEpoch.incrementAndGet()
+         remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }
+     }
+
+@@ -279,10 +367,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          parseRuleSets(api.ruleProviders()).firstOrNull { it.name == name }
      }
 
@@ -516,7 +557,7 @@ index cf707aa..5778b82 100644
                  instanceFollowRedirects = true
                  connectTimeout = 3_000
                  readTimeout = 3_000
-@@ -292,12 +373,16 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -292,12 +384,16 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
              }
              try {
                  val code = connection.responseCode
@@ -1773,10 +1814,10 @@ index 0000000..a68dc64
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt
 new file mode 100644
-index 0000000..02b0b91
+index 0000000..ace7240
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt
-@@ -0,0 +1,420 @@
+@@ -0,0 +1,424 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -1828,6 +1869,8 @@ index 0000000..02b0b91
 +    private val groupB = ProxyGroupUi("B", "Selector", "shared", listOf(ProxyNodeUi("shared"), ProxyNodeUi("b")))
 +
 +    @Before fun prepare() {
++        PanelRequestOwnershipShadows.RootStatus.reset()
++        PanelRequestOwnershipShadows.Sites.reset()
 +        server = newServer { response(it) }
 +        val app = ApplicationProvider.getApplicationContext<Application>()
 +        app.getSharedPreferences("hetu", 0).edit().clear()
@@ -2110,6 +2153,7 @@ index 0000000..02b0b91
 +    }
 +
 +    @Test fun ordinaryPollKeepsAnActiveGroupInTheSamePidSession() {
++        assertEquals("Ordinary-poll fixture must start in PID 77", 77, PanelRequestOwnershipShadows.RootStatus.pid)
 +        val old = gate()
 +        response = { req -> if (req.requestUrl!!.encodedPath == "/group/A/delay") {
 +            old.hold(); body("""{"shared":22}""")
@@ -2119,6 +2163,7 @@ index 0000000..02b0b91
 +        var refreshed = false
 +        vm.viewModelScope.launch { vm.refreshNow(); refreshed = true }
 +        eventually("Ordinary poll completes") { refreshed }
++        assertEquals("Ordinary poll must remain in the same PID session", 77, vm.state.corePid)
 +        assertEquals(true, vm.testingGroups["A"])
 +        assertEquals(true, vm.testingNodes["shared"])
 +        old.countDown(); awaitActions()
@@ -2199,10 +2244,10 @@ index 0000000..02b0b91
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt
 new file mode 100644
-index 0000000..fc6ac21
+index 0000000..a746d44
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt
-@@ -0,0 +1,317 @@
+@@ -0,0 +1,495 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -2210,8 +2255,10 @@ index 0000000..fc6ac21
 +import androidx.test.core.app.ApplicationProvider
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
 +import kotlinx.coroutines.launch
 +import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.supervisorScope
 +import okhttp3.mockwebserver.Dispatcher
 +import okhttp3.mockwebserver.MockResponse
 +import okhttp3.mockwebserver.MockWebServer
@@ -2229,6 +2276,7 @@ index 0000000..fc6ac21
 +import java.util.concurrent.CountDownLatch
 +import java.util.concurrent.TimeUnit
 +import java.util.concurrent.atomic.AtomicBoolean
++import java.util.concurrent.atomic.AtomicInteger
 +import java.util.concurrent.atomic.AtomicReference
 +
 +/** Real repository HTTP requests: Root probes enter the local core, and waves retain partial success. */
@@ -2518,6 +2566,181 @@ index 0000000..fc6ac21
 +            val secondPaths = (1..4).map { second.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
 +            assertEquals(listOf("/proxies", "/providers/proxies", "/proxies/B/delay", "/proxies/B/delay"), secondPaths)
 +        } }
++    }
++
++    @Test fun confirmedNestedSelectionRefreshesProbeMetadataButAFailedPutPreservesItsCache() = runBlocking {
++        MockWebServer().use { server ->
++            val selected = AtomicReference("A")
++            val rejectSelection = AtomicBoolean(false)
++            server.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    val path = request.requestUrl!!.encodedPath
++                    if (request.method == "PUT" && path == "/proxies/Nested") {
++                        if (rejectSelection.get()) return MockResponse().setResponseCode(401)
++                        selected.set(JSONObject(request.body.readUtf8()).getString("name"))
++                        return MockResponse().setResponseCode(204)
++                    }
++                    return when (path) {
++                        "/proxies" -> {
++                            val outer = JSONObject().put("name", "Outer").put("type", "Selector")
++                                .put("all", JSONArray(listOf("Nested"))).put("now", "Nested").put("testUrl", testUrl)
++                            val nested = JSONObject().put("name", "Nested").put("type", "Selector")
++                                .put("all", JSONArray(listOf("A", "B"))).put("now", selected.get()).put("testUrl", testUrl)
++                            val proxies = JSONObject().put("Outer", outer).put("Nested", nested)
++                            for (leaf in listOf("A", "B")) proxies.put(leaf, JSONObject().put("name", leaf).put("type", "Shadowsocks"))
++                            MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
++                        }
++                        "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                        "/proxies/A/delay" -> MockResponse().setBody("{\"delay\":65}")
++                        "/proxies/B/delay" -> MockResponse().setBody("{\"delay\":74}")
++                        else -> MockResponse().setResponseCode(404)
++                    }
++                }
++            }
++            server.start(); selectApi(server)
++            val repository = ProxyDashboardRepository(context)
++            assertEquals(65L, repository.delay("Outer")) // Cache Outer -> Nested -> A.
++            repository.select("Nested", "B")
++            assertEquals(74L, repository.delay("Outer")) // Immediately follows the successful PUT.
++
++            rejectSelection.set(true)
++            val failure = try {
++                repository.select("Nested", "A")
++                null
++            } catch (error: MihomoControllerClient.ControllerHttpException) { error }
++            assertNotNull(failure)
++            assertEquals(401, failure!!.statusCode)
++            assertEquals("B", selected.get())
++            assertEquals(74L, repository.delay("Outer")) // Failure retains the current B metadata cache.
++
++            assertEquals(9, server.requestCount)
++            val paths = (1..9).map { server.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
++            assertEquals(listOf("/proxies", "/providers/proxies", "/proxies/A/delay", "/proxies/Nested",
++                "/proxies", "/providers/proxies", "/proxies/B/delay", "/proxies/Nested", "/proxies/B/delay"), paths)
++        }
++    }
++
++    @Test fun singleAndBulkProviderUpdatesRefreshCachedMetadataBeforeTestingNewLeaves() = runBlocking {
++        MockWebServer().use { server ->
++            val current = AtomicReference("A")
++            server.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    val path = request.requestUrl!!.encodedPath
++                    if (request.method == "PUT" && path == "/providers/proxies/sub") {
++                        current.set(if (current.get() == "A") "B" else "C")
++                        return MockResponse().setResponseCode(204)
++                    }
++                    val leaf = current.get()
++                    return when (path) {
++                        "/proxies" -> {
++                            // Dynamic provider nodes are supplied by /providers/proxies.
++                            val group = JSONObject().put("name", "Route").put("type", "Selector")
++                                .put("all", JSONArray(listOf(leaf))).put("now", leaf).put("testUrl", testUrl)
++                            MockResponse().setBody(JSONObject().put("proxies", JSONObject().put("Route", group)).toString())
++                        }
++                        "/providers/proxies" -> {
++                            val provider = JSONObject().put("name", "sub").put("vehicleType", "HTTP")
++                                .put("testUrl", testUrl).put("expectedStatus", "204")
++                                .put("proxies", JSONArray().put(JSONObject().put("name", leaf).put("type", "Shadowsocks")))
++                            MockResponse().setBody(JSONObject().put("providers", JSONObject().put("sub", provider)).toString())
++                        }
++                        "/providers/proxies/sub/$leaf/healthcheck" -> MockResponse()
++                            .setBody("{\"delay\":${mapOf("A" to 65L, "B" to 74L, "C" to 83L).getValue(leaf)}}")
++                        else -> MockResponse().setResponseCode(404)
++                    }
++                }
++            }
++            server.start(); selectApi(server)
++            val repository = ProxyDashboardRepository(context)
++            assertEquals(65L, repository.delay("A"))
++            assertEquals(setOf("B"), repository.refreshProvider("sub")!!.nodes)
++            assertEquals(74L, repository.delay("B")) // Newly added B is absent from the old cached A snapshot.
++            assertEquals(74L, repository.delay("B"))
++            assertEquals(setOf("C"), repository.refreshSubscriptions().single().nodes)
++            assertEquals(83L, repository.delay("C")) // The same mutation guard covers the batch entry point.
++
++            assertEquals(15, server.requestCount)
++            val requests = (1..15).map { server.takeRequest(2, TimeUnit.SECONDS)!! }
++            assertEquals(3, requests.count { it.requestUrl!!.encodedPath == "/proxies" })
++            assertEquals(2, requests.count { it.method == "PUT" && it.requestUrl!!.encodedPath == "/providers/proxies/sub" })
++            assertEquals(1, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/A/healthcheck" })
++            assertEquals(2, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/B/healthcheck" })
++            assertEquals(1, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/C/healthcheck" })
++        }
++    }
++
++    @Test fun successfulMutationRejectsCollectedGlobalAndAutomaticGroupResultsWhileAnotherProbeIsPending() = runBlocking {
++        for (global in listOf(true, false)) MockWebServer().use { server ->
++            val names = (1..7).map { "node$it" }
++            val latencyRequests = AtomicInteger()
++            val putRequests = AtomicInteger()
++            val selected = AtomicReference(names.first())
++            val held = CountDownLatch(1)
++            val release = CountDownLatch(1)
++            server.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    val path = request.requestUrl!!.encodedPath
++                    if (request.method == "PUT" && path == "/proxies/Route") {
++                        check(JSONObject(request.body.readUtf8()).getString("name") == "node2")
++                        selected.set("node2")
++                        putRequests.incrementAndGet()
++                        return MockResponse().setResponseCode(204)
++                    }
++                    if (path.endsWith("/delay")) {
++                        if (latencyRequests.incrementAndGet() == 7) {
++                            // Waves await every six-node chunk before starting the next.
++                            // Entering request seven proves six results already completed
++                            // their individual identity checks and were collected.
++                            held.countDown()
++                            check(release.await(6, TimeUnit.SECONDS)) { "Wave fixture was not released" }
++                        }
++                        return MockResponse().setBody("{\"delay\":74}")
++                    }
++                    return when (path) {
++                        "/proxies" -> {
++                            val proxies = JSONObject()
++                            for (leaf in names) proxies.put(leaf, JSONObject().put("name", leaf).put("type", "Shadowsocks"))
++                            for ((name, type) in listOf("Route" to "Selector", "Auto" to "URLTest")) {
++                                proxies.put(name, JSONObject().put("name", name).put("type", type)
++                                    .put("all", JSONArray(names)).put("now", selected.get()).put("testUrl", testUrl))
++                            }
++                            MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
++                        }
++                        "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                        else -> MockResponse().setResponseCode(404)
++                    }
++                }
++            }
++            server.start(); selectApi(server)
++            val repository = ProxyDashboardRepository(context)
++            val group = ProxyGroupUi("Auto", "URLTest", names.first(), names.map { ProxyNodeUi(it) })
++            val published = AtomicBoolean(false)
++            supervisorScope {
++                val wave = async(Dispatchers.Default) {
++                    val result = if (global) repository.globalDelay() else repository.groupDelay(group, names)
++                    published.set(true)
++                    result
++                }
++                try {
++                    assertTrue("The seventh probe must enter after the first completed chunk", held.await(3, TimeUnit.SECONDS))
++                    assertEquals(7, latencyRequests.get())
++                    repository.select("Route", "node2")
++                    assertEquals("node2", selected.get())
++                    assertEquals(1, putRequests.get())
++                } finally {
++                    release.countDown()
++                }
++                val failure = try {
++                    wave.await()
++                    null
++                } catch (error: IOException) { error }
++                assertNotNull("An obsolete wave must not return its earlier successful results", failure)
++                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
++                assertFalse(published.get())
++                assertEquals(7, latencyRequests.get())
++                assertEquals(10, server.requestCount) // Two snapshots, seven probes, one successful PUT.
++            }
++        }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java

@@ -1,0 +1,230 @@
+{
+  "schema": 1,
+  "scope": "restored real clone: mutation epoch plus isolated VM test fixture reset; local source and host boundary fixtures only",
+  "createdUtc": "2026-10-05T22:11:46.857015+00:00",
+  "workingTreeParentCommit": "20315ad79cbdfa7f024f560318ffc5f90dab1b37",
+  "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+  "baseAndroidAppTree": "c5f2c1a9e070fe4c6e1940b5d6729ccc4810fdaa",
+  "versionCode": 2086,
+  "versionName": "0.12.16-v20-fix",
+  "previousCommittedHostProofPreserved": {
+    "path": "docs/qa/20261006-v2086-function-source-host-proof.json",
+    "sha256": "87bd1b2f903cd33214e2442b1f35ce55d6b098cd4979d89be824b247b2d62a62",
+    "itsAndroidSourceDoesNotValidateThisRevision": true
+  },
+  "previousUncommittedEpochExecutionFromReplacedScratch": {
+    "recordedPatchSha256": "e77afba84aa415e64b74c101022815ae307e052755f18b5b5fc2189ac52d112e",
+    "recordedProofSha256": "1235f8475ad2bddfeb368549baa3e38f18286cbd8d7bc68674ffe05d93ceedbd",
+    "hostBoundaryTestsExecutedThen": 67,
+    "evidenceOrigin": "earlier session execution and recorded hashes; original uncommitted file/logs lost in scratch replacement",
+    "proofFilePresentInRestoredClone": false,
+    "executionNotReusedForCurrentSource": true
+  },
+  "patchSha256": "8c8281ce4248610259696b03d1d224ee8b2b6bb677227fe552a225723958687a",
+  "inputsSha256": "5acab6aa5b44ba2bb62cd17b1d884412a1a75f7e18183f0c55a0b3735d7c3164",
+  "changedOrAddedFiles": {
+    "android-app/app/build.gradle.kts": "ec2160fec32c7de63290b8750fc170a35db2e303388866a463cc5cdc93bf64b5",
+    "android-app/app/src/main/assets/hetu-root.sh": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "b6e579759a02e68cb1408d5117911d375f77a9550634e9c4399d5d7a86a9ea8a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "0eac385bf98ccbf5a9925df92a855233c0c7beddc1a3499255bf274c3e079ffc",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "b8a08a67c15b723b8bd67cb443931f9aad2a675a00f64af692596414dfd70440",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java": "9e4a1302e87ef51d91f76ebbcddf514aeed477549b159c1e841eee5135001dd6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "5cc5f89b6de5a7d1b5aca2fa970457916b5fc521c808dd7a05342b23217e68b2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "73b437aa72e5b79ba720dc8b4f995590aaf13080b6985b13053144f65e8e3133",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "04c5aeb43281ee8cbf2a75d35f154e2b5550a495eef14b0134a46ec8d4b00a25",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "f987911e93363d988c0e7c9cc6aa7a7a9b17879d68bf55c6c7901f641224e87d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java": "5f7955eaee7c46899b5401d4ceae103dfab6640c30a10eba73418621648294e6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "b9745db7a1daf64673a329359b30636078f638f03f9196e25a20c2ca26a3fa89",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "ab306338f7d66b13ef5dc6d4259665373c145a4487e3a2e40debbac5b906f75f",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java": "52969bec08c3bbb2daeaaad9bbc306974878cfe23e14c852c224be1bc40b27fa",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java": "992722b4531ca1ebab5d54f339eccf66d05402a2a16ff16a0af7a3b14a22499b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "2977c5a6f8e2e3cab2db1c4b2f41ddd9d5b500252bd4b558b71f77af978b3402"
+  },
+  "frozenInputs": 370,
+  "requiredEffectiveInputs": 386,
+  "locallyMissingUnchangedPayloadFiles": {
+    "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+    "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+    "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+    "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
+  },
+  "completeEffectiveSourceVerified": false,
+  "full386InputRebuildRequiredInCI": true,
+  "originalAndroidTestCasesPreserved": 487,
+  "originalTestXmlFilesPreserved": 51,
+  "newAndroidTestsExpected": 57,
+  "expectedAndroidUnitTests": 544,
+  "expectedAndroidTestXmlFiles": 56,
+  "newAndroidTestPlan": {
+    "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt",
+      "tests": 4
+    },
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+      "tests": 12
+    },
+    "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",
+      "tests": 12
+    },
+    "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
+      "tests": 13
+    },
+    "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+      "tests": 16
+    }
+  },
+  "actualNewAndroidTestDeclarations": {
+    "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 12,
+    "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
+    "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
+    "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
+  },
+  "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+  "runtimePayloadCountRequiredInCI": 23,
+  "androidUnitTestsExecuted": false,
+  "apkBuilt": false,
+  "lintExecuted": false,
+  "apkRuntimePayloadsVerified": false,
+  "deviceValidationExecuted": false,
+  "googleAccountAuthenticationValidated": false,
+  "priorRunsNotReused": [
+    "37376676669/7b8de498",
+    "37377929368/3b68da9"
+  ],
+  "unchangedGuardAndWorkflowSha256": {
+    ".github/scripts/functionfix_source_scope.py": "6b84a74237ee0b26749f81c54f11eac801dd3dda8711162c1b7be01952f9133b",
+    ".github/scripts/test_functionfix_source_scope.py": "74d98e529d3c63c5360a0537d80dcaf47c8f8c94d55340f39ce47830f12e36ca",
+    ".github/scripts/verify_functionfix_test_results.py": "2e9dfdeac8718186ede68ad6596d6f2a807450fd5d0adbe9a17b7018c8e7d168",
+    ".github/workflows/ui-v76-build.yml": "4ca1bd46323fcc33b33171b74d13b404f53eb9cabbc325243847aac688c3c140"
+  },
+  "checks": [
+    {
+      "name": "function_source",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_source_scope.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.142,
+      "unittestCounts": [
+        11
+      ],
+      "logSha256": "a1997bca199d13e3e903ceb20a1553adeacc855514ae424c9195f78f6a0df6d4",
+      "output": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.091s\n\nOK\n"
+    },
+    {
+      "name": "function_evidence",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_test_results.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.169,
+      "unittestCounts": [
+        5
+      ],
+      "logSha256": "3d06fcee0354b416c024ee911d536621a72ea3f4b3fd7f7bf139b069b687218b",
+      "output": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.118s\n\nOK\n"
+    },
+    {
+      "name": "function_workflow",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_workflow.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.06,
+      "unittestCounts": [
+        4
+      ],
+      "logSha256": "af55efa5c3ceb122f8184c380aa405d3f3b4e7e0c1e892773d0eff31d0645c8a",
+      "output": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.004s\n\nOK\n"
+    },
+    {
+      "name": "five_original_source_gates",
+      "command": [
+        "python",
+        ".github/scripts/run_functionfix_baseline_hosts.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.552,
+      "unittestCounts": [
+        5,
+        6,
+        18,
+        8,
+        10
+      ],
+      "logSha256": "060e56678f5ce5dfc4cff41a6731767036b10c59f71c0c016b0231004a4cd050",
+      "output": "{\"baselineInputs\": 379, \"locallyVerifiedBaselineInputs\": 375, \"missingUnchangedPayloadFiles\": [\"android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo\", \"android-app/app/src/main/assets/mihomo-root/x86_64/mihomo\", \"android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so\", \"android-app/app/src/main/jniLibs/x86_64/libhetu_core.so\"], \"exactFunctionPatchReversed\": true, \"currentCheckoutUnmodified\": true}\ntest_current_ui_packages_and_named_bridges_are_allowed (__main__.PresentationScope.test_current_ui_packages_and_named_bridges_are_allowed) ... ok\ntest_only_expected_version_change_is_allowed_in_build_inputs (__main__.PresentationScope.test_only_expected_version_change_is_allowed_in_build_inputs) ... ok\ntest_path_traversal_is_rejected_even_with_allowed_ui_prefix (__main__.PresentationScope.test_path_traversal_is_rejected_even_with_allowed_ui_prefix) ... ok\ntest_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch (__main__.PresentationScope.test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch) ... ok\ntest_unlisted_root_package_bridge_is_rejected (__main__.PresentationScope.test_unlisted_root_package_bridge_is_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nOK\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.003s\n\nOK\n..................\n----------------------------------------------------------------------\nRan 18 tests in 1.152s\n\nOK\n........\n----------------------------------------------------------------------\nRan 8 tests in 0.016s\n\nOK\ntest_exact_authentication_production_files_are_allowed (__main__.AuthenticationScope.test_exact_authentication_production_files_are_allowed) ... ok\ntest_existing_ui_boundary_still_rejects_authentication_runtime (__main__.AuthenticationScope.test_existing_ui_boundary_still_rejects_authentication_runtime) ... ok\ntest_history_fixture_can_only_add_cross_thread_visibility_and_audit (__main__.AuthenticationScope.test_history_fixture_can_only_add_cross_thread_visibility_and_audit) ... ok\ntest_manifest_requires_fixed_provenance_and_preserves_the_baseline (__main__.AuthenticationScope.test_manifest_requires_fixed_provenance_and_preserves_the_baseline) ... ok\ntest_old_action_safety_assertion_can_only_gain_failure_details (__main__.AuthenticationScope.test_old_action_safety_assertion_can_only_gain_failure_details) ... ok\ntest_only_the_named_authentication_tests_are_allowed (__main__.AuthenticationScope.test_only_the_named_authentication_tests_are_allowed) ... ok\ntest_only_the_new_version_can_change_in_build_inputs (__main__.AuthenticationScope.test_only_the_new_version_can_change_in_build_inputs) ... ok\ntest_path_traversal_is_rejected (__main__.AuthenticationScope.test_path_traversal_is_rejected) ... ok\ntest_runtime_assets_manager_manifest_and_dependencies_stay_protected (__main__.AuthenticationScope.test_runtime_assets_manager_manifest_and_dependencies_stay_protected) ... ok\ntest_unrelated_presentation_sources_are_not_authorized (__main__.AuthenticationScope.test_unrelated_presentation_sources_are_not_authorized) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "name": "dynamic_junit_filters",
+      "command": [
+        "python",
+        ".github/scripts/functionfix_ci_config.py",
+        "junit-filters"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.042,
+      "unittestCounts": [],
+      "logSha256": "165dd3846ffe85a4792d604997fab97acafaad05e15520e893b7f720774d3c0c",
+      "output": "--tests\nio.github.xgl34222220.hetu.PanelExpansionAnchorTest\n--tests\nio.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest\n--tests\nio.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest\n--tests\nio.github.xgl34222220.hetu.RootFakeIpRangesTest\n--tests\nio.github.xgl34222220.hetu.PanelRequestOwnershipTest\n"
+    },
+    {
+      "name": "git_diff_whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.01,
+      "unittestCounts": [],
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": ""
+    }
+  ],
+  "notExecutedLocally": [
+    "Android 544 tests / 56 XML including actual HTTP mutation epoch regressions and reset VM fixture",
+    "Full386 inputs including four unchanged ignored native payloads; CI must restore and compare real bytes",
+    "APK build, lint, 23 packaged payloads / signing / ABI and isolated API35/API36 installation"
+  ],
+  "locallyVerifiedInputs": 382,
+  "allExecutedHostCommandsPassed": true,
+  "sourceReconstruction": {
+    "command": [
+      "python",
+      ".github/scripts/generate_functionfix_source_layer.py",
+      "--output",
+      "/tmp/hetu-select-epoch-reset-reproduce-p14shxn8"
+    ],
+    "exitCode": 0,
+    "result": {
+      "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+      "changedOrAddedFiles": 16,
+      "frozenInputs": 370,
+      "requiredEffectiveInputs": 386,
+      "locallyVerifiedInputs": 382,
+      "locallyMissingUnchangedPayloadFiles": [
+        "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo",
+        "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo",
+        "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so",
+        "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"
+      ],
+      "completeEffectiveSourceVerified": false,
+      "expectedUnitTests": 544,
+      "expectedTestXmlFiles": 56,
+      "patchSha256": "8c8281ce4248610259696b03d1d224ee8b2b6bb677227fe552a225723958687a",
+      "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+      "output": "/tmp/hetu-select-epoch-reset-reproduce-p14shxn8"
+    },
+    "finalManifestAndPatchReproducedByteForByte": true
+  },
+  "hostUnittestCasesPassed": 67
+}

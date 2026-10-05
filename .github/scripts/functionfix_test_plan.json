@@ -5,7 +5,7 @@
   },
   "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
     "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
-    "tests": 10
+    "tests": 13
   },
   "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
     "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",

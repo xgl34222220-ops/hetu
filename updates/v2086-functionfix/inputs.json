@@ -21,13 +21,13 @@
     "updates/v2085-pdf-final-geometry/runtime.patch": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
     ".github/scripts/pdf85_final_transforms.json": "fe4b7fbfb049ba2bf1ec2dca129bdd7c69ace73d2069dcc1e3d01b6a9479626d"
   },
-  "patchSha256": "5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f",
-  "testPlanSha256": "1ec2003f31dbea254a66805f3dbed3d1ab62b7a478bd98a37f0cc1cad1bc6bfe",
+  "patchSha256": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
+  "testPlanSha256": "2bece507b8dac55759bdc004cd808a5b8772098b0d66b9fe46042ab51ba47ade",
   "baselineUnitTests": 487,
   "baselineTestXmlFiles": 51,
   "newTestCounts": {
     "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
-    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 10,
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 13,
     "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
     "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
     "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
@@ -39,13 +39,13 @@
     "io.github.xgl34222220.hetu.RootFakeIpRangesTest": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
     "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt"
   },
-  "expectedUnitTests": 542,
+  "expectedUnitTests": 545,
   "expectedTestXmlFiles": 56,
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "ec2160fec32c7de63290b8750fc170a35db2e303388866a463cc5cdc93bf64b5",
     "android-app/app/src/main/assets/hetu-root.sh": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "b6e579759a02e68cb1408d5117911d375f77a9550634e9c4399d5d7a86a9ea8a",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "08a6e7cc13d9cbe7dc3abe56400ad8a30487088a6a059058baf151789cfd0f45",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "92853a83cc5bcf2fa4786d3a72e0b43a30adc7b1346d4f3e35c286a20b71c06a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "b8a08a67c15b723b8bd67cb443931f9aad2a675a00f64af692596414dfd70440",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java": "9e4a1302e87ef51d91f76ebbcddf514aeed477549b159c1e841eee5135001dd6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "5cc5f89b6de5a7d1b5aca2fa970457916b5fc521c808dd7a05342b23217e68b2",
@@ -53,8 +53,8 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "04c5aeb43281ee8cbf2a75d35f154e2b5550a495eef14b0134a46ec8d4b00a25",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "f987911e93363d988c0e7c9cc6aa7a7a9b17879d68bf55c6c7901f641224e87d",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java": "5f7955eaee7c46899b5401d4ceae103dfab6640c30a10eba73418621648294e6",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "a2bab35172eba9d98299b5160f3e6c5c7bb70e6a67e8dd1d2781ea4b7ea97809",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "5f0aa06577d14a80a2225680aeda1aee17e73d7b6efa1b1e7bf39c120b6a02f6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "b9745db7a1daf64673a329359b30636078f638f03f9196e25a20c2ca26a3fa89",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "b152f19831b93ebf19dc2e4491c439b83bd7cf113285106afd6d5811e3575d96",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java": "52969bec08c3bbb2daeaaad9bbc306974878cfe23e14c852c224be1bc40b27fa",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java": "992722b4531ca1ebab5d54f339eccf66d05402a2a16ff16a0af7a3b14a22499b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "2977c5a6f8e2e3cab2db1c4b2f41ddd9d5b500252bd4b558b71f77af978b3402"

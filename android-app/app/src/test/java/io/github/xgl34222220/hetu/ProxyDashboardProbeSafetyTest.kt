@@ -5,8 +5,10 @@ import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -24,6 +26,7 @@ import java.net.ServerSocket
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 /** Real repository HTTP requests: Root probes enter the local core, and waves retain partial success. */
@@ -313,5 +316,180 @@ class ProxyDashboardProbeSafetyTest {
             val secondPaths = (1..4).map { second.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
             assertEquals(listOf("/proxies", "/providers/proxies", "/proxies/B/delay", "/proxies/B/delay"), secondPaths)
         } }
+    }
+
+    @Test fun confirmedNestedSelectionRefreshesProbeMetadataButAFailedPutPreservesItsCache() = runBlocking {
+        MockWebServer().use { server ->
+            val selected = AtomicReference("A")
+            val rejectSelection = AtomicBoolean(false)
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.requestUrl!!.encodedPath
+                    if (request.method == "PUT" && path == "/proxies/Nested") {
+                        if (rejectSelection.get()) return MockResponse().setResponseCode(401)
+                        selected.set(JSONObject(request.body.readUtf8()).getString("name"))
+                        return MockResponse().setResponseCode(204)
+                    }
+                    return when (path) {
+                        "/proxies" -> {
+                            val outer = JSONObject().put("name", "Outer").put("type", "Selector")
+                                .put("all", JSONArray(listOf("Nested"))).put("now", "Nested").put("testUrl", testUrl)
+                            val nested = JSONObject().put("name", "Nested").put("type", "Selector")
+                                .put("all", JSONArray(listOf("A", "B"))).put("now", selected.get()).put("testUrl", testUrl)
+                            val proxies = JSONObject().put("Outer", outer).put("Nested", nested)
+                            for (leaf in listOf("A", "B")) proxies.put(leaf, JSONObject().put("name", leaf).put("type", "Shadowsocks"))
+                            MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
+                        }
+                        "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
+                        "/proxies/A/delay" -> MockResponse().setBody("{\"delay\":65}")
+                        "/proxies/B/delay" -> MockResponse().setBody("{\"delay\":74}")
+                        else -> MockResponse().setResponseCode(404)
+                    }
+                }
+            }
+            server.start(); selectApi(server)
+            val repository = ProxyDashboardRepository(context)
+            assertEquals(65L, repository.delay("Outer")) // Cache Outer -> Nested -> A.
+            repository.select("Nested", "B")
+            assertEquals(74L, repository.delay("Outer")) // Immediately follows the successful PUT.
+
+            rejectSelection.set(true)
+            val failure = try {
+                repository.select("Nested", "A")
+                null
+            } catch (error: MihomoControllerClient.ControllerHttpException) { error }
+            assertNotNull(failure)
+            assertEquals(401, failure!!.statusCode)
+            assertEquals("B", selected.get())
+            assertEquals(74L, repository.delay("Outer")) // Failure retains the current B metadata cache.
+
+            assertEquals(9, server.requestCount)
+            val paths = (1..9).map { server.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
+            assertEquals(listOf("/proxies", "/providers/proxies", "/proxies/A/delay", "/proxies/Nested",
+                "/proxies", "/providers/proxies", "/proxies/B/delay", "/proxies/Nested", "/proxies/B/delay"), paths)
+        }
+    }
+
+    @Test fun singleAndBulkProviderUpdatesRefreshCachedMetadataBeforeTestingNewLeaves() = runBlocking {
+        MockWebServer().use { server ->
+            val current = AtomicReference("A")
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.requestUrl!!.encodedPath
+                    if (request.method == "PUT" && path == "/providers/proxies/sub") {
+                        current.set(if (current.get() == "A") "B" else "C")
+                        return MockResponse().setResponseCode(204)
+                    }
+                    val leaf = current.get()
+                    return when (path) {
+                        "/proxies" -> {
+                            // Dynamic provider nodes are supplied by /providers/proxies.
+                            val group = JSONObject().put("name", "Route").put("type", "Selector")
+                                .put("all", JSONArray(listOf(leaf))).put("now", leaf).put("testUrl", testUrl)
+                            MockResponse().setBody(JSONObject().put("proxies", JSONObject().put("Route", group)).toString())
+                        }
+                        "/providers/proxies" -> {
+                            val provider = JSONObject().put("name", "sub").put("vehicleType", "HTTP")
+                                .put("testUrl", testUrl).put("expectedStatus", "204")
+                                .put("proxies", JSONArray().put(JSONObject().put("name", leaf).put("type", "Shadowsocks")))
+                            MockResponse().setBody(JSONObject().put("providers", JSONObject().put("sub", provider)).toString())
+                        }
+                        "/providers/proxies/sub/$leaf/healthcheck" -> MockResponse()
+                            .setBody("{\"delay\":${mapOf("A" to 65L, "B" to 74L, "C" to 83L).getValue(leaf)}}")
+                        else -> MockResponse().setResponseCode(404)
+                    }
+                }
+            }
+            server.start(); selectApi(server)
+            val repository = ProxyDashboardRepository(context)
+            assertEquals(65L, repository.delay("A"))
+            assertEquals(setOf("B"), repository.refreshProvider("sub")!!.nodes)
+            assertEquals(74L, repository.delay("B")) // Newly added B is absent from the old cached A snapshot.
+            assertEquals(74L, repository.delay("B"))
+            assertEquals(setOf("C"), repository.refreshSubscriptions().single().nodes)
+            assertEquals(83L, repository.delay("C")) // The same mutation guard covers the batch entry point.
+
+            assertEquals(15, server.requestCount)
+            val requests = (1..15).map { server.takeRequest(2, TimeUnit.SECONDS)!! }
+            assertEquals(3, requests.count { it.requestUrl!!.encodedPath == "/proxies" })
+            assertEquals(2, requests.count { it.method == "PUT" && it.requestUrl!!.encodedPath == "/providers/proxies/sub" })
+            assertEquals(1, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/A/healthcheck" })
+            assertEquals(2, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/B/healthcheck" })
+            assertEquals(1, requests.count { it.requestUrl!!.encodedPath == "/providers/proxies/sub/C/healthcheck" })
+        }
+    }
+
+    @Test fun successfulMutationRejectsCollectedGlobalAndAutomaticGroupResultsWhileAnotherProbeIsPending() = runBlocking {
+        for (global in listOf(true, false)) MockWebServer().use { server ->
+            val names = (1..7).map { "node$it" }
+            val latencyRequests = AtomicInteger()
+            val putRequests = AtomicInteger()
+            val selected = AtomicReference(names.first())
+            val held = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    val path = request.requestUrl!!.encodedPath
+                    if (request.method == "PUT" && path == "/proxies/Route") {
+                        check(JSONObject(request.body.readUtf8()).getString("name") == "node2")
+                        selected.set("node2")
+                        putRequests.incrementAndGet()
+                        return MockResponse().setResponseCode(204)
+                    }
+                    if (path.endsWith("/delay")) {
+                        if (latencyRequests.incrementAndGet() == 7) {
+                            // Waves await every six-node chunk before starting the next.
+                            // Entering request seven proves six results already completed
+                            // their individual identity checks and were collected.
+                            held.countDown()
+                            check(release.await(6, TimeUnit.SECONDS)) { "Wave fixture was not released" }
+                        }
+                        return MockResponse().setBody("{\"delay\":74}")
+                    }
+                    return when (path) {
+                        "/proxies" -> {
+                            val proxies = JSONObject()
+                            for (leaf in names) proxies.put(leaf, JSONObject().put("name", leaf).put("type", "Shadowsocks"))
+                            for ((name, type) in listOf("Route" to "Selector", "Auto" to "URLTest")) {
+                                proxies.put(name, JSONObject().put("name", name).put("type", type)
+                                    .put("all", JSONArray(names)).put("now", selected.get()).put("testUrl", testUrl))
+                            }
+                            MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
+                        }
+                        "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
+                        else -> MockResponse().setResponseCode(404)
+                    }
+                }
+            }
+            server.start(); selectApi(server)
+            val repository = ProxyDashboardRepository(context)
+            val group = ProxyGroupUi("Auto", "URLTest", names.first(), names.map { ProxyNodeUi(it) })
+            val published = AtomicBoolean(false)
+            supervisorScope {
+                val wave = async(Dispatchers.Default) {
+                    val result = if (global) repository.globalDelay() else repository.groupDelay(group, names)
+                    published.set(true)
+                    result
+                }
+                try {
+                    assertTrue("The seventh probe must enter after the first completed chunk", held.await(3, TimeUnit.SECONDS))
+                    assertEquals(7, latencyRequests.get())
+                    repository.select("Route", "node2")
+                    assertEquals("node2", selected.get())
+                    assertEquals(1, putRequests.get())
+                } finally {
+                    release.countDown()
+                }
+                val failure = try {
+                    wave.await()
+                    null
+                } catch (error: IOException) { error }
+                assertNotNull("An obsolete wave must not return its earlier successful results", failure)
+                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
+                assertFalse(published.get())
+                assertEquals(7, latencyRequests.get())
+                assertEquals(10, server.requestCount) // Two snapshots, seven probes, one successful PUT.
+            }
+        }
     }
 }

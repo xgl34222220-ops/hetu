@@ -49,6 +49,8 @@ class PanelRequestOwnershipTest {
     private val groupB = ProxyGroupUi("B", "Selector", "shared", listOf(ProxyNodeUi("shared"), ProxyNodeUi("b")))
 
     @Before fun prepare() {
+        PanelRequestOwnershipShadows.RootStatus.reset()
+        PanelRequestOwnershipShadows.Sites.reset()
         server = newServer { response(it) }
         val app = ApplicationProvider.getApplicationContext<Application>()
         app.getSharedPreferences("hetu", 0).edit().clear()
@@ -331,6 +333,7 @@ class PanelRequestOwnershipTest {
     }
 
     @Test fun ordinaryPollKeepsAnActiveGroupInTheSamePidSession() {
+        assertEquals("Ordinary-poll fixture must start in PID 77", 77, PanelRequestOwnershipShadows.RootStatus.pid)
         val old = gate()
         response = { req -> if (req.requestUrl!!.encodedPath == "/group/A/delay") {
             old.hold(); body("""{"shared":22}""")
@@ -340,6 +343,7 @@ class PanelRequestOwnershipTest {
         var refreshed = false
         vm.viewModelScope.launch { vm.refreshNow(); refreshed = true }
         eventually("Ordinary poll completes") { refreshed }
+        assertEquals("Ordinary poll must remain in the same PID session", 77, vm.state.corePid)
         assertEquals(true, vm.testingGroups["A"])
         assertEquals(true, vm.testingNodes["shared"])
         old.countDown(); awaitActions()

@@ -18,6 +18,7 @@ import java.net.HttpURLConnection
 import java.net.InetSocketAddress
 import java.net.Proxy
 import java.net.URL
+import java.util.concurrent.atomic.AtomicLong
 import kotlin.coroutines.coroutineContext
 
 internal data class DashboardProviderUi(
@@ -52,16 +53,17 @@ internal class ProxyDashboardRepository(context: Context) {
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
-    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long) {
+    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
         val stable: Boolean get() = runtimeEpoch >= 0L
         override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
-            settings == other.settings && runtimeEpoch == other.runtimeEpoch
-        override fun hashCode(): Int = 31 * settings.hashCode() + runtimeEpoch.hashCode()
+            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch
+        override fun hashCode(): Int = 31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) + mutationEpoch.hashCode()
     }
     private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
     private val probeSnapshotMutex = Mutex()
     private var cachedProbeSnapshot: ProbeSnapshot? = null
     private var probeSnapshotAt = 0L
+    private val probeMutationEpoch = AtomicLong()
     private val probeIdentityKeys = setOf(
         "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
         "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
@@ -82,7 +84,7 @@ internal class ProxyDashboardRepository(context: Context) {
                 ProxyConfigLibrary.BUNDLED_NAME else ""
         }
         // Ordinary status/health reads do not change this nonblocking control epoch.
-        return ProbeIdentity(settings, RootProxyManager.observationTicket())
+        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get())
     }
 
     private fun requireCurrentProbe(identity: ProbeIdentity) {
@@ -158,6 +160,9 @@ internal class ProxyDashboardRepository(context: Context) {
         val oldIds = if (disconnectPrevious && previous.isNotBlank() && previous != node)
             selectionConnectionIds(api.connections(), group) else emptyList()
         api.select(group, node)
+        // Successful core mutations invalidate both cached metadata and in-flight
+        // observations immediately, without waiting behind a blocking snapshot read.
+        probeMutationEpoch.incrementAndGet()
         // A failed switch never reaches cleanup. Missing/unknown chains are retained.
         var failed = 0
         for (id in oldIds) {
@@ -203,7 +208,10 @@ internal class ProxyDashboardRepository(context: Context) {
             coroutineScope {
                 chunk.map { provider ->
                     async {
-                        try { api.updateProxyProvider(provider.name) }
+                        try {
+                            api.updateProxyProvider(provider.name)
+                            probeMutationEpoch.incrementAndGet()
+                        }
                         catch (cancel: CancellationException) { throw cancel }
                         catch (_: Exception) { }
                     }
@@ -263,6 +271,7 @@ internal class ProxyDashboardRepository(context: Context) {
                 } }.awaitAll()
             }.forEach { (node, value) -> if (value != null) results[node] = value }
         }
+        requireCurrentProbe(snapshot.identity)
         return results
     }
 
@@ -303,6 +312,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             }
             measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
         }
+        requireCurrentProbe(snapshot.identity)
         results
     }
 
@@ -348,6 +358,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
 
     suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {
         api.updateProxyProvider(name)
+        probeMutationEpoch.incrementAndGet()
         remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }
     }
 

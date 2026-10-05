@@ -1,3 +1,15 @@
+## 最终功能候选：整波返回前身份检查，目标545/56
+
+已确认成功PUT时批量快结果/慢阻塞的迟到map会被VM接纳，measureSnapshot及非Selector groupDelay返回前各补现有identity guard；原稳定身份partial成功继续保留。追加1真实HTTP测试覆盖global/group两条路径，Probe原12完整保留共13，新增58/原487总545、56XML。此前544/a980报告对应该追加前候选，保留历史事实但不代替新源验收；等待新层/67host与自己的新CI。其余所有前述授权及保留边界保持，不扩大review、不取消旧CI。
+
+## 当前续验：3b68真实542/1失败，缓存mutation epoch与夹具显式重置
+
+原test/v20.76-new-ui恢复到20315ad；Android与3b68相同，保留原PDF任务所有文档与成功/失败记录，不操作其CI。本功能run37377929368@3b68 attempt1真实56XML542项，1failure/0error/0skip；原487和新展开4/探测10/订阅12/fake13通过，VM15/16通过。唯一ordinaryPoll失败为自定义shadow静态PID88跨测试残留；仅测试@Before显式RootStatus.reset/Sites.reset及前后77断言，保留原16测试/所有原busy/结果断言，生产VM不改。完整日志/原XML/套件摘要归档docs/qa/20261006-v2086-3b68da9-*。lint/当前安装尚未执行，不称Root0。
+
+另确认实际group testNode路径成功选择及订阅刷新后短缓存未失效：成功PUT立即推进AtomicLong mutation epoch，失败PUT保留有效缓存，旧缓存/迟到结果由现有身份守卫拒绝。Probe原10保留加2真实HTTP回归，共12；下一候选57新增、544总项/56XML，386完整输入（本地382缺原4native）。须重建当前独立层/67host证明、提交原分支并用自己的新CI完整验收；原196主机报告仅属7b8输入，丢失临时epoch报告不能冒充本次实物核验。
+
+用户功能修复授权及原设计/功能/权限/签名/22原载荷/自启/六层保持，必要revision152已在原精确版本契约内。覆盖安装后用户点击一次代理「重启」应用新Root脚本；不强停现有核心、不操作手机或帐号、不清数据/no hook/不合并main或正式发布。真实Google认证根因与真机修复仍未验证，AOSP及HTTP延迟不能替代。详见docs/FUNCTION_FIX_20261006.md。
+
 ## 当前续验：7b8de49 首轮测试编译失败，仅修两处夹具类型
 
 功能生产源已编译/23载荷/687ABI通过，但原新run37376676669的Runtime unit tests在新增PanelExpansionAnchorTest的DpRect height/width类型误用处编译失败；0实际XML，Android单测、lint、当前双API未执行，不记542或Root0成功。原failure与历史对照success分别保留，未取消CI。根任务只修两处边界计算的尺寸类型（使用.value边差），原断言/阈值/4测试/542目标/56XML及全部生产文件不变；新层patch5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f，20新host+47原source再次通过，本地382缺4、CI完整386仍必须重建。详见docs/qa/20261006-v2086-anchor-fixture-compilation-candidate.json；196原host证明属于7b8首轮字节不改写。继续原branch新提交独立验收，不拿首轮或旧274/ec成功替代。
@@ -328,3 +340,7 @@ V20.78 在相同补丁链追加 `updates/v2078-network-traces/runtime.patch`；2
 - 不引入Vue空回调、console.log、setTimeout假启停/测速、硬编码IP/节点/CPU/流量/ISP。未知值继续未知。
 - 分开报告迁移脚本、实际应用提交、编译、测试、发布和真机结果。用户要求回复不放图片/图片链接，交付真实APK、源码、报告和文字即可。
 - 旧test.92自动写回已停用，不重写Git历史。之前批量清理旧分支/标签/产物被安全检查拦截、未完成，本轮未执行历史清理，不授权绕过。
+
+本轮恢复后实物源独立重建完成：patch8c8281ce4248610259696b03d1d224ee8b2b6bb677227fe552a225723958687a，inputs5acab6aa5b44ba2bb62cd17b1d884412a1a75f7e18183f0c55a0b3735d7c3164；20新增与47原源码host全部通过，层逐字节复现。报告 docs/qa/20261006-v2086-select-epoch-reset-source-host-proof.json SHA256 a980694b26c1fb954917b0bc5ce16ca3f605820e897b8972a283113f100f14b5。此时Android544/56、lint和当前双API仍待新提交自己的CI。
+
+最终batch候选67host已全部通过且层逐字节复现：patch ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a、inputs 796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22；545/56，local382/required386。独立报告 docs/qa/20261006-v2086-batch-epoch-source-host-proof.json SHA49f1cc67cf4deb944141f4735f98c37c4cbc5d4a3012118f187a1e0c704aad27。此时新Android验收仍未执行。

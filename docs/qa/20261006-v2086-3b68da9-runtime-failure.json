@@ -1,0 +1,493 @@
+{
+  "schema": 1,
+  "observedUtc": "2026-10-05T22:03:39.966879+00:00",
+  "applicationCommit": "3b68da93082e43263e2cfae8011c05fa7fdcff14",
+  "runId": 37377929368,
+  "attempt": 1,
+  "buildJobId": 111991911440,
+  "runConclusion": "failure",
+  "uiArtifact": {
+    "id": 11372891473,
+    "sha256": "726b97431c4a9da77759bba550cb0a0e13a43b233446632c4c542d091bb77af5",
+    "bytes": 14490679
+  },
+  "rawBuildLogPath": "docs/qa/20261006-v2086-3b68da9-build-failure.log",
+  "rawBuildLogSha256": "444270aabe4af0ba27569ac09418fee88467c76aada9e2a41c28747f3e792dca",
+  "actualXmlFiles": 56,
+  "actualTestcases": {
+    "tests": 542,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  "suites": [
+    {
+      "name": "io.github.xgl34222220.hetu.AdblockSnifferTest",
+      "sha256": "b04b6a1a090d8c1a5baf35dea021ad8853b7041db3a106ababe842ed6266f3f6",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.AppCrashReportTest",
+      "sha256": "8d661281efbda508c49198340d1fb7289af1f75bc2bc0790a2f12b8f232e2ed5",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.AutomationConceptParity57Test",
+      "sha256": "e5027a3540a48adc650499a1be58819fc54a4902450cf6471894bee3c5f11f7e",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest",
+      "sha256": "a41e982076530c4a37c11056d8c782d1f5a63c7b1f6584e164a42f4da2c225c6",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest",
+      "sha256": "8e1707cabd4cc922de227f7ade065ab650254b4c011aa69bff61fdb6f06a2e66",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.BootStartup60Test",
+      "sha256": "3c55146c5a01142dbae944a8af2e9c2c822bbeb6c7b4200850346ca4a42562bf",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ConceptParity57Test",
+      "sha256": "2d4ae6bcad016271af5f403cf09275bcf0a7171064192882f8a783c0b74f87e9",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest",
+      "sha256": "86826edb60272a77f90f19a9367eb85f0afe97fba36c38736554e0d34ac79c32",
+      "tests": 26,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ConceptStateCoverageTest",
+      "sha256": "1248c8c90d466430abd5af884caa2cf3542dbc30d99bb6b945a7fa942707176f",
+      "tests": 25,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+      "sha256": "e6a2ecefc70ceadd459dde91c9fc264a017be63e0d498a5b90affb9d49493eab",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "sha256": "fabd990488d8d36a2f153dd7ca421e241f8fbe3318f8c878775ef06ddf9d41cb",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.CoreManagerConcept57Test",
+      "sha256": "717b354e2ed19f6a371bf75f8f5610bbca9d969e093b1537bb9ad524276a7447",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+      "sha256": "23dd8ce7e6045a3197afa8589b5efd7751ea68f49db2cc557fea3f19e4f2342a",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.DocumentPickerSafetyTest",
+      "sha256": "fb085f05efe12cb66a35982e0dd774ddadc0b47c86d055a2ba1070d9a75908a3",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+      "sha256": "0846af8825dc08e6d8ad9dd7e025e7fdb5870a597fb51f00e46dba961a559e3f",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.JournalReliabilityTest",
+      "sha256": "a38ab418b77658af4fd6d17a97d78b237fd653d706d05c5e95af38c0ddb4cca0",
+      "tests": 21,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.LargeTitleParity59Test",
+      "sha256": "24944656d3c6a631366a0d83cface75e2a891b9704990ee888d68184303bbc50",
+      "tests": 1,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+      "sha256": "3604b306216699362aa30a10ebf403d09de26193f364dfbca66dfd42c9228bbb",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.MainLanguageBindingTest",
+      "sha256": "ff769a082d363852706de087bdfef3188c9186f9cac6f7edbb041a79b929b165",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NetworkDiagnosticsTest",
+      "sha256": "bdafec957233bfcb429d7d5cca305cad1e649aeb763086802b414ff5be2e4693",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NativeConceptScreenshotTest",
+      "sha256": "bd23acb64d2314b20c9a6a78a526b9d3cbdfedaace0d420893fd0cd62b9bd0d3",
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NetworkRecoveryStressTest",
+      "sha256": "785e1fcf6478b93b12b2af56957712633b1580ced6f7c4ba62484cc3bbd24308",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NewHomePanelInteractionTest",
+      "sha256": "dccfaa067df865943bdff1e619fc8dc7e1edc7e4df3e90eb7498325c2240bb02",
+      "tests": 9,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NewUiIntegrationTest",
+      "sha256": "13da1e3125c9a39e5cb15c37669fa5b6802799c8f8cd8448f7389fcd59b3cecd",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.NewUiShell83Test",
+      "sha256": "9a12f236add0c9bb14a594087ce04bebf0bad0bdfc1cd5f44925d4fa9a8e2c58",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelActionSafetyTest",
+      "sha256": "d54b940b368a7c0091f41002883367c55d5e264d5a280b283aca3ea2d282c3a3",
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelConceptModelTest",
+      "sha256": "51983688de5f04904e801f59c9547244fc19deca51e21c5e3ec650c369ac54dd",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "sha256": "08917a9ea51505526131b68d5476a90426a9496c00cdfc47b3c9f202c1b38a36",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "sha256": "613b8a522825775480461763608b390e6ad88b32b2304104d7412187557bdea1",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest",
+      "sha256": "1f6c4a96a2cd39d69a246f51f0b9487795202346a583e23cf89cb97f18190bed",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "sha256": "bb7d9ce0240c95e989e366ebd64b7663a32c91692ba30ada6fc2ddd19faac770",
+      "tests": 16,
+      "failures": 1,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.PanelModel11Test",
+      "sha256": "53d4e2be5e8a2bdd5461d1ca6a5cd3ba00e0e9ed1d5a1b5993d2f69342d7ecfe",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+      "sha256": "9ff69095ae2e182f5aa88114ee946ed9379ccb13eaf1548fcda7d055c8609f85",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "sha256": "a690a505f72ed7a5103c03b42d2a2723a64c6126b80282e7fb8c27f60c092faa",
+      "tests": 10,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+      "sha256": "e57843b305862b9c796e7fcaee7588696fc8301b4ec26edb82a4c38f1d71b127",
+      "tests": 16,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyScriptSafetyTest",
+      "sha256": "ca51b3afc9c112b65667e68036256ff66b13e3cafc0755cd29b02fc9c3c5cf9c",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxyNetworkJournalTest",
+      "sha256": "7a1b5ba57a4e2e3226ef2fd124d7069011ebcce1fad064386a53398b0cf03df2",
+      "tests": 11,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "sha256": "c9cde788f8fb282a12a615de30d3f844f37a09480a7fef2c765d99cb78438a9e",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RootAutostartTest",
+      "sha256": "786cde46f5c44047adb12c8baa596147149be28157bca20d1d5959f8f17d2c4e",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "sha256": "d78705e95250e400ceb3692a7abbfd616950e045b61cd9bb3cc5f838ffeb5161",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+      "sha256": "5a16134191ffc54b51811c593c34e19d634ad4f3ec019149b72f4c88c1c8ed71",
+      "tests": 7,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RootNetworkRecoveryTest",
+      "sha256": "7f001ed6de90c0b529f884864b951dd5bb161e4fa685dabdfb07cbd6cbf7b85f",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.Runtime146ContractTest",
+      "sha256": "6b16eb97194ce21f0fb77af0346a216c7c72cba108cfb8f2453fce1874a72227",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RuntimeStartup15Test",
+      "sha256": "0a02e3e7cc5c744b8c983fd498485625982f9602ae6a3abe2d53cdb8613eb952",
+      "tests": 13,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.RuntimeYaml15Test",
+      "sha256": "94e2c0a55f18d52ef73da606751ae8501ee086ab597a416102b1f7b9f2b8f25c",
+      "tests": 14,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.SettingsBackupParity57Test",
+      "sha256": "d534760deefeb11873ef62957690a415505a783d0e8bfaa5a14e0562fb09b6f8",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.SettingsConceptParityTest",
+      "sha256": "9f6e0e9430854a6adb4b5b584b7c8b1261d499447dd056906f735d450e79e98e",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+      "sha256": "0df9fa012866c35e341d291689bd4d36dbc602cac5f381da8ddd4b01761d3203",
+      "tests": 2,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ToastFeedbackTest",
+      "sha256": "1d17206464d53522464af65f8184787aa1924233ae9254d63c0cc13fe949f8a0",
+      "tests": 6,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.ToolsConceptParityTest",
+      "sha256": "7f18e2d94b0cacec6c760615bd7b75b833fd4468b0fe11be00fc60e05177aefb",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.UI83EditorHistoryTest",
+      "sha256": "b9ec4abb54f6c8b700274b11c5ad2b4cbf1e9b4771b461fa98be396253a6dc51",
+      "tests": 12,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.UI83ToolsTest",
+      "sha256": "85ef1270d23c468e3df085059ee67d412ac1235d28af7ff4c5232811c9632298",
+      "tests": 8,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.WanDetails61Test",
+      "sha256": "cf870cbe27c7e6836f89b485de772302ce9c7c7bf5d797203753d5af61ed1567",
+      "tests": 4,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "sha256": "959af54919266a8dcbba29d9eb22f60513188083e0987867628dea7c91b2267a",
+      "tests": 3,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest",
+      "sha256": "76c47f341c8f8f8f77e98ec4f084eba3307616df3210927a0b9defae5e24e18f",
+      "tests": 5,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    {
+      "name": "io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+      "sha256": "9d8f4b62d37a5162e1aa03b98da714f26e4940e4c351ebea2fa22a051caa2b49",
+      "tests": 49,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    }
+  ],
+  "failures": [
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "name": "ordinaryPollKeepsAnActiveGroupInTheSamePidSession",
+      "seconds": "0.096",
+      "message": "java.lang.AssertionError: expected:<true> but was:<null>",
+      "trace": "java.lang.AssertionError: expected:<true> but was:<null>\n\tat org.junit.Assert.fail(Assert.java:89)\n\tat org.junit.Assert.failNotEquals(Assert.java:835)\n\tat org.junit.Assert.assertEquals(Assert.java:120)\n\tat org.junit.Assert.assertEquals(Assert.java:146)\n\tat io.github.xgl34222220.hetu.PanelRequestOwnershipTest.ordinaryPollKeepsAnActiveGroupInTheSamePidSession(PanelRequestOwnershipTest.kt:343)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:524)\n\tat org.robolectric.internal.SandboxTestRunner.executeInSandbox(SandboxTestRunner.java:494)\n\tat org.robolectric.internal.SandboxTestRunner.access$900(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$7.evaluate(SandboxTestRunner.java:442)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.robolectric.internal.SandboxTestRunner.access$600(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$6.evaluate(SandboxTestRunner.java:333)\n\tat org.robolectric.internal.SandboxTestRunner$3.evaluate(SandboxTestRunner.java:233)\n\tat org.robolectric.internal.SandboxTestRunner$5.lambda$evaluate$0(SandboxTestRunner.java:317)\n\tat org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:101)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n"
+    }
+  ],
+  "original487CasesPassed": true,
+  "newExpansion4CasesPassed": true,
+  "lintExecuted": false,
+  "candidateDualApiInstallationExecuted": false,
+  "rootMutationCount": "not executed",
+  "failureInterpretation": "custom @Config shadows retain static fields without a registered ShadowProvider; preceding externalPid test sets pid88 while ordinaryPoll fixture assumes77, causing the correct production PID guard to invalidate busy ownership",
+  "fixtureCorrection": "explicit RootStatus/Sites.reset in Before and PID77 assertions; keep all sixteen cases, busy/result assertions, and production generation logic",
+  "candidateCacheCorrection": "successful selection and provider single/bulk PUT advances private cache mutation epoch; failed PUT preserves cache; two additional real HTTP cases",
+  "candidateExpectedTests": 544,
+  "candidateExpectedXmlFiles": 56,
+  "candidateAndroidAcceptance": "pending; this old542 failure cannot validate new544 candidate"
+}
