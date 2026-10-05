@@ -1,0 +1,31 @@
+{
+  "baselineCommit": "492a9c646f752ca5d20c5951486ad723985be73a",
+  "currentApplicationCommit": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
+  "sourceChangesInHomeAndPanel": [],
+  "sharedChanges": "Exact opt-in only transform validated by pdf85_source_scope.validate_shared_page; flatCanvas=false/referenceDocument=false/maxVisibleChoices=null defaults preserve previous path",
+  "comparison": {
+    "fromCommit": "18909201b6168687cac4e1de5ece68db36938fda",
+    "toCommit": "770f3fa8e252958e9cb05fb0e6a4b6d7aa40edb6",
+    "fromUiArtifact": 11337935682,
+    "toUiArtifact": 11339995867,
+    "matchedScreens": 43,
+    "byteIdentical": 42,
+    "differences": [
+      {
+        "image": "02-012-api-expanded.png",
+        "pixelBounds": [
+          270,
+          636,
+          308,
+          646
+        ],
+        "observedValues": [
+          "47023",
+          "57011"
+        ],
+        "meaning": "Actual ephemeral loopback fixture port; layout and remaining pixels byte-identical"
+      }
+    ]
+  },
+  "latestApplicationScreenshotComparison": "pending latest CI artifact"
+}

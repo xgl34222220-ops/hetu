@@ -14,8 +14,11 @@ class LargeTitleParity59Test {
         assertTrue(tools.contains("tools.HetuToolsV2("))
         val toolsScreen = java.io.File("src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt").readText()
         val toolsDesign = java.io.File("src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt").readText()
-        assertTrue(toolsScreen.contains("top = 26.dp"))
+        // PDF03A/1 and04/1 have the same visible title alignment. HxPage
+        // already reserves its collapsed toolbar, so its local padding differs.
+        assertTrue(toolsScreen.contains("top = 66.dp"))
         assertTrue(toolsDesign.contains("fontSize = 36.sp"))
-        assertTrue(settings.contains("largeTitleTopPadding = 26.dp"))
+        assertTrue(settings.contains("largeTitleTopPadding = 16.dp"))
+        assertTrue(settings.contains("largeTitleBottomPadding = 12.dp"))
     }
 }

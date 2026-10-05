@@ -5,7 +5,7 @@
   "previousPatchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
   "versionCode": 2085,
   "versionName": "0.12.15-v20-pdf",
-  "patchSha256": "255e26a3329018ec4d3058f8b4da46b4afc3991b7979f67f2983579d5bcf0c1d",
+  "patchSha256": "e3cdce3c7d563aa30cb235017337daea5d3ea352d69cd354c8d6119cc7e5ad30",
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "233cda9f3a372510cc9335f3f628a25216a64c5ae9ed2d66a4054948b04206f3",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java": "03c4b503fa94cd484f27ca6c0a731fb33b56289bbc9ccb18e3f7b1d93254c223",
@@ -28,6 +28,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "1e8bed62dfc3fc665cf906f0f6c17a8e7aa67ea6bf9579de96b6ab126933044c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "a4463e8549f86860631e7548bcd7aa7cede9053330337c8eb72acf9f9b49ca40",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java": "880b97d431f61793bbc3c574b5d15efbf3adec18d5d87858a479ac68968f11b4",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt": "2708b29d79b965c47b159b262a815ebb0a7e471814707c7d47247948bd57a848",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt": "b1d96bdd4b1268a32eeb96eceff04a593a9292445f35c31ecc83f352bb47a969",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt": "dbdbc8a15b791f0d6240de6baa69f22cfc8cdbdad78950da72e945371c0150d6",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt": "499b204cdd0b41ea18493d73c8daf2468007bffc63a13ce38b919ab5fbdf1a3b"
@@ -330,7 +331,6 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi8ExperienceTest.kt": "2c14afc89b26023137c965698a0f10438b4af7d595c7966eacbff5b614142c7e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi9BentoTest.kt": "09effa80161b5e64a00c5fbeb0d45f93ce4189d2a04e39517d51c7cadf79e355",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt": "09b3bbd7b19bbcb9f11131fe712a5e12acc737ae8f4302ca8ff8ffdf467fce06",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt": "0beba3598ff9d0469b16c398c59d9472bf23f146e246f800108e69e6f8abb081",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt": "58425f9d85a387090c54a2acf806a230e79946ab17ef52759ad8969699c60a32",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionModel12Test.kt": "e64e0dae2492edbd5d3214ab1338ad5aaf0747106308daf618f86192f95ada50",

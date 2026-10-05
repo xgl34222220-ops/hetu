@@ -1,0 +1,16 @@
+{
+  "commit": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
+  "run": 37298079055,
+  "failedJob": 111723994601,
+  "failedStep": "Runtime unit tests",
+  "executedTests": 479,
+  "failedTests": 1,
+  "failedCase": "LargeTitleParity59Test.rootToolsAndSettingsUseExpandedHeaderActions",
+  "actualFailureLine": 17,
+  "reason": "Old literal UI spacing assertion top=26.dp conflicts with PDF-reviewed tools top=66.dp; settings expectation also must become16dp/bottom12dp",
+  "buildApk": "passed",
+  "lintFinalSigningInstallation": "not-executed",
+  "uiArtifact": 11340384188,
+  "repair": "Update the existing single test case to instructed PDF UI spacing; retain all other expanded/collapsed action checks and exact422/479 counts",
+  "repairInstalledValidation": "pending"
+}
