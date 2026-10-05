@@ -305,9 +305,9 @@ internal fun ToolsAddDomainDialogCard(
     ToolsDialogCard(
         title = if (overlay.allow) "添加白名单" else "添加黑名单",
         text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
-        confirmLabel = "添加", confirmLoading = overlay.saving,
+        confirmLabel = "添加", confirmLoading = overlay.saving, neutralCancel = true,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
-    ) { ToolsField("域名", overlay.draft, onDraftChange, placeholder = "example.com", monospace = true, keyboardType = KeyboardType.Uri, error = overlay.error) }
+    ) { ToolsField("域名", overlay.draft, onDraftChange, placeholder = "example.com", monospace = true, keyboardType = KeyboardType.Uri, error = overlay.error, clearable = !overlay.saving) }
 }
 
 /** Page 49: reached by tapping a row of 最近拦截. */
@@ -315,7 +315,7 @@ internal fun ToolsAddDomainDialogCard(
 internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     ToolsDialogCard(
-        title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving,
+        title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving, neutralCancel = true,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     ) {
         Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)

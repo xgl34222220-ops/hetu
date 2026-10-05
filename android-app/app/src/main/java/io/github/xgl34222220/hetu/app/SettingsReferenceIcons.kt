@@ -39,6 +39,8 @@ private object SettingsReferenceIcons {
     val CloudDown = line("CloudDown", "M6 18a5 5 0 0 1-1-9.9A7 7 0 0 1 18.8 8 5 5 0 0 1 19 18", "M12 12v10", "m8 18 4 4 4-4")
     val Droplet = line("Droplet", "M12 2C10 5 4 10 4 15a8 8 0 0 0 16 0c0-5-6-10-8-13Z", "M8 15a4 4 0 0 0 4 4")
     val Dock = line("Dock", "M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z", "M6 14h12")
+    val LiquidGlass = line("LiquidGlass", "M10 4 12 10 18 12 12 14 10 20 8 14 2 12 8 10 10 4Z", "M19 2 20 5 23 6 20 7 19 10 18 7 15 6 18 5 19 2Z")
+    val Scale = line("Scale", "M8 3H5a2 2 0 0 0-2 2v3", "M16 3h3a2 2 0 0 1 2 2v3", "M21 16v3a2 2 0 0 1-2 2h-3", "M8 21H5a2 2 0 0 1-2-2v-3")
     val Move = line("Move", "M2 12h20", "m6 8-4 4 4 4", "m18 8 4 4-4 4")
     val Back = line("Back", "m9 4-6 6 6 6", "M3 10h12a6 6 0 0 1 0 12h-4")
     val Gauge = line("Gauge", "M3.4 18a10 10 0 1 1 17.2 0Z", "m12 13 5-5", "M12 3v3", "m5 6 2 2", "M2 12h3")
@@ -49,6 +51,13 @@ private object SettingsReferenceIcons {
     val Moon = line("Moon", "M21 13.1A9 9 0 0 1 10.9 3 9 9 0 1 0 21 13.1Z")
     val SystemTheme = line("SystemTheme", "M12 2v2", "M2 12h2", "m4.9 4.9 1.4 1.4", "m17.7 6.3 1.4-1.4", "M16.1 8a6 6 0 0 0-8.2 8", "M9.5 19A7 7 0 0 0 21 12.8a7 7 0 0 1-8-7.7", "M3 21 21 3")
     val Blur = line("Blur", "M13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0Z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "m4.9 4.9 2.2 2.2", "m16.9 16.9 2.2 2.2", "m4.9 19.1 2.2-2.2", "m16.9 7.1 2.2-2.2")
+}
+
+/** Dedicated motion-setting glyphs; other Dashboard/GridView/BlurOn callers keep their existing icons. */
+internal object SettingsActionIcons {
+    val FloatingDock: ImageVector get() = SettingsReferenceIcons.Dock
+    val LiquidGlass: ImageVector get() = SettingsReferenceIcons.LiquidGlass
+    val Scale: ImageVector get() = SettingsReferenceIcons.Scale
 }
 
 internal fun settingsLineIcon(icon: ImageVector): ImageVector = when (icon.name.substringAfterLast('.')) {

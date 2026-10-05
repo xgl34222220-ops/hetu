@@ -921,9 +921,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     SettingsDivider()
                     SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
                     SettingsDivider()
-                    SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
+                    SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = SettingsActionIcons.FloatingDock, iconTint = c.textMuted)
                     SettingsDivider()
-                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
+                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = SettingsActionIcons.LiquidGlass, iconTint = c.accent, enabled = blur)
                 }
             }
         }
@@ -938,7 +938,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         }
                     }
                     SettingsDivider()
-                    SettingsNavRow(ht("界面缩放"), subtitle = ht("统一调整界面和文字大小"), icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
+                    SettingsNavRow(ht("界面缩放"), subtitle = ht("统一调整界面和文字大小"), icon = SettingsActionIcons.Scale, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
                 }
             }
         }

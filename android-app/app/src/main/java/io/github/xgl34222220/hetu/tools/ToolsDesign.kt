@@ -173,6 +173,7 @@ internal fun ToolsButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     loading: Boolean = false,
+    neutral: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -180,7 +181,7 @@ internal fun ToolsButton(
     val (fill, foreground) = when (kind) {
         HomeButtonKind.Primary -> c.accent to c.onAccent
         HomeButtonKind.Secondary -> c.surface to c.t1
-        HomeButtonKind.Soft -> c.accentSoft to c.accent
+        HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent
         HomeButtonKind.Ghost -> Color.Transparent to c.accent
     }
     Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)

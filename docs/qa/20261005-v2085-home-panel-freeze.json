@@ -1,6 +1,6 @@
 {
   "baselineCommit": "492a9c646f752ca5d20c5951486ad723985be73a",
-  "currentApplicationCommit": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
+  "currentApplicationCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
   "sourceChangesInHomeAndPanel": [],
   "sharedChanges": "Exact opt-in only transform validated by pdf85_source_scope.validate_shared_page; flatCanvas=false/referenceDocument=false/maxVisibleChoices=null defaults preserve previous path",
   "comparison": {
@@ -27,5 +27,29 @@
       }
     ]
   },
-  "latestApplicationScreenshotComparison": "pending latest CI artifact"
+  "latestApplicationScreenshotComparison": {
+    "fromCommit": "18909201b6168687cac4e1de5ece68db36938fda",
+    "toCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+    "fromUiArtifact": 11337935682,
+    "toUiArtifact": 11341183078,
+    "matchedScreens": 43,
+    "byteIdentical": 42,
+    "differences": [
+      {
+        "image": "02-012-api-expanded.png",
+        "pixelBounds": [
+          278,
+          636,
+          308,
+          646
+        ],
+        "observedValues": [
+          "47023",
+          "42041"
+        ],
+        "meaning": "Only actual ephemeral isolated fixture port differs; compared images opened visually; remaining pixels identical"
+      }
+    ],
+    "interpretation": "42/43 byte-identical; one actual fixture port value differs, no layout difference"
+  }
 }

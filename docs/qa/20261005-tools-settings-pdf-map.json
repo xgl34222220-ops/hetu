@@ -21,7 +21,7 @@
     }
   ],
   "scope": "130 supplied PDF states only; home and panel frozen",
-  "visualReview": "All 130 reference pages read. This round's 125 available native component screenshots inspected against PDF; remaining five built-in WebUI states await installed run. Fixture data and un-emulated OS chrome differ; no pixel parity pass is claimed.",
+  "visualReview": "All130 reference pages and current125 component plus5 installed native WebView states actually inspected against the PDF. Fixture content and system chrome differ. Current source ce is tested; subsequent follow-up remains untested until new CI. No literal pixel parity pass claimed.",
   "pages": [
     {
       "document": "03A",
@@ -33,9 +33,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-001-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "92fa97fa42c7ca09c82618146077150ae303b376182c90372b0b34cbf637c2e8",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -47,9 +51,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-002-tools-collapsed.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-002-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7d728dbd68186a5359bb0273c452d96feec0c06163407e60dcb2a5aee88fa411",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -61,9 +69,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-003-tools-search.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-003-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "c2d51517987f8ced566cca62947755946140a8738873ae2fc7425abb05c9997f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -75,9 +87,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-004-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -89,9 +105,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-005-add-subscription-empty.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-005-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "edce4a491a5d541e82cdcb2770d717e14ae98489819dd22138d4232b818f6f71",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -103,9 +123,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-006-current-config-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-006-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -117,9 +141,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-007-other-config-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-007-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -131,9 +159,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-008-bundled-config-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-008-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -145,9 +177,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-009-rename-config.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-009-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "46d50f417cf57c492b453c3a9d5903b30876fd641744670736becd1488b07202",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -159,9 +195,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-010-delete-config.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-010-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "28defb4390cbdf816bd9119a4999581c4475a488edeb2e74c601d3aa57f17df4",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -173,9 +213,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-011-delete-subscription.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-011-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "cefe4b21a9a3ef8821f070f2634da9ce57d3bb10e17613e83e4efc544816bd73",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -187,9 +231,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-012-discard-import.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-012-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -201,9 +249,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-013-yaml-outline.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-013-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "dc0b134a752ac58958a8fb0d6feae31778f171fee265944ab73963a87d720748",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -215,9 +267,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-014-yaml-selection-conflict.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-014-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "449e16df55e7ff35733637964dd9d394443dd4d80efb33738d4cf7cb166b9cc0",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -229,9 +285,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-015-yaml-validation-error.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-015-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "9fe09ad1a991195b17ccd6a015f8208321934524d3450e1f9946537ba38e9395",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -243,9 +303,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-016-yaml-read-error.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-016-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "de0b6c06e0a5dcc8313a9a0830b19a9c057dfbc0950f671c46e4377738621666",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -257,9 +321,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-017-yaml-external-conflict.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-017-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7e53001cfba1fe8f775683f3abe1213d113d763216dc2806813366bd9dedfd3f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -271,9 +339,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-018-yaml-reload-confirm.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-018-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "f1db7bd51fa36ce716e09ff540b2adcb5070764f9461dd5f0a2509d807c33841",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -285,9 +357,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-019-yaml-discard.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-019-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "1e38a9c8cc45964f803a5e54f06f51471ed8b478d96bd0627cf0ab1d3e0a23f0",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -299,9 +375,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-020-import-link-invalid.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-020-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -313,9 +393,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-021-subscription-empty-name.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-021-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "6f8360c0a131e56164fb2cb7131dac8f8a012a30d8e28a8d06316d920c04dbc0",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -327,9 +411,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-022-subscription-invalid-url.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-022-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e6bbcacd7704ff71c2708cbb678e515d1bc2d29d60e57cd06766989fbe6d0299",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -341,9 +429,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-023-edit-subscription-invalid.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-023-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "c7bc3c21bcb5db0ee88934a04785f79fa7d09fda98687f180d99342baa53dba5",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -355,9 +447,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-024-import-link.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-024-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -369,9 +465,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-025-yaml-editor.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-025-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b832e418257e29d2ed24e086a7c30287d8ea606b77b8fe164d12f18f16913775",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -383,9 +483,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-026-edit-subscription.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-026-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "05decb724dbd0610eb18c4e267f3faca2d5d941a7b542a7b965cba2638f433a5",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -397,9 +501,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-027-import-file-empty.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-027-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "a6e0d13b2961a839ea4ed623c3ed88827611bf573d84e63c328aa3d3ec591578",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -411,9 +519,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-028-app-blacklist.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-028-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "d0e226ab4142ca0d12fb3fdf102efee5a3b13a2980d62b4c1f5fe34f9b43efe7",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -425,9 +537,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-029-app-sort.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-029-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "43ceac0aefdad37c32ddecbd838eedc76c830b19f4bfe1077d10a071d0b922df",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -439,9 +555,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-030-app-more.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-030-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "c3977468c655b219e7a4c57d0fa14b500d5163411f682639212ce00503430bf4",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -453,9 +573,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-031-app-whitelist.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-031-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "3751e8c666eda14dbcf7dd95a8b5e213b11c4c45488bde5b4b52a768807dc9a6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -467,9 +591,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-032-app-core-mode.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-032-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "44dda181928da6edfc55e5ed988194298f048c74a9ea24e8e75f74be5be12a71",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -481,9 +609,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-033-app-search.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-033-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "4b0cf6970416004fbd6d1b0df28cf60fb892e12f70a9e26bc0ecb4f02a72477b",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -495,9 +627,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-034-core-three-cards.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-034-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b15cf69ee5a8ae0b9bfede1fa519a7e1f772d595f7dd5535cf73aee97424fc05",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -509,9 +645,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-035-core-download-progress.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-035-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "fb2fb99272a1d1087d91c85c125a38a759c9d5395b72142390aa8f51da348f64",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -523,9 +663,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-036-bypass-rules.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-036-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -537,9 +681,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-037-bypass-discard.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-037-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -551,9 +699,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-038-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "9c394b0d70889a2a0e11eff033d209458d9c7ecbf0094ca9d7aa2f4c46dbf973",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -565,9 +717,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-039-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -579,9 +735,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-040-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b4dac1296fb67dcf7dd1f344052af48aa6a7121675ab2cfdd74c4dbe0874a983",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -593,9 +753,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-041-diagnostic-startup.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-041-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "3845a37fcbcb41ade54fa4df7fde816d369aee913911b1798643e0068f830c79",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -607,9 +771,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-042-diagnostic-recovery.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-042-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8bce44b3b4ec23799ab1d31c28067fc4c374b68365275be552e27cea7a9df676",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -621,9 +789,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-043-diagnostic-network.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-043-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "3b5d0337be0cdec3385854852bb95f59a76a6cc2425f16b07fb137d4f478c5d6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -635,9 +807,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-044-adblock-rules.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-044-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "149ece5db4f8f879b9d9f0f2e48303c88cd15016b4a9f3ebe7261acab3d59142",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -649,9 +825,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-045-adblock-status.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-045-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "6dacdf69c1bca1ccdeea899af64b5f7f64320127030a1e8df6e1ad6eb9d6bbc8",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -663,9 +843,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-046-adblock-help.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-046-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "a34b0118f9eead861197c0c3c20552a5abb222220fcd04adf6c9e19b00260ea1",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03A",
@@ -677,9 +861,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-047-adblock-add-allow.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-047-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "851b568df8c4fc01aaffb5398da0be63eaa3b244d28a4b81749b348bc51111ba",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -691,9 +879,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-048-adblock-add-block.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-048-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "9bfe20e55a7c411c5ed93014e344a958d519087007392a3b037c72d6ae38cca4",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03A",
@@ -705,9 +897,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03A-049-adblock-whitelist-confirm.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03A-049-current.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "a9a097566351ff57ce330e5742d5bc01fd9142da67216f97899be6e171e9abde",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03B",
@@ -719,9 +915,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-001-adblock-global-warning.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-001-adblock-global-warning.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "d75b1b35ad49c42968cbc17e79ba0996735f183f63a7ae1da3b67ff491ff09f6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03B",
@@ -733,9 +933,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-002-log-files.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-002-log-files.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "0733e7be0775e12ed93097353fbc54b57c738fe11f66a073f3d1b717a3028763",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -747,9 +951,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-003-log-file-picker.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-003-log-file-picker.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "4c4e7608a1f4e4cc55ae40e47d5cf034d9385d68ee5ff493c2640dc00062fe8a",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -761,9 +969,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-004-log-clear.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-004-log-clear.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "3bcb34a20cc38c3cb0a4039bc065eda1211757bef12ca2b8d97682b49d94004c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -775,9 +987,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-005-log-search-expanded.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-005-log-search-expanded.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "56c128fef5ab8481b73eb4b6529b08e3428725bc40fc904e15bc00353cd26174",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -789,9 +1005,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-006-scripts.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-006-scripts.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8bdc67e41b5c005300b1796e23e43008a29d81d0e1280d6ffa2cea57640035e1",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -803,9 +1023,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-007-scripts-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-007-scripts-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "5d93ff7694ce6df33a421e48f5d0ff17cb4aed890d9a99859dc8fbfcbb0e0fbf",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -817,9 +1041,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-008-pre-start-hook.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-008-pre-start-hook.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "6fe43cb1ae032a53a6ca8e58246c6d1be7624cd23becdba93820ab34bdc9882c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -831,9 +1059,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-009-post-stop-hook.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-009-post-stop-hook.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "dbecdd53508508791d44a881bb88184d14c159a67a9b8529d7d1b161e608daf3",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -845,9 +1077,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-010-script-delete.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-010-script-delete.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "ada846466bd98cd962283818a7529c357ee878b4513205a75286d7e0aa36213e",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -859,9 +1095,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-011-script-environment.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-011-script-environment.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "10b57ceddb00e6c1e2f477854635e34b337494fd2fadf10be973245c7c25bb2b",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -873,9 +1113,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-012-runtime-editor.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-012-runtime-editor.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "3414f50a4bd85d36eef257b2b53c7f9c144c80de57339f1c88ffabc5407a623c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -887,9 +1131,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-013-files-list.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-013-files-list.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "75a0f1bbebc5e21c485a5e413c83128bfef47062290f7a95e4992000612673c3",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -901,9 +1149,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-014-files-subfolder-search.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-014-files-subfolder-search.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e85ce05fdd910639ddf600ad246e4f377ec3ebc389063d8d491e3411387989e1",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -915,9 +1167,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-015-files-more.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-015-files-more.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "07a791ad88f606577074568be6acfa2178c838f6c932c77ade04cb4634492606",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -929,9 +1185,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-016-file-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-016-file-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "782b52b5852593dbc39f44e1d72005aee0a0cc5d9ab74e144eac7c8964d399be",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -943,9 +1203,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-017-folder-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-017-folder-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "dbe396c29bede4cccbe9dd49473303dde5e7386483139b8d1644a2fbc85c48d6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -957,9 +1221,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-018-files-new-file.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-018-files-new-file.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e25a1dc8f4f5f9a168cc2ae5355ba1bfcb49c3839b1d47452908406c3ab01e5d",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -971,9 +1239,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-019-files-new-folder.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-019-files-new-folder.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "739720ab5629e8fb4bece85aa3bdeaf4e773ada69f97775d46812a44ac68296d",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -985,9 +1257,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-020-files-download.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-020-files-download.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "1e6e8dc87ab51bf847bcb3c74b2fce0a70b8e72e7131f2ce19f5f8f127dc132f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -999,9 +1275,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-021-files-download-invalid.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-021-files-download-invalid.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "20d8bfa2c1d396821ccac8381228fb5d7050fe7a7dbfeca3f95233867dd5dba3",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1013,9 +1293,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-022-files-rename.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-022-files-rename.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e5790decf016c598266c49dc7ec36d4ae834224d75a5da27b8309894cdb09377",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1027,9 +1311,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-023-file-delete.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-023-file-delete.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "d67195a33195fff95a5d576f436d2f43a02b6e2d98038a2f2899e45396a0f938",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1041,9 +1329,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-024-folder-delete.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-024-folder-delete.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "6e5dcd74135390a40796486f419cdff29bee439f811bb551e3fab2a185257ac5",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1055,9 +1347,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-025-files-name-unchanged.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-025-files-name-unchanged.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "4c6c28c6745f832fe1a515e60a8876fe8908da5df03f8af84498754aab8e7bc0",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1069,9 +1365,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-026-runtime-editor-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-026-runtime-editor-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7f682e61818e61eb260009f910decb302fa3ee0bd7b6016be483f30675059af5",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1083,9 +1383,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-027-runtime-editor-jump.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-027-runtime-editor-jump.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "97f5870a9b96d80b1ba1d1a45593a7ab24ca603ffe4741e5d5eabaa150a0212c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1097,9 +1401,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-028-runtime-editor-discard.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-028-runtime-editor-discard.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b2da3f5d67be0c345ec2b5cbf989ff537bd9de45ff05bdf2ffad18910a3e9063",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1111,9 +1419,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-029-runtime-editor-search.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-029-runtime-editor-search.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "40629a00df36db43a55c72cb1bfb56733326267f47c6c3f52ae519f547b1c36e",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1125,9 +1437,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-030-network-match.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-030-network-match.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "1707fecd3545d61203d6d51cb538ecd6c16c192ac0aed48c0c32ee97c4b3b0d3",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1139,9 +1455,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-031-match-action.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-031-match-action.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "4eb5a046ee3112a600910706c834964e67ea983fefb28a90631575da4d66f3d6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1153,9 +1473,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-032-unmatch-action.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-032-unmatch-action.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "65636ebbd609f0eb7858b4503aefe13014d2681042bd3ef6844fbeee590f063f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1167,9 +1491,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-033-web-panels.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-033-web-panels.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "ec3837c6bdec6ca67ce733af6755bcf38bd50f3366776bfee5f9eb5e69d517bf",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1181,9 +1509,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-034-add-web-panel.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-034-add-web-panel.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "2b48c878dec5d5ea6f6f3e4293b0caf78cb6622b1d7cb59f3fa28cf21810b5fd",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1195,9 +1527,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-035-edit-web-panel.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-035-edit-web-panel.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "f1549a04e72ff0078fdfd4564020d3b88a095d154a6ef58def621796b35dcc96",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1209,9 +1545,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-036-delete-web-panel.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-036-delete-web-panel.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "5fe22c48cd1b36753dc1ae7ee629ed4e567c8d0c8e78db14600cde21873dd130",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1223,9 +1563,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-037-local-mode.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-037-local-mode.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "97ab9ece9eb5bdf53eabd3c5b80590e226f3615fa13b888b21b48f0936d85363",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1237,9 +1581,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-038-custom-web-container.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-038-custom-web-container.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e520a7f5ba55a6770a340bf80569d1821e80ba5b8affe2bb0f6e3343f2bf5ad1",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1251,9 +1599,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-039-substore-web-container.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-039-substore-web-container.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8a73652ac675ff12d62f59881956df8a04d47c9fa7b48f14d810d2e446512837",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1265,10 +1617,11 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "passed selected real WebView DOM/native state in isolated loopback fixture",
       "currentCapture": "reference-03B-040-native-overview.png",
       "currentScreenshotReviewed": true,
-      "installedArtifact": 11338486322
+      "installedArtifact": 11343255111,
+      "currentCaptureSha256": "f30d9c435f968a47004457df167e654c776f22541bb76929eb0346093dbf6058"
     },
     {
       "document": "03B",
@@ -1280,10 +1633,11 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "passed selected real WebView DOM/native state in isolated loopback fixture",
       "currentCapture": "reference-03B-041-native-groups.png",
       "currentScreenshotReviewed": true,
-      "installedArtifact": 11338486322
+      "installedArtifact": 11343255111,
+      "currentCaptureSha256": "cdf76a1fbb7e1d3908020722692798fe334cb5c2b4b7e0cb79d6bf58e9e8da7f"
     },
     {
       "document": "03B",
@@ -1295,10 +1649,11 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "passed selected real WebView DOM/native state in isolated loopback fixture",
       "currentCapture": "reference-03B-042-native-connections.png",
       "currentScreenshotReviewed": true,
-      "installedArtifact": 11338486322
+      "installedArtifact": 11343255111,
+      "currentCaptureSha256": "623c1e7295849cb3f9d3346f9b30af286c57fe44622e976f9414881994def7fb"
     },
     {
       "document": "03B",
@@ -1310,10 +1665,11 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "passed selected real WebView DOM/native state in isolated loopback fixture",
       "currentCapture": "reference-03B-043-native-node-dialog.png",
       "currentScreenshotReviewed": true,
-      "installedArtifact": 11338486322
+      "installedArtifact": 11343255111,
+      "currentCaptureSha256": "6a29819db3a13ee7f4d9e8c4b69b0a16202dd15fac5c9f95ffaa1ad4a17e5be4"
     },
     {
       "document": "03B",
@@ -1325,10 +1681,11 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "passed selected real WebView DOM/native state in isolated loopback fixture",
       "currentCapture": "reference-03B-044-native-switch-failure.png",
       "currentScreenshotReviewed": true,
-      "installedArtifact": 11338486322
+      "installedArtifact": 11343255111,
+      "currentCaptureSha256": "d67553cc74ddbc5b8eff5b84af4062d8a1235a04e164b90ad6a110668103996c"
     },
     {
       "document": "03B",
@@ -1340,9 +1697,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "sub-store.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "158d7e5ab739f79b1fae0f8e7d75a5b78c01e413c57f0ef6e77a61d5cf2ceeda",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "03B",
@@ -1354,9 +1715,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-046-substore-checking.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-046-substore-checking.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "103190b977fca8775ba103981462fa89401dba2cb6020007e3865e372ab409d0",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03B",
@@ -1368,9 +1733,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-047-substore-connected.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-047-substore-connected.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7ba63dd588e85e2fd0355dbfb3d71a371effa84530bc5c3adc1ecc0f5853cb89",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "03B",
@@ -1382,9 +1751,13 @@
       "referenceImageRead": true,
       "historicalCapture": "03B-048-substore-unavailable.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "03B-048-substore-unavailable.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "c2977f884f2d66505756d46148d57bef6d5fceca685370a386a6edc9216ec1f4",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "actual current cebeb PDF paired review"
     },
     {
       "document": "04",
@@ -1396,9 +1769,13 @@
       "referenceImageRead": true,
       "historicalCapture": null,
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "settings-hub.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "a5b1703828602bb088602bc044d3e6da11dab6a999c296fe0af63068324ef166",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1410,9 +1787,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-002-settings-collapsed.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-002-settings-collapsed.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "9e1d8746e8153f518cc5720ee549a1b345f52ade53b4f7affbce034e7b735694",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1424,9 +1805,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-003-basic-proxy.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-003-basic-proxy.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "119bbe92f1de9c7385cc3de8dfdb751acbf1c5a4e13b0329e55f71098adffdca",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1438,9 +1823,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-004-advanced-settings.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-004-advanced-settings.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "ee1be111972c21ffe070aed25903a60ec6ecaed33efc78397eb29eec7aac5610",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1452,9 +1841,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-005-resource-limits.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-005-resource-limits.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "d1dcfae8d886089c7884c4b35c072f7f65b0dfb3e92c714816b72f837f6a3706",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1466,9 +1859,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-006-startup-download.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-006-startup-download.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "576f1f160ec07b48f503945f809247c7084713ac3f462c99ad0fa0a2135f4a96",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1480,9 +1877,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-007-default-panel.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-007-default-panel.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "fdd636cddb6a120e4fc5a12a3d1a51eae3d3384ef81af7ebf6de01d702e80f99",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1494,9 +1895,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-008-theme.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-008-theme.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "0965a13d70fa756023244c38b23d62622212997868d9d0447a8aaed2de59df46",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1508,9 +1913,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-009-theme-motion.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-009-theme-motion.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "711dca91b99bd9dcb3cf5e7b89adfa8ebdb771c328f003cf0d576415b6e2c723",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1522,9 +1931,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-010-backup.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-010-backup.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "dd8dfa64104b2287445f6e1ad1a9546cd3415aa58a3f19fa4f40da7dd1f0442a",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1536,9 +1949,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-011-notification.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-011-notification.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "38b09af9851fd47b5c76eef9447df9994d799997c3f8a37b51a6fb48d6643d95",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1550,9 +1967,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-012-notification-actions.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-012-notification-actions.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b49c6a27e1110743e4aeee794729f7a1be6def9de4b7de05ab919647bc19c74c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1564,9 +1985,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-013-about.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-013-about.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b2fb8daa682a9dcd300387607c0dcf5f6798b20be5c72276fe860159eb01bd5f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1578,9 +2003,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-014-startup-config.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-014-startup-config.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7bba0022ca1e15480e6950e2acc46499ed621d6113f05b04db807ab38b82d0e6",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1592,9 +2021,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-015-core-choice.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-015-core-choice.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "45fa17c6a51ffecbb9aa06bb25aefa0aa2b16d0f2b37528ea43435bf888bce0c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1606,9 +2039,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-016-run-mode-choice.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-016-run-mode-choice.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8f2004b05ba526664d6e2d4b3e35a338d000469809e367060d8b4050ccdc9f40",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1620,9 +2057,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-017-ipv6-choice.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-017-ipv6-choice.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "800e2ebc1fd6f5a7858cf1e0e3186eb0a2d8062035ebafc6a53f85e03b7d8663",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1634,9 +2075,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-018-default-panel-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-018-default-panel-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "7f01fe5614e69d28701c04ef59ce8e65642a6ae4beb65aa1d4fba551d6fc7845",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1648,9 +2093,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-019-language-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-019-language-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8466c25500448032587d9fd824a6556b0696e934aaeed5cd01c432a20928897f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1662,9 +2111,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-020-top-blur-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-020-top-blur-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "922d6fa157506411db4f6be3c0745a2c883ed5b687d417d5480c53acb54e25ea",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1676,9 +2129,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-021-scale-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-021-scale-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "37b01e15a3b572d7f2d0c8a76d2231551370fdaa993524fc243eca39339e054a",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1690,9 +2147,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-022-refresh-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-022-refresh-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "8668cc6b6284fe6b92d652c7e12d5a64bf2d23c2d5d1776a6f7f1a831d211e7a",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1704,9 +2165,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-023-target-menu.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-023-target-menu.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "611eacb04da465c31bc4bbab177c2e8a2abdeaa03b7a2c78bda5d899b74d83e3",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1718,9 +2183,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-024-action-one.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-024-action-one.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b3ef1cef997d7dd776cf6f99080c7789eccffc4f70d8fbdf74833f7de6dd97d8",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1732,9 +2201,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-025-action-two.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-025-action-two.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e848c58398d9961d7170a82c95abad61d29d742a7e6fae37366ca0191e43d30f",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1746,9 +2219,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-026-action-three.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-026-action-three.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "864c1df52152ea76c8310648875244a3b4021fcd036fd83ab50f4716ebf5c609",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1760,9 +2237,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-027-dns-dialog.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-027-dns-dialog.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "29a0ce673b2b545137231eef2593365597bc0704919ca39913fa8ffe75a1643e",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1774,9 +2255,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-028-restore-confirm.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-028-restore-confirm.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "b8ef2c63cda35c4deab9391040b845d4d6b9e5a9c7b005dc7075d798892cc935",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1788,9 +2273,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-029-mirror-dialog.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-029-mirror-dialog.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "6eceac3d72b9e90be7809b351aa35137099acea08f5ab6bcfd2c3213e6ff0fed",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1802,9 +2291,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-030-mirror-invalid.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-030-mirror-invalid.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "166529615eb9336aabd628edbd4bbd6798b6bd4aecf039266208ac95b01f5ee2",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1816,9 +2309,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-031-mihomo-license.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-031-mihomo-license.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "ab1777aff6e5e05d5d6d8f7bc7dfb59b3eb773089f1352a5da573d5d654a22fe",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1830,9 +2327,13 @@
       "referenceImageRead": true,
       "historicalCapture": "04-032-adguard-license.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-032-adguard-license.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "e304204e4c0e2cb1396721c4fbb1a7ee1e249886640464d95a14cfd304277f3c",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     },
     {
       "document": "04",
@@ -1844,12 +2345,34 @@
       "referenceImageRead": true,
       "historicalCapture": "04-033-lucide-license.png",
       "currentPixelParity": "reviewed-differences-pending",
-      "currentInteractionValidation": "pending",
+      "currentInteractionValidation": "Existing installed smoke covers selected entries; not a separate callback/I-O acceptance for this PDF page",
       "currentCapture": "04-033-lucide-license.png",
-      "currentScreenshotReviewed": true
+      "currentScreenshotReviewed": true,
+      "currentCaptureSha256": "fa99b66268446e3f947adc485f19a90bea12d653de29a564179a55b148971e19",
+      "currentCaptureArtifact": 11341183078,
+      "currentCaptureCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "latestReviewBasis": "a89 actual PDF paired review + exact current PNG bytes"
     }
   ],
-  "currentReviewCommit": "18909201b6168687cac4e1de5ece68db36938fda",
-  "currentReviewRun": 37292555012,
-  "currentReviewSummary": "130 current states actually reviewed from 1890920 build and installed native WebView; screenshot availability is not a 1:1 pixel pass."
+  "currentReviewCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+  "currentReviewRun": 37300578403,
+  "currentReviewSummary": {
+    "referencesOpened": 130,
+    "componentPages": 125,
+    "componentArtifact": 11341183078,
+    "componentTestXml": {
+      "tests": 479,
+      "files": 49,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "unchangedSinceActuallyReviewedProvisionalCapture": 90,
+    "literalPixelParity": "not-passed",
+    "explanation": "Reference image reading/current state coverage/manual paired review are distinct from literal pixel parity and per-page functional acceptance.",
+    "latestInstalledStatesReviewed": 5,
+    "totalPagesWithCurrentCapture": 130,
+    "fullPixelParityAccepted": false,
+    "latestInstallationEvidence": "docs/qa/20261005-v2085-ce-installation-success.json"
+  }
 }

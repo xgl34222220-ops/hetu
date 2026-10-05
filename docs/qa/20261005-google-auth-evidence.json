@@ -62,15 +62,16 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
-    "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN for direct UID",
+    "applicationCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+    "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
-    "currentChanges": "Only bounded connection metadata classification/quota; no new Root/controller requests, DNS/routing changes, credentials/cookies/tokens, hooks or permissions"
+    "currentChanges": "Only bounded connection metadata classification/quota; no new Root/controller requests, DNS/routing changes, credentials/cookies/tokens, hooks or permissions",
+    "dnsPolicy": "install_dns_redirect4/6 use mark,uid0,interface,blacklist returns and scoped TCP/UDP:53 redirect; neither accepts DUIDS nor calls direct_uid_returns. Actual resolver/packet UID and failure-time answers unavailable."
   },
   "proved": [
     "Some historical GMS connections reached the core and had bidirectional counters",
     "Historical Google services used different rule/chain selections",
-    "Own-process direct probes and GMS proxy connections are different paths"
+    "Own-process application TCP/UDP probe and GMS proxy connections are distinct observation paths; DNS separately governed, not assumed direct"
   ],
   "notProved": [
     "Current Google account authentication success",
@@ -83,7 +84,8 @@
     "classifierTests": 8,
     "passedInRuns": [
       37292555012,
-      37293354486
+      37293354486,
+      37300578403
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",

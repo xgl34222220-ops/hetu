@@ -1,19 +1,26 @@
 package io.github.xgl34222220.hetu.tools
 
 import io.github.xgl34222220.hetu.ui.ht
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeBadge
 import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
@@ -71,9 +78,9 @@ internal fun ToolsCoresScreen(
 }
 
 internal fun ToolsCore.glyph(): ImageVector = when {
-    id.startsWith("mihomo") -> ToolsFeatureIcons.Cat
-    id.startsWith("sing-box") || id.startsWith("singbox") -> ToolsFeatureIcons.Box
-    id.startsWith("xray") -> HomeIcons.X
+    id.startsWith("mihomo") -> ToolsIcons.CoreMihomoPdf34
+    id.startsWith("sing-box") || id.startsWith("singbox") -> ToolsIcons.CoreSingBoxPdf34
+    id.startsWith("xray") -> ToolsIcons.CoreXrayPdf34
     else -> ToolsIcons.Cpu
 }
 
@@ -84,10 +91,18 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
     HomeCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                ToolsGlyphTile(core.glyph(), background = if (core.runnable) c.accentSoft else c.sunken)
+                Box(
+                    Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))
+                        .background(if (core.runnable) c.accentSoft else c.sunken),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(core.glyph(), null, Modifier.size(40.dp), tint = c.t1)
+                }
                 Column(Modifier.weight(1f)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(core.name, Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(core.name, Modifier.weight(1f, fill = core.runnable), color = c.t1,
+                            style = HomeType.rowTitle.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
+                            maxLines = 1, overflow = TextOverflow.Ellipsis)
                         when {
                             !core.runnable -> HomeBadge(ht("仅下载管理"))
                             core.updateAvailable -> HomeBadge(ht("有更新"), tone = HomeTone.Accent)

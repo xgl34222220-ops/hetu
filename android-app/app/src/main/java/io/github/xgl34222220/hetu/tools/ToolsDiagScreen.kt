@@ -97,7 +97,8 @@ internal fun ToolsDiagScreen(
 /** Page 41: the generated startup copy, YAML-coloured, with 复制. */
 @Composable
 internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
-    val palette = toolsYamlPalette()
+    val c = LocalHomeColors.current
+    val palette = remember(c) { ToolsYamlPalette(key = c.t2, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
     DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier) { text ->
         remember(text, palette) { toolsYamlAnnotated(text, palette) }
     }
@@ -128,7 +129,7 @@ private fun DiagTextSheet(
             content.loading -> ToolsLoading()
             content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
             content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
-            else -> ToolsCodeBox(styled(content.text))
+            else -> ToolsCodeBox(styled(content.text), plain = title == "消息与网络诊断")
         }
     }
 }
@@ -142,7 +143,7 @@ internal fun ToolsRestoreNetworkDialogCard(onConfirm: () -> Unit, onCancel: () -
     ToolsDialogCard(
         title = "恢复网络？",
         text = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
-        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading,
+        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading, neutralCancel = true,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     )
 }

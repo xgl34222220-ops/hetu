@@ -57,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
@@ -409,11 +410,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
  * reports stay inside the sheet; lines never wrap, which keeps YAML indentation readable.
  */
 @Composable
-internal fun ToolsCodeBox(text: AnnotatedString, modifier: Modifier = Modifier, maxHeight: Dp = 420.dp) {
+internal fun ToolsCodeBox(text: AnnotatedString, modifier: Modifier = Modifier, maxHeight: Dp = 420.dp, plain: Boolean = false) {
     val c = LocalHomeColors.current
-    HomeCard(modifier.fillMaxWidth().heightIn(max = maxHeight), background = c.bg) {
+    HomeCard(modifier.fillMaxWidth().heightIn(max = maxHeight), background = if (plain) Color.Transparent else c.bg) {
         Box(Modifier.verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())) {
-            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t1, style = ToolsEditorType.code, softWrap = false)
+            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t1, style = ToolsEditorType.code.copy(fontSize = 14.sp, lineHeight = 20.sp), softWrap = false)
         }
     }
 }

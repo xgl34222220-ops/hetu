@@ -706,7 +706,7 @@ private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean)
                 Text(time, fontSize = 14.sp, lineHeight = 19.sp, color = c.text, fontWeight = FontWeight.Medium)
                 Spacer(Modifier.width(10.dp))
             }
-            Text(level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
+            Text(if (level.equals("warning", true)) "WARN" else level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
                 modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 2.dp))
         }
         Spacer(Modifier.height(7.dp))

@@ -56,7 +56,7 @@ index 3f7ba83..8fd1b33 100644
              OtherCard(card) {
                  OtherLabel("代理能力")
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
-index 7c958c3..01566ac 100644
+index 7c958c3..e6ba113 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 @@ -432,7 +432,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -68,6 +68,15 @@ index 7c958c3..01566ac 100644
          title = selected?.name ?: "core.log",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
+@@ -706,7 +706,7 @@ private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean)
+                 Text(time, fontSize = 14.sp, lineHeight = 19.sp, color = c.text, fontWeight = FontWeight.Medium)
+                 Spacer(Modifier.width(10.dp))
+             }
+-            Text(level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
++            Text(if (level.equals("warning", true)) "WARN" else level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
+                 modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 2.dp))
+         }
+         Spacer(Modifier.height(7.dp))
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
 index 7f55bf3..9fd87b0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
@@ -81,6 +90,68 @@ index 7f55bf3..9fd87b0 100644
          title = "网络匹配",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
+index 4d244bd..2ac70c2 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
+@@ -289,6 +289,21 @@ internal fun webToolChromeClient(state: WebToolLoadState) = object : WebChromeCl
+     override fun onProgressChanged(view: WebView?, newProgress: Int) { state.progress = newProgress.coerceIn(0, 100) }
+ }
+ 
++/** Opens a selected HTTP(S) page, rejecting URI user-info in both page and Sub-Store backend. */
++internal fun webToolBrowserIntent(url: String): Intent? {
++    if (url.any { it.isWhitespace() || it.isISOControl() }) return null
++    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
++    if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank() || uri.rawUserInfo != null) return null
++    val page = android.net.Uri.parse(url)
++    val backend = runCatching { page.getQueryParameter("api") }.getOrNull()
++    if (backend != null) {
++        if (backend.any { it.isWhitespace() || it.isISOControl() }) return null
++        val api = runCatching { java.net.URI(backend) }.getOrNull() ?: return null
++        if (api.scheme?.lowercase() !in setOf("http", "https") || api.host.isNullOrBlank() || api.rawUserInfo != null) return null
++    }
++    return Intent(Intent.ACTION_VIEW, page.normalizeScheme()).addCategory(Intent.CATEGORY_BROWSABLE)
++}
++
+ /** Keeps status/cutout/keyboard/navigation insets and native history-aware Back. */
+ internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLoadState, name: String, subStoreBackend: String? = null) {
+     enableEdgeToEdge()
+@@ -304,7 +319,15 @@ internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLo
+                             Icon(WebToolIcons.Lock, "HTTPS", tint = Hx.colors.textMuted, modifier = Modifier.size(18.dp))
+                             Spacer(Modifier.width(14.dp))
+                             Text(state.host, color = Hx.colors.textMuted, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
+-                                maxLines = 1, overflow = TextOverflow.Ellipsis)
++                                modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                            Text("默认浏览器打开", color = Hx.colors.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
++                                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Hx.colors.accentSoft)
++                                    .clickable {
++                                        val target = webToolBrowserIntent(view.url ?: state.url)
++                                        if (target != null) runCatching { startActivity(target) }.onFailure {
++                                            android.widget.Toast.makeText(this@setWebToolContent, "没有可用的浏览器", android.widget.Toast.LENGTH_SHORT).show()
++                                        }
++                                    }.padding(horizontal = 9.dp, vertical = 5.dp))
+                         }
+                     }
+                 }
+@@ -344,7 +367,8 @@ class ProxySubStoreWebActivity : ComponentActivity() {
+         super.onCreate(savedInstanceState)
+         val backend = intent.getStringExtra("backend").orEmpty().ifBlank { DEFAULT_SUB_STORE_BACKEND }
+         val api = URLEncoder.encode(backend, "UTF-8")
+-        val state = WebToolLoadState(SUB_STORE_FRONTEND)
++        val initialUrl = SUB_STORE_FRONTEND + "?api=" + api
++        val state = WebToolLoadState(initialUrl)
+         val view = WebView(this).apply {
+             settings.javaScriptEnabled = true
+             settings.domStorageEnabled = true
+@@ -357,7 +381,7 @@ class ProxySubStoreWebActivity : ComponentActivity() {
+         }
+         webView = view
+         setWebToolContent(view, state, "Sub-Store", backend)
+-        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(SUB_STORE_FRONTEND + "?api=" + api)
++        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(initialUrl)
+         else { state.url = view.url ?: SUB_STORE_FRONTEND; state.progress = view.progress; state.loading = view.progress < 100 }
+     }
+     override fun onSaveInstanceState(outState: Bundle) { webView?.savePage(outState); super.onSaveInstanceState(outState) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 index 56730b7..4a3b426 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
@@ -154,7 +225,7 @@ index 1a9af21..2e4214d 100644
      val repo = remember { RuntimeFilesRepository(context) }
      var editor by remember { mutableStateOf<CodeEditor?>(null) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..14fd7b7 100644
+index be09cbe..5635e74 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -178,6 +178,7 @@ internal fun HxPage(
@@ -185,20 +256,25 @@ index be09cbe..14fd7b7 100644
      HxSheet(onDismiss = onDismiss) {
          Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
 -            Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
-+            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
++            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = if (title == "AdGuard") 30.sp else 24.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
              if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
              if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
                  Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
-@@ -1098,7 +1099,7 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
+@@ -1098,9 +1099,10 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
          ) {
              Text(
                  text.ifBlank { "（空）" },
 -                fontFamily = if (wrapLines) FontFamily.Default else FontFamily.Monospace,
+-                fontSize = 11.5.sp,
+-                lineHeight = 16.sp,
 +                fontFamily = if (wrapLines && !referenceDocument) FontFamily.Default else FontFamily.Monospace,
-                 fontSize = 11.5.sp,
-                 lineHeight = 16.sp,
++                fontSize = if (referenceDocument) 10.sp else 11.5.sp,
++                lineHeight = if (referenceDocument) 14.sp else 16.sp,
++                letterSpacing = if (referenceDocument) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
                  color = c.text,
-@@ -1124,6 +1125,7 @@ internal fun HxChoiceSheet(
+             )
+         }
+@@ -1124,6 +1126,7 @@ internal fun HxChoiceSheet(
      trailingReferenceRadios: Boolean = false,
      presentation: HxChoicePresentation = HxChoicePresentation.Standard,
      menuWidthOverride: Dp? = null,
@@ -206,7 +282,7 @@ index be09cbe..14fd7b7 100644
  ) {
      val c = Hx.colors
      val haptics = rememberHetuHaptics()
-@@ -1162,6 +1164,21 @@ internal fun HxChoiceSheet(
+@@ -1162,6 +1165,21 @@ internal fun HxChoiceSheet(
                          if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
                      }
                  }
@@ -228,6 +304,32 @@ index be09cbe..14fd7b7 100644
              } else choices.forEachIndexed { index, choice ->
                  HxMenuItem(
                      choice.label,
+@@ -1261,6 +1279,7 @@ internal fun HxFormDialog(
+     titleTextAlign: TextAlign = TextAlign.Center,
+     hideMessageOnError: Boolean = false,
+     highlightError: Boolean = true,
++    fieldOutlineColor: Color? = null,
+     plainFields: Boolean = false,
+     compactPills: Boolean = false,
+     validate: (List<String>) -> String? = { null },
+@@ -1310,7 +1329,7 @@ internal fun HxFormDialog(
+                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
+                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
+                         modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+-                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else c.line, RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
++                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else (fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+                             .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
+                         decorationBox = { input -> Box {
+                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
+@@ -1320,7 +1339,7 @@ internal fun HxFormDialog(
+                     if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
+                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+-                if (!message.isNullOrBlank() && messageBelowFields) {
++                if (!message.isNullOrBlank() && messageBelowFields && !(hideMessageOnError && error != null)) {
+                     Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
+                 }
+                 AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 index 088770f..8b9333b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
@@ -267,7 +369,7 @@ index 088770f..8b9333b 100644
 +    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
-index 206b829..135c9cf 100644
+index 206b829..d5b396e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
 @@ -79,6 +79,8 @@ internal fun SettingsRow(
@@ -314,8 +416,73 @@ index 206b829..135c9cf 100644
          if (!value.isNullOrBlank()) {
              Spacer(Modifier.width(8.dp))
              Text(value, color = Hx.colors.textMuted, fontSize = 15.sp, lineHeight = 20.sp,
+@@ -218,6 +223,7 @@ internal fun SettingsDialog(
+     onDismiss: () -> Unit,
+     confirmLabel: String,
+     onConfirm: () -> Unit,
++    pillButtons: Boolean = false,
+     content: @Composable ColumnScope.() -> Unit,
+ ) {
+     HxReferenceDialog(onDismiss = onDismiss) {
+@@ -227,16 +233,16 @@ internal fun SettingsDialog(
+             content()
+             Spacer(Modifier.height(18.dp))
+             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+-                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f))
+-                SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f))
++                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f), pillButtons)
++                SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f), pillButtons)
+             }
+     }
+ }
+ 
+ @Composable
+-private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) {
++private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier, pillButtons: Boolean) {
+     val source = remember { MutableInteractionSource() }
+-    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(RoundedCornerShape(16.dp))
++    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(if (pillButtons) Hx.pillShape else RoundedCornerShape(16.dp))
+         .background(if (primary) {
+             if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
+         } else Hx.colors.accentSoft)
+@@ -254,7 +260,7 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
+         val next = value.trim()
+         if (!settingsMirrorPrefixValid(next)) error = true
+         else onSave(next)
+-    }) {
++    }, pillButtons = true) {
+         Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
+         Spacer(Modifier.height(6.dp))
+         SettingsInput(value, { value = it; error = false }, error = error)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
+index b2614b5..4d426d8 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
+@@ -39,6 +39,8 @@ private object SettingsReferenceIcons {
+     val CloudDown = line("CloudDown", "M6 18a5 5 0 0 1-1-9.9A7 7 0 0 1 18.8 8 5 5 0 0 1 19 18", "M12 12v10", "m8 18 4 4 4-4")
+     val Droplet = line("Droplet", "M12 2C10 5 4 10 4 15a8 8 0 0 0 16 0c0-5-6-10-8-13Z", "M8 15a4 4 0 0 0 4 4")
+     val Dock = line("Dock", "M4 6h16a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2Z", "M6 14h12")
++    val LiquidGlass = line("LiquidGlass", "M10 4 12 10 18 12 12 14 10 20 8 14 2 12 8 10 10 4Z", "M19 2 20 5 23 6 20 7 19 10 18 7 15 6 18 5 19 2Z")
++    val Scale = line("Scale", "M8 3H5a2 2 0 0 0-2 2v3", "M16 3h3a2 2 0 0 1 2 2v3", "M21 16v3a2 2 0 0 1-2 2h-3", "M8 21H5a2 2 0 0 1-2-2v-3")
+     val Move = line("Move", "M2 12h20", "m6 8-4 4 4 4", "m18 8 4 4-4 4")
+     val Back = line("Back", "m9 4-6 6 6 6", "M3 10h12a6 6 0 0 1 0 12h-4")
+     val Gauge = line("Gauge", "M3.4 18a10 10 0 1 1 17.2 0Z", "m12 13 5-5", "M12 3v3", "m5 6 2 2", "M2 12h3")
+@@ -51,6 +53,13 @@ private object SettingsReferenceIcons {
+     val Blur = line("Blur", "M13.5 12a1.5 1.5 0 1 1-3 0a1.5 1.5 0 1 1 3 0Z", "M12 2v3", "M12 19v3", "M2 12h3", "M19 12h3", "m4.9 4.9 2.2 2.2", "m16.9 16.9 2.2 2.2", "m4.9 19.1 2.2-2.2", "m16.9 7.1 2.2-2.2")
+ }
+ 
++/** Dedicated motion-setting glyphs; other Dashboard/GridView/BlurOn callers keep their existing icons. */
++internal object SettingsActionIcons {
++    val FloatingDock: ImageVector get() = SettingsReferenceIcons.Dock
++    val LiquidGlass: ImageVector get() = SettingsReferenceIcons.LiquidGlass
++    val Scale: ImageVector get() = SettingsReferenceIcons.Scale
++}
++
+ internal fun settingsLineIcon(icon: ImageVector): ImageVector = when (icon.name.substringAfterLast('.')) {
+     "GridView", "Apps" -> SettingsReferenceIcons.Grid
+     "RestartAlt" -> SettingsReferenceIcons.Power
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index b06fbb2..c1e853b 100644
+index b06fbb2..710f4cb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -199,7 +199,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
@@ -439,6 +606,27 @@ index b06fbb2..c1e853b 100644
          title = ht("主题设置"),
          subtitle = null,
          onBack = onBack,
+@@ -915,9 +921,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                     SettingsDivider()
+                     SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
+                     SettingsDivider()
+-                    SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = Icons.Rounded.Dashboard, iconTint = c.textMuted)
++                    SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = SettingsActionIcons.FloatingDock, iconTint = c.textMuted)
+                     SettingsDivider()
+-                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = Icons.Rounded.BlurOn, iconTint = c.accent, enabled = blur)
++                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = SettingsActionIcons.LiquidGlass, iconTint = c.accent, enabled = blur)
+                 }
+             }
+         }
+@@ -932,7 +938,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         }
+                     }
+                     SettingsDivider()
+-                    SettingsNavRow(ht("界面缩放"), subtitle = ht("统一调整界面和文字大小"), icon = Icons.Rounded.GridView, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
++                    SettingsNavRow(ht("界面缩放"), subtitle = ht("统一调整界面和文字大小"), icon = SettingsActionIcons.Scale, iconTint = c.textMuted, value = "${(uiScale * 100).toInt()}%", dropdown = true) { choice = "scale" }
+                 }
+             }
+         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ddc05df..f35e74c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -453,7 +641,7 @@ index ddc05df..f35e74c 100644
              SettingsSection {
                  SettingsGroup {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..4ba1f61 100644
+index b68a65b..1f7bce6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -501,7 +689,24 @@ index b68a65b..4ba1f61 100644
          title = "文件管理",
          largeTitle = true,
          largeTitleFontSizeSp = 36f,
-@@ -909,7 +909,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -790,7 +790,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+     if (downloadDialog) {
+         HxFormDialog(
+             title = "下载到当前目录",
+-            widthFraction = .87f, titleFontSize = 22.sp, hideMessageOnError = true, highlightError = false, plainFields = true,
++            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, hideMessageOnError = true, highlightError = false, plainFields = true,
+             message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
+             fields = listOf(
+                 HxField("下载地址", placeholder = "https://example.com/file.yaml"),
+@@ -821,6 +821,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+         HxFormDialog(
+             title = "重命名",
+             message = "原文件：${entry.name}", messageBelowFields = true,
++            hideMessageOnError = true, highlightError = false, fieldOutlineColor = c.accent,
+             fields = listOf(HxField("新名称", entry.name)),
+             confirmLabel = "重命名",
+             validate = { v ->
+@@ -909,7 +910,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
      }
  
@@ -510,7 +715,7 @@ index b68a65b..4ba1f61 100644
          item(key = "preflight") {
              SettingsSection {
                  SettingsGroup(title = "运行预检") {
-@@ -1055,9 +1055,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1055,9 +1056,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          actions.toList() != initialActions || labels.toList() != initialLabels
  
      val targetOptions = listOf(
@@ -523,7 +728,7 @@ index b68a65b..4ba1f61 100644
      )
      val actionOptions = listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
      val refreshOptions = listOf(2, 3, 5, 10, 30, 60)
-@@ -1086,7 +1086,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1086,7 +1087,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          onBack()
      }
  
@@ -532,7 +737,7 @@ index b68a65b..4ba1f61 100644
          title = "通知详细设置",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
-@@ -1171,6 +1171,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1171,6 +1172,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  presentation = HxChoicePresentation.Notification,
                  title = "点击通知打开",
                  choices = targetOptions.map { HxChoice(it.first, it.second) },
@@ -540,8 +745,64 @@ index b68a65b..4ba1f61 100644
                  selected = target,
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+index 97cc0f0..d643f9c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+@@ -305,9 +305,9 @@ internal fun ToolsAddDomainDialogCard(
+     ToolsDialogCard(
+         title = if (overlay.allow) "添加白名单" else "添加黑名单",
+         text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
+-        confirmLabel = "添加", confirmLoading = overlay.saving,
++        confirmLabel = "添加", confirmLoading = overlay.saving, neutralCancel = true,
+         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
+-    ) { ToolsField("域名", overlay.draft, onDraftChange, placeholder = "example.com", monospace = true, keyboardType = KeyboardType.Uri, error = overlay.error) }
++    ) { ToolsField("域名", overlay.draft, onDraftChange, placeholder = "example.com", monospace = true, keyboardType = KeyboardType.Uri, error = overlay.error, clearable = !overlay.saving) }
+ }
+ 
+ /** Page 49: reached by tapping a row of 最近拦截. */
+@@ -315,7 +315,7 @@ internal fun ToolsAddDomainDialogCard(
+ internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+     val c = LocalHomeColors.current
+     ToolsDialogCard(
+-        title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving,
++        title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving, neutralCancel = true,
+         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
+     ) {
+         Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
+index 6125191..0e0c702 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
+@@ -116,7 +116,7 @@ internal fun ToolsAppsScreen(
+                     LazyColumn(
+                         Modifier.fillMaxSize(),
+                         contentPadding = PaddingValues(start = HomeDims.gutter, end = HomeDims.gutter, top = HomeDims.gap, bottom = HomeDims.gap),
+-                        verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
++                        verticalArrangement = Arrangement.spacedBy(10.dp),
+                     ) {
+                         items(rows, key = { it.key }) { app ->
+                             AppRow(app, checked = app.key in state.selected, inert = core || state.refreshing, dimmed = core, onClick = { onToggleApp(app) }, appIcon = appIcon)
+@@ -131,7 +131,7 @@ internal fun ToolsAppsScreen(
+                 Text(state.selectedCount.toString(), color = c.accent, style = HomeType.value.copy(fontFeatureSettings = "tnum"))
+                 Text(" " + ht("个"), color = c.t1, style = HomeType.bodySmall)
+                 Text(ht("  ·  "), color = c.t3, style = HomeType.bodySmall)
+-                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = ToolsType.url, maxLines = 2, overflow = TextOverflow.Ellipsis)
+             }
+         }
+     }
+@@ -153,7 +153,7 @@ private fun AppRow(
+             Modifier
+                 .fillMaxWidth()
+                 .clickable(enabled = !inert, role = Role.Checkbox) { haptics(HomeHaptic.Tick); onClick() }
+-                .heightIn(min = 64.dp)
++                .heightIn(min = 78.dp)
+                 .padding(horizontal = 14.dp, vertical = 10.dp),
+             verticalAlignment = Alignment.CenterVertically,
+             horizontalArrangement = Arrangement.spacedBy(12.dp),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..640f94c 100644
+index e3bff78..f2b0b75 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 @@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
@@ -628,11 +889,12 @@ index e3bff78..640f94c 100644
      }
  }
  
-@@ -267,14 +271,30 @@ internal fun ToolsField(
+@@ -267,14 +271,36 @@ internal fun ToolsField(
      monospace: Boolean = false,
      readOnly: Boolean = false,
      keyboardType: KeyboardType = KeyboardType.Text,
 +    compact: Boolean = false,
++    clearable: Boolean = false,
  ) {
      val c = LocalHomeColors.current
 -    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -655,14 +917,19 @@ index e3bff78..640f94c 100644
 +                        .clip(HomeDims.controlShape).background(c.sunken)
 +                        .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
 +                        if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
-+                        inner()
++                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++                            Box(Modifier.weight(1f)) { inner() }
++                            if (clearable && value.isNotEmpty()) Box(Modifier.size(20.dp).clip(CircleShape)
++                                .background(c.t3.copy(alpha = .14f)).clickable(role = Role.Button, onClickLabel = ht("清除输入")) { onValueChange("") },
++                                contentAlignment = Alignment.Center) { Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = c.t3) }
++                        }
 +                    }
 +                },
 +            )
          }
          if (error != null) {
              Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-@@ -396,6 +416,7 @@ internal fun ToolsDangerButton(
+@@ -396,6 +422,7 @@ internal fun ToolsDangerButton(
  /* ------------------------------------------------------------------ */
  
  internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
@@ -670,13 +937,14 @@ index e3bff78..640f94c 100644
  
  /**
   * The inside of a confirmation dialog: centred title and message, optional form content,
-@@ -411,30 +432,46 @@ internal fun ToolsDialogCard(
+@@ -411,30 +438,47 @@ internal fun ToolsDialogCard(
      modifier: Modifier = Modifier,
      text: String? = null,
      confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
 +    actions: ToolsDialogActions = ToolsDialogActions.Filled,
      cancelLabel: String = "取消",
      confirmLoading: Boolean = false,
++    neutralCancel: Boolean = false,
      content: (@Composable ColumnScope.() -> Unit)? = null,
  ) {
      val c = LocalHomeColors.current
@@ -727,7 +995,7 @@ index e3bff78..640f94c 100644
 +            }
 +        } else {
 +            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-+                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
++                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, neutral = neutralCancel, enabled = !confirmLoading)
 +                when (confirmKind) {
 +                    ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
 +                    ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)
@@ -736,7 +1004,7 @@ index e3bff78..640f94c 100644
              }
          }
      }
-@@ -456,12 +493,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
+@@ -456,12 +500,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
  
  /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
  @Composable
@@ -751,7 +1019,7 @@ index e3bff78..640f94c 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
-@@ -469,17 +506,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -469,17 +513,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
              .padding(4.dp),
      ) {
          if (title != null) {
@@ -866,8 +1134,73 @@ index e9d3077..9ca7e2f 100644
          title = "删除订阅？",
          text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
          confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
+index 8ac0639..d4f2847 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
+@@ -1,19 +1,26 @@
+ package io.github.xgl34222220.hetu.tools
+ 
+ import io.github.xgl34222220.hetu.ui.ht
++import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.home.HomeBadge
+ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
+@@ -71,9 +78,9 @@ internal fun ToolsCoresScreen(
+ }
+ 
+ internal fun ToolsCore.glyph(): ImageVector = when {
+-    id.startsWith("mihomo") -> ToolsFeatureIcons.Cat
+-    id.startsWith("sing-box") || id.startsWith("singbox") -> ToolsFeatureIcons.Box
+-    id.startsWith("xray") -> HomeIcons.X
++    id.startsWith("mihomo") -> ToolsIcons.CoreMihomoPdf34
++    id.startsWith("sing-box") || id.startsWith("singbox") -> ToolsIcons.CoreSingBoxPdf34
++    id.startsWith("xray") -> ToolsIcons.CoreXrayPdf34
+     else -> ToolsIcons.Cpu
+ }
+ 
+@@ -84,10 +91,18 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
+     HomeCard(Modifier.fillMaxWidth()) {
+         Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+-                ToolsGlyphTile(core.glyph(), background = if (core.runnable) c.accentSoft else c.sunken)
++                Box(
++                    Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))
++                        .background(if (core.runnable) c.accentSoft else c.sunken),
++                    contentAlignment = Alignment.Center,
++                ) {
++                    Icon(core.glyph(), null, Modifier.size(40.dp), tint = c.t1)
++                }
+                 Column(Modifier.weight(1f)) {
+                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                        Text(core.name, Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        Text(core.name, Modifier.weight(1f, fill = core.runnable), color = c.t1,
++                            style = HomeType.rowTitle.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),
++                            maxLines = 1, overflow = TextOverflow.Ellipsis)
+                         when {
+                             !core.runnable -> HomeBadge(ht("仅下载管理"))
+                             core.updateAvailable -> HomeBadge(ht("有更新"), tone = HomeTone.Accent)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-index 7e58000..b73e570 100644
+index 7e58000..84b576f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 @@ -61,7 +61,7 @@ internal object ToolsTypography {
@@ -879,7 +1212,20 @@ index 7e58000..b73e570 100644
      val body = TextStyle(fontSize = 16.sp, lineHeight = 23.sp)
      val bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
      val rowSub = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
-@@ -184,7 +184,7 @@ internal fun ToolsButton(
+@@ -173,6 +173,7 @@ internal fun ToolsButton(
+     icon: ImageVector? = null,
+     enabled: Boolean = true,
+     loading: Boolean = false,
++    neutral: Boolean = false,
+ ) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+@@ -180,11 +181,11 @@ internal fun ToolsButton(
+     val (fill, foreground) = when (kind) {
+         HomeButtonKind.Primary -> c.accent to c.onAccent
+         HomeButtonKind.Secondary -> c.surface to c.t1
+-        HomeButtonKind.Soft -> c.accentSoft to c.accent
++        HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent
          HomeButtonKind.Ghost -> Color.Transparent to c.accent
      }
      Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
@@ -888,7 +1234,7 @@ index 7e58000..b73e570 100644
          .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
          .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
              role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-@@ -259,6 +259,7 @@ internal fun <T> ToolsSegmented(
+@@ -259,6 +260,7 @@ internal fun <T> ToolsSegmented(
      onSelect: (T) -> Unit,
      modifier: Modifier = Modifier,
      enabled: Boolean = true,
@@ -896,7 +1242,7 @@ index 7e58000..b73e570 100644
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
-@@ -268,7 +269,10 @@ internal fun <T> ToolsSegmented(
+@@ -268,7 +270,10 @@ internal fun <T> ToolsSegmented(
                  .background(if (selected == key) c.accentSoft else Color.Transparent)
                  .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
                  .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
@@ -908,6 +1254,38 @@ index 7e58000..b73e570 100644
              }
          }
      }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
+index 556dff0..f782df1 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
+@@ -97,7 +97,8 @@ internal fun ToolsDiagScreen(
+ /** Page 41: the generated startup copy, YAML-coloured, with 复制. */
+ @Composable
+ internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
+-    val palette = toolsYamlPalette()
++    val c = LocalHomeColors.current
++    val palette = remember(c) { ToolsYamlPalette(key = c.t2, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
+     DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier) { text ->
+         remember(text, palette) { toolsYamlAnnotated(text, palette) }
+     }
+@@ -128,7 +129,7 @@ private fun DiagTextSheet(
+             content.loading -> ToolsLoading()
+             content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
+             content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
+-            else -> ToolsCodeBox(styled(content.text))
++            else -> ToolsCodeBox(styled(content.text), plain = title == "消息与网络诊断")
+         }
+     }
+ }
+@@ -142,7 +143,7 @@ internal fun ToolsRestoreNetworkDialogCard(onConfirm: () -> Unit, onCancel: () -
+     ToolsDialogCard(
+         title = "恢复网络？",
+         text = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
+-        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading,
++        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading, neutralCancel = true,
+         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
+     )
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 index 2b98b46..ae98331 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
@@ -951,7 +1329,7 @@ index 2b98b46..ae98331 100644
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.DangerSoft,
          onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-index a60a9d7..2bb5c4e 100644
+index a60a9d7..d7720df 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 @@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
@@ -962,7 +1340,15 @@ index a60a9d7..2bb5c4e 100644
  import androidx.compose.foundation.layout.windowInsetsPadding
  import androidx.compose.foundation.rememberScrollState
  import androidx.compose.foundation.shape.CircleShape
-@@ -371,7 +372,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+@@ -56,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
+ import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
+ import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
+@@ -371,7 +373,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
      val haptics = LocalHomeHaptics.current
      Column(
          modifier
@@ -971,11 +1357,37 @@ index a60a9d7..2bb5c4e 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
+@@ -408,11 +410,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+  * reports stay inside the sheet; lines never wrap, which keeps YAML indentation readable.
+  */
+ @Composable
+-internal fun ToolsCodeBox(text: AnnotatedString, modifier: Modifier = Modifier, maxHeight: Dp = 420.dp) {
++internal fun ToolsCodeBox(text: AnnotatedString, modifier: Modifier = Modifier, maxHeight: Dp = 420.dp, plain: Boolean = false) {
+     val c = LocalHomeColors.current
+-    HomeCard(modifier.fillMaxWidth().heightIn(max = maxHeight), background = c.bg) {
++    HomeCard(modifier.fillMaxWidth().heightIn(max = maxHeight), background = if (plain) Color.Transparent else c.bg) {
+         Box(Modifier.verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState())) {
+-            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t1, style = ToolsEditorType.code, softWrap = false)
++            Text(text, Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t1, style = ToolsEditorType.code.copy(fontSize = 14.sp, lineHeight = 20.sp), softWrap = false)
+         }
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
-index 9b0a4af..d42cb39 100644
+index 9b0a4af..732e2a2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
-@@ -118,6 +118,11 @@ internal object ToolsIcons {
+@@ -1,8 +1,9 @@
+-// Geometry from Lucide (ISC); same construction as home/HomeIcons.kt and ui/HetuLucideIcons.kt.
++// Stroke geometry from Lucide (ISC); PDF-derived filled core glyphs are documented below.
+ package io.github.xgl34222220.hetu.tools
+ 
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.PathFillType
+ import androidx.compose.ui.graphics.StrokeCap
+ import androidx.compose.ui.graphics.StrokeJoin
+ import androidx.compose.ui.graphics.vector.ImageVector
+@@ -118,6 +119,11 @@ internal object ToolsIcons {
          "m4.243 5.21 14.39 12.472",
      ) }
  
@@ -987,6 +1399,35 @@ index 9b0a4af..d42cb39 100644
      val Activity: ImageVector by lazy { vector("Activity",
          "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
      ) }
+@@ -198,4 +204,28 @@ internal object ToolsIcons {
+         "M12 9v4",
+         "M12 17h.01",
+     ) }
++
++    /**
++     * Filled silhouettes traced from the user-provided PDF03A page 34 JPEG (xref 71),
++     * 850 x 1850 source pixels. These three glyphs are not Lucide geometry.
++     * Threshold: max(R,G,B) < 128; marching-squares contour at 0.5, no path simplification.
++     * EvenOdd preserves eye and cube negative space; callers supply the live palette tint.
++     */
++    private fun pdfCoreSilhouette(name: String, outline: String): ImageVector = ImageVector.Builder(
++        name = "HetuPdf03A34.$name", defaultWidth = 40.dp, defaultHeight = 40.dp,
++        viewportWidth = 86f, viewportHeight = 86f,
++    ).apply {
++        addPath(pathData = PathParser().parsePathString(outline).toNodes(),
++            fill = SolidColor(Color.Black), pathFillType = PathFillType.EvenOdd)
++    }.build()
++
++    val CoreMihomoPdf34: ImageVector by lazy { pdfCoreSilhouette("CoreMihomoPdf34",
++        "M16,2.5 L17,2.5 L17.5,3 L18,3.5 L18.5,4 L19,4.5 L19.5,5 L20,5.5 L20.5,6 L21,6.5 L21.5,7 L22,7.5 L22.5,8 L23,8.5 L23.5,9 L24,9.5 L24.5,10 L25,10.5 L25.5,11 L26,11.5 L26.5,12 L27,12.5 L27.5,13 L28,13.5 L28.5,14 L29,14.5 L29.5,15 L30,15.5 L30.5,16 L31,16.5 L31.5,17 L32,17.5 L33,17.5 L33.5,17 L34,16.5 L35,16.5 L36,16.5 L37,16.5 L38,16.5 L39,16.5 L40,16.5 L41,16.5 L42,16.5 L43,16.5 L44,16.5 L45,16.5 L46,16.5 L47,16.5 L48,16.5 L49,16.5 L50,16.5 L51,16.5 L52,16.5 L53,16.5 L54,16.5 L54.5,16 L55,15.5 L55.5,15 L56,14.5 L56.5,14 L57,13.5 L57.5,13 L58,12.5 L58.5,12 L59,11.5 L59.5,11 L60,10.5 L60.5,10 L61,9.5 L61.5,9 L62,8.5 L62.5,8 L63,7.5 L64,7.5 L64.5,7 L65,6.5 L65.5,6 L66,5.5 L66.5,5 L67,4.5 L67.5,4 L68,3.5 L68.5,3 L69,2.5 L69.5,3 L70,3.5 L70.5,4 L70.5,5 L70.5,6 L71,6.5 L71.5,7 L71.5,8 L71.5,9 L71.5,10 L72,10.5 L72.5,11 L72.5,12 L72.5,13 L73,13.5 L73.5,14 L73.5,15 L73.5,16 L74,16.5 L74.5,17 L74.5,18 L74.5,19 L74.5,20 L75,20.5 L75.5,21 L75.5,22 L75.5,23 L76,23.5 L76.5,24 L76.5,25 L76.5,26 L76.5,27 L77,27.5 L77.5,28 L77.5,29 L77.5,30 L78,30.5 L78.5,31 L78.5,32 L78.5,33 L79,33.5 L79.5,34 L79.5,35 L79.5,36 L79.5,37 L80,37.5 L80.5,38 L80.5,39 L80.5,40 L81,40.5 L81.5,41 L81.5,42 L81.5,43 L81.5,44 L82,44.5 L82.5,45 L82.5,46 L82.5,47 L83,47.5 L83.5,48 L83.5,49 L83.5,50 L83.5,51 L83.5,52 L84,52.5 L84.5,53 L84.5,54 L84.5,55 L84.5,56 L84.5,57 L84.5,58 L84.5,59 L84.5,60 L84.5,61 L84.5,62 L84,62.5 L83.5,63 L83.5,64 L83.5,65 L83,65.5 L82.5,66 L82.5,67 L82,67.5 L81.5,68 L81,68.5 L80.5,69 L80,69.5 L79.5,70 L79,70.5 L78.5,71 L78,71.5 L77.5,72 L77,72.5 L76.5,73 L76,73.5 L75,73.5 L74.5,74 L74,74.5 L73,74.5 L72.5,75 L72,75.5 L71,75.5 L70.5,76 L70,76.5 L69,76.5 L68,76.5 L67,76.5 L66.5,77 L66,77.5 L65,77.5 L64,77.5 L63,77.5 L62,77.5 L61,77.5 L60,77.5 L59.5,78 L59,78.5 L58,78.5 L57,78.5 L56,78.5 L55,78.5 L54,78.5 L53,78.5 L52,78.5 L51,78.5 L50,78.5 L49,78.5 L48,78.5 L47,78.5 L46,78.5 L45,78.5 L44,78.5 L43,78.5 L42,78.5 L41,78.5 L40,78.5 L39,78.5 L38,78.5 L37,78.5 L36,78.5 L35,78.5 L34,78.5 L33,78.5 L32,78.5 L31,78.5 L30,78.5 L29,78.5 L28,78.5 L27,78.5 L26,78.5 L25,78.5 L24,78.5 L23.5,78 L23,77.5 L22,77.5 L21,77.5 L20,77.5 L19,77.5 L18.5,77 L18,76.5 L17,76.5 L16,76.5 L15,76.5 L14.5,76 L14,75.5 L13,75.5 L12.5,75 L12,74.5 L11,74.5 L10.5,74 L10,73.5 L9,73.5 L8.5,73 L8,72.5 L7.5,72 L7,71.5 L6.5,71 L6,70.5 L5.5,70 L5,69.5 L4.5,69 L4,68.5 L3.5,68 L3.5,67 L3,66.5 L2.5,66 L2.5,65 L2,64.5 L1.5,64 L1.5,63 L1.5,62 L1.5,61 L1,60.5 L0.5,60 L0.5,59 L0.5,58 L0.5,57 L0.5,56 L0.5,55 L1,54.5 L1.5,54 L1.5,53 L1.5,52 L1.5,51 L1.5,50 L2,49.5 L2.5,49 L2.5,48 L2.5,47 L2.5,46 L3,45.5 L3.5,45 L3.5,44 L3.5,43 L4,42.5 L4.5,42 L4.5,41 L4.5,40 L4.5,39 L5,38.5 L5.5,38 L5.5,37 L5.5,36 L6,35.5 L6.5,35 L6.5,34 L6.5,33 L6.5,32 L7,31.5 L7.5,31 L7.5,30 L7.5,29 L8,28.5 L8.5,28 L8.5,27 L8.5,26 L8.5,25 L9,24.5 L9.5,24 L9.5,23 L9.5,22 L10,21.5 L10.5,21 L10.5,20 L10.5,19 L11,18.5 L11.5,18 L11.5,17 L11.5,16 L11.5,15 L12,14.5 L12.5,14 L12.5,13 L12.5,12 L13,11.5 L13.5,11 L13.5,10 L13.5,9 L14,8.5 L14.5,8 L14.5,7 L14.5,6 L14.5,5 L15,4.5 L15.5,4 L15.5,3 Z M27,39.5 L26.5,40 L26,40.5 L25,40.5 L24.5,41 L24,41.5 L23.5,42 L23,42.5 L22.5,43 L22.5,44 L22,44.5 L21.5,45 L21.5,46 L21.5,47 L21.5,48 L22,48.5 L22.5,49 L22.5,50 L23,50.5 L23.5,51 L24,51.5 L24.5,52 L25,52.5 L26,52.5 L26.5,53 L27,53.5 L28,53.5 L29,53.5 L30,53.5 L30.5,53 L31,52.5 L32,52.5 L32.5,52 L33,51.5 L33.5,51 L34,50.5 L34.5,50 L34.5,49 L35,48.5 L35.5,48 L35.5,47 L35.5,46 L35.5,45 L35,44.5 L34.5,44 L34.5,43 L34,42.5 L33.5,42 L33,41.5 L32.5,41 L32,40.5 L31,40.5 L30.5,40 L30,39.5 L29,39.5 L28,39.5 Z M55,39.5 L54.5,40 L54,40.5 L53,40.5 L52.5,41 L52,41.5 L51.5,42 L51,42.5 L50.5,43 L50.5,44 L50,44.5 L49.5,45 L49.5,46 L49.5,47 L49.5,48 L50,48.5 L50.5,49 L50.5,50 L51,50.5 L51.5,51 L52,51.5 L52.5,52 L53,52.5 L54,52.5 L54.5,53 L55,53.5 L56,53.5 L57,53.5 L58,53.5 L58.5,53 L59,52.5 L60,52.5 L60.5,52 L61,51.5 L61.5,51 L61.5,50 L62,49.5 L62.5,49 L62.5,48 L63,47.5 L63.5,47 L63.5,46 L63,45.5 L62.5,45 L62.5,44 L62.5,43 L62,42.5 L61.5,42 L61,41.5 L60.5,41 L60,40.5 L59,40.5 L58.5,40 L58,39.5 L57,39.5 L56,39.5 Z",
++    ) }
++    val CoreXrayPdf34: ImageVector by lazy { pdfCoreSilhouette("CoreXrayPdf34",
++        "M64,8.5 L65,8.5 L66,8.5 L67,8.5 L68,8.5 L69,8.5 L70,8.5 L71,8.5 L72,8.5 L73,8.5 L74,8.5 L75,8.5 L76,8.5 L76.5,9 L76.5,10 L76,10.5 L75.5,11 L75,11.5 L74.5,12 L74,12.5 L73.5,13 L73.5,14 L73,14.5 L72.5,15 L72,15.5 L71.5,16 L71,16.5 L70.5,17 L70.5,18 L70,18.5 L69.5,19 L69,19.5 L68.5,20 L68,20.5 L67.5,21 L67.5,22 L67,22.5 L66.5,23 L66,23.5 L65.5,24 L65,24.5 L64.5,25 L64.5,26 L64,26.5 L63.5,27 L63,27.5 L62.5,28 L62,28.5 L61.5,29 L61,29.5 L60.5,30 L60.5,31 L60,31.5 L59.5,32 L59,32.5 L58.5,33 L58,33.5 L57.5,34 L57.5,35 L57,35.5 L56.5,36 L56,36.5 L55.5,37 L55,37.5 L54.5,38 L54.5,39 L54,39.5 L53.5,40 L53,40.5 L52.5,41 L52,41.5 L51.5,42 L51.5,43 L51,43.5 L50.5,44 L50,44.5 L49.5,45 L49,45.5 L48.5,46 L48,46.5 L47.5,47 L47.5,48 L47,48.5 L46.5,49 L46,49.5 L45.5,50 L45,50.5 L44.5,51 L44,51.5 L43.5,52 L43,52.5 L42.5,53 L42.5,54 L42,54.5 L41.5,55 L41,55.5 L40.5,56 L40,56.5 L39.5,57 L39.5,58 L39,58.5 L38.5,59 L38,59.5 L37.5,60 L37,60.5 L36.5,61 L36.5,62 L36,62.5 L35.5,63 L35,63.5 L34.5,64 L34,64.5 L33.5,65 L33.5,66 L33,66.5 L32.5,67 L32,67.5 L31.5,68 L31,68.5 L30.5,69 L30.5,70 L30,70.5 L29.5,71 L29,71.5 L28.5,72 L28,72.5 L27.5,73 L27.5,74 L27,74.5 L26.5,75 L26,75.5 L25,75.5 L24.5,75 L24,74.5 L23,74.5 L22,74.5 L21,74.5 L20,74.5 L19,74.5 L18,74.5 L17.5,75 L17,75.5 L16,75.5 L15,75.5 L14,75.5 L13,75.5 L12,75.5 L11,75.5 L10,75.5 L9,75.5 L8.5,75 L9,74.5 L9.5,74 L10,73.5 L10.5,73 L11,72.5 L11.5,72 L12,71.5 L12.5,71 L12.5,70 L13,69.5 L13.5,69 L14,68.5 L14.5,68 L15,67.5 L15.5,67 L16,66.5 L16.5,66 L16.5,65 L17,64.5 L17.5,64 L18,63.5 L18.5,63 L19,62.5 L19.5,62 L20,61.5 L20.5,61 L20.5,60 L21,59.5 L21.5,59 L22,58.5 L22.5,58 L23,57.5 L23.5,57 L24,56.5 L24.5,56 L25,55.5 L25.5,55 L25.5,54 L26,53.5 L26.5,53 L27,52.5 L27.5,52 L28,51.5 L28.5,51 L29,50.5 L29.5,50 L29.5,49 L30,48.5 L30.5,48 L31,47.5 L31.5,47 L32,46.5 L32.5,46 L33,45.5 L33.5,45 L33.5,44 L34,43.5 L34.5,43 L35,42.5 L35.5,42 L35,41.5 L34.5,41 L34,40.5 L33.5,40 L33.5,39 L33,38.5 L32.5,38 L32,37.5 L31.5,37 L31,36.5 L30.5,36 L30,35.5 L29.5,35 L29,34.5 L28.5,34 L28.5,33 L28,32.5 L27.5,32 L27,31.5 L26.5,31 L26,30.5 L25.5,30 L25,29.5 L24.5,29 L24.5,28 L24,27.5 L23.5,27 L23,26.5 L22.5,26 L22,25.5 L21.5,25 L21,24.5 L20.5,24 L20.5,23 L20,22.5 L19.5,22 L19,21.5 L18.5,21 L18,20.5 L17.5,20 L17,19.5 L16.5,19 L16,18.5 L15.5,18 L15.5,17 L15,16.5 L14.5,16 L14,15.5 L13.5,15 L13,14.5 L12.5,14 L12,13.5 L11.5,13 L11.5,12 L11,11.5 L10.5,11 L11,10.5 L12,10.5 L12.5,11 L13,11.5 L14,11.5 L15,11.5 L16,11.5 L17,11.5 L18,11.5 L18.5,12 L19,12.5 L20,12.5 L21,12.5 L22,12.5 L22.5,13 L23,13.5 L24,13.5 L25,13.5 L26,13.5 L26.5,14 L27,14.5 L28,14.5 L29,14.5 L29.5,15 L30,15.5 L30.5,16 L31,16.5 L31.5,17 L32,17.5 L32.5,18 L33,18.5 L33.5,19 L33.5,20 L34,20.5 L34.5,21 L35,21.5 L35.5,22 L36,22.5 L36.5,23 L37,23.5 L37.5,24 L37.5,25 L38,25.5 L38.5,26 L39,26.5 L39.5,27 L40,27.5 L40.5,28 L41,28.5 L41.5,29 L41.5,30 L42,30.5 L42.5,31 L43,31.5 L44,31.5 L44.5,31 L45,30.5 L45.5,30 L46,29.5 L46.5,29 L47,28.5 L47.5,28 L48,27.5 L48.5,27 L48.5,26 L49,25.5 L49.5,25 L50,24.5 L50.5,24 L51,23.5 L51.5,23 L52,22.5 L52.5,22 L53,21.5 L53.5,21 L54,20.5 L54.5,20 L55,19.5 L55.5,19 L55.5,18 L56,17.5 L56.5,17 L57,16.5 L57.5,16 L58,15.5 L58.5,15 L59,14.5 L59.5,14 L60,13.5 L60.5,13 L60.5,12 L61,11.5 L61.5,11 L62,10.5 L62.5,10 L63,9.5 L63.5,9 Z M46,53.5 L47,53.5 L48,53.5 L49,53.5 L50,53.5 L50.5,54 L51,54.5 L52,54.5 L53,54.5 L54,54.5 L55,54.5 L56,54.5 L56.5,55 L57,55.5 L58,55.5 L59,55.5 L60,55.5 L60.5,56 L61,56.5 L61.5,57 L62,57.5 L62.5,58 L63,58.5 L63.5,59 L64,59.5 L64.5,60 L65,60.5 L65.5,61 L66,61.5 L66.5,62 L66.5,63 L67,63.5 L67.5,64 L68,64.5 L68.5,65 L69,65.5 L69.5,66 L70,66.5 L70.5,67 L70.5,68 L71,68.5 L71.5,69 L72,69.5 L72.5,70 L73,70.5 L73.5,71 L73.5,72 L74,72.5 L74.5,73 L75,73.5 L75.5,74 L76,74.5 L76.5,75 L76,75.5 L75,75.5 L74,75.5 L73,75.5 L72,75.5 L71,75.5 L70,75.5 L69,75.5 L68,75.5 L67,75.5 L66,75.5 L65,75.5 L64,75.5 L63.5,75 L63,74.5 L62.5,74 L62,73.5 L61.5,73 L61,72.5 L60.5,72 L60,71.5 L59.5,71 L59,70.5 L58.5,70 L58.5,69 L58,68.5 L57.5,68 L57,67.5 L56.5,67 L56,66.5 L55.5,66 L55,65.5 L54.5,65 L54,64.5 L53.5,64 L53,63.5 L52.5,63 L52.5,62 L52,61.5 L51.5,61 L51,60.5 L50.5,60 L50,59.5 L49.5,59 L49,58.5 L48.5,58 L48,57.5 L47.5,57 L47.5,56 L47,55.5 L46.5,55 L46,54.5 L45.5,54 Z",
++    ) }
++    val CoreSingBoxPdf34: ImageVector by lazy { pdfCoreSilhouette("CoreSingBoxPdf34",
++        "M41,-0.5 L42,-0.5 L43,-0.5 L44,-0.5 L44.5,0 L45,0.5 L46,0.5 L46.5,1 L47,1.5 L48,1.5 L48.5,2 L49,2.5 L49.5,3 L50,3.5 L51,3.5 L51.5,4 L52,4.5 L53,4.5 L53.5,5 L54,5.5 L55,5.5 L55.5,6 L56,6.5 L56.5,7 L57,7.5 L58,7.5 L58.5,8 L59,8.5 L60,8.5 L60.5,9 L61,9.5 L61.5,10 L62,10.5 L63,10.5 L63.5,11 L64,11.5 L65,11.5 L65.5,12 L66,12.5 L66.5,13 L67,13.5 L68,13.5 L68.5,14 L69,14.5 L70,14.5 L70.5,15 L71,15.5 L72,15.5 L72.5,16 L73,16.5 L73.5,17 L74,17.5 L75,17.5 L75.5,18 L76,18.5 L76.5,19 L76.5,20 L76,20.5 L75,20.5 L74.5,21 L74,21.5 L73.5,22 L73,22.5 L72,22.5 L71.5,23 L71,23.5 L70,23.5 L69.5,24 L69,24.5 L68.5,25 L68,25.5 L67,25.5 L66.5,26 L66,26.5 L65,26.5 L64.5,27 L64,27.5 L63.5,28 L63,28.5 L62,28.5 L61.5,29 L61,29.5 L60,29.5 L59.5,30 L59,30.5 L58,30.5 L57.5,31 L57,31.5 L56.5,32 L56,32.5 L55,32.5 L54.5,33 L54,33.5 L53,33.5 L52.5,34 L52,34.5 L51.5,35 L51,35.5 L50,35.5 L49.5,36 L49,36.5 L48,36.5 L47.5,37 L47,37.5 L46,37.5 L45.5,38 L45,38.5 L44.5,39 L44,39.5 L43,39.5 L42,39.5 L41.5,39 L41,38.5 L40,38.5 L39.5,38 L39,37.5 L38,37.5 L37.5,37 L37,36.5 L36.5,36 L36,35.5 L35,35.5 L34.5,35 L34,34.5 L33,34.5 L32.5,34 L32,33.5 L31.5,33 L31,32.5 L30,32.5 L29.5,32 L29,31.5 L28,31.5 L27.5,31 L27,30.5 L26,30.5 L25.5,30 L25,29.5 L24,29.5 L23.5,29 L23,28.5 L22.5,28 L22,27.5 L21,27.5 L20.5,27 L20,26.5 L19,26.5 L18.5,26 L18,25.5 L17.5,25 L17,24.5 L16,24.5 L15.5,24 L15,23.5 L14,23.5 L13.5,23 L13,22.5 L12.5,22 L12,21.5 L11,21.5 L10.5,21 L10,20.5 L9,20.5 L8.5,20 L9,19.5 L9.5,19 L10,18.5 L10.5,18 L11,17.5 L11.5,17 L12,16.5 L13,16.5 L13.5,16 L14,15.5 L15,15.5 L15.5,15 L16,14.5 L16.5,14 L17,13.5 L18,13.5 L18.5,13 L19,12.5 L20,12.5 L20.5,12 L21,11.5 L21.5,11 L22,10.5 L23,10.5 L23.5,10 L24,9.5 L25,9.5 L25.5,9 L26,8.5 L27,8.5 L27.5,8 L28,7.5 L28.5,7 L29,6.5 L30,6.5 L30.5,6 L31,5.5 L32,5.5 L32.5,5 L33,4.5 L33.5,4 L34,3.5 L35,3.5 L35.5,3 L36,2.5 L37,2.5 L37.5,2 L38,1.5 L38.5,1 L39,0.5 L40,0.5 L40.5,0 Z M6,27.5 L7,27.5 L7.5,28 L8,28.5 L9,28.5 L9.5,29 L10,29.5 L10.5,30 L11,30.5 L12,30.5 L12.5,31 L13,31.5 L14,31.5 L14.5,32 L15,32.5 L16,32.5 L16.5,33 L17,33.5 L17.5,34 L18,34.5 L19,34.5 L19.5,35 L20,35.5 L21,35.5 L21.5,36 L22,36.5 L22.5,37 L23,37.5 L24,37.5 L24.5,38 L25,38.5 L26,38.5 L26.5,39 L27,39.5 L27.5,40 L28,40.5 L29,40.5 L29.5,41 L30,41.5 L31,41.5 L31.5,42 L32,42.5 L33,42.5 L33.5,43 L34,43.5 L34.5,44 L35,44.5 L36,44.5 L36.5,45 L37,45.5 L37.5,46 L38,46.5 L38.5,47 L38.5,48 L38.5,49 L38.5,50 L38.5,51 L38.5,52 L38.5,53 L38.5,54 L38.5,55 L38.5,56 L38.5,57 L38.5,58 L38.5,59 L38.5,60 L38.5,61 L38.5,62 L38.5,63 L38.5,64 L38.5,65 L38.5,66 L38.5,67 L38.5,68 L38.5,69 L38.5,70 L38.5,71 L38.5,72 L38.5,73 L38.5,74 L38.5,75 L38.5,76 L38.5,77 L38.5,78 L38.5,79 L38.5,80 L38.5,81 L38.5,82 L38.5,83 L38.5,84 L38,84.5 L37,84.5 L36.5,84 L36,83.5 L35,83.5 L34.5,83 L34,82.5 L33,82.5 L32.5,82 L32,81.5 L31,81.5 L30.5,81 L30,80.5 L29.5,80 L29,79.5 L28,79.5 L27.5,79 L27,78.5 L26,78.5 L25.5,78 L25,77.5 L24,77.5 L23.5,77 L23,76.5 L22.5,76 L22,75.5 L21,75.5 L20.5,75 L20,74.5 L19,74.5 L18.5,74 L18,73.5 L17.5,73 L17,72.5 L16,72.5 L15.5,72 L15,71.5 L14,71.5 L13.5,71 L13,70.5 L12,70.5 L11.5,70 L11,69.5 L10.5,69 L10,68.5 L9,68.5 L8.5,68 L8,67.5 L7,67.5 L6.5,67 L6.5,66 L6,65.5 L5.5,65 L5.5,64 L5,63.5 L4.5,63 L4.5,62 L4.5,61 L4.5,60 L4.5,59 L4.5,58 L4.5,57 L4.5,56 L4.5,55 L4.5,54 L4.5,53 L4.5,52 L4.5,51 L4.5,50 L4.5,49 L4.5,48 L4.5,47 L4.5,46 L4.5,45 L4.5,44 L4.5,43 L4.5,42 L4.5,41 L4.5,40 L4.5,39 L4.5,38 L4.5,37 L4.5,36 L4.5,35 L4.5,34 L4.5,33 L4.5,32 L4.5,31 L4.5,30 L5,29.5 L5.5,29 L5.5,28 Z M79,27.5 L79.5,28 L80,28.5 L80.5,29 L80.5,30 L80.5,31 L80.5,32 L80.5,33 L80.5,34 L80.5,35 L80.5,36 L80.5,37 L80.5,38 L80.5,39 L80.5,40 L80.5,41 L80.5,42 L80.5,43 L80.5,44 L80.5,45 L80.5,46 L80.5,47 L80.5,48 L80.5,49 L80.5,50 L80.5,51 L80.5,52 L80.5,53 L80.5,54 L80.5,55 L80.5,56 L80.5,57 L80.5,58 L80.5,59 L80.5,60 L80.5,61 L80.5,62 L80.5,63 L80.5,64 L80,64.5 L79.5,65 L79.5,66 L79,66.5 L78.5,67 L78,67.5 L77,67.5 L76.5,68 L76,68.5 L75,68.5 L74.5,69 L74,69.5 L73.5,70 L73,70.5 L72,70.5 L71.5,71 L71,71.5 L70,71.5 L69.5,72 L69,72.5 L68.5,73 L68,73.5 L67,73.5 L66.5,74 L66,74.5 L65,74.5 L64.5,75 L64,75.5 L63,75.5 L62.5,76 L62,76.5 L61.5,77 L61,77.5 L60,77.5 L59.5,78 L59,78.5 L58,78.5 L57.5,79 L57,79.5 L56.5,80 L56,80.5 L55,80.5 L54.5,81 L54,81.5 L53,81.5 L52.5,82 L52,82.5 L51,82.5 L50.5,83 L50,83.5 L49.5,84 L49,84.5 L48,84.5 L47,84.5 L46.5,84 L46.5,83 L46.5,82 L46.5,81 L46.5,80 L46.5,79 L46.5,78 L46.5,77 L46.5,76 L46.5,75 L46.5,74 L46.5,73 L46.5,72 L46.5,71 L46.5,70 L46.5,69 L46.5,68 L46.5,67 L46.5,66 L46.5,65 L46.5,64 L46.5,63 L46.5,62 L46.5,61 L46.5,60 L46.5,59 L46.5,58 L46.5,57 L46.5,56 L46.5,55 L46.5,54 L46.5,53 L46.5,52 L46.5,51 L46.5,50 L46.5,49 L46.5,48 L46.5,47 L47,46.5 L47.5,46 L48,45.5 L49,45.5 L49.5,45 L50,44.5 L50.5,44 L51,43.5 L52,43.5 L52.5,43 L53,42.5 L54,42.5 L54.5,42 L55,41.5 L55.5,41 L56,40.5 L57,40.5 L57.5,40 L58,39.5 L59,39.5 L59.5,39 L60,38.5 L61,38.5 L61.5,38 L62,37.5 L62.5,37 L63,36.5 L64,36.5 L64.5,36 L65,35.5 L66,35.5 L66.5,35 L67,34.5 L67.5,34 L68,33.5 L69,33.5 L69.5,33 L70,32.5 L71,32.5 L71.5,32 L72,31.5 L72.5,31 L73,30.5 L74,30.5 L74.5,30 L75,29.5 L76,29.5 L76.5,29 L77,28.5 L78,28.5 L78.5,28 Z",
++    ) }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
 index 19c6bd6..24c963d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
@@ -1084,6 +1525,38 @@ index c5175b2..ade3e2e 100644
          title = "放弃填写？",
          text = "已填写的内容还没有保存，返回会放弃这些修改。",
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.Danger,
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+index e47d1d6..9233ec8 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -626,8 +626,25 @@ class ConceptRemainingCoverageTest {
+         val custom = Robolectric.buildActivity(ProxyWebPanelViewerActivity::class.java, intent).setup()
+         try { frame(); expect("正在加载外部面板…"); capture("03B-038-custom-web-container") }
+         finally { custom.pause().stop().destroy(); frame() }
+-        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java).setup()
+-        try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
++        val subStoreIntent = android.content.Intent(ApplicationProvider.getApplicationContext<Application>(), ProxySubStoreWebActivity::class.java)
++            .putExtra("backend", "http://127.0.0.1:3123/")
++        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java, subStoreIntent).setup()
++        try {
++            frame(); expect("正在加载 Sub-Store…"); expect("默认浏览器打开"); capture("03B-039-substore-web-container")
++            click("默认浏览器打开")
++            val external = Shadows.shadowOf(subStore.get()).nextStartedActivity
++            assertNotNull(external)
++            assertEquals(android.content.Intent.ACTION_VIEW, external.action)
++            assertTrue(external.hasCategory(android.content.Intent.CATEGORY_BROWSABLE))
++            assertEquals("sub-store.vercel.app", external.data!!.host)
++            assertEquals("http://127.0.0.1:3123/", external.data!!.getQueryParameter("api"))
++            for (unsafe in listOf("file:///data/user/0", "javascript:alert(1)", "https://user:secret@example.com", "https://example.com/\n",
++                "https://sub-store.vercel.app/?api=https%3A%2F%2Fuser%3Asecret%40example.com",
++                "https://sub-store.vercel.app/?api=file%3A%2F%2F%2Fdata%2Fuser%2F0")) {
++                assertNull(webToolBrowserIntent(unsafe))
++            }
++            assertEquals("https", webToolBrowserIntent("HTTPS://example.com")!!.data!!.scheme)
++        }
+         finally { subStore.pause().stop().destroy(); frame() }
+     }
+     @Config(sdk = [28])
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java
 new file mode 100644
 index 0000000..50d3531

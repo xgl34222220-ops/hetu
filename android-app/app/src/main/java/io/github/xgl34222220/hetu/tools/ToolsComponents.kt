@@ -272,6 +272,7 @@ internal fun ToolsField(
     readOnly: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
     compact: Boolean = false,
+    clearable: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -291,7 +292,12 @@ internal fun ToolsField(
                         .clip(HomeDims.controlShape).background(c.sunken)
                         .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
-                        inner()
+                        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Box(Modifier.weight(1f)) { inner() }
+                            if (clearable && value.isNotEmpty()) Box(Modifier.size(20.dp).clip(CircleShape)
+                                .background(c.t3.copy(alpha = .14f)).clickable(role = Role.Button, onClickLabel = ht("清除输入")) { onValueChange("") },
+                                contentAlignment = Alignment.Center) { Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = c.t3) }
+                        }
                     }
                 },
             )
@@ -435,6 +441,7 @@ internal fun ToolsDialogCard(
     actions: ToolsDialogActions = ToolsDialogActions.Filled,
     cancelLabel: String = "取消",
     confirmLoading: Boolean = false,
+    neutralCancel: Boolean = false,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
@@ -466,7 +473,7 @@ internal fun ToolsDialogCard(
             }
         } else {
             Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
+                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, neutral = neutralCancel, enabled = !confirmLoading)
                 when (confirmKind) {
                     ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
                     ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)

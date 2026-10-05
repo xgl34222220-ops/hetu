@@ -116,7 +116,7 @@ internal fun ToolsAppsScreen(
                     LazyColumn(
                         Modifier.fillMaxSize(),
                         contentPadding = PaddingValues(start = HomeDims.gutter, end = HomeDims.gutter, top = HomeDims.gap, bottom = HomeDims.gap),
-                        verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
+                        verticalArrangement = Arrangement.spacedBy(10.dp),
                     ) {
                         items(rows, key = { it.key }) { app ->
                             AppRow(app, checked = app.key in state.selected, inert = core || state.refreshing, dimmed = core, onClick = { onToggleApp(app) }, appIcon = appIcon)
@@ -131,7 +131,7 @@ internal fun ToolsAppsScreen(
                 Text(state.selectedCount.toString(), color = c.accent, style = HomeType.value.copy(fontFeatureSettings = "tnum"))
                 Text(" " + ht("个"), color = c.t1, style = HomeType.bodySmall)
                 Text(ht("  ·  "), color = c.t3, style = HomeType.bodySmall)
-                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                Text(ht(state.scope.tip), Modifier.weight(1f), color = c.t2, style = ToolsType.url, maxLines = 2, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -153,7 +153,7 @@ private fun AppRow(
             Modifier
                 .fillMaxWidth()
                 .clickable(enabled = !inert, role = Role.Checkbox) { haptics(HomeHaptic.Tick); onClick() }
-                .heightIn(min = 64.dp)
+                .heightIn(min = 78.dp)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),

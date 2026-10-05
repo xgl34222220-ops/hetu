@@ -223,6 +223,7 @@ internal fun SettingsDialog(
     onDismiss: () -> Unit,
     confirmLabel: String,
     onConfirm: () -> Unit,
+    pillButtons: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     HxReferenceDialog(onDismiss = onDismiss) {
@@ -232,16 +233,16 @@ internal fun SettingsDialog(
             content()
             Spacer(Modifier.height(18.dp))
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f))
-                SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f))
+                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f), pillButtons)
+                SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f), pillButtons)
             }
     }
 }
 
 @Composable
-private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) {
+private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier, pillButtons: Boolean) {
     val source = remember { MutableInteractionSource() }
-    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(RoundedCornerShape(16.dp))
+    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(if (pillButtons) Hx.pillShape else RoundedCornerShape(16.dp))
         .background(if (primary) {
             if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
         } else Hx.colors.accentSoft)
@@ -259,7 +260,7 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
         val next = value.trim()
         if (!settingsMirrorPrefixValid(next)) error = true
         else onSave(next)
-    }) {
+    }, pillButtons = true) {
         Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
         Spacer(Modifier.height(6.dp))
         SettingsInput(value, { value = it; error = false }, error = error)

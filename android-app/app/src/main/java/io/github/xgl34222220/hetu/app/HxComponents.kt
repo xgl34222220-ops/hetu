@@ -1079,7 +1079,7 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
     val c = Hx.colors
     HxSheet(onDismiss = onDismiss) {
         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = if (title == "AdGuard") 30.sp else 24.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
             if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
             if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
                 Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
@@ -1100,8 +1100,9 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
             Text(
                 text.ifBlank { "（空）" },
                 fontFamily = if (wrapLines && !referenceDocument) FontFamily.Default else FontFamily.Monospace,
-                fontSize = 11.5.sp,
-                lineHeight = 16.sp,
+                fontSize = if (referenceDocument) 10.sp else 11.5.sp,
+                lineHeight = if (referenceDocument) 14.sp else 16.sp,
+                letterSpacing = if (referenceDocument) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
                 color = c.text,
             )
         }
@@ -1278,6 +1279,7 @@ internal fun HxFormDialog(
     titleTextAlign: TextAlign = TextAlign.Center,
     hideMessageOnError: Boolean = false,
     highlightError: Boolean = true,
+    fieldOutlineColor: Color? = null,
     plainFields: Boolean = false,
     compactPills: Boolean = false,
     validate: (List<String>) -> String? = { null },
@@ -1327,7 +1329,7 @@ internal fun HxFormDialog(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
                         modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else c.line, RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else (fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
                             .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
                         decorationBox = { input -> Box {
                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
@@ -1337,7 +1339,7 @@ internal fun HxFormDialog(
                     if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
                         style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                 }
-                if (!message.isNullOrBlank() && messageBelowFields) {
+                if (!message.isNullOrBlank() && messageBelowFields && !(hideMessageOnError && error != null)) {
                     Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
                 }
                 AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
