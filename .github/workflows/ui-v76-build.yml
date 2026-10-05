@@ -3,7 +3,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: hetu-v2085-${{ github.ref }}
+  group: hetu-v2085-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   build:

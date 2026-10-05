@@ -144,7 +144,7 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
             val title = ht(entry.title)
             ToolsRow(
                 title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
-                icon = entry.icon(),
+                icon = io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
                 subtitle = ht(if (brief) entry.brief else entry.summary),
                 subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
                 onClick = { onOpen(entry) },

@@ -154,7 +154,7 @@ index 1a9af21..2e4214d 100644
      val repo = remember { RuntimeFilesRepository(context) }
      var editor by remember { mutableStateOf<CodeEditor?>(null) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..669144f 100644
+index be09cbe..14fd7b7 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -178,6 +178,7 @@ internal fun HxPage(
@@ -211,7 +211,7 @@ index be09cbe..669144f 100644
                      }
                  }
 +            } else if (maxVisibleChoices != null) {
-+                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 40).dp).verticalScroll(rememberScrollState())) {
++                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 42.5f).dp).verticalScroll(rememberScrollState())) {
 +choices.forEachIndexed { index, choice ->
 +                HxMenuItem(
 +                    choice.label,
@@ -266,8 +266,56 @@ index 088770f..8b9333b 100644
 -    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true) }
 +    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+index 206b829..135c9cf 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+@@ -79,6 +79,8 @@ internal fun SettingsRow(
+     onClick: (() -> Unit)? = null,
+     compact: Boolean = false,
+     modifier: Modifier = Modifier,
++    rootReference: Boolean = false,
++    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
+     trailing: @Composable RowScope.() -> Unit = {},
+ ) {
+     val c = Hx.colors
+@@ -87,7 +89,7 @@ internal fun SettingsRow(
+         modifier.fillMaxWidth().hxAnchorSource()
+             .then(if (onClick != null) Modifier.hxPressScale(source, .99f)
+                 .clickable(interactionSource = source, indication = null, enabled = enabled, onClick = onClick) else Modifier)
+-            .heightIn(min = if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
++            .heightIn(min = rowMinHeight ?: if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
+             .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp),
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+@@ -97,9 +99,10 @@ internal fun SettingsRow(
+         }
+         Column(Modifier.weight(1f)) {
+             Text(title, fontSize = 18.sp, lineHeight = 24.sp,
+-                fontWeight = FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
++                fontWeight = if (rootReference) FontWeight.Bold else FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
+                 maxLines = 2, overflow = TextOverflow.Ellipsis)
+-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
++            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = if (rootReference) 16.sp else 14.sp, lineHeight = if (rootReference) 20.sp else 18.sp,
++                fontWeight = if (rootReference) FontWeight.SemiBold else FontWeight.Normal,
+                 color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
+         }
+         trailing()
+@@ -115,9 +118,11 @@ internal fun SettingsNavRow(
+     value: String? = null,
+     dropdown: Boolean = false,
+     compact: Boolean = false,
++    rootReference: Boolean = false,
++    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
+     onClick: () -> Unit,
+ ) {
+-    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact) {
++    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, rootReference = rootReference, rowMinHeight = rowMinHeight) {
+         if (!value.isNullOrBlank()) {
+             Spacer(Modifier.width(8.dp))
+             Text(value, color = Hx.colors.textMuted, fontSize = 15.sp, lineHeight = 20.sp,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index b06fbb2..a064443 100644
+index b06fbb2..c1e853b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -199,7 +199,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
@@ -306,7 +354,68 @@ index b06fbb2..a064443 100644
              title = ht("设置"),
              scrollToTopSignal = vm.reselect,
              // The collapsed reference begins at the appearance group. Retain enough
-@@ -557,12 +557,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -361,9 +361,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+             // even on a tall viewport; do not shrink rows or hard-code a device height.
+             bottomPadding = bottomPadding + with(density) { firstGroupHeightPx.toDp() },
+             largeTitleStartPadding = 26.dp,
+-            largeTitleTopPadding = 26.dp,
++            largeTitleTopPadding = 16.dp,
+             largeTitleFontSizeSp = 36f,
+-            largeTitleBottomPadding = 18.dp,
++            largeTitleBottomPadding = 12.dp,
+             canvasColor = c.canvas,
+         ) {
+             item(key = "proxy-config") {
+@@ -388,12 +388,14 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+             item(key = "appearance-panel") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
++                        rowMinHeight = 74.dp,
+                         title = ht("语言与主题"),
+                         summary = ht("显示语言、主题与显示"),
+                         icon = Icons.Rounded.Palette,
+                         onClick = { nav.push(HxRoute.Theme) },
+                     )
+                     MiuixSettingsArrow(
++                        rowMinHeight = 74.dp,
+                         title = ht("默认面板"),
+                         summary = ht("选择面板与显示偏好"),
+                         icon = Icons.Rounded.GridView,
+@@ -405,18 +407,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+             item(key = "backup-startup-notify") {
+                 MiuixSettingsCard {
+                     MiuixSettingsArrow(
++                        rowMinHeight = 70.dp,
+                         title = ht("备份与恢复"),
+                         summary = ht("导出与恢复应用设置"),
+                         icon = Icons.Rounded.Layers,
+                         onClick = { nav.push(HxRoute.BackupSettings) },
+                     )
+                     MiuixSettingsArrow(
++                        rowMinHeight = 70.dp,
+                         title = ht("开机启动与下载"),
+                         summary = ht("启动设置与资源下载"),
+                         icon = Icons.Rounded.RestartAlt,
+                         onClick = { nav.push(HxRoute.StartupDownloadSettings) },
+                     )
+                     MiuixSettingsArrow(
++                        rowMinHeight = 70.dp,
+                         title = ht("通知设置"),
+                         summary = ht("管理运行状态提醒"),
+                         icon = Icons.Rounded.Notifications,
+@@ -520,9 +525,10 @@ private fun MiuixSettingsArrow(
+     summary: String? = null,
+     icon: androidx.compose.ui.graphics.vector.ImageVector,
+     value: String? = null,
++    rowMinHeight: Dp = 78.dp,
+     onClick: () -> Unit,
+ ) {
+-    SettingsNavRow(title, subtitle = summary, icon = icon, value = value, onClick = onClick)
++    SettingsNavRow(title, subtitle = summary, icon = icon, value = value, rootReference = true, rowMinHeight = rowMinHeight, onClick = onClick)
+ }
+ 
+ /* ------------------------------------------------------------------ */
+@@ -557,12 +563,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
      val c = Hx.colors
  
@@ -321,7 +430,7 @@ index b06fbb2..a064443 100644
      ) {
          item(key = "core") {
              SettingsSection {
-@@ -851,7 +851,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -851,7 +857,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
          revision++
      }
  
@@ -799,7 +908,7 @@ index a60a9d7..2bb5c4e 100644
              .clip(HomeDims.menuShape)
              .background(c.surface)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-index 7a05ec8..c7f7a26 100644
+index 7a05ec8..4f35d7c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 @@ -31,6 +31,8 @@ import androidx.compose.ui.draw.alpha
@@ -820,9 +929,12 @@ index 7a05ec8..c7f7a26 100644
              verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
          ) {
              Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
-@@ -144,8 +146,9 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
+@@ -142,10 +144,11 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
+             val title = ht(entry.title)
+             ToolsRow(
                  title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
-                 icon = entry.icon(),
+-                icon = entry.icon(),
++                icon = io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
                  subtitle = ht(if (brief) entry.brief else entry.summary),
 +                subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
                  onClick = { onOpen(entry) },

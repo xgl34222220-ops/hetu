@@ -361,9 +361,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             // even on a tall viewport; do not shrink rows or hard-code a device height.
             bottomPadding = bottomPadding + with(density) { firstGroupHeightPx.toDp() },
             largeTitleStartPadding = 26.dp,
-            largeTitleTopPadding = 26.dp,
+            largeTitleTopPadding = 16.dp,
             largeTitleFontSizeSp = 36f,
-            largeTitleBottomPadding = 18.dp,
+            largeTitleBottomPadding = 12.dp,
             canvasColor = c.canvas,
         ) {
             item(key = "proxy-config") {
@@ -388,12 +388,14 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             item(key = "appearance-panel") {
                 MiuixSettingsCard {
                     MiuixSettingsArrow(
+                        rowMinHeight = 74.dp,
                         title = ht("语言与主题"),
                         summary = ht("显示语言、主题与显示"),
                         icon = Icons.Rounded.Palette,
                         onClick = { nav.push(HxRoute.Theme) },
                     )
                     MiuixSettingsArrow(
+                        rowMinHeight = 74.dp,
                         title = ht("默认面板"),
                         summary = ht("选择面板与显示偏好"),
                         icon = Icons.Rounded.GridView,
@@ -405,18 +407,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             item(key = "backup-startup-notify") {
                 MiuixSettingsCard {
                     MiuixSettingsArrow(
+                        rowMinHeight = 70.dp,
                         title = ht("备份与恢复"),
                         summary = ht("导出与恢复应用设置"),
                         icon = Icons.Rounded.Layers,
                         onClick = { nav.push(HxRoute.BackupSettings) },
                     )
                     MiuixSettingsArrow(
+                        rowMinHeight = 70.dp,
                         title = ht("开机启动与下载"),
                         summary = ht("启动设置与资源下载"),
                         icon = Icons.Rounded.RestartAlt,
                         onClick = { nav.push(HxRoute.StartupDownloadSettings) },
                     )
                     MiuixSettingsArrow(
+                        rowMinHeight = 70.dp,
                         title = ht("通知设置"),
                         summary = ht("管理运行状态提醒"),
                         icon = Icons.Rounded.Notifications,
@@ -520,9 +525,10 @@ private fun MiuixSettingsArrow(
     summary: String? = null,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
     value: String? = null,
+    rowMinHeight: Dp = 78.dp,
     onClick: () -> Unit,
 ) {
-    SettingsNavRow(title, subtitle = summary, icon = icon, value = value, onClick = onClick)
+    SettingsNavRow(title, subtitle = summary, icon = icon, value = value, rootReference = true, rowMinHeight = rowMinHeight, onClick = onClick)
 }
 
 /* ------------------------------------------------------------------ */

@@ -79,6 +79,8 @@ internal fun SettingsRow(
     onClick: (() -> Unit)? = null,
     compact: Boolean = false,
     modifier: Modifier = Modifier,
+    rootReference: Boolean = false,
+    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = Hx.colors
@@ -87,7 +89,7 @@ internal fun SettingsRow(
         modifier.fillMaxWidth().hxAnchorSource()
             .then(if (onClick != null) Modifier.hxPressScale(source, .99f)
                 .clickable(interactionSource = source, indication = null, enabled = enabled, onClick = onClick) else Modifier)
-            .heightIn(min = if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
+            .heightIn(min = rowMinHeight ?: if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
             .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -97,9 +99,10 @@ internal fun SettingsRow(
         }
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 18.sp, lineHeight = 24.sp,
-                fontWeight = FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
+                fontWeight = if (rootReference) FontWeight.Bold else FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
+            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = if (rootReference) 16.sp else 14.sp, lineHeight = if (rootReference) 20.sp else 18.sp,
+                fontWeight = if (rootReference) FontWeight.SemiBold else FontWeight.Normal,
                 color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         trailing()
@@ -115,9 +118,11 @@ internal fun SettingsNavRow(
     value: String? = null,
     dropdown: Boolean = false,
     compact: Boolean = false,
+    rootReference: Boolean = false,
+    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
     onClick: () -> Unit,
 ) {
-    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact) {
+    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, rootReference = rootReference, rowMinHeight = rowMinHeight) {
         if (!value.isNullOrBlank()) {
             Spacer(Modifier.width(8.dp))
             Text(value, color = Hx.colors.textMuted, fontSize = 15.sp, lineHeight = 20.sp,

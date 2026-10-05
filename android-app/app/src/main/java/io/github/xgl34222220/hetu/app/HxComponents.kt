@@ -1165,7 +1165,7 @@ internal fun HxChoiceSheet(
                     }
                 }
             } else if (maxVisibleChoices != null) {
-                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 40).dp).verticalScroll(rememberScrollState())) {
+                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 42.5f).dp).verticalScroll(rememberScrollState())) {
 choices.forEachIndexed { index, choice ->
                 HxMenuItem(
                     choice.label,

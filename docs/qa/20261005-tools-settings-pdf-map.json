@@ -1264,10 +1264,11 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending-installed-capture",
+      "currentPixelParity": "reviewed-differences-pending",
       "currentInteractionValidation": "pending",
-      "currentCapture": null,
-      "currentScreenshotReviewed": false
+      "currentCapture": "reference-03B-040-native-overview.png",
+      "currentScreenshotReviewed": true,
+      "installedArtifact": 11338486322
     },
     {
       "document": "03B",
@@ -1278,10 +1279,11 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending-installed-capture",
+      "currentPixelParity": "reviewed-differences-pending",
       "currentInteractionValidation": "pending",
-      "currentCapture": null,
-      "currentScreenshotReviewed": false
+      "currentCapture": "reference-03B-041-native-groups.png",
+      "currentScreenshotReviewed": true,
+      "installedArtifact": 11338486322
     },
     {
       "document": "03B",
@@ -1292,10 +1294,11 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending-installed-capture",
+      "currentPixelParity": "reviewed-differences-pending",
       "currentInteractionValidation": "pending",
-      "currentCapture": null,
-      "currentScreenshotReviewed": false
+      "currentCapture": "reference-03B-042-native-connections.png",
+      "currentScreenshotReviewed": true,
+      "installedArtifact": 11338486322
     },
     {
       "document": "03B",
@@ -1306,10 +1309,11 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending-installed-capture",
+      "currentPixelParity": "reviewed-differences-pending",
       "currentInteractionValidation": "pending",
-      "currentCapture": null,
-      "currentScreenshotReviewed": false
+      "currentCapture": "reference-03B-043-native-node-dialog.png",
+      "currentScreenshotReviewed": true,
+      "installedArtifact": 11338486322
     },
     {
       "document": "03B",
@@ -1320,10 +1324,11 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending-installed-capture",
+      "currentPixelParity": "reviewed-differences-pending",
       "currentInteractionValidation": "pending",
-      "currentCapture": null,
-      "currentScreenshotReviewed": false
+      "currentCapture": "reference-03B-044-native-switch-failure.png",
+      "currentScreenshotReviewed": true,
+      "installedArtifact": 11338486322
     },
     {
       "document": "03B",
@@ -1845,5 +1850,6 @@
     }
   ],
   "currentReviewCommit": "18909201b6168687cac4e1de5ece68db36938fda",
-  "currentReviewRun": 37292555012
+  "currentReviewRun": 37292555012,
+  "currentReviewSummary": "130 current states actually reviewed from 1890920 build and installed native WebView; screenshot availability is not a 1:1 pixel pass."
 }
