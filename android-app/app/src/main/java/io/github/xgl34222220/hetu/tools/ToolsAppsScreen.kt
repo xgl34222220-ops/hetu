@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu.tools
 import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -78,17 +79,17 @@ internal fun ToolsAppsScreen(
     val rows = remember(state) { state.visible }
 
     Column(modifier.fillMaxSize().background(c.bg)) {
-        ToolsWideBar(title = "应用管理", onBack = onBack) {
-            HomeIconButton(if (state.searching) HomeIcons.X else ToolsIcons.Search, if (state.searching) "关闭搜索" else "搜索", onToggleSearch, enabled = ready)
+        ToolsTopBar(title = "应用管理", onBack = onBack) {
+            HomeIconButton(ToolsIcons.Search, if (state.searching) "关闭搜索" else "搜索", onToggleSearch, modifier = Modifier.width(32.dp), enabled = ready)
             Box {
-                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, enabled = ready)
+                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, modifier = Modifier.width(32.dp), enabled = ready)
                 if (menu == ToolsAppsMenu.Sort) {
                     ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppSortMenuCard(state, onSortChange, onToggleDescending) }
                 }
             }
-            HomeIconButton(HomeIcons.CircleCheck, "全选当前结果", onSelectAll, enabled = ready && !core && rows.isNotEmpty())
+            HomeIconButton(HomeIcons.CircleCheck, "全选当前结果", onSelectAll, modifier = Modifier.width(32.dp), enabled = ready && !core && rows.isNotEmpty())
             Box {
-                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, enabled = ready)
+                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, modifier = Modifier.width(32.dp), enabled = ready)
                 if (menu == ToolsAppsMenu.More) {
                     ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh) }
                 }

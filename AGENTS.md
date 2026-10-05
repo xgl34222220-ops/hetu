@@ -1,3 +1,13 @@
+## 当前接续：V20.85 实际PDF130页与认证证据
+
+原仓库 xgl34222220-ops/hetu / test/v20.76-new-ui，从492a9c继续；不另开重复实现、不取消CI。最新完整验证应用93988af07d8f052e928a8db166daaeaeb053ef67 / run37307367305四job success。479/49XML零失败错误跳过，API35/36各64=59+5、21palette、Root0、真实loopback401→200/Bearer与清理通过；APK134761323 bytes/SHA5721cd95354b2c306aa099b1bb8671645b27a2b54c05b45006311724a1a786e6。详见docs/qa/20261005-v2085-939-installation-success.json。
+
+本条提交继续修正末次全尺寸复核确认的搜索/应用标题/广告说明与填充glyph、重命名错误态宽度、AI稳定glyph、通知第7行裁剪；此批新构建尚待执行，不能移用939或中间771/2bb通过结果。追加v2085同层36修改输入、336冻结，422原基线和479总数保留；首页/panel默认布局动效、核心/权限/签名与历史补丁冻结。PDF03A49、03B48、0433页均实际读并130当前截图有入口映射，仍没有字面像素1:1与130完整功能验收结论。
+
+Google197434实际为帐号认证错误而非CAPTCHA；历史GMS两条分流链、独立DNS重定向与河图自身UID直测已证据对照，但缺当前故障时DNS/认证HTTP/TLS及另一代理同刻链路，真机根因和修复仍未确认。新增25条Google元数据配额及8分类用例，只改证据保留、不改DNS/链路/权限；AOSP控制器认证不是Google账号验收。AVD/按钮禁用/旧间距断言失败证据和V20.83 a93交付记录全部保留。用户已授权本测试分支代码/UI/tests/CI/docs提交与隔离验收；不操作手机/帐号/网络安全设置、不合并main、不发布部署、无hook。
+
+详细过程与边界见docs/V20.85_PDF_CONTINUATION.md；页码入口/当前captureSHA见docs/qa/20261005-tools-settings-pdf-map.json。
+
 ## 当前续接：V20.84 控制接口鉴权与面板缺测状态（构建通过，安装续验待核）
 
 继续 `test/v20.76-new-ui`，以已实际编译的 `a93a756d8578cf3afa60ee090405535ad097e49e` 为底座；其完整 Actions `37240041766` 现四 job 均 success，保留下面交付时记录的原状态。本轮 versionCode 2084 / `0.12.14-v20-auth`，独立追加 `updates/v2084-controller-auth/runtime.patch`，原 V20.82/83 清单及补丁字节不变。

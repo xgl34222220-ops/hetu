@@ -475,8 +475,20 @@ class ConceptRemainingCoverageTest {
             val row = generateSequence(label) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
             assertTrue("Reference file menu keeps its measured43dp action rows", row.boundsInWindow.height in 42.5f..44.5f)
         }
-        capture("03B-016-file-menu"); click("重命名"); capture("03B-022-files-rename")
-        click("重命名"); expect("名称没有变化"); capture("03B-025-files-name-unchanged"); click("取消")
+        capture("03B-016-file-menu"); click("重命名")
+        var normalRenameWidth = 0f
+        rule.runOnUiThread {
+            val title = nativeNodes().first { "重命名" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
+            normalRenameWidth = title.boundsInWindow.width
+        }
+        capture("03B-022-files-rename")
+        click("重命名"); expect("名称没有变化")
+        rule.runOnUiThread {
+            val title = nativeNodes().first { "重命名" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
+            val errorWidth = title.boundsInWindow.width
+            assertTrue("Rename validation keeps input and widens only the error card", errorWidth > normalRenameWidth + 20f)
+        }
+        capture("03B-025-files-name-unchanged"); click("取消")
         longClick("config.yaml"); click("删除"); capture("03B-023-file-delete"); click("取消")
         longClick("backup")
         rule.runOnUiThread {

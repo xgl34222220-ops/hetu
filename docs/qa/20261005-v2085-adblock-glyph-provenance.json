@@ -1,0 +1,51 @@
+{
+  "sourcePdf": "河图概念图-03A-工具上册-离线版(1).pdf",
+  "sourcePage": 45,
+  "sourcePdfSha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+  "sourceJpegXref": 93,
+  "sourceJpegSha256": "5788fb9bac0d40bf44de10c84a49f1d9dd3907ac4fa2d4a2f151cc613e0d56b8",
+  "sourceJpegResolution": [
+    850,
+    1850
+  ],
+  "segmentation": "G - R > 70 AND G - B > 30; integer RGB",
+  "contour": "marching-squares at 0.5; all vertices retained; EvenOdd negative space",
+  "metrics": [
+    {
+      "name": "AdblockProtectingPdf45",
+      "sourceCropPixels": [
+        96,
+        327,
+        192,
+        423
+      ],
+      "viewport": 96,
+      "loops": 2,
+      "vertices": 458,
+      "foregroundPixels": 4722,
+      "differentPixelsAtSourceCenters": 0,
+      "binaryIoU": 1.0
+    },
+    {
+      "name": "AdblockCheckPdf45",
+      "sourceCropPixels": [
+        61,
+        782,
+        117,
+        838
+      ],
+      "viewport": 56,
+      "loops": 2,
+      "vertices": 296,
+      "foregroundPixels": 1956,
+      "differentPixelsAtSourceCenters": 0,
+      "binaryIoU": 1.0
+    }
+  ],
+  "preview": "/workspace/scratch/3788973cf567/tmp/pdf-adblock-silhouette-comparison.png",
+  "limitations": [
+    "Binary pixel-center equivalence is not antialiasing/gradient/color equivalence.",
+    "White check negative space shows current palette background; glyph fill uses caller tint.",
+    "Existing production layout, icon size, and state selection remain unchanged."
+  ]
+}

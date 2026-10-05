@@ -418,7 +418,13 @@ class ConceptStateCoverageTest {
         capture("04-011-notification")
         touch("刷新频率"); capture("04-022-refresh-menu"); click("5 秒")
         assertEquals(3, vm.prefs.getInt(ProxyStatusNotificationService.PREF_REFRESH_SECONDS, 3))
-        touch("点击通知打开"); capture("04-023-target-menu"); click("工具")
+        touch("点击通知打开")
+        rule.runOnUiThread {
+            val seventh = nativeNodes().first { "设置" in labels(it) && it.boundsInWindow.height > 0f }
+            val viewport = generateSequence(seventh) { it.parent }.first { it.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange) != null }
+            assertTrue("All seven PDF target rows fit in the measured scroll viewport", seventh.boundsInWindow.bottom <= viewport.boundsInWindow.bottom + .5f)
+        }
+        capture("04-023-target-menu"); click("工具")
         assertEquals("Home", vm.prefs.getString(ProxyStatusNotificationService.PREF_CLICK_TARGET, "Home"))
         scroll(580f); capture("04-012-notification-actions")
         touch("动作", 0); capture("04-024-action-one"); click("重载")

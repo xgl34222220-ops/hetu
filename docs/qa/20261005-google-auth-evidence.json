@@ -62,7 +62,7 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+    "applicationCommit": "93988af07d8f052e928a8db166daaeaeb053ef67",
     "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
     "currentChanges": "Only bounded connection metadata classification/quota; no new Root/controller requests, DNS/routing changes, credentials/cookies/tokens, hooks or permissions",
@@ -85,7 +85,10 @@
     "passedInRuns": [
       37292555012,
       37293354486,
-      37300578403
+      37300578403,
+      37305122492,
+      37306185320,
+      37307367305
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",

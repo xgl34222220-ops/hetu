@@ -821,7 +821,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
         HxFormDialog(
             title = "重命名",
             message = "原文件：${entry.name}", messageBelowFields = true,
-            hideMessageOnError = true, highlightError = false, fieldOutlineColor = c.accent,
+            hideMessageOnError = true, highlightError = false, errorWidthFraction = .84f, errorFieldOutlineColor = c.accent,
             fields = listOf(HxField("新名称", entry.name)),
             confirmLabel = "重命名",
             validate = { v ->

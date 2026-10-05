@@ -26,6 +26,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.CustomAccessibilityAction
+import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -127,7 +130,7 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
 private fun statusLook(state: ToolsAdblockState): StatusLook {
     val c = LocalHomeColors.current
     return when (state.status) {
-        ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodSoft, "保护中", "广告域名直接 REJECT，\n其余流量照常分流。")
+        ToolsAdStatus.Protecting -> StatusLook(ToolsIcons.AdblockProtectingPdf45, c.good, c.goodSoft, "保护中", "广告域名直接 REJECT，\n其余流量照常分流。")
         ToolsAdStatus.WrongMode -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
         ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.sunken, "已开启", "启动代理后自动验证运行链。")
         ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "运行链未确认", "尚未确认规则模式及广告规则加载；下拉刷新后重试验证。")
@@ -198,7 +201,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
     val c = LocalHomeColors.current
     ToolsRow(
         AnnotatedString(title),
-        icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+        icon = if (ok) ToolsIcons.AdblockCheckPdf45 else ToolsFeatureIcons.CircleDashed,
         iconTint = if (ok) c.good else c.t3,
         subtitle = detail, compact = true,
     )
@@ -278,13 +281,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
 @Composable
 internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
-    HomeSheetContent(title = "广告过滤说明", modifier = modifier, onClose = onClose) {
+    val closeLabel = ht("关闭")
+    HomeSheetContent(title = "广告过滤说明", modifier = modifier.semantics {
+        customActions = listOf(CustomAccessibilityAction(closeLabel) { onClose(); true })
+    }) {
         Column(Modifier.padding(horizontal = 4.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
             Text(ht("应用流量会先经过应用直连与明确白名单，再匹配广告规则 REJECT，之后才进入普通配置分流与兜底。"), color = c.t2, style = ToolsType.dialogText)
             Text(ht("代理运行时，独立 DNS 过滤会自动暂停，避免两套过滤链同时接管。"), color = c.t2, style = ToolsType.dialogText)
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                Text(ht("应用流量 → 直连应用 / 白名单 → 广告 RULE-SET → 地区 / 规则集分流 → 兜底"), Modifier.padding(horizontal = 14.dp, vertical = 12.dp), color = c.t1, style = HomeType.mono)
-            }
         }
     }
 }

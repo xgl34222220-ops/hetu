@@ -1166,8 +1166,9 @@ internal fun HxChoiceSheet(
                     }
                 }
             } else if (maxVisibleChoices != null) {
-                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 42.5f).dp).verticalScroll(rememberScrollState())) {
-choices.forEachIndexed { index, choice ->
+                val density = LocalDensity.current
+                var visibleRowsHeight by remember(maxVisibleChoices, choices) { mutableStateOf<Int?>(null) }
+                @Composable fun choiceRow(index: Int, choice: HxChoice) {
                 HxMenuItem(
                     choice.label,
                     onClick = { close { onPick(choice.id) } },
@@ -1178,7 +1179,12 @@ choices.forEachIndexed { index, choice ->
                     choicePresentation = presentation,
                 )
                 if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
-            }
+                }
+                Column(Modifier.fillMaxWidth().heightIn(max = visibleRowsHeight?.let { with(density) { it.toDp() } } ?: (maxVisibleChoices * 48.5f).dp).verticalScroll(rememberScrollState())) {
+                    Column(Modifier.onSizeChanged { visibleRowsHeight = it.height }) {
+                        choices.take(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index, choice) }
+                    }
+                    choices.drop(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index + maxVisibleChoices, choice) }
                 }
             } else choices.forEachIndexed { index, choice ->
                 HxMenuItem(
@@ -1274,6 +1280,7 @@ internal fun HxFormDialog(
     messageBelowFields: Boolean = false,
     errorField: (String) -> Int? = { null },
     widthFraction: Float? = null,
+    errorWidthFraction: Float? = null,
     titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
     titleLineHeight: androidx.compose.ui.unit.TextUnit = 26.sp,
     titleTextAlign: TextAlign = TextAlign.Center,
@@ -1281,6 +1288,7 @@ internal fun HxFormDialog(
     hideMessageOnError: Boolean = false,
     highlightError: Boolean = true,
     fieldOutlineColor: Color? = null,
+    errorFieldOutlineColor: Color? = null,
     plainFields: Boolean = false,
     compactPills: Boolean = false,
     validate: (List<String>) -> String? = { null },
@@ -1306,7 +1314,7 @@ internal fun HxFormDialog(
         if (problem != null) { error = problem; shakeTick++ }
         else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
     }
-    HxReferenceDialog(onDismiss, widthFraction = widthFraction ?: if (configFooter) .74f else .76f, contentPadding = 0.dp) {
+    HxReferenceDialog(onDismiss, widthFraction = (if (error != null) errorWidthFraction else null) ?: widthFraction ?: if (configFooter) .74f else .76f, contentPadding = 0.dp) {
         Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
             Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
                 .graphicsLayer { translationX = shake.value * density }) {
@@ -1330,7 +1338,7 @@ internal fun HxFormDialog(
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
                         modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else (fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else ((if (error != null) errorFieldOutlineColor else null) ?: fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
                             .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
                         decorationBox = { input -> Box {
                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)

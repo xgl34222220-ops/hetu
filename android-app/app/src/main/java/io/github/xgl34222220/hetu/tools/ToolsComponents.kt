@@ -312,7 +312,7 @@ internal fun ToolsField(
     }
 }
 
-/** 44 dp sunken search box with a leading glyph and a clear button; takes focus when it appears. */
+/** Search-only surface pill with a leading glyph and a clear button; takes focus when it appears. */
 @Composable
 internal fun ToolsSearchField(
     value: String,
@@ -339,7 +339,7 @@ internal fun ToolsSearchField(
         cursorBrush = SolidColor(c.accent),
         decorationBox = { inner ->
             Row(
-                Modifier.fillMaxWidth().height(HomeDims.touch).clip(HomeDims.controlShape).background(c.sunken).padding(start = 12.dp, end = 4.dp),
+                Modifier.fillMaxWidth().height(HomeDims.touch).clip(CircleShape).background(c.surface).padding(start = 12.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
@@ -352,7 +352,11 @@ internal fun ToolsSearchField(
                     Box(
                         Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
                         contentAlignment = Alignment.Center,
-                    ) { Icon(HomeIcons.X, null, Modifier.size(16.dp), tint = c.t3) }
+                    ) {
+                        Box(Modifier.size(18.dp).background(c.t3, CircleShape), contentAlignment = Alignment.Center) {
+                            Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = Color.White)
+                        }
+                    }
                 }
             }
         },
