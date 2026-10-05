@@ -64,10 +64,10 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+    "applicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
     "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
-    "currentChanges": "Latest01b6634 tools/settings presentation preserves bounded Google metadata classifier and underlying DNS, routing, credentials, hooks and permissions. The frozen-source gates passed. Its isolated Mihomo controller401→200 results do not locate or fix user Google Play account authentication.",
+    "currentChanges": "Latest2730954 tools/settings presentation preserves bounded Google metadata classifier and underlying DNS, routing, credentials, hooks and permissions. Exact2730954 CI frozen-source gates passed; pending workspace candidates supply no acceptance evidence. Its isolated Mihomo controller401→200 results do not locate or fix user Google Play account authentication.",
     "dnsPolicy": "install_dns_redirect4/6 use mark,uid0,interface,blacklist returns and scoped TCP/UDP:53 redirect; neither accepts DUIDS nor calls direct_uid_returns. Actual resolver/packet UID and failure-time answers unavailable.",
     "defaultGoogleProbeTarget": {
       "source": "ProxyLatencyTargets.kt",
@@ -80,9 +80,10 @@
       "9399121212b68a5f6422170e00835095218c2f8e",
       "936ffac87a81ef056e3c006987667e9d56baf5bc",
       "26a0906ed9765c04de1316cdcf99cd0460d9d276",
-      "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+      "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+      "01b66345f645aa168d56400ccc89313d3932f3f8"
     ],
-    "workflowRun": 37353575277
+    "workflowRun": 37360879852
   },
   "proved": [
     "Some historical GMS connections reached the core and had bidirectional counters",
@@ -113,42 +114,44 @@
       37330392252,
       37342421613,
       37346239863,
-      37353575277
+      37353575277,
+      37360879852
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",
     "aospGoogleAccount": "No user account or actual GMS authentication in AOSP fixture",
     "latestVerifiedApplication": {
-      "commit": "01b66345f645aa168d56400ccc89313d3932f3f8",
-      "runId": 37353575277,
+      "commit": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "runId": 37360879852,
       "runConclusion": "success",
-      "completedAtUtc": "2026-10-05T18:34:36Z",
-      "artifactEvidence": "docs/qa/20261005-v2085-01b6634-installation-success.json",
+      "completedAtUtc": "2026-10-05T19:33:56Z",
+      "artifactEvidence": "docs/qa/20261005-v2085-2730954-installation-success.json",
       "strictEvidenceChecksPassed": 53,
       "runtimeUnitTests": 479,
       "runtimeUnitXmlFiles": 49,
       "googleConnectionClassifierTests": 8,
       "googleConnectionClassifierXml": {
-        "path": "/workspace/scratch/3788973cf567/tmp/ui85-01b6634-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
-        "sha256": "c7804898e97304be86f1c7a266a036418ec42bbd811ce1b4b86e29586632caaa",
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+        "sha256": "c92d4fe6b8296e303d2a885335db16ef3891d06c7b336e5055d18c6f304c7dbd",
         "tests": 8,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
-      "apkBytes": 134823359,
-      "apkSha256": "78785c46c716093b7b1d1f78808dc62529cbe723bab33ceaff95bb18cec2c11e",
+      "apkBytes": 134827739,
+      "apkSha256": "82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c",
       "controllerLoopbackOnly": true,
       "GooglePlayAccountAuthenticationProved": false,
       "nextSourceCandidateAccepted": false,
+      "sourceEvidenceProvenance": "Exact2730954 fresh CI logs, raw XML and artifacts; pending workspace source/layer excluded.",
       "api35": {
-        "jobId": 111916367156,
-        "artifactId": 11364763203,
+        "jobId": 111940875609,
+        "artifactId": 11367328067,
         "checksPassed": 64,
         "newControllerAuthenticationChecks": 5,
         "paletteCasesPassed": 21,
         "rootMutationActions": 0,
-        "validBearerHTTP200": 24,
+        "validBearerHTTP200": 19,
         "bearerPaths": [
           "/configs",
           "/connections",
@@ -157,11 +160,11 @@
           "/rules",
           "/version"
         ],
-        "retryWhile401AtMonotonic": 762.193697854,
-        "retryReadyAtMonotonic": 767.233471315,
-        "fixture200AtMonotonic": 767.233472688,
-        "retryAfterFixture200AtMonotonic": 767.233515338,
-        "first200AtMonotonic": 767.268717941,
+        "retryWhile401AtMonotonic": 821.094796946,
+        "retryReadyAtMonotonic": 825.950669143,
+        "fixture200AtMonotonic": 825.950670025,
+        "retryAfterFixture200AtMonotonic": 825.950713216,
+        "first200AtMonotonic": 825.987830466,
         "exclusiveRetryRecoveryClaimed": false,
         "preferencesSha256Restored": true,
         "reverseRestored": true,
@@ -171,13 +174,13 @@
         "forwardsRemoved": true
       },
       "api36": {
-        "jobId": 111916367367,
-        "artifactId": 11364936725,
+        "jobId": 111940875419,
+        "artifactId": 11368065372,
         "checksPassed": 64,
         "newControllerAuthenticationChecks": 5,
         "paletteCasesPassed": 21,
         "rootMutationActions": 0,
-        "validBearerHTTP200": 23,
+        "validBearerHTTP200": 19,
         "bearerPaths": [
           "/configs",
           "/connections",
@@ -186,11 +189,11 @@
           "/rules",
           "/version"
         ],
-        "retryWhile401AtMonotonic": 816.14682689,
-        "retryReadyAtMonotonic": 820.78158084,
-        "fixture200AtMonotonic": 820.781581812,
-        "retryAfterFixture200AtMonotonic": 820.781615903,
-        "first200AtMonotonic": 820.808796137,
+        "retryWhile401AtMonotonic": 818.736193095,
+        "retryReadyAtMonotonic": 824.04581465,
+        "fixture200AtMonotonic": 824.045815872,
+        "retryAfterFixture200AtMonotonic": 824.045872788,
+        "first200AtMonotonic": 824.085465728,
         "exclusiveRetryRecoveryClaimed": false,
         "preferencesSha256Restored": true,
         "reverseRestored": true,
@@ -360,6 +363,88 @@
           "emulatorReaped": true,
           "forwardsRemoved": true
         }
+      },
+      {
+        "commit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+        "runId": 37353575277,
+        "runConclusion": "success",
+        "completedAtUtc": "2026-10-05T18:34:36Z",
+        "artifactEvidence": "docs/qa/20261005-v2085-01b6634-installation-success.json",
+        "strictEvidenceChecksPassed": 53,
+        "runtimeUnitTests": 479,
+        "runtimeUnitXmlFiles": 49,
+        "googleConnectionClassifierTests": 8,
+        "googleConnectionClassifierXml": {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-01b6634-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+          "sha256": "c7804898e97304be86f1c7a266a036418ec42bbd811ce1b4b86e29586632caaa",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "apkBytes": 134823359,
+        "apkSha256": "78785c46c716093b7b1d1f78808dc62529cbe723bab33ceaff95bb18cec2c11e",
+        "controllerLoopbackOnly": true,
+        "GooglePlayAccountAuthenticationProved": false,
+        "nextSourceCandidateAccepted": false,
+        "api35": {
+          "jobId": 111916367156,
+          "artifactId": 11364763203,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "paletteCasesPassed": 21,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 24,
+          "bearerPaths": [
+            "/configs",
+            "/connections",
+            "/providers/proxies",
+            "/proxies",
+            "/rules",
+            "/version"
+          ],
+          "retryWhile401AtMonotonic": 762.193697854,
+          "retryReadyAtMonotonic": 767.233471315,
+          "fixture200AtMonotonic": 767.233472688,
+          "retryAfterFixture200AtMonotonic": 767.233515338,
+          "first200AtMonotonic": 767.268717941,
+          "exclusiveRetryRecoveryClaimed": false,
+          "preferencesSha256Restored": true,
+          "reverseRestored": true,
+          "kvmRestored": true,
+          "launcherReaped": true,
+          "emulatorReaped": true,
+          "forwardsRemoved": true
+        },
+        "api36": {
+          "jobId": 111916367367,
+          "artifactId": 11364936725,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "paletteCasesPassed": 21,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 23,
+          "bearerPaths": [
+            "/configs",
+            "/connections",
+            "/providers/proxies",
+            "/proxies",
+            "/rules",
+            "/version"
+          ],
+          "retryWhile401AtMonotonic": 816.14682689,
+          "retryReadyAtMonotonic": 820.78158084,
+          "fixture200AtMonotonic": 820.781581812,
+          "retryAfterFixture200AtMonotonic": 820.781615903,
+          "first200AtMonotonic": 820.808796137,
+          "exclusiveRetryRecoveryClaimed": false,
+          "preferencesSha256Restored": true,
+          "reverseRestored": true,
+          "kvmRestored": true,
+          "launcherReaped": true,
+          "emulatorReaped": true,
+          "forwardsRemoved": true
+        }
       }
     ],
     "historicalFailedApplications": [
@@ -394,5 +479,5 @@
     "text": "Mihomo 控制接口返回401: {\"message\":\"Unauthorized\"}",
     "scope": "Old app controller read error, already addressed in V20.84/controller tests; different from Play Store Google account authentication. This image supplies no Play fault-time HTTP/TLS/DNS evidence."
   },
-  "currentSource": "01b66345f645aa168d56400ccc89313d3932f3f8"
+  "currentSource": "2730954591393c1b81f747cef72adb8940c5a82c"
 }

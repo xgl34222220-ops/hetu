@@ -201,6 +201,29 @@ def main():
                              'baselineUnitTests': intake['baselineUnitTests'],
                              'expectedUnitTests': intake['expectedUnitTests'],
                              'newTestCounts': intake['newTestCounts']}
+        final_pdf_report = None
+        final_pdf_inputs = ROOT / 'updates/v2085-pdf-final-geometry/inputs.json'
+        if final_pdf_inputs.exists():
+            from pdf85_final_source_scope import validate_layer as validate_final_pdf, validate_presentation
+            assert intake_report is not None, 'Final PDF geometry requires the verified tools intake'
+            final_pdf = json.loads(final_pdf_inputs.read_text())
+            validate_final_pdf(final_pdf, final_files)
+            final_pdf_patch = final_pdf_inputs.with_name('runtime.patch')
+            assert digest(final_pdf_patch) == final_pdf['patchSha256']
+            before_final_pdf = {name: (work / name).read_text() for name in final_pdf['changedOrAddedFiles']}
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'Final PDF baseline changed: ' + name
+            apply(final_pdf_patch, work)
+            for name, before in before_final_pdf.items():
+                validate_presentation(before, (work / name).read_text(), name)
+            for name, sha in final_pdf['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Final PDF source mismatch: ' + name
+            for name, sha in final_pdf['frozenFiles'].items():
+                assert digest(work / name) == sha, 'Final PDF changed frozen source: ' + name
+            final_files.update(final_pdf['changedOrAddedFiles'])
+            final_pdf_report = {'baseCommit': final_pdf['baseCommit'], 'patchSha256': final_pdf['patchSha256'],
+                                'changedOrAddedFiles': 4, 'frozenInputs': 375, 'expectedUnitTests': 487,
+                                'exactWholeFilePresentationTransforms': True, 'priorLayersUnchanged': True}
         # Every PDF-frozen input is included here with its final, exact SHA.
         # Only the explicit two intake adapter deltas can supersede that layer.
         validate_checkout_matches_generated(work, ROOT, final_files)
@@ -216,6 +239,8 @@ def main():
             report['pdfReferenceLayer'] = pdf_report
         if intake_report is not None:
             report['toolsIntakeLayer'] = intake_report
+        if final_pdf_report is not None:
+            report['finalPdfGeometryLayer'] = final_pdf_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

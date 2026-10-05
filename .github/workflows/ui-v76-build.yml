@@ -46,8 +46,13 @@ jobs:
       run: |
         set -euo pipefail
         git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c
+        git fetch --no-tags --depth=1 origin ec211b9ad81748dee30fec43f0a25849559e4623
         python3 .github/scripts/test_tools_intake_source_scope.py
         python3 .github/scripts/test_tools_intake_test_results.py
+    - name: Verify measured final PDF presentation preserves intake and shared defaults
+      run: |
+        set -euo pipefail
+        python3 .github/scripts/test_pdf85_final_source_scope.py
     - name: Verify independent authentication source and test-evidence boundaries
       run: 'set -euo pipefail
 
@@ -512,6 +517,7 @@ jobs:
     - updates/v2084-controller-auth/**
     - updates/v2085-pdf-tools-settings/**
     - updates/v2085-tools-intake/**
+    - updates/v2085-pdf-final-geometry/**
     - .github/scripts/**
     - .github/workflows/ui-v76-build.yml
     - tools/qa/**

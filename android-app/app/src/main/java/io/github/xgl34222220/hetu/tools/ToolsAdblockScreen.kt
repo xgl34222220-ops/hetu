@@ -90,7 +90,7 @@ internal fun ToolsAdblockScreen(
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
     Column(modifier.fillMaxSize().background(c.bg)) {
-        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null) {
+        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {
             HomeIconButton(ToolsFeatureIcons.CircleHelp, "说明", onHelp)
             HomeIconButton(HomeIcons.RefreshCw, "重新检测", onRefresh, enabled = idle)
         }

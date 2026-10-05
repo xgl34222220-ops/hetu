@@ -232,6 +232,7 @@ internal fun ToolsTopBar(
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    subtitleStyle: TextStyle? = null,
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val c = LocalHomeColors.current
@@ -244,7 +245,7 @@ internal fun ToolsTopBar(
         }
         Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,
+            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,
                 maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }

@@ -2,6 +2,8 @@
 """Host regression for full-source freezing and immutable additive intake."""
 import copy
 import json
+import shutil
+import subprocess
 from pathlib import Path
 import tempfile
 import unittest
@@ -223,17 +225,35 @@ class ToolsIntakeScopeTest(unittest.TestCase):
 
     def test_current_generator_reproduces_available_inputs_and_reports_missing_payloads(self):
         with tempfile.TemporaryDirectory() as directory:
-            report = generate(ROOT, directory)
+            intake_view = ROOT
+            if (ROOT / 'updates/v2085-pdf-final-geometry/inputs.json').exists():
+                # The intake generator still rejects every non-intake delta.
+                # Verify and remove only the exact later presentation layer
+                # in a disposable predecessor view, never in the checkout.
+                from pdf85_final_source_scope import ALLOWED, BASE_COMMIT, validate_presentation
+                intake_view = Path(directory) / 'intake-view'
+                intake_view.mkdir()
+                subprocess.run(['git', 'init', '-q', str(intake_view)], check=True)
+                subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1', str(ROOT), scope.BASE_COMMIT], cwd=intake_view, check=True)
+                for name in scope.compilation_inputs(ROOT) | scope.HISTORICAL_FILES_SHA256.keys():
+                    target = intake_view / name
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copyfile(ROOT / name, target)
+                for name in ALLOWED:
+                    before = subprocess.check_output(['git', 'show', BASE_COMMIT + ':' + name], cwd=ROOT).decode()
+                    validate_presentation(before, (ROOT / name).read_text(), name)
+                    (intake_view / name).write_text(before)
+            report = generate(intake_view, Path(directory) / 'generated')
             missing = set(self.previous) - scope.compilation_inputs(ROOT)
             self.assertEqual(report['locallyMissingUnchangedPayloadFiles'], sorted(missing))
             self.assertEqual(report['completeEffectiveSourceVerified'], not missing)
             self.assertEqual(report['requiredEffectiveInputs'], 379)
             self.assertEqual(report['locallyVerifiedInputs'], 379 - len(missing))
             self.assertEqual(report['changedOrAddedFiles'], 5)
-            layer = json.loads((Path(directory) / 'inputs.json').read_text())
+            layer = json.loads((Path(directory) / 'generated/inputs.json').read_text())
             scope.validate_layer(layer, self.previous)
             scope.validate_new_source_files(ROOT, layer)
-            self.assertEqual(scope.digest(Path(directory) / 'runtime.patch'), layer['patchSha256'])
+            self.assertEqual(scope.digest(Path(directory) / 'generated/runtime.patch'), layer['patchSha256'])
 
     def test_generator_cannot_treat_missing_source_as_external_payload(self):
         missing = 'android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt'

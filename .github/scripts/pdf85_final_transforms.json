@@ -1,0 +1,66 @@
+{
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt": [
+    {
+      "before": "    subtitle: String? = null,\n    actions: @Composable RowScope.() -> Unit = {},\n",
+      "after": "    subtitle: String? = null,\n    subtitleStyle: TextStyle? = null,\n    actions: @Composable RowScope.() -> Unit = {},\n",
+      "count": 1,
+      "baselineBeforeCount": 1,
+      "candidateAfterCount": 1
+    },
+    {
+      "before": "            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,\n",
+      "after": "            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,\n",
+      "count": 1,
+      "baselineBeforeCount": 1,
+      "candidateAfterCount": 1
+    }
+  ],
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt": [
+    {
+      "before": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null) {\n",
+      "after": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {\n",
+      "count": 1,
+      "baselineBeforeCount": 1,
+      "candidateAfterCount": 1
+    }
+  ],
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt": [
+    {
+      "before": "import androidx.compose.ui.draw.clip\n",
+      "after": "import androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.drawBehind\nimport androidx.compose.ui.geometry.CornerRadius\nimport androidx.compose.ui.geometry.Offset\nimport androidx.compose.ui.geometry.Size\n",
+      "count": 1
+    },
+    {
+      "before": "    menuSelectedHorizontalPadding: Dp? = null,\n) {\n",
+      "after": "    menuSelectedHorizontalPadding: Dp? = null,\n    menuSelectedTextColor: Color? = null,\n    menuSelectedVerticalVisualInset: Dp? = null,\n) {\n",
+      "count": 1
+    },
+    {
+      "before": "                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)\n",
+      "after": "                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null ||\n                menuSelectedTextColor != null || menuSelectedVerticalVisualInset != null)\n",
+      "count": 1
+    },
+    {
+      "before": "                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,\n",
+      "after": "                        selectedTextColor = menuSelectedTextColor ?: if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,\n",
+      "count": 1
+    },
+    {
+      "before": "                        choicePresentation = menuRowPresentation ?: presentation,\n",
+      "after": "                        choicePresentation = if (menuSelectedVerticalVisualInset != null && choice.id == selected) HxChoicePresentation.Settings else menuRowPresentation ?: presentation,\n",
+      "count": 1
+    },
+    {
+      "before": "                if (menuSelectedHorizontalPadding != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }\n",
+      "after": "                if (menuSelectedVerticalVisualInset != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding ?: 0.dp).clip(Hx.pillShape).drawBehind {\n                        val inset = menuSelectedVerticalVisualInset.toPx().coerceIn(0f, size.height / 2f)\n                        val visualHeight = size.height - 2f * inset\n                        drawRoundRect(color = c.surfaceMuted, topLeft = Offset(0f, inset), size = Size(size.width, visualHeight), cornerRadius = CornerRadius(visualHeight / 2f))\n                    }) { item() }\n                } else if (menuSelectedHorizontalPadding != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }\n",
+      "count": 1
+    }
+  ],
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": [
+    {
+      "before": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = 141.dp,\n                menuAnchorEndInset = 1.dp,\n                menuItemFontSizeSp = 16f,\n                menuItemMinimumHeight = 40.dp,\n                menuItemVerticalPadding = 8.dp,\n                menuContentTopPadding = 3.dp,\n                menuContentBottomPadding = 9.dp,\n                menuSelectedHorizontalPadding = 3.dp,\n                menuDividers = false,\n",
+      "after": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = if (index == 2) 143.dp else 141.dp,\n                menuAnchorEndInset = when (index) { 1 -> 0.dp; 2 -> 4.dp; else -> 1.dp },\n                menuItemFontSizeSp = if (index == 1 || index == 2) 14f else 16f,\n                menuItemMinimumHeight = if (index == 1 || index == 2) 34.dp else 40.dp,\n                menuItemVerticalPadding = when (index) { 1 -> 5.5.dp; 2 -> 5.dp; else -> 8.dp },\n                menuContentTopPadding = if (index == 2) 5.dp else 3.dp,\n                menuContentBottomPadding = when (index) { 1 -> 4.dp; 2 -> 5.dp; else -> 9.dp },\n                menuSelectedHorizontalPadding = if (index == 2) 6.dp else 3.dp,\n                menuDividers = index == 1,\n                menuSelectedTextColor = if (index == 1) c.accent else null,\n                menuSelectedVerticalVisualInset = if (index == 2) 1.5.dp else null,\n",
+      "count": 1
+    }
+  ]
+}

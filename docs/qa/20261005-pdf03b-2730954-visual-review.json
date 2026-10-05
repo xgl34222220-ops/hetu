@@ -1,0 +1,3575 @@
+{
+  "schema_version": 4,
+  "created_utc": "2026-10-05T19:24:03.916271+00:00",
+  "application_commit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "run_id": 37360879852,
+  "review_status": "FINAL COMPLETE48 own2730954primarypages:43components+5freshownAPI36nativeactuallyopened;notice115/footer41/body74andnode300x355reverified;literalpixel1:1false",
+  "ui_artifact": {
+    "id": 11367152157,
+    "zip_path": "/workspace/scratch/3788973cf567/attachments/42ffd0b7-8867-46eb-84fa-ded3adb8eea5/github-actions-artifact-11367152157.zip",
+    "zip_sha256": "d5da6417b7b168ab4e6a9ed44cbfa662900dc7692cdd2b2a2926932ffc878769",
+    "zip_bytes": 14679604,
+    "digest_independently_verified": true,
+    "flat_png_root": "/workspace/scratch/3788973cf567/tmp/ui85-2730954",
+    "extracted_evidence_root": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence"
+  },
+  "pdf": {
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03B-工具下册-离线版(1).pdf",
+    "sha256": "e89366d0b62f25b053f225b1ada287a2852a4eeaca969106f9d62c1f14a0550a",
+    "actual_pages": 48
+  },
+  "prior_actual_visual_review": {
+    "path": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+    "sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+    "application_commit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+    "run_id": 37353575277,
+    "historical_only": "Matchingcomponent visualfindings inherited only for equalPNGbytes; priornative40-44 not currentinstalled evidence."
+  },
+  "counts": {
+    "actual_pdf_pages": 48,
+    "component_pages": 43,
+    "fresh_component_hashes_checked": 43,
+    "same_component_bytes_vs01b6634": 40,
+    "changed_component_bytes_vs01b6634": [
+      46,
+      47,
+      48
+    ],
+    "component_reviews_inherited_via_identical_bytes": 40,
+    "fresh_component_pairs_actually_opened": 3,
+    "fresh_component_pages_actually_opened": [
+      46,
+      47,
+      48
+    ],
+    "distinct_fresh_component_png_hashes": 43,
+    "component_pages_reviewed_using_fresh_hashes": 43,
+    "pairedVisualOpenedInThisFinalReview_true": 8,
+    "pairedVisualOpenedInThisFinalReview_false": 40,
+    "installed_native_pages_reviewed": 5,
+    "browser_pages_counted_as_installation": 0,
+    "literal_pixel_1to1_pass": 0,
+    "installed_native_pages": [
+      40,
+      41,
+      42,
+      43,
+      44
+    ],
+    "installed_pages_not_executed": [],
+    "fresh_primary_pngs_total": 48,
+    "distinct_fresh_primary_png_hashes": 48,
+    "complete_primary_page_coverage": 48,
+    "fresh_native_pairs_actually_opened": 5,
+    "high_confidence_production_layout_defects_remaining_in_reviewed_states": 0
+  },
+  "validation_status": {
+    "JUnit_XML_count": 49,
+    "parsed_counts": {
+      "tests": 479,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "passed_tests": 479,
+    "overall_unit_result": "PASS479/0failure/0error/0skip",
+    "failed_tests": [],
+    "xml_manifest": [
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AdblockSnifferTest.xml",
+        "sha256": "1cedcdb757d7002fc17e8d45ae4acae017a51a573358d007b99380cf19085a60",
+        "suite": "io.github.xgl34222220.hetu.AdblockSnifferTest",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AppCrashReportTest.xml",
+        "sha256": "7fa8aa9cc3eec91026848379c0cc1de352c075e60fc109048c605ca81fe03306",
+        "suite": "io.github.xgl34222220.hetu.AppCrashReportTest",
+        "counts": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationConceptParity57Test.xml",
+        "sha256": "c9a7d1a415fc7f12644b215592d5a17f3baf431ed4e36b90a12c4c01037b1d11",
+        "suite": "io.github.xgl34222220.hetu.AutomationConceptParity57Test",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest.xml",
+        "sha256": "bcd170d2af7be1875392492975e10aa8b4b4a26d67df0e3f780b247ef3667010",
+        "suite": "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationToolsConceptParityTest.xml",
+        "sha256": "ebb13f29613c8507ef8ff45def8e2b34b35952e41df1c1f79dd5edb8cddfe076",
+        "suite": "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.BootStartup60Test.xml",
+        "sha256": "d25faae47d0f1c0eed8908e6988e8d97ff942ad971aadb3bca5a5f5782074db7",
+        "suite": "io.github.xgl34222220.hetu.BootStartup60Test",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptParity57Test.xml",
+        "sha256": "96a462de01bdbf2545614560a6d4acbf24a99d1a9c963befbbe1769718d0de05",
+        "suite": "io.github.xgl34222220.hetu.ConceptParity57Test",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptRemainingCoverageTest.xml",
+        "sha256": "4c264dcb62a587ce06d2f33ee56f64ce003435de8a5f4b674ad52872894b023c",
+        "suite": "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest",
+        "counts": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptStateCoverageTest.xml",
+        "sha256": "19f9c8cb2b27a62b64d86ac774b042b8051a9788aaaaeb266a468775f8ae67bc",
+        "suite": "io.github.xgl34222220.hetu.ConceptStateCoverageTest",
+        "counts": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerAuthenticationTest.xml",
+        "sha256": "b9a994936fb0a313f83f4a135d823485791f60ab1e8bccf45130a98810a576cc",
+        "suite": "io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+        "counts": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerReadStateTest.xml",
+        "sha256": "a448803f4c39c7aaab729922c73181612fce43eac7d167cc2ab0d30b73b532d1",
+        "suite": "io.github.xgl34222220.hetu.ControllerReadStateTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CoreManagerConcept57Test.xml",
+        "sha256": "c3f802a96c2cb2dd7424fa03175d73b829542a0bd2db211edeb4446d102bdd30",
+        "suite": "io.github.xgl34222220.hetu.CoreManagerConcept57Test",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest.xml",
+        "sha256": "a2f3eaa430574d948e5cbe697762e31f776904b8a436304ff0b0637f3888133e",
+        "suite": "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+        "counts": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.DocumentPickerSafetyTest.xml",
+        "sha256": "a30965fbb55ce440dc1bf2feb6a5e0f862dd747f2b94a1a2a84a75900890758c",
+        "suite": "io.github.xgl34222220.hetu.DocumentPickerSafetyTest",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+        "sha256": "c92d4fe6b8296e303d2a885335db16ef3891d06c7b336e5055d18c6f304c7dbd",
+        "suite": "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+        "counts": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.JournalReliabilityTest.xml",
+        "sha256": "513bea89203bd24e34584035adfdf5118fa3a3d7ec6b7d3e8d7a7695c0cbf93b",
+        "suite": "io.github.xgl34222220.hetu.JournalReliabilityTest",
+        "counts": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LargeTitleParity59Test.xml",
+        "sha256": "928b3b8e8010328afdb363b08bc3d3190bbfec0f539da6009d9c8a5ae1c40edb",
+        "suite": "io.github.xgl34222220.hetu.LargeTitleParity59Test",
+        "counts": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LegacyControllerCredentialTest.xml",
+        "sha256": "d8ec2dc65a3030f29b555c3f49d63097fd9d91ff42eb1f57caff75e570f1aaac",
+        "suite": "io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+        "counts": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.MainLanguageBindingTest.xml",
+        "sha256": "453d1cb38bf9987a8ceadd2223dc1ad685f2282e6b43843afb68688a42a845eb",
+        "suite": "io.github.xgl34222220.hetu.MainLanguageBindingTest",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NativeConceptScreenshotTest.xml",
+        "sha256": "9b621062c5308eba084b9afdf6fb0da67f047d4f4a7308491b2aeaa50b33235e",
+        "suite": "io.github.xgl34222220.hetu.NativeConceptScreenshotTest",
+        "counts": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkDiagnosticsTest.xml",
+        "sha256": "d0dec4caba69f2fcf4f4de726509ccf3f842958b4e6c019d380314a32083ba63",
+        "suite": "io.github.xgl34222220.hetu.NetworkDiagnosticsTest",
+        "counts": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkRecoveryStressTest.xml",
+        "sha256": "eddf29900e4dae33d3943842f23b3a80e7fc54c043a916e31df94dc7e8bf1192",
+        "suite": "io.github.xgl34222220.hetu.NetworkRecoveryStressTest",
+        "counts": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewHomePanelInteractionTest.xml",
+        "sha256": "136ac8c9d55a1b649cb13b88106d147a252910e8b3b707257058705e2b618873",
+        "suite": "io.github.xgl34222220.hetu.NewHomePanelInteractionTest",
+        "counts": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiIntegrationTest.xml",
+        "sha256": "209d4faad7d0c06453c5891897935412630a411c46c7d83ff19e9a12e740ca8f",
+        "suite": "io.github.xgl34222220.hetu.NewUiIntegrationTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiShell83Test.xml",
+        "sha256": "f7ea99293b6d1fa07875100881d55ffe3d76868ef81c6a45111bf4458489e8f8",
+        "suite": "io.github.xgl34222220.hetu.NewUiShell83Test",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelActionSafetyTest.xml",
+        "sha256": "b0938dd0dbb73782ebd6a1323cbd200256685aece17aa104c781adfcab8b53ff",
+        "suite": "io.github.xgl34222220.hetu.PanelActionSafetyTest",
+        "counts": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelConceptModelTest.xml",
+        "sha256": "d9791fb42790f71705299d554f3adafa58c1c48766b0457e6aa33529903eee1b",
+        "suite": "io.github.xgl34222220.hetu.PanelConceptModelTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelControllerErrorTest.xml",
+        "sha256": "a06bf11b4a68bc573595b531cae6e79caf306a2789fd9b66fb2786b83987ebf5",
+        "suite": "io.github.xgl34222220.hetu.PanelControllerErrorTest",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelLayoutDefaultsTest.xml",
+        "sha256": "97929bd0c7f69a90071f4bb2e23df3c42e547443641bc83c5a521ed5e52c12bd",
+        "suite": "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest",
+        "counts": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelModel11Test.xml",
+        "sha256": "3a1d27625b98e9bb466f255d7b995e84142ae9dbe29b7f08e5f6450e94fe83a0",
+        "suite": "io.github.xgl34222220.hetu.PanelModel11Test",
+        "counts": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyAdblockExportTest.xml",
+        "sha256": "ee63ed9c8e8b44920ebdef5a614b6c63f90626470e34903f437cc905328942de",
+        "suite": "io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+        "counts": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyLatencyRegressionTest.xml",
+        "sha256": "a4270bd38600d8e142266486c34492b524b5ec66070cc803cbe27dd6555b13fd",
+        "suite": "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+        "counts": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyNetworkJournalTest.xml",
+        "sha256": "e7c8607280b295697cf3ad03d647bb48dc5415b07477a6f0259690e015a5733f",
+        "suite": "io.github.xgl34222220.hetu.ProxyNetworkJournalTest",
+        "counts": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyScriptSafetyTest.xml",
+        "sha256": "bb4aa5b8a948bffbbfc43277850294cb9f865b72d6e17aa6b250748eb1e9e9e9",
+        "suite": "io.github.xgl34222220.hetu.ProxyScriptSafetyTest",
+        "counts": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootAutostartTest.xml",
+        "sha256": "74a487a4194c0b225c92275752ee62d9a328ddf40161fbda83144f36ccd66d9f",
+        "suite": "io.github.xgl34222220.hetu.RootAutostartTest",
+        "counts": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootHealthUpgradeTest.xml",
+        "sha256": "177882054b309c96118b6ef829a30a54a9b469fe70ff689c345ee3362722f077",
+        "suite": "io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+        "counts": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootNetworkRecoveryTest.xml",
+        "sha256": "698937693bc8c37cbaa389b14effbc61779639992e012379c904d7600b1cfb7f",
+        "suite": "io.github.xgl34222220.hetu.RootNetworkRecoveryTest",
+        "counts": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.Runtime146ContractTest.xml",
+        "sha256": "f987ef77ff971293f43eab60d62a7e4c494ca7fe8564e328843b6f1c72a23760",
+        "suite": "io.github.xgl34222220.hetu.Runtime146ContractTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeStartup15Test.xml",
+        "sha256": "204151d6597c0ab419b55f6f2fe731410f6e5a770d7a5bf3bec4ffca0dbba5b0",
+        "suite": "io.github.xgl34222220.hetu.RuntimeStartup15Test",
+        "counts": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeYaml15Test.xml",
+        "sha256": "8bf745f0ff4a3776f694dbc60fd3aabfe22253976d998bb1a01eebb9fc4224fb",
+        "suite": "io.github.xgl34222220.hetu.RuntimeYaml15Test",
+        "counts": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsBackupParity57Test.xml",
+        "sha256": "23e58a0e9186c95e503fcf828f66f59d003f68f22e503cc5f3604eac7bc7b341",
+        "suite": "io.github.xgl34222220.hetu.SettingsBackupParity57Test",
+        "counts": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsConceptParityTest.xml",
+        "sha256": "ff4e81342fc1ba99b49c6f361fdbac4ab9b85761d050885f907fee9394d45648",
+        "suite": "io.github.xgl34222220.hetu.SettingsConceptParityTest",
+        "counts": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsPickerParity58Test.xml",
+        "sha256": "ae205d46dae689791d4ec9dfe29b179820875150340d96486efeb49cee37deb2",
+        "suite": "io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+        "counts": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToastFeedbackTest.xml",
+        "sha256": "74d7f3e1966dd10ed62f0b8e12a9a77ea3bb9022dd0699955990cb9dce6ac326",
+        "suite": "io.github.xgl34222220.hetu.ToastFeedbackTest",
+        "counts": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToolsConceptParityTest.xml",
+        "sha256": "adc3c20cf78bcbcd04f0dda63cc3fa5cb7fdfeb33a6ffc1526a20622938c729a",
+        "suite": "io.github.xgl34222220.hetu.ToolsConceptParityTest",
+        "counts": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83EditorHistoryTest.xml",
+        "sha256": "955f701ea634ca713c2692f1ba3682d34992a61823b9ff5b7c52052be48430fe",
+        "suite": "io.github.xgl34222220.hetu.UI83EditorHistoryTest",
+        "counts": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83ToolsTest.xml",
+        "sha256": "5a949ede3a37985faefe231f2d957e27971b308e732b0c6dac9cd18eca10b90b",
+        "suite": "io.github.xgl34222220.hetu.UI83ToolsTest",
+        "counts": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.WanDetails61Test.xml",
+        "sha256": "9f2ba46cba3d53fae273dd0033adaf11e0ffbdfb9f22919406b301e6df60cd16",
+        "suite": "io.github.xgl34222220.hetu.WanDetails61Test",
+        "counts": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.tools.ToolsPdf85Test.xml",
+        "sha256": "d671ffe24526d5e0dee080dc8cea99e6dc0a5a9324462f10aa5a3d68b0cfa747",
+        "suite": "io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+        "counts": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    ],
+    "installation_evidence_status": "Own2730954API36 artifact read: installSuccess, all5currentnative originals/PDFpairs opened, actualnewDOM/XML/framehashes read,64checks pass in ownedisolatedAOSPfixture. NoGoogle/actualcore/userdevicehealthclaim.",
+    "API36_actual_results": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/results.json",
+      "sha256": "50e71a140bfa1d09697ea7cd0e02f1ba76504245861a61efb3e64784605b0d2a",
+      "checks_read": 64,
+      "result_counts": {
+        "passed": 64
+      },
+      "legacyChecksPassed": 59,
+      "paletteCasesPassed": 21,
+      "newPanelAuthChecks": [
+        {
+          "name": "panel-controller-401-first-read",
+          "result": "passed",
+          "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+        },
+        {
+          "name": "panel-controller-401-api-settings",
+          "result": "passed",
+          "evidence": "actual NativeCompose ApiSheet opened by native tap"
+        },
+        {
+          "name": "panel-controller-401-retry",
+          "result": "passed",
+          "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+        },
+        {
+          "name": "panel-controller-200-recovered",
+          "result": "passed",
+          "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+        },
+        {
+          "name": "panel-controller-fixture-cleanup",
+          "result": "passed",
+          "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+        }
+      ],
+      "fixtureOnly": true,
+      "rootMutationActions": 0,
+      "apiLevel": 36,
+      "limitations_verbatim": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation."
+    }
+  },
+  "source_at_capture_checks": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "source_at_capture_commit_sha256": "0d93da6d2bb352058eedd04f102e90730032b2c51bf3531e8c9d5becadfd978a",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt",
+      "source_at_capture_commit_sha256": "69e85b0079a3283f0fac1ff36e88bd637d675c2058eb86045b215e3790232490",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt",
+      "source_at_capture_commit_sha256": "47bed1f910c74c8765fdc7d2a9224dade34fb3f3b2f495599a9da6c31807c051",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "source_at_capture_commit_sha256": "3135112e77707b3fa8e60668f3656057e5ed0dc99b7a24253a888eaf781a573b",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "source_at_capture_commit_sha256": "01c46960be657fac74dead747c6ac0ab7f911f10772d787b901c1675a48396d1",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt",
+      "source_at_capture_commit_sha256": "cd8c6cc2ea8e825b6c5fcc18a427ddd089789e7d02a9efcb92d036d37883f9b6",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "source_at_capture_commit_sha256": "0ae41ad11aa66b92d85e155d08ee024a520daefa3d90a8fc3e1bd7cf417ec75f",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+      "source_at_capture_commit_sha256": "e803b8df90a1de70212e66847d988bb33831723f35bdfa38c2037eaaac1ee999",
+      "source_bytes_equal01b6634": true
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "source_at_capture_commit_sha256": "3fd7434c34179546596fb7e737564fb4f0a4f2587bff0cbabd25df135dd15bf0",
+      "source_bytes_equal01b6634": false,
+      "entire_file_reverse_only_3_notification_menu_argument_blocks_equals01b6634": true,
+      "notification_only_extra_arguments_count": 25,
+      "mapped_03B_functions_callbacks_validators_unchanged": true,
+      "whole_file_reverted_sha256": "1dd75cec90790c89cdc4f69e8376835de297a3cca94b3333c3aca0a07b98a288",
+      "other_scope_change": "PDF04notification22/23/24 calleroptions only; allBsourcefunctions otherwise exact01b6634."
+    }
+  ],
+  "known_notice_footer_source_status": {
+    "ProxyLocalWebUi_source_byte_identical01b6634": true,
+    "source_sha256": "0d93da6d2bb352058eedd04f102e90730032b2c51bf3531e8c9d5becadfd978a",
+    "notice_specific_padding": "3px13px",
+    "shared_footer_padding_unchanged": "5px13px",
+    "historical01_actual_notice115_footer41_body74": true,
+    "historical01_actual_node_dialog300x355": true,
+    "own_native_geometry_verification": "Actualown2730954API36PNG/PDFpair remeasured115/41/body74;B43node300x355unchanged",
+    "actual_own_geometry_verified": true
+  },
+  "source_guard_read": {
+    "path": ".github/scripts/pdf85_source_scope.py",
+    "source_at_capture_SHA256": "aa785e88a8303cf19d26e4c75baa45f7126f3a1a4a9a57d2777691f5dc407932",
+    "actual_function_read": "validate_webui_reference_header",
+    "exact_expected_extra_has_notice_rule_once": true,
+    "whole_file_exact_expected_equality_guard_present": true,
+    "child_reexecuted_guard_tests": false,
+    "actual_build_source_proof_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/out/verification/effective-source-proof.json",
+    "actual_build_source_proof_sha256": "0effd3d532468e00bb77ca646ff0a3a9caf6ffc7160b2bdbe7d9be3b19d7e4df",
+    "read": {
+      "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+      "baseRun": 37171744564,
+      "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+      "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "baselineFiles": 307,
+      "changedOrAddedFiles": 31,
+      "checkoutMatchesGeneratedSource": true,
+      "historicPatchesAppliedToCheckout": false,
+      "presentationLayer": {
+        "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+        "baseRun": 37211142058,
+        "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+        "changedOrAddedFiles": 68,
+        "protectedRuntimeUnchanged": true
+      },
+      "controllerAuthenticationLayer": {
+        "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+        "baseRun": 37240041766,
+        "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+        "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+        "changedOrAddedFiles": 17,
+        "runtimePayloadsUnchanged": true,
+        "dependenciesUnchanged": true,
+        "manifestAndPermissionsUnchanged": true,
+        "unchangedOutsideAuthScope": true,
+        "baselineUnitTests": 392,
+        "expectedUnitTests": 422,
+        "newTestCounts": {
+          "ToastFeedbackTest": 6,
+          "ControllerAuthenticationTest": 11,
+          "LegacyControllerCredentialTest": 3,
+          "ControllerReadStateTest": 6,
+          "PanelControllerErrorTest": 4
+        }
+      },
+      "pdfReferenceLayer": {
+        "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+        "frozenInputs": 332,
+        "homeAndPanelUnchanged": true,
+        "runtimePayloadsUnchanged": true,
+        "manifestDependenciesAndSigningUnchanged": true,
+        "expectedUnitTests": 479
+      }
+    }
+  },
+  "comparison_method": [
+    "All43own2730954component images independentlyhashed against01b6634.40arebyte-identical andexplicitlyinherit their matchingactual historical visualreview.",
+    "Only changed46-48 currentPNG+originalPDF normalizedfullsizepairs opened. Actualport32773; allRGBchangesvs01 limitedbackendportglyphbox[164,199,200,212].",
+    "Eachpage pairedVisualOpenedInThisFinalReview trueonly3newport-changedcomponentpairs+5owncurrentAPI36nativepairs=8;40identicalcomponentreviews falseandexplicitlyinherited. All48primaryhashes current, historical/native/browsernotnewinstallationproof."
+  ],
+  "pages": [
+    {
+      "page": 1,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-01.png",
+      "reference_png_sha256": "a336a78c7849eeaa0f04e7beab7fe1849e7493890b49eaa04cd6338bdafc2e68",
+      "reference_xref": 3,
+      "reference_embedded_jpeg_sha256": "b18e058921a529f548ec922f9a83b35f1123d304dd1442c2110adaf0d2b4d455",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-001-adblock-global-warning.png",
+      "capture_sha256": "0a71de43ad1afddaac234c51d5d98a4163ea6f736a80cfdd2575824b24fbd69b",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "0a71de43ad1afddaac234c51d5d98a4163ea6f736a80cfdd2575824b24fbd69b"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Fresh26a0906 main global-warning shield shows white exclamation; no inflated protecting halo is visible in this frame. Byte-identical to936ffac; production legacy AdblockScreen source is also byte-identical.",
+        "Compact filled circle foreground bbox[38,199,57,218] gives19x19px across3 RGB thresholds; reference normalizes19.4188dp. Center47.5/208.5 and body first foreground x65/y202 remain exactly as936ffac. Fixed18dp slot /23dp requiredSize confirmed by unchanged source.",
+        "Original effective flag, hits124, recent entry and provider-verification content remain truthful fixture states. This verifies presentation only, not complete WrongMode I/O or Google account authentication."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 2,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-02.png",
+      "reference_png_sha256": "272b0b13972795440b7bab8e488f86d5609687103c55869be2b52d227468fc98",
+      "reference_xref": 7,
+      "reference_embedded_jpeg_sha256": "728d709dd7abbd087f0d1f2ddeb2fa8b21c2dde1a3a92179fe7d3b12e824767b",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-002-log-files.png",
+      "capture_sha256": "cb7b96cf548b6971386cbc4204232632695ec4cf1bc0e97268742be6a48061aa",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "cb7b96cf548b6971386cbc4204232632695ec4cf1bc0e97268742be6a48061aa"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Log title and WARN pill visible; current2 fixture lines vs reference6, and refresh off vs on are state/data differences.",
+        "Subtitle remains left below top bar while PDF subtitle sits in centred title block; label typeface/weight shapes still differ. No literal parity pass.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 3,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-03.png",
+      "reference_png_sha256": "70c944feac5566f8e2a50a3cad8169fc75704d8953c1944efc17ff790cc276bd",
+      "reference_xref": 9,
+      "reference_embedded_jpeg_sha256": "94c0be04383ea16aedab1c057c7d5b4a3d203b70564d850b7583325d706b2ced",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-003-log-file-picker.png",
+      "capture_sha256": "2bca2caf00a959565d74bb20db87b6c262cd8bc5de114d06dcd065b7a505602d",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "2bca2caf00a959565d74bb20db87b6c262cd8bc5de114d06dcd065b7a505602d"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Log chooser shown with checked row; available log-file set differs with owned fixture.",
+        "Reference chooser pointer/notch and semibold label style differ from current popup rendering.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 4,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-04.png",
+      "reference_png_sha256": "ebb36461bfa5d41f51d6ba6e9d7ae256d75d37d8a0eda6e429e139cd14da92de",
+      "reference_xref": 11,
+      "reference_embedded_jpeg_sha256": "79e1ab79d70775b7106b0be0d4cb6db16452dd15ed62bed13738f79ae3c0e862",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-004-log-clear.png",
+      "capture_sha256": "5a87e55e9b36b415d5b21cfc3eb6a399144e14ae5c966271f850fbcb285f80cc",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "5a87e55e9b36b415d5b21cfc3eb6a399144e14ae5c966271f850fbcb285f80cc"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Clear-log dialog preserves title, explanation, cancel and destructive action.",
+        "Approximate modal alignment restored, but font/radius/spacing is not certified pixel equivalent; data behind dialog excluded.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 5,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-05.png",
+      "reference_png_sha256": "485a18fc2c40048f091221be077a7caf473d1f41c585650235bfd56d81f0f9fb",
+      "reference_xref": 13,
+      "reference_embedded_jpeg_sha256": "f94708b21fa44f099d588afd7efbc4d88e4bc01a6003207e77af519ce1edf466",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-005-log-search-expanded.png",
+      "capture_sha256": "afbc0c5a8ddca9d129a1ca7a612d073a6b17f5aae5666fc6d6ef01dc2225a476",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "afbc0c5a8ddca9d129a1ca7a612d073a6b17f5aae5666fc6d6ef01dc2225a476"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Expanded log search shown; query text/raw matching payload differs with legitimate fixture and retained search behaviour.",
+        "Controls and data cards present. No raw payload truncation or sample text substitution requested.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 6,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-06.png",
+      "reference_png_sha256": "ef94509ded0afa6ba9aca380f05ef5e0a402a9c7f0588491181c5a6872c381b0",
+      "reference_xref": 15,
+      "reference_embedded_jpeg_sha256": "93a8a73e0be687ee6136eb0a3f5643bf1066feed00050139ba5dd528a00f7845",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-006-scripts.png",
+      "capture_sha256": "8bdc67e41b5c005300b1796e23e43008a29d81d0e1280d6ffa2cea57640035e1",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "8bdc67e41b5c005300b1796e23e43008a29d81d0e1280d6ffa2cea57640035e1"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Fixed hook controls, script environment and custom script row present.",
+        "Hook configured status/file name/file size are state/data differences. Current labels/icons/spacing approximately match; family/ink differences remain visible.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 7,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-07.png",
+      "reference_png_sha256": "14ff25b7e94ee1266b7008a91e695bb02eca76091293add6f3cffb52f39b0e9d",
+      "reference_xref": 17,
+      "reference_embedded_jpeg_sha256": "b63073e74c44abbcd2943301a398614c32209b8de7952faa7ecfd56402964c03",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-007-scripts-menu.png",
+      "capture_sha256": "5d93ff7694ce6df33a421e48f5d0ff17cb4aed890d9a99859dc8fbfcbb0e0fbf",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "5d93ff7694ce6df33a421e48f5d0ff17cb4aed890d9a99859dc8fbfcbb0e0fbf"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Script actions popup shown; data behind it differs.",
+        "Popup notch/label weight and row spacing are not pixel equivalent.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 8,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-08.png",
+      "reference_png_sha256": "3515c7dc15932589ecf987db67cc6eea8bf1fdcce4285b432285c6365386f438",
+      "reference_xref": 19,
+      "reference_embedded_jpeg_sha256": "964662800abf6a759c609095f78762503ba9884cd2ca32c9e8bcd0ae356fdf8d",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-008-pre-start-hook.png",
+      "capture_sha256": "6fe43cb1ae032a53a6ca8e58246c6d1be7624cd23becdba93820ab34bdc9882c",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "6fe43cb1ae032a53a6ca8e58246c6d1be7624cd23becdba93820ab34bdc9882c"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Start-hook sheet is bounded and contains title, explanation, code editor and clear/save actions.",
+        "Reference uses monospace-looking code text; actual source ScriptCodeField explicitly uses HetuSystemFontFamily14sp/20sp. Script body itself is legitimate owned fixture text and is retained.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 9,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-09.png",
+      "reference_png_sha256": "43a13c94efab5a8b8c968cb2971966091cb56ed8335fe1dc52cd3d0607f4017c",
+      "reference_xref": 21,
+      "reference_embedded_jpeg_sha256": "ee4f629a8c166a56e05c53e6d333d6f93e7fb5b4bd91ed850e7b0a51ce979f10",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-009-post-stop-hook.png",
+      "capture_sha256": "dbecdd53508508791d44a881bb88184d14c159a67a9b8529d7d1b161e608daf3",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "dbecdd53508508791d44a881bb88184d14c159a67a9b8529d7d1b161e608daf3"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Raw393px-wide originalseparately opened again; fulltitle/explanation/code label complete at16dp. Earlierpair displayloss offirstcharacters doesnotoccur inactualPNG.",
+        "Scriptcontent state preserved; system14sp/20sp codefont and sheet typography are stillnot originalrasterink parity. FreshPNGequal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 10,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-10.png",
+      "reference_png_sha256": "432fd7164153b9cdb15b3264095f514b27b3cf1b9e183cd4544eb23e36da19b6",
+      "reference_xref": 23,
+      "reference_embedded_jpeg_sha256": "0cae917acc3d656d71b604030b11e508120bac7db4a18cc4d66ae091643902af",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-010-script-delete.png",
+      "capture_sha256": "ada846466bd98cd962283818a7529c357ee878b4513205a75286d7e0aa36213e",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "ada846466bd98cd962283818a7529c357ee878b4513205a75286d7e0aa36213e"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Delete-script confirmation shown with cancel/delete; correct existing script literal retained.",
+        "Current explanation regular type has different ink/line wrap from PDF; cannot call full pixel parity.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 11,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-11.png",
+      "reference_png_sha256": "ebc8ecb1f3f979bca2c3b64e31231fd8239716880f9aa09eedb029db0947ce0f",
+      "reference_xref": 25,
+      "reference_embedded_jpeg_sha256": "59895f98116900541cb6432952a9ffc08eb8154a56eb343213e801b0e607d7d0",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-011-script-environment.png",
+      "capture_sha256": "10b57ceddb00e6c1e2f477854635e34b337494fd2fadf10be973245c7c25bb2b",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "10b57ceddb00e6c1e2f477854635e34b337494fd2fadf10be973245c7c25bb2b"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Environment sheet fields and shell failure rule are present and complete.",
+        "Current typeface/weight and light code-card tone differ from raster reference. Labels and explanatory content preserved.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 12,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-12.png",
+      "reference_png_sha256": "e7f2028555d780695c8616fc2529c77a18b987e4e9a873ad60c415f7a93c8701",
+      "reference_xref": 27,
+      "reference_embedded_jpeg_sha256": "4f246cbec0d2d3e1343a6400909182842afab616cd5df0059d4245e958125ab5",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-012-runtime-editor.png",
+      "capture_sha256": "3414f50a4bd85d36eef257b2b53c7f9c144c80de57339f1c88ffabc5407a623c",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "3414f50a4bd85d36eef257b2b53c7f9c144c80de57339f1c88ffabc5407a623c"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Editor, syntax text, toolbar and symbol strip rendered; real YAML content differs.",
+        "Current editor typeface/syntax colours/toolbar glyphs remain visibly different; no YAML rewriting for image likeness.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 13,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-13.png",
+      "reference_png_sha256": "d57e82b4601f0f25f5b91aa4f9e93487e59faec15926b8b23eaeaa65c33e557e",
+      "reference_xref": 29,
+      "reference_embedded_jpeg_sha256": "618a242b24af787d2d07f98fd95281093cd0f6480ceeaca45e931fa55e0ce56e",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-013-files-list.png",
+      "capture_sha256": "bba7dbb0e11ea494bc99f94edf4d96a0fe4ee1e60067dab4bca7b85096e3c195",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "bba7dbb0e11ea494bc99f94edf4d96a0fe4ee1e60067dab4bca7b85096e3c195"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Special directly traced rounded layered folder now appears in each real directory row.",
+        "Dark-threshold115 first folder bbox[33,218,57,240]24x22px; raster reference bbox[35,306,61,330]26x24px normalised24.04x22.19. AA threshold and supplied JPEG blur explain silhouette measurement bounds; vector itself24x23.059.",
+        "Directory/file names, counts and ages differ with fixture; keep real entries. Header/card/row font ink still not literal reference equality.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 14,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-14.png",
+      "reference_png_sha256": "500f98de2d079944ba51afcd551cabfedbc09fe638ba2d023eb3ed55f018ad74",
+      "reference_xref": 31,
+      "reference_embedded_jpeg_sha256": "8b3d9e6cba4f57eb18a58ab30d30db7fab15db84dd37b2c6b546021e56ce1f7f",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-014-files-subfolder-search.png",
+      "capture_sha256": "a3c3420a4f13f14d49efba8e90df8f1baf3f81ef68f290b055fd7815f6b07832",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "a3c3420a4f13f14d49efba8e90df8f1baf3f81ef68f290b055fd7815f6b07832"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Parent row now shows private traced layered folder and right ChevronLeft. Raw original PNG separately opened: two-dot parent label and search/breadcrumb content complete.",
+        "Dark-threshold115 ink bbox folder[33,272,57,294]=24x22px; right-chevron[345,277,351,289]=6x12px. Actual PDF parent folder25x24rawpx normalises23.12x22.19dp. Source callback still navigates computed parent; query/directory/content counts are legitimate fixture differences.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 15,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-15.png",
+      "reference_png_sha256": "e270fd1e96b3e97c79ae4ac525b194841689b95dcec3bca388c83369d2f5bb71",
+      "reference_xref": 33,
+      "reference_embedded_jpeg_sha256": "9416600efd1926b3bafe6455846b166488b13b994493fd3f8dfb2f279e95baee",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-015-files-more.png",
+      "capture_sha256": "975d97c53f2783152e5e035b7dfac0c83b4d08288e248259f046ef19e051025e",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "975d97c53f2783152e5e035b7dfac0c83b4d08288e248259f046ef19e051025e"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "File more-actions menu shows import/download/create-file/create-folder and retains actions.",
+        "Reference uses dim background plus anchored pointer; current menu render has no dimmed scrim in this frame. This is existing popup styling, not data content.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 16,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-16.png",
+      "reference_png_sha256": "b6d261ea4880bd62adc6ae33811d30dc695a470c6c8f20a861ed51e0302c1eda",
+      "reference_xref": 35,
+      "reference_embedded_jpeg_sha256": "3cf7e2b1ebc55920ede6ad111a86c487221e51cbd27727d7476177dfafaa3403",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-016-file-menu.png",
+      "capture_sha256": "9d920cc27f6761d500a2b1f5b634c6610f3775105d7c2fad9207713c961cd652",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "9d920cc27f6761d500a2b1f5b634c6610f3775105d7c2fad9207713c961cd652"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Selected file row and file actions popover present; edits/rename/export/delete remain.",
+        "File-name/size/age are fixture content. Popup font/icon/stroke and pointer alignment are approximate rather than certified pixel equivalent.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 17,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-17.png",
+      "reference_png_sha256": "a2fed7243b28ac156cd74503fa2dbbe816e72fc8a7f9327b3f907868b0dda3a6",
+      "reference_xref": 37,
+      "reference_embedded_jpeg_sha256": "a216ed7383d2d06bb8589a8bba994caac177c68edd2262a5c0c75b8bb1a1ea33",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-017-folder-menu.png",
+      "capture_sha256": "8c8ec0c756185efe85e7b42073ba94f6bf717ec4c33b2fca9fbeb64ecd1ef386",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "8c8ec0c756185efe85e7b42073ba94f6bf717ec4c33b2fca9fbeb64ecd1ef386"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Selected folder row uses private traced layered list folder; selected fixture directory/name/index differs from reference.",
+        "Popover header and open-row still retain their smaller outline-folder variants; no new change in this capture (byte-identical7cf). Existing popover font and glyph silhouette are not literal raster parity.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 18,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-18.png",
+      "reference_png_sha256": "ef9afdc9e45458c543c20878fd7f5a5144bd5debbc439335060aa7feda7dac24",
+      "reference_xref": 39,
+      "reference_embedded_jpeg_sha256": "76d42d4a53c82c1585899ecd48f017619956f30e3feebca0a88e191a78d37f52",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-018-files-new-file.png",
+      "capture_sha256": "d8ce73af5520ca8871e030eaa611456d921f31c8993a08b9b4980188928d3982",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "d8ce73af5520ca8871e030eaa611456d921f31c8993a08b9b4980188928d3982"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "New-file title/start alignment retained; label/input explicit600 opt-in and #1168FE confirm action render.",
+        "Reference has filled value rules.yaml; current is an empty field with placeholder. Placeholder remains intentionally original style; it is not evidence that filled input weight option failed.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 19,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-19.png",
+      "reference_png_sha256": "dc5b45495e26e0c539223579d211624a891f4b7ef1b18a83f2e0359a551891f5",
+      "reference_xref": 41,
+      "reference_embedded_jpeg_sha256": "c8a5f6464287b42ae597d266687f86358f802fbc8461e4bca4b195273518b03c",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-019-files-new-folder.png",
+      "capture_sha256": "072caa8ed40e6232d316cb9e5ce1f5e621775f65587fa8b70218e8aeb5826cab",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "072caa8ed40e6232d316cb9e5ce1f5e621775f65587fa8b70218e8aeb5826cab"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "New-folder centred title retained; label/input explicit600 opt-in and #1168FE confirm action render.",
+        "Reference has filled drafts value; current empty backup placeholder is a state difference. Field-height differences are not generalised from this mixed filled/placeholder state.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 20,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-20.png",
+      "reference_png_sha256": "be9c1b7f1c0f172be43e5df0c489c9425cb0e850db1c875a9f4d012a2b748c6f",
+      "reference_xref": 43,
+      "reference_embedded_jpeg_sha256": "5750024171a893e2bf7377818b0e7ed1eb2177c2c3a332d24b2d5670d367a036",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-020-files-download.png",
+      "capture_sha256": "3c332b6777a23d8b7f990c96daefbb36bd2c0e0436a33b71245801a44169e46a",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "3c332b6777a23d8b7f990c96daefbb36bd2c0e0436a33b71245801a44169e46a"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Normal-only plain field caller34dp/7dp now rendered. Border centre pixel RGB220/224/236 at x200: first y404..437 and second y478..511 inclusive, both34px, versus reference36rawpx=>33.29dp. Previous excess40px resolved.",
+        "Title remains left aligned, typed field weight600 and default-light reference confirmRGB17/104/254 retained. Original HTTPS/address explanation and inferred optional-file-name behavior preserved; fixture values differ.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 21,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-21.png",
+      "reference_png_sha256": "53c7db8912ba7f04401933835695fb0663b97104b40dfdf89813e01710068f4b",
+      "reference_xref": 45,
+      "reference_embedded_jpeg_sha256": "76fce4062b1a08daa4c868a821a916711a1e5bc8ba932184632c87d042ffd4c6",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-021-files-download-invalid.png",
+      "capture_sha256": "bc6d26d4f8cfc4ad63ea89a0c118b9514be2d31234bf4324dab344b280103520",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "bc6d26d4f8cfc4ad63ea89a0c118b9514be2d31234bf4324dab344b280103520"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Error title centred; explanation hidden; inline HTTPS error retained.",
+        "Both current error-state fields40px; PDF approx43raw px→39.76dp. Preserve error-state geometry and original URL validator. Invalid address literal differs with fixture.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 22,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-22.png",
+      "reference_png_sha256": "65b504d9f2d4c4d7a113db4834ec05b4637a7554e2667cc3ca64d6128751e314",
+      "reference_xref": 47,
+      "reference_embedded_jpeg_sha256": "91f5c5d740775966ca866f15cc26cf43e440cca23fd83cceabd174eb187d2660",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-022-files-rename.png",
+      "capture_sha256": "24fdae6844ea7203fa4a660de07a2875119946e93f8e0de78ea8a9417c7c43bb",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "24fdae6844ea7203fa4a660de07a2875119946e93f8e0de78ea8a9417c7c43bb"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Normal rename is .76 viewport with neutral outline; local label/input600 and confirm reference blue render.",
+        "Reference edited name differs with fixture; original-file explanatory text and validator remain. Not a full font-family/ink parity claim.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 23,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-23.png",
+      "reference_png_sha256": "fcb52fe7380639d817991b3ebd288b0123ff6fabd1673e8c4c5b4c5b05591169",
+      "reference_xref": 49,
+      "reference_embedded_jpeg_sha256": "e0c75664b71882bce4f0ef4e3bc81f9c6337c7894be514445f05141b3d03ab01",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-023-file-delete.png",
+      "capture_sha256": "b7bef895d3f90017351a45ea2eacd79e1c1149d5e9ecc688e22a723be436b7a8",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "b7bef895d3f90017351a45ea2eacd79e1c1149d5e9ecc688e22a723be436b7a8"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "File delete title/message/destructive action present; selected file preserved.",
+        "Dialog typeface weight and normal red/spacing differ slightly from PDF; no deletion executed for review.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 24,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-24.png",
+      "reference_png_sha256": "e7189d8a4231d4058868603c338963a19b835b3468c0d032ffef2e67a3361bb5",
+      "reference_xref": 51,
+      "reference_embedded_jpeg_sha256": "defd30266f8bb17dd4dea2c266b0b371760f3b6f35599ec447d20981a749e777",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-024-folder-delete.png",
+      "capture_sha256": "2ae68533b38cb855f0801e35b37c69096ef0d063be120b9e02e5e9974f9aed4d",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "2ae68533b38cb855f0801e35b37c69096ef0d063be120b9e02e5e9974f9aed4d"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Folder delete title/message and selected directory present.",
+        "Directory name/order differ with fixture; original includes-content warning preserved. No deletion executed.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 25,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-25.png",
+      "reference_png_sha256": "29ca2b3553818fd055cb335e5e7d7ac179957d9ea82164f33b5851c47538b2d2",
+      "reference_xref": 53,
+      "reference_embedded_jpeg_sha256": "830f8a19e9d40353aec91601ea22f25f8729c0ebcb5ddbcf452890e73f8f228c",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-025-files-name-unchanged.png",
+      "capture_sha256": "b6dc0ddce3072e70cf96958fed6916e9a1f75fc4809ec5fd19a4d055846ff6ed",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "b6dc0ddce3072e70cf96958fed6916e9a1f75fc4809ec5fd19a4d055846ff6ed"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Unchanged-name validation retains .84 viewport, blue error outline, centred title and inline error.",
+        "Same config.yaml input now uses explicit600; confirm button measured median[17,104,254] matches PDF target. Input/title/label ink shape still not certified literal font parity. Error outline intentionally retains c.accent rather than changing global theme.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 26,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-26.png",
+      "reference_png_sha256": "1a2f5c64cf4fdf3bf7832d04cc4f521020ee5c2f3400e35afb08268f8f984b71",
+      "reference_xref": 55,
+      "reference_embedded_jpeg_sha256": "f480f5ec0e63d583dd428abaf1c257c598fc0873cbe1f754dabb8007a3798ce0",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-026-runtime-editor-menu.png",
+      "capture_sha256": "7f682e61818e61eb260009f910decb302fa3ee0bd7b6016be483f30675059af5",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "7f682e61818e61eb260009f910decb302fa3ee0bd7b6016be483f30675059af5"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Editor actions menu present; current YAML contains different real content.",
+        "Menu glyph/ink and editor syntax palette differ from PDF; existing editing/copy/validation actions retained.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 27,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-27.png",
+      "reference_png_sha256": "68a26b2402bf5652823278ee1b0821075d8398daeb74cf3898f684761f1ea05e",
+      "reference_xref": 57,
+      "reference_embedded_jpeg_sha256": "3e2d31de41739a8c5ca537292645fc7ed0a8d2525c93773f8320b8ea525fefa9",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-027-runtime-editor-jump.png",
+      "capture_sha256": "97f5870a9b96d80b1ba1d1a45593a7ab24ca603ffe4741e5d5eabaa150a0212c",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "97f5870a9b96d80b1ba1d1a45593a7ab24ca603ffe4741e5d5eabaa150a0212c"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Jump-to-line sheet shows actual current line draft and total; callbacks retained.",
+        "Reference12 vs current1 is state, while sheet input tone/border/spacing remains visibly different. Root previously preserved this original implementation; no parity pass claimed.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 28,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-28.png",
+      "reference_png_sha256": "4fe843beba73c5253a3d1873ba350a46ff32e206fe7a9a042427f82bf7fcd026",
+      "reference_xref": 59,
+      "reference_embedded_jpeg_sha256": "41ce1d78c746de0b70ea72598fc6e4ab7df3bebe9cd15d906153a83a136e620c",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-028-runtime-editor-discard.png",
+      "capture_sha256": "7d40502b3f0a5d7d35b2e08afbd36619d3fcd43698b956d8eaba06c7d08372ee",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "7d40502b3f0a5d7d35b2e08afbd36619d3fcd43698b956d8eaba06c7d08372ee"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Raworiginal separatelyopened: discardtitle/messagecentered and bothbottom labels complete withnooverlap.",
+        "Real dirtyYAML commentline state preserved. FreshPNGequal939912; fullraster sheet/font/colourparity notpassed."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 29,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-29.png",
+      "reference_png_sha256": "f3e856c78d8f16ff64cd72e087415bed439d3ce4aa05cfc5c80775ce2621ccc7",
+      "reference_xref": 61,
+      "reference_embedded_jpeg_sha256": "95fb8e93ae185cf6793470fb74eeb3b8bb46b1c7be21e741b27ec99ff3b066c3",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-029-runtime-editor-search.png",
+      "capture_sha256": "40629a00df36db43a55c72cb1bfb56733326267f47c6c3f52ae519f547b1c36e",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "40629a00df36db43a55c72cb1bfb56733326267f47c6c3f52ae519f547b1c36e"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Search bar and two matches visible; source YAML content differs.",
+        "Current search highlights are vivid yellow versus softer orange reference; editor implementation retains original search behaviour.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 30,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-30.png",
+      "reference_png_sha256": "849b6f8b564b8b453ec764b4717a9fbcec406b81762d063f8bd77925e1bb223d",
+      "reference_xref": 63,
+      "reference_embedded_jpeg_sha256": "a401a654c6b4d7d311c012133533bb86034e6df1f913ed4df58e65f546158b01",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-030-network-match.png",
+      "capture_sha256": "9e670afc57dd0dcdd9e68cfae440538a465d8316241ddeb25982d3b351c6dcb4",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "9e670afc57dd0dcdd9e68cfae440538a465d8316241ddeb25982d3b351c6dcb4"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Network current environment, switches, automatic actions, SSID/BSSID groups and permission note present.",
+        "On/off, SSID/BSSID item list and network name are state/data differences. Card-label font metrics/action-row spacing still not literal PDF equality.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 31,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-31.png",
+      "reference_png_sha256": "60beb1d47127a7cd388862ec97f9257f2f896fc02ea3c67d1f9b2b630b7be6f8",
+      "reference_xref": 65,
+      "reference_embedded_jpeg_sha256": "bb9726b12f98ae39be8921a51bbdb573e07512c890c870d4c1bcce68d7ea8610",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-031-match-action.png",
+      "capture_sha256": "3d275e0cedc7ba5f178e8f5dabf2b15f67362a92468759d2e3c2fdb26e922d10",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "3d275e0cedc7ba5f178e8f5dabf2b15f67362a92468759d2e3c2fdb26e922d10"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Match-success chooser present with correct three options and checked start-proxy action.",
+        "Popup/card style follows production state; SSID/BSSID/monitor status are fixture differences. Font/position not certified pixel parity.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 32,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-32.png",
+      "reference_png_sha256": "8922e52d820c57da9709a36ee7ec25e12549355b91e78ef0fa66e4907abbbad2",
+      "reference_xref": 67,
+      "reference_embedded_jpeg_sha256": "55e965d1b0d5a123eb39d023bb730e2df21bf605fc9d5919113b8fb0acb69a5a",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-032-unmatch-action.png",
+      "capture_sha256": "e0d12cfd6540a050f2ec9b699e6baf849aa9c23c597696b9aa59e950c459b77e",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "e0d12cfd6540a050f2ec9b699e6baf849aa9c23c597696b9aa59e950c459b77e"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Mismatch-action chooser labels, three options and checked row present; original raw ROI confirmed complete left labels in prior byte-identical capture.",
+        "Network-state, monitored switch and entries are fixture differences; current chooser typography/vertical anchor not literal pixel equivalence.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 33,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-33.png",
+      "reference_png_sha256": "5f717b17bcf51477a523b1d2e2da21bfa964e3225f1c2c7bffbaf70aa5d2bbb1",
+      "reference_xref": 69,
+      "reference_embedded_jpeg_sha256": "8dcad96a7a0cf8a2a7aea33d0c834080c6b10a8aaa8908311f2f2facf188bb4d",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-033-web-panels.png",
+      "capture_sha256": "ec3837c6bdec6ca67ce733af6755bcf38bd50f3366776bfee5f9eb5e69d517bf",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "ec3837c6bdec6ca67ce733af6755bcf38bd50f3366776bfee5f9eb5e69d517bf"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Web panel page has local mode, custom panel, install/update and cache cards.",
+        "Legitimate panel name differs; body label/font metrics and flat surfaces are not fully equivalent to PDF gradient. Existing functions preserved.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 34,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-34.png",
+      "reference_png_sha256": "c4ca5e8f7b2af7ae8e2efae162ac57169a612f5e8cc057b1303ec4b84b67d798",
+      "reference_xref": 71,
+      "reference_embedded_jpeg_sha256": "825561c74fad0012a6394d74e22c09990857a9b465be74e9d936c6ab442eec27",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-034-add-web-panel.png",
+      "capture_sha256": "2b48c878dec5d5ea6f6f3e4293b0caf78cb6622b1d7cb59f3fa28cf21810b5fd",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "2b48c878dec5d5ea6f6f3e4293b0caf78cb6622b1d7cb59f3fa28cf21810b5fd"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Add-Web-panel sheet retains name/HTTPS fields and save.",
+        "Input value matches reference URL but typeface/field tone/spacings differ. This form intentionally retains its existing independent blue, not file-manager override.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 35,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-35.png",
+      "reference_png_sha256": "4de28a7f92717690d2394de45d76f7165a556c037e881b989fb80064fc77f6d5",
+      "reference_xref": 73,
+      "reference_embedded_jpeg_sha256": "633b85c6bce878cc37e229ad1413effd65c715dcc30c8adc8ea3121568415b85",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-035-edit-web-panel.png",
+      "capture_sha256": "f1549a04e72ff0078fdfd4564020d3b88a095d154a6ef58def621796b35dcc96",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "f1549a04e72ff0078fdfd4564020d3b88a095d154a6ef58def621796b35dcc96"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Raworiginal separatelyopened: full编辑Web面板/title/name/HTTPS/save complete; noleftcrop.",
+        "Existing panelname/state preserved. FreshPNGequal939912; referencefieldtypeface/tone/spacingdifferences remain."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 36,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-36.png",
+      "reference_png_sha256": "9b456893c353a05666bdef30fcdaa1192e15304d9e7d8323242da8256c405101",
+      "reference_xref": 75,
+      "reference_embedded_jpeg_sha256": "c982e37af2d537af64f7efc6e3eac5d2ac2349eb74f2f01fe3341a54de643168",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-036-delete-web-panel.png",
+      "capture_sha256": "5fe22c48cd1b36753dc1ae7ee629ed4e567c8d0c8e78db14600cde21873dd130",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "5fe22c48cd1b36753dc1ae7ee629ed4e567c8d0c8e78db14600cde21873dd130"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Delete-Web-panel sheet present with actual renamed panel.",
+        "Panel prefix/name is functional fixture output; image byte-identical to20c. Destructive action and warning remain.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 37,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-37.png",
+      "reference_png_sha256": "b5e085df18ced8b18ed46eed30faafb19e4dccb8b6e0f0d91725e2fe159592ed",
+      "reference_xref": 77,
+      "reference_embedded_jpeg_sha256": "21766f6a63e40a866d0a1b9b84e1356d0de60f893f27c1f53b3c02ce2f6f0aa7",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-037-local-mode.png",
+      "capture_sha256": "97ab9ece9eb5bdf53eabd3c5b80590e226f3615fa13b888b21b48f0936d85363",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "97ab9ece9eb5bdf53eabd3c5b80590e226f3615fa13b888b21b48f0936d85363"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Local panel mode chooser renders automatic/built-in/Zashboard choices and selected automatic mode.",
+        "Descriptions complete; circle/check/icon and font-family ink still not literal reference certification.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 38,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-38.png",
+      "reference_png_sha256": "dac4bafa9fcf3629a0c3655f91f4dfda7904cfa7867a43fff6c49adb025a354f",
+      "reference_xref": 79,
+      "reference_embedded_jpeg_sha256": "4c37c020d4e46a74bf6a16fdc71b4e7faad302f06ba278dfdcc60103ecec7455",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-038-custom-web-container.png",
+      "capture_sha256": "e520a7f5ba55a6770a340bf80569d1821e80ba5b8affe2bb0f6e3343f2bf5ad1",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "e520a7f5ba55a6770a340bf80569d1821e80ba5b8affe2bb0f6e3343f2bf5ad1"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "External panel container has URL, loader, loading text and website-content attribution.",
+        "Progress-bar fraction/spinner phase are animation state, not layout defect. Current flat background/typeface differs from raster reference.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 39,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-39.png",
+      "reference_png_sha256": "2a2eed15b2410ca2730a2f48a85328066e2c48335b4aeb5a00eb48568a6a61a0",
+      "reference_xref": 81,
+      "reference_embedded_jpeg_sha256": "1fc21d8ae3905361f164388e7859631bda594d8450d9e5fd8f0ccebddf6df7e8",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-039-substore-web-container.png",
+      "capture_sha256": "8b1d68be78b4682bbe5ff69c70e2c35e8d94d9cac0c4536e7f0b85926b943520",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "8b1d68be78b4682bbe5ff69c70e2c35e8d94d9cac0c4536e7f0b85926b943520"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Sub-Store page-container badge restored as static original wording; no added browser action.",
+        "Loading progress/spinner phase and backend URL are runtime state; container layout not fully certified pixel equivalent.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 40,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-40.png",
+      "reference_png_sha256": "276f4b602026a5f4ec24796b93d4c674265a4e270077162b8007ec02e1a11ae4",
+      "reference_xref": 83,
+      "reference_embedded_jpeg_sha256": "78a7b4a6c9391c233214e142acae1174764a370b3371dc24249bf8d52bc8c773",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-040-native-overview.png",
+      "capture_sha256": "27490b920640ddffb2082395782f2896b6f48a5175b3684d82382eaea0a5315f",
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_kind": "installed-Android-native-WebView",
+      "current_capture_status": "own2730954freshAPI36installednativeactuallyopened",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-2730954-native-pairs/03B-40-pair.png",
+      "pair_sha256": "5a0fbcb4aab9f4f4032991e37f733d74b073136fb2b728ae0fa2ff8741055532",
+      "old_native_accepted_as_fresh2730954": false,
+      "browser_accepted_as_installation": false,
+      "review_method": "Thisrun ownfreshAPI36original394x852 andactualPDFnormalizedpairopened fullsize;correspondingnewDOM/XMLread. No oldprimaryused.",
+      "observations": [
+        "Own2730954freshnative overview actualfullsizeopened with4metriccards/cube-link-layers-trafficglyphs andgreenConnectedrightpill withtick;currentDOMmetricCount4/newXMLfulllabels matchactualimage.",
+        "BelowOS24pxcurrentRGBcontent equal01, yetcurrentimage/PDFpair/DOM/XML actuallyreopened rather thanusingoldnative. Currentcontroller29090 differsPDF9090 byownedfixture configuration."
+      ],
+      "capture_domain": "OwninstalledAPI36AndroidWebView isolatedcontrollerfixture127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "artifact_id": 11368065372,
+      "apiLevel": 36,
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-040-native-overview.dom.json",
+        "sha256": "3fda4bf1950176f51c0e4dbe822c25b5c49d85facd7548bb3da2aebb1c4711fd",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n核心版本\nMihomo v1.19.0\n当前连接\n18\n策略组\n12\n累计流量\n↑ 624 KB · ↓ 165 MB",
+          "status": "已连接",
+          "metricCount": 4,
+          "groupCount": 0,
+          "connectionCount": 0,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-040-native-overview.xml",
+        "sha256": "d6a9791916c9cbf75292ebbb7a0c5fb9be3bc7f87a288f6438b37fd06dfd8005",
+        "node_count": 29,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "核心版本",
+          "Mihomo v1.19.0",
+          "当前连接",
+          "18",
+          "策略组",
+          "12",
+          "累计流量",
+          "↑ 624 KB · ↓ 165 MB"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGBdiff_bbox_vs_historical01b6634": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "all_RGB_below_OS24px_equal01b6634": true
+    },
+    {
+      "page": 41,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-41.png",
+      "reference_png_sha256": "3795070fff7258d21424e21885f555939b065bfce1f90e2b205222621731bb3d",
+      "reference_xref": 85,
+      "reference_embedded_jpeg_sha256": "a93ceaf98173a23c4c1f5f183471c05a2dab7c2828504d1abee3ee91d60de673",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-041-native-groups.png",
+      "capture_sha256": "64972a3d714cc590d9187fe24b5ee632ecc8fdbf59228d85f15375496dafa885",
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_kind": "installed-Android-native-WebView",
+      "current_capture_status": "own2730954freshAPI36installednativeactuallyopened",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-2730954-native-pairs/03B-41-pair.png",
+      "pair_sha256": "6e169cf4dfa237e40e2e87b2ae070c95cbf094a28834cd56bad8c0065fc74719",
+      "old_native_accepted_as_fresh2730954": false,
+      "browser_accepted_as_installation": false,
+      "review_method": "Thisrun ownfreshAPI36original394x852 andactualPDFnormalizedpairopened fullsize;correspondingnewDOM/XMLread. No oldprimaryused.",
+      "observations": [
+        "Ownfreshnative groupsfullsizeopened:tickafteraddress,URLTestsliders/Selectortarget/Fallbackshield/AI稳定lightning;pills/dropdowns present. DOM12groups/6fixturechoices andselectednodes preserved.",
+        "BelowOS24pxcontent equals01;reference choice/count differences aretruthfulfixturedata. ActualnewXML69nodes read;no oldsubstitution."
+      ],
+      "capture_domain": "OwninstalledAPI36AndroidWebView isolatedcontrollerfixture127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "artifact_id": 11368065372,
+      "apiLevel": 36,
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-041-native-groups.dom.json",
+        "sha256": "517fa9dcbfc8236cdd68b62408d55e5c95f57d642ca30cbc81246c264ae19765",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-041-native-groups.xml",
+        "sha256": "96d29c2b2d5061a5dbec1a4b00c0f500c200cf1caac7fc76cba6a7aeaa97854a",
+        "node_count": 69,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "节点选择",
+          "URLTest · 6 节点",
+          "香港 01",
+          "节点选择：选择节点",
+          "手动选择",
+          "Selector · 6 节点",
+          "香港 02",
+          "手动选择：选择节点",
+          "故障转移",
+          "Fallback · 6 节点",
+          "日本 01",
+          "故障转移：选择节点",
+          "AI 稳定",
+          "Fallback · 6 节点",
+          "日本 02",
+          "AI 稳定：选择节点",
+          "香港节点",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "香港节点：选择节点",
+          "日本节点",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "日本节点：选择节点",
+          "台湾节点",
+          "Fallback · 6 节点",
+          "香港 01",
+          "台湾节点：选择节点",
+          "新加坡节点",
+          "Fallback · 6 节点",
+          "香港 02",
+          "新加坡节点：选择节点",
+          "其他节点",
+          "Fallback · 6 节点",
+          "日本 01",
+          "其他节点：选择节点",
+          "流媒体",
+          "Fallback · 6 节点",
+          "日本 02",
+          "流媒体：选择节点",
+          "自动选择",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "自动选择：选择节点",
+          "备用选择",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "备用选择：选择节点"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGBdiff_bbox_vs_historical01b6634": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "all_RGB_below_OS24px_equal01b6634": true
+    },
+    {
+      "page": 42,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-42.png",
+      "reference_png_sha256": "78cbcecfee547597d71083af12fe75d93275d79d72167159f9683fd5c159ffd5",
+      "reference_xref": 87,
+      "reference_embedded_jpeg_sha256": "6ac679d8be9987c2cb061a5e0de4a87281dd3eaa31d87790a4bb521c4589f956",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-042-native-connections.png",
+      "capture_sha256": "1a7f78865c702d29dc9e2a5eafdb08a73bfca8c4399bbaffdfafe8a2ad0e5c0e",
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_kind": "installed-Android-native-WebView",
+      "current_capture_status": "own2730954freshAPI36installednativeactuallyopened",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-2730954-native-pairs/03B-42-pair.png",
+      "pair_sha256": "a48be2a90477b53e545881fe13cfb556a894cbb9628f72fe5d15f87de65b7e4b",
+      "old_native_accepted_as_fresh2730954": false,
+      "browser_accepted_as_installation": false,
+      "review_method": "Thisrun ownfreshAPI36original394x852 andactualPDFnormalizedpairopened fullsize;correspondingnewDOM/XMLread. No oldprimaryused.",
+      "observations": [
+        "Ownfreshnative connectiontabactive,dotbeforeaddress,chainlinks/host-route/counterrows visiblypresent;newDOM18connections/newXML128nodes read.",
+        "Nativecontroller127.0.0.1:29090 andfixtureexamplehosts/IP/transfer data stayseparatefromSubStorecomponentlocalhost32773. AllcontentbelowOS24pxequals01;foursamplePDFconnections notusedtodelete actual18entries."
+      ],
+      "capture_domain": "OwninstalledAPI36AndroidWebView isolatedcontrollerfixture127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "artifact_id": 11368065372,
+      "apiLevel": 36,
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-042-native-connections.dom.json",
+        "sha256": "971e161a3f629f51dda0ff172df578d07863b8bc96018abeb1079a2a57d4cb12",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\napi.example.com\n节点选择 → 香港 01\n↑1 KB\n↓1 MB\ndownload.example.com\n节点选择 → 香港 02\n↑2 KB\n↓2 MB\n203.0.113.20\n节点选择 → 日本 01\n↑3 KB\n↓3 MB\nupdates.example.com\n节点选择 → 日本 02\n↑4 KB\n↓4 MB\n192.0.2.53\n节点选择 → 新加坡 01\n↑5 KB\n↓5 MB\napi.example.com\n节点选择 → 台湾 01\n↑6 KB\n↓6 MB\ndownload.example.com\n节点选择 → 香港 01\n↑7 KB\n↓7 MB\n203.0.113.20\n节点选择 → 香港 02\n↑8 KB\n↓8 MB\nupdates.example.com\n节点选择 → 日本 01\n↑9 KB\n↓9 MB\n192.0.2.53\n节点选择 → 日本 02\n↑10 KB\n↓10 MB\napi.example.com\n节点选择 → 新加坡 01\n↑11 KB\n↓11 MB\ndownload.example.com\n节点选择 → 台湾 01\n↑12 KB\n↓12 MB\n203.0.113.20\n节点选择 → 香港 01\n↑13 KB\n↓13 MB\nupdates.example.com\n节点选择 → 香港 02\n↑14 KB\n↓14 MB\n192.0.2.53\n节点选择 → 日本 01\n↑15 KB\n↓15 MB\napi.example.com\n节点选择 → 日本 02\n↑16 KB\n↓16 MB\ndownload.example.com\n节点选择 → 新加坡 01\n↑17 KB\n↓17 MB\n203.0.113.20\n节点选择 → 台湾 01\n↑18 KB\n↓18 MB",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 0,
+          "connectionCount": 18,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-042-native-connections.xml",
+        "sha256": "e9357602056f84d3e7ac878f83b93853889045b11210828995bfb9ecc457bee6",
+        "node_count": 128,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "api.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "1 KB",
+          "↓",
+          "1 MB",
+          "download.example.com",
+          "节点选择 → 香港 02",
+          "↑",
+          "2 KB",
+          "↓",
+          "2 MB",
+          "203.0.113.20",
+          "节点选择 → 日本 01",
+          "↑",
+          "3 KB",
+          "↓",
+          "3 MB",
+          "updates.example.com",
+          "节点选择 → 日本 02",
+          "↑",
+          "4 KB",
+          "↓",
+          "4 MB",
+          "192.0.2.53",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "5 KB",
+          "↓",
+          "5 MB",
+          "api.example.com",
+          "节点选择 → 台湾 01",
+          "↑",
+          "6 KB",
+          "↓",
+          "6 MB",
+          "download.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "7 KB",
+          "↓",
+          "7 MB",
+          "203.0.113.20",
+          "节点选择 → 香港 02",
+          "↑",
+          "8 KB",
+          "↓",
+          "8 MB",
+          "updates.example.com",
+          "节点选择 → 日本 01",
+          "↑",
+          "9 KB",
+          "↓",
+          "9 MB",
+          "192.0.2.53",
+          "节点选择 → 日本 02",
+          "↑",
+          "10 KB",
+          "↓",
+          "10 MB",
+          "api.example.com",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "11 KB",
+          "↓",
+          "11 MB",
+          "download.example.com",
+          "节点选择 → 台湾 01",
+          "↑",
+          "12 KB",
+          "↓",
+          "12 MB",
+          "203.0.113.20",
+          "节点选择 → 香港 01",
+          "↑",
+          "13 KB",
+          "↓",
+          "13 MB",
+          "updates.example.com",
+          "节点选择 → 香港 02",
+          "↑",
+          "14 KB",
+          "↓",
+          "14 MB",
+          "192.0.2.53",
+          "节点选择 → 日本 01",
+          "↑",
+          "15 KB",
+          "↓",
+          "15 MB",
+          "api.example.com",
+          "节点选择 → 日本 02",
+          "↑",
+          "16 KB",
+          "↓",
+          "16 MB",
+          "download.example.com",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "17 KB",
+          "↓",
+          "17 MB",
+          "203.0.113.20",
+          "节点选择 → 台湾 01",
+          "↑",
+          "18 KB",
+          "↓",
+          "18 MB"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGBdiff_bbox_vs_historical01b6634": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "all_RGB_below_OS24px_equal01b6634": true
+    },
+    {
+      "page": 43,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-43.png",
+      "reference_png_sha256": "c034159b7b7654af8776550c2be0dbf4f58eca7511f2631b522c0cd7f358e05d",
+      "reference_xref": 89,
+      "reference_embedded_jpeg_sha256": "a4bd253954559b9e616d7d2546511a45d6d8d9413704862f0a16187467cfff82",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-043-native-node-dialog.png",
+      "capture_sha256": "511442d9259a71bb0c155417f5e054c1f5b37cf54932e3201a9ea6b829fa6c7e",
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_kind": "installed-Android-native-WebView",
+      "current_capture_status": "own2730954freshAPI36installednativeactuallyopened",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-2730954-native-pairs/03B-43-pair.png",
+      "pair_sha256": "7265d63db3932f72a6839511da28204ae4529f16544fbc456f2d438da62bff55",
+      "old_native_accepted_as_fresh2730954": false,
+      "browser_accepted_as_installation": false,
+      "review_method": "Thisrun ownfreshAPI36original394x852 andactualPDFnormalizedpairopened fullsize;correspondingnewDOM/XMLread. No oldprimaryused.",
+      "observations": [
+        "Ownfreshnativenode-dialog fullsizeopened with6radiochoices/first香港01checked/cancel;newDOMnodeDialogOpentrue andXML6options/取消 read.",
+        "Fourthresholdwhitebbox[47,237,347,592]=300x355, exactly01 actualgeometry. EveryRGBpixelbelowOS24pxequals01;genericfooter5px13px/notice-onlyrule unchanged. Source/order/selectionhandlers remain byteidentical."
+      ],
+      "capture_domain": "OwninstalledAPI36AndroidWebView isolatedcontrollerfixture127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "artifact_id": 11368065372,
+      "apiLevel": 36,
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-043-native-node-dialog.dom.json",
+        "sha256": "98e12fefe1034a74fe2944516acfc576374499c4cb0dfbdb07b7c2d9e9f64984",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n节点选择\n香港 01\n香港 02\n日本 01\n日本 02\n新加坡 01\n台湾 01\n取消",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": true,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-043-native-node-dialog.xml",
+        "sha256": "13f5f47a9974b28cb68981f652b999dfa4404eae420b20f02db4dba649252515",
+        "node_count": 17,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "节点选择",
+          "节点选择",
+          "香港 01",
+          "香港 02",
+          "日本 01",
+          "日本 02",
+          "新加坡 01",
+          "台湾 01",
+          "取消"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGBdiff_bbox_vs_historical01b6634": [
+        16,
+        6,
+        348,
+        18
+      ],
+      "all_RGB_below_OS24px_equal01b6634": true
+    },
+    {
+      "page": 44,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-44.png",
+      "reference_png_sha256": "f67e4ee9e099114bc09e1f2198399eeb4535b6daa04c090c15e6f7bcf1a8e45b",
+      "reference_xref": 91,
+      "reference_embedded_jpeg_sha256": "344ed1e276ca0ed6d186303eb3563bb81a813864925dfb7da1711de88b2b3d15",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-044-native-switch-failure.png",
+      "capture_sha256": "5423e53c23e381904829c42ee50298752db2bc2401228ff865f63d54cd009f6c",
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_kind": "installed-Android-native-WebView",
+      "current_capture_status": "own2730954freshAPI36installednativeactuallyopened",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-2730954-native-pairs/03B-44-pair.png",
+      "pair_sha256": "b66854adb01ec7687d24e6d44003c5ed0ce506f0bd0ff9947293b41b17e6e182",
+      "old_native_accepted_as_fresh2730954": false,
+      "browser_accepted_as_installation": false,
+      "review_method": "Thisrun ownfreshAPI36original394x852 andactualPDFnormalizedpairopened fullsize;correspondingnewDOM/XMLread. No oldprimaryused.",
+      "observations": [
+        "Ownfreshnativefailedswitch notice actualfullsizeopened:提示/切换失败：HTTP503/确定;newDOMnoticeOpentrue,nodeDialogOpenfalse,firstSelected香港01 plusfullXML read.",
+        "Fourthresholdwhitebbox[78,357,316,472]=238x115;dividerx84/y431 givesbody74/footer41, same01 truecurrentmeasurement. Knownoldca4pxexcessremainscorrected;allcurrentcontentbelowOS24pxequals01 andallsourceWebUI bytes exact01.",
+        "Referenceheight123raw->114.028/footer44raw->40.791;currentresidual0.972/0.209pxbelow1. Do notinferadditionalcodefault orliteralpixel1:1 fromrasters. Fixture503notGoogleaccountauth."
+      ],
+      "capture_domain": "OwninstalledAPI36AndroidWebView isolatedcontrollerfixture127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "artifact_id": 11368065372,
+      "apiLevel": 36,
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-044-native-switch-failure.dom.json",
+        "sha256": "202deaf6dcfe8e4a9aa4ca005b59d8dc23d9ba448f5b515a0fa09f50f9447b2c",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n提示\n切换失败：HTTP 503\n确定",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": true,
+          "noticeMessage": "切换失败：HTTP 503"
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-044-native-switch-failure.xml",
+        "sha256": "f1e0ce67a479969e608602914db6915291953b7688f444de365e20a6a56d81ca",
+        "node_count": 11,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "提示",
+          "提示",
+          "切换失败：HTTP 503",
+          "确定"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGBdiff_bbox_vs_historical01b6634": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "all_RGB_below_OS24px_equal01b6634": true
+    },
+    {
+      "page": 45,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-45.png",
+      "reference_png_sha256": "83a882b2de42e9ca8fe08f2acc3f788979d6d3de225e62e42ef49a017ad3affe",
+      "reference_xref": 93,
+      "reference_embedded_jpeg_sha256": "d5257129d0bc81980499d3f69739bb382fabdf2f6da29280dbc9678acd578ae6",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": false,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/sub-store.png",
+      "capture_sha256": "158d7e5ab739f79b1fae0f8e7d75a5b78c01e413c57f0ef6e77a61d5cf2ceeda",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": true,
+      "actually_opened_full_size_pair": false,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "158d7e5ab739f79b1fae0f8e7d75a5b78c01e413c57f0ef6e77a61d5cf2ceeda"
+      },
+      "review_method": "Fresh2730954PNGhash independentlyverified; byte-identical01b6634component. Explicitlyinherit matchinghistorical actualvisual findings; newidenticalpair notopened.",
+      "pair_path": null,
+      "pair_sha256": null,
+      "inherited_visual_findings": [
+        "Existing alias sub-store.png actually opened and matched to supplied PDF45; ProxySubStoreActivity route retained.",
+        "Local backend fields, detect/open panel actions and complete explanation present. Font/colour metrics still not certified pixel1:1.",
+        "Fresh936ffac actuallyopened; PNG bytes equal939912."
+      ],
+      "observations": [
+        "NoPNGbyte change; matchinghistory inherited. ToolScreensdifferenceslimited04notificationmenuarguments, all03Bmappedsourcefunctionscallbacks exact."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 46,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-46.png",
+      "reference_png_sha256": "e4075bce0a4cc0ab50ea11fb85f2e35c1ca8a506a58013f87dadac71f35a2a94",
+      "reference_xref": 95,
+      "reference_embedded_jpeg_sha256": "3a4db2104101f24fd560674d27fa44f636c3b652888188d290336ea1d2d37a25",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-046-substore-checking.png",
+      "capture_sha256": "859aadca7c9bba8eb9630792fb2f636cd5e7df6a48948bac7d8c5b844f28aaf8",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": false,
+      "actually_opened_full_size_pair": true,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "4dac7ad17f1ea587ea1834feac7b8a5a80cd731a3892a8fc910278d6883d13dc"
+      },
+      "pair_path": "/tmp/b-2730954-review-pairs/03B-46-pair.png",
+      "pair_sha256": "3946a255ffb46d0e53e359cbbd15a51d68deab12c7911dc42fc05a820612b7c9",
+      "changed_RGB_bbox_vs01b6634": [
+        164,
+        199,
+        200,
+        212
+      ],
+      "review_method": "Ownchanged2730954newPNGin fullsizePDFnormalizedpairactuallyopened.",
+      "observations": [
+        "Actualownedendpoint localhost32773 replacesprior39315. AllRGBchanges areportglyphs only[164,199,200,212], no othergeometry/state/textdiff.",
+        "Checking spinner/disabled检测中 preserved.",
+        "Completeexplanation/actions visible andunchanged; originaldata/handlers preserved, notGoogleauthproof."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 47,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-47.png",
+      "reference_png_sha256": "2914c35c88d053373cdd249694a98214c156cbab8b0395daa40c40c51a679181",
+      "reference_xref": 97,
+      "reference_embedded_jpeg_sha256": "6bdd00ae210d4bb474e3825f196bd7be6d4fb5901350090c43e352596b70e0ab",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-047-substore-connected.png",
+      "capture_sha256": "dc0927724fcb61dd315fa5c4c92650cb0fd6721acd9fab968d14562055e76689",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": false,
+      "actually_opened_full_size_pair": true,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "27b6b6847ea9bc3c1aa9aee4bdf85fcffd978a6c413c844bf448ee265796b8a9"
+      },
+      "pair_path": "/tmp/b-2730954-review-pairs/03B-47-pair.png",
+      "pair_sha256": "a8be3acd16575c530a6c2579ce9549b4da77481fd0455e96a6ce2e147ea24f70",
+      "changed_RGB_bbox_vs01b6634": [
+        164,
+        199,
+        200,
+        212
+      ],
+      "review_method": "Ownchanged2730954newPNGin fullsizePDFnormalizedpairactuallyopened.",
+      "observations": [
+        "Actualownedendpoint localhost32773 replacesprior39315. AllRGBchanges areportglyphs only[164,199,200,212], no othergeometry/state/textdiff.",
+        "Actualgreenconnected version2.20.0-fixture retained.",
+        "Completeexplanation/actions visible andunchanged; originaldata/handlers preserved, notGoogleauthproof."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    },
+    {
+      "page": 48,
+      "reference_png": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-48.png",
+      "reference_png_sha256": "bb93e43700e8b48d69d94f9e4e23ab321f7b13ca04e0763bd6fed2a46c1fa209",
+      "reference_xref": 99,
+      "reference_embedded_jpeg_sha256": "394cf3e0e97e34e5f7a0e12809b57e730b1837c2e8485fc40e0c4f782fda637a",
+      "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt",
+      "pairedVisualOpenedInThisFinalReview": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_for_this_page_executed_by_review": false,
+      "capture_path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/03B-048-substore-unavailable.png",
+      "capture_sha256": "2a658f1a092b77aba62d9ab3b33934e13c9147c201ee2dd0b89c4c704486e35c",
+      "capture_size": [
+        393,
+        852
+      ],
+      "capture_kind": "controlled-component",
+      "current_capture_status": "ownfresh2730954component",
+      "same_bytes_as01b6634": false,
+      "actually_opened_full_size_pair": true,
+      "prior_visual_evidence": {
+        "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-01b6634-visual-review.json",
+        "report_sha256": "29cba84642859c94d52573092ac7563138413b75e9bb0ea346bcee2221c94b47",
+        "capture_sha256": "fbde99d5ada6111e0ba614a55356a90bcee9bff8bc3e9058156534c584108e13"
+      },
+      "pair_path": "/tmp/b-2730954-review-pairs/03B-48-pair.png",
+      "pair_sha256": "e9f0404c29e01089f8c364e69faaea8329647d4ce9fa0b1dace342066ad79def",
+      "changed_RGB_bbox_vs01b6634": [
+        164,
+        199,
+        200,
+        212
+      ],
+      "review_method": "Ownchanged2730954newPNGin fullsizePDFnormalizedpairactuallyopened.",
+      "observations": [
+        "Actualownedendpoint localhost32773 replacesprior39315. AllRGBchanges areportglyphs only[164,199,200,212], no othergeometry/state/textdiff.",
+        "Actualred ownedHTTP503 retained, PDFConnectionrefused remainsdifferentrealfailureclass.",
+        "Completeexplanation/actions visible andunchanged; originaldata/handlers preserved, notGoogleauthproof."
+      ],
+      "capture_domain": "OwnRobolectric controlled component/activityrender"
+    }
+  ],
+  "limits": [
+    "Literalpixel1:1 remains false; typefaceink/fonts/surface/radius/spacinguncertified andnot blanketcalledOEM.",
+    "43owncomponent images independenthashes;40historical matchingactualreviews inherited and3newfullsizepairs opened. This isnot43installedcallbacks/I-Oacceptance.",
+    "Fresh49XML actual479passed;sourceguard/buildsourceproof actuallyread,childdidnotrunnew53tests.",
+    "Only scoped3notificationmenuargument blocks differ inToolScreens; completefileinverse equals01, all03Bmappedfunctions/callbacks/validators exact. EightotherBsourcefiles byteidenticalincludingWebUI.",
+    "Own2730954newnative44 measurementactualnotice115/footer41/body74;node43actual300x355unchanged. Geometry/historynotrelabeledfrom01;neworiginals/PDFpairs/DOM/XML read. Literalpixel1:1remainsfalse.",
+    "RealSubStoreport/version/HTTP503 andB1fixture state kept truthful; nocopyingreferenceexampledata orGoogleinference.",
+    "Owncurrentinstallednative40-44nowallreviewed fromAPI36artifact11368065372. Prior01report unchanged;everynewprimarypath/hashrunidentity separate, WebUIcontroller29090 distinctfromSubStorecomponent32773.",
+    "Only thisuniqueJSON written;nosource/test/CI/guard/patch/input/fixtureoperations andnoduplicateartifactdownload.",
+    "Preciseapplication2730954591393c1b81f747cef72adb8940c5a82c/run37360879852 identity; subsequentdocorapplicationcannot relabeloldframesasfresh."
+  ],
+  "updated_utc": "2026-10-05T19:37:42.623084+00:00",
+  "native_artifact": {
+    "id": 11368065372,
+    "zip_path": "/workspace/scratch/3788973cf567/attachments/c6444a8d-250f-4d23-8f19-811fcb8124e5/github-actions-artifact-11368065372.zip",
+    "zip_sha256": "3e5b466c7cefaedd0cc97f6e8141acb096c2ec221f1ddc8bfb00c8dfde1263af",
+    "zip_bytes": 3795748,
+    "digest_independently_verified": true,
+    "extracted_root": "/tmp/hetu-ci-latest-2730954/api36",
+    "api_level": 36,
+    "application_commit": "2730954591393c1b81f747cef72adb8940c5a82c",
+    "run_id": 37360879852,
+    "commit_run_artifact_association_source": "Parent/Google agent verified own2730954completed-successrun/artifact association. Reviewer independently hashes actualZIP/new48primaryPNGs and reads currentinstalledversion/DOM/XML/targetmetadata; no priorinstalledimage substituted.",
+    "installed_package_from_actual_XML": "io.github.xgl34222220.hetu",
+    "version_txt_path": "/tmp/hetu-ci-latest-2730954/api36/version.txt",
+    "version_txt_sha256": "1e66fe55018d1270fb993e257efbe7c237973701b328c9ac5ffbadbe0da984cd",
+    "installed_version_actual": "versionCode=2085 minSdk=26 targetSdk=35\n    versionName=0.12.15-v20-pdf",
+    "install_log_path": "/tmp/hetu-ci-latest-2730954/api36/install.txt",
+    "install_log_sha256": "8d09d14919695c7dc5e22e8b10f4854a8bff99b5d0bebc4e313f3074108db41a",
+    "install_result": "candidate/Hetu-0.12.15-v20-pdf.apk: 1 file pushed, 0 skipped. 397.4 MB/s (134827739 bytes in 0.324s)\nPerforming Push Install\nSuccess",
+    "launch_log_path": "/tmp/hetu-ci-latest-2730954/api36/launch.txt",
+    "launch_log_sha256": "42be7b61334d6babf2713a0ac96883d925d7b4ae0252e99bfed6ebbc402c7485",
+    "launch_result": "Starting: Intent { cmp=io.github.xgl34222220.hetu/.LauncherOfficial }\nStatus: ok\nLaunchState: COLD\nActivity: io.github.xgl34222220.hetu/.HetuActivity\nTotalTime: 2565\nWaitTime: 2567\nComplete",
+    "owned_target_preflight": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/panel-target-preflight.json",
+      "sha256": "b673fe614cbb9fa52b943b7079524b4eb360a17cc3299de312d61fdad272ae3f",
+      "actual_read": {
+        "avd": "hetu-smoke",
+        "apiLevel": 36,
+        "ownedSession": "27edbfc17a6d4409a4491cc488c4f2bb",
+        "runnerPid": 2569,
+        "launcherPid": 2583,
+        "launcherStartTicks": 9344,
+        "supervisorPid": 2585,
+        "emulatorPids": [
+          2586
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      }
+    },
+    "actual_AOSP_config": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/owned-avd-config-before-boot.ini",
+      "sha256": "db0d670a2354740fcf23f9de9100b524132e60200e021f7a8d25571df130cb21",
+      "SDK_config_path": "/tmp/hetu-ci-latest-2730954/api36/owned-avd-config-sdk.ini",
+      "SDK_config_sha256": "3d815bb9bae1293cb6e031f7bb43d25a54867a4bfb00bf89aac810889679493e",
+      "read_confirmed_values": [
+        "PlayStore.enabled=no",
+        "abi.type=x86_64",
+        "image.sysdir.1=system-images/android-36/default/x86_64/",
+        "tag.id=default",
+        "AvdId=hetu-smoke",
+        "avd.id=hetu-smoke",
+        "avd.name=hetu-smoke"
+      ],
+      "real_device_evidence": false
+    }
+  },
+  "native_input_and_requests": {
+    "native-webview-input.json": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/native-webview-input.json",
+      "sha256": "dd90d734a505e192974350086e18831130935cdd648f8589583d3bc4c5d74263",
+      "actual_JSON_read": [
+        {
+          "label": "策略组",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "连接",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            320,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "策略组",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "节点选择：选择节点",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            263,
+            261
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "香港 02",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            354
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "确定",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            277,
+            452
+          ],
+          "input": "native adb tap"
+        }
+      ]
+    },
+    "native-webview-fixture-requests.json": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/native-webview-fixture-requests.json",
+      "sha256": "216638ade1dd464b14b5f1be12d0fbb1548e39a18322e4420bb021f361111834",
+      "actual_JSON_read": [
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/favicon.ico"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "PUT",
+          "path": "/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9",
+          "valid_fixture_request": true
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        }
+      ]
+    },
+    "native-webview-frame-hashes.json": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/native-webview-frame-hashes.json",
+      "sha256": "ffb4da617c2d0be422f21e3ee7bcff2ff76a0e9b214a5992daaccafc7c7ac31b",
+      "actual_JSON_read": {
+        "reference-03B-040-native-overview.png": "27490b920640ddffb2082395782f2896b6f48a5175b3684d82382eaea0a5315f",
+        "reference-03B-041-native-groups.png": "64972a3d714cc590d9187fe24b5ee632ecc8fdbf59228d85f15375496dafa885",
+        "reference-03B-042-native-connections.png": "1a7f78865c702d29dc9e2a5eafdb08a73bfca8c4399bbaffdfafe8a2ad0e5c0e",
+        "reference-03B-043-native-node-dialog.png": "511442d9259a71bb0c155417f5e054c1f5b37cf54932e3201a9ea6b829fa6c7e",
+        "reference-03B-044-native-switch-failure.png": "5423e53c23e381904829c42ee50298752db2bc2401228ff865f63d54cd009f6c"
+      }
+    },
+    "webview-forward-cleanup.json": {
+      "path": "/tmp/hetu-ci-latest-2730954/api36/webview-forward-cleanup.json",
+      "sha256": "ff7f321c9b3c483724f59f22ff52e3b646255b9c3aafda1faf90304d3867f8aa",
+      "actual_JSON_read": [
+        {
+          "app_pid": 2395,
+          "local_port": 43229,
+          "removed": true
+        },
+        {
+          "app_pid": 2395,
+          "local_port": 44893,
+          "removed": true
+        }
+      ]
+    }
+  },
+  "production_layout_recheck": {
+    "reference_raster_width": 425,
+    "current_native_width": 394,
+    "normalization_ratio": 0.9270588235294117,
+    "actual_new_native_and_actual_PDF_pairs_opened": true,
+    "measurements": [
+      {
+        "page": 43,
+        "actual_current_capture": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-043-native-node-dialog.png",
+        "actual_current_capture_sha256": "511442d9259a71bb0c155417f5e054c1f5b37cf54932e3201a9ea6b829fa6c7e",
+        "reference": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-43.png",
+        "reference_sha256": "c034159b7b7654af8776550c2be0dbf4f58eca7511f2631b522c0cd7f358e05d",
+        "surface_minRGB_thresholds": [
+          225,
+          230,
+          235,
+          240
+        ],
+        "all4threshold_current_bboxes": [
+          [
+            47,
+            237,
+            347,
+            592
+          ],
+          [
+            47,
+            237,
+            347,
+            592
+          ],
+          [
+            47,
+            237,
+            347,
+            592
+          ],
+          [
+            47,
+            237,
+            347,
+            592
+          ]
+        ],
+        "current_surface_size": [
+          300,
+          355
+        ],
+        "source_bytesequal01": true,
+        "high_confidence_source_defect_remaining": false,
+        "historical01_bbox": [
+          47,
+          237,
+          347,
+          592
+        ],
+        "current_size_delta_vs01": [
+          0,
+          0
+        ],
+        "actual_reference_bbox": [
+          50,
+          322,
+          375,
+          704
+        ],
+        "reference_raw_size": [
+          325,
+          382
+        ],
+        "reference_normalized394_size": [
+          301.2941176470588,
+          354.1364705882353
+        ],
+        "geometry_conclusion": "Actualowndialog300x355reverified;genericfooterunchanged,nocontentRGBchangebelowOS. Heightresidualunder1pxnotsourceerror;smallwidthmeasurementalone nothighconfidence defect."
+      },
+      {
+        "page": 44,
+        "actual_current_capture": "/tmp/hetu-ci-latest-2730954/api36/reference-03B-044-native-switch-failure.png",
+        "actual_current_capture_sha256": "5423e53c23e381904829c42ee50298752db2bc2401228ff865f63d54cd009f6c",
+        "reference": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-44.png",
+        "reference_sha256": "f67e4ee9e099114bc09e1f2198399eeb4535b6daa04c090c15e6f7bcf1a8e45b",
+        "surface_minRGB_thresholds": [
+          225,
+          230,
+          235,
+          240
+        ],
+        "all4threshold_current_bboxes": [
+          [
+            78,
+            357,
+            316,
+            472
+          ],
+          [
+            78,
+            357,
+            316,
+            472
+          ],
+          [
+            78,
+            357,
+            316,
+            472
+          ],
+          [
+            78,
+            357,
+            316,
+            472
+          ]
+        ],
+        "current_surface_size": [
+          238,
+          115
+        ],
+        "source_bytesequal01": true,
+        "high_confidence_source_defect_remaining": false,
+        "divider_sample_x": 84,
+        "divider_actual_y": 431,
+        "current_top_to_divider": 74,
+        "current_footer_height": 41,
+        "historical01_notice_height": 115,
+        "historical01_footer_height": 41,
+        "historical01_body_to_divider": 74,
+        "current_geometry_delta_vs01": [
+          0,
+          0,
+          0
+        ],
+        "historicalca_old_notice_height": 119,
+        "historicalca_old_footer_height": 45,
+        "current_height_delta_vs_oldca": -4,
+        "current_footer_delta_vs_oldca": -4,
+        "reference_actual_bbox": [
+          85,
+          441,
+          341,
+          564
+        ],
+        "reference_raw_size": [
+          256,
+          123
+        ],
+        "reference_normalized394_size": [
+          237.3270588235294,
+          114.02823529411764
+        ],
+        "reference_divider_y": 520,
+        "reference_top_to_divider_normalized394": 73.23764705882353,
+        "reference_footer_normalized394": 40.790588235294116,
+        "height_residual_current_minus_reference": 0.9717647058823644,
+        "footer_residual_current_minus_reference": 0.20941176470588374,
+        "body_residual_current_minus_reference": 0.7623529411764736,
+        "geometry_conclusion": "Ownfreshmeasurement confirmsnotice115/footer41/body74;known4pxexcess stayscorrected. Height/footer/bodyresidualsunder1pxexcludedfromsourcefaultclaim."
+      }
+    ],
+    "known_B44_4px_defect_status": "Remainscorrectedandactuallyreverifiedinown2730954native",
+    "high_confidence_remaining_source_defects_in_reviewed_states": [],
+    "limited_conclusion": "No new high-confidence03Bproductionlayoutiteminreviewedstates. Historicalidenticalvisualfindings anduncertifiedtypeface/raster/surface/spacing differences/legitimatefixturecoverage limitationsremain;48capturesare notliteralpixel1:1certification.",
+    "excluded_from_source_error_inference": [
+      "OSchrome/timestamp",
+      "actualownedfixtureIP/port/nodes/counts/HTTPdata",
+      "fontfamilyrasterinkalone",
+      "sub1pxgeometrydifferences"
+    ],
+    "literalPixel1to1": false
+  }
+}

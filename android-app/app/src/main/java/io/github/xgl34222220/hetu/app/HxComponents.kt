@@ -126,6 +126,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.graphicsLayer
@@ -1161,6 +1165,8 @@ internal fun HxChoiceSheet(
     menuRowPresentation: HxChoicePresentation? = null,
     menuDividers: Boolean? = null,
     menuSelectedHorizontalPadding: Dp? = null,
+    menuSelectedTextColor: Color? = null,
+    menuSelectedVerticalVisualInset: Dp? = null,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -1177,7 +1183,8 @@ internal fun HxChoiceSheet(
         }
         val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&
             (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||
-                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)
+                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null ||
+                menuSelectedTextColor != null || menuSelectedVerticalVisualInset != null)
         val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)
         HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,
             anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,
@@ -1189,16 +1196,22 @@ internal fun HxChoiceSheet(
                         onClick = { close { onPick(choice.id) } },
                         description = choice.description,
                         selected = choice.id == selected,
-                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
+                        selectedTextColor = menuSelectedTextColor ?: if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
                         enabled = choice.enabled,
-                        choicePresentation = menuRowPresentation ?: presentation,
+                        choicePresentation = if (menuSelectedVerticalVisualInset != null && choice.id == selected) HxChoicePresentation.Settings else menuRowPresentation ?: presentation,
                         compact = menuItemVerticalPadding != null,
                         compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,
                         minimumHeight = menuItemMinimumHeight ?: 0.dp,
                         labelFontSizeSp = menuItemFontSizeSp,
                     )
                 }
-                if (menuSelectedHorizontalPadding != null && choice.id == selected) {
+                if (menuSelectedVerticalVisualInset != null && choice.id == selected) {
+                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding ?: 0.dp).clip(Hx.pillShape).drawBehind {
+                        val inset = menuSelectedVerticalVisualInset.toPx().coerceIn(0f, size.height / 2f)
+                        val visualHeight = size.height - 2f * inset
+                        drawRoundRect(color = c.surfaceMuted, topLeft = Offset(0f, inset), size = Size(size.width, visualHeight), cornerRadius = CornerRadius(visualHeight / 2f))
+                    }) { item() }
+                } else if (menuSelectedHorizontalPadding != null && choice.id == selected) {
                     Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }
                 } else item()
             }

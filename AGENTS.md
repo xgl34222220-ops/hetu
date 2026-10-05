@@ -1,3 +1,13 @@
+## 当前接续：2730954独立验收归档与工具接入后的四处PDF收尾
+
+原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui，2730954591393c1b81f747cef72adb8940c5a82c / Actions37360879852于2026-10-05 19:33:56UTC整体success。自己的49XML479/0失败错误跳过，原422保留；双API各64=59导航+5控制器认证、21配色、Root mutation0、Bearer六路径各19条200、原偏好/端口/KVM/进程清理均通过，严格53项原始证据PASS。真实273APK134827739字节/SHA82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c，非最终交付。130页原PDF与当前捕获逐SHA核验，18对新实际重开、112页字节相同继承；首页panel43张42张全同，剩一张仅隔离夹具端口47023→33407且完整图已打开。静态图不等于动效或全部130回调验收，字面像素1:1仍未全部通过。
+
+真实远端另一任务已接入工具包23dd77d及浅clone修正ec211b9ad81748dee30fec43f0a25849559e4623。原分支ff接续，全部两adapter/授权helper/新增8测试保留，不重复实现；当前ec的原CI attempt2由另一次续跑排队，不能把attempt1的cancelled直接归因取消者。我们没有取消CI或重复重跑原提交，失败/取消与新attempt状态分别记录。03B九源、home/panel、核心、签名/权限和旧四层源均与273无重叠。
+
+最后四源候选仅Adblock caller副标题12sp（全局14/19/Medium默认仍原样）、通知25字14/约35行距/主题强调色选中文字、26字14/约34行距/选中底色垂直视觉内缩1.5dp且触摸框不变；24仍16/40，22/23caller与9目标7行可视滚动、所有onPick/onDismiss/配置不改。四源完整变换均对ec精确，添加updates/v2085-pdf-final-geometry于intake之后，旧五层10份inputs/patch字节冻结；379有效输入，4呈现修改/375冻结，4个不入Git载荷仍须CI恢复实验，本地375源重建通过，不称本地完整有效源。487/51XML目标=原479+intake8，不删原测试；旧intake scope18与evidence5、PDF6、authEvidence6、panelAuth18及新完整呈现守卫8合计61项host通过。候选自己的Android编译、487、最新图及双API安装尚未执行，不能挪用273验收。历史AVD/936等失败和V20.83 a93交付保留，不改安全门禁。
+
+Google截图为帐号认证错误，非CAPTCHA；旧不同GMS链路/流量及控制器401→200不足定位Play帐号故障。缺当前故障时DNS答案、实际UID/分流/代理链和认证HTTP/TLS，以及正常代理同刻对照；真实根因未建立/真机修复未验证。AOSP无GMS及用户帐号，不操作手机、退出帐号、清数据或改网络安全设置。未合并main、发布或部署，无hook。详见docs/V20.85_PDF_CONTINUATION.md及逐页/原始验收证据。
+
 ## 当前接续：2026-10-06 工具源码包接入
 
 用户明确要求接入 hetu-tools-part1-v20.48.zip 与 hetu-tools-part2-v20.48.zip；继续原 test/v20.76-new-ui，从2730954591393c1b81f747cef72adb8940c5a82c核对。27份上传Kotlin均有已适配实现，实际主入口app/PanelToolsScreens.ToolsScreen已连HetuToolsV2；不要直接覆盖回旧包而丢失当前PDF、CIDR、名单及运行链修复。本批只补仍存在的VPN授权意图与诊断迟到结果缺口，保留既有UI。独立追加updates/v2085-tools-intake；历史四层patch/inputs不改，首页/panel、设置呈现、核心、Root/service、签名、Manifest/权限和依赖冻结。

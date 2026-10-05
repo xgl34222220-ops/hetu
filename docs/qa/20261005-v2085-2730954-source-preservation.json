@@ -1,0 +1,59 @@
+{
+  "applicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "runId": 37360879852,
+  "checkedAtUtc": "2026-10-05T19:08:37.585358+00:00",
+  "parentApplication": "01b66345f645aa168d56400ccc89313d3932f3f8",
+  "exactReconstructedInputs": 372,
+  "changedInputs": 40,
+  "frozenInputs": 332,
+  "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+  "fullSharedDefaultAndNativeAndWebviewAndRootDiagnosticGuardsPassed": true,
+  "fourEntireSourceInverseChecksPassed": true,
+  "HxMenusFrozen": true,
+  "homePanelSourceDiffFromUserHandoff": [],
+  "existingTestsNotDeletedOrModifiedSinceParent": true,
+  "hostChecks": {
+    "scope": 6,
+    "authEvidence": 6,
+    "isolatedAuthSmoke": 18
+  },
+  "fullRealSourceNegativeGuardChecks": [
+    {
+      "mutation": "Enable flatCanvas shared default",
+      "rejected": true
+    },
+    {
+      "mutation": "Enable menu padding shared default",
+      "rejected": true
+    },
+    {
+      "mutation": "Remove extra notification target choices",
+      "rejected": true
+    },
+    {
+      "mutation": "Replace original choice callback",
+      "rejected": true
+    }
+  ],
+  "candidateOwnBuildAndInstalledAcceptance": {
+    "result": "PASS",
+    "runId": 37360879852,
+    "strictEvidenceChecks": 53,
+    "archivedEvidence": "docs/qa/20261005-v2085-2730954-installation-success.json",
+    "sha256": "c4819f0f2601e622ef32d5f03110aa3effaa6640dc5416564c805ffe6665f578"
+  },
+  "googlePlayRootCauseEstablished": false,
+  "realDeviceFixVerified": false,
+  "literal130PagePixelParityAccepted": false,
+  "sourceEditsStopped": true,
+  "ownOriginalXmlReview": {
+    "files": 49,
+    "tests": 479,
+    "actualTestcaseElements": 479,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xmlAggregateSha256": "352dae703783f48cbca212610e493ca0da1cf6eb793a8bcadf300ce346bbd0d2",
+    "rootIndependentlyParsed": true
+  }
+}
