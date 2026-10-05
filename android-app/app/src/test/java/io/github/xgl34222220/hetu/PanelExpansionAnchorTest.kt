@@ -98,7 +98,8 @@ class PanelExpansionAnchorTest {
         }
         settle()
         val before = card(9).getUnclippedBoundsInRoot()
-        assertTrue("Fixture must exercise a lower-half card", before.top > rule.onRoot().getUnclippedBoundsInRoot().height / 2)
+        val rootBounds = rule.onRoot().getUnclippedBoundsInRoot()
+        assertTrue("Fixture must exercise a lower-half card", before.top.value > (rootBounds.bottom.value - rootBounds.top.value) / 2f)
         assertTrue("Tapped card must clear the real dock", before.bottom <= rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).getUnclippedBoundsInRoot().top)
         card(9).performClick()
         settle()
@@ -148,7 +149,7 @@ class PanelExpansionAnchorTest {
         list().performScrollToNode(hasTestTag("panel-group:${name(12)}"))
         settle()
         val before = card(12).getUnclippedBoundsInRoot()
-        assertTrue("Adaptive layout must keep the final card full-width", before.width >= 280.dp)
+        assertTrue("Adaptive layout must keep the final card full-width", before.right.value - before.left.value >= 280f)
         card(12).performClick()
         settle()
         expectSameTop(12, before.top.value)

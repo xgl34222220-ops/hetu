@@ -1556,10 +1556,10 @@ index b36e274..24ee1bb 100644
                      onSelectNode = actions.onSelectNode,
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt
 new file mode 100644
-index 0000000..0259ba1
+index 0000000..e2e9c9c
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt
-@@ -0,0 +1,158 @@
+@@ -0,0 +1,159 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -1660,7 +1660,8 @@ index 0000000..0259ba1
 +        }
 +        settle()
 +        val before = card(9).getUnclippedBoundsInRoot()
-+        assertTrue("Fixture must exercise a lower-half card", before.top > rule.onRoot().getUnclippedBoundsInRoot().height / 2)
++        val rootBounds = rule.onRoot().getUnclippedBoundsInRoot()
++        assertTrue("Fixture must exercise a lower-half card", before.top.value > (rootBounds.bottom.value - rootBounds.top.value) / 2f)
 +        assertTrue("Tapped card must clear the real dock", before.bottom <= rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).getUnclippedBoundsInRoot().top)
 +        card(9).performClick()
 +        settle()
@@ -1710,7 +1711,7 @@ index 0000000..0259ba1
 +        list().performScrollToNode(hasTestTag("panel-group:${name(12)}"))
 +        settle()
 +        val before = card(12).getUnclippedBoundsInRoot()
-+        assertTrue("Adaptive layout must keep the final card full-width", before.width >= 280.dp)
++        assertTrue("Adaptive layout must keep the final card full-width", before.right.value - before.left.value >= 280f)
 +        card(12).performClick()
 +        settle()
 +        expectSameTop(12, before.top.value)

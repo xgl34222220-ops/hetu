@@ -1,3 +1,7 @@
+## 当前续验：7b8de49 首轮测试编译失败，仅修两处夹具类型
+
+功能生产源已编译/23载荷/687ABI通过，但原新run37376676669的Runtime unit tests在新增PanelExpansionAnchorTest的DpRect height/width类型误用处编译失败；0实际XML，Android单测、lint、当前双API未执行，不记542或Root0成功。原failure与历史对照success分别保留，未取消CI。根任务只修两处边界计算的尺寸类型（使用.value边差），原断言/阈值/4测试/542目标/56XML及全部生产文件不变；新层patch5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f，20新host+47原source再次通过，本地382缺4、CI完整386仍必须重建。详见docs/qa/20261006-v2086-anchor-fixture-compilation-candidate.json；196原host证明属于7b8首轮字节不改写。继续原branch新提交独立验收，不拿首轮或旧274/ec成功替代。
+
 ## 当前接续：V20.86 用户授权功能修复（源已收口，尚未 Android 验收）
 
 用户提供河图下 Google Play 身份验证错误及 BoxProxy 下同账号正常的截图，明确要求修复功能缺陷和策略组展开大幅上跳。本轮授权允许修复实际 launcher 的策略交互、运行路由、测速请求归属及订阅编辑；旧纯呈现 freeze 对这些明确范围不再阻止修复。保留当前设计、原功能入口/显式节点定位、原工具接入、四处 PDF 收尾、六历史补丁层、权限、签名、22 原载荷与原自启脚本。不引入 hook、不操作用户手机/账号、不清数据、不合并 main 或正式发布。

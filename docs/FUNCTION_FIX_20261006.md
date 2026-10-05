@@ -28,3 +28,9 @@
 提交前22个命令全部通过，其中Python单测实际196项；包括20新增源码/结果/工作流回归、47原源码边界、11原结果校验、42原交互/控制器/WebView夹具及76原Root+新fake-IP shell。另Node概念/语法、三项当前Java网络恢复/日志stress、Python/YAML/shell语法及diff检查通过。完整逐命令、日志摘要、源码数量与未执行项见docs/qa/20261006-v2086-function-source-host-proof.json；旧归档的历史before/after运行未在本地重做，CI仍保留原复现步骤。
 
 尚未执行本轮Android验收，也未生成本轮测试APK。真实Root、OEM切网与Google Play账号认证仍未验证。
+
+## 首轮 7b8de49 原始失败与测试尺寸类型修正
+
+7b8de498dc3c4cd7d044bdbee0e7efe2233d7953 / Actions37376676669 attempt1：生产APK编译、23载荷和687构造ABI零缺失通过，但Runtime unit tests在compileDebugUnitTestKotlin失败。新增PanelExpansionAnchorTest的101/151两处误用DpRect未导入的height/width扩展；实际原始XML为0，单测未执行，lint及当前APK双API安装未执行/跳过，不能记542通过或Root mutation0。历史V20.74对照独立success，未取消任何CI。原日志与实际失败UI artifact逐SHA归档到本轮fixture-compilation-candidate.json；已保留原source-host-proof196属于首轮输入。
+
+续验仅把这两个同一边界/同一阈值的断言改用DpRect四边的.value计算，原4测试、运行时源码及55新增总数均不变；新patch5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f精确重建本地382/完整386，新20与原五source47再次通过。原2a394patch及c131inputs属于首轮，当前新输入摘要详见候选JSON；新的Android编译、542/56和双API须候选自己的新CI证明，未通过前不交付。

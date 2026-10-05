@@ -21,7 +21,7 @@
     "updates/v2085-pdf-final-geometry/runtime.patch": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
     ".github/scripts/pdf85_final_transforms.json": "fe4b7fbfb049ba2bf1ec2dca129bdd7c69ace73d2069dcc1e3d01b6a9479626d"
   },
-  "patchSha256": "2a394afc8381d8390d34e0c29c150a5850d11299fb28b3bc41ba3c70135f6b62",
+  "patchSha256": "5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f",
   "testPlanSha256": "1ec2003f31dbea254a66805f3dbed3d1ab62b7a478bd98a37f0cc1cad1bc6bfe",
   "baselineUnitTests": 487,
   "baselineTestXmlFiles": 51,
@@ -51,7 +51,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "5cc5f89b6de5a7d1b5aca2fa970457916b5fc521c808dd7a05342b23217e68b2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "73b437aa72e5b79ba720dc8b4f995590aaf13080b6985b13053144f65e8e3133",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "04c5aeb43281ee8cbf2a75d35f154e2b5550a495eef14b0134a46ec8d4b00a25",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "9cdc0ada46ab36d708141e96e3cd2c35ec6c98eb39f3df81013173b9963aab8d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "f987911e93363d988c0e7c9cc6aa7a7a9b17879d68bf55c6c7901f641224e87d",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java": "5f7955eaee7c46899b5401d4ceae103dfab6640c30a10eba73418621648294e6",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "a2bab35172eba9d98299b5160f3e6c5c7bb70e6a67e8dd1d2781ea4b7ea97809",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "5f0aa06577d14a80a2225680aeda1aee17e73d7b6efa1b1e7bf39c120b6a02f6",
