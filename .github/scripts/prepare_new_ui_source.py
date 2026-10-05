@@ -152,7 +152,10 @@ def main():
             before_native_settings=(work/native_settings_path).read_text()
             before_picker_expectations=(work/PICKER_EXPECTATIONS_FILE).read_text()
             for name, sha in pdf['frozenFiles'].items():
-                assert digest(work/name)==sha and digest(ROOT/name)==sha, 'Frozen input changed: '+name
+                # Verify the precise prior layer here.  Checkout bytes are
+                # compared after every additive layer has been applied, so
+                # explicitly recorded intake deltas are verified, not skipped.
+                assert digest(work/name)==sha, 'Frozen PDF baseline changed: '+name
             apply(pdf_patch,work)
             validate_shared_page(before_shared,(work/shared_path).read_text())
             validate_native_settings_typography(before_native_settings,(work/native_settings_path).read_text())
@@ -165,14 +168,42 @@ def main():
             pdf_report={'patchSha256':pdf['patchSha256'],'frozenInputs':len(pdf['frozenFiles']),
                         'homeAndPanelUnchanged':True,'runtimePayloadsUnchanged':True,
                         'manifestDependenciesAndSigningUnchanged':True,'expectedUnitTests':479}
-        for name, sha in final_files.items():
-            assert digest(work / name) == sha, 'Generated source input regressed: ' + name
-            assert digest(ROOT / name) == sha, 'Checkout differs from generated source: ' + name
-        expected = set(final_files)
-        actual = {str(p.relative_to(ROOT)) for p in (ROOT / 'android-app').rglob('*') if p.is_file()
-                  and '/build/' not in str(p.relative_to(ROOT)) and '/.gradle/' not in str(p.relative_to(ROOT))
-                  and p.name != 'local.properties'}
-        assert actual <= expected, 'Unrecorded compilation input: ' + str(actual - expected)
+        intake_report = None
+        intake_inputs = ROOT / 'updates/v2085-tools-intake/inputs.json'
+        from tools_intake_source_scope import (validate_layer as validate_intake_layer,
+                                               validate_new_source_files,
+                                               validate_checkout_matches_generated,
+                                               verified_previous_files)
+        if intake_inputs.exists():
+            assert pdf_report is not None, 'Tools intake requires the complete PDF layer'
+            previous_files = verified_previous_files(ROOT)
+            assert final_files == previous_files, 'Intake did not follow the exact verified source layers'
+            intake = json.loads(intake_inputs.read_text())
+            validate_intake_layer(intake, previous_files)
+            intake_patch = intake_inputs.with_name('runtime.patch')
+            assert digest(intake_patch) == intake['patchSha256'], 'Tools intake patch changed without input update'
+            for name, sha in previous_files.items():
+                assert digest(work / name) == sha, 'Tools intake baseline mismatch: ' + name
+            apply(intake_patch, work)
+            for name, sha in intake['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Tools intake source mismatch: ' + name
+            for name, sha in intake['frozenFiles'].items():
+                assert digest(work / name) == sha, 'Tools intake changed frozen input: ' + name
+            validate_new_source_files(work, intake)
+            final_files.update(intake['changedOrAddedFiles'])
+            intake_report = {'baseCommit': intake['baseCommit'],
+                             'baseAndroidAppTree': intake['baseAndroidAppTree'],
+                             'patchSha256': intake['patchSha256'],
+                             'changedOrAddedFiles': len(intake['changedOrAddedFiles']),
+                             'frozenInputs': len(intake['frozenFiles']),
+                             'homeAndPanelUnchanged': True, 'runtimePayloadsUnchanged': True,
+                             'manifestDependenciesAndSigningUnchanged': True,
+                             'baselineUnitTests': intake['baselineUnitTests'],
+                             'expectedUnitTests': intake['expectedUnitTests'],
+                             'newTestCounts': intake['newTestCounts']}
+        # Every PDF-frozen input is included here with its final, exact SHA.
+        # Only the explicit two intake adapter deltas can supersede that layer.
+        validate_checkout_matches_generated(work, ROOT, final_files)
         report = {'baseCommit': spec['baseCommit'], 'baseRun': spec['baseRun'],
                   'archiveSha256': spec['archiveSha256'], 'integrationPatchSha256': spec['patchSha256'],
                   'baselineFiles': len(spec['baselineFiles']), 'changedOrAddedFiles': len(spec['integratedFiles']),
@@ -183,6 +214,8 @@ def main():
             report['controllerAuthenticationLayer'] = auth_report
         if pdf_report is not None:
             report['pdfReferenceLayer'] = pdf_report
+        if intake_report is not None:
+            report['toolsIntakeLayer'] = intake_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

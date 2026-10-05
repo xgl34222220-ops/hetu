@@ -1,3 +1,9 @@
+## 当前接续：2026-10-06 工具源码包接入
+
+用户明确要求接入 hetu-tools-part1-v20.48.zip 与 hetu-tools-part2-v20.48.zip；继续原 test/v20.76-new-ui，从2730954591393c1b81f747cef72adb8940c5a82c核对。27份上传Kotlin均有已适配实现，实际主入口app/PanelToolsScreens.ToolsScreen已连HetuToolsV2；不要直接覆盖回旧包而丢失当前PDF、CIDR、名单及运行链修复。本批只补仍存在的VPN授权意图与诊断迟到结果缺口，保留既有UI。独立追加updates/v2085-tools-intake；历史四层patch/inputs不改，首页/panel、设置呈现、核心、Root/service、签名、Manifest/权限和依赖冻结。
+
+本轮新增ToolsDnsConsentIntakeTest5项实际adapter授权回归与ToolsDiagIntakeTest3项实际Host交互回归，全部原479继续，总目标487/51XML。候选自己的Android编译、全量单测/lint/签名与双API安装必须依本轮新CI读取，不挪用273或01b结果。原运行中的37360879852不取消；当前候选源码收口并准备独立新验收，尚未通过。详见docs/TOOLS_INTAKE_20261006.md和逐文件provenance。无hook、不操作用户手机、不扩大权限、不合并main、不正式发布。
+
 ## 当前接续：01b6634 独立完整验收与胶囊、通知菜单收尾
 
 应用01b66345f645aa168d56400ccc89313d3932f3f8 / Actions37353575277于2026-10-05 18:34:36UTC completed/success。build111910202022、历史V20.74对照111910202241、API35安装111916367156与API36安装111916367367均success。实际49原XML479项、0失败/错误/跳过，原422全部继续执行；23固定载荷、687 ABI零缺失、lint与固定签名通过。自己的53项严格原始证据检查全部PASS，docs/qa/20261005-v2085-01b6634-installation-success.json；不是使用ca或更早结果验证本轮。

@@ -1,6 +1,5 @@
 package io.github.xgl34222220.hetu.tools
 
-import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -9,6 +8,7 @@ import android.graphics.Bitmap
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.LocalActivityResultRegistryOwner
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.runtime.Composable
@@ -34,6 +34,8 @@ import io.github.xgl34222220.hetu.ui.HetuComposeController
 import java.util.TreeSet
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -122,18 +124,11 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
         }
     }
 
-    // 独立 DNS 过滤：starting the local VPN may need the system consent screen first.
-    val vpnConsent = rememberLauncherForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == Activity.RESULT_OK && prefs.getBoolean(Keys.AdblockFallback, false)) {
-            rules.startVpn()
-            toast("独立 DNS 过滤已启用；Root 代理启动时自动暂停")
-        } else {
-            prefs.edit().putBoolean(Keys.AdblockFallback, false).apply()
-            toast("未授予 VPN 权限，独立 DNS 过滤未开启")
-        }
-    }
+    // Await in the page's coroutine: leaving the page invalidates the pending intent.
+    val registry = checkNotNull(LocalActivityResultRegistryOwner.current).activityResultRegistry
+    val vpnConsent = remember(registry) { ToolsVpnConsent(registry) }
 
-    return remember(app) {
+    return remember(app, vpnConsent) {
         ToolsFeatureHost(appIcon = { item, modifier -> ToolsAppIcon(rules, item, modifier) }, actions = ToolsFeatureActions(
             /* ------------------------------ 应用管理 ------------------------------ */
             loadApps = { refresh ->
@@ -282,15 +277,23 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             setAdSource = { id, on -> rules.setRuleSource(id, on) },
             updateAdRules = { rules.updateRules() },
             changeAdDomain = { domain, allow, add -> rules.changeDomain(domain, allow, add) },
-            setStandaloneDns = { on ->
+            setStandaloneDns = standaloneDns@ { on ->
+                currentCoroutineContext().ensureActive()
+                val request = vpnConsent.beginIntent()
+                val rootRunning = ProxyStatusBridge.rootProxyRunning(app)
+                var granted = true
+                if (on && !rootRunning) {
+                    val consent = rules.prepareVpn()
+                    if (consent != null) granted = vpnConsent.await(consent)
+                }
+                currentCoroutineContext().ensureActive()
+                if (!vpnConsent.isCurrent(request)) return@standaloneDns ""
+                if (!granted) return@standaloneDns "未授予 VPN 权限，独立 DNS 过滤未开启"
                 prefs.edit().putBoolean(Keys.AdblockFallback, on).putString("proxyAdblockFallbackMode", "vpn").putBoolean("autoStartVpn", on).apply()
                 when {
-                    ProxyStatusBridge.rootProxyRunning(app) -> if (on) "已保存；Root 代理停止后自动恢复独立 DNS 过滤" else "已关闭代理停止后的独立 DNS 过滤"
+                    rootRunning || ProxyStatusBridge.rootProxyRunning(app) -> if (on) "已保存；Root 代理停止后自动恢复独立 DNS 过滤" else "已关闭代理停止后的独立 DNS 过滤"
                     !on -> { rules.stopVpn(); "独立 DNS 过滤已关闭" }
-                    else -> {
-                        val consent = rules.prepareVpn()
-                        if (consent != null) { vpnConsent.launch(consent); "" } else { rules.startVpn(); "独立 DNS 过滤已启用；Root 代理启动时自动暂停" }
-                    }
+                    else -> { rules.startVpn(); "独立 DNS 过滤已启用；Root 代理启动时自动暂停" }
                 }
             },
             setCnameProtection = { on -> prefs.edit().putBoolean(Keys.Cname, on).apply() },

@@ -366,7 +366,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         }
     }
 
-    /** Opens a text sheet at once (spinner), then fills it; a closed sheet ignores the late result. */
+    /** Each opening has its own identity; closed or reopened sheets ignore that request's late result. */
     fun open(start: ToolsDiagOverlay, read: suspend () -> String, wrap: (ToolsDiagText) -> ToolsDiagOverlay) {
         overlay = start
         scope.launch {
@@ -377,7 +377,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             } catch (error: Exception) {
                 ToolsDiagText(loading = false, error = error.reason("读取失败"))
             }
-            if (overlay == start) overlay = wrap(content)
+            if (overlay === start) overlay = wrap(content)
         }
     }
 

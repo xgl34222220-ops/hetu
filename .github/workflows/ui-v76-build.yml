@@ -42,6 +42,11 @@ jobs:
         '
     - name: Verify PDF layer preserves frozen UI and diagnostic boundaries
       run: python3 .github/scripts/test_pdf85_source_scope.py
+    - name: Verify uploaded tools intake source and additive test boundaries
+      run: |
+        set -euo pipefail
+        python3 .github/scripts/test_tools_intake_source_scope.py
+        python3 .github/scripts/test_tools_intake_test_results.py
     - name: Verify independent authentication source and test-evidence boundaries
       run: 'set -euo pipefail
 
@@ -159,7 +164,7 @@ jobs:
         \ --tests '*NetworkRecoveryStressTest' --tests '*JournalReliabilityTest' --tests '*NewUiIntegrationTest' --tests '*NewUiShell83Test'\
         \ --tests '*NewHomePanelInteractionTest' --tests '*UI83ToolsTest' --tests '*UI83EditorHistoryTest' --tests '*ToastFeedbackTest'\
         \ --tests '*ControllerAuthenticationTest' --tests '*LegacyControllerCredentialTest' --tests '*ControllerReadStateTest' --tests\
-        \ '*PanelControllerErrorTest' --tests '*GoogleConnectionEvidenceTest' --tests '*ToolsPdf85Test' --stacktrace\n"
+        \ '*PanelControllerErrorTest' --tests '*GoogleConnectionEvidenceTest' --tests '*ToolsPdf85Test' --tests '*ToolsDiagIntakeTest' --tests '*ToolsDnsConsentIntakeTest' --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
@@ -167,9 +172,9 @@ jobs:
     - name: Consolidate native and browser state evidence
       run: 'set -euo pipefail
 
-        python3 .github/scripts/verify_pdf85_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
+        python3 .github/scripts/verify_tools_intake_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
 
-        python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 479 --browser-evidence out/verification/webui-browser
+        python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 487 --browser-evidence out/verification/webui-browser
         --browser-commit "$GITHUB_SHA"
 
         '
@@ -505,6 +510,7 @@ jobs:
     - updates/v2083-ui-polish/**
     - updates/v2084-controller-auth/**
     - updates/v2085-pdf-tools-settings/**
+    - updates/v2085-tools-intake/**
     - .github/scripts/**
     - .github/workflows/ui-v76-build.yml
     - tools/qa/**
