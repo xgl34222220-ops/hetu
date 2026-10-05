@@ -93,12 +93,12 @@ internal object ToolsDims {
 }
 
 internal object ToolsType {
-    val dialogTitle = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    val dialogTitle = TextStyle(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
     val dialogText = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
-    val menuItem = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp)
+    val menuItem = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
     val emptyTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
     val readOnlyValue = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
-    val url = HomeType.rowSub.copy(fontSize = 13.sp, lineHeight = 19.sp)
+    val url = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 18.sp)
 }
 
 /* ------------------------------------------------------------------ */
@@ -289,7 +289,6 @@ internal fun ToolsField(
                 decorationBox = { inner ->
                     Box(Modifier.fillMaxWidth().heightIn(min = if (compact) 42.dp else 48.dp)
                         .clip(HomeDims.controlShape).background(c.sunken)
-                        .then(if (error != null) Modifier.border(.75.dp, c.bad.copy(alpha = .7f), HomeDims.controlShape) else Modifier)
                         .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
                         if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
                         inner()
@@ -494,12 +493,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
 
 /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
 @Composable
-internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = Modifier, title: String? = null) {
+internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = Modifier, title: String? = null, captionTitle: Boolean = false) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     Column(
         modifier
-            .width(ToolsDims.menuMinWidth)
+            .width(if (captionTitle) ToolsDims.menuMinWidth else ToolsDims.menuMinWidth + 10.dp)
             .shadow(16.dp, HomeDims.menuShape)
             .clip(HomeDims.menuShape)
             .background(c.surface)
@@ -507,17 +506,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
             .padding(4.dp),
     ) {
         if (title != null) {
-            Text(title, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp), color = if (captionTitle) c.t3 else c.t1, style = if (captionTitle) HomeType.caption else HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         entries.forEach { entry ->
             val tint = if (entry.danger) c.bad else c.t1
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = if (captionTitle) 32.dp else 40.dp)
                     .clip(ToolsDims.menuItemShape)
                     .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); entry.onClick() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = if (captionTitle) 4.dp else 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp),
             ) {

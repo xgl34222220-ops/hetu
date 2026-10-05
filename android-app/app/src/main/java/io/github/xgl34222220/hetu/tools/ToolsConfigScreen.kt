@@ -97,6 +97,7 @@ private fun ConfigCard(
                 modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.File,
                 subtitle = ht(config.caption),
+                subtitleMaxLines = 1,
                 selected = config.current,
                 enabled = !state.busy,
                 endPadding = 4.dp,
@@ -153,7 +154,7 @@ private fun SubscriptionCard(
                 subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
                 subtitleMaxLines = 1,
                 subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
-                subtitleColor = if (item.placeholder) c.warn else c.t3,
+                subtitleColor = if (item.placeholder) c.warn else c.t2,
                 enabled = !state.busy,
                 endPadding = 4.dp,
                 onClick = { onEdit(item) },
@@ -190,6 +191,7 @@ internal fun ToolsConfigMenuCard(config: ToolsConfig, modifier: Modifier = Modif
         },
         modifier = modifier,
         title = config.name,
+        captionTitle = config.current,
     )
 }
 

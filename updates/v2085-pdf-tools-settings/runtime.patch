@@ -541,7 +541,7 @@ index b68a65b..4ba1f61 100644
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..1efe4fd 100644
+index e3bff78..640f94c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 @@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
@@ -568,7 +568,7 @@ index e3bff78..1efe4fd 100644
  import androidx.compose.ui.text.input.ImeAction
  import androidx.compose.ui.text.input.KeyboardType
  import androidx.compose.ui.text.style.TextAlign
-@@ -84,8 +87,8 @@ internal object ToolsDims {
+@@ -84,18 +87,18 @@ internal object ToolsDims {
      val dialogShape = RoundedCornerShape(20.dp)
      val menuItemShape = RoundedCornerShape(10.dp)
      val keyShape = RoundedCornerShape(8.dp)
@@ -579,12 +579,16 @@ index e3bff78..1efe4fd 100644
      val menuMaxWidth = 280.dp
  }
  
-@@ -95,7 +98,7 @@ internal object ToolsType {
-     val menuItem = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp)
+ internal object ToolsType {
+-    val dialogTitle = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
++    val dialogTitle = TextStyle(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
+     val dialogText = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
+-    val menuItem = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp)
++    val menuItem = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Medium)
      val emptyTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
      val readOnlyValue = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
 -    val url = HomeType.rowSub.copy(fontSize = 14.sp, lineHeight = 19.sp)
-+    val url = HomeType.rowSub.copy(fontSize = 13.sp, lineHeight = 19.sp)
++    val url = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 18.sp)
  }
  
  /* ------------------------------------------------------------------ */
@@ -624,7 +628,7 @@ index e3bff78..1efe4fd 100644
      }
  }
  
-@@ -267,14 +271,31 @@ internal fun ToolsField(
+@@ -267,14 +271,30 @@ internal fun ToolsField(
      monospace: Boolean = false,
      readOnly: Boolean = false,
      keyboardType: KeyboardType = KeyboardType.Text,
@@ -649,7 +653,6 @@ index e3bff78..1efe4fd 100644
 +                decorationBox = { inner ->
 +                    Box(Modifier.fillMaxWidth().heightIn(min = if (compact) 42.dp else 48.dp)
 +                        .clip(HomeDims.controlShape).background(c.sunken)
-+                        .then(if (error != null) Modifier.border(.75.dp, c.bad.copy(alpha = .7f), HomeDims.controlShape) else Modifier)
 +                        .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
 +                        if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
 +                        inner()
@@ -659,7 +662,7 @@ index e3bff78..1efe4fd 100644
          }
          if (error != null) {
              Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-@@ -396,6 +417,7 @@ internal fun ToolsDangerButton(
+@@ -396,6 +416,7 @@ internal fun ToolsDangerButton(
  /* ------------------------------------------------------------------ */
  
  internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
@@ -667,7 +670,7 @@ index e3bff78..1efe4fd 100644
  
  /**
   * The inside of a confirmation dialog: centred title and message, optional form content,
-@@ -411,30 +433,46 @@ internal fun ToolsDialogCard(
+@@ -411,30 +432,46 @@ internal fun ToolsDialogCard(
      modifier: Modifier = Modifier,
      text: String? = null,
      confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
@@ -733,20 +736,47 @@ index e3bff78..1efe4fd 100644
              }
          }
      }
-@@ -461,7 +499,7 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -456,12 +493,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
+ 
+ /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
+ @Composable
+-internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = Modifier, title: String? = null) {
++internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = Modifier, title: String? = null, captionTitle: Boolean = false) {
+     val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      Column(
          modifier
 -            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
-+            .width(ToolsDims.menuMinWidth)
++            .width(if (captionTitle) ToolsDims.menuMinWidth else ToolsDims.menuMinWidth + 10.dp)
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
+@@ -469,17 +506,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+             .padding(4.dp),
+     ) {
+         if (title != null) {
+-            Text(title, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(title, Modifier.padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 4.dp), color = if (captionTitle) c.t3 else c.t1, style = if (captionTitle) HomeType.caption else HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         entries.forEach { entry ->
+             val tint = if (entry.danger) c.bad else c.t1
+             Row(
+                 Modifier
+                     .fillMaxWidth()
+-                    .heightIn(min = 40.dp)
++                    .heightIn(min = if (captionTitle) 32.dp else 40.dp)
+                     .clip(ToolsDims.menuItemShape)
+                     .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); entry.onClick() }
+-                    .padding(horizontal = 12.dp, vertical = 6.dp),
++                    .padding(horizontal = 12.dp, vertical = if (captionTitle) 4.dp else 6.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+                 horizontalArrangement = Arrangement.spacedBy(10.dp),
+             ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-index e9d3077..c47941e 100644
+index e9d3077..9ca7e2f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-@@ -92,9 +92,9 @@ private fun ConfigCard(
+@@ -92,11 +92,12 @@ private fun ConfigCard(
      HomeCard(Modifier.fillMaxWidth()) {
          ToolsCardHeader(ToolsIcons.Folder, "配置管理")
          state.configs.forEach { config ->
@@ -756,8 +786,11 @@ index e9d3077..c47941e 100644
 +                modifier = Modifier.padding(horizontal = 10.dp),
                  icon = ToolsIcons.File,
                  subtitle = ht(config.caption),
++                subtitleMaxLines = 1,
                  selected = config.current,
-@@ -114,7 +114,6 @@ private fun ConfigCard(
+                 enabled = !state.busy,
+                 endPadding = 4.dp,
+@@ -114,7 +115,6 @@ private fun ConfigCard(
                  },
              )
          }
@@ -765,7 +798,7 @@ index e9d3077..c47941e 100644
          ToolsRow(
              title = AnnotatedString(ht("编辑当前 YAML")),
              icon = ToolsIcons.Pencil,
-@@ -141,18 +140,18 @@ private fun SubscriptionCard(
+@@ -141,20 +141,20 @@ private fun SubscriptionCard(
              trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null) },
          )
          if (state.subscriptions.isEmpty()) {
@@ -784,9 +817,12 @@ index e9d3077..c47941e 100644
                  subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
 +                subtitleMaxLines = 1,
                  subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
-                 subtitleColor = if (item.placeholder) c.warn else c.t3,
+-                subtitleColor = if (item.placeholder) c.warn else c.t3,
++                subtitleColor = if (item.placeholder) c.warn else c.t2,
                  enabled = !state.busy,
-@@ -164,7 +163,6 @@ private fun SubscriptionCard(
+                 endPadding = 4.dp,
+                 onClick = { onEdit(item) },
+@@ -164,7 +164,6 @@ private fun SubscriptionCard(
                  },
              )
          }
@@ -794,7 +830,15 @@ index e9d3077..c47941e 100644
          ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
      }
  }
-@@ -209,9 +207,10 @@ internal fun ToolsRenameConfigDialogCard(
+@@ -192,6 +191,7 @@ internal fun ToolsConfigMenuCard(config: ToolsConfig, modifier: Modifier = Modif
+         },
+         modifier = modifier,
+         title = config.name,
++        captionTitle = config.current,
+     )
+ }
+ 
+@@ -209,9 +209,10 @@ internal fun ToolsRenameConfigDialogCard(
      modifier: Modifier = Modifier,
  ) {
      ToolsDialogCard(
@@ -806,7 +850,7 @@ index e9d3077..c47941e 100644
  }
  
  /** Page 10. */
-@@ -223,6 +222,7 @@ internal fun ToolsDeleteConfigDialogCard(
+@@ -223,6 +224,7 @@ internal fun ToolsDeleteConfigDialogCard(
      modifier: Modifier = Modifier,
  ) {
      ToolsDialogCard(
@@ -814,7 +858,7 @@ index e9d3077..c47941e 100644
          title = "删除配置？",
          text = "「${overlay.config}」将被永久删除。" + if (overlay.isCurrent) "\n删除后会切换回内置模板。" else "",
          confirmLabel = "删除", confirmKind = ToolsConfirmKind.Danger,
-@@ -239,6 +239,7 @@ internal fun ToolsDeleteSubscriptionDialogCard(
+@@ -239,6 +241,7 @@ internal fun ToolsDeleteSubscriptionDialogCard(
      modifier: Modifier = Modifier,
  ) {
      ToolsDialogCard(
@@ -823,7 +867,7 @@ index e9d3077..c47941e 100644
          text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
          confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-index 7e58000..d8dd716 100644
+index 7e58000..b73e570 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 @@ -61,7 +61,7 @@ internal object ToolsTypography {
@@ -844,6 +888,26 @@ index 7e58000..d8dd716 100644
          .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
          .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
              role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+@@ -259,6 +259,7 @@ internal fun <T> ToolsSegmented(
+     onSelect: (T) -> Unit,
+     modifier: Modifier = Modifier,
+     enabled: Boolean = true,
++    icons: Map<T, ImageVector> = emptyMap(),
+ ) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+@@ -268,7 +269,10 @@ internal fun <T> ToolsSegmented(
+                 .background(if (selected == key) c.accentSoft else Color.Transparent)
+                 .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
+                 .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
+-                Text(ht(label), color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
++                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }
++                    Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)
++                }
+             }
+         }
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 index 2b98b46..ae98331 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
@@ -907,8 +971,36 @@ index a60a9d7..2bb5c4e 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
+index 9b0a4af..d42cb39 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
+@@ -118,6 +118,11 @@ internal object ToolsIcons {
+         "m4.243 5.21 14.39 12.472",
+     ) }
+ 
++    val ShieldX: ImageVector by lazy { vector("ShieldX",
++        "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
++        "m9 9 6 6", "m15 9-6 6",
++    ) }
++
+     val Activity: ImageVector by lazy { vector("Activity",
+         "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
+     ) }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
+index 19c6bd6..24c963d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt
+@@ -53,6 +53,7 @@ internal fun ToolsImportScreen(
+             selected = form.tab,
+             onSelect = onTabChange,
+             enabled = !form.importing,
++            icons = mapOf(ToolsImportTab.File to ToolsIcons.File, ToolsImportTab.Link to ToolsIcons.Link),
+         )
+         Spacer(Modifier.height(16.dp))
+         HomeCard(Modifier.fillMaxWidth()) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
-index 7a05ec8..4f35d7c 100644
+index 7a05ec8..21f2ab5 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 @@ -31,6 +31,8 @@ import androidx.compose.ui.draw.alpha
@@ -920,6 +1012,17 @@ index 7a05ec8..4f35d7c 100644
  import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
  import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
  import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
+@@ -52,8 +54,8 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
+     ToolsEntry.SubStore -> ToolsIcons.Link
+     ToolsEntry.CnIp -> ToolsIcons.Database
+     ToolsEntry.Cores -> ToolsIcons.Cpu
+-    ToolsEntry.Adblock -> ToolsIcons.ShieldBan
+-    ToolsEntry.Diag -> ToolsIcons.Activity
++    ToolsEntry.Adblock -> ToolsIcons.ShieldX
++    ToolsEntry.Diag -> ToolsIcons.SquareTerminal
+     ToolsEntry.WebUi -> ToolsIcons.Monitor
+ }
+ 
 @@ -100,7 +102,7 @@ internal fun ToolsScreen(
                  .padding(contentPadding)
                  .verticalScroll(scroll)
@@ -929,12 +1032,38 @@ index 7a05ec8..4f35d7c 100644
              verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
          ) {
              Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
-@@ -142,10 +144,11 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
+@@ -110,9 +112,9 @@ internal fun ToolsScreen(
+             if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索工具")
+ 
+             when {
+-                results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, onOpen = onOpen) }
++                results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, collapsed = collapsed, onOpen = onOpen) }
+                 results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = ht("尝试其他关键词"))
+-                else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, onOpen = onOpen) }
++                else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, collapsed = collapsed, onOpen = onOpen) }
+             }
+         }
+ 
+@@ -131,21 +133,23 @@ internal fun ToolsScreen(
+ }
+ 
+ @Composable
+-private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onOpen: (ToolsEntry) -> Unit) {
++private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, collapsed: Boolean, onOpen: (ToolsEntry) -> Unit) {
+     val c = LocalHomeColors.current
+     if (group.title != null) {
+         Text(ht(group.title), Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
+     }
+     HomeCard(Modifier.fillMaxWidth()) {
+-        group.entries.forEachIndexed { index, entry ->
++        val entries = if (brief) group.entries.sortedBy { when (it) { ToolsEntry.Share -> 0; ToolsEntry.NetMatch -> 1; else -> 2 } } else group.entries
++        entries.forEachIndexed { index, entry ->
+             // Cards define the groups; the reference has no dividers between hub entries.
              val title = ht(entry.title)
              ToolsRow(
                  title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
 -                icon = entry.icon(),
-+                icon = io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
++                icon = if (collapsed && entry == ToolsEntry.Configs) ToolsIcons.FileText else io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
                  subtitle = ht(if (brief) entry.brief else entry.summary),
 +                subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
                  onClick = { onOpen(entry) },

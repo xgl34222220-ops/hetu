@@ -259,6 +259,7 @@ internal fun <T> ToolsSegmented(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    icons: Map<T, ImageVector> = emptyMap(),
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -268,7 +269,10 @@ internal fun <T> ToolsSegmented(
                 .background(if (selected == key) c.accentSoft else Color.Transparent)
                 .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
                 .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {
-                Text(ht(label), color = if (selected == key) c.accent else c.t2, style = ToolsTypography.rowTitle, maxLines = 1)
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }
+                    Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)
+                }
             }
         }
     }

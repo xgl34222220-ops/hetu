@@ -54,8 +54,8 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
     ToolsEntry.SubStore -> ToolsIcons.Link
     ToolsEntry.CnIp -> ToolsIcons.Database
     ToolsEntry.Cores -> ToolsIcons.Cpu
-    ToolsEntry.Adblock -> ToolsIcons.ShieldBan
-    ToolsEntry.Diag -> ToolsIcons.Activity
+    ToolsEntry.Adblock -> ToolsIcons.ShieldX
+    ToolsEntry.Diag -> ToolsIcons.SquareTerminal
     ToolsEntry.WebUi -> ToolsIcons.Monitor
 }
 
@@ -112,9 +112,9 @@ internal fun ToolsScreen(
             if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索工具")
 
             when {
-                results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, onOpen = onOpen) }
+                results == null -> state.groups.forEach { group -> ToolsGroup(group, query = "", brief = false, collapsed = collapsed, onOpen = onOpen) }
                 results.isEmpty() -> ToolsEmpty(ToolsIcons.Search, "没有匹配的工具", subtitle = ht("尝试其他关键词"))
-                else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, onOpen = onOpen) }
+                else -> results.forEach { group -> ToolsGroup(group, query = state.query, brief = true, collapsed = collapsed, onOpen = onOpen) }
             }
         }
 
@@ -133,18 +133,19 @@ internal fun ToolsScreen(
 }
 
 @Composable
-private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onOpen: (ToolsEntry) -> Unit) {
+private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, collapsed: Boolean, onOpen: (ToolsEntry) -> Unit) {
     val c = LocalHomeColors.current
     if (group.title != null) {
         Text(ht(group.title), Modifier.padding(start = 4.dp, end = 4.dp, top = 12.dp), color = c.t2, style = HomeType.section)
     }
     HomeCard(Modifier.fillMaxWidth()) {
-        group.entries.forEachIndexed { index, entry ->
+        val entries = if (brief) group.entries.sortedBy { when (it) { ToolsEntry.Share -> 0; ToolsEntry.NetMatch -> 1; else -> 2 } } else group.entries
+        entries.forEachIndexed { index, entry ->
             // Cards define the groups; the reference has no dividers between hub entries.
             val title = ht(entry.title)
             ToolsRow(
                 title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
-                icon = io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
+                icon = if (collapsed && entry == ToolsEntry.Configs) ToolsIcons.FileText else io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
                 subtitle = ht(if (brief) entry.brief else entry.summary),
                 subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
                 onClick = { onOpen(entry) },

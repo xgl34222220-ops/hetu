@@ -53,6 +53,7 @@ internal fun ToolsImportScreen(
             selected = form.tab,
             onSelect = onTabChange,
             enabled = !form.importing,
+            icons = mapOf(ToolsImportTab.File to ToolsIcons.File, ToolsImportTab.Link to ToolsIcons.Link),
         )
         Spacer(Modifier.height(16.dp))
         HomeCard(Modifier.fillMaxWidth()) {
