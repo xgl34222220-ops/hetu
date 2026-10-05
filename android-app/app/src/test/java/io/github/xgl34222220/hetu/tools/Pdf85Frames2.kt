@@ -174,7 +174,8 @@ internal fun Pdf85C43Report() = Frame {
 /* ------------------------------ 广告过滤 ------------------------------ */
 
 @Composable
-internal fun Pdf85C44AdblockRules() = Frame { Adblock(scrolled = RulesScroll) }
+// The mdpi 7cf page45 capture places the LevelCard at y765, below the y78 toolbar.
+internal fun Pdf85C44AdblockRules() = Frame { Adblock(scrolled = 687) }
 
 @Composable
 internal fun Pdf85C45AdblockStatus() = Frame { Adblock() }

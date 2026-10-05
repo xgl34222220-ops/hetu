@@ -98,7 +98,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                 Box(Modifier.fillMaxWidth().heightIn(min = 400.dp).clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface).padding(16.dp)) {
                     SelectionContainer {
                         Text(if (busy && text.isBlank()) "正在读取启动配置…" else text.ifBlank { "暂无启动配置" },
-                            color = Hx.colors.textMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp,
+                            color = Hx.colors.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 19.sp, letterSpacing = 0.sp,
                             modifier = Modifier.horizontalScroll(rememberScrollState()))
                     }
                 }

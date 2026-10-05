@@ -1,0 +1,1145 @@
+{
+  "schema": 1,
+  "createdAtUtc": "2026-10-05T14:06:28.663408+00:00",
+  "reviewer": "/root/settings_parity_audit",
+  "purpose": "Actual PDF04 production-style re-audit after user reported visible mismatch; candidate style change record, not pixel parity acceptance.",
+  "reference": {
+    "filename": "河图概念图-04-设置-离线版(2).pdf",
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-04-设置-离线版(2).pdf",
+    "sha256": "88e57de80fba6454bc8c28831cc89000dece6298e4131cb9c9d6342706dbe9d6",
+    "pageCount": 33,
+    "imageXrefsReadFromActualPdf": true
+  },
+  "baseline": {
+    "appCommit": "20c308da02e4920f6581c5210af291ff6fb63dab",
+    "captureDirectory": "/workspace/scratch/3788973cf567/tmp/ui85-20c",
+    "all33CurrentMappingImagesActuallyOpenedAtFullSize": true,
+    "earlier939To20cComparison": {
+      "sameCount": 32,
+      "onlyChangedPage": 23,
+      "reason": "Actual seven-row notification target viewport fixed; all nine target semantics retained."
+    }
+  },
+  "measurementMethod": {
+    "referenceRenderedWidth": 425,
+    "currentNativeWidth": 393,
+    "widthNormalizationFactor": 0.9247058823529412,
+    "note": "Glyph crop widths/heights normalized by 393/425 only. This is not full-page registration: PDF caption and OS status/navigation chrome are excluded. Dark ink areas are comparative raster observations, not proof of an identical font family. No claim that every remaining typography difference is OEM-only."
+  },
+  "measurements": [
+    {
+      "id": "basic-core-title",
+      "page": 3,
+      "sameText": "代理核心",
+      "referenceCrop": [
+        87,
+        157,
+        172,
+        181
+      ],
+      "currentCrop": [
+        77,
+        79,
+        154,
+        102
+      ],
+      "referenceNormalizedGlyphSize": [
+        69.4,
+        16.6
+      ],
+      "currentGlyphSize": [
+        71,
+        18
+      ],
+      "referenceNormalizedDarkInkPixels": 590.9,
+      "currentDarkInkPixels": 469,
+      "interpretation": "Width and height are close; current nested SemiBold is visibly lighter. Candidate changes weight without inflating title size."
+    },
+    {
+      "id": "basic-core-subtitle",
+      "page": 3,
+      "sameText": "选择代理核心程序",
+      "referenceNormalizedGlyphSize": [
+        110,
+        12.9
+      ],
+      "currentGlyphSize": [
+        102,
+        13
+      ],
+      "referenceNormalizedDarkInkPixels": 611.4,
+      "currentDarkInkPixels": 284,
+      "interpretation": "Same glyph height; production Normal weight is a correctable difference, with font-family/rasterization contribution still possible."
+    },
+    {
+      "id": "basic-config-subtitle",
+      "page": 3,
+      "sameText": "查看当前生成的运行配置文件",
+      "referenceNormalizedGlyphSize": [
+        178.5,
+        12.9
+      ],
+      "currentGlyphSize": [
+        167,
+        13
+      ],
+      "referenceNormalizedDarkInkPixels": 996.2,
+      "currentDarkInkPixels": 449
+    },
+    {
+      "id": "root-subtitle",
+      "page": 1,
+      "sameText": "核心、模式与当前配置",
+      "referenceNormalizedGlyphSize": [
+        148,
+        12.9
+      ],
+      "currentGlyphSize": [
+        163,
+        16
+      ],
+      "interpretation": "Current root-specific 16sp supporting text is larger; candidate reduces only root subtitle to the common 14sp SemiBold token."
+    },
+    {
+      "id": "closed-autostart-subtitle",
+      "page": 6,
+      "referenceText": "安装 Root 开机脚本，开机后自动启动服务",
+      "currentBaselineText": "成功启动一次代理后开启，安装 Root 开机脚本",
+      "referenceNormalizedGlyphSize": [
+        216.4,
+        11.1
+      ],
+      "currentGlyphSize": [
+        201,
+        32
+      ],
+      "referenceLineCount": 1,
+      "currentLineCount": 2,
+      "approxReferenceNormalizedFirstCardHeight": 79,
+      "currentFirstCardHeight": 94,
+      "interpretation": "Static copy differs and wraps to two lines. Restored original copy is a candidate fix; it must be re-rendered before claiming a one-line result."
+    },
+    {
+      "id": "backup-export-label",
+      "page": 10,
+      "sameText": "导出备份",
+      "referenceNormalizedGlyphSize": [
+        61,
+        13.9
+      ],
+      "currentGlyphSize": [
+        50,
+        13
+      ],
+      "referenceFlatButtonRgbSamples": [
+        [
+          0,
+          84,
+          234
+        ],
+        [
+          0,
+          84,
+          234
+        ],
+        [
+          0,
+          83,
+          233
+        ],
+        [
+          1,
+          82,
+          233
+        ]
+      ],
+      "currentFlatButtonRgbSamples": [
+        [
+          10,
+          98,
+          232
+        ],
+        [
+          10,
+          98,
+          232
+        ],
+        [
+          10,
+          98,
+          232
+        ],
+        [
+          10,
+          98,
+          232
+        ]
+      ],
+      "interpretation": "Current shared HxButton labelLarge13sp is narrower, and default blue differs. Candidate applies 16sp and approximately #0054EA only within two settings backup buttons."
+    },
+    {
+      "id": "about-summary",
+      "page": 13,
+      "sameText": "Root 透明代理与广告过滤，基于 Mihomo。",
+      "referenceNormalizedGlyphSize": [
+        279.3,
+        13.9
+      ],
+      "currentGlyphSize": [
+        238,
+        13
+      ],
+      "interpretation": "Current production bodyMedium13sp is smaller/narrower. Candidate changes this sentence to15sp SemiBold; logo108dp matches and is preserved."
+    }
+  ],
+  "candidateChanges": [
+    {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt",
+      "function": "SettingsRow",
+      "pagesUsedForMeasurement": [
+        1,
+        3,
+        6,
+        10,
+        13
+      ],
+      "before": {
+        "titleFontSizeSp": 18,
+        "nestedTitleWeight": "SemiBold",
+        "rootTitleWeight": "Bold",
+        "nestedSubtitleFontSizeSp": 14,
+        "nestedSubtitleWeight": "Normal",
+        "rootSubtitleFontSizeSp": 16,
+        "rootSubtitleWeight": "SemiBold",
+        "rootSubtitleLineHeightSp": 20
+      },
+      "candidate": {
+        "titleFontSizeSp": 18,
+        "allTitleWeight": "Bold",
+        "allSubtitleFontSizeSp": 14,
+        "allSubtitleWeight": "SemiBold",
+        "allSubtitleLineHeightSp": 18
+      },
+      "scopeNote": "Settings-owned row primitive is also reused by supplied tool subpages; no home/panel source edits or shared Hx defaults are required."
+    },
+    {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "function": "SettingsScreen startupDownload/autostart branch",
+      "page": 6,
+      "candidateClosedText": "安装 Root 开机脚本，开机后自动启动服务",
+      "busyAndInstalledBranchesUnchanged": true,
+      "enabledGuardUnchanged": true,
+      "setAutoStartCallbackUnchanged": true,
+      "safetyPrerequisitesAndToastNotRemoved": true
+    },
+    {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "function": "SettingsScreen backup create/restore buttons",
+      "pages": [
+        10,
+        28
+      ],
+      "candidateFont": {
+        "fontSizeSp": 16,
+        "fontWeight": "SemiBold",
+        "lineHeightInherited": true
+      },
+      "candidateAccentArgb": "FF0054EA",
+      "accentCondition": "!c.dark && !vm.dynamicColor && vm.accentHex.isBlank()",
+      "fieldsVerifiedInActualViewModel": [
+        "dynamicColor",
+        "accentHex"
+      ],
+      "customMonetAndDarkUseOriginalHxColors": true,
+      "implementation": "Local MaterialTheme typography and LocalHx wrap existing HxButton calls only; no new button implementation."
+    },
+    {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "function": "AboutScreen brand description sentence",
+      "pages": [
+        13,
+        31,
+        32,
+        33
+      ],
+      "before": {
+        "fontSizeSp": 13,
+        "weight": "Normal"
+      },
+      "candidate": {
+        "fontSizeSp": 15,
+        "weight": "SemiBold",
+        "lineHeightInherited": true
+      },
+      "legalTextAssetsUnchanged": true,
+      "logoAndHeroDimensionsUnchanged": true
+    }
+  ],
+  "callbackAndGuardEvidence": {
+    "baselineCommit": "270f559424f3ef6e3503d2431ea24f81d295d3d7",
+    "comparisons": [
+      {
+        "field": "backupExport",
+        "literal": "onClick = { launchDocumentPicker(vm::toast) { exporter.launch(\"Hetu-backup.json\") } }",
+        "literalSha256": "6a925f134bf8acf2390c743b740537d424485f829f6a4f5fbe74e344bb45f68e",
+        "baselineCount": 1,
+        "candidateCount": 1,
+        "literalUnchanged": true
+      },
+      {
+        "field": "backupImport",
+        "literal": "onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf(\"application/json\", \"text/plain\", \"application/octet-stream\")) } }",
+        "literalSha256": "ee86681eae6a3363e3683de3f9d7b7d46119548e61d1283db1b193dffa88d9d9",
+        "baselineCount": 1,
+        "candidateCount": 1,
+        "literalUnchanged": true
+      },
+      {
+        "field": "autoStartChange",
+        "literal": "{ vm.setAutoStart(it) }",
+        "literalSha256": "cad3b046f7696539350b4a363a2a2c442c859aec8139f1062bdf78b27bd79b6c",
+        "baselineCount": 1,
+        "candidateCount": 1,
+        "literalUnchanged": true
+      },
+      {
+        "field": "autoStartEnabledGuard",
+        "literal": "enabled = !vm.autoStartBusy && vm.operation == null",
+        "literalSha256": "ad0cfd8666e7cc4452b6ef32da3ca4c95d2a9bf658ea56f5380750f442d4d12e",
+        "baselineCount": 1,
+        "candidateCount": 1,
+        "literalUnchanged": true
+      },
+      {
+        "field": "autoStartBusyInstalledBranches",
+        "literal": "subtitle = if (vm.autoStartBusy) \"正在设置开机脚本…\" else if (autoStart) \"开机脚本已安装，开机后自动启动服务\"",
+        "literalSha256": "a074a8ee4bbbff2754f68ddbd2cfec2ccef4221edd201534dc70e835d0a7f8bb",
+        "baselineCount": 1,
+        "candidateCount": 1,
+        "literalUnchanged": true
+      }
+    ],
+    "additionalNote": "No HetuViewModel, Root manager, permissions, data, hooks, or safety-gate source edits were made by this style batch."
+  },
+  "nonChangesAndLimitations": {
+    "canvasAndCards": "Reference/native canvas samples differ around 1–2 RGB units; text-column origins and row/card geometry are close. No speculative background gradient or card-width change is justified by this review.",
+    "referenceAndFixtureStateDifferences": "Theme motion captures have blur/back-animation preferences disabled, so dependent rows/switches differ from enabled PDF examples. This is separate from geometry and must not be reported as 1:1 acceptance.",
+    "legalDocuments": "Full legitimate GPL/ISC and additional attribution text is retained; line breaking/sheet-height differences do not justify truncating legal text.",
+    "referenceStatusNavChromeExcluded": true
+  },
+  "candidateValidation": {
+    "state": "Working-tree production candidate; uncommitted styles at time of this report. Parent owns final integration/commit/CI.",
+    "gitDiffCheckPassed": true,
+    "newCandidateScreenshotsRead": false,
+    "newCandidateBuildUnitInstallationResult": "Not yet validated by this review; older20c479 pass does not validate these newer style changes.",
+    "pixelOneToOnePassed": false,
+    "nextReview": "Re-open new full-size PDF04 captures and remeasure candidate typography, backup button default/custom/Monet/dark behavior, autostart static-copy line wrapping, and legal text preservation.",
+    "latestNewScreenshotsActuallyRead": true,
+    "latestReviewedCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "laterCorrectionsStillPendingNewCI": true
+  },
+  "sourceFilesAtReportTime": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt",
+      "sha256": "e221c7f075bd67b0b284852be0bc6198b167b66e77a57dfc0c90282717be2b06",
+      "note": "Snapshot hash may include parent-agent concurrent changes; it is not an immutable candidate commit identity."
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sha256": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "note": "Snapshot hash may include parent-agent concurrent changes; it is not an immutable candidate commit identity."
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "sha256": "589ee66c495d4deb7c0170fec4500f43fb41bbb769f1d9f0c65b7483360e2b15",
+      "note": "Snapshot hash may include parent-agent concurrent changes; it is not an immutable candidate commit identity."
+    }
+  ],
+  "referenceAndBaselineImageEvidence": [
+    {
+      "page": 1,
+      "pdfImageXref": 10,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "b7799be706b76c86eca5350a1f95647c88c54878cfa72d9f9314cafd5ae1e0f4",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-01.png",
+      "renderedReferenceSha256": "2131d0cd30aa0763ed41bd6062103f6c2e751f5b6b4958ea0a8e8e5c1959581d",
+      "baselineCapture": "settings-hub.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/settings-hub.png",
+      "baselineCaptureSha256": "a5b1703828602bb088602bc044d3e6da11dab6a999c296fe0af63068324ef166",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 2,
+      "pdfImageXref": 14,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "59438a6943931ac89bc89afd383f8e954fcd60ebfa94c6d204409cce64bf53ec",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-02.png",
+      "renderedReferenceSha256": "f116b7265c8ef2c7ce19d451cb615e9b54738b32deb5a73a05d552be0e6f443c",
+      "baselineCapture": "04-002-settings-collapsed.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-002-settings-collapsed.png",
+      "baselineCaptureSha256": "9e1d8746e8153f518cc5720ee549a1b345f52ade53b4f7affbce034e7b735694",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 3,
+      "pdfImageXref": 16,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1851
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "ee1de7a903150fa3b8f37b8c2107da254552b52f0c8d37e2dfb551fde79d5d6e",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-03.png",
+      "renderedReferenceSha256": "563b77cc7258b764bb7927282369095032b4c6a7e505d5ba627496b4591b2cf6",
+      "baselineCapture": "04-003-basic-proxy.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-003-basic-proxy.png",
+      "baselineCaptureSha256": "119bbe92f1de9c7385cc3de8dfdb751acbf1c5a4e13b0329e55f71098adffdca",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 4,
+      "pdfImageXref": 18,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "46e063347df7769b2629430d4711478bd51843bad2f6d2ac64746eed7462075b",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-04.png",
+      "renderedReferenceSha256": "3c306dd8e0c34fbfa4c5f4837b556fdb37ef20ab852595b21168e8c4bc4b6465",
+      "baselineCapture": "04-004-advanced-settings.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-004-advanced-settings.png",
+      "baselineCaptureSha256": "ee1be111972c21ffe070aed25903a60ec6ecaed33efc78397eb29eec7aac5610",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 5,
+      "pdfImageXref": 20,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1851
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "e91ce6e232cca4b76860ad47e3f4cb0c9a6d8f2e2cb87daaa686a81cf73bf09a",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-05.png",
+      "renderedReferenceSha256": "d69aa0984149a96ca2fb1e69a8226d13979622533d4a2250eb24299af7b1ff20",
+      "baselineCapture": "04-005-resource-limits.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-005-resource-limits.png",
+      "baselineCaptureSha256": "d1dcfae8d886089c7884c4b35c072f7f65b0dfb3e92c714816b72f837f6a3706",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 6,
+      "pdfImageXref": 22,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "8719e1c3864c1ad4be0a327a6574caffe76fec932ae01c92db7522dd30feb1b8",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-06.png",
+      "renderedReferenceSha256": "83cf62ea6621d32abba62485bb110b697120c3c9cfd19ba8c5f0739d2261a30e",
+      "baselineCapture": "04-006-startup-download.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-006-startup-download.png",
+      "baselineCaptureSha256": "576f1f160ec07b48f503945f809247c7084713ac3f462c99ad0fa0a2135f4a96",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 7,
+      "pdfImageXref": 24,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "b4ea4f8fc74b07ebad3052a3cf445b091c92d137eb009a5a99cf60cf3f6992a7",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-07.png",
+      "renderedReferenceSha256": "5d8021bde70d29a6e3ad9ac015d627998fc20783bf0f681a059f2a0a0b302f44",
+      "baselineCapture": "04-007-default-panel.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-007-default-panel.png",
+      "baselineCaptureSha256": "fdd636cddb6a120e4fc5a12a3d1a51eae3d3384ef81af7ebf6de01d702e80f99",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 8,
+      "pdfImageXref": 26,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "08ce41e0eba324649f35c77526daa20722e1a18cfd03f84a14c2d1ddd094211c",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-08.png",
+      "renderedReferenceSha256": "fefe786e5e93797889010bdd0cb1dc2d4ab8afc726f671bd035de210f32a2eb4",
+      "baselineCapture": "04-008-theme.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-008-theme.png",
+      "baselineCaptureSha256": "0965a13d70fa756023244c38b23d62622212997868d9d0447a8aaed2de59df46",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 9,
+      "pdfImageXref": 28,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "485fe6f2e222703abfefe55739d01220f2d694ea4397540977f930eca97f9c16",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-09.png",
+      "renderedReferenceSha256": "42e6ce9d9aafc4646826309283f81223bf6f188dd84195c9b918c99ee950a81b",
+      "baselineCapture": "04-009-theme-motion.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-009-theme-motion.png",
+      "baselineCaptureSha256": "e04d9b37e013ab0675bb9407c771452ad113b1ec51f4533ea43222ec4c0b909b",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 10,
+      "pdfImageXref": 30,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "3820189ac879b113e4ec8889126d9bde662067f7c1e65c64b1c6cd4689bd4498",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-10.png",
+      "renderedReferenceSha256": "f1419c476a74df9e7795ce42434204ab4283c92f6bd02a6f2670d41209567716",
+      "baselineCapture": "04-010-backup.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-010-backup.png",
+      "baselineCaptureSha256": "f65ffb8e62e811dd9ea9342c3d1d9567bc0a7ad079e2a72e1a9e7b5eb399791d",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 11,
+      "pdfImageXref": 32,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "30813607c34567e5c3b15878b14c17eb504a1a788d4b173ca3e2f543dd2b3c30",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-11.png",
+      "renderedReferenceSha256": "aa77d4e1873c816acfe5e2adb8f771c8724eec29444ef3b446744df6433b6313",
+      "baselineCapture": "04-011-notification.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-011-notification.png",
+      "baselineCaptureSha256": "38b09af9851fd47b5c76eef9447df9994d799997c3f8a37b51a6fb48d6643d95",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 12,
+      "pdfImageXref": 34,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "86226cc80fa1ec4bd06dd89461cb3df75b06f4a0b44ef91e8e359599f79348e5",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-12.png",
+      "renderedReferenceSha256": "a13ff67accdc5a1c2d96c5aee6e5f27f086e38f12d8c094dd3a21756f4140bb8",
+      "baselineCapture": "04-012-notification-actions.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-012-notification-actions.png",
+      "baselineCaptureSha256": "b49c6a27e1110743e4aeee794729f7a1be6def9de4b7de05ab919647bc19c74c",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 13,
+      "pdfImageXref": 36,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "cef8fe68ad8cc504995880879bab57d12f6bf0a546bff72f5f0e3e164f32a79e",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-13.png",
+      "renderedReferenceSha256": "50887ed829c6bbcf9ae66d5dfd564fc27eaaba461b05173d1a005099feaa6195",
+      "baselineCapture": "04-013-about.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-013-about.png",
+      "baselineCaptureSha256": "b2fb8daa682a9dcd300387607c0dcf5f6798b20be5c72276fe860159eb01bd5f",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 14,
+      "pdfImageXref": 38,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1851
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "184e0439d9e0392b29f22fdb0f4260eed97434019ca1b2c3e5944973ee1c5896",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-14.png",
+      "renderedReferenceSha256": "6c009b3e7c1e9bfb91b58cbc3a6fc74219b0554f89b8e050ee59bc7e18e43992",
+      "baselineCapture": "04-014-startup-config.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-014-startup-config.png",
+      "baselineCaptureSha256": "ceee6a96396e89e170957639849515de3e8eefb1314df096393ba5e53feb5974",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 15,
+      "pdfImageXref": 40,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "2ac687864c2d282dc25aca2a09db05ee8a6969b2ec6f1067a31c619329e8258a",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-15.png",
+      "renderedReferenceSha256": "d0224189116a5843402a56d005e0bd98166d4fe36015a160f957f96334b519e6",
+      "baselineCapture": "04-015-core-choice.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-015-core-choice.png",
+      "baselineCaptureSha256": "45fa17c6a51ffecbb9aa06bb25aefa0aa2b16d0f2b37528ea43435bf888bce0c",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 16,
+      "pdfImageXref": 42,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "af955e0588f0e53970fdcd5a6ceba24c6ec1ad5b8b3b49506121df11bbdb9cb1",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-16.png",
+      "renderedReferenceSha256": "b4619510aa2e91f1a6ff49bf0fac63e9191099cd0a6ee70b46b9ff84968fba9c",
+      "baselineCapture": "04-016-run-mode-choice.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-016-run-mode-choice.png",
+      "baselineCaptureSha256": "8f2004b05ba526664d6e2d4b3e35a338d000469809e367060d8b4050ccdc9f40",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 17,
+      "pdfImageXref": 44,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "3f057b90e8a8d9e13ace508fb818a3b495fbb72b955680410d122b5170fb7272",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-17.png",
+      "renderedReferenceSha256": "04b405d7ce02371548a934204dfbdf0659220d739bc9d4cd441c4e9f4d3c6fe1",
+      "baselineCapture": "04-017-ipv6-choice.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-017-ipv6-choice.png",
+      "baselineCaptureSha256": "800e2ebc1fd6f5a7858cf1e0e3186eb0a2d8062035ebafc6a53f85e03b7d8663",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 18,
+      "pdfImageXref": 46,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "64700d20d4595e2239aa99b1b8f60f30be7254f0195d2a519a123bf93605b1f2",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-18.png",
+      "renderedReferenceSha256": "9708381d42021a9159f9b2891bd95427da7a04191e8f3348705091418a044eb3",
+      "baselineCapture": "04-018-default-panel-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-018-default-panel-menu.png",
+      "baselineCaptureSha256": "7f01fe5614e69d28701c04ef59ce8e65642a6ae4beb65aa1d4fba551d6fc7845",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 19,
+      "pdfImageXref": 48,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "2d323e86c05998bad50b85625a657fb2f896bf17dcc7903087eb09945afdf05b",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-19.png",
+      "renderedReferenceSha256": "a601fe84300ec700b19a6464bfa43db880ebcde159cb4900e3823ff4c0f5d095",
+      "baselineCapture": "04-019-language-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-019-language-menu.png",
+      "baselineCaptureSha256": "8466c25500448032587d9fd824a6556b0696e934aaeed5cd01c432a20928897f",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 20,
+      "pdfImageXref": 50,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "f9ed6f3468d345a3e5d0f7a5b900bf7d6cbd1b429041ecd97e54ed0aaab25cb3",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-20.png",
+      "renderedReferenceSha256": "3185746cab81db7bc2fa3398449d94bc997db23e070c84587d18572dc8f6a21b",
+      "baselineCapture": "04-020-top-blur-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-020-top-blur-menu.png",
+      "baselineCaptureSha256": "70e352bf3b6d87be3527ec845919b8ba20264a8143dbefe3de8c0ae831ab6993",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 21,
+      "pdfImageXref": 52,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "9af3c5be5f7a07e54ade4316f1d1dd011834db8f7e0a4512258bbdf715a42550",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-21.png",
+      "renderedReferenceSha256": "996dc4626c751041e6edc4302c3a4c796d85d1a6460b5bb5d669671a1bf88814",
+      "baselineCapture": "04-021-scale-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-021-scale-menu.png",
+      "baselineCaptureSha256": "db364973312befd21f57752f45a7277017046368ae5fc13332b479e9b1a2e1a0",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 22,
+      "pdfImageXref": 54,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "a26dd3a9ace190ec658ab692c281a92ca1e9c50f21545197b2f10794bfc22883",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-22.png",
+      "renderedReferenceSha256": "1f80b4d689197dbb660e332bc972fbcd9fed5fd6af25bec9705115a21ca1c11a",
+      "baselineCapture": "04-022-refresh-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-022-refresh-menu.png",
+      "baselineCaptureSha256": "8668cc6b6284fe6b92d652c7e12d5a64bf2d23c2d5d1776a6f7f1a831d211e7a",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 23,
+      "pdfImageXref": 56,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "00a55908ff8ead155cbe7d924f127bb57b2bccb32dbd9f19e1e1a6b789ba249b",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-23.png",
+      "renderedReferenceSha256": "ebd30055395cbbd07da5b682862af67658c7fb01f7542e5d97a528a26ff00905",
+      "baselineCapture": "04-023-target-menu.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-023-target-menu.png",
+      "baselineCaptureSha256": "4341c85e058fff6b1f8fa6c54f398df414e5f74ea72044cdc7c13f50aac42e23",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 24,
+      "pdfImageXref": 58,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "d758119192a8e02100389eb0b2ac31da7db3e11596ed6bb9182e931a6041db42",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-24.png",
+      "renderedReferenceSha256": "2b2d9cec81ae22f445d9db31e40b95fb21d86dbcf59af36fb4977ac12943daf8",
+      "baselineCapture": "04-024-action-one.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-024-action-one.png",
+      "baselineCaptureSha256": "b3ef1cef997d7dd776cf6f99080c7789eccffc4f70d8fbdf74833f7de6dd97d8",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 25,
+      "pdfImageXref": 60,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "a97f2882d86e2a8433ee9ee94d5c4422f56d313edc6821d5af320ab87d2e75ab",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-25.png",
+      "renderedReferenceSha256": "41312e6a3974ac5315b0990cc64e85121abcb50267363fa2f49f1f5b3688d093",
+      "baselineCapture": "04-025-action-two.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-025-action-two.png",
+      "baselineCaptureSha256": "e848c58398d9961d7170a82c95abad61d29d742a7e6fae37366ca0191e43d30f",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 26,
+      "pdfImageXref": 62,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "84ce9bc49581c2ef53ac7b9a4ec68252d5e11a025dfe28f34b697929c26475de",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-26.png",
+      "renderedReferenceSha256": "58edfb4441dfc11718df61b55a899a715a13261956eb2a674f73f4cfb645980d",
+      "baselineCapture": "04-026-action-three.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-026-action-three.png",
+      "baselineCaptureSha256": "864c1df52152ea76c8310648875244a3b4021fcd036fd83ab50f4716ebf5c609",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 27,
+      "pdfImageXref": 64,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "4a659d1f18ea481e31822316eaca096f34b65d8795c0ae74d87dc6cc0899b8f9",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-27.png",
+      "renderedReferenceSha256": "265681632434d2c35857ad9b889826988b03f14bc2d444f5b51631f6f4afa095",
+      "baselineCapture": "04-027-dns-dialog.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-027-dns-dialog.png",
+      "baselineCaptureSha256": "29a0ce673b2b545137231eef2593365597bc0704919ca39913fa8ffe75a1643e",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 28,
+      "pdfImageXref": 66,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "7a2a0729947290e66c46691c53177057f598722b26ec7087c851c0bcc4ce8e8d",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-28.png",
+      "renderedReferenceSha256": "3018c3a72f5adbbc08516c6df13e38ff35866c1fb26ea24d314077b868aa8900",
+      "baselineCapture": "04-028-restore-confirm.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-028-restore-confirm.png",
+      "baselineCaptureSha256": "31cc7afcbe1e5ea2247751e6312e99754d9f071d4a3975191de022546285936b",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 29,
+      "pdfImageXref": 68,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "3958e2c867f2d098f67dcca9b0c68a8dc40c03ab01b18c1bad9a822d9ea82e82",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-29.png",
+      "renderedReferenceSha256": "1dfc838c255fa1ae3f99cce2f204411f8d1e803ebe44c6e8df38faa332807874",
+      "baselineCapture": "04-029-mirror-dialog.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-029-mirror-dialog.png",
+      "baselineCaptureSha256": "6ba6473851d1bb56d4b9b0a5ce9b35ca4e7ff0e1292ea741ba9e96a3bf962958",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 30,
+      "pdfImageXref": 70,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        851,
+        1849
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "c6da9303303d0933873e1a6505155b8477fcddc0936af5edbc114243b82781de",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-30.png",
+      "renderedReferenceSha256": "649b360503c0382c70563dbee18e57f28e6fd1df9dfba7c2249800d459169000",
+      "baselineCapture": "04-030-mirror-invalid.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-030-mirror-invalid.png",
+      "baselineCaptureSha256": "929275c3bbadc54668b89739cc0369ed572baad198b373b19644c2df7c01dd91",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 31,
+      "pdfImageXref": 72,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "a85594a95d0870771266f486aaff71e09756d7dfdf81f79e16e940076206fd91",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-31.png",
+      "renderedReferenceSha256": "f543cf7127541f8cdc758cb7b44aaf3645a1caf48ed9302ff5f2272175359f66",
+      "baselineCapture": "04-031-mihomo-license.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-031-mihomo-license.png",
+      "baselineCaptureSha256": "a497b4efa219e31e3cbf0ef9abf2bd1c98354b30151200239f520cd7f883508b",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 32,
+      "pdfImageXref": 74,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "8e5379efe56ae316e16022b040287754387760c328b9b7025c0ef8405249d0d2",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-32.png",
+      "renderedReferenceSha256": "3dfcb7b53664de397f86488ddda68b71600f1ba557605baaa2c624507d0153ba",
+      "baselineCapture": "04-032-adguard-license.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-032-adguard-license.png",
+      "baselineCaptureSha256": "4b9b510c6f6b292916a01697a274a95eb89f69ebda6d85711209ab639116a9f4",
+      "referenceAndBaselineImageActuallyRead": true
+    },
+    {
+      "page": 33,
+      "pdfImageXref": 76,
+      "pdfImageGeneration": 0,
+      "pdfImageSize": [
+        850,
+        1850
+      ],
+      "pdfImageEncoding": "DCTDecode",
+      "embeddedImageSha256": "7d6b08675c5c852a2d13e1bc9baaef9c4a2c19663af54bc21b6f2f52cd84261d",
+      "renderedReferencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-33.png",
+      "renderedReferenceSha256": "8eb5793b22299499e56d7cb19ca9c5d7a5466bf5608076ff374001a40c4fb559",
+      "baselineCapture": "04-033-lucide-license.png",
+      "baselineCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-20c/04-033-lucide-license.png",
+      "baselineCaptureSha256": "2c392be1d1795a305ad183eacaf7718553cb8ad6c6d588687947eaedba1370bb",
+      "referenceAndBaselineImageActuallyRead": true
+    }
+  ],
+  "dividerAudit": {
+    "samples": [
+      {
+        "page": 3,
+        "referenceBand": [
+          120,
+          220,
+          310,
+          220
+        ],
+        "referenceMedianRGB": [
+          240,
+          240,
+          252
+        ],
+        "currentBand": [
+          110,
+          138,
+          290,
+          138
+        ],
+        "currentMedianRGB": [
+          238,
+          237,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          238,
+          237,
+          248
+        ]
+      },
+      {
+        "page": 3,
+        "referenceBand": [
+          120,
+          304,
+          310,
+          304
+        ],
+        "referenceMedianRGB": [
+          239,
+          239,
+          251
+        ],
+        "currentBand": [
+          110,
+          215,
+          290,
+          215
+        ],
+        "currentMedianRGB": [
+          238,
+          237,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          238,
+          237,
+          248
+        ]
+      },
+      {
+        "page": 7,
+        "referenceBand": [
+          120,
+          211,
+          310,
+          211
+        ],
+        "referenceMedianRGB": [
+          237,
+          238,
+          250
+        ],
+        "currentBand": [
+          110,
+          124,
+          290,
+          124
+        ],
+        "currentMedianRGB": [
+          239,
+          240,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          239,
+          240,
+          248
+        ]
+      },
+      {
+        "page": 10,
+        "referenceBand": [
+          120,
+          596,
+          310,
+          596
+        ],
+        "referenceMedianRGB": [
+          237,
+          239,
+          253
+        ],
+        "currentBand": [
+          110,
+          537,
+          290,
+          537
+        ],
+        "currentMedianRGB": [
+          239,
+          240,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          239,
+          240,
+          248
+        ]
+      }
+    ],
+    "productionSource": "SettingsReferenceComponents.SettingsDivider background(Hx.colors.line.copy(alpha=.34f))",
+    "lineToken": "LightHx.line opaqueFFDCE0EC; unlike oldHome translucenttoken",
+    "decision": "Keep divider. Samplesdiffer roughly1-5RGB, reference sometimesdarker; no highconfidence noticeablyblack line defect."
+  },
+  "actual7cfReview": {
+    "reportPath": "/tmp/hetu_pdf04_7cf_visual_review.json",
+    "reportSha256": "efcd7d9f60400ae1d9f83f1f5d90dfee828927812e50c00e24c454d70a5531e4",
+    "artifactId": 11351635003,
+    "commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "all33FullSizeActuallyRead": true,
+    "nativeSourceCorrections": [
+      {
+        "page": 3,
+        "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+        "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+      },
+      {
+        "page": 15,
+        "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+        "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+      },
+      {
+        "page": 16,
+        "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+        "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+      },
+      {
+        "page": 17,
+        "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+        "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+      }
+    ],
+    "allPixelParityCertified": false,
+    "post7cfCandidateNotYetValidated": true
+  },
+  "sourceMappingCorrections": [
+    {
+      "page": 3,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 15,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 16,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 17,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    }
+  ],
+  "post7cfNotificationCandidate": {
+    "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+    "function": "NotificationSettingsScreen / master firstSettingsSwitchRow",
+    "pages": [
+      11,
+      22,
+      23
+    ],
+    "subtitle": "常驻显示运行状态、网速与快捷控制",
+    "referenceGlyphSize": [
+      232,
+      13
+    ],
+    "referenceNormalizedGlyphSize": [
+      214.53176470588235,
+      12.021176470588236
+    ],
+    "current7cfGlyphSize": [
+      216,
+      32
+    ],
+    "current7cfLines": 2,
+    "referenceLines": 1,
+    "currentColumnWidthDp": 225,
+    "candidateSubtitleFontSizeSp": 13,
+    "candidateRowMinHeightDp": 72,
+    "defaultOtherRowsFontSizeSp": 14,
+    "defaultOtherSubtitleRowHeightDp": 78,
+    "beforeWorkingTreeSha256": "8ea2383d0f63a929d9bd64cb68de3ee6e729978811cadf1bed82eec4680a5bff",
+    "afterWorkingTreeSha256": "e1d24a5cb07d1e69e5cd3a848fc30fe13e520dace4b71ce31f022cbdea696506",
+    "exactTwoParameterReversalEqualsPriorWorkingTree": true,
+    "parentFolderAndDownload34_7OptinsPreserved": true,
+    "permissionGuardAndDraftCallbackExact": true,
+    "freshRendering": "pending new coordinated build/artifact; not validated by7cf479 or7cfPNG",
+    "note": "Width219/230 sum estimates do not substitute exact TextMeasurer or new captured wrapping."
+  }
+}

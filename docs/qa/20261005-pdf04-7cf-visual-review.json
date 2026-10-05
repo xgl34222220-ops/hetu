@@ -1,0 +1,2272 @@
+{
+  "schema": 1,
+  "createdAtUtc": "2026-10-05T14:57:32.715471+00:00",
+  "reviewer": "settings_parity_audit",
+  "purpose": "Actual PDF04 all33pages against new7cf264PNGartifact and scoped presentation fixes; no UIparity fiction",
+  "applicationCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "run": 37322190390,
+  "artifact": {
+    "id": 11351635003,
+    "zipSha256": "d006820f530c4244963077fee74943091a9fa0b7464740bce6a4e9abfb86f511",
+    "downloadAndDigestVerification": "Parentagent actually downloaded/verified; thissubagent inspectedextractedimages+metadata/XML",
+    "extractedPNGCount": 264,
+    "directory": "/workspace/scratch/3788973cf567/tmp/ui85-7cf"
+  },
+  "reference": {
+    "filename": "河图概念图-04-设置-离线版(2).pdf",
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-04-设置-离线版(2).pdf",
+    "sha256": "88e57de80fba6454bc8c28831cc89000dece6298e4131cb9c9d6342706dbe9d6",
+    "pageCount": 33,
+    "imageXrefsReadFromActualPdf": true
+  },
+  "measurements": [
+    {
+      "id": "native-core-title",
+      "page": 3,
+      "sameText": "代理核心",
+      "referenceCrop": [
+        87,
+        157,
+        172,
+        181
+      ],
+      "currentCrop": [
+        77,
+        79,
+        154,
+        102
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          90,
+          161,
+          164,
+          178
+        ],
+        "glyphWidthHeight": [
+          75,
+          18
+        ],
+        "inkPixels": 691
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        69.353,
+        16.645
+      ],
+      "referenceNormalizedInkPixels": 590.861,
+      "current": {
+        "glyphBBox": [
+          79,
+          82,
+          149,
+          99
+        ],
+        "glyphWidthHeight": [
+          71,
+          18
+        ],
+        "inkPixels": 469
+      }
+    },
+    {
+      "id": "native-core-subtitle",
+      "page": 3,
+      "sameText": "选择代理核心程序",
+      "referenceCrop": [
+        87,
+        182,
+        213,
+        201
+      ],
+      "currentCrop": [
+        77,
+        105,
+        185,
+        123
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          91,
+          184,
+          209,
+          197
+        ],
+        "glyphWidthHeight": [
+          119,
+          14
+        ],
+        "inkPixels": 715
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        110.04,
+        12.946
+      ],
+      "referenceNormalizedInkPixels": 611.383,
+      "current": {
+        "glyphBBox": [
+          79,
+          108,
+          180,
+          120
+        ],
+        "glyphWidthHeight": [
+          102,
+          13
+        ],
+        "inkPixels": 284
+      }
+    },
+    {
+      "id": "root-basic-subtitle",
+      "page": 1,
+      "sameText": "核心、模式与当前配置",
+      "referenceCrop": [
+        87,
+        237,
+        255,
+        257
+      ],
+      "currentCrop": [
+        77,
+        183,
+        258,
+        203
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          90,
+          240,
+          249,
+          253
+        ],
+        "glyphWidthHeight": [
+          160,
+          14
+        ],
+        "inkPixels": 842
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        147.953,
+        12.946
+      ],
+      "referenceNormalizedInkPixels": 719.978,
+      "current": {
+        "glyphBBox": [
+          81,
+          185,
+          223,
+          198
+        ],
+        "glyphWidthHeight": [
+          143,
+          14
+        ],
+        "inkPixels": 570
+      }
+    },
+    {
+      "id": "backup-label",
+      "page": 10,
+      "sameText": "导出备份",
+      "referenceCrop": [
+        170,
+        250,
+        252,
+        273
+      ],
+      "currentCrop": [
+        155,
+        189,
+        236,
+        212
+      ],
+      "threshold": "allRGB>220 white",
+      "reference": {
+        "glyphBBox": [
+          180,
+          254,
+          245,
+          268
+        ],
+        "glyphWidthHeight": [
+          66,
+          15
+        ],
+        "inkPixels": 228
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        61.031,
+        13.871
+      ],
+      "referenceNormalizedInkPixels": 194.958,
+      "current": {
+        "glyphBBox": [
+          165,
+          192,
+          226,
+          207
+        ],
+        "glyphWidthHeight": [
+          62,
+          16
+        ],
+        "inkPixels": 271
+      }
+    },
+    {
+      "id": "about-description",
+      "page": 13,
+      "sameText": "Root 透明代理与广告过滤，基于 Mihomo。",
+      "referenceCrop": [
+        56,
+        375,
+        368,
+        398
+      ],
+      "currentCrop": [
+        42,
+        273,
+        350,
+        293
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          61,
+          379,
+          362,
+          393
+        ],
+        "glyphWidthHeight": [
+          302,
+          15
+        ],
+        "inkPixels": 1362
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        279.261,
+        13.871
+      ],
+      "referenceNormalizedInkPixels": 1164.62,
+      "current": {
+        "glyphBBox": [
+          50,
+          274,
+          334,
+          288
+        ],
+        "glyphWidthHeight": [
+          285,
+          15
+        ],
+        "inkPixels": 1074
+      }
+    },
+    {
+      "id": "startup-topbar",
+      "page": 6,
+      "sameText": "开机启动与下载",
+      "referenceCrop": [
+        130,
+        88,
+        296,
+        117
+      ],
+      "currentCrop": [
+        118,
+        13,
+        280,
+        39
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          141,
+          92,
+          285,
+          111
+        ],
+        "glyphWidthHeight": [
+          145,
+          20
+        ],
+        "inkPixels": 1366
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        134.082,
+        18.494
+      ],
+      "referenceNormalizedInkPixels": 1168.041,
+      "current": {
+        "glyphBBox": [
+          128,
+          16,
+          265,
+          35
+        ],
+        "glyphWidthHeight": [
+          138,
+          20
+        ],
+        "inkPixels": 1016
+      }
+    },
+    {
+      "id": "notification-description",
+      "page": 11,
+      "sameText": "常驻显示运行状态、网速与快捷控制",
+      "referenceCrop": [
+        81,
+        198,
+        325,
+        218
+      ],
+      "currentCrop": [
+        77,
+        97,
+        302,
+        134
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          85,
+          201,
+          316,
+          213
+        ],
+        "glyphWidthHeight": [
+          232,
+          13
+        ],
+        "inkPixels": 1198
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        214.532,
+        12.021
+      ],
+      "referenceNormalizedInkPixels": 1024.387,
+      "current": {
+        "glyphBBox": [
+          81,
+          98,
+          296,
+          129
+        ],
+        "glyphWidthHeight": [
+          216,
+          32
+        ],
+        "inkPixels": 957
+      }
+    },
+    {
+      "id": "mirror-normal-title",
+      "page": 29,
+      "sameText": "加速下载",
+      "referenceCrop": [
+        140,
+        401,
+        283,
+        435
+      ],
+      "currentCrop": [
+        136,
+        342,
+        257,
+        374
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          161,
+          406,
+          264,
+          430
+        ],
+        "glyphWidthHeight": [
+          104,
+          25
+        ],
+        "inkPixels": 1271
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        96.169,
+        23.118
+      ],
+      "referenceNormalizedInkPixels": 1086.808,
+      "current": {
+        "glyphBBox": [
+          150,
+          345,
+          246,
+          367
+        ],
+        "glyphWidthHeight": [
+          97,
+          23
+        ],
+        "inkPixels": 868
+      }
+    },
+    {
+      "id": "mirror-error-title",
+      "page": 30,
+      "sameText": "加速下载",
+      "referenceCrop": [
+        145,
+        403,
+        280,
+        432
+      ],
+      "currentCrop": [
+        136,
+        327,
+        257,
+        360
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          172,
+          408,
+          252,
+          427
+        ],
+        "glyphWidthHeight": [
+          81,
+          20
+        ],
+        "inkPixels": 801
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        74.901,
+        18.494
+      ],
+      "referenceNormalizedInkPixels": 684.92,
+      "current": {
+        "glyphBBox": [
+          150,
+          333,
+          246,
+          355
+        ],
+        "glyphWidthHeight": [
+          97,
+          23
+        ],
+        "inkPixels": 868
+      }
+    },
+    {
+      "id": "mirror-error-value",
+      "page": 30,
+      "sameText": "mirror.example",
+      "referenceCrop": [
+        67,
+        493,
+        295,
+        516
+      ],
+      "currentCrop": [
+        58,
+        414,
+        275,
+        436
+      ],
+      "threshold": "allRGB<160 dark",
+      "reference": {
+        "glyphBBox": [
+          73,
+          493,
+          211,
+          511
+        ],
+        "glyphWidthHeight": [
+          139,
+          19
+        ],
+        "inkPixels": 524
+      },
+      "referenceNormalizedGlyphWidthHeight": [
+        128.534,
+        17.569
+      ],
+      "referenceNormalizedInkPixels": 448.062,
+      "current": {
+        "glyphBBox": [
+          64,
+          419,
+          161,
+          432
+        ],
+        "glyphWidthHeight": [
+          98,
+          14
+        ],
+        "inkPixels": 271
+      }
+    },
+    {
+      "id": "autostart-off-long-sentence",
+      "page": 6,
+      "sameText": "安装 Root 开机脚本，开机后自动启动服务",
+      "referenceGlyphBBox": [
+        91,
+        187,
+        324,
+        198
+      ],
+      "referenceNormalizedGlyphWidthHeight": [
+        216.38117647058823,
+        11.096470588235293
+      ],
+      "currentLineGlyphBBoxes": [
+        [
+          81,
+          98,
+          291,
+          111
+        ],
+        [
+          81,
+          116,
+          136,
+          129
+        ]
+      ],
+      "currentLineGlyphWidthHeight": [
+        [
+          211,
+          14
+        ],
+        [
+          56,
+          14
+        ]
+      ],
+      "referenceLineCount": 1,
+      "currentLineCount": 2,
+      "referenceCardHeightPixels": 86,
+      "referenceNormalizedCardHeight": 79.52470588235293,
+      "currentCardBoundsY": [
+        52,
+        146
+      ],
+      "currentCardHeightPixels": 94,
+      "currentColumnWidthDp": 225,
+      "columnCalculation": "365 card -32 padding -26 icon -24 spacer -8 switch spacer -50 switch =225",
+      "densityEvidence": "Captured window393x852, mdpi fixture; fontScale1 inferred from default fixture configuration/noLocalDensity override, not a runtime LocalDensity dump.",
+      "proposedOffOnlyFontSizeSp": 11.5,
+      "proposedOffOnlyRowMinHeightDp": 72,
+      "predictedCardHeight": 80,
+      "widthPrediction": "(211+56)*11.5/14≈219.3px ink-width estimate, not an exact TextMeasurer advance; new screenshot required."
+    },
+    {
+      "id": "native-overwrite-long-sentence",
+      "page": 3,
+      "referenceGlyphBBox": [
+        92,
+        435,
+        320,
+        446
+      ],
+      "referenceNormalizedGlyphWidthHeight": [
+        211.75764705882352,
+        11.096470588235293
+      ],
+      "currentGlyphBBox": [
+        79,
+        329,
+        297,
+        359
+      ],
+      "referenceLineCount": 1,
+      "currentLineCount": 2,
+      "columnWidthDp": 229,
+      "newCandidate": "Only sole native switchRow uses11.5sp600; defaultnative labels14sp600. Original河图参数static sentence restored; no callback changed."
+    },
+    {
+      "id": "startup-code",
+      "page": 14,
+      "sameText": "mixed-port: 7890",
+      "referenceGlyphBBox": [
+        38,
+        266,
+        172,
+        278
+      ],
+      "referenceNormalizedGlyphWidthHeight": [
+        124.83529411764705,
+        12.021176470588236
+      ],
+      "currentGlyphBBox": [
+        31,
+        183,
+        148,
+        193
+      ],
+      "currentGlyphWidthHeight": [
+        118,
+        11
+      ],
+      "referenceAverageFirstThreeLinePitchPixels": 20.5,
+      "referenceNormalizedAverageLinePitch": 18.956470588235295,
+      "currentLinePitchPixels": 17,
+      "sourceIn7cf": "Monospace11sp,lineHeight17sp,inheritedletterSpacing,textMuted",
+      "candidate": "Monospace12sp/19sp/letterSpacing0/theme text;12chosen to preserve measured width after removing inheritedletterSpacing, not copied fromotherYAMLfonts.",
+      "referenceInkDarkestRGB": [
+        40,
+        49,
+        67
+      ],
+      "currentInkDarkestRGB": [
+        95,
+        100,
+        115
+      ],
+      "colorMeasurementLimit": "Rasterantialiasing affects inkRGB; no fixed color inferred fromoneglyphpixel."
+    },
+    {
+      "id": "backup-fill",
+      "page": 10,
+      "referencePixels": [
+        {
+          "xy": [
+            48,
+            252
+          ],
+          "rgb": [
+            0,
+            84,
+            234
+          ]
+        },
+        {
+          "xy": [
+            371,
+            252
+          ],
+          "rgb": [
+            0,
+            84,
+            234
+          ]
+        },
+        {
+          "xy": [
+            48,
+            272
+          ],
+          "rgb": [
+            0,
+            83,
+            233
+          ]
+        }
+      ],
+      "currentPixels": [
+        {
+          "xy": [
+            45,
+            193
+          ],
+          "rgb": [
+            0,
+            84,
+            234
+          ]
+        },
+        {
+          "xy": [
+            340,
+            209
+          ],
+          "rgb": [
+            0,
+            84,
+            234
+          ]
+        }
+      ],
+      "source7cfCondition": "!c.dark && !vm.dynamicColor && vm.accentHex.isBlank()",
+      "currentObservedPalette": "Onlydefaultlight;custom/Monet/darkvisualbranch not asserted."
+    },
+    {
+      "id": "mirror-field",
+      "pages": [
+        29,
+        30
+      ],
+      "referenceNormalFieldBoundsY": [
+        482,
+        532
+      ],
+      "referenceNormalNormalizedHeight": 46.23529411764706,
+      "referenceErrorFieldBoundsY": [
+        452,
+        526
+      ],
+      "referenceErrorNormalizedHeight": 68.42823529411764,
+      "currentNormalFieldBoundsY": [
+        419,
+        455
+      ],
+      "currentErrorFieldBoundsY": [
+        407,
+        443
+      ],
+      "currentNormalHeight": 36,
+      "currentErrorHeight": 36,
+      "normalReferenceFillMedianRGB": [
+        230,
+        228,
+        253
+      ],
+      "errorReferenceFillMedianRGB": [
+        233,
+        230,
+        253
+      ],
+      "currentFillRGB": [
+        232,
+        229,
+        255
+      ],
+      "referenceErrorLabelLocation": "inside bordered field",
+      "currentErrorLabelLocation": "outside bordered field",
+      "buttons": "PDF29pill / PDF30rounded16dp.7cfbothpill.",
+      "candidate": "referenceMirror=false default; onlyMirrorcallertrue;normal46min,error68min/value18/22Semi/errorlabel13/17Semi inside;normal24/30title,error19/24title;normalpill,error16dp; default darksurfaceMuted retained."
+    }
+  ],
+  "measurementMethod": {
+    "widthNormalizationFactor": 0.9247058823529412,
+    "referenceWidth": 425,
+    "currentWidth": 393,
+    "note": "Width-scaled glyph/field/height measurements, not full-page registration. PDFcaption/OScrome and actualprefs/data are distinguished. Production fontSize/fontWeightdifferences remain eligible fixes; no blanket OEMexclusion. Ink-width estimate does not prove exact textadvance."
+  },
+  "dividerAudit": {
+    "samples": [
+      {
+        "page": 3,
+        "referenceBand": [
+          120,
+          220,
+          310,
+          220
+        ],
+        "referenceMedianRGB": [
+          240,
+          240,
+          252
+        ],
+        "currentBand": [
+          110,
+          138,
+          290,
+          138
+        ],
+        "currentMedianRGB": [
+          238,
+          237,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          238,
+          237,
+          248
+        ]
+      },
+      {
+        "page": 3,
+        "referenceBand": [
+          120,
+          304,
+          310,
+          304
+        ],
+        "referenceMedianRGB": [
+          239,
+          239,
+          251
+        ],
+        "currentBand": [
+          110,
+          215,
+          290,
+          215
+        ],
+        "currentMedianRGB": [
+          238,
+          237,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          238,
+          237,
+          248
+        ]
+      },
+      {
+        "page": 7,
+        "referenceBand": [
+          120,
+          211,
+          310,
+          211
+        ],
+        "referenceMedianRGB": [
+          237,
+          238,
+          250
+        ],
+        "currentBand": [
+          110,
+          124,
+          290,
+          124
+        ],
+        "currentMedianRGB": [
+          239,
+          240,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          239,
+          240,
+          248
+        ]
+      },
+      {
+        "page": 10,
+        "referenceBand": [
+          120,
+          596,
+          310,
+          596
+        ],
+        "referenceMedianRGB": [
+          237,
+          239,
+          253
+        ],
+        "currentBand": [
+          110,
+          537,
+          290,
+          537
+        ],
+        "currentMedianRGB": [
+          239,
+          240,
+          248
+        ],
+        "baseline20cMedianRGB": [
+          239,
+          240,
+          248
+        ]
+      }
+    ],
+    "productionSource": "SettingsReferenceComponents.SettingsDivider background(Hx.colors.line.copy(alpha=.34f))",
+    "lineToken": "LightHx.line opaqueFFDCE0EC; unlike oldHome translucenttoken",
+    "decision": "Keep divider. Samplesdiffer roughly1-5RGB, reference sometimesdarker; no highconfidence noticeablyblack line defect."
+  },
+  "nativeSourceMappingCorrections": [
+    {
+      "page": 3,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 15,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 16,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    },
+    {
+      "page": 17,
+      "old": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "actual": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "rendererEvidence": "ConceptRemainingCoverageTest.basicProxyActualNativeActivityAndMenus actualRootTproxyActivity setup/captures"
+    }
+  ],
+  "topHighConfidenceDifferencesIn7cf": [
+    {
+      "pages": [
+        3,
+        15,
+        16,
+        17
+      ],
+      "finding": "Nativebasic descriptions13Normal and longoverwrite2lines; sourceSettingsRow mapping wrong; laterlocalnativehelpercandidate prepared."
+    },
+    {
+      "pages": [
+        6,
+        29,
+        30
+      ],
+      "finding": "Autostartclosed longsentence2lines/card94 versusreference1/79.53; OFFonly11.5/72candidate rootprepared."
+    },
+    {
+      "pages": [
+        29,
+        30
+      ],
+      "finding": "Mirrorfield normal/error36 instead46.24/68.43,errorlabeloutside/wrongpill/error title24 insteadreference≈19; laterMirror-onlycandidate prepared."
+    },
+    {
+      "page": 14,
+      "finding": "Startupmono11/17 too small/light; later12/19/letter0/theme textcandidate prepared."
+    },
+    {
+      "pages": [
+        4,
+        5
+      ],
+      "finding": "Detailedresourceicons/input indentmissing; reference4/5 contradictory. Rootchooses detailed5 unified style, preserves actualprefs."
+    }
+  ],
+  "candidateAfter7cf": {
+    "files": [
+      {
+        "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "before7cfSha256": "b7f3e101677541a63acd199939d9b94cf36b88716b001f07817ad92fb78f0287",
+        "candidateWorkingTreeSha256": "3061d1b044f16a8ee6ca3984256652228d7f38022ef26180178a90e22e5f43e6",
+        "reversalCheck": "Exact whole-file reverse UI edits equals7cf;Components also reverses parent-authorized autostart optional parameters. No callbacks/guards/validation changes.",
+        "compiled": false,
+        "newCandidateScreenshotsRead": false
+      },
+      {
+        "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt",
+        "before7cfSha256": "e221c7f075bd67b0b284852be0bc6198b167b66e77a57dfc0c90282717be2b06",
+        "candidateWorkingTreeSha256": "2050e971cbddfb746ad3e50698123ac687b25b3db5b2a294566ca949c18e6eec",
+        "reversalCheck": "Exact whole-file reverse UI edits equals7cf;Components also reverses parent-authorized autostart optional parameters. No callbacks/guards/validation changes.",
+        "compiled": false,
+        "newCandidateScreenshotsRead": false
+      },
+      {
+        "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+        "before7cfSha256": "c8a1eba181509ea213b38716fe8c9ef365609786594af0fc51d6a1f699417969",
+        "candidateWorkingTreeSha256": "584fbc3f7b652f4cf3b0c2a8a5e1373603de2859dcaf4a7184b9d5a21b84c485",
+        "reversalCheck": "Exact whole-file reverse UI edits equals7cf;Components also reverses parent-authorized autostart optional parameters. No callbacks/guards/validation changes.",
+        "compiled": false,
+        "newCandidateScreenshotsRead": false
+      }
+    ],
+    "nativeOnlyOverwriteFont11_5": true,
+    "nativeDefaultSubtitleFont14Weight600": true,
+    "api26_27Fallback": "Preserve existingfamily;setFontVariationSettingswght600 may unsupportedfalse;API26/27 not deviceverified",
+    "mirror": {
+      "inputDefaultOptin": false,
+      "callerOptin": "onlySettingsMirrorDialog",
+      "normalMinHeightDp": 46,
+      "errorMinHeightDp": 68,
+      "valueFontSizeLineHeightSp": [
+        18,
+        22
+      ],
+      "errorLabelFontSizeLineHeightSp": [
+        13,
+        17
+      ],
+      "normalTitleFontSizeLineHeightSp": [
+        24,
+        30
+      ],
+      "errorTitleFontSizeLineHeightSp": [
+        19,
+        24
+      ],
+      "normalPill": true,
+      "errorPill": false,
+      "restoreDefaultsRetained": true,
+      "darkSurfaceMutedRetained": true,
+      "validTrimSaveValueResetDismissExact": true
+    },
+    "startupConfigText": {
+      "fontSizeSp": 12,
+      "lineHeightSp": 19,
+      "letterSpacingSp": 0,
+      "color": "Hx.colors.text",
+      "copyExportGenerateReadCallbacksExact": true
+    },
+    "gitDiffCheckPassed": true,
+    "newCommitAndNewBuildValidation": "Pending root coordinated commit/full CI. 7cf479 doesnot validate theseafter7cfchanges.",
+    "notificationSingleCaller": {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "function": "NotificationSettingsScreen / master firstSettingsSwitchRow",
+      "pages": [
+        11,
+        22,
+        23
+      ],
+      "subtitle": "常驻显示运行状态、网速与快捷控制",
+      "referenceGlyphSize": [
+        232,
+        13
+      ],
+      "referenceNormalizedGlyphSize": [
+        214.53176470588235,
+        12.021176470588236
+      ],
+      "current7cfGlyphSize": [
+        216,
+        32
+      ],
+      "current7cfLines": 2,
+      "referenceLines": 1,
+      "currentColumnWidthDp": 225,
+      "candidateSubtitleFontSizeSp": 13,
+      "candidateRowMinHeightDp": 72,
+      "defaultOtherRowsFontSizeSp": 14,
+      "defaultOtherSubtitleRowHeightDp": 78,
+      "beforeWorkingTreeSha256": "8ea2383d0f63a929d9bd64cb68de3ee6e729978811cadf1bed82eec4680a5bff",
+      "afterWorkingTreeSha256": "e1d24a5cb07d1e69e5cd3a848fc30fe13e520dace4b71ce31f022cbdea696506",
+      "exactTwoParameterReversalEqualsPriorWorkingTree": true,
+      "parentFolderAndDownload34_7OptinsPreserved": true,
+      "permissionGuardAndDraftCallbackExact": true,
+      "freshRendering": "pending new coordinated build/artifact; not validated by7cf479 or7cfPNG",
+      "note": "Width219/230 sum estimates do not substitute exact TextMeasurer or new captured wrapping."
+    }
+  },
+  "unitEvidenceActuallyParsedFor7cf": {
+    "xmlFiles": 49,
+    "tests": 479,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "pageReviews": [
+    {
+      "document": "04",
+      "page": 1,
+      "referenceTitle": "设置  ·  设置-首页展开",
+      "referenceImageXref": 10,
+      "referenceEmbeddedImageSha256": "b7799be706b76c86eca5350a1f95647c88c54878cfa72d9f9314cafd5ae1e0f4",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-01.png",
+      "referenceRenderedSha256": "2131d0cd30aa0763ed41bd6062103f6c2e751f5b6b4958ea0a8e8e5c1959581d",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "settings-hub.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/settings-hub.png",
+      "currentSha256": "e6a9a6d6723abc5859002fe35f935467f3df2d3a5fe1b4b8666e5e2b191bf655",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "a5b1703828602bb088602bc044d3e6da11dab6a999c296fe0af63068324ef166",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "NewUiShell83Test",
+        "testFunction": "settingsHubRetainsAllConceptGroups",
+        "entry": "HetuRoot(Settings) -> SettingsScreen"
+      },
+      "findings": [
+        "Root descriptions now14sp SemiBold; measured basic description143x14 vs reference-normalized147.95x12.95. Improved proportion relative old16sp; not pixel-identical.",
+        "Root icons and scroll position still have reference variant differences; shared dock/home/panel remain outside edits."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 2,
+      "referenceTitle": "设置  ·  设置-首页收起",
+      "referenceImageXref": 14,
+      "referenceEmbeddedImageSha256": "59438a6943931ac89bc89afd383f8e954fcd60ebfa94c6d204409cce64bf53ec",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-02.png",
+      "referenceRenderedSha256": "f116b7265c8ef2c7ce19d451cb615e9b54738b32deb5a73a05d552be0e6f443c",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-002-settings-collapsed.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-002-settings-collapsed.png",
+      "currentSha256": "ee4ae2325aed7966fbfc1b294a7bb990d5c227e005f02222b6df656ff4d1224d",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "9e1d8746e8153f518cc5720ee549a1b345f52ade53b4f7affbce034e7b735694",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "toolsAndSettingsCollapsedHeaders",
+        "entry": "HetuRoot(Settings) -> SettingsScreen scrolled"
+      },
+      "findings": [
+        "Collapsed Settings title uses referenceTopBar Bold; no title/action overlap found.",
+        "PDF collapsed variant uses some filled/different icons whereas current root rows retain expanded-page glyphs; not explained by font/OEM."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 3,
+      "referenceTitle": "设置  ·  设置-基础代理配置",
+      "referenceImageXref": 16,
+      "referenceEmbeddedImageSha256": "ee1de7a903150fa3b8f37b8c2107da254552b52f0c8d37e2dfb551fde79d5d6e",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-03.png",
+      "referenceRenderedSha256": "563b77cc7258b764bb7927282369095032b4c6a7e505d5ba627496b4591b2cf6",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-003-basic-proxy.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-003-basic-proxy.png",
+      "currentSha256": "119bbe92f1de9c7385cc3de8dfdb751acbf1c5a4e13b0329e55f71098adffdca",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "119bbe92f1de9c7385cc3de8dfdb751acbf1c5a4e13b0329e55f71098adffdca",
+      "byteIdenticalBaseline20c": true,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "productionSourceSha256At7cf": "b7f3e101677541a63acd199939d9b94cf36b88716b001f07817ad92fb78f0287",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": true,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "basicProxyActualNativeActivityAndMenus",
+        "entry": "Robolectric RootTproxyActivity.setup()"
+      },
+      "findings": [
+        "Entire PNG SHA identical to20c. This is actual native RootTproxyActivity, not Compose SettingsRow.",
+        "Native subtitles remained13sp Normal in7cf; later candidate helper14sp600 does not count as7cf verified.",
+        "Auto-overwrite long description remains2lines versus1reference. Local11.5sp600 and original河图参数 candidate prepared after7cf."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 4,
+      "referenceTitle": "设置  ·  设置-高级代理配置",
+      "referenceImageXref": 18,
+      "referenceEmbeddedImageSha256": "46e063347df7769b2629430d4711478bd51843bad2f6d2ac64746eed7462075b",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-04.png",
+      "referenceRenderedSha256": "3c306dd8e0c34fbfa4c5f4837b556fdb37ef20ab852595b21168e8c4bc4b6465",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-004-advanced-settings.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-004-advanced-settings.png",
+      "currentSha256": "0fccf4e43d68f78137c83b02b896aec30c7278839a844abeed83ffabc498f789",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "ee1be111972c21ffe070aed25903a60ec6ecaed33efc78397eb29eec7aac5610",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "productionSourceSha256At7cf": "9107775d20040a2d87e124005ec96f2a2a07b671eb98a3452ba52b0c17c40abd",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "actualAdvancedSettingsActivityAndDnsDialog",
+        "entry": "Robolectric ProxyAdvancedSettingsActivity.setup() -> OtherProxySettingsPage"
+      },
+      "findings": [
+        "Reference top-bar Bold/chevron rendered without overlap. Actual values retain preferences.",
+        "Reference04p4 has no CPU/DNS strategy leading icons whereas04p5 does; inconsistent reference depictions are recorded rather than faked with preferences."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 5,
+      "referenceTitle": "设置  ·  设置-高级资源限制",
+      "referenceImageXref": 20,
+      "referenceEmbeddedImageSha256": "e91ce6e232cca4b76860ad47e3f4cb0c9a6d8f2e2cb87daaa686a81cf73bf09a",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-05.png",
+      "referenceRenderedSha256": "d69aa0984149a96ca2fb1e69a8226d13979622533d4a2250eb24299af7b1ff20",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-005-resource-limits.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-005-resource-limits.png",
+      "currentSha256": "c2cde15df8f6499e0cc7ec18145c8328e79a9f86454c35af1ef9f0a84025d7b0",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "d1dcfae8d886089c7884c4b35c072f7f65b0dfb3e92c714816b72f837f6a3706",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "productionSourceSha256At7cf": "9107775d20040a2d87e124005ec96f2a2a07b671eb98a3452ba52b0c17c40abd",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "actualAdvancedSettingsActivityAndDnsDialog",
+        "entry": "Same actual Advanced Activity after scroll(560f)"
+      },
+      "findings": [
+        "Resource CPU/memory/disk and vendor-cleanup leading icons absent in7cf; PDF5 shows them.",
+        "Input left edge30px versus PDF84*393/425=77.67; icon-aligned detailed layout candidate advised to root.",
+        "Different checked states/CPU value and current scroll position are synthetic fixture data, not production fixes."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 6,
+      "referenceTitle": "设置  ·  设置-开机启动与下载",
+      "referenceImageXref": 22,
+      "referenceEmbeddedImageSha256": "8719e1c3864c1ad4be0a327a6574caffe76fec932ae01c92db7522dd30feb1b8",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-06.png",
+      "referenceRenderedSha256": "83cf62ea6621d32abba62485bb110b697120c3c9cfd19ba8c5f0739d2261a30e",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-006-startup-download.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-006-startup-download.png",
+      "currentSha256": "0bdee81cad53dd3f64fb2ed08d530a8642a0b5c3763c1784ae59cccb7f282cd8",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "576f1f160ec07b48f503945f809247c7084713ac3f462c99ad0fa0a2135f4a96",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "HetuRoot -> SettingsScreen startupDownload"
+      },
+      "findings": [
+        "Original autostart OFF sentence restored but still2lines in7cf; first card94px versus reference86*393/425=79.53.",
+        "LocalOFF&&!busy11.5sp/row72dp candidate is after7cf and awaits new screenshot.",
+        "Mirror toggle/prefix differ because actual fixture preference is disabled/blank; not forced to reference enabledURL."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 7,
+      "referenceTitle": "设置  ·  设置-默认面板",
+      "referenceImageXref": 24,
+      "referenceEmbeddedImageSha256": "b4ea4f8fc74b07ebad3052a3cf445b091c92d137eb009a5a99cf60cf3f6992a7",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-07.png",
+      "referenceRenderedSha256": "5d8021bde70d29a6e3ad9ac015d627998fc20783bf0f681a059f2a0a0b302f44",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-007-default-panel.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-007-default-panel.png",
+      "currentSha256": "86d580ae2855cc61852980c3274a4d6f469cf8e155ce1149d857927a778a5314",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "fdd636cddb6a120e4fc5a12a3d1a51eae3d3384ef81af7ebf6de01d702e80f99",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "HetuRoot -> SettingsScreen defaultPanel"
+      },
+      "findings": [
+        "Gauge/Grid preserved; title referenceTopBar rendered, divider light.",
+        "Launch-panel switch isfalse infixture versustrue reference; not a layout fix."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 8,
+      "referenceTitle": "设置  ·  设置-主题外观",
+      "referenceImageXref": 26,
+      "referenceEmbeddedImageSha256": "08ce41e0eba324649f35c77526daa20722e1a18cfd03f84a14c2d1ddd094211c",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-08.png",
+      "referenceRenderedSha256": "fefe786e5e93797889010bdd0cb1dc2d4ab8afc726f671bd035de210f32a2eb4",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-008-theme.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-008-theme.png",
+      "currentSha256": "eea3c319d80d0c8c94f669cfc86047c94805cec60376701152af04cd9bcc940d",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "0965a13d70fa756023244c38b23d62622212997868d9d0447a8aaed2de59df46",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "themeMenusAndScroll",
+        "entry": "HxThemeLabScreen"
+      },
+      "findings": [
+        "Theme cards/8accent swatches/section order present;14Semi explanations render.",
+        "Selected light vs reference system, blurfalse vs reference true are realfixture choices."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 9,
+      "referenceTitle": "设置  ·  设置-主题玻璃与动画",
+      "referenceImageXref": 28,
+      "referenceEmbeddedImageSha256": "485fe6f2e222703abfefe55739d01220f2d694ea4397540977f930eca97f9c16",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-09.png",
+      "referenceRenderedSha256": "42e6ce9d9aafc4646826309283f81223bf6f188dd84195c9b918c99ee950a81b",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-009-theme-motion.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-009-theme-motion.png",
+      "currentSha256": "7c37ff2303696748293355f81a3ca8b02a9cf25092f216a612198148de23ca39",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "e04d9b37e013ab0675bb9407c771452ad113b1ec51f4533ea43222ec4c0b909b",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "themeMenusAndScroll",
+        "entry": "HxThemeLabScreen after scroll(630f)"
+      },
+      "findings": [
+        "Dedicated floatingDock/LiquidGlass stars/Scale corner glyphs retained and render.",
+        "Current prior-theme section visible from actual scroll. Follow-edge row conditional on backAnimationfalse so absent; not forced visible."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 10,
+      "referenceTitle": "设置  ·  设置-备份与恢复",
+      "referenceImageXref": 30,
+      "referenceEmbeddedImageSha256": "3820189ac879b113e4ec8889126d9bde662067f7c1e65c64b1c6cd4689bd4498",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-10.png",
+      "referenceRenderedSha256": "f1419c476a74df9e7795ce42434204ab4283c92f6bd02a6f2670d41209567716",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-010-backup.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-010-backup.png",
+      "currentSha256": "5851f4332dd9b416bde168ff77a752d17854218335c9f1a2cbaaa99cdbc30e3b",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "f65ffb8e62e811dd9ea9342c3d1d9567bc0a7ad079e2a72e1a9e7b5eb399791d",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "HetuRoot -> SettingsScreen backup"
+      },
+      "findings": [
+        "Default light/noMonet/noCustom backup primary fill now0054EA sampled exactly; label62x16 vs reference-normalized61.03x13.87.",
+        "Subtitle centered under title; export icon remains removed onlyfrombackup export.",
+        "Custom/Monet/dark branches protected in source; this screenshot onlydefaultlight."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 11,
+      "referenceTitle": "设置  ·  设置-通知详细设置",
+      "referenceImageXref": 32,
+      "referenceEmbeddedImageSha256": "30813607c34567e5c3b15878b14c17eb504a1a788d4b173ca3e2f543dd2b3c30",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-11.png",
+      "referenceRenderedSha256": "aa77d4e1873c816acfe5e2adb8f771c8724eec29444ef3b446744df6433b6313",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-011-notification.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-011-notification.png",
+      "currentSha256": "8093e672bd844abe9ddaec40e3fb2c41ff86ccf8e0c51508de91a948ea9c0d64",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "38b09af9851fd47b5c76eef9447df9994d799997c3f8a37b51a6fb48d6643d95",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen"
+      },
+      "findings": [
+        "Existing status description2lines vs PDF1line persists in7cf (also20c);14Semi improved weight but did not fix wrap.",
+        "Notification template content/toggle state are actualfixture values, not forced to PDFexample.",
+        "After7cf candidate: onlythisstatusdescription13sp,rowMinHeight72dp;awaitsfreshrendering.Otherrows14/78 andpermission/draftcallbackunchanged."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 12,
+      "referenceTitle": "设置  ·  设置-通知快捷按钮",
+      "referenceImageXref": 34,
+      "referenceEmbeddedImageSha256": "86226cc80fa1ec4bd06dd89461cb3df75b06f4a0b44ef91e8e359599f79348e5",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-12.png",
+      "referenceRenderedSha256": "a13ff67accdc5a1c2d96c5aee6e5f27f086e38f12d8c094dd3a21756f4140bb8",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-012-notification-actions.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-012-notification-actions.png",
+      "currentSha256": "492f8f7b134ec2dcc505c9b90e954b1d15aa718bfe5c5eb25e914beac91fcc77",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "b49c6a27e1110743e4aeee794729f7a1be6def9de4b7de05ab919647bc19c74c",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen after scroll(580f)"
+      },
+      "findings": [
+        "Three shortcut editors remain available, all action titles bold and labels genuine stored/default placeholders.",
+        "Scroll cropping differs; PDF field label/placeholder visual weight remains different, not claimed pixel-equal."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 13,
+      "referenceTitle": "设置  ·  设置-关于",
+      "referenceImageXref": 36,
+      "referenceEmbeddedImageSha256": "cef8fe68ad8cc504995880879bab57d12f6bf0a546bff72f5f0e3e164f32a79e",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-13.png",
+      "referenceRenderedSha256": "50887ed829c6bbcf9ae66d5dfd564fc27eaaba461b05173d1a005099feaa6195",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-013-about.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-013-about.png",
+      "currentSha256": "2d014337d5ca970c20fdbaf1ea674b41b69dfbf34545ca7506c91c7e07083afe",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "b2fb8daa682a9dcd300387607c0dcf5f6798b20be5c72276fe860159eb01bd5f",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "productionSourceSha256At7cf": "589ee66c495d4deb7c0170fec4500f43fb41bbb769f1d9f0c65b7483360e2b15",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "bundledLicenseSheets",
+        "entry": "AboutScreen"
+      },
+      "findings": [
+        "About same sentence now15SemiBold:285x15 vs reference-normalized279.26x13.87. No clipping.",
+        "Real version0.12.15-v20-pdf(2085) differs from PDFexample1.0.0(100) intentionally."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 14,
+      "referenceTitle": "设置  ·  设置-启动配置",
+      "referenceImageXref": 38,
+      "referenceEmbeddedImageSha256": "184e0439d9e0392b29f22fdb0f4260eed97434019ca1b2c3e5944973ee1c5896",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-14.png",
+      "referenceRenderedSha256": "6c009b3e7c1e9bfb91b58cbc3a6fc74219b0554f89b8e050ee59bc7e18e43992",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-014-startup-config.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-014-startup-config.png",
+      "currentSha256": "5f36feab701c965b4f56a9889c42c35bd93704aa39657fd8f9514fe662fe03a1",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "ceee6a96396e89e170957639849515de3e8eefb1314df096393ba5e53feb5974",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+      "productionSourceSha256At7cf": "c8a1eba181509ea213b38716fe8c9ef365609786594af0fc51d6a1f699417969",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "startupConfigReadAndRecoveryCancel",
+        "entry": "SettingsStartupConfigScreen"
+      },
+      "findings": [
+        "Centered own subtitle and copy/export actions retained.",
+        "Code mono11/17 in7cf is visibly smaller/lighter than reference; same mixed-port line118x11 vs normalized124.84x12.02.",
+        "Later candidate12/19/letterSpacing0/theme text not verified by7cf image. YAML body uses genuine fixture config."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 15,
+      "referenceTitle": "设置  ·  设置-核心选择",
+      "referenceImageXref": 40,
+      "referenceEmbeddedImageSha256": "2ac687864c2d282dc25aca2a09db05ee8a6969b2ec6f1067a31c619329e8258a",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-15.png",
+      "referenceRenderedSha256": "d0224189116a5843402a56d005e0bd98166d4fe36015a160f957f96334b519e6",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-015-core-choice.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-015-core-choice.png",
+      "currentSha256": "45fa17c6a51ffecbb9aa06bb25aefa0aa2b16d0f2b37528ea43435bf888bce0c",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "45fa17c6a51ffecbb9aa06bb25aefa0aa2b16d0f2b37528ea43435bf888bce0c",
+      "byteIdenticalBaseline20c": true,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "productionSourceSha256At7cf": "b7f3e101677541a63acd199939d9b94cf36b88716b001f07817ad92fb78f0287",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": true,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "basicProxyActualNativeActivityAndMenus",
+        "entry": "RootTproxyActivity.chooseCore -> showChoice"
+      },
+      "findings": [
+        "PNG byte-identical20c; actual nativeRootTproxyActivity picker and underlying page, not SettingsRow.",
+        "MihomoSmart unavailable remains disabled by actual installed-capability guard."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 16,
+      "referenceTitle": "设置  ·  设置-运行模式选择",
+      "referenceImageXref": 42,
+      "referenceEmbeddedImageSha256": "af955e0588f0e53970fdcd5a6ceba24c6ec1ad5b8b3b49506121df11bbdb9cb1",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-16.png",
+      "referenceRenderedSha256": "b4619510aa2e91f1a6ff49bf0fac63e9191099cd0a6ee70b46b9ff84968fba9c",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-016-run-mode-choice.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-016-run-mode-choice.png",
+      "currentSha256": "8f2004b05ba526664d6e2d4b3e35a338d000469809e367060d8b4050ccdc9f40",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "8f2004b05ba526664d6e2d4b3e35a338d000469809e367060d8b4050ccdc9f40",
+      "byteIdenticalBaseline20c": true,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "productionSourceSha256At7cf": "b7f3e101677541a63acd199939d9b94cf36b88716b001f07817ad92fb78f0287",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": true,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "basicProxyActualNativeActivityAndMenus",
+        "entry": "RootTproxyActivity.chooseMode -> showChoice"
+      },
+      "findings": [
+        "PNG byte-identical20c; native mode list all5 choices and descriptions present, typography smaller/lighter than reference remains.",
+        "Runtime capability guards unchanged; future native subtitle candidate onlyunderlying row labels."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 17,
+      "referenceTitle": "设置  ·  设置-IPv6选择",
+      "referenceImageXref": 44,
+      "referenceEmbeddedImageSha256": "3f057b90e8a8d9e13ace508fb818a3b495fbb72b955680410d122b5170fb7272",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-17.png",
+      "referenceRenderedSha256": "04b405d7ce02371548a934204dfbdf0659220d739bc9d4cd441c4e9f4d3c6fe1",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-017-ipv6-choice.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-017-ipv6-choice.png",
+      "currentSha256": "800e2ebc1fd6f5a7858cf1e0e3186eb0a2d8062035ebafc6a53f85e03b7d8663",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "800e2ebc1fd6f5a7858cf1e0e3186eb0a2d8062035ebafc6a53f85e03b7d8663",
+      "byteIdenticalBaseline20c": true,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+      "productionSourceSha256At7cf": "b7f3e101677541a63acd199939d9b94cf36b88716b001f07817ad92fb78f0287",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": true,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "basicProxyActualNativeActivityAndMenus",
+        "entry": "RootTproxyActivity.chooseIpv6 -> showChoice"
+      },
+      "findings": [
+        "PNG byte-identical20c; native IPv6all4 choices available and correct selected state; typography still differs."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 18,
+      "referenceTitle": "设置  ·  设置-默认面板选择",
+      "referenceImageXref": 46,
+      "referenceEmbeddedImageSha256": "64700d20d4595e2239aa99b1b8f60f30be7254f0195d2a519a123bf93605b1f2",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-18.png",
+      "referenceRenderedSha256": "9708381d42021a9159f9b2891bd95427da7a04191e8f3348705091418a044eb3",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-018-default-panel-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-018-default-panel-menu.png",
+      "currentSha256": "d6cec4472a5118797cb355de48ab01e0b67c0bfd15777760199697a0d42959d8",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "7f01fe5614e69d28701c04ef59ce8e65642a6ae4beb65aa1d4fba551d6fc7845",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "SettingsScreen.defaultPanel -> HxChoiceSheet"
+      },
+      "findings": [
+        "All7 default panel choices visible; unselected menu text and surface/shadow not pixel-identical reference.",
+        "Glyph/defaultpanel selection source behavior retained."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 19,
+      "referenceTitle": "设置  ·  设置-语言选择",
+      "referenceImageXref": 48,
+      "referenceEmbeddedImageSha256": "2d323e86c05998bad50b85625a657fb2f896bf17dcc7903087eb09945afdf05b",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-19.png",
+      "referenceRenderedSha256": "a601fe84300ec700b19a6464bfa43db880ebcde159cb4900e3823ff4c0f5d095",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-019-language-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-019-language-menu.png",
+      "currentSha256": "beaf0bfe8e792f1ac7dbc2907d1443881bc03ce0313898560131e44e7c087d7f",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "8466c25500448032587d9fd824a6556b0696e934aaeed5cd01c432a20928897f",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "themeMenusAndScroll",
+        "entry": "HxThemeLabScreen language -> HxChoiceSheet"
+      },
+      "findings": [
+        "All5 languages present and check consistent with actualpref.",
+        "Menu typography/line separators differ from reference; not classified OEM-only."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 20,
+      "referenceTitle": "设置  ·  设置-顶栏模糊选择",
+      "referenceImageXref": 50,
+      "referenceEmbeddedImageSha256": "f9ed6f3468d345a3e5d0f7a5b900bf7d6cbd1b429041ecd97e54ed0aaab25cb3",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-20.png",
+      "referenceRenderedSha256": "3185746cab81db7bc2fa3398449d94bc997db23e070c84587d18572dc8f6a21b",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-020-top-blur-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-020-top-blur-menu.png",
+      "currentSha256": "efedc749db77f6d2703c235b1ea44ccc7686e14d37550df6718f929fda2b35da",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "70e352bf3b6d87be3527ec845919b8ba20264a8143dbefe3de8c0ae831ab6993",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "themeMenusAndScroll",
+        "entry": "HxThemeLabScreen topBarBlurStyle -> HxChoiceSheet"
+      },
+      "findings": [
+        "Blur-style2choices descriptions rendered.",
+        "Underlying blur/return toggles and choicecurrent gaussian state differ from reference actualprefs, no forced repaint."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 21,
+      "referenceTitle": "设置  ·  设置-界面缩放选择",
+      "referenceImageXref": 52,
+      "referenceEmbeddedImageSha256": "9af3c5be5f7a07e54ade4316f1d1dd011834db8f7e0a4512258bbdf715a42550",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-21.png",
+      "referenceRenderedSha256": "996dc4626c751041e6edc4302c3a4c796d85d1a6460b5bb5d669671a1bf88814",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-021-scale-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-021-scale-menu.png",
+      "currentSha256": "080a64944a3804a2bdf1e8fbf1ac4e84abc54d928e5413a1014f2fea8ba46712",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "db364973312befd21f57752f45a7277017046368ae5fc13332b479e9b1a2e1a0",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "themeMenusAndScroll",
+        "entry": "HxThemeLabScreen scale -> HxChoiceSheet"
+      },
+      "findings": [
+        "All5 scales present with100% selected.",
+        "Missing followEdge and visible theme colors derive genuine backAnimationfalse/prior scroll; not geometry1:1."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 22,
+      "referenceTitle": "设置  ·  设置-通知刷新频率",
+      "referenceImageXref": 54,
+      "referenceEmbeddedImageSha256": "a26dd3a9ace190ec658ab692c281a92ca1e9c50f21545197b2f10794bfc22883",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-22.png",
+      "referenceRenderedSha256": "1f80b4d689197dbb660e332bc972fbcd9fed5fd6af25bec9705115a21ca1c11a",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-022-refresh-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-022-refresh-menu.png",
+      "currentSha256": "1c029f7d4a3f76c68a5567f3d11b7b66de236224b73f4ac8ad0387d2e8c982fa",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "8668cc6b6284fe6b92d652c7e12d5a64bf2d23c2d5d1776a6f7f1a831d211e7a",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen refresh -> HxChoiceSheet"
+      },
+      "findings": [
+        "All6 refresh choices visible; same functionreal draft unchanged.",
+        "Underlying status description remains2lines; reference1line."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 23,
+      "referenceTitle": "设置  ·  设置-通知点击目标",
+      "referenceImageXref": 56,
+      "referenceEmbeddedImageSha256": "00a55908ff8ead155cbe7d924f127bb57b2bccb32dbd9f19e1e1a6b789ba249b",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-23.png",
+      "referenceRenderedSha256": "ebd30055395cbbd07da5b682862af67658c7fb01f7542e5d97a528a26ff00905",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-023-target-menu.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-023-target-menu.png",
+      "currentSha256": "0dafdd51c6ed15104b1ae519eb3d70e73f49540f42c93e516653367248771d5d",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "4341c85e058fff6b1f8fa6c54f398df414e5f74ea72044cdc7c13f50aac42e23",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen target -> HxChoiceSheet maxVisibleChoices=7"
+      },
+      "findings": [
+        "Seventh设置 fully visible in measured popup viewport.",
+        "Actual native metadata includes all9choices:首页,面板,策略,面板浮窗,策略浮窗,工具,设置,配置页,订阅页. Last2remain scrollable in source; no claim8/9executed."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 24,
+      "referenceTitle": "设置  ·  设置-通知按钮1动作",
+      "referenceImageXref": 58,
+      "referenceEmbeddedImageSha256": "d758119192a8e02100389eb0b2ac31da7db3e11596ed6bb9182e931a6041db42",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-24.png",
+      "referenceRenderedSha256": "2b2d9cec81ae22f445d9db31e40b95fb21d86dbcf59af36fb4977ac12943daf8",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-024-action-one.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-024-action-one.png",
+      "currentSha256": "f459ad6e0241c4914001690255c6ecb953d2170ac2d1d89477b3a060144a52f5",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "b3ef1cef997d7dd776cf6f99080c7789eccffc4f70d8fbdf74833f7de6dd97d8",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen action0 -> HxChoiceSheet"
+      },
+      "findings": [
+        "All5 action choices present with correct first-row selection; popup clips underlying page by design.",
+        "Unselected menu glyph weight/anchor placement still not pixelidentical reference."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 25,
+      "referenceTitle": "设置  ·  设置-通知按钮2动作",
+      "referenceImageXref": 60,
+      "referenceEmbeddedImageSha256": "a97f2882d86e2a8433ee9ee94d5c4422f56d313edc6821d5af320ab87d2e75ab",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-25.png",
+      "referenceRenderedSha256": "41312e6a3974ac5315b0990cc64e85121abcb50267363fa2f49f1f5b3688d093",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-025-action-two.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-025-action-two.png",
+      "currentSha256": "731d2d15c56d9c6fb1929b454fc2f89af83b8520a2e49122c7349cf4daeffb32",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "e848c58398d9961d7170a82c95abad61d29d742a7e6fae37366ca0191e43d30f",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen action1 -> HxChoiceSheet"
+      },
+      "findings": [
+        "All5 action choices present, second-row restart selected.",
+        "Popup underlying bottom fields differ with scroll/fixture; no production action disappearance found."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 26,
+      "referenceTitle": "设置  ·  设置-通知按钮3动作",
+      "referenceImageXref": 62,
+      "referenceEmbeddedImageSha256": "84ce9bc49581c2ef53ac7b9a4ec68252d5e11a025dfe28f34b697929c26475de",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-26.png",
+      "referenceRenderedSha256": "58edfb4441dfc11718df61b55a899a715a13261956eb2a674f73f4cfb645980d",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-026-action-three.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-026-action-three.png",
+      "currentSha256": "3a7eb6c6d8bbcaad10522f34ca590c9a31fea387c6ae6fe576d8cae28d8df583",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "864c1df52152ea76c8310648875244a3b4021fcd036fd83ab50f4716ebf5c609",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "productionSourceSha256At7cf": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "notificationMenusAreDraftsAndBackDiscards",
+        "entry": "NotificationSettingsScreen action2 -> HxChoiceSheet"
+      },
+      "findings": [
+        "All5 action choices present, third-row stop selected; screen-bottom fit maintained."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 27,
+      "referenceTitle": "设置  ·  设置-DNS劫持策略",
+      "referenceImageXref": 64,
+      "referenceEmbeddedImageSha256": "4a659d1f18ea481e31822316eaca096f34b65d8795c0ae74d87dc6cc0899b8f9",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-27.png",
+      "referenceRenderedSha256": "265681632434d2c35857ad9b889826988b03f14bc2d444f5b51631f6f4afa095",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-027-dns-dialog.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-027-dns-dialog.png",
+      "currentSha256": "ad77e9ddf4ac7b67286a96d3c9364fd3ea37e0c8ec3fd224c1c29e3617556874",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "29a0ce673b2b545137231eef2593365597bc0704919ca39913fa8ffe75a1643e",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "productionSourceSha256At7cf": "9107775d20040a2d87e124005ec96f2a2a07b671eb98a3452ba52b0c17c40abd",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "actualAdvancedSettingsActivityAndDnsDialog",
+        "entry": "OtherProxySettingsPage DNS HxReferenceDialog"
+      },
+      "findings": [
+        "DNS reference dialog title/all3radio options/cancel present; nativeAdvanced activity real renderer.",
+        "No new clipping/overlap found, fonts/dialogposition remain nonidentical."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 28,
+      "referenceTitle": "设置  ·  设置-恢复备份确认",
+      "referenceImageXref": 66,
+      "referenceEmbeddedImageSha256": "7a2a0729947290e66c46691c53177057f598722b26ec7087c851c0bcc4ce8e8d",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-28.png",
+      "referenceRenderedSha256": "3018c3a72f5adbbc08516c6df13e38ff35866c1fb26ea24d314077b868aa8900",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-028-restore-confirm.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-028-restore-confirm.png",
+      "currentSha256": "8d19a09f87c00046d821a2ab946c19eb2c888415148f0b56beb29a981e7eb024",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "31cc7afcbe1e5ea2247751e6312e99754d9f071d4a3975191de022546285936b",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptRemainingCoverageTest",
+        "testFunction": "restoreFileResultRequiresConfirmationAndCancelPreservesSettings",
+        "entry": "SettingsScreen backup ActivityResult -> restore SettingsDialog"
+      },
+      "findings": [
+        "Restore buttons retain16dp rounded corners; no Mirror pill opt-in leakage.",
+        "Restore description preserves actual deduplication/running-agent safety wording rather than deleting functions to match screenshot."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 29,
+      "referenceTitle": "设置  ·  设置-加速地址编辑",
+      "referenceImageXref": 68,
+      "referenceEmbeddedImageSha256": "3958e2c867f2d098f67dcca9b0c68a8dc40c03ab01b18c1bad9a822d9ea82e82",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-29.png",
+      "referenceRenderedSha256": "1dfc838c255fa1ae3f99cce2f204411f8d1e803ebe44c6e8df38faa332807874",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-029-mirror-dialog.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-029-mirror-dialog.png",
+      "currentSha256": "096a03a5e0370b58c7114a3e27b92ef5a9a1e380292f6836c776ba83df3f3249",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "6ba6473851d1bb56d4b9b0a5ce9b35ca4e7ff0e1292ea741ba9e96a3bf962958",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "SettingsScreen startupDownload -> SettingsMirrorDialog normal"
+      },
+      "findings": [
+        "Normal Mirror pill buttons match reference29; normalinput36px vs reference46.24, valuefont15 vs reference larger.",
+        "Normal title97x23 vs reference-normalized96.17x23.12matches closely.",
+        "Blank initialURL is legitimate fixture; later Mirror-only referenceInput46/18font candidate prepared."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 30,
+      "referenceTitle": "设置  ·  设置-加速地址校验",
+      "referenceImageXref": 70,
+      "referenceEmbeddedImageSha256": "c6da9303303d0933873e1a6505155b8477fcddc0936af5edbc114243b82781de",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-30.png",
+      "referenceRenderedSha256": "649b360503c0382c70563dbee18e57f28e6fd1df9dfba7c2249800d459169000",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-030-mirror-invalid.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-030-mirror-invalid.png",
+      "currentSha256": "8b5cc0a8224e7be0336c67b7c448c3a6bfc4a26bd359b6e02ad52871271896f6",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "929275c3bbadc54668b89739cc0369ed572baad198b373b19644c2df7c01dd91",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "productionSourceSha256At7cf": "583d82a064e0a9d9fe4ac1efb81a1765d2706b28f5dccdc46ab7ebf11afa8d09",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "settingsNestedPagesAndMirrorValidation",
+        "entry": "SettingsMirrorDialog invalid URL onConfirm"
+      },
+      "findings": [
+        "Error input36px vs reference68.43; labeloutside insteadinside; pill buttons wrong for reference30 rounded16dp.",
+        "Error title97x23 vs reference-normalized74.90x18.49is too large.",
+        "Later error68/labelinside/title19/24/nonpill candidate prepared; validator remains exact."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 31,
+      "referenceTitle": "设置  ·  设置-Mihomo许可",
+      "referenceImageXref": 72,
+      "referenceEmbeddedImageSha256": "a85594a95d0870771266f486aaff71e09756d7dfdf81f79e16e940076206fd91",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-31.png",
+      "referenceRenderedSha256": "f543cf7127541f8cdc758cb7b44aaf3645a1caf48ed9302ff5f2272175359f66",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-031-mihomo-license.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-031-mihomo-license.png",
+      "currentSha256": "738b97fddecd0c3bf3ca17fa85611dff8d29ca63bc74d8b95b0b536b6c29c133",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "a497b4efa219e31e3cbf0ef9abf2bd1c98354b30151200239f520cd7f883508b",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "productionSourceSha256At7cf": "589ee66c495d4deb7c0170fec4500f43fb41bbb769f1d9f0c65b7483360e2b15",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "bundledLicenseSheets",
+        "entry": "AboutScreen -> HxTextSheet referenceDocument Mihomo"
+      },
+      "findings": [
+        "Mihomo24 title and mono10/14 license remain; complete GPL text kept.",
+        "Some body line breaks/paragraph spacing/sheet cap differ from reference. Not certified pixel1:1 and not all dismissed OEM."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 32,
+      "referenceTitle": "设置  ·  设置-AdGuard许可",
+      "referenceImageXref": 74,
+      "referenceEmbeddedImageSha256": "8e5379efe56ae316e16022b040287754387760c328b9b7025c0ef8405249d0d2",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-32.png",
+      "referenceRenderedSha256": "3dfcb7b53664de397f86488ddda68b71600f1ba557605baaa2c624507d0153ba",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-032-adguard-license.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-032-adguard-license.png",
+      "currentSha256": "9d01c32292ed8766671c083c0d831056af831781716092b7fa9eecfe4a000d67",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "4b9b510c6f6b292916a01697a274a95eb89f69ebda6d85711209ab639116a9f4",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "productionSourceSha256At7cf": "589ee66c495d4deb7c0170fec4500f43fb41bbb769f1d9f0c65b7483360e2b15",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "bundledLicenseSheets",
+        "entry": "AboutScreen -> HxTextSheet referenceDocument AdGuard"
+      },
+      "findings": [
+        "AdGuard30 title and mono10/14 retained; full GPL text kept.",
+        "Same layout caveats as31; no legal text removed to force same visible excerpt."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    },
+    {
+      "document": "04",
+      "page": 33,
+      "referenceTitle": "设置  ·  设置-Lucide许可",
+      "referenceImageXref": 76,
+      "referenceEmbeddedImageSha256": "7d6b08675c5c852a2d13e1bc9baaef9c4a2c19663af54bc21b6f2f52cd84261d",
+      "referenceRenderedPath": "/workspace/scratch/3788973cf567/tmp/pdf-review/04-33.png",
+      "referenceRenderedSha256": "8eb5793b22299499e56d7cb19ca9c5d7a5466bf5608076ff374001a40c4fb559",
+      "referenceFullSizeActuallyOpenedThisReview": true,
+      "currentCapture": "04-033-lucide-license.png",
+      "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/04-033-lucide-license.png",
+      "currentSha256": "ab8d534e025aac8771286cd6280f544e90cae34d23e3bf9648d732998e7260c2",
+      "currentDimensions": [
+        393,
+        852
+      ],
+      "currentFullSizeActuallyOpenedThisReview": true,
+      "baseline20cSha256": "2c392be1d1795a305ad183eacaf7718553cb8ad6c6d588687947eaedba1370bb",
+      "byteIdenticalBaseline20c": false,
+      "actualProductionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "productionSourceSha256At7cf": "589ee66c495d4deb7c0170fec4500f43fb41bbb769f1d9f0c65b7483360e2b15",
+      "mappedProductionSourceBeforeCorrection": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt",
+      "sourceMappingCorrectionRequired": false,
+      "renderer": {
+        "testClass": "ConceptStateCoverageTest",
+        "testFunction": "bundledLicenseSheets",
+        "entry": "AboutScreen -> HxTextSheet referenceDocument Lucide"
+      },
+      "findings": [
+        "Lucide24 title and mono10/14 retained; complete ISC plus Feather attribution kept.",
+        "Reference shows a shorter excerpt, current sheet contains full legal content and different line breaks/cap. No truncation."
+      ],
+      "status": "visually-reviewed-with-recorded-differences",
+      "pixelParityCertified": false,
+      "allCallbacksForThisPageExecuted": false
+    }
+  ],
+  "summary": {
+    "referencePagesActuallyOpened": 33,
+    "currentMappedPagesActuallyOpened": 33,
+    "currentMappedPagesByteIdentical20c": 4,
+    "byteIdenticalPages": [
+      3,
+      15,
+      16,
+      17
+    ],
+    "sourceMappingCorrections": 4,
+    "pixel1to1Certified": false,
+    "newTopbarOverlapOrMissingEntryFound": false,
+    "GooglePhoneAuthenticationFixed": false
+  },
+  "limitations": [
+    "Visual screenshotreview is not full130 callbacks or I/Oacceptance.",
+    "7cf unitXML479 pass applies only7cf; latercandidatesrequirenew full CI/artifact review.",
+    "Originalcaption/OSstatus/navbar variations excluded; actualpref switchvalues/URLs/version/YAML differ and are not faked.",
+    "Some old menu typography/separators, root collapsed glyphvariants, notification longdescription wrapping, license linebreaks/sheet cap stillvisiblydiffer; not all attributedtoOEMfont.",
+    "Completelegalassets retained includingFeatherattribution; no bodytruncation to matchexcerpt.",
+    "Home/panel sharedlayout/animations untouched. No userphone/account/networksecurity/Rootpermission/hook operations.",
+    "RuntimeLocalDensity/fontScale values were not serialized by thisartifact; density/fontScale inference is distinguished fromactualdump.",
+    "API26/27 weightvariation family-preserving branch is not realdeviceverified."
+  ]
+}

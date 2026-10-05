@@ -801,11 +801,11 @@ internal fun HxBanner(
                 null, tint = tone.fg(), modifier = Modifier.size(18.dp))
             Spacer(Modifier.width(8.dp))
             Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.5.sp, lineHeight = 14.sp,
-                fontWeight = FontWeight.SemiBold), color = Hx.colors.text, modifier = Modifier.weight(1f))
+                fontWeight = FontWeight.SemiBold), color = tone.fg(), modifier = Modifier.weight(1f))
             if (actionLabel != null && onAction != null) {
                 Box(Modifier.heightIn(min = 32.dp).clickable(role = Role.Button, onClick = onAction)
                     .padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-                    Text(actionLabel, color = tone.fg(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                    Text(actionLabel, color = Hx.colors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
                 }
             }
         }
@@ -1313,6 +1313,8 @@ internal fun HxFormDialog(
     labelFontWeight: FontWeight? = null,
     inputFontWeight: FontWeight? = null,
     confirmColorOverride: Color? = null,
+    normalPlainFieldHeight: Dp? = null,
+    normalPlainFieldVerticalPadding: Dp? = null,
     plainFields: Boolean = false,
     compactPills: Boolean = false,
     validate: (List<String>) -> String? = { null },
@@ -1361,9 +1363,9 @@ internal fun HxFormDialog(
                         keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp, fontWeight = inputFontWeight ?: MaterialTheme.typography.bodyLarge.fontWeight),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+                        modifier = Modifier.fillMaxWidth().heightIn(min = (if (error == null && plainFields) normalPlainFieldHeight else null) ?: if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
                             .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else ((if (error != null) errorFieldOutlineColor else null) ?: fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                            .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
+                            .padding(horizontal = 12.dp, vertical = (if (error == null && plainFields) normalPlainFieldVerticalPadding else null) ?: if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
                         decorationBox = { input -> Box {
                             if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
                             input()

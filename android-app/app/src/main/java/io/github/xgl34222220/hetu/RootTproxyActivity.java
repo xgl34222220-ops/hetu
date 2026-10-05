@@ -57,7 +57,7 @@ public final class RootTproxyActivity extends Activity {
         coreValue=settingRow(basic,"cpu","代理核心","选择代理核心程序","",this::chooseCore);settingsDivider(basic);
         modeValue=settingRow(basic,"route","运行模式","选择代理运行模式","",this::chooseMode);settingsDivider(basic);
         ipv6Value=settingRow(basic,"globe","IPv6","启用或禁用 IPv6 支持","",this::chooseIpv6);settingsDivider(basic);
-        overwriteSwitch=switchRow(basic,"refresh","自动覆写","启动时将必要的设置参数覆写到运行配置",prefs.getBoolean("proxyBaseAutoOverwrite",true),value->{
+        overwriteSwitch=switchRow(basic,"refresh","自动覆写","启动时将必要的河图参数覆写到运行配置",prefs.getBoolean("proxyBaseAutoOverwrite",true),value->{
             prefs.edit().putBoolean("proxyBaseAutoOverwrite",value).apply();changed("proxyBaseAutoOverwrite");refresh();
         });
 
@@ -84,10 +84,21 @@ public final class RootTproxyActivity extends Activity {
         return well;
     }
 
+    private TextView settingsSubtitle(String value){
+        return settingsSubtitle(value,14);
+    }
+
+    private TextView settingsSubtitle(String value,float size){
+        TextView text=u.text(value,size,u.muted,false);
+        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.P)text.setTypeface(android.graphics.Typeface.create(text.getTypeface(),600,false));
+        else text.setFontVariationSettings("'wght' 600");
+        return text;
+    }
+
     private TextView settingRow(LinearLayout parent,String icon,String label,String subtitle,String value,Runnable action){
         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setPadding(0,u.dp(3),0,u.dp(3));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));
+        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle));
         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         TextView right=u.text(value,15,u.muted,false);right.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);right.setMaxWidth(u.dp(135));right.setEllipsize(TextUtils.TruncateAt.END);right.setSingleLine(true);row.addView(right,new LinearLayout.LayoutParams(-2,-1));
         LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(u.dp(18),u.dp(18));cp.leftMargin=u.dp(6);row.addView(new SettingsLineIcon(this,"unfold",u.muted),cp);row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return right;
@@ -96,7 +107,7 @@ public final class RootTproxyActivity extends Activity {
     private CompoundButton switchRow(LinearLayout parent,String icon,String label,String subtitle,boolean checked,java.util.function.Consumer<Boolean> listener){
         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,u.dp(3),0,u.dp(3));
         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));
+        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle,11.5f));
         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         CompoundButton sw=new SettingsToggle(this);sw.setContentDescription(label);sw.setChecked(checked);sw.setOnCheckedChangeListener((button,value)->listener.accept(value));row.addView(sw,new LinearLayout.LayoutParams(u.dp(50),u.dp(48)));row.setOnClickListener(v->sw.toggle());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return sw;
     }
@@ -104,7 +115,7 @@ public final class RootTproxyActivity extends Activity {
     private void plainAction(LinearLayout parent,String icon,String title,String subtitle,Runnable action){
         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));labels.addView(settingsSubtitle(subtitle));row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         row.addView(new IconView(this,"chevron",u.muted),new LinearLayout.LayoutParams(u.dp(18),u.dp(18)));row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));
     }
 
@@ -112,7 +123,7 @@ public final class RootTproxyActivity extends Activity {
         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
         LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));
-        TextView current=u.text(value,13,u.muted,false);current.setSingleLine(true);current.setEllipsize(TextUtils.TruncateAt.MIDDLE);labels.addView(current);
+        TextView current=settingsSubtitle(value);current.setSingleLine(true);current.setEllipsize(TextUtils.TruncateAt.MIDDLE);labels.addView(current);
         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
         row.addView(new IconView(this,"chevron",u.muted),new LinearLayout.LayoutParams(u.dp(18),u.dp(18)));row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return current;
     }

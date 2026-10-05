@@ -52,9 +52,9 @@
     ],
     "interpretation": "42/43 byte-identical; one actual fixture port value differs, no layout difference"
   },
-  "latestReviewCommit": "93988af07d8f052e928a8db166daaeaeb053ef67",
-  "latestReviewRun": 37307367305,
-  "latestComponentArtifact": 11344677854,
+  "latestReviewCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "latestReviewRun": 37322190390,
+  "latestComponentArtifact": 11351635003,
   "latestPngComparison": {
     "total": 43,
     "byteIdentical": 42,
@@ -62,15 +62,16 @@
       {
         "name": "02-012-api-expanded.png",
         "bbox": [
-          286,
+          278,
           636,
           308,
           646
         ],
         "oldSha256": "ed4f44fd9144b23efd1a0906dd2e3b8a845b5b6c4d19d5df7c8c9ab903f58824",
-        "newSha256": "374a9f8512c128e9cacf3d4a1680d6780f00cc122d07c447862fd170b72ad5e0"
+        "newSha256": "62ebb55f94da5713b90a8f5743553a6d1f2aa8fd71fa4d6bfe1198f17f51bdf7",
+        "meaning": "Isolated fixture ephemeral loopback port pixels only; no layout or motion source changes"
       }
-    ],
-    "interpretation": "The single difference is the test fixture random port digits in API sheet. No frozen layout/animation source difference."
-  }
+    ]
+  },
+  "latestNativeAndRootUiCandidate": "Shared opt-in source whole-file transforms and 333 frozen hashes must independently pass new commit; 7cf images do not validate uncommitted code."
 }

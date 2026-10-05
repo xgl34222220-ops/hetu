@@ -133,7 +133,7 @@ def main():
         pdf_report = None
         pdf_inputs = ROOT / 'updates/v2085-pdf-tools-settings/inputs.json'
         if pdf_inputs.exists():
-            from pdf85_source_scope import validate_layer as validate_pdf_layer, validate_changes, validate_shared_page, validate_webui_reference_header
+            from pdf85_source_scope import validate_layer as validate_pdf_layer, validate_changes, validate_shared_page, validate_webui_reference_header, validate_native_settings_typography
             pdf = json.loads(pdf_inputs.read_text())
             validate_pdf_layer(pdf)
             assert digest(AUTH_INPUTS)==pdf['previousInputsSha256']
@@ -148,10 +148,13 @@ def main():
             before_shared=(work/shared_path).read_text()
             webui_path='android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt'
             before_webui=(work/webui_path).read_text()
+            native_settings_path='android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java'
+            before_native_settings=(work/native_settings_path).read_text()
             for name, sha in pdf['frozenFiles'].items():
                 assert digest(work/name)==sha and digest(ROOT/name)==sha, 'Frozen input changed: '+name
             apply(pdf_patch,work)
             validate_shared_page(before_shared,(work/shared_path).read_text())
+            validate_native_settings_typography(before_native_settings,(work/native_settings_path).read_text())
             validate_webui_reference_header(before_webui,(work/webui_path).read_text())
             validate_changes(before_gradle,(work/gradle_path).read_text(),before_root,(work/root_path).read_text())
             for name, sha in pdf['changedOrAddedFiles'].items():

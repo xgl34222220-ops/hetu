@@ -285,6 +285,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                             { vm.setAutoStart(it) },
                             enabled = !vm.autoStartBusy && vm.operation == null,
                             subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "安装 Root 开机脚本，开机后自动启动服务",
+                            rowMinHeight = if (!vm.autoStartBusy && !autoStart) 72.dp else null,
+                            subtitleFontSizeSp = if (!vm.autoStartBusy && !autoStart) 11.5f else null,
                             icon = Icons.Rounded.RestartAlt,
                             iconTint = c.text,
                         )

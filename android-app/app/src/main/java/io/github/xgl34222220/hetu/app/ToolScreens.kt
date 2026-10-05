@@ -710,11 +710,12 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
             if (path != root) item(key = "subdirectory") {
                 HxSection {
                     HxGroup {
-                        HxRow("..", icon = Icons.AutoMirrored.Rounded.ArrowBack, referenceRow = true,
+                        HxRow("..", icon = FileManagerReferenceIcons.Folder, referenceRow = true,
                             referenceTextSizeSp = 18f, minimumHeight = 68.dp, onClick = {
                                 val parent = File(path).parentFile?.path.orEmpty()
                                 onOpen(parent.takeIf { it == root || it.startsWith("$root/") } ?: root)
-                            })
+                            }, trailing = { Icon(io.github.xgl34222220.hetu.home.HomeIcons.ChevronLeft, null,
+                                tint = c.text, modifier = Modifier.size(24.dp)) })
                         (folders + files).forEach { entry ->
                             FileReferenceEntryRow(entry, (menuFor ?: renameFor ?: deleteFor)?.path == entry.path,
                                 onClick = { haptics.perform(HetuHaptic.Tap); if (entry.directory) onOpen(entry.path) else openFile(entry) },
@@ -794,6 +795,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
             title = "下载到当前目录",
             widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, centerTitleOnError = true, hideMessageOnError = true, highlightError = false, plainFields = true,
             labelFontWeight = FontWeight.SemiBold, inputFontWeight = FontWeight.SemiBold, confirmColorOverride = referenceConfirmColor,
+            normalPlainFieldHeight = 34.dp, normalPlainFieldVerticalPadding = 7.dp,
             message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
             fields = listOf(
                 HxField("下载地址", placeholder = "https://example.com/file.yaml"),
@@ -1111,7 +1113,8 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         } else {
                             enabled = on
                         }
-                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted)
+                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted,
+                        subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)
                     SettingsDivider()
                     SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
                     SettingsDivider()

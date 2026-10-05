@@ -1,0 +1,1251 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-05T15:01:01.991889+00:00",
+  "scope": "PDF03A34/35 original JPEG and actual7cf native core-button color measurements; bounded local presentation correction",
+  "status": {
+    "source_candidate": "pending-unbuilt-unrendered",
+    "pixel_1_to_1_acceptance": false,
+    "new_callback_or_IO_device_acceptance": false,
+    "ci_or_test_started_or_cancelled_by_agent": false,
+    "new_git_commit_or_push_by_agent": false,
+    "source_touched_in_this_task": [
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt"
+    ]
+  },
+  "repo": {
+    "path": "/workspace/scratch/3788973cf567/hetu",
+    "branch": "test/v20.76-new-ui",
+    "baseline_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "head_observed_at_report": "7cfdf426400026c06a997f09d3b7eb4defad852b"
+  },
+  "original_pdf": {
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+    "sha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+    "size_bytes": 9214377,
+    "page_count": 49,
+    "extraction_method": "PyMuPDF extract_image(xref71 and73); decoded by Pillow only for numeric pixel measurements; no separate JPEG file written"
+  },
+  "actually_opened_pages_and_captureSHA": [
+    {
+      "page_1_based": 34,
+      "page_viewport_points": [
+        0.0,
+        0.0,
+        425.0,
+        950.0
+      ],
+      "embedded_jpeg_xref": 71,
+      "embedded_jpeg_sha256": "5b602879affef59079734b2572f2acf1a84ef265e79fe2a691646a2a8316a282",
+      "embedded_jpeg_size_bytes": 166608,
+      "embedded_jpeg_dimensions_px": [
+        850,
+        1850
+      ],
+      "actually_opened_reference": {
+        "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-34.png",
+        "sha256": "da432eb12a9301449a1e804dfd01604dbc1a73c93a4868bc539bfcb31c21ac68",
+        "size_bytes": 242056,
+        "dimensions_px": [
+          425,
+          950
+        ],
+        "actually_opened_with_view_image": true
+      },
+      "actually_opened_native": {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-034-current.png",
+        "sha256": "b028fdebe4af0495817eb97a412c841fc7e41e0649595f5718d0e3462ecb0673",
+        "size_bytes": 56871,
+        "dimensions_px": [
+          393,
+          852
+        ],
+        "actually_opened_with_view_image": true
+      },
+      "captureSHA": "b028fdebe4af0495817eb97a412c841fc7e41e0649595f5718d0e3462ecb0673",
+      "assigned_application_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "capture_identity_basis": "Parent identifies actual7cf capture; PNG byte hash independently matches extracted pdf85 artifact image.",
+      "artifact_native_path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf-evidence/android-app/app/build/outputs/pdf85/03A-034-current.png",
+      "artifact_native_sha256": "b028fdebe4af0495817eb97a412c841fc7e41e0649595f5718d0e3462ecb0673",
+      "native_matches_artifact_byte_for_byte": true,
+      "reference_roi_measurements": {
+        "mihomo_import_fill": {
+          "roi_bbox_exclusive": [
+            452,
+            550,
+            510,
+            590
+          ],
+          "pixel_count": 2320,
+          "median_rgb": [
+            238.0,
+            240.0,
+            252.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                238,
+                240,
+                252
+              ],
+              "count": 1403
+            },
+            {
+              "rgb": [
+                239,
+                241,
+                253
+              ],
+              "count": 493
+            },
+            {
+              "rgb": [
+                240,
+                240,
+                252
+              ],
+              "count": 230
+            }
+          ]
+        },
+        "xray_download_fill": {
+          "roi_bbox_exclusive": [
+            70,
+            930,
+            120,
+            970
+          ],
+          "pixel_count": 2000,
+          "median_rgb": [
+            238.0,
+            240.0,
+            252.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                238,
+                240,
+                252
+              ],
+              "count": 1220
+            },
+            {
+              "rgb": [
+                239,
+                241,
+                253
+              ],
+              "count": 411
+            },
+            {
+              "rgb": [
+                237,
+                239,
+                251
+              ],
+              "count": 171
+            }
+          ]
+        },
+        "singbox_download_fill": {
+          "roi_bbox_exclusive": [
+            70,
+            1320,
+            120,
+            1360
+          ],
+          "pixel_count": 2000,
+          "median_rgb": [
+            238.0,
+            240.0,
+            252.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                238,
+                240,
+                252
+              ],
+              "count": 960
+            },
+            {
+              "rgb": [
+                240,
+                240,
+                252
+              ],
+              "count": 365
+            },
+            {
+              "rgb": [
+                237,
+                239,
+                251
+              ],
+              "count": 256
+            }
+          ]
+        }
+      },
+      "native_roi_measurements": {
+        "mihomo_import_fill": {
+          "roi_bbox_exclusive": [
+            205,
+            174,
+            250,
+            205
+          ],
+          "pixel_count": 1395,
+          "median_rgb": [
+            220.0,
+            229.0,
+            255.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                220,
+                229,
+                255
+              ],
+              "count": 1395
+            }
+          ]
+        },
+        "xray_download_fill": {
+          "roi_bbox_exclusive": [
+            38,
+            341,
+            67,
+            371
+          ],
+          "pixel_count": 870,
+          "median_rgb": [
+            220.0,
+            229.0,
+            255.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                220,
+                229,
+                255
+              ],
+              "count": 870
+            }
+          ]
+        },
+        "singbox_download_fill": {
+          "roi_bbox_exclusive": [
+            38,
+            507,
+            67,
+            537
+          ],
+          "pixel_count": 870,
+          "median_rgb": [
+            220.0,
+            229.0,
+            255.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                220,
+                229,
+                255
+              ],
+              "count": 870
+            }
+          ]
+        }
+      }
+    },
+    {
+      "page_1_based": 35,
+      "page_viewport_points": [
+        0.0,
+        0.0,
+        425.0,
+        950.0
+      ],
+      "embedded_jpeg_xref": 73,
+      "embedded_jpeg_sha256": "507b457e11cfcb71c839de327a6d3196a241208ccaa82d2c67a6c1bc4bdf9392",
+      "embedded_jpeg_size_bytes": 158446,
+      "embedded_jpeg_dimensions_px": [
+        850,
+        1850
+      ],
+      "actually_opened_reference": {
+        "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-35.png",
+        "sha256": "1b1fffbb80e86691b102c3ec66bbc0808b05a9aa142ec79f4943883bd1547f95",
+        "size_bytes": 244662,
+        "dimensions_px": [
+          425,
+          950
+        ],
+        "actually_opened_with_view_image": true
+      },
+      "actually_opened_native": {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-035-current.png",
+        "sha256": "a319c6f42e04a31783dd9ab952dccb4b28fd0ea52aeffe7c6c2eecad852305a6",
+        "size_bytes": 63132,
+        "dimensions_px": [
+          393,
+          852
+        ],
+        "actually_opened_with_view_image": true
+      },
+      "captureSHA": "a319c6f42e04a31783dd9ab952dccb4b28fd0ea52aeffe7c6c2eecad852305a6",
+      "assigned_application_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "capture_identity_basis": "Parent identifies actual7cf capture; PNG byte hash independently matches extracted pdf85 artifact image.",
+      "artifact_native_path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf-evidence/android-app/app/build/outputs/pdf85/03A-035-current.png",
+      "artifact_native_sha256": "a319c6f42e04a31783dd9ab952dccb4b28fd0ea52aeffe7c6c2eecad852305a6",
+      "native_matches_artifact_byte_for_byte": true,
+      "reference_roi_measurements": {
+        "busy_processing_fill": {
+          "roi_bbox_exclusive": [
+            70,
+            600,
+            120,
+            640
+          ],
+          "pixel_count": 2000,
+          "median_rgb": [
+            200.0,
+            202.0,
+            214.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                200,
+                202,
+                214
+              ],
+              "count": 1024
+            },
+            {
+              "rgb": [
+                201,
+                203,
+                215
+              ],
+              "count": 437
+            },
+            {
+              "rgb": [
+                201,
+                204,
+                213
+              ],
+              "count": 170
+            }
+          ]
+        },
+        "mihomo_import_fill": {
+          "roi_bbox_exclusive": [
+            452,
+            600,
+            510,
+            640
+          ],
+          "pixel_count": 2320,
+          "median_rgb": [
+            234.0,
+            237.0,
+            246.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                234,
+                237,
+                246
+              ],
+              "count": 1071
+            },
+            {
+              "rgb": [
+                236,
+                236,
+                246
+              ],
+              "count": 627
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                247
+              ],
+              "count": 228
+            }
+          ]
+        },
+        "xray_download_fill": {
+          "roi_bbox_exclusive": [
+            70,
+            982,
+            120,
+            1022
+          ],
+          "pixel_count": 2000,
+          "median_rgb": [
+            234.0,
+            237.0,
+            246.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                234,
+                237,
+                246
+              ],
+              "count": 1358
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                247
+              ],
+              "count": 358
+            },
+            {
+              "rgb": [
+                233,
+                236,
+                245
+              ],
+              "count": 111
+            }
+          ]
+        },
+        "singbox_download_fill": {
+          "roi_bbox_exclusive": [
+            70,
+            1372,
+            120,
+            1412
+          ],
+          "pixel_count": 2000,
+          "median_rgb": [
+            234.0,
+            237.0,
+            246.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                234,
+                237,
+                246
+              ],
+              "count": 1552
+            },
+            {
+              "rgb": [
+                233,
+                236,
+                245
+              ],
+              "count": 191
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                247
+              ],
+              "count": 85
+            }
+          ]
+        },
+        "card_surface": {
+          "roi_bbox_exclusive": [
+            450,
+            400,
+            500,
+            450
+          ],
+          "pixel_count": 2500,
+          "median_rgb": [
+            248.0,
+            247.0,
+            253.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                248,
+                247,
+                253
+              ],
+              "count": 982
+            },
+            {
+              "rgb": [
+                249,
+                248,
+                254
+              ],
+              "count": 628
+            },
+            {
+              "rgb": [
+                247,
+                246,
+                252
+              ],
+              "count": 70
+            }
+          ]
+        }
+      },
+      "native_roi_measurements": {
+        "busy_processing_fill": {
+          "roi_bbox_exclusive": [
+            38,
+            207,
+            60,
+            235
+          ],
+          "pixel_count": 616,
+          "median_rgb": [
+            248.0,
+            247.0,
+            253.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                248,
+                247,
+                253
+              ],
+              "count": 616
+            }
+          ]
+        },
+        "mihomo_import_fill": {
+          "roi_bbox_exclusive": [
+            205,
+            207,
+            250,
+            237
+          ],
+          "pixel_count": 1350,
+          "median_rgb": [
+            235.0,
+            239.0,
+            254.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                235,
+                239,
+                254
+              ],
+              "count": 675
+            },
+            {
+              "rgb": [
+                236,
+                239,
+                254
+              ],
+              "count": 510
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                253
+              ],
+              "count": 126
+            }
+          ]
+        },
+        "xray_download_fill": {
+          "roi_bbox_exclusive": [
+            38,
+            373,
+            67,
+            403
+          ],
+          "pixel_count": 870,
+          "median_rgb": [
+            235.0,
+            239.0,
+            254.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                235,
+                239,
+                254
+              ],
+              "count": 434
+            },
+            {
+              "rgb": [
+                236,
+                239,
+                254
+              ],
+              "count": 323
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                253
+              ],
+              "count": 81
+            }
+          ]
+        },
+        "singbox_download_fill": {
+          "roi_bbox_exclusive": [
+            38,
+            539,
+            67,
+            569
+          ],
+          "pixel_count": 870,
+          "median_rgb": [
+            235.0,
+            239.0,
+            254.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                235,
+                239,
+                254
+              ],
+              "count": 436
+            },
+            {
+              "rgb": [
+                236,
+                239,
+                254
+              ],
+              "count": 322
+            },
+            {
+              "rgb": [
+                235,
+                238,
+                253
+              ],
+              "count": 84
+            }
+          ]
+        },
+        "card_surface": {
+          "roi_bbox_exclusive": [
+            200,
+            130,
+            270,
+            150
+          ],
+          "pixel_count": 1400,
+          "median_rgb": [
+            248.0,
+            247.0,
+            253.0
+          ],
+          "top_rgb_counts": [
+            {
+              "rgb": [
+                248,
+                247,
+                253
+              ],
+              "count": 824
+            },
+            {
+              "rgb": [
+                115,
+                119,
+                133
+              ],
+              "count": 25
+            },
+            {
+              "rgb": [
+                95,
+                100,
+                115
+              ],
+              "count": 25
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "measurement_method": {
+    "roi_bbox_format": "[left, top, right_exclusive, bottom_exclusive]",
+    "reference_coordinates": "Original embedded850×1850 JPEG, not the425×950 PDF thumbnail. JPEG is rendered at half-size below the25px PDF header.",
+    "native_coordinates": "Supplied393×852 native actual7cf PNG. Reference and native ROIs select equivalent unoccluded flat interiors of the same named buttons, avoiding text and rounded edges.",
+    "rgb_method": "Median of all ROI pixels plus most-common RGB counts. JPEG compression and antialiasing remain.",
+    "typography_or_geometry_measurement_scope": "No typography or geometry changes in this task."
+  },
+  "foreground_roi_measurements": {
+    "reference35_busy_text": {
+      "roi_bbox_exclusive": [
+        225,
+        604,
+        333,
+        649
+      ],
+      "selection": "R>240 and G>240 and B>240",
+      "selected_pixel_count": 1154,
+      "median_rgb": [
+        251.0,
+        252.0,
+        252.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            255,
+            255,
+            255
+          ],
+          "count": 111
+        },
+        {
+          "rgb": [
+            254,
+            255,
+            255
+          ],
+          "count": 85
+        },
+        {
+          "rgb": [
+            255,
+            255,
+            253
+          ],
+          "count": 33
+        },
+        {
+          "rgb": [
+            255,
+            254,
+            255
+          ],
+          "count": 28
+        }
+      ]
+    },
+    "reference35_busy_spinner": {
+      "roi_bbox_exclusive": [
+        140,
+        598,
+        206,
+        655
+      ],
+      "selection": "R>240 and G>240 and B>240",
+      "selected_pixel_count": 405,
+      "median_rgb": [
+        252.0,
+        253.0,
+        253.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            255,
+            255,
+            255
+          ],
+          "count": 63
+        },
+        {
+          "rgb": [
+            254,
+            255,
+            255
+          ],
+          "count": 46
+        },
+        {
+          "rgb": [
+            252,
+            252,
+            252
+          ],
+          "count": 23
+        },
+        {
+          "rgb": [
+            251,
+            251,
+            251
+          ],
+          "count": 21
+        }
+      ]
+    },
+    "reference35_disabled_import_text": {
+      "roi_bbox_exclusive": [
+        563,
+        601,
+        663,
+        657
+      ],
+      "selection": "Lowest red-channel 10th quantile (threshold 196.0)",
+      "selected_pixel_count": 636,
+      "median_rgb": [
+        193.0,
+        195.0,
+        208.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            194,
+            196,
+            209
+          ],
+          "count": 35
+        },
+        {
+          "rgb": [
+            196,
+            198,
+            211
+          ],
+          "count": 34
+        },
+        {
+          "rgb": [
+            192,
+            194,
+            207
+          ],
+          "count": 33
+        },
+        {
+          "rgb": [
+            195,
+            197,
+            210
+          ],
+          "count": 29
+        }
+      ]
+    },
+    "reference35_disabled_download_text": {
+      "roi_bbox_exclusive": [
+        197,
+        976,
+        296,
+        1036
+      ],
+      "selection": "Lowest red-channel 10th quantile (threshold 187.0)",
+      "selected_pixel_count": 636,
+      "median_rgb": [
+        183.0,
+        186.0,
+        199.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            187,
+            189,
+            202
+          ],
+          "count": 36
+        },
+        {
+          "rgb": [
+            186,
+            188,
+            201
+          ],
+          "count": 34
+        },
+        {
+          "rgb": [
+            183,
+            185,
+            198
+          ],
+          "count": 18
+        },
+        {
+          "rgb": [
+            183,
+            186,
+            201
+          ],
+          "count": 18
+        }
+      ]
+    },
+    "native35_busy_text": {
+      "roi_bbox_exclusive": [
+        99,
+        211,
+        149,
+        237
+      ],
+      "selection": "Lowest red-channel 10th quantile (threshold 147.0)",
+      "selected_pixel_count": 155,
+      "median_rgb": [
+        147.0,
+        147.0,
+        155.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            146,
+            147,
+            155
+          ],
+          "count": 67
+        },
+        {
+          "rgb": [
+            147,
+            148,
+            155
+          ],
+          "count": 31
+        },
+        {
+          "rgb": [
+            147,
+            147,
+            155
+          ],
+          "count": 30
+        },
+        {
+          "rgb": [
+            147,
+            148,
+            156
+          ],
+          "count": 27
+        }
+      ]
+    },
+    "native35_disabled_import_text": {
+      "roi_bbox_exclusive": [
+        265,
+        210,
+        300,
+        238
+      ],
+      "selection": "Lowest red-channel 10th quantile (threshold 158.8)",
+      "selected_pixel_count": 98,
+      "median_rgb": [
+        141.0,
+        180.0,
+        244.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            141,
+            180,
+            244
+          ],
+          "count": 33
+        },
+        {
+          "rgb": [
+            140,
+            179,
+            243
+          ],
+          "count": 13
+        },
+        {
+          "rgb": [
+            140,
+            180,
+            243
+          ],
+          "count": 10
+        },
+        {
+          "rgb": [
+            141,
+            180,
+            243
+          ],
+          "count": 10
+        }
+      ]
+    },
+    "native35_disabled_download_text": {
+      "roi_bbox_exclusive": [
+        94,
+        375,
+        130,
+        402
+      ],
+      "selection": "Lowest red-channel 10th quantile (threshold 146.0)",
+      "selected_pixel_count": 100,
+      "median_rgb": [
+        141.0,
+        180.0,
+        244.0
+      ],
+      "top_rgb_counts": [
+        {
+          "rgb": [
+            141,
+            180,
+            244
+          ],
+          "count": 36
+        },
+        {
+          "rgb": [
+            141,
+            180,
+            243
+          ],
+          "count": 16
+        },
+        {
+          "rgb": [
+            140,
+            180,
+            243
+          ],
+          "count": 9
+        },
+        {
+          "rgb": [
+            145,
+            183,
+            244
+          ],
+          "count": 8
+        }
+      ]
+    }
+  },
+  "findings": [
+    "Busy reference processing button fill ROI median#C8CAD6; actual7cf native#F8F7FD. Reference text and spinner have predominantly white foreground pixels; native busy label is gray and native button has a border.",
+    "Enabled Soft import/Xray-download/sing-box-download interiors unanimously measure#EEF0FC in PDF34 and#DCE5FF in native34.",
+    "Disabled Soft counterpart interiors unanimously measure#EAEDF6 in PDF35 and median#EBEFFE in native35.",
+    "Disabled reference download-label most-common RGB187/189/202 (#BBBDCA) is gray; native disabled download/import foreground samples have median141/180/244 (#8DB4F4), blue. Import/download glyph distributions differ because of antialiasing and JPEG compression; chosen disabled gray target uses the measured download mode."
+  ],
+  "read_only_shared_button_contract": {
+    "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "entire_file_sha256": "a4b8756f3026cf6dbb941f85e4b5fc27ded1102bcbf6b4ef23fa0264ce206c6f",
+    "entire_file_matches_baseline": true,
+    "ToolsButton_function_sha256": "b3d11ac078be5d01652ab661da0fa4784192301245580a456958ea710880cf73",
+    "default_kind": "HomeButtonKind.Secondary",
+    "disabled_layer_alpha": 0.45,
+    "secondary_fill": "c.surface",
+    "secondary_foreground": "c.t1",
+    "secondary_border": ".75.dp,c.line2",
+    "soft_fill": "c.accentSoft unless neutral",
+    "soft_foreground": "c.accent unless neutral",
+    "busy_spinner_uses_foreground": true,
+    "clickable_enabled_expression": "enabled && !loading",
+    "clickable_role": "Role.Button",
+    "function_source": "@Composable\ninternal fun ToolsButton(\n    text: String,\n    onClick: () -> Unit,\n    modifier: Modifier = Modifier,\n    kind: HomeButtonKind = HomeButtonKind.Secondary,\n    icon: ImageVector? = null,\n    enabled: Boolean = true,\n    loading: Boolean = false,\n    neutral: Boolean = false,\n) {\n    val c = LocalHomeColors.current\n    val haptics = LocalHomeHaptics.current\n    val source = remember { MutableInteractionSource() }\n    val (fill, foreground) = when (kind) {\n        HomeButtonKind.Primary -> c.accent to c.onAccent\n        HomeButtonKind.Secondary -> c.surface to c.t1\n        HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent\n        HomeButtonKind.Ghost -> Color.Transparent to c.accent\n    }\n    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)\n        .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)\n        .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)\n        .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,\n            role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }\n        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,\n        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {\n        if (loading) HomeSpinner(size = 18.dp, color = foreground)\n        else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)\n        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)\n    }\n}\n\n"
+  },
+  "pending_source_change": {
+    "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+    "function": "CoreCard",
+    "function_line_1_based": 90,
+    "added_presentation_helper": "coreButtonColorBeforeDisabledAlpha",
+    "scope": "CompositionLocalProvider immediately surrounding only processing, download and import HomeButton calls. Update/Restore/Remove keep original c palette.",
+    "measured_light_targets": {
+      "processing_fill": "#C8CAD6",
+      "processing_foreground": "Color.White",
+      "processing_border": "Color.Transparent",
+      "enabled_soft_fill": "#EEF0FC",
+      "disabled_soft_fill": "#EAEDF6",
+      "disabled_soft_foreground": "#BBBDCA"
+    },
+    "disabled_color_calibration": "For each channel, (target - actual c.surface * (1-.45))/.45, clamped0..1; shared .45 disabled alpha is preserved.",
+    "calibration_at_measured_card_surface": {
+      "processing_fill": {
+        "reference_target_rgb": [
+          200.0,
+          202.0,
+          214.0
+        ],
+        "pre_alpha_rgb_at_measured_surface_float": [
+          141.33333333333331,
+          146.99999999999994,
+          166.33333333333331
+        ],
+        "pre_alpha_rgb_at_measured_surface_rounded": [
+          141,
+          147,
+          166
+        ],
+        "expected_after_existing_layer_alpha_rgb_float": [
+          200.0,
+          202.0,
+          214.0
+        ]
+      },
+      "disabled_soft_fill": {
+        "reference_target_rgb": [
+          234.0,
+          237.0,
+          246.0
+        ],
+        "pre_alpha_rgb_at_measured_surface_float": [
+          216.88888888888886,
+          224.77777777777771,
+          237.44444444444443
+        ],
+        "pre_alpha_rgb_at_measured_surface_rounded": [
+          217,
+          225,
+          237
+        ],
+        "expected_after_existing_layer_alpha_rgb_float": [
+          234.0,
+          237.0,
+          246.0
+        ]
+      },
+      "disabled_soft_foreground": {
+        "reference_target_rgb": [
+          187.0,
+          189.0,
+          202.0
+        ],
+        "pre_alpha_rgb_at_measured_surface_float": [
+          112.44444444444443,
+          118.11111111111106,
+          139.66666666666666
+        ],
+        "pre_alpha_rgb_at_measured_surface_rounded": [
+          112,
+          118,
+          140
+        ],
+        "expected_after_existing_layer_alpha_rgb_float": [
+          187.0,
+          189.0,
+          202.0
+        ]
+      },
+      "enabled_soft_fill": {
+        "reference_target_rgb": [
+          238,
+          240,
+          252
+        ],
+        "hex": "#EEF0FC",
+        "disabled_alpha_not_applied": true
+      },
+      "processing_foreground": {
+        "source_foreground": "Color.White",
+        "expected_white_full_coverage_after_layer_alpha_at_measured_surface_rgb_float": [
+          251.15,
+          250.60000000000002,
+          253.9
+        ],
+        "note": "Shared disabled layer alpha remains .45; rendered white foreground becomes near-white over the card. No exact rendered candidate claim."
+      }
+    },
+    "enabled_accent_color": "Original dynamic c.accent preserved.",
+    "dark_fallback": "Original c palette for both softButtonColors and processingColors.",
+    "busy_original_and_candidate_call_byte_identical": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)",
+    "core_callback_and_state_behavior": "Existing busy enabled=false/loading=true/empty onClick, primary action callback, import callback and enabled predicates are preserved exactly; no core IO, download, import, signature or state logic changed.",
+    "geometry_fonts_spinner_sizes": "All original dimensions, shape selection, typography and spinner sizes remain unchanged.",
+    "source_reversal_proof": {
+      "reverse_CoreCard_tail_and_two_imports_restores_baseline_source_byte_for_byte": true,
+      "baseline_source_sha256": "c224b2a98895dbaec76dac7ef8dda48fcd47244dd289faaf92c7c49c8fc4ae28",
+      "pending_source_sha256": "66b8209da7d6e0bac83e8e8ed097832495803159e59ff361cd75ccf26a12d6a4",
+      "reversed_source_sha256": "c224b2a98895dbaec76dac7ef8dda48fcd47244dd289faaf92c7c49c8fc4ae28",
+      "exact_preserved_fragments": {
+        "busy_call": {
+          "text": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "primary_callback": {
+          "text": "action.label, { onPrimary(action) }, Modifier.weight(1f),",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "import_call": {
+          "text": "HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "row_geometry": {
+          "text": "Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp))",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "action_selection": {
+          "text": "val action = core.primaryAction()",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "enabled_argument": {
+          "text": "enabled = enabled,",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "progress_spinner": {
+          "text": "HomeSpinner(size = 16.dp, color = c.accent)",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        },
+        "progress_text": {
+          "text": "Text(progress.ifBlank { \"处理中…\" }, color = c.t2, style = HomeType.rowSub.copy(fontFeatureSettings = \"tnum\"), maxLines = 2, overflow = TextOverflow.Ellipsis)",
+          "baseline_occurrences": 1,
+          "pending_occurrences": 1,
+          "byte_identical_fragment": true
+        }
+      },
+      "action_kind_mapping_identical_ignoring_indentation": true,
+      "card_header_glyphs_badges_progress_geometry_and_typography_byte_identical": true,
+      "shared_ToolsDesign_entire_file_byte_identical_to_baseline": true
+    },
+    "source_baseline_content": "package io.github.xgl34222220.hetu.tools\n\nimport io.github.xgl34222220.hetu.ui.ht\nimport androidx.compose.foundation.background\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Box\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.size\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.material3.Icon\nimport androidx.compose.material3.Text\nimport androidx.compose.runtime.Composable\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.vector.ImageVector\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextOverflow\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport io.github.xgl34222220.hetu.home.HomeBadge\nimport io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton\nimport io.github.xgl34222220.hetu.home.HomeButtonKind\nimport io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard\nimport io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims\nimport io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton\nimport io.github.xgl34222220.hetu.home.HomeIcons\nimport io.github.xgl34222220.hetu.home.HomeSpinner\nimport io.github.xgl34222220.hetu.home.HomeTone\nimport io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType\nimport io.github.xgl34222220.hetu.home.LocalHomeColors\n\n/**\n * 核心管理 (工具 › 核心管理). Stateless.\n *\n * - Page 34: one card per core: glyph tile, name with a badge, version line, two buttons.\n * - Page 35: the busy card shows a progress line and “处理中”; every other button is disabled.\n */\n@Composable\ninternal fun ToolsCoresScreen(\n    state: ToolsCoresState,\n    onBack: () -> Unit,\n    onCheck: () -> Unit,\n    onPrimary: (ToolsCore, ToolsCoreAction) -> Unit,\n    onImport: (ToolsCore) -> Unit,\n    onRetry: () -> Unit,\n    modifier: Modifier = Modifier,\n) {\n    val idle = state.busyId == null\n    ToolsPage(\n        title = \"核心管理\",\n        onBack = onBack,\n        modifier = modifier,\n        refreshing = state.checking,\n        onRefresh = if (idle) onCheck else null,\n        subtitle = state.running.takeIf { it.isNotBlank() }?.let { \"运行中：$it\" },\n        actions = { HomeIconButton(HomeIcons.RefreshCw, \"检查更新\", onCheck, enabled = idle && state.load is ToolsLoad.Ready, loading = state.checking) },\n    ) {\n        when (val load = state.load) {\n            ToolsLoad.Loading -> ToolsLoading()\n            is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.Cpu, \"核心状态读取失败\", subtitle = load.message) {\n                HomeButton(\"重新读取\", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)\n            }\n            ToolsLoad.Ready -> Column(verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {\n                state.cores.forEach { core ->\n                    CoreCard(core, busy = state.busyId == core.id, enabled = idle, progress = state.progress, onPrimary = { onPrimary(core, it) }, onImport = { onImport(core) })\n                }\n                ToolsNote(\n                    \"核心按设备 ABI 从发布源直接拉取。内置核心未下载更新时使用 App 自带版本；标注「仅下载管理」的核心只做下载与版本管理。\",\n                    Modifier.padding(horizontal = 4.dp, vertical = 4.dp),\n                )\n            }\n        }\n    }\n}\n\ninternal fun ToolsCore.glyph(): ImageVector = when {\n    id.startsWith(\"mihomo\") -> ToolsIcons.CoreMihomoPdf34\n    id.startsWith(\"sing-box\") || id.startsWith(\"singbox\") -> ToolsIcons.CoreSingBoxPdf34\n    id.startsWith(\"xray\") -> ToolsIcons.CoreXrayPdf34\n    else -> ToolsIcons.Cpu\n}\n\n@Composable\nprivate fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress: String, onPrimary: (ToolsCoreAction) -> Unit, onImport: () -> Unit) {\n    val c = LocalHomeColors.current\n    val action = core.primaryAction()\n    HomeCard(Modifier.fillMaxWidth()) {\n        Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {\n            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {\n                Box(\n                    Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))\n                        .background(if (core.runnable) c.accentSoft else c.sunken),\n                    contentAlignment = Alignment.Center,\n                ) {\n                    Icon(core.glyph(), null, Modifier.size(40.dp), tint = c.t1)\n                }\n                Column(Modifier.weight(1f)) {\n                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                        Text(core.name, Modifier.weight(1f, fill = core.runnable), color = c.t1,\n                            style = HomeType.rowTitle.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),\n                            maxLines = 1, overflow = TextOverflow.Ellipsis)\n                        when {\n                            !core.runnable -> HomeBadge(ht(\"仅下载管理\"))\n                            core.updateAvailable -> HomeBadge(ht(\"有更新\"), tone = HomeTone.Accent)\n                            core.latest.isNotBlank() -> HomeBadge(ht(\"已是最新\"), tone = HomeTone.Good)\n                        }\n                    }\n                    Text(core.versionLine, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)\n                }\n            }\n            if (busy) {\n                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                    HomeSpinner(size = 16.dp, color = c.accent)\n                    Text(progress.ifBlank { \"处理中…\" }, color = c.t2, style = HomeType.rowSub.copy(fontFeatureSettings = \"tnum\"), maxLines = 2, overflow = TextOverflow.Ellipsis)\n                }\n            }\n            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                when {\n                    busy -> HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)\n                    action != null -> HomeButton(\n                        action.label, { onPrimary(action) }, Modifier.weight(1f),\n                        kind = when (action) {\n                            ToolsCoreAction.Update -> HomeButtonKind.Primary\n                            ToolsCoreAction.Download -> HomeButtonKind.Soft\n                            ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary\n                        },\n                        enabled = enabled,\n                    )\n                }\n                HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)\n            }\n        }\n    }\n}\n",
+    "source_candidate_content": "package io.github.xgl34222220.hetu.tools\n\nimport io.github.xgl34222220.hetu.ui.ht\nimport androidx.compose.foundation.background\nimport androidx.compose.foundation.layout.Arrangement\nimport androidx.compose.foundation.layout.Box\nimport androidx.compose.foundation.layout.Column\nimport androidx.compose.foundation.layout.Row\nimport androidx.compose.foundation.layout.fillMaxWidth\nimport androidx.compose.foundation.layout.padding\nimport androidx.compose.foundation.layout.size\nimport androidx.compose.foundation.shape.RoundedCornerShape\nimport androidx.compose.material3.Icon\nimport androidx.compose.material3.Text\nimport androidx.compose.runtime.Composable\nimport androidx.compose.runtime.CompositionLocalProvider\nimport androidx.compose.ui.Alignment\nimport androidx.compose.ui.Modifier\nimport androidx.compose.ui.draw.clip\nimport androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.graphics.vector.ImageVector\nimport androidx.compose.ui.text.font.FontWeight\nimport androidx.compose.ui.text.style.TextOverflow\nimport androidx.compose.ui.unit.dp\nimport androidx.compose.ui.unit.sp\nimport io.github.xgl34222220.hetu.home.HomeBadge\nimport io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton\nimport io.github.xgl34222220.hetu.home.HomeButtonKind\nimport io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard\nimport io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims\nimport io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton\nimport io.github.xgl34222220.hetu.home.HomeIcons\nimport io.github.xgl34222220.hetu.home.HomeSpinner\nimport io.github.xgl34222220.hetu.home.HomeTone\nimport io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType\nimport io.github.xgl34222220.hetu.home.LocalHomeColors\n\n/**\n * 核心管理 (工具 › 核心管理). Stateless.\n *\n * - Page 34: one card per core: glyph tile, name with a badge, version line, two buttons.\n * - Page 35: the busy card shows a progress line and “处理中”; every other button is disabled.\n */\n@Composable\ninternal fun ToolsCoresScreen(\n    state: ToolsCoresState,\n    onBack: () -> Unit,\n    onCheck: () -> Unit,\n    onPrimary: (ToolsCore, ToolsCoreAction) -> Unit,\n    onImport: (ToolsCore) -> Unit,\n    onRetry: () -> Unit,\n    modifier: Modifier = Modifier,\n) {\n    val idle = state.busyId == null\n    ToolsPage(\n        title = \"核心管理\",\n        onBack = onBack,\n        modifier = modifier,\n        refreshing = state.checking,\n        onRefresh = if (idle) onCheck else null,\n        subtitle = state.running.takeIf { it.isNotBlank() }?.let { \"运行中：$it\" },\n        actions = { HomeIconButton(HomeIcons.RefreshCw, \"检查更新\", onCheck, enabled = idle && state.load is ToolsLoad.Ready, loading = state.checking) },\n    ) {\n        when (val load = state.load) {\n            ToolsLoad.Loading -> ToolsLoading()\n            is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.Cpu, \"核心状态读取失败\", subtitle = load.message) {\n                HomeButton(\"重新读取\", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)\n            }\n            ToolsLoad.Ready -> Column(verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {\n                state.cores.forEach { core ->\n                    CoreCard(core, busy = state.busyId == core.id, enabled = idle, progress = state.progress, onPrimary = { onPrimary(core, it) }, onImport = { onImport(core) })\n                }\n                ToolsNote(\n                    \"核心按设备 ABI 从发布源直接拉取。内置核心未下载更新时使用 App 自带版本；标注「仅下载管理」的核心只做下载与版本管理。\",\n                    Modifier.padding(horizontal = 4.dp, vertical = 4.dp),\n                )\n            }\n        }\n    }\n}\n\ninternal fun ToolsCore.glyph(): ImageVector = when {\n    id.startsWith(\"mihomo\") -> ToolsIcons.CoreMihomoPdf34\n    id.startsWith(\"sing-box\") || id.startsWith(\"singbox\") -> ToolsIcons.CoreSingBoxPdf34\n    id.startsWith(\"xray\") -> ToolsIcons.CoreXrayPdf34\n    else -> ToolsIcons.Cpu\n}\n\n@Composable\nprivate fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress: String, onPrimary: (ToolsCoreAction) -> Unit, onImport: () -> Unit) {\n    val c = LocalHomeColors.current\n    val action = core.primaryAction()\n    val softButtonColors = if (c.dark) c else c.copy(\n        accentSoft = if (enabled) Color(0xFFEEF0FC) else coreButtonColorBeforeDisabledAlpha(Color(0xFFEAEDF6), c.surface),\n        accent = if (enabled) c.accent else coreButtonColorBeforeDisabledAlpha(Color(0xFFBBBDCA), c.surface),\n    )\n    val processingColors = if (c.dark) c else c.copy(\n        surface = coreButtonColorBeforeDisabledAlpha(Color(0xFFC8CAD6), c.surface),\n        t1 = Color.White,\n        line2 = Color.Transparent,\n    )\n    HomeCard(Modifier.fillMaxWidth()) {\n        Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {\n            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {\n                Box(\n                    Modifier.size(60.dp).clip(RoundedCornerShape(16.dp))\n                        .background(if (core.runnable) c.accentSoft else c.sunken),\n                    contentAlignment = Alignment.Center,\n                ) {\n                    Icon(core.glyph(), null, Modifier.size(40.dp), tint = c.t1)\n                }\n                Column(Modifier.weight(1f)) {\n                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                        Text(core.name, Modifier.weight(1f, fill = core.runnable), color = c.t1,\n                            style = HomeType.rowTitle.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold),\n                            maxLines = 1, overflow = TextOverflow.Ellipsis)\n                        when {\n                            !core.runnable -> HomeBadge(ht(\"仅下载管理\"))\n                            core.updateAvailable -> HomeBadge(ht(\"有更新\"), tone = HomeTone.Accent)\n                            core.latest.isNotBlank() -> HomeBadge(ht(\"已是最新\"), tone = HomeTone.Good)\n                        }\n                    }\n                    Text(core.versionLine, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)\n                }\n            }\n            if (busy) {\n                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                    HomeSpinner(size = 16.dp, color = c.accent)\n                    Text(progress.ifBlank { \"处理中…\" }, color = c.t2, style = HomeType.rowSub.copy(fontFeatureSettings = \"tnum\"), maxLines = 2, overflow = TextOverflow.Ellipsis)\n                }\n            }\n            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                when {\n                    busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {\n                        HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)\n                    }\n                    action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {\n                        HomeButton(\n                            action.label, { onPrimary(action) }, Modifier.weight(1f),\n                            kind = when (action) {\n                                ToolsCoreAction.Update -> HomeButtonKind.Primary\n                                ToolsCoreAction.Download -> HomeButtonKind.Soft\n                                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary\n                            },\n                            enabled = enabled,\n                        )\n                    }\n                }\n                CompositionLocalProvider(LocalHomeColors provides softButtonColors) {\n                    HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)\n                }\n            }\n        }\n    }\n}\n\n/** Keep the shared button's disabled alpha while matching the measured light-mode colors. */\nprivate fun coreButtonColorBeforeDisabledAlpha(fill: Color, surface: Color): Color {\n    val alpha = .45f\n    return fill.copy(\n        red = ((fill.red - surface.red * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n        green = ((fill.green - surface.green * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n        blue = ((fill.blue - surface.blue * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n    )\n}\n",
+    "selected_file_diff": "diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\nindex d4f2847..559e865 100644\n--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\n+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\n@@ -13,9 +13,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape\n import androidx.compose.material3.Icon\n import androidx.compose.material3.Text\n import androidx.compose.runtime.Composable\n+import androidx.compose.runtime.CompositionLocalProvider\n import androidx.compose.ui.Alignment\n import androidx.compose.ui.Modifier\n import androidx.compose.ui.draw.clip\n+import androidx.compose.ui.graphics.Color\n import androidx.compose.ui.graphics.vector.ImageVector\n import androidx.compose.ui.text.font.FontWeight\n import androidx.compose.ui.text.style.TextOverflow\n@@ -88,6 +90,15 @@ internal fun ToolsCore.glyph(): ImageVector = when {\n private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress: String, onPrimary: (ToolsCoreAction) -> Unit, onImport: () -> Unit) {\n     val c = LocalHomeColors.current\n     val action = core.primaryAction()\n+    val softButtonColors = if (c.dark) c else c.copy(\n+        accentSoft = if (enabled) Color(0xFFEEF0FC) else coreButtonColorBeforeDisabledAlpha(Color(0xFFEAEDF6), c.surface),\n+        accent = if (enabled) c.accent else coreButtonColorBeforeDisabledAlpha(Color(0xFFBBBDCA), c.surface),\n+    )\n+    val processingColors = if (c.dark) c else c.copy(\n+        surface = coreButtonColorBeforeDisabledAlpha(Color(0xFFC8CAD6), c.surface),\n+        t1 = Color.White,\n+        line2 = Color.Transparent,\n+    )\n     HomeCard(Modifier.fillMaxWidth()) {\n         Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {\n             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {\n@@ -120,19 +131,35 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:\n             }\n             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                 when {\n-                    busy -> HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)\n-                    action != null -> HomeButton(\n-                        action.label, { onPrimary(action) }, Modifier.weight(1f),\n-                        kind = when (action) {\n-                            ToolsCoreAction.Update -> HomeButtonKind.Primary\n-                            ToolsCoreAction.Download -> HomeButtonKind.Soft\n-                            ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary\n-                        },\n-                        enabled = enabled,\n-                    )\n+                    busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {\n+                        HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)\n+                    }\n+                    action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {\n+                        HomeButton(\n+                            action.label, { onPrimary(action) }, Modifier.weight(1f),\n+                            kind = when (action) {\n+                                ToolsCoreAction.Update -> HomeButtonKind.Primary\n+                                ToolsCoreAction.Download -> HomeButtonKind.Soft\n+                                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary\n+                            },\n+                            enabled = enabled,\n+                        )\n+                    }\n+                }\n+                CompositionLocalProvider(LocalHomeColors provides softButtonColors) {\n+                    HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)\n                 }\n-                HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)\n             }\n         }\n     }\n }\n+\n+/** Keep the shared button's disabled alpha while matching the measured light-mode colors. */\n+private fun coreButtonColorBeforeDisabledAlpha(fill: Color, surface: Color): Color {\n+    val alpha = .45f\n+    return fill.copy(\n+        red = ((fill.red - surface.red * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n+        green = ((fill.green - surface.green * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n+        blue = ((fill.blue - surface.blue * (1f - alpha)) / alpha).coerceIn(0f, 1f),\n+    )\n+}\n",
+    "selected_file_diff_check": {
+      "command": "git diff --check -- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "selected_file_numstat": "38\t11\tandroid-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+    "implementation_pending_own_build_and_render": true,
+    "limitations": "Color calibration is arithmetic evidence, not a rendered candidate. Shared .45 alpha keeps processing white near-white after compositing; geometry and overall PDF parity remain outside this correction."
+  }
+}

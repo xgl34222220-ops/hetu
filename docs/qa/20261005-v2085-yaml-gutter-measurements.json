@@ -1,0 +1,254 @@
+{
+  "applicationCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "currentCompiledFontSp": 13.5,
+  "currentCompiledLineHeightSp": 18,
+  "pendingSourceCandidate": {
+    "fontSp": 13,
+    "lineHeightSp": 17,
+    "rendered": false
+  },
+  "mask": "blue integer B-R>30 and B-G>20 to preserve dimmed-key antialiasing; digits luma < local75thpercentile -10",
+  "measurements": [
+    {
+      "page": 13,
+      "referenceKey": {
+        "bbox": [
+          75,
+          315,
+          164,
+          330
+        ],
+        "size": [
+          89,
+          15
+        ]
+      },
+      "currentKey": {
+        "bbox": [
+          58,
+          227,
+          143,
+          241
+        ],
+        "size": [
+          85,
+          14
+        ]
+      },
+      "referenceDigit1": {
+        "bbox": [
+          40,
+          316,
+          46,
+          326
+        ],
+        "size": [
+          6,
+          10
+        ]
+      },
+      "currentDigit1": {
+        "bbox": [
+          42,
+          228,
+          46,
+          238
+        ],
+        "size": [
+          4,
+          10
+        ]
+      },
+      "referenceSha256": "8dc64411d28c465950231967532af1e51d370360fc9149ee1b1773ab4461cc40",
+      "currentSha256": "487c9e3526304831b131e68ede11e12f9970e1c91d54be84874f0cadb69c117b",
+      "referenceKeyX393dp": 69.3529411764706,
+      "referenceDigitBBoxX393dp": [
+        36.98823529411764,
+        42.5364705882353
+      ]
+    },
+    {
+      "page": 14,
+      "referenceKey": {
+        "bbox": [
+          76,
+          315,
+          163,
+          330
+        ],
+        "size": [
+          87,
+          15
+        ]
+      },
+      "currentKey": {
+        "bbox": [
+          58,
+          227,
+          143,
+          241
+        ],
+        "size": [
+          85,
+          14
+        ]
+      },
+      "referenceDigit1": {
+        "bbox": [
+          41,
+          316,
+          46,
+          326
+        ],
+        "size": [
+          5,
+          10
+        ]
+      },
+      "currentDigit1": {
+        "bbox": [
+          42,
+          228,
+          46,
+          238
+        ],
+        "size": [
+          4,
+          10
+        ]
+      },
+      "referenceSha256": "b7267c4768779f9c138dceac4bc32e42e6dffcb611174bd3b33b184128268d22",
+      "currentSha256": "05d9256a2c97d9ccbb817dd77db41bdde8ed549e73d545634b75c530800d6663",
+      "referenceKeyX393dp": 70.27764705882353,
+      "referenceDigitBBoxX393dp": [
+        37.91294117647059,
+        42.5364705882353
+      ]
+    },
+    {
+      "page": 17,
+      "referenceKey": {
+        "bbox": [
+          76,
+          315,
+          164,
+          330
+        ],
+        "size": [
+          88,
+          15
+        ]
+      },
+      "currentKey": {
+        "bbox": [
+          58,
+          227,
+          143,
+          241
+        ],
+        "size": [
+          85,
+          14
+        ]
+      },
+      "referenceDigit1": {
+        "bbox": [
+          41,
+          316,
+          47,
+          326
+        ],
+        "size": [
+          6,
+          10
+        ]
+      },
+      "currentDigit1": {
+        "bbox": [
+          42,
+          228,
+          46,
+          238
+        ],
+        "size": [
+          4,
+          10
+        ]
+      },
+      "referenceSha256": "da4169463e828d2029a3edfe030ad12bf810bcccb93f33b4a0c6b1b3c30e2818",
+      "currentSha256": "f993e6c8003de013d20d2d20ac1cfc3db46f17bcba836657c4a67f5246bcc020",
+      "referenceKeyX393dp": 70.27764705882353,
+      "referenceDigitBBoxX393dp": [
+        37.91294117647059,
+        43.461176470588235
+      ]
+    },
+    {
+      "page": 25,
+      "referenceKey": {
+        "bbox": [
+          75,
+          315,
+          163,
+          330
+        ],
+        "size": [
+          88,
+          15
+        ]
+      },
+      "currentKey": {
+        "bbox": [
+          58,
+          227,
+          143,
+          241
+        ],
+        "size": [
+          85,
+          14
+        ]
+      },
+      "referenceDigit1": {
+        "bbox": [
+          40,
+          317,
+          46,
+          326
+        ],
+        "size": [
+          6,
+          9
+        ]
+      },
+      "currentDigit1": {
+        "bbox": [
+          42,
+          228,
+          46,
+          238
+        ],
+        "size": [
+          4,
+          10
+        ]
+      },
+      "referenceSha256": "a23e0acbc9d54db0fcaffffe15696d4eb64106ac0bcc48b7f4fbe19037a2fbbf",
+      "currentSha256": "bb2981f4fbc50394031e2ce195290598188781f9506ce37eef863ed8d8b0bdf1",
+      "referenceKeyX393dp": 69.3529411764706,
+      "referenceDigitBBoxX393dp": [
+        36.98823529411764,
+        42.5364705882353
+      ]
+    }
+  ],
+  "currentSourceGutterWidthDp": 44,
+  "currentSourceGutterRightPaddingDp": 10,
+  "candidateGeometry": {
+    "gutterWidthDp": 55,
+    "gutterRightPaddingDp": 24,
+    "predictedBodyShiftDp": 11,
+    "predictedDigitShiftDp": -3
+  },
+  "B31": "Actual PDF03B31 opened: 网络匹配/匹配成功动作 choice popup, not this YAML editor; no gutter change applicable."
+}

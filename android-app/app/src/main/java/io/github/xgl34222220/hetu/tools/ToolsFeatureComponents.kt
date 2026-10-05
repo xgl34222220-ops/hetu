@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardCapitalization
@@ -201,6 +202,7 @@ internal fun ToolsSwitchRow(
     enabled: Boolean = true,
     monospaceSubtitle: Boolean = false,
     rawContent: Boolean = false,
+    subtitleStyle: TextStyle? = null,
 ) {
     val c = LocalHomeColors.current
     ToolsRow(
@@ -209,7 +211,7 @@ internal fun ToolsSwitchRow(
         icon = icon,
         iconTint = c.t1,
         subtitle = subtitle?.let { if (rawContent) it else ht(it) },
-        subtitleStyle = if (monospaceSubtitle) ToolsType.url else HomeType.rowSub,
+        subtitleStyle = subtitleStyle ?: (if (monospaceSubtitle) ToolsType.url else HomeType.rowSub),
         enabled = enabled,
         onClick = { onCheckedChange(!checked) },
         trailing = { ToolsSwitch(checked, null) },

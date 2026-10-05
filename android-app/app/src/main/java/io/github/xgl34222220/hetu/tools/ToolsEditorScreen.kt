@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -37,7 +40,6 @@ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
-import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
@@ -186,32 +188,35 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
 /*  Sheets (pages 13, 14, 17)                                           */
 /* ------------------------------------------------------------------ */
 
-/** Page 13. Top-level keys in accent monospace with their line number; nested names are indented. */
+/** Page 13. Accent labels in rounded pills with their line number; nested names are indented. */
 @Composable
 internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (ToolsOutlineItem) -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = ht("点击跳转到对应区段"), onClose = onClose) {
+    val sheetBackground = if (c.dark) Modifier.background(c.surface) else Modifier.background(
+        Brush.verticalGradient(listOf(Color(0xFFF3F3FD), Color(0xFFEFF1FE))),
+    )
+    HomeSheetContent(title = "语法大纲", modifier = modifier.then(sheetBackground), onClose = onClose) {
         if (items.isEmpty()) {
             Text(ht("没有可识别的顶层字段。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
         } else {
-            HomeCard(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
-                Column(Modifier.verticalScroll(rememberScrollState())) {
-                    items.forEachIndexed { index, item ->
-                        if (index > 0) HomeDivider()
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .heightIn(min = 32.dp)
-                                .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
-                                .padding(start = 16.dp + 20.dp * item.level, end = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        ) {
-                            Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.mono, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text(item.line.toString(), color = c.t3, style = HomeType.caption.copy(fontFeatureSettings = "tnum"))
-                            ToolsChevron()
-                        }
+            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
+                items.forEach { item ->
+                    Row(
+                        Modifier
+                            .fillMaxWidth()
+                            .heightIn(min = 32.dp)
+                            .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
+                            .padding(vertical = 2.dp)
+                            .clip(RoundedCornerShape(50))
+                            .background(c.surface)
+                            .padding(start = 14.dp + 28.dp * item.level, end = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.bodySmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(item.line.toString(), color = c.t3, style = HomeType.caption.copy(fontFeatureSettings = "tnum"))
+                        ToolsChevron()
                     }
                 }
             }

@@ -1,0 +1,646 @@
+{
+  "applicationCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "workflowRunId": 37322190390,
+  "uiArtifactId": 11351635003,
+  "sourceCallers": {
+    "A22": "ToolsSubscriptionScreen.kt ToolsField(订阅链接,error=form.urlError,hint=保存到当前配置，运行时会尝试应用。); ToolsComponents.kt ToolsField fixed error Row then hint Text",
+    "A44": "ToolsAdblockScreen.kt ToolsSwitchRow 独立 DNS 过滤 subtitle=代理未运行时用本地 VPN 继续过滤广告; ToolsFeatureComponents.kt ToolsSwitchRow delegates ToolsRow; ToolsComponents.kt ToolsRow subtitle usesToolsTypography.rowSub14sp/19sp",
+    "A49": "ToolsAdblockScreen.kt ToolsConfirmAllowDialogCard overlay.domain Text color=c.t1 style=ToolsTypography.mono14sp/21sp, FontFamily.Monospace"
+  },
+  "mask": "integer RGB max<200 and channel spread<50; excluding near-white surfaces. Gutter origins separately measured; no OCR or presumed OEM factor.",
+  "domainRef": {
+    "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-49.png",
+    "sha256": "6881de78a7a7dfe8e336b05735dcbb916904ae7bcac427341549324e620b1cc5",
+    "roi": [
+      143,
+      470,
+      282,
+      491
+    ],
+    "inkBBox": [
+      148,
+      475,
+      277,
+      490
+    ],
+    "inkSize": [
+      129,
+      15
+    ],
+    "inkPixelCount": 636,
+    "modalInkColors": [
+      {
+        "rgb": [
+          94,
+          98,
+          118
+        ],
+        "pixels": 4
+      },
+      {
+        "rgb": [
+          128,
+          130,
+          147
+        ],
+        "pixels": 3
+      },
+      {
+        "rgb": [
+          129,
+          130,
+          148
+        ],
+        "pixels": 3
+      },
+      {
+        "rgb": [
+          183,
+          185,
+          195
+        ],
+        "pixels": 3
+      },
+      {
+        "rgb": [
+          111,
+          112,
+          131
+        ],
+        "pixels": 3
+      }
+    ],
+    "columnInkRuns": [
+      [
+        148,
+        156
+      ],
+      [
+        158,
+        166
+      ],
+      [
+        167,
+        175
+      ],
+      [
+        176,
+        179
+      ],
+      [
+        180,
+        188
+      ],
+      [
+        189,
+        197
+      ],
+      [
+        198,
+        206
+      ],
+      [
+        208,
+        220
+      ],
+      [
+        221,
+        229
+      ],
+      [
+        230,
+        233
+      ],
+      [
+        234,
+        242
+      ],
+      [
+        243,
+        246
+      ],
+      [
+        247,
+        254
+      ],
+      [
+        256,
+        264
+      ],
+      [
+        265,
+        277
+      ]
+    ]
+  },
+  "domainNative": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-049-current.png",
+    "sha256": "b82488b15e3cfbe1a97262904f80c4242044fe5f873ca0d88e0fdfbf68ac8240",
+    "roi": [
+      130,
+      397,
+      264,
+      418
+    ],
+    "inkBBox": [
+      138,
+      402,
+      256,
+      416
+    ],
+    "inkSize": [
+      118,
+      14
+    ],
+    "inkPixelCount": 374,
+    "modalInkColors": [
+      {
+        "rgb": [
+          23,
+          26,
+          36
+        ],
+        "pixels": 86
+      },
+      {
+        "rgb": [
+          178,
+          178,
+          185
+        ],
+        "pixels": 9
+      },
+      {
+        "rgb": [
+          40,
+          43,
+          52
+        ],
+        "pixels": 8
+      },
+      {
+        "rgb": [
+          50,
+          51,
+          61
+        ],
+        "pixels": 7
+      },
+      {
+        "rgb": [
+          52,
+          54,
+          64
+        ],
+        "pixels": 7
+      }
+    ],
+    "columnInkRuns": [
+      [
+        138,
+        144
+      ],
+      [
+        146,
+        152
+      ],
+      [
+        154,
+        160
+      ],
+      [
+        164,
+        166
+      ],
+      [
+        170,
+        176
+      ],
+      [
+        178,
+        184
+      ],
+      [
+        186,
+        192
+      ],
+      [
+        193,
+        200
+      ],
+      [
+        202,
+        208
+      ],
+      [
+        210,
+        217
+      ],
+      [
+        218,
+        224
+      ],
+      [
+        228,
+        230
+      ],
+      [
+        234,
+        240
+      ],
+      [
+        242,
+        248
+      ],
+      [
+        249,
+        256
+      ]
+    ]
+  },
+  "dnsRef": {
+    "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-44.png",
+    "sha256": "273d10d66f277a2a7b439e7f407403be9154bf5810077582658c73c4ef1aa913",
+    "roi": [
+      80,
+      862,
+      330,
+      880
+    ],
+    "inkBBox": [
+      82,
+      864,
+      312,
+      876
+    ],
+    "inkSize": [
+      230,
+      12
+    ],
+    "inkPixelCount": 1331,
+    "modalInkColors": [
+      {
+        "rgb": [
+          121,
+          123,
+          137
+        ],
+        "pixels": 5
+      },
+      {
+        "rgb": [
+          117,
+          119,
+          133
+        ],
+        "pixels": 5
+      },
+      {
+        "rgb": [
+          191,
+          190,
+          199
+        ],
+        "pixels": 5
+      },
+      {
+        "rgb": [
+          122,
+          123,
+          138
+        ],
+        "pixels": 4
+      },
+      {
+        "rgb": [
+          141,
+          143,
+          155
+        ],
+        "pixels": 4
+      }
+    ],
+    "columnInkRuns": [
+      [
+        82,
+        94
+      ],
+      [
+        95,
+        107
+      ],
+      [
+        108,
+        120
+      ],
+      [
+        121,
+        133
+      ],
+      [
+        134,
+        146
+      ],
+      [
+        147,
+        159
+      ],
+      [
+        160,
+        171
+      ],
+      [
+        173,
+        185
+      ],
+      [
+        186,
+        198
+      ],
+      [
+        204,
+        212
+      ],
+      [
+        213,
+        221
+      ],
+      [
+        222,
+        229
+      ],
+      [
+        235,
+        247
+      ],
+      [
+        248,
+        260
+      ],
+      [
+        261,
+        273
+      ],
+      [
+        274,
+        286
+      ],
+      [
+        287,
+        299
+      ],
+      [
+        300,
+        312
+      ]
+    ]
+  },
+  "dnsNativeFirstLine": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-044-current.png",
+    "sha256": "149ece5db4f8f879b9d9f0f2e48303c88cd15016b4a9f3ebe7261acab3d59142",
+    "roi": [
+      72,
+      710,
+      313,
+      730
+    ],
+    "inkBBox": [
+      74,
+      713,
+      289,
+      727
+    ],
+    "inkSize": [
+      215,
+      14
+    ],
+    "inkPixelCount": 958,
+    "modalInkColors": [
+      {
+        "rgb": [
+          95,
+          100,
+          115
+        ],
+        "pixels": 90
+      },
+      {
+        "rgb": [
+          97,
+          102,
+          117
+        ],
+        "pixels": 38
+      },
+      {
+        "rgb": [
+          162,
+          165,
+          175
+        ],
+        "pixels": 32
+      },
+      {
+        "rgb": [
+          105,
+          110,
+          124
+        ],
+        "pixels": 31
+      },
+      {
+        "rgb": [
+          119,
+          123,
+          137
+        ],
+        "pixels": 26
+      }
+    ],
+    "columnInkRuns": [
+      [
+        74,
+        88
+      ],
+      [
+        89,
+        102
+      ],
+      [
+        103,
+        115
+      ],
+      [
+        117,
+        129
+      ],
+      [
+        131,
+        143
+      ],
+      [
+        145,
+        158
+      ],
+      [
+        159,
+        170
+      ],
+      [
+        173,
+        185
+      ],
+      [
+        187,
+        199
+      ],
+      [
+        203,
+        212
+      ],
+      [
+        213,
+        220
+      ],
+      [
+        222,
+        230
+      ],
+      [
+        235,
+        247
+      ],
+      [
+        249,
+        261
+      ],
+      [
+        263,
+        275
+      ],
+      [
+        277,
+        289
+      ]
+    ]
+  },
+  "dnsNativeSecondLine": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-044-current.png",
+    "sha256": "149ece5db4f8f879b9d9f0f2e48303c88cd15016b4a9f3ebe7261acab3d59142",
+    "roi": [
+      72,
+      731,
+      313,
+      750
+    ],
+    "inkBBox": [
+      75,
+      732,
+      101,
+      746
+    ],
+    "inkSize": [
+      26,
+      14
+    ],
+    "inkPixelCount": 87,
+    "modalInkColors": [
+      {
+        "rgb": [
+          97,
+          102,
+          117
+        ],
+        "pixels": 16
+      },
+      {
+        "rgb": [
+          95,
+          100,
+          115
+        ],
+        "pixels": 12
+      },
+      {
+        "rgb": [
+          103,
+          107,
+          122
+        ],
+        "pixels": 10
+      },
+      {
+        "rgb": [
+          105,
+          110,
+          124
+        ],
+        "pixels": 6
+      },
+      {
+        "rgb": [
+          100,
+          104,
+          119
+        ],
+        "pixels": 6
+      }
+    ],
+    "columnInkRuns": [
+      [
+        75,
+        87
+      ],
+      [
+        89,
+        101
+      ]
+    ]
+  },
+  "normalization": "Reference425px→native393dp scale393/425",
+  "A44Conclusion": {
+    "referenceSubtitleInkSize393dp": [
+      212.68235294117648,
+      11.096470588235293
+    ],
+    "nativeTwoLineInkSizesDp": [
+      [
+        215,
+        14
+      ],
+      [
+        26,
+        14
+      ]
+    ],
+    "availableNativeSubtitleWidthDp": 227,
+    "fullNativeTextWidthEstimateDp": null,
+    "referenceOneLine": true,
+    "sourceFontSizeSp": 14,
+    "sourceLineHeightSp": 19,
+    "candidateFontSizeSp": 12,
+    "candidateLineHeightSp": 17,
+    "candidateStatus": "inference from reference11.096dp ink height/current14px; unrendered and root owns implementation",
+    "fullNativeInkWidthsSeparateLinesDp": [
+      215,
+      26
+    ],
+    "widthInference": "Two independent line ink widths sum241dp; this is not an exact full single-line glyph advance because line-breaking/side bearings differ.",
+    "availableWidthDerivation": "393-2*14 screen gutter-2*16 row padding-26 icon-2*18 gaps-44 switch =227dp"
+  },
+  "A49Conclusion": {
+    "referenceDomainInkSize393dp": [
+      119.2870588235294,
+      13.870588235294118
+    ],
+    "nativeInkSizeDp": [
+      118,
+      14
+    ],
+    "referenceFamilyEvidence": "Original column runs m=12px,l=3px,a/e=8px; unequal glyph advances. Native m=7px,l=7px,common8px advance. Confirms actual reference proportional vsnativeforcedmonospace.",
+    "sourceFontSizeSp": 14,
+    "sourceLineHeightSp": 21,
+    "candidate": "Use native proportional family atsame14sp/21sp first; source glyph ink height alreadymatches13.871dp reference. Native width after family change needs new capture, no numerical exactness promised.",
+    "colorDifference": "Modal glyph core values included; root decide source c.t2 if referencegray confirmed."
+  }
+}

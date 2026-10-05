@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import copy,json,unittest
 from pathlib import Path
-from pdf85_source_scope import validate_layer,validate_changes,validate_shared_page
+from pdf85_source_scope import validate_layer,validate_changes,validate_shared_page,validate_native_settings_typography,NATIVE_SUBTITLE_HELPER
 ROOT=Path(__file__).resolve().parents[2]
 class PdfScope(unittest.TestCase):
     def setUp(self):self.layer=json.loads((ROOT/'updates/v2085-pdf-tools-settings/inputs.json').read_text())
@@ -27,4 +27,11 @@ class PdfScope(unittest.TestCase):
         validate_changes(gradle,newer,before,after)
         for wrong in [after.replace('loop','rootShell()'),after.replace('loop','MihomoControllerClient()'),after.replace('prefix','mutated')]:
             with self.assertRaises(AssertionError):validate_changes(gradle,newer,before,wrong)
+    def test_native_settings_typography_cannot_change_root_callbacks(self):
+        before='prefix 启动时将必要的设置参数覆写到运行配置\n    private TextView settingRow(u.text(subtitle,13,u.muted,false)\n    private CompoundButton switchRow(u.text(subtitle,13,u.muted,false)\n    private void plainAction(u.text(subtitle,13,u.muted,false)\nTextView current=u.text(value,13,u.muted,false); setChecked(checked); listener.accept(value); prefs.apply();'
+        after=before.replace('u.text(subtitle,13,u.muted,false)','settingsSubtitle(subtitle)').replace('TextView current=u.text(value,13,u.muted,false)','TextView current=settingsSubtitle(value)').replace('    private TextView settingRow(',NATIVE_SUBTITLE_HELPER+'    private TextView settingRow(',1)
+        after=after.replace('    private CompoundButton switchRow(settingsSubtitle(subtitle)','    private CompoundButton switchRow(settingsSubtitle(subtitle,11.5f)').replace('启动时将必要的设置参数覆写到运行配置','启动时将必要的河图参数覆写到运行配置')
+        validate_native_settings_typography(before,after)
+        for old,new in [('setChecked(checked)','setChecked(true)'),('listener.accept(value)','rootShell()'),('prefs.apply()','prefs.clear()')]:
+            with self.assertRaises(AssertionError): validate_native_settings_typography(before,after.replace(old,new))
 if __name__=='__main__':unittest.main()

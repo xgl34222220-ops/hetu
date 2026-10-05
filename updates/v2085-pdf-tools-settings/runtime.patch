@@ -43,10 +43,31 @@ index 0000000..9b72347
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 3f7ba83..63b73d7 100644
+index 3f7ba83..33bfa6e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-@@ -53,7 +53,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -21,6 +21,11 @@ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.semantics.heading
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.graphics.vector.PathParser
+ import androidx.compose.ui.graphics.luminance
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.foundation.text.KeyboardOptions
+@@ -29,6 +34,8 @@ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.ui.HetuTheme
+ import io.github.xgl34222220.hetu.ui.LocalHetuTokens
++import io.github.xgl34222220.hetu.tools.ToolsIcons
++import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
+ 
+ class ProxyAdvancedSettingsActivity : ComponentActivity() {
+     override fun onCreate(savedInstanceState: Bundle?) {
+@@ -53,7 +60,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
      fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
  
@@ -55,6 +76,112 @@ index 3f7ba83..63b73d7 100644
          item {
              OtherCard(card) {
                  OtherLabel("代理能力")
+@@ -76,7 +83,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                     ProxyRuntimeProfile.DnsHijack.REDIRECT -> "REDIRECT"
+                     ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
+                     else -> "TPROXY"
+-                }) { choice = "dns" }
++                }, icon = ToolsFeatureIcons.Globe) { choice = "dns" }
+             }
+         }
+ 
+@@ -85,6 +92,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                 OtherLabel("资源限制")
+                 ResourceSetting(
+                     title = "CPU 核心分配",
++                    icon = ToolsIcons.Cpu,
+                     enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
+                     value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
+                     hint = "0-7",
+@@ -94,6 +102,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                 )
+                 ResourceSetting(
+                     title = "内存限制",
++                    icon = AdvancedSettingsResourceIcons.Ram,
+                     enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
+                     value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
+                     hint = "100M",
+@@ -103,6 +112,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                 )
+                 ResourceSetting(
+                     title = "磁盘 I/O 权重",
++                    icon = AdvancedSettingsResourceIcons.Drive,
+                     enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
+                     value = prefs.getString("proxyIoWeight", "4").orEmpty(),
+                     hint = "0-7",
+@@ -116,7 +126,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+         item {
+             OtherCard(card) {
+                 OtherLabel("厂商防火墙")
+-                OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false)) { putBool("proxyVendorFirewallCleanup", it) }
++                OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = AdvancedSettingsResourceIcons.VendorShield) { putBool("proxyVendorFirewallCleanup", it) }
+             }
+         }
+     }
+@@ -160,13 +170,13 @@ private fun OtherLabel(text: String) {
+ }
+ 
+ @Composable
+-private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
+-    SettingsSwitchRow(title, checked, onChange, enabled = enabled, compact = true)
++private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
++    SettingsSwitchRow(title, checked, onChange, enabled = enabled, compact = true, icon = icon)
+ }
+ 
+ @Composable
+-private fun OtherChoiceRow(title: String, value: String, onClick: () -> Unit) {
+-    SettingsNavRow(title, value = value, dropdown = true, compact = true, onClick = onClick)
++private fun OtherChoiceRow(title: String, value: String, icon: ImageVector? = null, onClick: () -> Unit) {
++    SettingsNavRow(title, value = value, dropdown = true, compact = true, onClick = onClick, icon = icon)
+ }
+ 
+ @Composable
+@@ -176,15 +186,43 @@ private fun ResourceSetting(
+     value: String,
+     hint: String,
+     keyboardType: KeyboardType,
++    icon: ImageVector? = null,
+     onEnabled: (Boolean) -> Unit,
+     onValue: (String) -> Unit,
+ ) {
+     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+-        SettingsSwitchRow(title, enabled, onEnabled, compact = true)
++        SettingsSwitchRow(title, enabled, onEnabled, compact = true, icon = icon)
+         SettingsInput(
+             value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
+             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+-            modifier = Modifier.padding(horizontal = 16.dp),
++            modifier = Modifier.padding(start = if (icon != null) 66.dp else 16.dp, end = 16.dp),
+         )
+     }
+ }
++
++/** Resource glyphs drawn from the detailed supplied PDF04/05; names bypass unrelated global icon mappings. */
++private object AdvancedSettingsResourceIcons {
++    private fun lineVector(name: String, vararg paths: String): ImageVector = ImageVector.Builder(
++        name = "HetuAdvancedPdf04.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
++        viewportWidth = 24f, viewportHeight = 24f,
++    ).apply {
++        paths.forEach {
++            addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black),
++                strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
++        }
++    }.build()
++
++    val Ram: ImageVector = lineVector("ResourceRam",
++        "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
++        "M6 7v8", "M10 7v8", "M14 7v8", "M18 7v8",
++        "M6 18v3", "M10 18v3", "M14 18v3", "M18 18v3",
++    )
++    val Drive: ImageVector = lineVector("ResourceDrive",
++        "M5.6 3.5h12.8a2 2 0 0 1 1.94 1.5L22 13v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7l1.66-8a2 2 0 0 1 1.94-1.5Z",
++        "M2 13h20", "M18.6 17.5a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0Z",
++    )
++    val VendorShield: ImageVector = lineVector("VendorShieldCircle",
++        "M12 2 3 5v7c0 6 9 11 9 11s9-5 9-11V5l-9-3Z",
++        "M15 10a3 3 0 1 1-6 0a3 3 0 1 1 6 0Z",
++    )
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
 index 5581d10..17c3223 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
@@ -192,6 +319,69 @@ index 56730b7..4a3b426 100644
              if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
          }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
          try{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+index 4ae0459..e44d4de 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+@@ -57,7 +57,7 @@ public final class RootTproxyActivity extends Activity {
+         coreValue=settingRow(basic,"cpu","代理核心","选择代理核心程序","",this::chooseCore);settingsDivider(basic);
+         modeValue=settingRow(basic,"route","运行模式","选择代理运行模式","",this::chooseMode);settingsDivider(basic);
+         ipv6Value=settingRow(basic,"globe","IPv6","启用或禁用 IPv6 支持","",this::chooseIpv6);settingsDivider(basic);
+-        overwriteSwitch=switchRow(basic,"refresh","自动覆写","启动时将必要的设置参数覆写到运行配置",prefs.getBoolean("proxyBaseAutoOverwrite",true),value->{
++        overwriteSwitch=switchRow(basic,"refresh","自动覆写","启动时将必要的河图参数覆写到运行配置",prefs.getBoolean("proxyBaseAutoOverwrite",true),value->{
+             prefs.edit().putBoolean("proxyBaseAutoOverwrite",value).apply();changed("proxyBaseAutoOverwrite");refresh();
+         });
+ 
+@@ -84,10 +84,21 @@ public final class RootTproxyActivity extends Activity {
+         return well;
+     }
+ 
++    private TextView settingsSubtitle(String value){
++        return settingsSubtitle(value,14);
++    }
++
++    private TextView settingsSubtitle(String value,float size){
++        TextView text=u.text(value,size,u.muted,false);
++        if(Build.VERSION.SDK_INT>=Build.VERSION_CODES.P)text.setTypeface(android.graphics.Typeface.create(text.getTypeface(),600,false));
++        else text.setFontVariationSettings("'wght' 600");
++        return text;
++    }
++
+     private TextView settingRow(LinearLayout parent,String icon,String label,String subtitle,String value,Runnable action){
+         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setPadding(0,u.dp(3),0,u.dp(3));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
+         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
+-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));
++        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle));
+         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+         TextView right=u.text(value,15,u.muted,false);right.setGravity(Gravity.RIGHT|Gravity.CENTER_VERTICAL);right.setMaxWidth(u.dp(135));right.setEllipsize(TextUtils.TruncateAt.END);right.setSingleLine(true);row.addView(right,new LinearLayout.LayoutParams(-2,-1));
+         LinearLayout.LayoutParams cp=new LinearLayout.LayoutParams(u.dp(18),u.dp(18));cp.leftMargin=u.dp(6);row.addView(new SettingsLineIcon(this,"unfold",u.muted),cp);row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return right;
+@@ -96,7 +107,7 @@ public final class RootTproxyActivity extends Activity {
+     private CompoundButton switchRow(LinearLayout parent,String icon,String label,String subtitle,boolean checked,java.util.function.Consumer<Boolean> listener){
+         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(0,u.dp(3),0,u.dp(3));
+         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
+-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));
++        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(label,18,u.text,true));labels.addView(settingsSubtitle(subtitle,11.5f));
+         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+         CompoundButton sw=new SettingsToggle(this);sw.setContentDescription(label);sw.setChecked(checked);sw.setOnCheckedChangeListener((button,value)->listener.accept(value));row.addView(sw,new LinearLayout.LayoutParams(u.dp(50),u.dp(48)));row.setOnClickListener(v->sw.toggle());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return sw;
+     }
+@@ -104,7 +115,7 @@ public final class RootTproxyActivity extends Activity {
+     private void plainAction(LinearLayout parent,String icon,String title,String subtitle,Runnable action){
+         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
+         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
+-        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));labels.addView(u.text(subtitle,13,u.muted,false));row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
++        LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));labels.addView(settingsSubtitle(subtitle));row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+         row.addView(new IconView(this,"chevron",u.muted),new LinearLayout.LayoutParams(u.dp(18),u.dp(18)));row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));
+     }
+ 
+@@ -112,7 +123,7 @@ public final class RootTproxyActivity extends Activity {
+         LinearLayout row=u.row();row.setMinimumHeight(u.dp(76));row.setGravity(Gravity.CENTER_VERTICAL);row.setBackground(u.touch(android.graphics.Color.TRANSPARENT,14));
+         row.addView(rowIcon(icon),new LinearLayout.LayoutParams(u.dp(30),u.dp(30)));
+         LinearLayout labels=u.col();labels.setPadding(u.dp(20),0,u.dp(8),0);labels.addView(u.text(title,18,u.text,true));
+-        TextView current=u.text(value,13,u.muted,false);current.setSingleLine(true);current.setEllipsize(TextUtils.TruncateAt.MIDDLE);labels.addView(current);
++        TextView current=settingsSubtitle(value);current.setSingleLine(true);current.setEllipsize(TextUtils.TruncateAt.MIDDLE);labels.addView(current);
+         row.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+         row.addView(new IconView(this,"chevron",u.muted),new LinearLayout.LayoutParams(u.dp(18),u.dp(18)));row.setOnClickListener(v->action.run());parent.addView(row,new LinearLayout.LayoutParams(-1,-2));return current;
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
 index 1a9af21..32e3549 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
@@ -345,7 +535,7 @@ index 3f3f5cd..325ca56 100644
                      null -> HxDot(tint, 9.dp)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..5a2e369 100644
+index be09cbe..3e7b528 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -178,6 +178,8 @@ internal fun HxPage(
@@ -400,11 +590,11 @@ index be09cbe..5a2e369 100644
 +                null, tint = tone.fg(), modifier = Modifier.size(18.dp))
 +            Spacer(Modifier.width(8.dp))
 +            Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.5.sp, lineHeight = 14.sp,
-+                fontWeight = FontWeight.SemiBold), color = Hx.colors.text, modifier = Modifier.weight(1f))
++                fontWeight = FontWeight.SemiBold), color = tone.fg(), modifier = Modifier.weight(1f))
 +            if (actionLabel != null && onAction != null) {
 +                Box(Modifier.heightIn(min = 32.dp).clickable(role = Role.Button, onClick = onAction)
 +                    .padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-+                    Text(actionLabel, color = tone.fg(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
++                    Text(actionLabel, color = Hx.colors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
 +                }
 +            }
 +        }
@@ -478,7 +668,7 @@ index be09cbe..5a2e369 100644
              } else choices.forEachIndexed { index, choice ->
                  HxMenuItem(
                      choice.label,
-@@ -1256,11 +1301,18 @@ internal fun HxFormDialog(
+@@ -1256,11 +1301,20 @@ internal fun HxFormDialog(
      messageBelowFields: Boolean = false,
      errorField: (String) -> Int? = { null },
      widthFraction: Float? = null,
@@ -494,10 +684,12 @@ index be09cbe..5a2e369 100644
 +    labelFontWeight: FontWeight? = null,
 +    inputFontWeight: FontWeight? = null,
 +    confirmColorOverride: Color? = null,
++    normalPlainFieldHeight: Dp? = null,
++    normalPlainFieldVerticalPadding: Dp? = null,
      plainFields: Boolean = false,
      compactPills: Boolean = false,
      validate: (List<String>) -> String? = { null },
-@@ -1286,12 +1338,12 @@ internal fun HxFormDialog(
+@@ -1286,12 +1340,12 @@ internal fun HxFormDialog(
          if (problem != null) { error = problem; shakeTick++ }
          else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
      }
@@ -512,7 +704,7 @@ index be09cbe..5a2e369 100644
                  Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
                  if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
                      Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-@@ -1299,7 +1351,7 @@ internal fun HxFormDialog(
+@@ -1299,7 +1353,7 @@ internal fun HxFormDialog(
                  }
                  fields.forEachIndexed { index, field ->
                      if (index > 0) Spacer(Modifier.height(12.dp))
@@ -521,20 +713,23 @@ index be09cbe..5a2e369 100644
                      Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp))
                      androidx.compose.foundation.text.BasicTextField(
                          value = values[index].value,
-@@ -1307,10 +1359,10 @@ internal fun HxFormDialog(
+@@ -1307,11 +1361,11 @@ internal fun HxFormDialog(
                          singleLine = field.singleLine,
                          maxLines = if (field.singleLine) 1 else 6,
                          keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
 -                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
 +                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp, fontWeight = inputFontWeight ?: MaterialTheme.typography.bodyLarge.fontWeight),
                          cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-                         modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+-                        modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
 -                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else c.line, RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
+-                            .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
++                        modifier = Modifier.fillMaxWidth().heightIn(min = (if (error == null && plainFields) normalPlainFieldHeight else null) ?: if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
 +                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else ((if (error != null) errorFieldOutlineColor else null) ?: fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                             .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
++                            .padding(horizontal = 12.dp, vertical = (if (error == null && plainFields) normalPlainFieldVerticalPadding else null) ?: if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
                          decorationBox = { input -> Box {
                              if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
-@@ -1320,7 +1372,7 @@ internal fun HxFormDialog(
+                             input()
+@@ -1320,7 +1374,7 @@ internal fun HxFormDialog(
                      if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
                          style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                  }
@@ -543,7 +738,7 @@ index be09cbe..5a2e369 100644
                      Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
                  }
                  AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-@@ -1328,7 +1380,7 @@ internal fun HxFormDialog(
+@@ -1328,7 +1382,7 @@ internal fun HxFormDialog(
                  }
                  if (!configFooter) {
                      Spacer(Modifier.height(14.dp))
@@ -702,19 +897,20 @@ index 088770f..b4cf06e 100644
 +    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
-index 206b829..ea310ab 100644
+index 206b829..176784d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
-@@ -79,6 +79,8 @@ internal fun SettingsRow(
+@@ -79,6 +79,9 @@ internal fun SettingsRow(
      onClick: (() -> Unit)? = null,
      compact: Boolean = false,
      modifier: Modifier = Modifier,
 +    rootReference: Boolean = false,
 +    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
++    subtitleFontSizeSp: Float? = null,
      trailing: @Composable RowScope.() -> Unit = {},
  ) {
      val c = Hx.colors
-@@ -87,7 +89,7 @@ internal fun SettingsRow(
+@@ -87,7 +90,7 @@ internal fun SettingsRow(
          modifier.fillMaxWidth().hxAnchorSource()
              .then(if (onClick != null) Modifier.hxPressScale(source, .99f)
                  .clickable(interactionSource = source, indication = null, enabled = enabled, onClick = onClick) else Modifier)
@@ -723,19 +919,20 @@ index 206b829..ea310ab 100644
              .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp),
          verticalAlignment = Alignment.CenterVertically,
      ) {
-@@ -97,9 +99,10 @@ internal fun SettingsRow(
+@@ -97,9 +100,10 @@ internal fun SettingsRow(
          }
          Column(Modifier.weight(1f)) {
              Text(title, fontSize = 18.sp, lineHeight = 24.sp,
 -                fontWeight = FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
 +                fontWeight = FontWeight.Bold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
                  maxLines = 2, overflow = TextOverflow.Ellipsis)
-             if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
+-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
++            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = (subtitleFontSizeSp ?: 14f).sp, lineHeight = 18.sp,
 +                fontWeight = FontWeight.SemiBold,
                  color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
          }
          trailing()
-@@ -115,9 +118,11 @@ internal fun SettingsNavRow(
+@@ -115,9 +119,11 @@ internal fun SettingsNavRow(
      value: String? = null,
      dropdown: Boolean = false,
      compact: Boolean = false,
@@ -748,15 +945,83 @@ index 206b829..ea310ab 100644
          if (!value.isNullOrBlank()) {
              Spacer(Modifier.width(8.dp))
              Text(value, color = Hx.colors.textMuted, fontSize = 15.sp, lineHeight = 20.sp,
-@@ -218,6 +223,7 @@ internal fun SettingsDialog(
+@@ -139,10 +145,13 @@ internal fun SettingsSwitchRow(
+     iconTint: Color = Hx.colors.text,
+     enabled: Boolean = true,
+     compact: Boolean = false,
++    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
++    subtitleFontSizeSp: Float? = null,
+ ) {
+     val source = remember { MutableInteractionSource() }
+     val haptics = rememberHetuHaptics()
+     SettingsRow(title, subtitle, icon, iconTint, enabled, compact = compact,
++        rowMinHeight = rowMinHeight, subtitleFontSizeSp = subtitleFontSizeSp,
+         modifier = Modifier.hxPressScale(source, .99f).semantics(mergeDescendants = true) {}
+             .toggleable(value = checked, enabled = enabled, role = Role.Switch, interactionSource = source, indication = null) { on ->
+                 haptics.perform(if (on) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
+@@ -181,15 +190,26 @@ internal fun SettingsInput(
+     error: Boolean = false,
+     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
+     modifier: Modifier = Modifier,
++    referenceMirror: Boolean = false,
+ ) {
+     val c = Hx.colors
+     Column(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+-        .background(if (c.dark) c.surfaceMuted else Color(0xFFE8E5FF))
++        .background(if (c.dark) c.surfaceMuted else if (referenceMirror) {
++            if (error) Color(0xFFE9E6FD) else Color(0xFFE6E4FD)
++        } else Color(0xFFE8E5FF))
+         .then(if (error) Modifier.border(1.dp, c.bad, RoundedCornerShape(12.dp)) else Modifier)
+-        .padding(horizontal = 10.dp, vertical = if (label == null) 9.dp else 8.dp)) {
++        .then(if (referenceMirror) Modifier.heightIn(min = if (error) 68.dp else 46.dp) else Modifier)
++        .padding(horizontal = 10.dp, vertical = when {
++            referenceMirror && error -> 11.5.dp
++            referenceMirror -> 12.dp
++            label == null -> 9.dp
++            else -> 8.dp
++        })) {
+         if (label != null) {
+-            Text(label, color = c.textMuted, fontSize = 11.5.sp, lineHeight = 15.sp)
+-            Spacer(Modifier.height(4.dp))
++            Text(label, color = c.textMuted, fontSize = if (referenceMirror) 13.sp else 11.5.sp,
++                lineHeight = if (referenceMirror) 17.sp else 15.sp,
++                fontWeight = if (referenceMirror) FontWeight.SemiBold else null)
++            Spacer(Modifier.height(if (referenceMirror) 6.dp else 4.dp))
+         }
+         BasicTextField(
+             value = value,
+@@ -197,11 +217,15 @@ internal fun SettingsInput(
+             enabled = enabled,
+             singleLine = singleLine,
+             keyboardOptions = keyboardOptions,
+-            textStyle = TextStyle(color = if (enabled) c.text else c.textMuted, fontSize = 15.sp, lineHeight = 19.sp),
++            textStyle = TextStyle(color = if (enabled) c.text else c.textMuted,
++                fontSize = if (referenceMirror) 18.sp else 15.sp,
++                lineHeight = if (referenceMirror) 22.sp else 19.sp,
++                fontWeight = if (referenceMirror) FontWeight.SemiBold else null),
+             cursorBrush = SolidColor(c.accent),
+             modifier = Modifier.fillMaxWidth()
++                .then(if (referenceMirror) Modifier.heightIn(min = 22.dp) else Modifier)
+                 .clip(RoundedCornerShape(9.dp))
+-                .then(if (label != null) Modifier.background(c.surface.copy(alpha = .9f)).padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.padding(horizontal = 5.dp)),
++                .then(if (label != null && !referenceMirror) Modifier.background(c.surface.copy(alpha = .9f)).padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.padding(horizontal = 5.dp)),
+             decorationBox = { field ->
+                 Box {
+                     if (value.isBlank() && placeholder.isNotBlank()) Text(placeholder, color = c.textFaint, fontSize = 15.sp, lineHeight = 19.sp)
+@@ -218,25 +242,28 @@ internal fun SettingsDialog(
      onDismiss: () -> Unit,
      confirmLabel: String,
      onConfirm: () -> Unit,
 +    pillButtons: Boolean = false,
++    titleFontSizeSp: Float? = null,
++    titleLineHeightSp: Float? = null,
      content: @Composable ColumnScope.() -> Unit,
  ) {
      HxReferenceDialog(onDismiss = onDismiss) {
-@@ -227,16 +233,16 @@ internal fun SettingsDialog(
+-            Text(title, color = Hx.colors.text, fontSize = 24.sp, lineHeight = 30.sp,
++            Text(title, color = Hx.colors.text, fontSize = (titleFontSizeSp ?: 24f).sp, lineHeight = (titleLineHeightSp ?: 30f).sp,
+                 fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp))
              content()
              Spacer(Modifier.height(18.dp))
              Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -777,15 +1042,25 @@ index 206b829..ea310ab 100644
          .background(if (primary) {
              if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
          } else Hx.colors.accentSoft)
-@@ -254,7 +260,7 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
+@@ -254,10 +281,14 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
          val next = value.trim()
          if (!settingsMirrorPrefixValid(next)) error = true
          else onSave(next)
 -    }) {
-+    }, pillButtons = true) {
-         Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
-         Spacer(Modifier.height(6.dp))
-         SettingsInput(value, { value = it; error = false }, error = error)
+-        Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
+-        Spacer(Modifier.height(6.dp))
+-        SettingsInput(value, { value = it; error = false }, error = error)
++    }, pillButtons = !error, titleFontSizeSp = if (error) 19f else null,
++        titleLineHeightSp = if (error) 24f else null) {
++        if (!error) {
++            Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
++            Spacer(Modifier.height(6.dp))
++        }
++        SettingsInput(value, { value = it; error = false }, label = if (error) ht("镜像前缀") else null,
++            error = error, referenceMirror = true)
+         if (error) Text(ht("请填写 http/https 地址"), color = Hx.colors.bad, fontSize = 12.sp,
+             modifier = Modifier.padding(start = 4.dp, top = 5.dp))
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
 index b2614b5..95e6050 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
@@ -836,7 +1111,7 @@ index b2614b5..95e6050 100644
      "GridView", "Apps" -> SettingsReferenceIcons.Grid
      "RestartAlt" -> SettingsReferenceIcons.Power
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index b06fbb2..c227c4b 100644
+index b06fbb2..fe24dac 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -96,6 +96,7 @@ import androidx.compose.material.icons.rounded.UploadFile
@@ -905,16 +1180,18 @@ index b06fbb2..c227c4b 100644
              title = ht("开机启动与下载"),
              largeTitle = false,
              compactTitleFontSizeSp = 20f,
-@@ -266,7 +284,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -266,7 +284,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                              autoStart,
                              { vm.setAutoStart(it) },
                              enabled = !vm.autoStartBusy && vm.operation == null,
 -                            subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "成功启动一次代理后开启，安装 Root 开机脚本",
 +                            subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "安装 Root 开机脚本，开机后自动启动服务",
++                            rowMinHeight = if (!vm.autoStartBusy && !autoStart) 72.dp else null,
++                            subtitleFontSizeSp = if (!vm.autoStartBusy && !autoStart) 11.5f else null,
                              icon = Icons.Rounded.RestartAlt,
                              iconTint = c.text,
                          )
-@@ -309,7 +327,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -309,7 +329,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              }
          }
      } else if (subPage == "defaultPanel") {
@@ -923,7 +1200,7 @@ index b06fbb2..c227c4b 100644
              title = ht("默认面板"),
              largeTitle = false,
              compactTitleFontSizeSp = 20f,
-@@ -353,7 +371,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -353,7 +373,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
  
      if (subPage == null) {
      top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
@@ -932,7 +1209,7 @@ index b06fbb2..c227c4b 100644
              title = ht("设置"),
              scrollToTopSignal = vm.reselect,
              // The collapsed reference begins at the appearance group. Retain enough
-@@ -361,9 +379,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -361,9 +381,9 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              // even on a tall viewport; do not shrink rows or hard-code a device height.
              bottomPadding = bottomPadding + with(density) { firstGroupHeightPx.toDp() },
              largeTitleStartPadding = 26.dp,
@@ -944,7 +1221,7 @@ index b06fbb2..c227c4b 100644
              canvasColor = c.canvas,
          ) {
              item(key = "proxy-config") {
-@@ -388,12 +406,14 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -388,12 +408,14 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              item(key = "appearance-panel") {
                  MiuixSettingsCard {
                      MiuixSettingsArrow(
@@ -959,7 +1236,7 @@ index b06fbb2..c227c4b 100644
                          title = ht("默认面板"),
                          summary = ht("选择面板与显示偏好"),
                          icon = Icons.Rounded.GridView,
-@@ -405,18 +425,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+@@ -405,18 +427,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
              item(key = "backup-startup-notify") {
                  MiuixSettingsCard {
                      MiuixSettingsArrow(
@@ -981,7 +1258,7 @@ index b06fbb2..c227c4b 100644
                          title = ht("通知设置"),
                          summary = ht("管理运行状态提醒"),
                          icon = Icons.Rounded.Notifications,
-@@ -520,9 +543,10 @@ private fun MiuixSettingsArrow(
+@@ -520,9 +545,10 @@ private fun MiuixSettingsArrow(
      summary: String? = null,
      icon: androidx.compose.ui.graphics.vector.ImageVector,
      value: String? = null,
@@ -993,7 +1270,7 @@ index b06fbb2..c227c4b 100644
  }
  
  /* ------------------------------------------------------------------ */
-@@ -557,12 +581,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -557,12 +583,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
      val c = Hx.colors
  
@@ -1008,7 +1285,7 @@ index b06fbb2..c227c4b 100644
      ) {
          item(key = "core") {
              SettingsSection {
-@@ -851,7 +875,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -851,7 +877,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
          revision++
      }
  
@@ -1017,7 +1294,7 @@ index b06fbb2..c227c4b 100644
          title = ht("主题设置"),
          subtitle = null,
          onBack = onBack,
-@@ -915,9 +939,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -915,9 +941,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      SettingsDivider()
                      SettingsNavRow(ht("顶栏模糊样式"), subtitle = ht("选择顶栏磨砂的过渡方式"), icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = if (topBlur == "gaussian") ht("高斯模糊") else ht("渐进式模糊"), dropdown = true) { choice = "topBlur" }
                      SettingsDivider()
@@ -1029,7 +1306,7 @@ index b06fbb2..c227c4b 100644
                  }
              }
          }
-@@ -932,7 +956,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -932,7 +958,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          }
                      }
                      SettingsDivider()
@@ -1039,7 +1316,7 @@ index b06fbb2..c227c4b 100644
              }
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
-index ddc05df..708634d 100644
+index ddc05df..cf09f3c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 @@ -15,6 +15,7 @@ import androidx.compose.material.icons.rounded.IosShare
@@ -1073,8 +1350,17 @@ index ddc05df..708634d 100644
          item(key = "actions") {
              SettingsSection {
                  SettingsGroup {
+@@ -90,7 +98,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+                 Box(Modifier.fillMaxWidth().heightIn(min = 400.dp).clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface).padding(16.dp)) {
+                     SelectionContainer {
+                         Text(if (busy && text.isBlank()) "正在读取启动配置…" else text.ifBlank { "暂无启动配置" },
+-                            color = Hx.colors.textMuted, fontFamily = FontFamily.Monospace, fontSize = 11.sp, lineHeight = 17.sp,
++                            color = Hx.colors.text, fontFamily = FontFamily.Monospace, fontSize = 12.sp, lineHeight = 19.sp, letterSpacing = 0.sp,
+                             modifier = Modifier.horizontalScroll(rememberScrollState()))
+                     }
+                 }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..2cef8b8 100644
+index b68a65b..c6bd3ea 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -1130,7 +1416,22 @@ index b68a65b..2cef8b8 100644
          title = "文件管理",
          largeTitle = true,
          largeTitleFontSizeSp = 36f,
-@@ -777,6 +778,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+@@ -709,11 +710,12 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+             if (path != root) item(key = "subdirectory") {
+                 HxSection {
+                     HxGroup {
+-                        HxRow("..", icon = Icons.AutoMirrored.Rounded.ArrowBack, referenceRow = true,
++                        HxRow("..", icon = FileManagerReferenceIcons.Folder, referenceRow = true,
+                             referenceTextSizeSp = 18f, minimumHeight = 68.dp, onClick = {
+                                 val parent = File(path).parentFile?.path.orEmpty()
+                                 onOpen(parent.takeIf { it == root || it.startsWith("$root/") } ?: root)
+-                            })
++                            }, trailing = { Icon(io.github.xgl34222220.hetu.home.HomeIcons.ChevronLeft, null,
++                                tint = c.text, modifier = Modifier.size(24.dp)) })
+                         (folders + files).forEach { entry ->
+                             FileReferenceEntryRow(entry, (menuFor ?: renameFor ?: deleteFor)?.path == entry.path,
+                                 onClick = { haptics.perform(HetuHaptic.Tap); if (entry.directory) onOpen(entry.path) else openFile(entry) },
+@@ -777,6 +779,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
              titleFontSize = if (folder) 20.sp else 26.sp,
              titleLineHeight = if (folder) 26.sp else 32.sp,
              titleTextAlign = if (folder) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
@@ -1138,17 +1439,18 @@ index b68a65b..2cef8b8 100644
              fields = listOf(HxField("名称", placeholder = if (folder) "例如 backup" else "例如 config.yaml")),
              confirmLabel = "创建",
              validate = { v -> runCatching { RuntimeFilesRepository.child(path, v[0]) }.exceptionOrNull()?.message },
-@@ -790,7 +792,8 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+@@ -790,7 +793,9 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
      if (downloadDialog) {
          HxFormDialog(
              title = "下载到当前目录",
 -            widthFraction = .87f, titleFontSize = 22.sp, hideMessageOnError = true, highlightError = false, plainFields = true,
 +            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, centerTitleOnError = true, hideMessageOnError = true, highlightError = false, plainFields = true,
 +            labelFontWeight = FontWeight.SemiBold, inputFontWeight = FontWeight.SemiBold, confirmColorOverride = referenceConfirmColor,
++            normalPlainFieldHeight = 34.dp, normalPlainFieldVerticalPadding = 7.dp,
              message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
              fields = listOf(
                  HxField("下载地址", placeholder = "https://example.com/file.yaml"),
-@@ -821,6 +824,8 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+@@ -821,6 +826,8 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
          HxFormDialog(
              title = "重命名",
              message = "原文件：${entry.name}", messageBelowFields = true,
@@ -1157,7 +1459,7 @@ index b68a65b..2cef8b8 100644
              fields = listOf(HxField("新名称", entry.name)),
              confirmLabel = "重命名",
              validate = { v ->
-@@ -874,7 +879,7 @@ private fun FileReferenceEntryRow(entry: RuntimeFileEntry, selected: Boolean, on
+@@ -874,7 +881,7 @@ private fun FileReferenceEntryRow(entry: RuntimeFileEntry, selected: Boolean, on
          minimumHeight = if (entry.directory) 68.dp else 74.dp,
          subtitle = if (entry.directory) null else listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
              .filter { it.isNotBlank() }.joinToString(" · "),
@@ -1166,7 +1468,7 @@ index b68a65b..2cef8b8 100644
          onClick = onClick, onLongClick = onLongClick,
          trailing = if (entry.directory) ({ HxChevron() }) else null)
  }
-@@ -909,7 +914,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -909,7 +916,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
      }
  
@@ -1175,7 +1477,7 @@ index b68a65b..2cef8b8 100644
          item(key = "preflight") {
              SettingsSection {
                  SettingsGroup(title = "运行预检") {
-@@ -1055,9 +1060,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1055,9 +1062,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          actions.toList() != initialActions || labels.toList() != initialLabels
  
      val targetOptions = listOf(
@@ -1188,7 +1490,7 @@ index b68a65b..2cef8b8 100644
      )
      val actionOptions = listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
      val refreshOptions = listOf(2, 3, 5, 10, 30, 60)
-@@ -1086,7 +1091,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1086,7 +1093,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          onBack()
      }
  
@@ -1197,7 +1499,17 @@ index b68a65b..2cef8b8 100644
          title = "通知详细设置",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
-@@ -1171,6 +1176,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1106,7 +1113,8 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         } else {
+                             enabled = on
+                         }
+-                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted)
++                    }, subtitle = "常驻显示运行状态、网速与快捷控制", icon = Icons.Rounded.Router, iconTint = c.textMuted,
++                        subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)
+                     SettingsDivider()
+                     SettingsNavRow("刷新频率", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = "$refresh 秒", dropdown = true) { picker = "refresh" to -1 }
+                     SettingsDivider()
+@@ -1171,6 +1179,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  presentation = HxChoicePresentation.Notification,
                  title = "点击通知打开",
                  choices = targetOptions.map { HxChoice(it.first, it.second) },
@@ -1206,10 +1518,10 @@ index b68a65b..2cef8b8 100644
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index 97cc0f0..bcf017d 100644
+index 97cc0f0..05343ca 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-@@ -26,6 +26,9 @@ import androidx.compose.ui.Modifier
+@@ -26,12 +26,17 @@ import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.alpha
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.vector.ImageVector
@@ -1217,9 +1529,26 @@ index 97cc0f0..bcf017d 100644
 +import androidx.compose.ui.semantics.customActions
 +import androidx.compose.ui.semantics.semantics
  import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.text.font.FontFamily
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.input.KeyboardType
-@@ -127,8 +130,8 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
+ import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.home.HomeBanner
+ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
+@@ -111,7 +116,7 @@ internal fun ToolsAdblockScreen(
+                     DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
+                     HomeCard(Modifier.fillMaxWidth()) {
+                         ToolsCardTitle("代理关闭时")
+-                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle)
++                        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = ht("代理未运行时用本地 VPN 继续过滤广告"), enabled = idle, subtitleStyle = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 17.sp))
+                         ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = ht("拦截伪装成正常域名的追踪 CNAME"), enabled = idle)
+                     }
+                 }
+@@ -127,8 +132,8 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
  private fun statusLook(state: ToolsAdblockState): StatusLook {
      val c = LocalHomeColors.current
      return when (state.status) {
@@ -1230,7 +1559,7 @@ index 97cc0f0..bcf017d 100644
          ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.sunken, "已开启", "启动代理后自动验证运行链。")
          ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "运行链未确认", "尚未确认规则模式及广告规则加载；下拉刷新后重试验证。")
          ToolsAdStatus.Off -> StatusLook(ToolsFeatureIcons.ShieldOff, c.t3, c.sunken, "已关闭", "代理仅负责转发，不执行广告规则。")
-@@ -140,10 +143,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
+@@ -140,10 +145,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
      val c = LocalHomeColors.current
      val look = statusLook(state)
      val number = if (state.enabled) c.accent else c.t3
@@ -1246,7 +1575,7 @@ index 97cc0f0..bcf017d 100644
              }
              Column(Modifier.weight(1f)) {
                  Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
-@@ -198,7 +204,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
+@@ -198,7 +206,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
      val c = LocalHomeColors.current
      ToolsRow(
          AnnotatedString(title),
@@ -1255,7 +1584,7 @@ index 97cc0f0..bcf017d 100644
          iconTint = if (ok) c.good else c.t3,
          subtitle = detail, compact = true,
      )
-@@ -278,13 +284,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
+@@ -278,13 +286,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
  @Composable
  internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
@@ -1273,7 +1602,7 @@ index 97cc0f0..bcf017d 100644
          }
      }
  }
-@@ -305,9 +311,9 @@ internal fun ToolsAddDomainDialogCard(
+@@ -305,9 +313,9 @@ internal fun ToolsAddDomainDialogCard(
      ToolsDialogCard(
          title = if (overlay.allow) "添加白名单" else "添加黑名单",
          text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
@@ -1285,7 +1614,7 @@ index 97cc0f0..bcf017d 100644
  }
  
  /** Page 49: reached by tapping a row of 最近拦截. */
-@@ -315,7 +321,7 @@ internal fun ToolsAddDomainDialogCard(
+@@ -315,10 +323,10 @@ internal fun ToolsAddDomainDialogCard(
  internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      ToolsDialogCard(
@@ -1293,7 +1622,11 @@ index 97cc0f0..bcf017d 100644
 +        title = "加入白名单？", confirmLabel = "加入", confirmLoading = overlay.saving, neutralCancel = true,
          onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
      ) {
-         Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+-        Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
++        Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t2, style = HomeType.mono.copy(fontFamily = FontFamily.Default), textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
+         Text(ht("及其子域名将不再被拦截。"), Modifier.fillMaxWidth().padding(top = 4.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
 index 6125191..b3c1459 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
@@ -1413,7 +1746,7 @@ index 6125191..b3c1459 100644
      )
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..3e75adc 100644
+index e3bff78..02828bc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 @@ -8,19 +8,24 @@ import io.github.xgl34222220.hetu.hxPressScale
@@ -1559,12 +1892,13 @@ index e3bff78..3e75adc 100644
      }
  }
  
-@@ -267,14 +287,36 @@ internal fun ToolsField(
+@@ -267,26 +287,50 @@ internal fun ToolsField(
      monospace: Boolean = false,
      readOnly: Boolean = false,
      keyboardType: KeyboardType = KeyboardType.Text,
 +    compact: Boolean = false,
 +    clearable: Boolean = false,
++    errorAfterHint: Boolean = false,
  ) {
      val c = LocalHomeColors.current
 -    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -1597,9 +1931,15 @@ index e3bff78..3e75adc 100644
 +                },
 +            )
          }
++        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
          if (error != null) {
              Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-@@ -286,7 +328,7 @@ internal fun ToolsField(
+                 Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
+                 Text(error, color = c.bad, style = HomeType.caption)
+             }
+         }
+-        if (hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
++        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
      }
  }
  
@@ -1608,7 +1948,7 @@ index e3bff78..3e75adc 100644
  @Composable
  internal fun ToolsSearchField(
      value: String,
-@@ -313,7 +355,7 @@ internal fun ToolsSearchField(
+@@ -313,7 +357,7 @@ internal fun ToolsSearchField(
          cursorBrush = SolidColor(c.accent),
          decorationBox = { inner ->
              Row(
@@ -1617,7 +1957,7 @@ index e3bff78..3e75adc 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(8.dp),
              ) {
-@@ -326,7 +368,11 @@ internal fun ToolsSearchField(
+@@ -326,7 +370,11 @@ internal fun ToolsSearchField(
                      Box(
                          Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
                          contentAlignment = Alignment.Center,
@@ -1630,7 +1970,7 @@ index e3bff78..3e75adc 100644
                  }
              }
          },
-@@ -343,11 +389,12 @@ internal fun ToolsEmpty(
+@@ -343,11 +391,12 @@ internal fun ToolsEmpty(
      title: String,
      modifier: Modifier = Modifier,
      subtitle: String? = null,
@@ -1644,7 +1984,7 @@ index e3bff78..3e75adc 100644
          Text(ht(title), color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
          if (subtitle != null) Text(subtitle, Modifier.padding(top = 4.dp), color = c.t2, style = HomeType.note, textAlign = TextAlign.Center)
          if (action != null) Box(Modifier.padding(top = 16.dp)) { action() }
-@@ -396,6 +443,7 @@ internal fun ToolsDangerButton(
+@@ -396,6 +445,7 @@ internal fun ToolsDangerButton(
  /* ------------------------------------------------------------------ */
  
  internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
@@ -1652,7 +1992,7 @@ index e3bff78..3e75adc 100644
  
  /**
   * The inside of a confirmation dialog: centred title and message, optional form content,
-@@ -411,30 +459,47 @@ internal fun ToolsDialogCard(
+@@ -411,30 +461,47 @@ internal fun ToolsDialogCard(
      modifier: Modifier = Modifier,
      text: String? = null,
      confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
@@ -1719,7 +2059,7 @@ index e3bff78..3e75adc 100644
              }
          }
      }
-@@ -456,12 +521,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
+@@ -456,12 +523,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
  
  /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
  @Composable
@@ -1734,7 +2074,7 @@ index e3bff78..3e75adc 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
-@@ -469,17 +534,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -469,17 +536,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
              .padding(4.dp),
      ) {
          if (title != null) {
@@ -1755,7 +2095,7 @@ index e3bff78..3e75adc 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(10.dp),
              ) {
-@@ -495,7 +560,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -495,7 +562,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
   * Place it inside the Box that wraps the «⋯» button.
   */
  @Composable
@@ -1809,7 +2149,7 @@ index e3bff78..3e75adc 100644
      Popup(
          alignment = Alignment.TopEnd,
          offset = IntOffset(0, offsetY),
-@@ -504,3 +614,10 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
+@@ -504,3 +616,10 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
          content = content,
      )
  }
@@ -1915,10 +2255,10 @@ index e9d3077..b2ab72c 100644
          text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
          confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
-index 8ac0639..d4f2847 100644
+index 8ac0639..559e865 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
-@@ -1,19 +1,26 @@
+@@ -1,19 +1,28 @@
  package io.github.xgl34222220.hetu.tools
  
  import io.github.xgl34222220.hetu.ui.ht
@@ -1934,9 +2274,11 @@ index 8ac0639..d4f2847 100644
 +import androidx.compose.material3.Icon
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
 +import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
@@ -1945,7 +2287,7 @@ index 8ac0639..d4f2847 100644
  import io.github.xgl34222220.hetu.home.HomeBadge
  import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
  import io.github.xgl34222220.hetu.home.HomeButtonKind
-@@ -71,9 +78,9 @@ internal fun ToolsCoresScreen(
+@@ -71,9 +80,9 @@ internal fun ToolsCoresScreen(
  }
  
  internal fun ToolsCore.glyph(): ImageVector = when {
@@ -1958,7 +2300,19 @@ index 8ac0639..d4f2847 100644
      else -> ToolsIcons.Cpu
  }
  
-@@ -84,10 +91,18 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
+@@ -81,13 +90,30 @@ internal fun ToolsCore.glyph(): ImageVector = when {
+ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress: String, onPrimary: (ToolsCoreAction) -> Unit, onImport: () -> Unit) {
+     val c = LocalHomeColors.current
+     val action = core.primaryAction()
++    val softButtonColors = if (c.dark) c else c.copy(
++        accentSoft = if (enabled) Color(0xFFEEF0FC) else coreButtonColorBeforeDisabledAlpha(Color(0xFFEAEDF6), c.surface),
++        accent = if (enabled) c.accent else coreButtonColorBeforeDisabledAlpha(Color(0xFFBBBDCA), c.surface),
++    )
++    val processingColors = if (c.dark) c else c.copy(
++        surface = coreButtonColorBeforeDisabledAlpha(Color(0xFFC8CAD6), c.surface),
++        t1 = Color.White,
++        line2 = Color.Transparent,
++    )
      HomeCard(Modifier.fillMaxWidth()) {
          Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
              Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -1979,6 +2333,53 @@ index 8ac0639..d4f2847 100644
                          when {
                              !core.runnable -> HomeBadge(ht("仅下载管理"))
                              core.updateAvailable -> HomeBadge(ht("有更新"), tone = HomeTone.Accent)
+@@ -105,19 +131,35 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
+             }
+             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                 when {
+-                    busy -> HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true)
+-                    action != null -> HomeButton(
+-                        action.label, { onPrimary(action) }, Modifier.weight(1f),
+-                        kind = when (action) {
+-                            ToolsCoreAction.Update -> HomeButtonKind.Primary
+-                            ToolsCoreAction.Download -> HomeButtonKind.Soft
+-                            ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary
+-                        },
+-                        enabled = enabled,
+-                    )
++                    busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {
++                        HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true)
++                    }
++                    action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {
++                        HomeButton(
++                            action.label, { onPrimary(action) }, Modifier.weight(1f),
++                            kind = when (action) {
++                                ToolsCoreAction.Update -> HomeButtonKind.Primary
++                                ToolsCoreAction.Download -> HomeButtonKind.Soft
++                                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary
++                            },
++                            enabled = enabled,
++                        )
++                    }
++                }
++                CompositionLocalProvider(LocalHomeColors provides softButtonColors) {
++                    HomeButton("导入", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)
+                 }
+-                HomeButton("导入", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)
+             }
+         }
+     }
+ }
++
++/** Keep the shared button's disabled alpha while matching the measured light-mode colors. */
++private fun coreButtonColorBeforeDisabledAlpha(fill: Color, surface: Color): Color {
++    val alpha = .45f
++    return fill.copy(
++        red = ((fill.red - surface.red * (1f - alpha)) / alpha).coerceIn(0f, 1f),
++        green = ((fill.green - surface.green * (1f - alpha)) / alpha).coerceIn(0f, 1f),
++        blue = ((fill.blue - surface.blue * (1f - alpha)) / alpha).coerceIn(0f, 1f),
++    )
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 index 7e58000..fbcb8fd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
@@ -2088,10 +2489,35 @@ index 556dff0..77f1c83 100644
      )
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
-index 2b98b46..c682670 100644
+index 2b98b46..eeb5172 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
-@@ -101,7 +101,7 @@ internal fun ToolsEditorScreen(
+@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+@@ -26,6 +27,8 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.contentDescription
+ import androidx.compose.ui.semantics.semantics
+@@ -37,7 +40,6 @@ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
+ import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
+ import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
+-import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
+ import io.github.xgl34222220.hetu.home.HomeHaptic
+ import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
+ import io.github.xgl34222220.hetu.home.HomeIcons
+@@ -101,7 +103,7 @@ internal fun ToolsEditorScreen(
                  when (val load = state.load) {
                      ToolsLoad.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HomeSpinner(size = 20.dp, color = c.t3) }
                      is ToolsLoad.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
@@ -2100,16 +2526,62 @@ index 2b98b46..c682670 100644
                              HomeButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
                          }
                      }
-@@ -202,7 +202,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
-                         Row(
-                             Modifier
-                                 .fillMaxWidth()
+@@ -186,32 +188,35 @@ private fun SymbolBar(enabled: Boolean, onInsert: (String) -> Unit) {
+ /*  Sheets (pages 13, 14, 17)                                           */
+ /* ------------------------------------------------------------------ */
+ 
+-/** Page 13. Top-level keys in accent monospace with their line number; nested names are indented. */
++/** Page 13. Accent labels in rounded pills with their line number; nested names are indented. */
+ @Composable
+ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (ToolsOutlineItem) -> Unit, onClose: () -> Unit, modifier: Modifier = Modifier) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+-    HomeSheetContent(title = "语法大纲", modifier = modifier, subtitle = ht("点击跳转到对应区段"), onClose = onClose) {
++    val sheetBackground = if (c.dark) Modifier.background(c.surface) else Modifier.background(
++        Brush.verticalGradient(listOf(Color(0xFFF3F3FD), Color(0xFFEFF1FE))),
++    )
++    HomeSheetContent(title = "语法大纲", modifier = modifier.then(sheetBackground), onClose = onClose) {
+         if (items.isEmpty()) {
+             Text(ht("没有可识别的顶层字段。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
+         } else {
+-            HomeCard(Modifier.fillMaxWidth().heightIn(max = 420.dp)) {
+-                Column(Modifier.verticalScroll(rememberScrollState())) {
+-                    items.forEachIndexed { index, item ->
+-                        if (index > 0) HomeDivider()
+-                        Row(
+-                            Modifier
+-                                .fillMaxWidth()
 -                                .heightIn(min = HomeDims.touch)
-+                                .heightIn(min = 32.dp)
-                                 .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
-                                 .padding(start = 16.dp + 20.dp * item.level, end = 12.dp),
-                             verticalAlignment = Alignment.CenterVertically,
-@@ -245,8 +245,10 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
+-                                .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
+-                                .padding(start = 16.dp + 20.dp * item.level, end = 12.dp),
+-                            verticalAlignment = Alignment.CenterVertically,
+-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+-                        ) {
+-                            Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.mono, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                            Text(item.line.toString(), color = c.t3, style = HomeType.caption.copy(fontFeatureSettings = "tnum"))
+-                            ToolsChevron()
+-                        }
++            Column(Modifier.fillMaxWidth().heightIn(max = 420.dp).verticalScroll(rememberScrollState())) {
++                items.forEach { item ->
++                    Row(
++                        Modifier
++                            .fillMaxWidth()
++                            .heightIn(min = 32.dp)
++                            .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
++                            .padding(vertical = 2.dp)
++                            .clip(RoundedCornerShape(50))
++                            .background(c.surface)
++                            .padding(start = 14.dp + 28.dp * item.level, end = 8.dp),
++                        verticalAlignment = Alignment.CenterVertically,
++                        horizontalArrangement = Arrangement.spacedBy(8.dp),
++                    ) {
++                        Text(item.title, Modifier.weight(1f), color = c.accent, style = HomeType.bodySmall.copy(fontWeight = FontWeight.Bold), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        Text(item.line.toString(), color = c.t3, style = HomeType.caption.copy(fontFeatureSettings = "tnum"))
++                        ToolsChevron()
+                     }
+                 }
+             }
+@@ -245,8 +250,10 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
      HomeSheetContent(
          title = title, modifier = modifier, onClose = onKeepDraft,
          footer = {
@@ -2122,7 +2594,7 @@ index 2b98b46..c682670 100644
          },
      ) { Text(text, Modifier.padding(horizontal = 4.dp), color = c.t2, style = ToolsType.dialogText) }
  }
-@@ -259,6 +261,7 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
+@@ -259,6 +266,7 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
  @Composable
  internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier, loading: Boolean = false) {
      ToolsDialogCard(
@@ -2130,7 +2602,7 @@ index 2b98b46..c682670 100644
          title = "放弃草稿并重新读取？",
          text = "重新读取成功后，本页未保存的修改和撤销记录会被替换为当前配置的最新内容。\n读取失败会继续保留草稿。",
          confirmLabel = "放弃并读取", confirmKind = ToolsConfirmKind.DangerSoft, confirmLoading = loading,
-@@ -270,6 +273,7 @@ internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> U
+@@ -270,6 +278,7 @@ internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> U
  @Composable
  internal fun ToolsDiscardEditsDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      ToolsDialogCard(
@@ -2139,7 +2611,7 @@ index 2b98b46..c682670 100644
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.DangerSoft,
          onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-index a60a9d7..e666e66 100644
+index a60a9d7..3b10e7e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 @@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
@@ -2158,7 +2630,15 @@ index a60a9d7..e666e66 100644
  import androidx.compose.foundation.layout.windowInsetsPadding
  import androidx.compose.foundation.rememberScrollState
  import androidx.compose.foundation.shape.CircleShape
-@@ -56,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardType
+@@ -49,6 +51,7 @@ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.contentDescription
+ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.text.TextStyle
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.ImeAction
+ import androidx.compose.ui.text.input.KeyboardCapitalization
+@@ -56,6 +59,7 @@ import androidx.compose.ui.text.input.KeyboardType
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.Dp
  import androidx.compose.ui.unit.dp
@@ -2166,7 +2646,24 @@ index a60a9d7..e666e66 100644
  import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
  import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
  import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
-@@ -366,34 +369,45 @@ internal class ToolsMenuOption(val label: String, val checked: Boolean? = null,
+@@ -198,6 +202,7 @@ internal fun ToolsSwitchRow(
+     enabled: Boolean = true,
+     monospaceSubtitle: Boolean = false,
+     rawContent: Boolean = false,
++    subtitleStyle: TextStyle? = null,
+ ) {
+     val c = LocalHomeColors.current
+     ToolsRow(
+@@ -206,7 +211,7 @@ internal fun ToolsSwitchRow(
+         icon = icon,
+         iconTint = c.t1,
+         subtitle = subtitle?.let { if (rawContent) it else ht(it) },
+-        subtitleStyle = if (monospaceSubtitle) ToolsType.url else HomeType.rowSub,
++        subtitleStyle = subtitleStyle ?: (if (monospaceSubtitle) ToolsType.url else HomeType.rowSub),
+         enabled = enabled,
+         onClick = { onCheckedChange(!checked) },
+         trailing = { ToolsSwitch(checked, null) },
+@@ -366,34 +371,45 @@ internal class ToolsMenuOption(val label: String, val checked: Boolean? = null,
  
  /** Menu of options; the chosen ones turn accent and get a trailing check (pages 29, 30). */
  @Composable
@@ -2221,7 +2718,7 @@ index a60a9d7..e666e66 100644
              }
          }
      }
-@@ -408,11 +422,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+@@ -408,11 +424,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
   * reports stay inside the sheet; lines never wrap, which keeps YAML indentation readable.
   */
  @Composable
@@ -2411,10 +2908,21 @@ index 7a05ec8..e0545b4 100644
              )
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
-index c5175b2..ade3e2e 100644
+index c5175b2..9e6ddcb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
-@@ -62,6 +62,7 @@ internal fun ToolsSubscriptionScreen(
+@@ -48,8 +48,9 @@ internal fun ToolsSubscriptionScreen(
+                     "订阅链接", form.url, onUrlChange,
+                     placeholder = "https://", monospace = true, keyboardType = KeyboardType.Uri,
+                     error = form.urlError, hint = "保存到当前配置，运行时会尝试应用。",
++                    errorAfterHint = adding,
+                 )
+-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                     HomeButton("保存", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)
+                     HomeButton("取消", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)
+                 }
+@@ -62,6 +63,7 @@ internal fun ToolsSubscriptionScreen(
  @Composable
  internal fun ToolsDiscardFormDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      ToolsDialogCard(
@@ -2423,23 +2931,38 @@ index c5175b2..ade3e2e 100644
          text = "已填写的内容还没有保存，返回会放弃这些修改。",
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.Danger,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
-index d109581..628b977 100644
+index d109581..9205165 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt
-@@ -256,10 +256,10 @@ private class ToolsYamlHighlight(private val palette: ToolsYamlPalette, private
+@@ -256,15 +256,15 @@ private class ToolsYamlHighlight(private val palette: ToolsYamlPalette, private
  /* ------------------------------------------------------------------ */
  
  internal object ToolsEditorType {
 -    /** Every line is exactly 20 sp tall (no first/last line trimming), so the gutter and line tints line up. */
-+    /** Every line is exactly 18 sp tall (no first/last line trimming), so the gutter and line tints line up. */
++    /** Every line is exactly 17 sp tall (no first/last line trimming), so the gutter and line tints line up. */
      val code: TextStyle = HomeType.mono.copy(
 -        fontSize = 12.sp,
 -        lineHeight = 20.sp,
-+        fontSize = 13.5.sp,
-+        lineHeight = 18.sp,
++        fontSize = 13.sp,
++        lineHeight = 17.sp,
          lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
      )
  }
+ 
+-private val GutterWidth = 44.dp
++private val GutterWidth = 55.dp
+ private val EditorPadding = 12.dp
+ 
+ /**
+@@ -317,7 +317,7 @@ internal fun ToolsYamlEditor(
+                 }
+                 .padding(vertical = EditorPadding),
+         ) {
+-            Text(gutter, Modifier.width(GutterWidth).padding(end = 10.dp), color = c.t3, style = ToolsEditorType.code, textAlign = TextAlign.End)
++            Text(gutter, Modifier.width(GutterWidth).padding(end = 24.dp), color = c.t3, style = ToolsEditorType.code, textAlign = TextAlign.End)
+             Box(Modifier.weight(1f).horizontalScroll(horizontal)) {
+                 BasicTextField(
+                     value = state.value,
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
 index e47d1d6..b6b2ef9 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
@@ -2757,10 +3280,10 @@ index 0000000..10c9644
 +internal fun Pdf85C25Editor() = Frame { Editor() }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
 new file mode 100644
-index 0000000..8851c36
+index 0000000..62a94e2
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
-@@ -0,0 +1,204 @@
+@@ -0,0 +1,205 @@
 +package io.github.xgl34222220.hetu.tools
 +
 +import androidx.compose.foundation.background
@@ -2937,7 +3460,8 @@ index 0000000..8851c36
 +/* ------------------------------ 广告过滤 ------------------------------ */
 +
 +@Composable
-+internal fun Pdf85C44AdblockRules() = Frame { Adblock(scrolled = RulesScroll) }
++// The mdpi 7cf page45 capture places the LevelCard at y765, below the y78 toolbar.
++internal fun Pdf85C44AdblockRules() = Frame { Adblock(scrolled = 687) }
 +
 +@Composable
 +internal fun Pdf85C45AdblockStatus() = Frame { Adblock() }

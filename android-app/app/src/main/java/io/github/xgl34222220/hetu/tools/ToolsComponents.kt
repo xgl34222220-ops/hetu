@@ -289,6 +289,7 @@ internal fun ToolsField(
     keyboardType: KeyboardType = KeyboardType.Text,
     compact: Boolean = false,
     clearable: Boolean = false,
+    errorAfterHint: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -318,13 +319,14 @@ internal fun ToolsField(
                 },
             )
         }
+        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
         if (error != null) {
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
                 Text(error, color = c.bad, style = HomeType.caption)
             }
         }
-        if (hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
+        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)
     }
 }
 

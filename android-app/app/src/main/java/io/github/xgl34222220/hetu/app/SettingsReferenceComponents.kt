@@ -81,6 +81,7 @@ internal fun SettingsRow(
     modifier: Modifier = Modifier,
     rootReference: Boolean = false,
     rowMinHeight: androidx.compose.ui.unit.Dp? = null,
+    subtitleFontSizeSp: Float? = null,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val c = Hx.colors
@@ -101,7 +102,7 @@ internal fun SettingsRow(
             Text(title, fontSize = 18.sp, lineHeight = 24.sp,
                 fontWeight = FontWeight.Bold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
+            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = (subtitleFontSizeSp ?: 14f).sp, lineHeight = 18.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
@@ -144,10 +145,13 @@ internal fun SettingsSwitchRow(
     iconTint: Color = Hx.colors.text,
     enabled: Boolean = true,
     compact: Boolean = false,
+    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
+    subtitleFontSizeSp: Float? = null,
 ) {
     val source = remember { MutableInteractionSource() }
     val haptics = rememberHetuHaptics()
     SettingsRow(title, subtitle, icon, iconTint, enabled, compact = compact,
+        rowMinHeight = rowMinHeight, subtitleFontSizeSp = subtitleFontSizeSp,
         modifier = Modifier.hxPressScale(source, .99f).semantics(mergeDescendants = true) {}
             .toggleable(value = checked, enabled = enabled, role = Role.Switch, interactionSource = source, indication = null) { on ->
                 haptics.perform(if (on) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
@@ -186,15 +190,26 @@ internal fun SettingsInput(
     error: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     modifier: Modifier = Modifier,
+    referenceMirror: Boolean = false,
 ) {
     val c = Hx.colors
     Column(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-        .background(if (c.dark) c.surfaceMuted else Color(0xFFE8E5FF))
+        .background(if (c.dark) c.surfaceMuted else if (referenceMirror) {
+            if (error) Color(0xFFE9E6FD) else Color(0xFFE6E4FD)
+        } else Color(0xFFE8E5FF))
         .then(if (error) Modifier.border(1.dp, c.bad, RoundedCornerShape(12.dp)) else Modifier)
-        .padding(horizontal = 10.dp, vertical = if (label == null) 9.dp else 8.dp)) {
+        .then(if (referenceMirror) Modifier.heightIn(min = if (error) 68.dp else 46.dp) else Modifier)
+        .padding(horizontal = 10.dp, vertical = when {
+            referenceMirror && error -> 11.5.dp
+            referenceMirror -> 12.dp
+            label == null -> 9.dp
+            else -> 8.dp
+        })) {
         if (label != null) {
-            Text(label, color = c.textMuted, fontSize = 11.5.sp, lineHeight = 15.sp)
-            Spacer(Modifier.height(4.dp))
+            Text(label, color = c.textMuted, fontSize = if (referenceMirror) 13.sp else 11.5.sp,
+                lineHeight = if (referenceMirror) 17.sp else 15.sp,
+                fontWeight = if (referenceMirror) FontWeight.SemiBold else null)
+            Spacer(Modifier.height(if (referenceMirror) 6.dp else 4.dp))
         }
         BasicTextField(
             value = value,
@@ -202,11 +217,15 @@ internal fun SettingsInput(
             enabled = enabled,
             singleLine = singleLine,
             keyboardOptions = keyboardOptions,
-            textStyle = TextStyle(color = if (enabled) c.text else c.textMuted, fontSize = 15.sp, lineHeight = 19.sp),
+            textStyle = TextStyle(color = if (enabled) c.text else c.textMuted,
+                fontSize = if (referenceMirror) 18.sp else 15.sp,
+                lineHeight = if (referenceMirror) 22.sp else 19.sp,
+                fontWeight = if (referenceMirror) FontWeight.SemiBold else null),
             cursorBrush = SolidColor(c.accent),
             modifier = Modifier.fillMaxWidth()
+                .then(if (referenceMirror) Modifier.heightIn(min = 22.dp) else Modifier)
                 .clip(RoundedCornerShape(9.dp))
-                .then(if (label != null) Modifier.background(c.surface.copy(alpha = .9f)).padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.padding(horizontal = 5.dp)),
+                .then(if (label != null && !referenceMirror) Modifier.background(c.surface.copy(alpha = .9f)).padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.padding(horizontal = 5.dp)),
             decorationBox = { field ->
                 Box {
                     if (value.isBlank() && placeholder.isNotBlank()) Text(placeholder, color = c.textFaint, fontSize = 15.sp, lineHeight = 19.sp)
@@ -224,10 +243,12 @@ internal fun SettingsDialog(
     confirmLabel: String,
     onConfirm: () -> Unit,
     pillButtons: Boolean = false,
+    titleFontSizeSp: Float? = null,
+    titleLineHeightSp: Float? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     HxReferenceDialog(onDismiss = onDismiss) {
-            Text(title, color = Hx.colors.text, fontSize = 24.sp, lineHeight = 30.sp,
+            Text(title, color = Hx.colors.text, fontSize = (titleFontSizeSp ?: 24f).sp, lineHeight = (titleLineHeightSp ?: 30f).sp,
                 fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp))
             content()
@@ -260,10 +281,14 @@ internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onD
         val next = value.trim()
         if (!settingsMirrorPrefixValid(next)) error = true
         else onSave(next)
-    }, pillButtons = true) {
-        Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
-        Spacer(Modifier.height(6.dp))
-        SettingsInput(value, { value = it; error = false }, error = error)
+    }, pillButtons = !error, titleFontSizeSp = if (error) 19f else null,
+        titleLineHeightSp = if (error) 24f else null) {
+        if (!error) {
+            Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
+            Spacer(Modifier.height(6.dp))
+        }
+        SettingsInput(value, { value = it; error = false }, label = if (error) ht("镜像前缀") else null,
+            error = error, referenceMirror = true)
         if (error) Text(ht("请填写 http/https 地址"), color = Hx.colors.bad, fontSize = 12.sp,
             modifier = Modifier.padding(start = 4.dp, top = 5.dp))
     }

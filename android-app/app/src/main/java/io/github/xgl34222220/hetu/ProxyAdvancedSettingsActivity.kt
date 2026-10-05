@@ -21,6 +21,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.PathParser
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.text.KeyboardOptions
@@ -29,6 +34,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
 
 class ProxyAdvancedSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -76,7 +83,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                     ProxyRuntimeProfile.DnsHijack.REDIRECT -> "REDIRECT"
                     ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
                     else -> "TPROXY"
-                }) { choice = "dns" }
+                }, icon = ToolsFeatureIcons.Globe) { choice = "dns" }
             }
         }
 
@@ -85,6 +92,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 OtherLabel("资源限制")
                 ResourceSetting(
                     title = "CPU 核心分配",
+                    icon = ToolsIcons.Cpu,
                     enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
                     value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
                     hint = "0-7",
@@ -94,6 +102,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 )
                 ResourceSetting(
                     title = "内存限制",
+                    icon = AdvancedSettingsResourceIcons.Ram,
                     enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
                     value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
                     hint = "100M",
@@ -103,6 +112,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 )
                 ResourceSetting(
                     title = "磁盘 I/O 权重",
+                    icon = AdvancedSettingsResourceIcons.Drive,
                     enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
                     value = prefs.getString("proxyIoWeight", "4").orEmpty(),
                     hint = "0-7",
@@ -116,7 +126,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
         item {
             OtherCard(card) {
                 OtherLabel("厂商防火墙")
-                OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false)) { putBool("proxyVendorFirewallCleanup", it) }
+                OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = AdvancedSettingsResourceIcons.VendorShield) { putBool("proxyVendorFirewallCleanup", it) }
             }
         }
     }
@@ -160,13 +170,13 @@ private fun OtherLabel(text: String) {
 }
 
 @Composable
-private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, onChange: (Boolean) -> Unit) {
-    SettingsSwitchRow(title, checked, onChange, enabled = enabled, compact = true)
+private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
+    SettingsSwitchRow(title, checked, onChange, enabled = enabled, compact = true, icon = icon)
 }
 
 @Composable
-private fun OtherChoiceRow(title: String, value: String, onClick: () -> Unit) {
-    SettingsNavRow(title, value = value, dropdown = true, compact = true, onClick = onClick)
+private fun OtherChoiceRow(title: String, value: String, icon: ImageVector? = null, onClick: () -> Unit) {
+    SettingsNavRow(title, value = value, dropdown = true, compact = true, onClick = onClick, icon = icon)
 }
 
 @Composable
@@ -176,15 +186,43 @@ private fun ResourceSetting(
     value: String,
     hint: String,
     keyboardType: KeyboardType,
+    icon: ImageVector? = null,
     onEnabled: (Boolean) -> Unit,
     onValue: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-        SettingsSwitchRow(title, enabled, onEnabled, compact = true)
+        SettingsSwitchRow(title, enabled, onEnabled, compact = true, icon = icon)
         SettingsInput(
             value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.padding(horizontal = 16.dp),
+            modifier = Modifier.padding(start = if (icon != null) 66.dp else 16.dp, end = 16.dp),
         )
     }
+}
+
+/** Resource glyphs drawn from the detailed supplied PDF04/05; names bypass unrelated global icon mappings. */
+private object AdvancedSettingsResourceIcons {
+    private fun lineVector(name: String, vararg paths: String): ImageVector = ImageVector.Builder(
+        name = "HetuAdvancedPdf04.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
+        viewportWidth = 24f, viewportHeight = 24f,
+    ).apply {
+        paths.forEach {
+            addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black),
+                strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
+        }
+    }.build()
+
+    val Ram: ImageVector = lineVector("ResourceRam",
+        "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
+        "M6 7v8", "M10 7v8", "M14 7v8", "M18 7v8",
+        "M6 18v3", "M10 18v3", "M14 18v3", "M18 18v3",
+    )
+    val Drive: ImageVector = lineVector("ResourceDrive",
+        "M5.6 3.5h12.8a2 2 0 0 1 1.94 1.5L22 13v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7l1.66-8a2 2 0 0 1 1.94-1.5Z",
+        "M2 13h20", "M18.6 17.5a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0Z",
+    )
+    val VendorShield: ImageVector = lineVector("VendorShieldCircle",
+        "M12 2 3 5v7c0 6 9 11 9 11s9-5 9-11V5l-9-3Z",
+        "M15 10a3 3 0 1 1-6 0a3 3 0 1 1 6 0Z",
+    )
 }

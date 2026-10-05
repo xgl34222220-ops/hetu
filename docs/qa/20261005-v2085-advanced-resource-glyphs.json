@@ -1,0 +1,27 @@
+{
+  "baseline": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt",
+  "source_sha256": "805cb88458834b7ee6099273b138bc11c97822842c816ff8b01ff4a328f180db",
+  "baseline_sha256": "9107775d20040a2d87e124005ec96f2a2a07b671eb98a3452ba52b0c17c40abd",
+  "normalized_sha256": "9107775d20040a2d87e124005ec96f2a2a07b671eb98a3452ba52b0c17c40abd",
+  "exact_equality_after_reverting_only_icon_and_alignment_changes": true,
+  "preserved": [
+    "prefs keys/read/write",
+    "changed/dirty/revision",
+    "enabled/onEnabled/onValue/onChange callbacks",
+    "DNS strategy/forward preference mutations",
+    "dialogs/radio/cancel callbacks",
+    "keyboard types",
+    "performance/QUIC/TCP/UDP default iconless layout"
+  ],
+  "changes": [
+    "CPU ToolsIcons.Cpu",
+    "RAM/Drive private source-specific line vectors",
+    "vendor shield-with-circle only startup cleanup row",
+    "DNS strategy ToolsFeatureIcons.Globe",
+    "3 ResourceSetting inputs start66/end16 when icon present, fallback start16/end16"
+  ],
+  "pdf_conflict": "Actual PDF04/04 has iconless wide CPU field; PDF04/05 detailed page has resource icons/indented input and DNS globe. Per root instructions with optional user choice unanswered, unify detailed05 resource/DNS glyph layout; do not invent different icons by scroll state.",
+  "namespace": "Activity and app/Hx/Settings helpers all declare root Kotlin package io.github.xgl34222220.hetu; tools objects imported explicitly. No generated app-import injection identified in preparation pipeline.",
+  "verification": "diffcheck passed; private SVG previews rendered for visual inspection; no compile/test/CI or patch change by this agent."
+}

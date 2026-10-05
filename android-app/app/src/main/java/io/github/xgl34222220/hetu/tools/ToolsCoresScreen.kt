@@ -13,9 +13,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,6 +90,15 @@ internal fun ToolsCore.glyph(): ImageVector = when {
 private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress: String, onPrimary: (ToolsCoreAction) -> Unit, onImport: () -> Unit) {
     val c = LocalHomeColors.current
     val action = core.primaryAction()
+    val softButtonColors = if (c.dark) c else c.copy(
+        accentSoft = if (enabled) Color(0xFFEEF0FC) else coreButtonColorBeforeDisabledAlpha(Color(0xFFEAEDF6), c.surface),
+        accent = if (enabled) c.accent else coreButtonColorBeforeDisabledAlpha(Color(0xFFBBBDCA), c.surface),
+    )
+    val processingColors = if (c.dark) c else c.copy(
+        surface = coreButtonColorBeforeDisabledAlpha(Color(0xFFC8CAD6), c.surface),
+        t1 = Color.White,
+        line2 = Color.Transparent,
+    )
     HomeCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
@@ -120,19 +131,35 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 when {
-                    busy -> HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true)
-                    action != null -> HomeButton(
-                        action.label, { onPrimary(action) }, Modifier.weight(1f),
-                        kind = when (action) {
-                            ToolsCoreAction.Update -> HomeButtonKind.Primary
-                            ToolsCoreAction.Download -> HomeButtonKind.Soft
-                            ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary
-                        },
-                        enabled = enabled,
-                    )
+                    busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {
+                        HomeButton("处理中", {}, Modifier.weight(1f), enabled = false, loading = true)
+                    }
+                    action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {
+                        HomeButton(
+                            action.label, { onPrimary(action) }, Modifier.weight(1f),
+                            kind = when (action) {
+                                ToolsCoreAction.Update -> HomeButtonKind.Primary
+                                ToolsCoreAction.Download -> HomeButtonKind.Soft
+                                ToolsCoreAction.Restore, ToolsCoreAction.Remove -> HomeButtonKind.Secondary
+                            },
+                            enabled = enabled,
+                        )
+                    }
                 }
-                HomeButton("导入", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)
+                CompositionLocalProvider(LocalHomeColors provides softButtonColors) {
+                    HomeButton("导入", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)
+                }
             }
         }
     }
+}
+
+/** Keep the shared button's disabled alpha while matching the measured light-mode colors. */
+private fun coreButtonColorBeforeDisabledAlpha(fill: Color, surface: Color): Color {
+    val alpha = .45f
+    return fill.copy(
+        red = ((fill.red - surface.red * (1f - alpha)) / alpha).coerceIn(0f, 1f),
+        green = ((fill.green - surface.green * (1f - alpha)) / alpha).coerceIn(0f, 1f),
+        blue = ((fill.blue - surface.blue * (1f - alpha)) / alpha).coerceIn(0f, 1f),
+    )
 }

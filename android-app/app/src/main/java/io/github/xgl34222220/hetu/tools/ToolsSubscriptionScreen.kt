@@ -48,8 +48,9 @@ internal fun ToolsSubscriptionScreen(
                     "订阅链接", form.url, onUrlChange,
                     placeholder = "https://", monospace = true, keyboardType = KeyboardType.Uri,
                     error = form.urlError, hint = "保存到当前配置，运行时会尝试应用。",
+                    errorAfterHint = adding,
                 )
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HomeButton("保存", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)
                     HomeButton("取消", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)
                 }
