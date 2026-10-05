@@ -8,7 +8,9 @@
     "actuallyOpened": true,
     "text": "需要进行身份验证。您需要登录自己的 Google 帐号。",
     "retryAndHotAirBalloon": true,
-    "captcha": false
+    "captcha": false,
+    "accountAvatarVisible": true,
+    "authenticationInference": "Visible avatar and message do not establish current account token validity, successful login, or node fault; no account action performed."
   },
   "historicalEvidence": {
     "source": "2026-10-03 user diagnostic message recovered from prior conversation; cross-checked AGENTS.md, docs/V20.75_THEME_COMPAT.md and docs/V20.76_SESSION_FILTER.md",
@@ -62,7 +64,7 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "93988af07d8f052e928a8db166daaeaeb053ef67",
+    "applicationCommit": "20c308da02e4920f6581c5210af291ff6fb63dab",
     "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
     "currentChanges": "Only bounded connection metadata classification/quota; no new Root/controller requests, DNS/routing changes, credentials/cookies/tokens, hooks or permissions",
@@ -88,7 +90,8 @@
       37300578403,
       37305122492,
       37306185320,
-      37307367305
+      37307367305,
+      37312432198
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",

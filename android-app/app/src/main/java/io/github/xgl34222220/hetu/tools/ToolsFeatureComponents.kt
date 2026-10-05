@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -368,34 +369,45 @@ internal class ToolsMenuOption(val label: String, val checked: Boolean? = null, 
 
 /** Menu of options; the chosen ones turn accent and get a trailing check (pages 29, 30). */
 @Composable
-internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modifier = Modifier) {
+internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modifier = Modifier, referenceWidth: Dp? = null) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
+    val compact = referenceWidth != null
+    val sortReference = referenceWidth == 130.dp
+    val outerPadding = if (!compact) 4.dp else if (sortReference) 6.dp else 5.dp
+    val widthModifier = if (referenceWidth == null) Modifier.width(168.dp)
+        else Modifier.widthIn(min = referenceWidth).width(IntrinsicSize.Max)
     Column(
         modifier
-            .width(168.dp)
+            .then(widthModifier)
             .shadow(16.dp, HomeDims.menuShape)
             .clip(HomeDims.menuShape)
             .background(c.surface)
             .border(1.dp, c.line, HomeDims.menuShape)
-            .padding(4.dp),
+            .padding(outerPadding),
     ) {
         options.forEach { option ->
-            if (option.dividerBefore) HomeDivider(Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
+            if (option.dividerBefore) HomeDivider(Modifier.padding(horizontal = 8.dp, vertical = if (compact) 6.dp else 4.dp))
             val on = option.checked == true
             Row(
                 Modifier
                     .fillMaxWidth()
-                    .heightIn(min = 40.dp)
+                    .heightIn(min = if (!compact) 40.dp else if (sortReference) 33.dp else 37.dp)
                     .alpha(if (option.enabled) 1f else .4f)
                     .clip(ToolsDims.menuItemShape)
                     .clickable(enabled = option.enabled, role = Role.Button) { haptics(HomeHaptic.Tap); option.onClick() }
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = if (compact && !sortReference) 11.dp else 12.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
+                horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 16.dp),
             ) {
-                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
-                if (option.checked != null) Box(Modifier.size(16.dp)) { if (on) Icon(HomeIcons.Check, null, Modifier.size(16.dp), tint = c.accent) }
+                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1,
+                    style = if (compact) ToolsType.menuItem.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+                        else ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
+                if (option.checked != null && (!compact || on)) {
+                    Box(Modifier.size(if (compact) 14.dp else 16.dp)) {
+                        if (on) Icon(HomeIcons.Check, null, Modifier.size(if (compact) 14.dp else 16.dp), tint = c.accent)
+                    }
+                }
             }
         }
     }

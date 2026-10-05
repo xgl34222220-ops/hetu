@@ -131,7 +131,7 @@ private fun statusLook(state: ToolsAdblockState): StatusLook {
     val c = LocalHomeColors.current
     return when (state.status) {
         ToolsAdStatus.Protecting -> StatusLook(ToolsIcons.AdblockProtectingPdf45, c.good, c.goodSoft, "保护中", "广告域名直接 REJECT，\n其余流量照常分流。")
-        ToolsAdStatus.WrongMode -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
+        ToolsAdStatus.WrongMode -> StatusLook(ToolsIcons.AdblockWrongModePdf03B01, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
         ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.sunken, "已开启", "启动代理后自动验证运行链。")
         ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "运行链未确认", "尚未确认规则模式及广告规则加载；下拉刷新后重试验证。")
         ToolsAdStatus.Off -> StatusLook(ToolsFeatureIcons.ShieldOff, c.t3, c.sunken, "已关闭", "代理仅负责转发，不执行广告规则。")
@@ -143,10 +143,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
     val c = LocalHomeColors.current
     val look = statusLook(state)
     val number = if (state.enabled) c.accent else c.t3
+    val referenceStatus = state.status == ToolsAdStatus.Protecting || state.status == ToolsAdStatus.WrongMode
+    val statusCircleSize = if (referenceStatus) 76.dp else 56.dp
+    val statusIconSize = if (referenceStatus) 44.dp else 28.dp
     HomeCard(Modifier.fillMaxWidth()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(56.dp).background(look.soft, CircleShape), contentAlignment = Alignment.Center) {
-                Icon(look.icon, null, Modifier.size(28.dp), tint = look.tint)
+            Box(Modifier.size(statusCircleSize).background(look.soft, CircleShape), contentAlignment = Alignment.Center) {
+                Icon(look.icon, null, Modifier.size(statusIconSize), tint = look.tint)
             }
             Column(Modifier.weight(1f)) {
                 Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)

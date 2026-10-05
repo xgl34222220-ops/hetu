@@ -8,8 +8,10 @@ import io.github.xgl34222220.hetu.hxPressScale
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
@@ -19,6 +21,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -34,19 +37,27 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
@@ -61,11 +72,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.IntRect
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.Popup
+import androidx.compose.ui.window.PopupPositionProvider
 import androidx.compose.ui.window.PopupProperties
 import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
@@ -543,7 +558,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
  * Place it inside the Box that wraps the «⋯» button.
  */
 @Composable
-internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Composable () -> Unit) {
+internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, reference: ToolsAppsMenuReference? = null, content: @Composable () -> Unit) {
+    if (reference != null) {
+        val c = LocalHomeColors.current
+        val density = LocalDensity.current
+        var menuSize by remember { mutableStateOf(IntSize.Zero) }
+        val dismissSource = remember { MutableInteractionSource() }
+        val dismissLabel = ht("关闭菜单")
+        Popup(
+            popupPositionProvider = ToolsAppsFullWindowPosition,
+            onDismissRequest = onDismiss,
+            properties = PopupProperties(focusable = true, clippingEnabled = false),
+        ) {
+            BoxWithConstraints(Modifier.fillMaxSize()) {
+                val windowWidth = with(density) { maxWidth.roundToPx() }
+                val windowHeight = with(density) { maxHeight.roundToPx() }
+                val margin = with(density) { 8.dp.roundToPx() }
+                val endInset = with(density) { reference.endInset.roundToPx() }
+                val left = (windowWidth - endInset - menuSize.width).coerceIn(margin, (windowWidth - menuSize.width - margin).coerceAtLeast(margin))
+                val pointerHeight = with(density) { 7.dp.roundToPx() }
+                val requestedTop = (reference.anchor?.top?.toInt() ?: 0) + offsetY - pointerHeight
+                val top = requestedTop.coerceIn(margin, (windowHeight - menuSize.height - margin).coerceAtLeast(margin))
+                val maxMenuWidth = (maxWidth - 16.dp).coerceAtLeast(1.dp)
+                val availableHeight = with(density) { (windowHeight - top - margin).coerceAtLeast(1).toDp() }
+                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = reference.scrimAlpha))
+                    .clickable(interactionSource = dismissSource, indication = null, onClickLabel = dismissLabel, onClick = onDismiss))
+                Column(Modifier.offset { IntOffset(left, top) }.width(IntrinsicSize.Max)
+                    .widthIn(max = maxMenuWidth).heightIn(max = availableHeight)
+                    .onSizeChanged { menuSize = it }.verticalScroll(rememberScrollState())) {
+                    Box(Modifier.fillMaxWidth().height(7.dp).drawBehind {
+                        val edge = 7.dp.toPx()
+                        val tip = ((reference.anchor?.center?.x ?: (left + size.width / 2f)) - left)
+                            .coerceIn(edge, (size.width - edge).coerceAtLeast(edge))
+                        val pointer = Path().apply {
+                            moveTo(tip - edge, size.height)
+                            lineTo(tip, 0f)
+                            lineTo(tip + edge, size.height)
+                            close()
+                        }
+                        drawPath(pointer, c.surface)
+                    })
+                    content()
+                }
+            }
+        }
+        return
+    }
     Popup(
         alignment = Alignment.TopEnd,
         offset = IntOffset(0, offsetY),
@@ -551,4 +611,11 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
         properties = PopupProperties(focusable = true),
         content = content,
     )
+}
+
+/** Opt-in presentation measured from PDF03A pages 29/30; other tools keep the legacy popup. */
+internal data class ToolsAppsMenuReference(val anchor: Rect?, val endInset: Dp, val scrimAlpha: Float)
+
+private object ToolsAppsFullWindowPosition : PopupPositionProvider {
+    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset = IntOffset.Zero
 }

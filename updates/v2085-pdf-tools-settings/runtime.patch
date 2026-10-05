@@ -836,7 +836,7 @@ index b68a65b..efa222d 100644
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index 97cc0f0..6b1d4af 100644
+index 97cc0f0..bcf017d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 @@ -26,6 +26,9 @@ import androidx.compose.ui.Modifier
@@ -849,16 +849,34 @@ index 97cc0f0..6b1d4af 100644
  import androidx.compose.ui.text.AnnotatedString
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.input.KeyboardType
-@@ -127,7 +130,7 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
+@@ -127,8 +130,8 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
  private fun statusLook(state: ToolsAdblockState): StatusLook {
      val c = LocalHomeColors.current
      return when (state.status) {
 -        ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodSoft, "保护中", "广告域名直接 REJECT，\n其余流量照常分流。")
+-        ToolsAdStatus.WrongMode -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
 +        ToolsAdStatus.Protecting -> StatusLook(ToolsIcons.AdblockProtectingPdf45, c.good, c.goodSoft, "保护中", "广告域名直接 REJECT，\n其余流量照常分流。")
-         ToolsAdStatus.WrongMode -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
++        ToolsAdStatus.WrongMode -> StatusLook(ToolsIcons.AdblockWrongModePdf03B01, c.warn, c.warnSoft, "当前为${state.modeLabel.ifBlank { "非规则" }}模式", "广告规则只在「规则」模式下生效。")
          ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.sunken, "已开启", "启动代理后自动验证运行链。")
          ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "运行链未确认", "尚未确认规则模式及广告规则加载；下拉刷新后重试验证。")
-@@ -198,7 +201,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
+         ToolsAdStatus.Off -> StatusLook(ToolsFeatureIcons.ShieldOff, c.t3, c.sunken, "已关闭", "代理仅负责转发，不执行广告规则。")
+@@ -140,10 +143,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
+     val c = LocalHomeColors.current
+     val look = statusLook(state)
+     val number = if (state.enabled) c.accent else c.t3
++    val referenceStatus = state.status == ToolsAdStatus.Protecting || state.status == ToolsAdStatus.WrongMode
++    val statusCircleSize = if (referenceStatus) 76.dp else 56.dp
++    val statusIconSize = if (referenceStatus) 44.dp else 28.dp
+     HomeCard(Modifier.fillMaxWidth()) {
+         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+-            Box(Modifier.size(56.dp).background(look.soft, CircleShape), contentAlignment = Alignment.Center) {
+-                Icon(look.icon, null, Modifier.size(28.dp), tint = look.tint)
++            Box(Modifier.size(statusCircleSize).background(look.soft, CircleShape), contentAlignment = Alignment.Center) {
++                Icon(look.icon, null, Modifier.size(statusIconSize), tint = look.tint)
+             }
+             Column(Modifier.weight(1f)) {
+                 Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
+@@ -198,7 +204,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
      val c = LocalHomeColors.current
      ToolsRow(
          AnnotatedString(title),
@@ -867,7 +885,7 @@ index 97cc0f0..6b1d4af 100644
          iconTint = if (ok) c.good else c.t3,
          subtitle = detail, compact = true,
      )
-@@ -278,13 +281,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
+@@ -278,13 +284,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
  @Composable
  internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
@@ -885,7 +903,7 @@ index 97cc0f0..6b1d4af 100644
          }
      }
  }
-@@ -305,9 +308,9 @@ internal fun ToolsAddDomainDialogCard(
+@@ -305,9 +311,9 @@ internal fun ToolsAddDomainDialogCard(
      ToolsDialogCard(
          title = if (overlay.allow) "添加白名单" else "添加黑名单",
          text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
@@ -897,7 +915,7 @@ index 97cc0f0..6b1d4af 100644
  }
  
  /** Page 49: reached by tapping a row of 最近拦截. */
-@@ -315,7 +318,7 @@ internal fun ToolsAddDomainDialogCard(
+@@ -315,7 +321,7 @@ internal fun ToolsAddDomainDialogCard(
  internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      ToolsDialogCard(
@@ -907,10 +925,10 @@ index 97cc0f0..6b1d4af 100644
      ) {
          Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono, textAlign = TextAlign.Center, maxLines = 2, overflow = TextOverflow.Ellipsis)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
-index 6125191..cd52a65 100644
+index 6125191..b3c1459 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
-@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu.tools
+@@ -3,11 +3,13 @@ package io.github.xgl34222220.hetu.tools
  import io.github.xgl34222220.hetu.ui.ht
  import androidx.compose.foundation.background
  import androidx.compose.foundation.clickable
@@ -918,8 +936,36 @@ index 6125191..cd52a65 100644
  import androidx.compose.foundation.layout.Arrangement
  import androidx.compose.foundation.layout.Box
  import androidx.compose.foundation.layout.Column
-@@ -78,17 +79,17 @@ internal fun ToolsAppsScreen(
+ import androidx.compose.foundation.layout.PaddingValues
+ import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.heightIn
+@@ -17,11 +19,17 @@ import androidx.compose.foundation.lazy.LazyColumn
+ import androidx.compose.foundation.lazy.items
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.geometry.Rect
++import androidx.compose.ui.layout.boundsInWindow
++import androidx.compose.ui.layout.onGloballyPositioned
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.text.font.FontWeight
+@@ -76,23 +84,32 @@ internal fun ToolsAppsScreen(
+     val core = state.scope == ToolsAppScope.Core
+     val menuOffset = with(LocalDensity.current) { 44.dp.roundToPx() }
      val rows = remember(state) { state.visible }
++    var sortAnchor by remember { mutableStateOf<Rect?>(null) }
++    var moreAnchor by remember { mutableStateOf<Rect?>(null) }
  
      Column(modifier.fillMaxSize().background(c.bg)) {
 -        ToolsWideBar(title = "应用管理", onBack = onBack) {
@@ -928,20 +974,33 @@ index 6125191..cd52a65 100644
 +            HomeIconButton(ToolsIcons.Search, if (state.searching) "关闭搜索" else "搜索", onToggleSearch, modifier = Modifier.width(32.dp), enabled = ready)
              Box {
 -                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, enabled = ready)
-+                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, modifier = Modifier.width(32.dp), enabled = ready)
++                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, modifier = Modifier.width(32.dp).onGloballyPositioned { sortAnchor = it.boundsInWindow() }, enabled = ready)
                  if (menu == ToolsAppsMenu.Sort) {
-                     ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppSortMenuCard(state, onSortChange, onToggleDescending) }
+-                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppSortMenuCard(state, onSortChange, onToggleDescending) }
++                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset,
++                        reference = ToolsAppsMenuReference(sortAnchor, endInset = 20.dp, scrimAlpha = .43f)) {
++                        ToolsAppSortMenuCard(state, onSortChange, onToggleDescending)
++                    }
                  }
              }
 -            HomeIconButton(HomeIcons.CircleCheck, "全选当前结果", onSelectAll, enabled = ready && !core && rows.isNotEmpty())
 +            HomeIconButton(HomeIcons.CircleCheck, "全选当前结果", onSelectAll, modifier = Modifier.width(32.dp), enabled = ready && !core && rows.isNotEmpty())
              Box {
 -                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, enabled = ready)
-+                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, modifier = Modifier.width(32.dp), enabled = ready)
++                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, modifier = Modifier.width(32.dp).onGloballyPositioned { moreAnchor = it.boundsInWindow() }, enabled = ready)
                  if (menu == ToolsAppsMenu.More) {
-                     ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh) }
+-                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh) }
++                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset,
++                        reference = ToolsAppsMenuReference(moreAnchor, endInset = 10.dp, scrimAlpha = .45f)) {
++                        ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh)
++                    }
                  }
-@@ -116,7 +117,7 @@ internal fun ToolsAppsScreen(
+             }
++            Spacer(Modifier.width(4.dp))
+         }
+         Column(Modifier.padding(horizontal = HomeDims.gutter), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
+             if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索应用或包名")
+@@ -116,7 +133,7 @@ internal fun ToolsAppsScreen(
                      LazyColumn(
                          Modifier.fillMaxSize(),
                          contentPadding = PaddingValues(start = HomeDims.gutter, end = HomeDims.gutter, top = HomeDims.gap, bottom = HomeDims.gap),
@@ -950,7 +1009,7 @@ index 6125191..cd52a65 100644
                      ) {
                          items(rows, key = { it.key }) { app ->
                              AppRow(app, checked = app.key in state.selected, inert = core || state.refreshing, dimmed = core, onClick = { onToggleApp(app) }, appIcon = appIcon)
-@@ -131,7 +132,7 @@ internal fun ToolsAppsScreen(
+@@ -131,7 +148,7 @@ internal fun ToolsAppsScreen(
                  Text(state.selectedCount.toString(), color = c.accent, style = HomeType.value.copy(fontFeatureSettings = "tnum"))
                  Text(" " + ht("个"), color = c.t1, style = HomeType.bodySmall)
                  Text(ht("  ·  "), color = c.t3, style = HomeType.bodySmall)
@@ -959,7 +1018,7 @@ index 6125191..cd52a65 100644
              }
          }
      }
-@@ -153,7 +154,7 @@ private fun AppRow(
+@@ -153,7 +170,7 @@ private fun AppRow(
              Modifier
                  .fillMaxWidth()
                  .clickable(enabled = !inert, role = Role.Checkbox) { haptics(HomeHaptic.Tick); onClick() }
@@ -968,11 +1027,34 @@ index 6125191..cd52a65 100644
                  .padding(horizontal = 14.dp, vertical = 10.dp),
              verticalAlignment = Alignment.CenterVertically,
              horizontalArrangement = Arrangement.spacedBy(12.dp),
+@@ -176,6 +193,7 @@ internal fun ToolsAppSortMenuCard(state: ToolsAppsState, onSortChange: (ToolsApp
+         ToolsAppSort.entries.map { sort -> ToolsMenuOption(sort.label, checked = state.sort == sort) { onSortChange(sort) } } +
+             ToolsMenuOption(if (state.descending) "改为升序" else "改为降序", dividerBefore = true, onClick = onToggleDescending),
+         modifier,
++        referenceWidth = 130.dp,
+     )
+ }
+ 
+@@ -198,5 +216,6 @@ internal fun ToolsAppMoreMenuCard(
+             ToolsMenuOption("刷新应用", enabled = !state.refreshing, onClick = onRefresh),
+         ),
+         modifier,
++        referenceWidth = 120.dp,
+     )
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..c7aa4f0 100644
+index e3bff78..cdc9974 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
+@@ -8,19 +8,24 @@ import io.github.xgl34222220.hetu.hxPressScale
+ import androidx.compose.foundation.clickable
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxWithConstraints
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.ColumnScope
++import androidx.compose.foundation.layout.IntrinsicSize
+ import androidx.compose.foundation.layout.Row
  import androidx.compose.foundation.layout.RowScope
  import androidx.compose.foundation.layout.WindowInsets
  import androidx.compose.foundation.layout.fillMaxSize
@@ -980,7 +1062,8 @@ index e3bff78..c7aa4f0 100644
  import androidx.compose.foundation.layout.fillMaxWidth
  import androidx.compose.foundation.layout.height
  import androidx.compose.foundation.layout.heightIn
-@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
+ import androidx.compose.foundation.layout.navigationBars
++import androidx.compose.foundation.layout.offset
  import androidx.compose.foundation.layout.padding
  import androidx.compose.foundation.layout.size
  import androidx.compose.foundation.layout.widthIn
@@ -988,7 +1071,35 @@ index e3bff78..c7aa4f0 100644
  import androidx.compose.foundation.layout.windowInsetsPadding
  import androidx.compose.foundation.rememberScrollState
  import androidx.compose.foundation.shape.CircleShape
-@@ -52,6 +54,7 @@ import androidx.compose.ui.text.AnnotatedString
+@@ -32,19 +37,27 @@ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.draw.drawBehind
+ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.focus.FocusRequester
+ import androidx.compose.ui.focus.focusRequester
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.geometry.Rect
++import androidx.compose.ui.graphics.Path
+ import androidx.compose.ui.graphics.SolidColor
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.platform.LocalFocusManager
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.layout.onSizeChanged
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.contentDescription
+ import androidx.compose.ui.semantics.semantics
+@@ -52,17 +65,22 @@ import androidx.compose.ui.text.AnnotatedString
  import androidx.compose.ui.text.SpanStyle
  import androidx.compose.ui.text.TextStyle
  import androidx.compose.ui.text.font.FontWeight
@@ -996,7 +1107,22 @@ index e3bff78..c7aa4f0 100644
  import androidx.compose.ui.text.input.ImeAction
  import androidx.compose.ui.text.input.KeyboardType
  import androidx.compose.ui.text.style.TextAlign
-@@ -84,18 +87,18 @@ internal object ToolsDims {
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.IntOffset
++import androidx.compose.ui.unit.IntRect
++import androidx.compose.ui.unit.IntSize
++import androidx.compose.ui.unit.LayoutDirection
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.window.Dialog
+ import androidx.compose.ui.window.DialogProperties
+ import androidx.compose.ui.window.Popup
++import androidx.compose.ui.window.PopupPositionProvider
+ import androidx.compose.ui.window.PopupProperties
+ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
+@@ -84,18 +102,18 @@ internal object ToolsDims {
      val dialogShape = RoundedCornerShape(20.dp)
      val menuItemShape = RoundedCornerShape(10.dp)
      val keyShape = RoundedCornerShape(8.dp)
@@ -1020,7 +1146,7 @@ index e3bff78..c7aa4f0 100644
  }
  
  /* ------------------------------------------------------------------ */
-@@ -167,7 +170,7 @@ internal fun ToolsCardHeader(
+@@ -167,7 +185,7 @@ internal fun ToolsCardHeader(
      ) {
          Icon(icon, null, Modifier.size(26.dp), tint = c.t1)
          Column(Modifier.weight(1f)) {
@@ -1029,7 +1155,7 @@ index e3bff78..c7aa4f0 100644
              if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
          }
          if (trailing != null) trailing()
-@@ -196,12 +199,13 @@ internal fun ToolsRow(
+@@ -196,12 +214,13 @@ internal fun ToolsRow(
      compact: Boolean = false,
      enabled: Boolean = true,
      endPadding: Dp = 16.dp,
@@ -1044,7 +1170,7 @@ index e3bff78..c7aa4f0 100644
      val source = remember { MutableInteractionSource() }
      val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
      Row(
-@@ -214,9 +218,9 @@ internal fun ToolsRow(
+@@ -214,9 +233,9 @@ internal fun ToolsRow(
          if (icon != null) Icon(icon, null, Modifier.size(26.dp), tint = iconTint)
          Column(Modifier.weight(1f)) {
              Text(title, color = titleColor, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -1056,7 +1182,7 @@ index e3bff78..c7aa4f0 100644
      }
  }
  
-@@ -267,14 +271,36 @@ internal fun ToolsField(
+@@ -267,14 +286,36 @@ internal fun ToolsField(
      monospace: Boolean = false,
      readOnly: Boolean = false,
      keyboardType: KeyboardType = KeyboardType.Text,
@@ -1096,7 +1222,7 @@ index e3bff78..c7aa4f0 100644
          }
          if (error != null) {
              Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-@@ -286,7 +312,7 @@ internal fun ToolsField(
+@@ -286,7 +327,7 @@ internal fun ToolsField(
      }
  }
  
@@ -1105,7 +1231,7 @@ index e3bff78..c7aa4f0 100644
  @Composable
  internal fun ToolsSearchField(
      value: String,
-@@ -313,7 +339,7 @@ internal fun ToolsSearchField(
+@@ -313,7 +354,7 @@ internal fun ToolsSearchField(
          cursorBrush = SolidColor(c.accent),
          decorationBox = { inner ->
              Row(
@@ -1114,7 +1240,7 @@ index e3bff78..c7aa4f0 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(8.dp),
              ) {
-@@ -326,7 +352,11 @@ internal fun ToolsSearchField(
+@@ -326,7 +367,11 @@ internal fun ToolsSearchField(
                      Box(
                          Modifier.size(36.dp).clip(CircleShape).clickable(onClickLabel = clearLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onValueChange("") },
                          contentAlignment = Alignment.Center,
@@ -1127,7 +1253,7 @@ index e3bff78..c7aa4f0 100644
                  }
              }
          },
-@@ -396,6 +426,7 @@ internal fun ToolsDangerButton(
+@@ -396,6 +441,7 @@ internal fun ToolsDangerButton(
  /* ------------------------------------------------------------------ */
  
  internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
@@ -1135,7 +1261,7 @@ index e3bff78..c7aa4f0 100644
  
  /**
   * The inside of a confirmation dialog: centred title and message, optional form content,
-@@ -411,30 +442,47 @@ internal fun ToolsDialogCard(
+@@ -411,30 +457,47 @@ internal fun ToolsDialogCard(
      modifier: Modifier = Modifier,
      text: String? = null,
      confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
@@ -1202,7 +1328,7 @@ index e3bff78..c7aa4f0 100644
              }
          }
      }
-@@ -456,12 +504,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
+@@ -456,12 +519,12 @@ internal class ToolsMenuEntry(val label: String, val icon: ImageVector, val dang
  
  /** The menu surface itself: optional caption line, then 40 dp items. Preview-friendly. */
  @Composable
@@ -1217,7 +1343,7 @@ index e3bff78..c7aa4f0 100644
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
-@@ -469,17 +517,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+@@ -469,17 +532,17 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
              .padding(4.dp),
      ) {
          if (title != null) {
@@ -1238,6 +1364,71 @@ index e3bff78..c7aa4f0 100644
                  verticalAlignment = Alignment.CenterVertically,
                  horizontalArrangement = Arrangement.spacedBy(10.dp),
              ) {
+@@ -495,7 +558,52 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+  * Place it inside the Box that wraps the «⋯» button.
+  */
+ @Composable
+-internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Composable () -> Unit) {
++internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, reference: ToolsAppsMenuReference? = null, content: @Composable () -> Unit) {
++    if (reference != null) {
++        val c = LocalHomeColors.current
++        val density = LocalDensity.current
++        var menuSize by remember { mutableStateOf(IntSize.Zero) }
++        val dismissSource = remember { MutableInteractionSource() }
++        val dismissLabel = ht("关闭菜单")
++        Popup(
++            popupPositionProvider = ToolsAppsFullWindowPosition,
++            onDismissRequest = onDismiss,
++            properties = PopupProperties(focusable = true, clippingEnabled = false),
++        ) {
++            BoxWithConstraints(Modifier.fillMaxSize()) {
++                val windowWidth = with(density) { maxWidth.roundToPx() }
++                val windowHeight = with(density) { maxHeight.roundToPx() }
++                val margin = with(density) { 8.dp.roundToPx() }
++                val endInset = with(density) { reference.endInset.roundToPx() }
++                val left = (windowWidth - endInset - menuSize.width).coerceIn(margin, (windowWidth - menuSize.width - margin).coerceAtLeast(margin))
++                val pointerHeight = with(density) { 7.dp.roundToPx() }
++                val requestedTop = (reference.anchor?.top?.toInt() ?: 0) + offsetY - pointerHeight
++                val top = requestedTop.coerceIn(margin, (windowHeight - menuSize.height - margin).coerceAtLeast(margin))
++                val maxMenuWidth = (maxWidth - 16.dp).coerceAtLeast(1.dp)
++                val availableHeight = with(density) { (windowHeight - top - margin).coerceAtLeast(1).toDp() }
++                Box(Modifier.matchParentSize().background(Color.Black.copy(alpha = reference.scrimAlpha))
++                    .clickable(interactionSource = dismissSource, indication = null, onClickLabel = dismissLabel, onClick = onDismiss))
++                Column(Modifier.offset { IntOffset(left, top) }.width(IntrinsicSize.Max)
++                    .widthIn(max = maxMenuWidth).heightIn(max = availableHeight)
++                    .onSizeChanged { menuSize = it }.verticalScroll(rememberScrollState())) {
++                    Box(Modifier.fillMaxWidth().height(7.dp).drawBehind {
++                        val edge = 7.dp.toPx()
++                        val tip = ((reference.anchor?.center?.x ?: (left + size.width / 2f)) - left)
++                            .coerceIn(edge, (size.width - edge).coerceAtLeast(edge))
++                        val pointer = Path().apply {
++                            moveTo(tip - edge, size.height)
++                            lineTo(tip, 0f)
++                            lineTo(tip + edge, size.height)
++                            close()
++                        }
++                        drawPath(pointer, c.surface)
++                    })
++                    content()
++                }
++            }
++        }
++        return
++    }
+     Popup(
+         alignment = Alignment.TopEnd,
+         offset = IntOffset(0, offsetY),
+@@ -504,3 +612,10 @@ internal fun ToolsMenuPopup(onDismiss: () -> Unit, offsetY: Int, content: @Compo
+         content = content,
+     )
+ }
++
++/** Opt-in presentation measured from PDF03A pages 29/30; other tools keep the legacy popup. */
++internal data class ToolsAppsMenuReference(val anchor: Rect?, val endInset: Dp, val scrimAlpha: Float)
++
++private object ToolsAppsFullWindowPosition : PopupPositionProvider {
++    override fun calculatePosition(anchorBounds: IntRect, windowSize: IntSize, layoutDirection: LayoutDirection, popupContentSize: IntSize): IntOffset = IntOffset.Zero
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 index e9d3077..b2ab72c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
@@ -1538,10 +1729,18 @@ index 2b98b46..ae98331 100644
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.DangerSoft,
          onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-index a60a9d7..d7720df 100644
+index a60a9d7..e666e66 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
-@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
+@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.ColumnScope
++import androidx.compose.foundation.layout.IntrinsicSize
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.RowScope
+ import androidx.compose.foundation.layout.WindowInsets
+@@ -25,6 +26,7 @@ import androidx.compose.foundation.layout.padding
  import androidx.compose.foundation.layout.size
  import androidx.compose.foundation.layout.statusBars
  import androidx.compose.foundation.layout.widthIn
@@ -1549,7 +1748,7 @@ index a60a9d7..d7720df 100644
  import androidx.compose.foundation.layout.windowInsetsPadding
  import androidx.compose.foundation.rememberScrollState
  import androidx.compose.foundation.shape.CircleShape
-@@ -56,6 +57,7 @@ import androidx.compose.ui.text.input.KeyboardType
+@@ -56,6 +58,7 @@ import androidx.compose.ui.text.input.KeyboardType
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.Dp
  import androidx.compose.ui.unit.dp
@@ -1557,16 +1756,62 @@ index a60a9d7..d7720df 100644
  import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
  import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
  import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
-@@ -371,7 +373,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+@@ -366,34 +369,45 @@ internal class ToolsMenuOption(val label: String, val checked: Boolean? = null,
+ 
+ /** Menu of options; the chosen ones turn accent and get a trailing check (pages 29, 30). */
+ @Composable
+-internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modifier = Modifier) {
++internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modifier = Modifier, referenceWidth: Dp? = null) {
+     val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
++    val compact = referenceWidth != null
++    val sortReference = referenceWidth == 130.dp
++    val outerPadding = if (!compact) 4.dp else if (sortReference) 6.dp else 5.dp
++    val widthModifier = if (referenceWidth == null) Modifier.width(168.dp)
++        else Modifier.widthIn(min = referenceWidth).width(IntrinsicSize.Max)
      Column(
          modifier
 -            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
-+            .width(168.dp)
++            .then(widthModifier)
              .shadow(16.dp, HomeDims.menuShape)
              .clip(HomeDims.menuShape)
              .background(c.surface)
-@@ -408,11 +410,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+             .border(1.dp, c.line, HomeDims.menuShape)
+-            .padding(4.dp),
++            .padding(outerPadding),
+     ) {
+         options.forEach { option ->
+-            if (option.dividerBefore) HomeDivider(Modifier.padding(horizontal = 8.dp, vertical = 4.dp))
++            if (option.dividerBefore) HomeDivider(Modifier.padding(horizontal = 8.dp, vertical = if (compact) 6.dp else 4.dp))
+             val on = option.checked == true
+             Row(
+                 Modifier
+                     .fillMaxWidth()
+-                    .heightIn(min = 40.dp)
++                    .heightIn(min = if (!compact) 40.dp else if (sortReference) 33.dp else 37.dp)
+                     .alpha(if (option.enabled) 1f else .4f)
+                     .clip(ToolsDims.menuItemShape)
+                     .clickable(enabled = option.enabled, role = Role.Button) { haptics(HomeHaptic.Tap); option.onClick() }
+-                    .padding(horizontal = 12.dp, vertical = 6.dp),
++                    .padding(horizontal = if (compact && !sortReference) 11.dp else 12.dp, vertical = 6.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+-                horizontalArrangement = Arrangement.spacedBy(16.dp),
++                horizontalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 16.dp),
+             ) {
+-                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1, style = ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
+-                if (option.checked != null) Box(Modifier.size(16.dp)) { if (on) Icon(HomeIcons.Check, null, Modifier.size(16.dp), tint = c.accent) }
++                Text(ht(option.label), Modifier.weight(1f), color = if (on) c.accent else c.t1,
++                    style = if (compact) ToolsType.menuItem.copy(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
++                        else ToolsType.menuItem.copy(fontWeight = if (on) FontWeight.SemiBold else null), maxLines = 1)
++                if (option.checked != null && (!compact || on)) {
++                    Box(Modifier.size(if (compact) 14.dp else 16.dp)) {
++                        if (on) Icon(HomeIcons.Check, null, Modifier.size(if (compact) 14.dp else 16.dp), tint = c.accent)
++                    }
++                }
+             }
+         }
+     }
+@@ -408,11 +422,11 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
   * reports stay inside the sheet; lines never wrap, which keeps YAML indentation readable.
   */
  @Composable
@@ -1582,7 +1827,7 @@ index a60a9d7..d7720df 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
-index 9b0a4af..52f1d2a 100644
+index 9b0a4af..ee8b5a0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt
 @@ -1,8 +1,9 @@
@@ -1608,7 +1853,7 @@ index 9b0a4af..52f1d2a 100644
      val Activity: ImageVector by lazy { vector("Activity",
          "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
      ) }
-@@ -198,4 +204,49 @@ internal object ToolsIcons {
+@@ -198,4 +204,59 @@ internal object ToolsIcons {
          "M12 9v4",
          "M12 17h.01",
      ) }
@@ -1643,8 +1888,8 @@ index 9b0a4af..52f1d2a 100644
 +     * Green segmentation: G - R > 70 and G - B > 30; marching-squares at 0.5.
 +     * No path simplification. EvenOdd preserves the white check as negative space.
 +     */
-+    private fun pdfAdblockSilhouette(name: String, viewport: Float, outline: String): ImageVector = ImageVector.Builder(
-+        name = "HetuPdf03A45.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
++    private fun pdfAdblockSilhouette(name: String, viewport: Float, outline: String, sourceDocumentPage: String = "03A45"): ImageVector = ImageVector.Builder(
++        name = "HetuPdf$sourceDocumentPage.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
 +        viewportWidth = viewport, viewportHeight = viewport,
 +    ).apply {
 +        addPath(pathData = PathParser().parsePathString(outline).toNodes(),
@@ -1656,6 +1901,16 @@ index 9b0a4af..52f1d2a 100644
 +    ) }
 +    val AdblockCheckPdf45: ImageVector by lazy { pdfAdblockSilhouette("AdblockCheckPdf45", 56f,
 +        "M22,1.5 L23,1.5 L24,1.5 L25,1.5 L26,1.5 L27,1.5 L28,1.5 L29,1.5 L30,1.5 L31,1.5 L32,1.5 L33,1.5 L34,1.5 L34.5,2 L35,2.5 L36,2.5 L37,2.5 L37.5,3 L38,3.5 L39,3.5 L39.5,4 L40,4.5 L41,4.5 L41.5,5 L42,5.5 L42.5,6 L43,6.5 L44,6.5 L44.5,7 L45,7.5 L45.5,8 L46,8.5 L46.5,9 L47,9.5 L47.5,10 L47.5,11 L48,11.5 L48.5,12 L49,12.5 L49.5,13 L50,13.5 L50.5,14 L50.5,15 L51,15.5 L51.5,16 L51.5,17 L52,17.5 L52.5,18 L52.5,19 L52.5,20 L52.5,21 L53,21.5 L53.5,22 L53.5,23 L53.5,24 L53.5,25 L53.5,26 L53.5,27 L53.5,28 L53.5,29 L53.5,30 L53.5,31 L53.5,32 L53.5,33 L53,33.5 L52.5,34 L52.5,35 L52,35.5 L51.5,36 L51.5,37 L51.5,38 L51,38.5 L50.5,39 L50,39.5 L49.5,40 L49.5,41 L49,41.5 L48.5,42 L48,42.5 L47.5,43 L47.5,44 L47,44.5 L46.5,45 L46,45.5 L45.5,46 L45,46.5 L44,46.5 L43.5,47 L43,47.5 L42.5,48 L42,48.5 L41.5,49 L41,49.5 L40,49.5 L39.5,50 L39,50.5 L38,50.5 L37,50.5 L36.5,51 L36,51.5 L35,51.5 L34.5,52 L34,52.5 L33,52.5 L32,52.5 L31,52.5 L30,52.5 L29,52.5 L28,52.5 L27,52.5 L26,52.5 L25,52.5 L24,52.5 L23,52.5 L22.5,52 L22,51.5 L21,51.5 L20,51.5 L19,51.5 L18.5,51 L18,50.5 L17,50.5 L16.5,50 L16,49.5 L15,49.5 L14.5,49 L14,48.5 L13,48.5 L12.5,48 L12,47.5 L11.5,47 L11,46.5 L10.5,46 L10,45.5 L9.5,45 L9,44.5 L8.5,44 L8,43.5 L7.5,43 L7,42.5 L6.5,42 L6.5,41 L6,40.5 L5.5,40 L5.5,39 L5,38.5 L4.5,38 L4.5,37 L4,36.5 L3.5,36 L3.5,35 L3,34.5 L2.5,34 L2.5,33 L2.5,32 L2.5,31 L2.5,30 L2.5,29 L2,28.5 L1.5,28 L1.5,27 L1.5,26 L2,25.5 L2.5,25 L2.5,24 L2.5,23 L2.5,22 L2.5,21 L3,20.5 L3.5,20 L3.5,19 L3.5,18 L3.5,17 L4,16.5 L4.5,16 L5,15.5 L5.5,15 L5.5,14 L6,13.5 L6.5,13 L6.5,12 L7,11.5 L7.5,11 L8,10.5 L8.5,10 L9,9.5 L9.5,9 L10,8.5 L10.5,8 L11,7.5 L11.5,7 L12,6.5 L12.5,6 L13,5.5 L14,5.5 L14.5,5 L15,4.5 L16,4.5 L16.5,4 L17,3.5 L17.5,3 L18,2.5 L19,2.5 L20,2.5 L21,2.5 L21.5,2 Z M36,18.5 L35.5,19 L35.5,20 L35,20.5 L34.5,21 L34,21.5 L33.5,22 L33,22.5 L32.5,23 L32,23.5 L31.5,24 L31,24.5 L30.5,25 L30,25.5 L29.5,26 L29,26.5 L28.5,27 L28,27.5 L27.5,28 L27,28.5 L26.5,29 L26,29.5 L25.5,30 L25,30.5 L24.5,30 L24,29.5 L23.5,29 L23,28.5 L22.5,28 L22,27.5 L21.5,27 L21,26.5 L20.5,26 L20,25.5 L19,25.5 L18,25.5 L17.5,26 L17,26.5 L16.5,27 L16.5,28 L16.5,29 L17,29.5 L17.5,30 L18,30.5 L18.5,31 L19,31.5 L19.5,32 L20,32.5 L21,32.5 L21.5,33 L22,33.5 L22.5,34 L22.5,35 L23,35.5 L24,35.5 L25,35.5 L26,35.5 L26.5,35 L27,34.5 L27.5,34 L28,33.5 L28.5,33 L29,32.5 L30,32.5 L30.5,32 L30.5,31 L31,30.5 L31.5,30 L32,29.5 L32.5,29 L33,28.5 L33.5,28 L34,27.5 L34.5,27 L35,26.5 L35.5,26 L36,25.5 L36.5,25 L37,24.5 L37.5,24 L38,23.5 L38.5,23 L39,22.5 L39.5,22 L39.5,21 L39,20.5 L38.5,20 L38,19.5 L37.5,19 L37,18.5 Z",
++    ) }
++
++    /**
++     * Filled warning shield traced from the user-provided PDF03B page 1 JPEG (xref 3).
++     * R - G > 35 and G - B > 50; marching-squares at 0.5 without simplification.
++     * The exclamation stem and dot are retained as separate EvenOdd negative spaces.
++     */
++    val AdblockWrongModePdf03B01: ImageVector by lazy { pdfAdblockSilhouette("AdblockWrongModePdf03B01", 96f,
++        "M45,2.5 L46,2.5 L47,2.5 L48,2.5 L49,2.5 L49.5,3 L50,3.5 L51,3.5 L51.5,4 L52,4.5 L53,4.5 L53.5,5 L54,5.5 L55,5.5 L55.5,6 L56,6.5 L57,6.5 L57.5,7 L58,7.5 L59,7.5 L59.5,8 L60,8.5 L61,8.5 L61.5,9 L62,9.5 L63,9.5 L63.5,10 L64,10.5 L65,10.5 L66,10.5 L66.5,11 L67,11.5 L68,11.5 L68.5,12 L69,12.5 L70,12.5 L70.5,13 L71,13.5 L72,13.5 L73,13.5 L73.5,14 L74,14.5 L75,14.5 L76,14.5 L76.5,15 L77,15.5 L78,15.5 L79,15.5 L79.5,16 L80,16.5 L81,16.5 L81.5,17 L82,17.5 L82.5,18 L82.5,19 L83,19.5 L83.5,20 L83.5,21 L84,21.5 L84.5,22 L84.5,23 L84,23.5 L83.5,24 L83.5,25 L83.5,26 L83.5,27 L83.5,28 L83.5,29 L83.5,30 L83.5,31 L83.5,32 L83.5,33 L83.5,34 L83.5,35 L83.5,36 L83.5,37 L83.5,38 L83.5,39 L83.5,40 L83.5,41 L83.5,42 L83.5,43 L83.5,44 L83.5,45 L83.5,46 L83.5,47 L83.5,48 L83.5,49 L83.5,50 L83.5,51 L83.5,52 L83.5,53 L83,53.5 L82.5,54 L82.5,55 L82.5,56 L82.5,57 L82,57.5 L81.5,58 L81.5,59 L81.5,60 L81,60.5 L80.5,61 L80.5,62 L80,62.5 L79.5,63 L79,63.5 L78.5,64 L78.5,65 L78,65.5 L77.5,66 L77.5,67 L77,67.5 L76.5,68 L76.5,69 L76,69.5 L75.5,70 L75,70.5 L74.5,71 L74,71.5 L73.5,72 L73.5,73 L73,73.5 L72.5,74 L72,74.5 L71.5,75 L71,75.5 L70.5,76 L70,76.5 L69.5,77 L69,77.5 L68.5,78 L68,78.5 L67.5,79 L67,79.5 L66.5,80 L66,80.5 L65.5,81 L65,81.5 L64.5,82 L64,82.5 L63,82.5 L62.5,83 L62,83.5 L61.5,84 L61,84.5 L60.5,85 L60,85.5 L59,85.5 L58.5,86 L58,86.5 L57,86.5 L56.5,87 L56,87.5 L55,87.5 L54.5,88 L54,88.5 L53,88.5 L52.5,89 L52,89.5 L51,89.5 L50.5,90 L50,90.5 L49,90.5 L48,90.5 L47.5,91 L47,91.5 L46.5,91 L46,90.5 L45,90.5 L44,90.5 L43.5,90 L43,89.5 L42,89.5 L41,89.5 L40.5,89 L40,88.5 L39,88.5 L38.5,88 L38,87.5 L37,87.5 L36.5,87 L36,86.5 L35.5,86 L35,85.5 L34,85.5 L33.5,85 L33,84.5 L32.5,84 L32,83.5 L31,83.5 L30.5,83 L30,82.5 L29.5,82 L29,81.5 L28.5,81 L28,80.5 L27,80.5 L26.5,80 L26,79.5 L25.5,79 L25,78.5 L24.5,78 L24,77.5 L23.5,77 L23,76.5 L22.5,76 L22,75.5 L21.5,75 L21.5,74 L21,73.5 L20.5,73 L20,72.5 L19.5,72 L19,71.5 L18.5,71 L18,70.5 L17.5,70 L17.5,69 L17,68.5 L16.5,68 L16.5,67 L16,66.5 L15.5,66 L15,65.5 L14.5,65 L14.5,64 L14,63.5 L13.5,63 L13.5,62 L13,61.5 L12.5,61 L12.5,60 L12.5,59 L12,58.5 L11.5,58 L11.5,57 L11.5,56 L11,55.5 L10.5,55 L10.5,54 L10.5,53 L10,52.5 L9.5,52 L9.5,51 L9.5,50 L9.5,49 L9.5,48 L9.5,47 L9.5,46 L9.5,45 L9.5,44 L9.5,43 L9.5,42 L9.5,41 L9.5,40 L9.5,39 L9.5,38 L9.5,37 L9.5,36 L9.5,35 L9.5,34 L9.5,33 L9.5,32 L9.5,31 L9.5,30 L9.5,29 L9.5,28 L9.5,27 L9.5,26 L9.5,25 L9.5,24 L9.5,23 L9.5,22 L9.5,21 L9.5,20 L10,19.5 L10.5,19 L11,18.5 L11.5,18 L11.5,17 L12,16.5 L13,16.5 L14,16.5 L14.5,16 L15,15.5 L16,15.5 L17,15.5 L17.5,15 L18,14.5 L19,14.5 L19.5,14 L20,13.5 L21,13.5 L22,13.5 L22.5,13 L23,12.5 L24,12.5 L25,12.5 L25.5,12 L26,11.5 L27,11.5 L27.5,11 L28,10.5 L29,10.5 L30,10.5 L30.5,10 L31,9.5 L32,9.5 L32.5,9 L33,8.5 L34,8.5 L34.5,8 L35,7.5 L36,7.5 L36.5,7 L37,6.5 L38,6.5 L38.5,6 L39,5.5 L40,5.5 L40.5,5 L41,4.5 L42,4.5 L42.5,4 L43,3.5 L44,3.5 L44.5,3 Z M47,24.5 L46.5,25 L46,25.5 L45,25.5 L44.5,26 L44,26.5 L43.5,27 L43.5,28 L43.5,29 L43.5,30 L43.5,31 L43.5,32 L43.5,33 L43.5,34 L43.5,35 L43.5,36 L43.5,37 L43.5,38 L43.5,39 L43.5,40 L43.5,41 L43.5,42 L43.5,43 L43.5,44 L43.5,45 L43.5,46 L43.5,47 L43.5,48 L43.5,49 L43.5,50 L43.5,51 L43.5,52 L44,52.5 L44.5,53 L44.5,54 L45,54.5 L46,54.5 L47,54.5 L48,54.5 L49,54.5 L50,54.5 L50.5,54 L50.5,53 L50.5,52 L50.5,51 L50.5,50 L50.5,49 L50.5,48 L50.5,47 L50.5,46 L50.5,45 L50.5,44 L50.5,43 L50.5,42 L50.5,41 L50.5,40 L50.5,39 L50.5,38 L50.5,37 L50.5,36 L50.5,35 L50.5,34 L50.5,33 L50.5,32 L51,31.5 L51.5,31 L51,30.5 L50.5,30 L50.5,29 L50.5,28 L50.5,27 L50,26.5 L49.5,26 L49,25.5 L48,25.5 L47.5,25 Z M46,59.5 L45.5,60 L45,60.5 L44.5,61 L44,61.5 L43.5,62 L43.5,63 L43,63.5 L42.5,64 L43,64.5 L43.5,65 L43.5,66 L44,66.5 L44.5,67 L45,67.5 L45.5,68 L46,68.5 L47,68.5 L48,68.5 L48.5,68 L49,67.5 L49.5,67 L50,66.5 L50.5,66 L51,65.5 L51.5,65 L51.5,64 L51.5,63 L51.5,62 L51,61.5 L50,61.5 L49.5,61 L49,60.5 L48.5,60 L48,59.5 L47,59.5 Z",
++        sourceDocumentPage = "03B01",
 +    ) }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt

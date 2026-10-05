@@ -47,5 +47,72 @@
     "Binary pixel-center equivalence is not antialiasing/gradient/color equivalence.",
     "White check negative space shows current palette background; glyph fill uses caller tint.",
     "Existing production layout, icon size, and state selection remain unchanged."
-  ]
+  ],
+  "warningGlyphAndStatusDimensions": {
+    "sourcePdf": "河图概念图-03B-工具下册-离线版(1).pdf",
+    "sourcePage": 1,
+    "sourcePdfSha256": "e89366d0b62f25b053f225b1ada287a2852a4eeaca969106f9d62c1f14a0550a",
+    "sourceJpegXref": 3,
+    "sourceJpegSha256": "b18e058921a529f548ec922f9a83b35f1123d304dd1442c2110adaf0d2b4d455",
+    "sourceJpegResolution": [
+      850,
+      1850
+    ],
+    "sourceCropPixels": [
+      97,
+      328,
+      193,
+      424
+    ],
+    "segmentation": "R - G > 35 AND G - B > 50; integer RGB",
+    "contour": "marching-squares at 0.5; all vertices retained; EvenOdd exclamation stem/dot negative spaces",
+    "viewport": 96,
+    "loops": 3,
+    "vertices": 440,
+    "foregroundPixels": 4779,
+    "differentPixelsAtSourceCenters": 0,
+    "binaryIoU": 1.0,
+    "geometry": {
+      "protectingCircleReferenceSourcePixels": [
+        63,
+        290,
+        227,
+        456
+      ],
+      "wrongModeCircleReferenceSourcePixels": [
+        64,
+        291,
+        227,
+        456
+      ],
+      "referenceCircle393dpRange": [
+        75.36,
+        76.75
+      ],
+      "referenceShieldSourcePixels": [
+        107,
+        331,
+        182,
+        420
+      ],
+      "referenceShield393dpSize": [
+        34.6764705882353,
+        41.14941176470588
+      ],
+      "protectingAndWrongModeCircle": 76,
+      "protectingAndWrongModeIcon": 44,
+      "newFilledGlyphActualDpSize": [
+        34.375,
+        40.79166666666667
+      ],
+      "otherStatesCircle": 56,
+      "otherStatesIcon": 28
+    },
+    "preview": "/workspace/scratch/3788973cf567/tmp/pdf-wrongmode-silhouette-comparison.png",
+    "limitations": [
+      "Binary equivalence is not original JPEG antialiasing/gradient/color equivalence.",
+      "Fill tint comes from the live app palette; negative spaces show the background.",
+      "Only the two supplied status states change geometry; state predicates/callbacks unchanged."
+    ]
+  }
 }

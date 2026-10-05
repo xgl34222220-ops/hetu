@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
@@ -18,11 +19,17 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.layout.boundsInWindow
+import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
@@ -77,23 +84,32 @@ internal fun ToolsAppsScreen(
     val core = state.scope == ToolsAppScope.Core
     val menuOffset = with(LocalDensity.current) { 44.dp.roundToPx() }
     val rows = remember(state) { state.visible }
+    var sortAnchor by remember { mutableStateOf<Rect?>(null) }
+    var moreAnchor by remember { mutableStateOf<Rect?>(null) }
 
     Column(modifier.fillMaxSize().background(c.bg)) {
         ToolsTopBar(title = "应用管理", onBack = onBack) {
             HomeIconButton(ToolsIcons.Search, if (state.searching) "关闭搜索" else "搜索", onToggleSearch, modifier = Modifier.width(32.dp), enabled = ready)
             Box {
-                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, modifier = Modifier.width(32.dp), enabled = ready)
+                HomeIconButton(ToolsFeatureIcons.ArrowUpDown, "排序", { onOpenMenu(ToolsAppsMenu.Sort) }, modifier = Modifier.width(32.dp).onGloballyPositioned { sortAnchor = it.boundsInWindow() }, enabled = ready)
                 if (menu == ToolsAppsMenu.Sort) {
-                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppSortMenuCard(state, onSortChange, onToggleDescending) }
+                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset,
+                        reference = ToolsAppsMenuReference(sortAnchor, endInset = 20.dp, scrimAlpha = .43f)) {
+                        ToolsAppSortMenuCard(state, onSortChange, onToggleDescending)
+                    }
                 }
             }
             HomeIconButton(HomeIcons.CircleCheck, "全选当前结果", onSelectAll, modifier = Modifier.width(32.dp), enabled = ready && !core && rows.isNotEmpty())
             Box {
-                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, modifier = Modifier.width(32.dp), enabled = ready)
+                HomeIconButton(ToolsFeatureIcons.EllipsisVertical, "更多", { onOpenMenu(ToolsAppsMenu.More) }, modifier = Modifier.width(32.dp).onGloballyPositioned { moreAnchor = it.boundsInWindow() }, enabled = ready)
                 if (menu == ToolsAppsMenu.More) {
-                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) { ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh) }
+                    ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset,
+                        reference = ToolsAppsMenuReference(moreAnchor, endInset = 10.dp, scrimAlpha = .45f)) {
+                        ToolsAppMoreMenuCard(state, onToggleSystem, onSelectAll, onClear, onRefresh)
+                    }
                 }
             }
+            Spacer(Modifier.width(4.dp))
         }
         Column(Modifier.padding(horizontal = HomeDims.gutter), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
             if (state.searching) ToolsSearchField(state.query, onQueryChange, "搜索应用或包名")
@@ -177,6 +193,7 @@ internal fun ToolsAppSortMenuCard(state: ToolsAppsState, onSortChange: (ToolsApp
         ToolsAppSort.entries.map { sort -> ToolsMenuOption(sort.label, checked = state.sort == sort) { onSortChange(sort) } } +
             ToolsMenuOption(if (state.descending) "改为升序" else "改为降序", dividerBefore = true, onClick = onToggleDescending),
         modifier,
+        referenceWidth = 130.dp,
     )
 }
 
@@ -199,5 +216,6 @@ internal fun ToolsAppMoreMenuCard(
             ToolsMenuOption("刷新应用", enabled = !state.refreshing, onClick = onRefresh),
         ),
         modifier,
+        referenceWidth = 120.dp,
     )
 }
