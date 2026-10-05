@@ -216,6 +216,7 @@ internal fun ToolsRow(
     endPadding: Dp = 16.dp,
     subtitleMaxLines: Int = 2,
     onClick: (() -> Unit)? = null,
+    gap: Dp = 18.dp,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
@@ -228,7 +229,7 @@ internal fun ToolsRow(
             .heightIn(min = if (compact) HomeDims.rowMinHeightSmall else HomeDims.rowMinHeight)
             .padding(start = 16.dp, end = endPadding, top = 8.dp, bottom = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(18.dp),
+        horizontalArrangement = Arrangement.spacedBy(gap),
     ) {
         if (icon != null) Icon(icon, null, Modifier.size(26.dp), tint = iconTint)
         Column(Modifier.weight(1f)) {
@@ -388,11 +389,12 @@ internal fun ToolsEmpty(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
+    iconSize: Dp = 32.dp,
     action: (@Composable () -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
     Column(modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 48.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Icon(icon, null, Modifier.padding(bottom = 12.dp).size(32.dp), tint = c.t3)
+        Icon(icon, null, Modifier.padding(bottom = 12.dp).size(iconSize), tint = c.t3)
         Text(ht(title), color = c.t1, style = ToolsType.emptyTitle, textAlign = TextAlign.Center)
         if (subtitle != null) Text(subtitle, Modifier.padding(top = 4.dp), color = c.t2, style = HomeType.note, textAlign = TextAlign.Center)
         if (action != null) Box(Modifier.padding(top = 16.dp)) { action() }

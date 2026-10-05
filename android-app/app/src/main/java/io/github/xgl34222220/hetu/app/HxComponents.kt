@@ -179,6 +179,7 @@ internal fun HxPage(
     largeTitleBottomPadding: Dp = 10.dp,
     canvasColor: Color? = null,
     flatCanvas: Boolean = false,
+    referenceTopBar: Boolean = false,
     referenceLabel: String? = null,
     content: LazyListScope.() -> Unit,
 ) {
@@ -355,7 +356,7 @@ internal fun HxPage(
                             scaleX = s
                             scaleY = s
                         },
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = FontWeight.SemiBold),
+                    style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = if (referenceTopBar) FontWeight.Bold else FontWeight.SemiBold),
                     color = c.text,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
@@ -363,7 +364,7 @@ internal fun HxPage(
                 )
                 if (onBack != null) {
                     IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)
+                        Icon(if (referenceTopBar) io.github.xgl34222220.hetu.home.HomeIcons.ChevronLeft else Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)
                     }
                 }
                 if (!largeTitle || collapsed || onBack != null) {
@@ -788,8 +789,28 @@ internal fun HxBanner(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    referenceCompact: Boolean = false,
 ) {
     val bg by animateColorAsState(tone.bg(), tween(HxMotion.Medium), label = "bannerBg")
+    if (referenceCompact) {
+        Row(modifier.fillMaxWidth().clip(Hx.rowShape).background(bg)
+            .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
+            .heightIn(min = 46.dp).padding(horizontal = 12.dp, vertical = 7.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Icon(if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.ErrorOutline else Icons.Rounded.Info,
+                null, tint = tone.fg(), modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.5.sp, lineHeight = 14.sp,
+                fontWeight = FontWeight.SemiBold), color = Hx.colors.text, modifier = Modifier.weight(1f))
+            if (actionLabel != null && onAction != null) {
+                Box(Modifier.heightIn(min = 32.dp).clickable(role = Role.Button, onClick = onAction)
+                    .padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
+                    Text(actionLabel, color = tone.fg(), fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+        }
+        return
+    }
     Row(
         modifier
             .fillMaxWidth()
@@ -1289,6 +1310,9 @@ internal fun HxFormDialog(
     highlightError: Boolean = true,
     fieldOutlineColor: Color? = null,
     errorFieldOutlineColor: Color? = null,
+    labelFontWeight: FontWeight? = null,
+    inputFontWeight: FontWeight? = null,
+    confirmColorOverride: Color? = null,
     plainFields: Boolean = false,
     compactPills: Boolean = false,
     validate: (List<String>) -> String? = { null },
@@ -1327,7 +1351,7 @@ internal fun HxFormDialog(
                 }
                 fields.forEachIndexed { index, field ->
                     if (index > 0) Spacer(Modifier.height(12.dp))
-                    Text(field.label, color = c.textMuted, fontSize = if (plainFields) 15.sp else 13.sp, lineHeight = if (plainFields) 20.sp else 18.sp, fontWeight = FontWeight.Medium)
+                    Text(field.label, color = c.textMuted, fontSize = if (plainFields) 15.sp else 13.sp, lineHeight = if (plainFields) 20.sp else 18.sp, fontWeight = labelFontWeight ?: FontWeight.Medium)
                     Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp))
                     androidx.compose.foundation.text.BasicTextField(
                         value = values[index].value,
@@ -1335,7 +1359,7 @@ internal fun HxFormDialog(
                         singleLine = field.singleLine,
                         maxLines = if (field.singleLine) 1 else 6,
                         keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
+                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp, fontWeight = inputFontWeight ?: MaterialTheme.typography.bodyLarge.fontWeight),
                         cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
                         modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
                             .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else ((if (error != null) errorFieldOutlineColor else null) ?: fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
@@ -1356,7 +1380,7 @@ internal fun HxFormDialog(
                 }
                 if (!configFooter) {
                     Spacer(Modifier.height(14.dp))
-                    HxDialogButtons(confirmLabel, c.accent, referenceCorners = !compactPills, buttonHeight = if (compactPills) 36.dp else 46.dp, onDismiss = onDismiss, onConfirm = submit)
+                    HxDialogButtons(confirmLabel, confirmColorOverride ?: c.accent, referenceCorners = !compactPills, buttonHeight = if (compactPills) 36.dp else 46.dp, onDismiss = onDismiss, onConfirm = submit)
                 }
             }
             if (configFooter) {

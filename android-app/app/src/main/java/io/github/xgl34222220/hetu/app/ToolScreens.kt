@@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
     BackHandler(enabled = dirty) { confirmLeave = true }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "绕过规则",
         largeTitle = false,
         subtitle = "这些地址与接口在 Root 层直接放行，不进入 Mihomo",
@@ -335,7 +335,7 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         return true
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "共享网络",
         largeTitle = false,
         subtitle = "热点、USB 与局域网转发流量",
@@ -432,7 +432,7 @@ internal fun CnIpScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val prefs = vm.prefs
     val c = Hx.colors
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxyCnIpDirect", false)) }
-    HxPage(flatCanvas = true, title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, referenceTopBar = true, title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
         item(key = "note") { HxNote("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。") }
         item(key = "main") {
             SettingsSection {
@@ -467,7 +467,7 @@ internal fun RuntimeCoreScreen(vm: HetuViewModel, onBack: () -> Unit, onOpenCore
     val c = Hx.colors
     var revision by remember { mutableIntStateOf(0) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
-    HxPage(flatCanvas = true, title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, referenceTopBar = true, title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
         item(key = "note") { HxNote("修改运行核心后，下次启动或重启代理生效。下载、更新与维护在「内核管理」。") }
         item(key = "cores") {
             HxSection {
@@ -537,6 +537,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val c = Hx.colors
+    val referenceConfirmColor = if (!c.dark && !vm.dynamicColor && vm.accentHex.isBlank()) Color(0xFF1168FE) else null
     val haptics = rememberHetuHaptics()
     val repo = remember { RuntimeFilesRepository(context) }
     val root = RuntimeFilesRepository.ROOT
@@ -638,7 +639,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
     }
     val showSearch = searching || path != root
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "文件管理",
         largeTitle = true,
         largeTitleFontSizeSp = 36f,
@@ -777,6 +778,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
             titleFontSize = if (folder) 20.sp else 26.sp,
             titleLineHeight = if (folder) 26.sp else 32.sp,
             titleTextAlign = if (folder) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start,
+            labelFontWeight = FontWeight.SemiBold, inputFontWeight = FontWeight.SemiBold, confirmColorOverride = referenceConfirmColor,
             fields = listOf(HxField("名称", placeholder = if (folder) "例如 backup" else "例如 config.yaml")),
             confirmLabel = "创建",
             validate = { v -> runCatching { RuntimeFilesRepository.child(path, v[0]) }.exceptionOrNull()?.message },
@@ -791,6 +793,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
         HxFormDialog(
             title = "下载到当前目录",
             widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, centerTitleOnError = true, hideMessageOnError = true, highlightError = false, plainFields = true,
+            labelFontWeight = FontWeight.SemiBold, inputFontWeight = FontWeight.SemiBold, confirmColorOverride = referenceConfirmColor,
             message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
             fields = listOf(
                 HxField("下载地址", placeholder = "https://example.com/file.yaml"),
@@ -822,6 +825,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
             title = "重命名",
             message = "原文件：${entry.name}", messageBelowFields = true,
             hideMessageOnError = true, highlightError = false, errorWidthFraction = .84f, errorFieldOutlineColor = c.accent,
+            labelFontWeight = FontWeight.SemiBold, inputFontWeight = FontWeight.SemiBold, confirmColorOverride = referenceConfirmColor,
             fields = listOf(HxField("新名称", entry.name)),
             confirmLabel = "重命名",
             validate = { v ->
@@ -875,7 +879,7 @@ private fun FileReferenceEntryRow(entry: RuntimeFileEntry, selected: Boolean, on
         minimumHeight = if (entry.directory) 68.dp else 74.dp,
         subtitle = if (entry.directory) null else listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
             .filter { it.isNotBlank() }.joinToString(" · "),
-        icon = if (entry.directory) Icons.Rounded.Folder else Icons.Rounded.Description,
+        icon = if (entry.directory) FileManagerReferenceIcons.Folder else Icons.Rounded.Description,
         onClick = onClick, onLongClick = onLongClick,
         trailing = if (entry.directory) ({ HxChevron() }) else null)
 }
@@ -910,7 +914,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
     }
 
-    HxPage(flatCanvas = true, title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, referenceTopBar = true, title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
         item(key = "preflight") {
             SettingsSection {
                 SettingsGroup(title = "运行预检") {
@@ -1087,7 +1091,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         onBack()
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "通知详细设置",
         largeTitle = false,
         compactTitleFontSizeSp = 20f,

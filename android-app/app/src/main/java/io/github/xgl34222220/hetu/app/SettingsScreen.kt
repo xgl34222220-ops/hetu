@@ -96,6 +96,7 @@ import androidx.compose.material.icons.rounded.UploadFile
 import androidx.compose.material.icons.rounded.Web
 import androidx.compose.material.icons.rounded.WifiTethering
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -199,7 +200,11 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
     }
 
     if (subPage == "backup") {
-        HxPage(flatCanvas = true,
+        val backupButtonTypography = MaterialTheme.typography.copy(
+            labelLarge = MaterialTheme.typography.labelLarge.copy(fontSize = 16.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold),
+        )
+        val backupButtonColors = if (!c.dark && !vm.dynamicColor && vm.accentHex.isBlank()) c.copy(accent = Color(0xFF0054EA)) else c
+        HxPage(flatCanvas = true, referenceTopBar = true,
             title = ht("备份与恢复"),
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
@@ -216,7 +221,11 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                     SettingsGroup {
                         SettingsRow("创建备份", subtitle = "导出当前配置与偏好设置", icon = Icons.Rounded.CloudSync, iconTint = c.text)
                         Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            HxButton("导出备份", onClick = { launchDocumentPicker(vm::toast) { exporter.launch("Hetu-backup.json") } }, modifier = Modifier.fillMaxWidth())
+                            CompositionLocalProvider(LocalHx provides backupButtonColors) {
+                                MaterialTheme(typography = backupButtonTypography) {
+                                    HxButton("导出备份", onClick = { launchDocumentPicker(vm::toast) { exporter.launch("Hetu-backup.json") } }, modifier = Modifier.fillMaxWidth())
+                                }
+                            }
                         }
                     }
                 }
@@ -226,7 +235,11 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                     SettingsGroup {
                         SettingsRow("从文件恢复", subtitle = "选择河图备份文件，恢复前会再次确认", icon = Icons.Rounded.Restore, iconTint = c.text)
                         Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
-                            HxButton("选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } }, modifier = Modifier.fillMaxWidth(), filled = false)
+                            CompositionLocalProvider(LocalHx provides backupButtonColors) {
+                                MaterialTheme(typography = backupButtonTypography) {
+                                    HxButton("选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } }, modifier = Modifier.fillMaxWidth(), filled = false)
+                                }
+                            }
                         }
                     }
                 }
@@ -257,7 +270,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
         val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
         val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
-        HxPage(flatCanvas = true,
+        HxPage(flatCanvas = true, referenceTopBar = true,
             title = ht("开机启动与下载"),
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
@@ -271,7 +284,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                             autoStart,
                             { vm.setAutoStart(it) },
                             enabled = !vm.autoStartBusy && vm.operation == null,
-                            subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "成功启动一次代理后开启，安装 Root 开机脚本",
+                            subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "安装 Root 开机脚本，开机后自动启动服务",
                             icon = Icons.Rounded.RestartAlt,
                             iconTint = c.text,
                         )
@@ -314,7 +327,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             }
         }
     } else if (subPage == "defaultPanel") {
-        HxPage(flatCanvas = true,
+        HxPage(flatCanvas = true, referenceTopBar = true,
             title = ht("默认面板"),
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
@@ -358,7 +371,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
 
     if (subPage == null) {
     top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
-        HxPage(flatCanvas = true,
+        HxPage(flatCanvas = true, referenceTopBar = true,
             title = ht("设置"),
             scrollToTopSignal = vm.reselect,
             // The collapsed reference begins at the appearance group. Retain enough
@@ -568,7 +581,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     val c = Hx.colors
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = ht("基础代理配置"),
         onBack = { nav.pop() },
         largeTitle = false,
@@ -862,7 +875,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         revision++
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = ht("主题设置"),
         subtitle = null,
         onBack = onBack,

@@ -101,7 +101,7 @@ internal fun ToolsEditorScreen(
                 when (val load = state.load) {
                     ToolsLoad.Loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HomeSpinner(size = 20.dp, color = c.t3) }
                     is ToolsLoad.Failed -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message) {
+                        ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message, iconSize = 60.dp) {
                             HomeButton("重新读取", onReload, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
                         }
                     }

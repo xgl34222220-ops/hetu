@@ -99,10 +99,10 @@ internal fun SettingsRow(
         }
         Column(Modifier.weight(1f)) {
             Text(title, fontSize = 18.sp, lineHeight = 24.sp,
-                fontWeight = if (rootReference) FontWeight.Bold else FontWeight.SemiBold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
+                fontWeight = FontWeight.Bold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = if (rootReference) 16.sp else 14.sp, lineHeight = if (rootReference) 20.sp else 18.sp,
-                fontWeight = if (rootReference) FontWeight.SemiBold else FontWeight.Normal,
+            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = 14.sp, lineHeight = 18.sp,
+                fontWeight = FontWeight.SemiBold,
                 color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         trailing()

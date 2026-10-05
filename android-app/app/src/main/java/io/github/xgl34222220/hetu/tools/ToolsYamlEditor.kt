@@ -256,10 +256,10 @@ private class ToolsYamlHighlight(private val palette: ToolsYamlPalette, private 
 /* ------------------------------------------------------------------ */
 
 internal object ToolsEditorType {
-    /** Every line is exactly 20 sp tall (no first/last line trimming), so the gutter and line tints line up. */
+    /** Every line is exactly 18 sp tall (no first/last line trimming), so the gutter and line tints line up. */
     val code: TextStyle = HomeType.mono.copy(
-        fontSize = 12.sp,
-        lineHeight = 20.sp,
+        fontSize = 13.5.sp,
+        lineHeight = 18.sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
     )
 }

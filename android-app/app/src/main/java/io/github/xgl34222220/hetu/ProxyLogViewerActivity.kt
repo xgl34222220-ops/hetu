@@ -432,7 +432,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
     val selected = files.firstOrNull { it.path == selectedPath }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = selected?.name ?: "core.log",
         largeTitle = false,
         compactTitleFontSizeSp = 20f,

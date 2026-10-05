@@ -70,7 +70,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
             catch (error: Exception) { message = error.message ?: "导出失败" }
         }
     }
-    HxPage(flatCanvas = true, title = "启动配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+    HxPage(flatCanvas = true, referenceTopBar = true, title = "启动配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
         item(key = "startup-subtitle") {
             Text("河图生成的最终 Mihomo 运行副本", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted,
                 maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,

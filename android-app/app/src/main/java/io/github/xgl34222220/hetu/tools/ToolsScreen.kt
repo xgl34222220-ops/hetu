@@ -148,8 +148,10 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, col
                 icon = if (collapsed && entry == ToolsEntry.Configs) ToolsIcons.FileText else io.github.xgl34222220.hetu.toolReferenceLineIcon(if (entry == ToolsEntry.WebUi) "Web面板" else entry.title, entry.icon()),
                 subtitle = ht(if (brief) entry.brief else entry.summary),
                 subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+                iconTint = c.t1,
                 onClick = { onOpen(entry) },
                 modifier = Modifier.heightIn(min = 72.dp),
+                gap = 26.dp,
                 trailing = { ToolsChevron() },
             )
         }

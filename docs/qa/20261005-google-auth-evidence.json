@@ -80,7 +80,8 @@
     "Node fault as the root cause",
     "DNS answer correctness at failure time",
     "Same-time comparison against the working alternative proxy",
-    "Current persistence of historical Root149 session defect"
+    "Current persistence of historical Root149 session defect",
+    "Google Play Store authentication success with the user account under Hetu"
   ],
   "isolatedTests": {
     "classifierTests": 8,
@@ -102,5 +103,18 @@
     "Same-time connection/DNS/rule/chain evidence from the working alternative proxy",
     "Existing Google/GMS authentication error record with credentials and tokens removed"
   ],
-  "deviceActions": []
+  "deviceActions": [],
+  "currentUserSymptom": {
+    "target": "Google Play Store (user clarified2026-10-05 21:30+08)",
+    "comparison": "User reports other proxy software opens the same store; no same-time exported trace available",
+    "observedError": "需要进行身份验证。您需要登录自己的 Google 帐号。",
+    "status": "not-fixed; not-CAPTCHA"
+  },
+  "separateControllerScreenshot": {
+    "filename": "197152.jpg",
+    "sha256": "6cd497f870f209f4dbf51cd3e9b8bf843fab9d2c4c6d294fa176bcc38e3c8b50",
+    "actuallyOpened": true,
+    "text": "Mihomo 控制接口返回401: {\"message\":\"Unauthorized\"}",
+    "scope": "Old app controller read error, already addressed in V20.84/controller tests; different from Play Store Google account authentication. This image supplies no Play fault-time HTTP/TLS/DNS evidence."
+  }
 }

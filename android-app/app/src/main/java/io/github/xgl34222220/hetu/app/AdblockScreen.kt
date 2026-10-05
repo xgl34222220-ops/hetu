@@ -36,7 +36,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Block
-import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
@@ -69,6 +68,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.ui.RulesSnapshot
+import io.github.xgl34222220.hetu.tools.ToolsIcons
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -81,6 +81,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     val scope = rememberCoroutineScope()
     val prefs = vm.prefs
     val c = Hx.colors
+    val verificationSuccessColor = if (!c.dark && !vm.dynamicColor && vm.accentHex.isBlank()) Color(0xFF57C064) else null
     var revision by remember { mutableIntStateOf(0) }
     var rules by remember { mutableStateOf<RulesSnapshot?>(null) }
     var stats by remember { mutableStateOf(AdblockRuntimeStats()) }
@@ -173,7 +174,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     val actualMode = vm.state.trafficMode.lowercase()
     val snapshot = rules
 
-    HxPage(
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "广告过滤",
         largeTitle = false, compactTitleFontSizeSp = 20f,
         onBack = { nav.pop() },
@@ -209,10 +210,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                                     .background(tint.copy(alpha = .18f)),
                             )
                             Box(Modifier.size(76.dp).clip(CircleShape).background(tint.copy(alpha = .14f)), contentAlignment = Alignment.Center) {
-                                Icon(Icons.Rounded.Shield, null, tint = tint, modifier = Modifier.size(44.dp))
-                                if (effective) Icon(Icons.Rounded.Check, null, tint = Color.White, modifier = Modifier.size(23.dp))
-                                else if (running && enabled && (actualMode in listOf("global", "direct") || lastError.isNotBlank()))
-                                    Text("!", color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold)
+                                val statusIcon = if (effective) ToolsIcons.AdblockProtectingPdf45
+                                    else if (running && enabled && (actualMode in listOf("global", "direct") || lastError.isNotBlank())) ToolsIcons.AdblockWrongModePdf03B01
+                                    else Icons.Rounded.Shield
+                                Icon(statusIcon, null, tint = tint, modifier = Modifier.size(44.dp))
                             }
                         }
                         Spacer(Modifier.width(14.dp))
@@ -252,7 +253,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                             perform("reload") { withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.hotReload(context) } }
                         })
                     } else if (running && enabled && (actualMode == "global" || actualMode == "direct")) {
-                        HxBanner("当前模式不会经过规则，广告过滤不会生效", tone = HxTone.Warn, modifier = Modifier.padding(bottom = 12.dp), actionLabel = "切到规则", onAction = {
+                        HxBanner("当前模式不会经过规则，广告过滤不会生效", tone = HxTone.Warn, modifier = Modifier.padding(bottom = 12.dp), actionLabel = "切到规则", referenceCompact = true, onAction = {
                             vm.setTrafficMode("rule")
                         })
                     }
@@ -273,13 +274,13 @@ internal fun AdblockScreen(vm: HetuViewModel) {
             HxSection() {
                 HxGroup {
                     AdblockHeading("运行链验证")
-                    VerifyRow("本地规则库", (snapshot?.count ?: 0) > 0, if ((snapshot?.count ?: 0) > 0) "${snapshot?.count} 条有效规则" else "当前没有启用的拦截规则")
+                    VerifyRow("本地规则库", (snapshot?.count ?: 0) > 0, if ((snapshot?.count ?: 0) > 0) "${snapshot?.count} 条有效规则" else "当前没有启用的拦截规则", successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" })
+                    VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" })
+                    VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true)
+                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
                 }
             }
         }
@@ -501,9 +502,9 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
     }
 }
 @Composable
-private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false) {
+private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null) {
     val c = Hx.colors
-    val tint by animateColorAsState(when (ok) { true -> c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
+    val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
     Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
             AnimatedContent(
@@ -514,7 +515,7 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
                 label = "verifyIcon",
             ) { state ->
                 when (state) {
-                    true -> Icon(Icons.Rounded.CheckCircle, null, tint = tint, modifier = Modifier.size(24.dp))
+                    true -> Icon(ToolsIcons.AdblockCheckPdf45, null, tint = tint, modifier = Modifier.size(26.dp))
                     false -> Icon(if (neutralFalse) Icons.Rounded.CheckCircle else Icons.Rounded.ErrorOutline, null, tint = tint, modifier = Modifier.size(24.dp))
                     null -> HxDot(tint, 9.dp)
                 }

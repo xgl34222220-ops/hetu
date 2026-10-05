@@ -384,7 +384,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         evaluate()
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = "网络匹配",
         largeTitle = false,
         compactTitleFontSizeSp = 20f,

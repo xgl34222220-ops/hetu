@@ -1,12 +1,12 @@
 ## 当前接续：V20.85 实际PDF130页与认证证据
 
-原仓库 xgl34222220-ops/hetu / test/v20.76-new-ui，从492a9c继续；没有重复实现或取消CI。最新完整验证应用20c308da02e4920f6581c5210af291ff6fb63dab /run37312432198四job success，13:15:25UTC完成；479/49XML零失败错误跳过，API35/36各64=59+5、21palette、Root0、loopback401→200/Bearer和隔离资源清理通过。APK134769727 bytes/SHAee6cfcbd722b44233b246b2883ac75b09dacdf8f05b00e08c46ff7af53ed5d7a。证据docs/qa/20261005-v2085-20c-installation-success.json。
+原仓库 xgl34222220-ops/hetu / test/v20.76-new-ui，从492a9c继续；没有重复实现或取消CI。最新完整验证应用270f559424f3ef6e3503d2431ea24f81d295d3d7 /run37317099530四job success，13:56:02UTC完成；479/49XML零失败错误跳过，API35/36各64=59+5、21palette、Root0、loopback401→200/Bearer和隔离资源清理通过。APK134783735 bytes/SHA58c4c2726622ba30537b53f287fe85e5960e14e21c762afd126a96b510ffeb95。证据docs/qa/20261005-v2085-270-installation-success.json。
 
-本条提交按原图实际量测补齐应用排序/更多菜单宽度、位置、遮罩和指示角，以及保护/模式提示圆与glyph尺寸。尚待独立新验收，不能挪用20c通过结果。追加v2085同层36修改、336冻结，422原基线和479总数保留；首页/panel默认布局动效、核心/权限/签名与历史补丁冻结。PDF03A49、03B48、0433均实际读并130当前截图有入口映射；字面像素1:1和130完整功能验收未全部通过；Google根因未知/真机修复未验证。
+本条追加候选修正工具标题位置和图标色、细分隔线透明度、YAML13.5/18sp、读取失败图标、设置说明字重/自启原句/备份按钮/关于说明，文件夹原稿轮廓及文件表单字重颜色，并将现有应用菜单/广告状态组件接入旧二级工具入口。共享PDF顶栏/表单/紧凑提示均为默认关闭或空值opt-in，首页/panel默认路径精确冻结。候选尚待自己的新CI，不能挪用270结果。追加v2085同层38修改、334冻结，422原基线和479总数保留；核心/权限/签名与历史补丁冻结。
 
-Google197434实际为帐号认证错误而非CAPTCHA；历史GMS两条分流链、独立DNS重定向与河图自身UID直测已证据对照，但缺当前故障时DNS/认证HTTP/TLS及另一代理同刻链路，真机根因和修复仍未确认。新增25条Google元数据配额及8分类用例，只改证据保留、不改DNS/链路/权限；AOSP控制器认证不是Google账号验收。AVD/按钮禁用/旧间距断言失败证据和V20.83 a93交付记录全部保留。用户已授权本测试分支代码/UI/tests/CI/docs提交与隔离验收；不操作手机/帐号/网络安全设置、不合并main、不发布部署、无hook。
+PDF03A49、03B48、0433均实际读并130当前截图有入口映射；字面像素1:1和130完整功能验收未全部通过。197434实际为Google帐号认证错误而非CAPTCHA；用户明确Google Play商店打不开，其他代理正常。实际重新读取197152仅显示Mihomo控制器401，与Play认证不同。历史GMS两条分流链、独立DNS重定向与河图自身UID直测已证据对照，但缺当前故障时DNS/认证HTTP/TLS及另一代理同刻链路，Google根因未知/真机修复未验证。新增25条Google元数据配额及8分类用例，只改证据保留、不改DNS/链路/权限；AOSP控制器认证不是Google账号验收。
 
-详细过程与边界见docs/V20.85_PDF_CONTINUATION.md；页码入口/当前captureSHA见docs/qa/20261005-tools-settings-pdf-map.json。
+AVD/按钮禁用/旧间距断言失败证据和V20.83 a93交付记录全部保留。用户已授权本测试分支代码/UI/tests/CI/docs提交与隔离验收；不操作手机/帐号/网络安全设置、不合并main、不发布部署、无hook。详细过程见docs/V20.85_PDF_CONTINUATION.md；入口/captureSHA见docs/qa/20261005-tools-settings-pdf-map.json。
 
 ## 当前续接：V20.84 控制接口鉴权与面板缺测状态（构建通过，安装续验待核）
 

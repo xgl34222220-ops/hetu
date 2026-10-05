@@ -66,6 +66,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -104,6 +106,9 @@ internal fun AppListScreen(vm: HetuViewModel) {
     var descending by rememberSaveable { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
+    var sortAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var moreAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val menuOffset = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.roundToPx() }
 
     LaunchedEffect(reload) {
         loading = true
@@ -146,10 +151,10 @@ internal fun AppListScreen(vm: HetuViewModel) {
         if (descending) sorted.asReversed() else sorted
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = ht("应用管理"),
         onBack = { nav.pop() },
-        largeTitle = false,
+        largeTitle = false, compactTitleFontSizeSp = 20f,
         bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
         overlay = {
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
@@ -168,30 +173,42 @@ internal fun AppListScreen(vm: HetuViewModel) {
             }
         },
         actions = {
-            AppListBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
+            AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsIcons.Search, "搜索", onClick = {
                 searching = !searching
                 if (!searching) query = ""
             })
             Box {
-                AppListBarAction(Icons.Rounded.Sort, "排序", onClick = { sortMenu = true })
-                androidx.compose.material3.DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("按名称") }, onClick = { sortMode = "name"; sortMenu = false })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("按 UID") }, onClick = { sortMode = "uid"; sortMenu = false })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("按包名") }, onClick = { sortMode = "package"; sortMenu = false })
-                    androidx.compose.material3.HorizontalDivider()
-                    androidx.compose.material3.DropdownMenuItem(text = { Text(if (descending) "改为升序" else "改为降序") }, onClick = { descending = !descending; sortMenu = false })
+                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.ArrowUpDown, "排序",
+                    modifier = Modifier.onGloballyPositioned { sortAnchor = it.boundsInWindow() }, onClick = { sortMenu = true })
+                if (sortMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
+                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { sortMenu = false }, offsetY = menuOffset,
+                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(sortAnchor, 20.dp, .43f)) {
+                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按名称", checked = sortMode == "name") { sortMode = "name"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按 UID", checked = sortMode == "uid") { sortMode = "uid"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按包名", checked = sortMode == "package") { sortMode = "package"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (descending) "改为升序" else "改为降序", dividerBefore = true) { descending = !descending; sortMenu = false },
+                        ), referenceWidth = 130.dp)
+                    }
                 }
             }
-            AppListBarAction(Icons.Rounded.Check, "仅看已选", onClick = { onlySelected = !onlySelected })
+            AppListBarAction(io.github.xgl34222220.hetu.home.HomeIcons.CircleCheck, "仅看已选", onClick = { onlySelected = !onlySelected })
             Box {
-                AppListBarAction(Icons.Rounded.MoreHoriz, "更多", onClick = { moreMenu = true })
-                androidx.compose.material3.DropdownMenu(expanded = moreMenu, onDismissRequest = { moreMenu = false }) {
-                    androidx.compose.material3.DropdownMenuItem(text = { Text(if (showSystem) "隐藏系统应用" else "显示系统应用") }, onClick = { showSystem = !showSystem; moreMenu = false })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("全选当前结果") }, onClick = { commit(selected + visible.map { it.selectionKey }); moreMenu = false })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("清空名单") }, onClick = { commit(emptySet()); moreMenu = false })
-                    androidx.compose.material3.DropdownMenuItem(text = { Text("刷新应用") }, onClick = { reload++; moreMenu = false })
+                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.EllipsisVertical, "更多",
+                    modifier = Modifier.onGloballyPositioned { moreAnchor = it.boundsInWindow() }, onClick = { moreMenu = true })
+                if (moreMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
+                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { moreMenu = false }, offsetY = menuOffset,
+                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(moreAnchor, 10.dp, .45f)) {
+                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (showSystem) "隐藏系统应用" else "显示系统应用", checked = showSystem) { showSystem = !showSystem; moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("全选当前结果") { commit(selected + visible.map { it.selectionKey }); moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("清空名单") { commit(emptySet()); moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("刷新应用") { reload++; moreMenu = false },
+                        ), referenceWidth = 120.dp)
+                    }
                 }
             }
+            Spacer(Modifier.width(4.dp))
         },
     ) {
         item(key = "mode-tabs") {
@@ -252,7 +269,7 @@ private fun TargetAppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, enab
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.bodyLarge, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(app.label, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
@@ -264,9 +281,9 @@ private fun TargetAppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, enab
 }
 
 @Composable
-private fun AppListBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, onClick: () -> Unit) {
+private fun AppListBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
     // Compact visual spacing from 03A/028. Material keeps its expanded minimum touch bounds.
-    androidx.compose.material3.IconButton(onClick = onClick, modifier = Modifier.width(32.dp).height(48.dp)) {
+    androidx.compose.material3.IconButton(onClick = onClick, modifier = modifier.width(32.dp).height(48.dp)) {
         androidx.compose.material3.Icon(icon, description, tint = Hx.colors.text, modifier = Modifier.size(20.dp))
     }
 }
@@ -333,7 +350,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
         }
     }
 
-    HxPage(flatCanvas = true,
+    HxPage(flatCanvas = true, referenceTopBar = true,
         title = ht("核心管理"),
         largeTitle = false,
         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
@@ -503,7 +520,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
     }
 
     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
-    HxPage(flatCanvas = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
+    HxPage(flatCanvas = true, referenceTopBar = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
         item(key = "brand") {
             val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
                 listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
@@ -535,7 +552,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
                     Spacer(Modifier.height(8.dp))
                     Text(
                         "Root 透明代理与广告过滤，基于 Mihomo。",
-                        style = MaterialTheme.typography.bodyMedium,
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                         color = c.textMuted,
                         textAlign = TextAlign.Center,
                         modifier = Modifier.padding(horizontal = 32.dp),

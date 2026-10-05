@@ -138,7 +138,8 @@ internal fun ToolsSurfaceCard(
 
 @Composable
 internal fun ToolsHairline(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(.5.dp).background(LocalHomeColors.current.line.copy(alpha = .45f)))
+    val line = LocalHomeColors.current.line
+    Box(modifier.fillMaxWidth().height(.5.dp).background(line.copy(alpha = line.alpha * .7f)))
 }
 
 @Composable
