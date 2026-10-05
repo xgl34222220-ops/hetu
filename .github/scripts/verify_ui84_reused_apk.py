@@ -40,6 +40,7 @@ ALLOWED = frozenset({
     'AGENTS.md',
     'docs/V20.84_CONTROLLER_AUTH.md',
     'docs/ci/V20.84_FOURTH_FAILURE.json',
+    'docs/ci/V20.84_FIRST_INSTALLATION_FAILURE.json',
 })
 LAYERS = {
     'updates/v2082-new-ui/inputs.json': '2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c',
@@ -128,6 +129,22 @@ def verify_archive(path, kind):
 
 def verify_apk_identity(size, digest):
     assert size == APK_BYTES and digest == APK_SHA, 'Fixed APK bytes differ'
+
+
+def verify_manifest(archive):
+    assert unique_names(archive) == ['manifest.json', 'apk-metadata.txt', 'apk-signature.txt'], 'Unexpected APK manifest ZIP layout'
+    manifest = read_json(archive, 'manifest.json')
+    assert manifest['schema'] == 1 and manifest['apkName'] == APK_NAME
+    verify_apk_identity(manifest['apkBytes'], manifest['apkSha256'])
+    assert manifest['partCount'] == len(manifest['parts']) == 6
+    assert sum(part['bytes'] for part in manifest['parts']) == APK_BYTES
+    metadata = archive.read('apk-metadata.txt').decode()
+    signature = archive.read('apk-signature.txt').decode()
+    assert "package: name='io.github.xgl34222220.hetu' versionCode='2084' versionName='0.12.14-v20-auth'" in metadata
+    assert 'certificate sha-256 digest: ' + CERT_SHA in signature.lower()
+    # These immutable text records supplement the fresh SDK checks below.
+    # They never replace actually running aapt and apksigner against the APK.
+    return manifest
 
 
 def unique_names(archive):
@@ -268,12 +285,7 @@ def main():
         apk.write_bytes(archive.read(APK_NAME))
     verify_apk_identity(apk.stat().st_size, sha(apk))
     with zipfile.ZipFile('candidate-manifest.zip') as archive:
-        assert unique_names(archive) == ['manifest.json'], 'Unexpected APK manifest ZIP layout'
-        manifest = read_json(archive, 'manifest.json')
-        assert manifest['schema'] == 1 and manifest['apkName'] == APK_NAME
-        verify_apk_identity(manifest['apkBytes'], manifest['apkSha256'])
-        assert manifest['partCount'] == len(manifest['parts']) == 6
-        assert sum(part['bytes'] for part in manifest['parts']) == APK_BYTES
+        verify_manifest(archive)
     with zipfile.ZipFile('candidate-verification.zip') as archive:
         counts, runtime = verify_verification(archive)
     with zipfile.ZipFile(apk) as archive:

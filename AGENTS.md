@@ -14,6 +14,8 @@
 
 仅修测试监督进程与目标识别，不改 Android 编译输入：固定 APK `Hetu-0.12.14-v20-auth.apk`，134727773 bytes，SHA256 `33d60ce01b63f40c6b6ccd8c63c5dd1ea38b85d4d25e37c32f48130c4207ff50`；其 Android 源码树 `2954ad5c83131050acd3ffd52eb63d8689a8de33`。待严格固定原 build/job、源码树、产物 ZIP 摘要、实际 422 XML、载荷/ABI/证书的双 API 安装续测，原 59 +新增 5 项与 21 配色全部保留。续测提交不作为重新编译提交，原第四轮 full-run failure 不改写为 success。
 
+首次固定 APK 安装续测 `c4e58f7fe2dfcb7ecef717641c6c883e64682f32` / Actions `37273953593` 仍失败：API35 `111646751627`、API36 `111646751764` 各实际 72 项 host 全过，但新复用守卫误设 manifest ZIP 只有 manifest.json，实际固定 ZIP 还有 apk-metadata.txt / apk-signature.txt，故在模拟器启动与安装前拒绝。保留 `docs/ci/V20.84_FIRST_INSTALLATION_FAILURE.json`，安装通过计数保持未执行；仅修正精确三成员结构与身份文本校验，新增回归后守卫 19 项通过，固定 ZIP 摘要与真实 aapt/apksigner 检查不放宽。原编译及 APK 不变，第二次安装续测仍待真实验收。
+
 原 23 载荷、Root runtime 151、核心/native/service.d、签名、Manifest/权限与依赖不变。无 hook、不操作用户设备/网络/安全设置、不永久删除数据、不合并主分支或正式发布。手机实际鉴权恢复、K80/OEM/KernelSU、真机 Root 与长期网络仍未验证。详细范围见 `docs/V20.84_CONTROLLER_AUTH.md`。
 
 ## 上次交付：V20.83 工具、设置与首页面板交互（构建及独立安装验收通过）

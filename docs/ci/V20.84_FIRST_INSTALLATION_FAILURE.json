@@ -1,0 +1,269 @@
+{
+  "schema": 1,
+  "version": "V20.84",
+  "installationTestCommit": "c4e58f7fe2dfcb7ecef717641c6c883e64682f32",
+  "compiledCandidateCommit": "121e0ab99904e7ea862b1dcb350a59169aeab0cd",
+  "compiledAndroidAppTree": "2954ad5c83131050acd3ffd52eb63d8689a8de33",
+  "ciRun": 37273953593,
+  "attempt": 1,
+  "conclusion": "failure",
+  "workflow": "ui-v84-install-validation.yml",
+  "fixedBuildEvidence": {
+    "ciRun": 37270231154,
+    "overallConclusion": "failure",
+    "buildJob": {
+      "id": 111635473569,
+      "conclusion": "success"
+    },
+    "historicalCrashJob": {
+      "id": 111635473860,
+      "conclusion": "success"
+    },
+    "units": {
+      "tests": 422,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "xmlFiles": 47,
+      "baseline": {
+        "tests": 392,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "baselineXmlFiles": 42,
+      "authentication": {
+        "tests": 30,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "authenticationXmlFiles": 5,
+      "authenticationSuites": {
+        "ControllerAuthenticationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "ControllerReadStateTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "LegacyControllerCredentialTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "PanelControllerErrorTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "ToastFeedbackTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    "lint": {
+      "Error": 0,
+      "Fatal": 0,
+      "Warning": 298,
+      "Hint": 7
+    },
+    "runtimePayloadsVerified": 23,
+    "abiConstructorReferences": 687,
+    "abiMissingConstructors": 0,
+    "apk": {
+      "name": "Hetu-0.12.14-v20-auth.apk",
+      "bytes": 134727773,
+      "sha256": "33d60ce01b63f40c6b6ccd8c63c5dd1ea38b85d4d25e37c32f48130c4207ff50",
+      "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad"
+    },
+    "unitTestsRerunInThisInstallationContinuation": false,
+    "boundary": "The existing compiled APK and its successful build gates are retained; this test-only continuation is not an application rebuild and the original full run remains failed."
+  },
+  "failureLocation": {
+    "source": ".github/scripts/verify_ui84_reused_apk.py",
+    "line": 271,
+    "function": "main",
+    "assertion": "unique_names(archive) == ['manifest.json']"
+  },
+  "manifestArtifact": {
+    "id": 11328133960,
+    "zipBytes": 2308,
+    "zipSha256": "2a572cf7361723c1c1817f0bf3cbf8e97ed78312829d2c7654a1bca2c97e99e8",
+    "expectedByFailedGuard": [
+      "manifest.json"
+    ],
+    "actualImmutableMembers": [
+      "manifest.json",
+      "apk-metadata.txt",
+      "apk-signature.txt"
+    ]
+  },
+  "installationEvidence": {
+    "api35": {
+      "job": 111646751627,
+      "status": "completed",
+      "conclusion": "failure",
+      "failure": "AssertionError: Unexpected APK manifest ZIP layout",
+      "artifact": {
+        "id": 11329298443,
+        "name": "Hetu-V20.84-Android-35-installation-continuation",
+        "bytes": 10994,
+        "zipSha256": "6980c7b27387db58f51bb4fbcf569da06189efca40ec5cf0364ee30e3934e571",
+        "downloadDigestVerified": true
+      },
+      "hostTests": {
+        "newInfrastructure": 48,
+        "preservedAdditional": 24,
+        "total": 72,
+        "allPassed": true,
+        "suites": {
+          "reused-apk-guard": {
+            "tests": 16,
+            "conclusion": "passed",
+            "evidence": "reused-apk-guard-tests.txt"
+          },
+          "emulator-supervisor": {
+            "tests": 17,
+            "conclusion": "passed",
+            "evidence": "emulator-supervisor-tests.txt"
+          },
+          "panel-auth-fixture": {
+            "tests": 15,
+            "conclusion": "passed",
+            "evidence": "panel-auth-fixture-tests.txt"
+          },
+          "controller-fixture": {
+            "tests": 5,
+            "conclusion": "passed",
+            "evidence": "controller-fixture-tests.txt"
+          },
+          "native-scroll-bounds": {
+            "tests": 13,
+            "conclusion": "passed",
+            "evidence": "native-scroll-bounds-tests.txt"
+          },
+          "ui-snapshot": {
+            "tests": 3,
+            "conclusion": "passed",
+            "evidence": "ui-snapshot-tests.txt"
+          },
+          "webview-frame": {
+            "tests": 3,
+            "conclusion": "passed",
+            "evidence": "webview-frame-tests.txt"
+          }
+        }
+      },
+      "sdkAndAvdPreparation": "success",
+      "fixedApkVerificationStep": "failure",
+      "installedNavigationSmokeStep": "skipped",
+      "requireAll64InstalledChecksStep": "skipped",
+      "emulatorLaunchExecuted": false,
+      "apkInstallExecuted": false,
+      "actualResultsJsonPresent": false,
+      "passedChecks": null,
+      "legacyChecksPassed": null,
+      "paletteCasesPassed": null,
+      "installedChecksExecuted": 0,
+      "newPanelAuthenticationChecksExecuted": 0,
+      "nativePanel401Or200CapturesProduced": 0,
+      "originalBuildSourceRunConclusion": "failure",
+      "successfulOriginalBuildJob": 111635473569,
+      "successfulOriginalHistoricalCrashJob": 111635473860,
+      "guardProgressBoundary": "Source run/job/artifact provenance and immutable APK bytes were checked before line271. Verification of47 XML/runtime/ABI/signature inside this continuation had not yet run; those results belong to the independently checked fixed build."
+    },
+    "api36": {
+      "job": 111646751764,
+      "status": "completed",
+      "conclusion": "failure",
+      "failure": "AssertionError: Unexpected APK manifest ZIP layout",
+      "artifact": {
+        "id": 11329553065,
+        "name": "Hetu-V20.84-Android-36-installation-continuation",
+        "bytes": 10992,
+        "zipSha256": "587c8037f968fea83254faabe53d3d073bde0fe268906273e5fb9d86643dcc90",
+        "downloadDigestVerified": true
+      },
+      "hostTests": {
+        "newInfrastructure": 48,
+        "preservedAdditional": 24,
+        "total": 72,
+        "allPassed": true,
+        "suites": {
+          "reused-apk-guard": {
+            "tests": 16,
+            "conclusion": "passed",
+            "evidence": "reused-apk-guard-tests.txt"
+          },
+          "emulator-supervisor": {
+            "tests": 17,
+            "conclusion": "passed",
+            "evidence": "emulator-supervisor-tests.txt"
+          },
+          "panel-auth-fixture": {
+            "tests": 15,
+            "conclusion": "passed",
+            "evidence": "panel-auth-fixture-tests.txt"
+          },
+          "controller-fixture": {
+            "tests": 5,
+            "conclusion": "passed",
+            "evidence": "controller-fixture-tests.txt"
+          },
+          "native-scroll-bounds": {
+            "tests": 13,
+            "conclusion": "passed",
+            "evidence": "native-scroll-bounds-tests.txt"
+          },
+          "ui-snapshot": {
+            "tests": 3,
+            "conclusion": "passed",
+            "evidence": "ui-snapshot-tests.txt"
+          },
+          "webview-frame": {
+            "tests": 3,
+            "conclusion": "passed",
+            "evidence": "webview-frame-tests.txt"
+          }
+        }
+      },
+      "sdkAndAvdPreparation": "success",
+      "fixedApkVerificationStep": "failure",
+      "installedNavigationSmokeStep": "skipped",
+      "requireAll64InstalledChecksStep": "skipped",
+      "emulatorLaunchExecuted": false,
+      "apkInstallExecuted": false,
+      "actualResultsJsonPresent": false,
+      "passedChecks": null,
+      "legacyChecksPassed": null,
+      "paletteCasesPassed": null,
+      "installedChecksExecuted": 0,
+      "newPanelAuthenticationChecksExecuted": 0,
+      "nativePanel401Or200CapturesProduced": 0,
+      "originalBuildSourceRunConclusion": "failure",
+      "successfulOriginalBuildJob": 111635473569,
+      "successfulOriginalHistoricalCrashJob": 111635473860,
+      "guardProgressBoundary": "Source run/job/artifact provenance and immutable APK bytes were checked before line271. Verification of47 XML/runtime/ABI/signature inside this continuation had not yet run; those results belong to the independently checked fixed build."
+    }
+  },
+  "causeBoundary": "The new reuse guard assumed one manifest ZIP member; the pinned original artifact has exactly three existing members: manifest.json, apk-metadata.txt and apk-signature.txt. Both jobs failed on that guard before emulator launch or APK installation. No production APK failure or401 rendering outcome is established.",
+  "correctionBoundary": "Update only the reuse guard and its host regressions to require the exact three immutable members and reject duplicates, directories and unexpected members. Preserve pinned run/job/artifact/APK identity, source tree/layer equality and all original/new installed assertions; include this exact failure record in the infrastructure-only path allowlist.",
+  "applicationCompilationInputsUnchanged": true,
+  "original392UnitAssertionsPreserved": true,
+  "original59AndNew5InstalledAssertionsPreserved": true,
+  "failureEvidenceRetained": true,
+  "combinedVerified": false,
+  "evidenceBoundary": "Both fresh downloaded14-file artifacts and CI job traces were independently checked. Each API completed72 host checks(48 new infrastructure+24 preserved), but installed smoke and final64-check verification were skipped. All installation pass counts remain unknown; no new5 authentication checks executed.",
+  "recordedAtUtc": "2026-10-05T06:51:52.495968+00:00"
+}

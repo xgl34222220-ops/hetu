@@ -72,6 +72,24 @@ def source_proof():
     }
 
 
+def manifest_archive(missing=None, extra=None, metadata_version='2084', certificate=None):
+    data = io.BytesIO()
+    manifest = {'schema': 1, 'apkName': guard.APK_NAME, 'apkBytes': guard.APK_BYTES,
+                'apkSha256': guard.APK_SHA, 'partCount': 6,
+                'parts': [{'bytes': 25165824}] * 5 + [{'bytes': 8898653}]}
+    members = {
+        'manifest.json': json.dumps(manifest),
+        'apk-metadata.txt': f"package: name='io.github.xgl34222220.hetu' versionCode='{metadata_version}' versionName='0.12.14-v20-auth'",
+        'apk-signature.txt': 'V2 Signer: certificate SHA-256 digest: ' + (certificate or guard.CERT_SHA),
+    }
+    if missing: del members[missing]
+    if extra: members[extra] = 'Unexpected extra artifact file'
+    with zipfile.ZipFile(data, 'w') as z:
+        for name, value in members.items(): z.writestr(name, value)
+    data.seek(0)
+    return zipfile.ZipFile(data)
+
+
 def installed_evidence():
     checks = [{'name': f'legacy-{i}', 'result': 'passed'} for i in range(59)]
     checks += [{'name': name, 'result': 'passed'} for name in guard.AUTH_CHECKS]
@@ -149,6 +167,25 @@ class FixedApkEvidence(unittest.TestCase):
         for size, digest in ((134727772, guard.APK_SHA), (134727773, 'wrong')):
             with self.subTest(size=size, digest=digest), self.assertRaisesRegex(AssertionError, 'APK bytes'):
                 guard.verify_apk_identity(size, digest)
+
+    def test_real_three_member_manifest_layout_is_accepted(self):
+        with manifest_archive() as z:
+            manifest = guard.verify_manifest(z)
+        self.assertEqual((134727773, 6, guard.APK_SHA),
+                         (manifest['apkBytes'], manifest['partCount'], manifest['apkSha256']))
+
+    def test_manifest_archive_missing_or_extra_member_is_rejected(self):
+        for member in ('manifest.json', 'apk-metadata.txt', 'apk-signature.txt'):
+            with manifest_archive(missing=member) as z, self.subTest(missing=member), self.assertRaisesRegex(AssertionError, 'manifest ZIP layout'):
+                guard.verify_manifest(z)
+        with manifest_archive(extra='unreviewed.txt') as z, self.assertRaisesRegex(AssertionError, 'manifest ZIP layout'):
+            guard.verify_manifest(z)
+
+    def test_immutable_manifest_texts_must_match_the_apk_identity(self):
+        with manifest_archive(metadata_version='2083') as z, self.assertRaises(AssertionError):
+            guard.verify_manifest(z)
+        with manifest_archive(certificate='other-certificate') as z, self.assertRaises(AssertionError):
+            guard.verify_manifest(z)
 
     def test_exact_baseline_and_new_suites_are_separate(self):
         with xml_archive() as z:
