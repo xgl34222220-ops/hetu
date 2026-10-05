@@ -1,4 +1,4 @@
-# Fixed manifest ZIP member layout independently checked against the original artifact.
+# Capture exact owned AVD configuration before target verification; retain all gates.
 name: Hetu V20.84 fixed APK installation continuation
 permissions:
   contents: read
@@ -120,6 +120,8 @@ jobs:
         hw.ramSize=2048
 
         EOF
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
 
         '
     - name: Verify unchanged Android inputs, exact signed APK and original successful build gates
