@@ -45,6 +45,7 @@ jobs:
     - name: Verify uploaded tools intake source and additive test boundaries
       run: |
         set -euo pipefail
+        git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c
         python3 .github/scripts/test_tools_intake_source_scope.py
         python3 .github/scripts/test_tools_intake_test_results.py
     - name: Verify independent authentication source and test-evidence boundaries
