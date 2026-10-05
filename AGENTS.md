@@ -1,4 +1,12 @@
-## 当前接续：V20.85 939912 独立验收与未编译窄修正
+## 当前接续：936ffac 原始失败证据与菜单宽度期望续验
+
+应用936ffac87a81ef056e3c006987667e9d56baf5bc / Actions37338269235已经真实编译并产出264新组件图、23载荷与687配色ABI零缺失，但原49XML为479项/478通过/1失败/0错误/0跳过；SettingsPickerParity58Test.rootSettingsChoiceWidthsStayCompact在第11行仍硬编码Mode184，下一行IPv6也仍184，与实际附PDF04新原生214相冲。实际新图Mode214对原图归一213.60、IPv6214对212.68；Core174对173.85且能力禁用门禁保留。不能把这轮记为通过；lint、最终APK签名/运输manifest、API35/36安装59+5+21及401→200均未执行。原完整日志与49原XML已归档docs/qa/20261005-v2085-936ffac-acceptance-failure.json，不覆盖先前成功/失败。
+
+续验候选将现有测试两处184期望更新214，原Core174、全部@Test及其余断言精确保留；新增整文件期望变换门禁及拒绝删测试/改Core/改dim的负例。40修改/332冻结仍总计372；新增白名单仅原设置测试源，不扩大运行层、权限、核心、依赖或签名。全部479仍必须执行，不能降低原422基线或跳过失败类。已有生产UI源不以这次断言修正伪称已安装通过。当前30项host检查通过、372输入精确重建；自己的后续提交与全量CI待执行。首页/panel继续冻结，GooglePlay根因未定位/真机修复未验证，控制器认证与Google帐号认证独立报告。
+
+同一续验另包含实际新图发现的03A21名称错误状态局部留白：新URL栏比原稿归一多下移12.33dp；input→error墨迹13对7.398、error→URLlabel32对27.741、error文字82×14对73.052×11.096。只在Add名称error非空时传nullable errorStyle12/14/.4sp与errorSpacing6，名称→URL真实Spacer19（其它24）、URL→footer始终24；两源ToolsComponents/Subscription的默认null8dp、完整error文字/icon13、validator与键盘/clear/save/cancel回调保留，没有offset/负padding。两份独立整文件逆转均等936ffac，源已停止，证据归档docs/qa/20261005-v2085-settings-width-expectation-candidate.json。候选自己的编译与新图仍未执行；936原FAIL与图页剩余差不改写为通过。
+
+## 939912 已完成的独立验收与其后窄修正
 
 真实仓库 xgl34222220-ops/hetu / test/v20.76-new-ui 延续原实现，无重复分支或取消CI。最新已完整验证的应用提交为9399121212b68a5f6422170e00835095218c2f8e，Actions37330392252截至2026-10-05 15:36:52UTC为completed/success，构建、历史崩溃守护、API35安装、API36安装四job均success。实际49XML/479项零失败、错误、跳过；原422基线、新Google分类8和工具状态49继续执行。23载荷、687ABI零缺失、lint与固定签名通过。APK134804906字节，SHA256 e23997fa0af6f78e310983a05a9514b21749067090585caa9ad8d65c9cf9b0fb；本轮独立证据docs/qa/20261005-v2085-939912-installation-success.json的53项严格证据检查全部PASS，不替代7cf、270及以前成功/失败记录。
 

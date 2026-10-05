@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 import copy,json,unittest
 from pathlib import Path
-from pdf85_source_scope import validate_layer,validate_changes,validate_shared_page,validate_native_settings_typography,NATIVE_SUBTITLE_HELPER
+from pdf85_source_scope import validate_layer,validate_changes,validate_shared_page,validate_native_settings_typography,validate_settings_picker_expectations,NATIVE_SUBTITLE_HELPER
 ROOT=Path(__file__).resolve().parents[2]
 class PdfScope(unittest.TestCase):
     def setUp(self):self.layer=json.loads((ROOT/'updates/v2085-pdf-tools-settings/inputs.json').read_text())
@@ -38,4 +38,9 @@ class PdfScope(unittest.TestCase):
         validate_native_settings_typography(before,after)
         for old,new in [('setChecked(checked)','setChecked(true)'),('listener.accept(value)','rootShell()'),('prefs.apply()','prefs.clear()'),(',174,index->',',214,index->')]:
             with self.assertRaises(AssertionError): validate_native_settings_typography(before,after.replace(old,new))
+        picker='@Test rootWidth\nassertTrue(source.contains("selected,174,index"))\nassertTrue(source.contains("enabled,selected,184,index"))\nassertTrue(source.contains("ordinal(),184,index"))\nassertTrue(source.contains("FLAG_DIM_BEHIND"))\nassertTrue(source.contains("lp.dimAmount=0f"))\n@Test composeDim\nassertTrue(source.contains("dimBehind: Boolean = true"))'
+        newer=picker.replace('selected,184,index','selected,214,index').replace('ordinal(),184,index','ordinal(),214,index')
+        validate_settings_picker_expectations(picker,newer)
+        for wrong in [newer.replace('selected,174,index','selected,214,index'),newer.replace('@Test composeDim','composeDim'),newer.replace('lp.dimAmount=0f','lp.dimAmount=1f'),newer.replace('dimBehind: Boolean = true','dimBehind: Boolean = false')]:
+            with self.assertRaises(AssertionError):validate_settings_picker_expectations(picker,wrong)
 if __name__=='__main__':unittest.main()

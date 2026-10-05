@@ -2,7 +2,9 @@ package io.github.xgl34222220.hetu.tools
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -40,15 +42,18 @@ internal fun ToolsSubscriptionScreen(
     val adding = form.mode is ToolsSubscriptionMode.Add
     ToolsPage(title = if (adding) "添加订阅" else "编辑订阅", onBack = onBack, modifier = modifier) {
         HomeCard(Modifier.fillMaxWidth()) {
-            Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(24.dp)) {
+            Column(Modifier.padding(HomeDims.cardPadding)) {
                 if (adding) {
                     ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError,
-                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp)
+                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
+                        errorStyle = if (form.nameError != null) ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 14.sp, letterSpacing = 0.4.sp) else null,
+                        errorSpacing = if (form.nameError != null) 6.dp else null)
                 } else {
                     ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。",
                         readOnlyValueStyle = ToolsType.readOnlyValue.copy(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold),
                         hintStyle = ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 17.sp))
                 }
+                Spacer(Modifier.height(if (adding && form.nameError != null) 19.dp else 24.dp))
                 ToolsField(
                     "订阅链接", form.url, onUrlChange,
                     placeholder = "https://", monospace = true, keyboardType = KeyboardType.Uri,
@@ -56,6 +61,7 @@ internal fun ToolsSubscriptionScreen(
                     errorAfterHint = adding,
                     inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
                 )
+                Spacer(Modifier.height(24.dp))
                 Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     HomeButton("保存", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)
                     HomeButton("取消", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)

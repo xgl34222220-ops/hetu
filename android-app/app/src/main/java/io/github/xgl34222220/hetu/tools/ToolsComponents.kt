@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -296,14 +297,18 @@ internal fun ToolsField(
     hintStyle: TextStyle? = null,
     inputMinHeight: Dp? = null,
     inputVerticalPadding: Dp? = null,
+    errorStyle: TextStyle? = null,
+    errorSpacing: Dp? = null,
 ) {
     val c = LocalHomeColors.current
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = if (errorSpacing == null) Arrangement.spacedBy(8.dp) else Arrangement.Top) {
         if (readOnly) {
             Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.label.copy(fontWeight = FontWeight.SemiBold))
+            if (errorSpacing != null) Spacer(Modifier.height(8.dp))
             Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = readOnlyValueStyle ?: ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
             Text(ht(label), color = c.t1, style = if (compact) HomeType.caption else HomeType.label.copy(fontWeight = FontWeight.SemiBold))
+            if (errorSpacing != null) Spacer(Modifier.height(8.dp))
             BasicTextField(
                 value = value, onValueChange = onValueChange,
                 modifier = Modifier.fillMaxWidth(), singleLine = true,
@@ -325,14 +330,21 @@ internal fun ToolsField(
                 },
             )
         }
-        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
+        if (errorAfterHint && hint != null) {
+            if (errorSpacing != null) Spacer(Modifier.height(8.dp))
+            Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
+        }
         if (error != null) {
+            if (errorSpacing != null) Spacer(Modifier.height(errorSpacing))
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                 Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
-                Text(error, color = c.bad, style = HomeType.caption)
+                Text(error, color = c.bad, style = errorStyle ?: HomeType.caption)
             }
         }
-        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
+        if (!errorAfterHint && hint != null) {
+            if (errorSpacing != null) Spacer(Modifier.height(8.dp))
+            Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)
+        }
     }
 }
 

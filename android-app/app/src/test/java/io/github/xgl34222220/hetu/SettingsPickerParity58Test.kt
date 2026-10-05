@@ -8,8 +8,8 @@ class SettingsPickerParity58Test {
     @Test fun rootSettingsChoiceWidthsStayCompact() {
         val source = java.io.File("src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java").readText()
         assertTrue(source.contains("selected,174,index"))
-        assertTrue(source.contains("enabled,selected,184,index"))
-        assertTrue(source.contains("ordinal(),184,index"))
+        assertTrue(source.contains("enabled,selected,214,index"))
+        assertTrue(source.contains("ordinal(),214,index"))
         assertTrue(source.contains("FLAG_DIM_BEHIND"))
         assertTrue(source.contains("lp.dimAmount=0f"))
     }

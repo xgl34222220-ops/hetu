@@ -1,0 +1,465 @@
+{
+  "parentApplication": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+  "candidateOwnBuildAndCaptures": "not executed yet",
+  "literal130PagePixelParityAccepted": false,
+  "changedInputs": 40,
+  "frozenInputs": 332,
+  "totalInputs": 372,
+  "patchSha256": "dc77846d7c9ea6e6c74260e7369aa35f9dc425eb743aa52b3d07cafa4837e1ce",
+  "exactReconstructionAll372Inputs": true,
+  "fullSharedDefaultsGuard": true,
+  "fullNativeSettingsCallbackGuard": true,
+  "fullSettingsPickerTestGuard": true,
+  "fullWebuiAuthBehaviorGuard": true,
+  "boundedRootDiagnosticOnlyGuard": true,
+  "manifestDependenciesSigningCoreAndHomePanelFrozen": true,
+  "productionSourceUnchangedExcept": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt"
+  ],
+  "runtimePresentationOnly": "Add name-error font/gaps from fresh936/PDF measurement, default-null field options; no text/validator/callback changes",
+  "onlyTestChange": "Two existing Mode/IPv6 width assertions184→214, Core174 and every other test/assertion byte-exact preserved",
+  "historicalLayers": [
+    {
+      "path": "updates/v2082-new-ui/inputs.json",
+      "sha256": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2082-new-ui/integration.patch",
+      "sha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/inputs.json",
+      "sha256": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/ui.patch",
+      "sha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/inputs.json",
+      "sha256": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/runtime.patch",
+      "sha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "byteEqualHistoricalBase": true
+    }
+  ],
+  "A21SourceAndDefaultFlowProof": {
+    "sha256": "68336e94eb6431f046b41c073f4da8aefbc2c7f04b8e9b4897371d56055bb59b",
+    "evidence": {
+      "kind": "A21 Add-name-error presentation candidate; unbuilt/unrendered",
+      "baseline_application": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+      "source_edits_stopped": true,
+      "exclusive_edited_sources": [
+        "ToolsComponents.kt",
+        "ToolsSubscriptionScreen.kt"
+      ],
+      "authorized_scope": "Only Add subscription name-error typography/gap and name→URL gap; no other source/caller changes in this task",
+      "changes": {
+        "nullable_optins": "errorStyle:TextStyle?=null,errorSpacing:Dp?=null appended to ToolsField; null retains exact Arrangement.spacedBy(8.dp) recipe and original caption",
+        "real_layout": "Opt-in uses Arrangement.Top plus positive explicit Spacers between children; original label→control/helper spacing8 preserved, error spacing comes from caller; no offset/negative padding",
+        "Add_name_error_only": "12sp/14sp caption copy,letterSpacing0.4sp;6dp before error; params null when nameError isnull",
+        "form_gaps": "Three existing logical content groups, separated by two explicit spacers: name→URL19dp only adding&&nameError!=null else24dp; URL→footer always24dp",
+        "preserved": "Same validation/errors/labels/hints,icon13dp,Add URLerrorAfterHint,Edit readonly styles/input43/9.5,footer7/else28,save/back/loading/enabled/clear/keyboard callbacks; other ToolsRow etc unchanged"
+      },
+      "files": [
+        {
+          "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+          "baseline_sha256": "943e9f9e761f046df5687bfe0393c58c6dece298d3d85cbd2edc79650eafc541",
+          "candidate_sha256": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+          "whole_file_explicit_inverse_equals936ffac": true,
+          "inverse_transforms": [
+            {
+              "candidate_fragment": "import androidx.compose.foundation.layout.Spacer\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "    errorStyle: TextStyle? = null,\n    errorSpacing: Dp? = null,\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "Column(modifier.fillMaxWidth(), verticalArrangement = if (errorSpacing == null) Arrangement.spacedBy(8.dp) else Arrangement.Top)",
+              "baseline_fragment": "Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp))",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "            if (errorSpacing != null) Spacer(Modifier.height(8.dp))\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 4
+            },
+            {
+              "candidate_fragment": "            if (errorSpacing != null) Spacer(Modifier.height(errorSpacing))\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "Text(error, color = c.bad, style = errorStyle ?: HomeType.caption)",
+              "baseline_fragment": "Text(error, color = c.bad, style = HomeType.caption)",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "        if (errorAfterHint && hint != null) {\n            Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)\n        }",
+              "baseline_fragment": "        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "        if (!errorAfterHint && hint != null) {\n            Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)\n        }",
+              "baseline_fragment": "        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = hintStyle ?: HomeType.caption)",
+              "expected_and_actual_occurrences": 1
+            }
+          ],
+          "protected_callback_default_byte_checks": [
+            {
+              "sha256": "26433cb4e49f1067217b52668c860dc0601a1fbaab3170c01ce5e003ce9c1c0e",
+              "byte_length": 472,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "                value = value, onValueChange = onValueChange,\n                modifier = Modifier.fillMaxWidth(), singleLine = true,\n                textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium,\n                    fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),\n                keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),"
+            },
+            {
+              "sha256": "15b44b1a9a1212714d39cd49739434fedbb208ccf3bb2c89ddb0aa1acaa25d55",
+              "byte_length": 396,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "                            if (clearable && value.isNotEmpty()) Box(Modifier.size(20.dp).clip(CircleShape)\n                                .background(c.t3.copy(alpha = .14f)).clickable(role = Role.Button, onClickLabel = ht(\"清除输入\")) { onValueChange(\"\") },\n                                contentAlignment = Alignment.Center) { Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = c.t3) }"
+            },
+            {
+              "sha256": "6540f2186309714995586eae351b701eb791e6dbfb02cdc7abeb7b4ed1653d9d",
+              "byte_length": 220,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "    val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }"
+            },
+            {
+              "function": "ToolsRow",
+              "entire_function_byte_equal936": true,
+              "sha256": "7db98ca39cc66de65d9c1cd7afcbe0f56e0803aae3b655c777c5a1893c16411a"
+            },
+            {
+              "literal": "                Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)",
+              "identical_literal_present_in936_and_candidate": true
+            }
+          ]
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+          "baseline_sha256": "4d47d609d629b52d56399f001a64b51ba1e0c251d4d3437552eeda227bbeb438",
+          "candidate_sha256": "99231fe32edc94048b015c1de7b322b059c2f559b25aca6a6f71eebb010bbc0b",
+          "whole_file_explicit_inverse_equals936ffac": true,
+          "inverse_transforms": [
+            {
+              "candidate_fragment": "import androidx.compose.foundation.layout.Spacer\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "import androidx.compose.foundation.layout.height\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "            Column(Modifier.padding(HomeDims.cardPadding)) {",
+              "baseline_fragment": "            Column(Modifier.padding(HomeDims.cardPadding), verticalArrangement = Arrangement.spacedBy(24.dp)) {",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,\n                        errorStyle = if (form.nameError != null) ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 14.sp, letterSpacing = 0.4.sp) else null,\n                        errorSpacing = if (form.nameError != null) 6.dp else null)",
+              "baseline_fragment": "                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp)",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "                Spacer(Modifier.height(if (adding && form.nameError != null) 19.dp else 24.dp))\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            },
+            {
+              "candidate_fragment": "                Spacer(Modifier.height(24.dp))\n",
+              "baseline_fragment": "",
+              "expected_and_actual_occurrences": 1
+            }
+          ],
+          "protected_callback_default_byte_checks": [
+            {
+              "sha256": "3c64a612f9c18bb392f3be3e82c232e7f33029492f4f78b98e8bd031c160f15d",
+              "byte_length": 118,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "    onNameChange: (String) -> Unit,\n    onUrlChange: (String) -> Unit,\n    onSave: () -> Unit,\n    onBack: () -> Unit,"
+            },
+            {
+              "sha256": "8c9e9b1b1bba0668af6641937f345f7b46c144cdc20f2e3ba1c0588f6aa176f2",
+              "byte_length": 108,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "ToolsField(\"订阅名称\", form.name, onNameChange, placeholder = \"例如 主订阅\", error = form.nameError"
+            },
+            {
+              "sha256": "d46489782a067c30ef9be63a9931c1125540eae13e799a89eae72579b6a7ec9c",
+              "byte_length": 137,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "ToolsField(\"订阅名称\", form.name, {}, readOnly = true, hint = \"名称用于策略组引用，可在 YAML 编辑器中统一修改。\""
+            },
+            {
+              "sha256": "9c6efab2ef13a669ee7aca630f1b9ab7644e02ed846c5516b7a68a6178b4c846",
+              "byte_length": 305,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "                    \"订阅链接\", form.url, onUrlChange,\n                    placeholder = \"https://\", monospace = true, keyboardType = KeyboardType.Uri,\n                    error = form.urlError, hint = \"保存到当前配置，运行时会尝试应用。\",\n                    errorAfterHint = adding,"
+            },
+            {
+              "sha256": "f7486ecaa7ebc081b37534657f0e429d936edba45e98f08cb64c501ca264b0af",
+              "byte_length": 430,
+              "identical_literal_present_in936_and_candidate": true,
+              "literal": "                Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                    HomeButton(\"保存\", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)\n                    HomeButton(\"取消\", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)"
+            },
+            {
+              "function": "ToolsDiscardFormDialogCard",
+              "entire_function_byte_equal936": true,
+              "sha256": "54d43f5f57bc77576fe1b1ea10f292b3aecf079b99851f8ae854c971d2254276"
+            }
+          ]
+        }
+      ],
+      "default_and_callback_proof": {
+        "field_default_path": "When errorSpacing=null, new explicit Spacers are absent and Column arrangement is exact old spacedBy8; errorStyle=null uses exact old HomeType.caption. Removing opt-ins/conditional structure restores complete936 source bytes.",
+        "form_normal_and_Edit": "Existing three content groups now have two24dp spacers in normal/Add-without-nameError/Edit, equivalent to original spacedBy24. URL→footer24 always retained.",
+        "no_offset_or_negative_padding_added": true
+      },
+      "A21_actual936_measurements": {
+        "scope": "Only03A21 additional name-error block measurements requested by parent; no wider review",
+        "coordinate_convention": "Ink/fill bbox inclusive; inferred layout intervals end-exclusive. Lineboxes below are source-constrained differential reconstruction, not semantics-tree measurements.",
+        "reference": {
+          "input_fill_bbox": [
+            31,
+            194,
+            393,
+            239
+          ],
+          "error_roi": [
+            30,
+            245,
+            145,
+            270
+          ],
+          "error_ink_bbox": [
+            33,
+            247,
+            136,
+            263
+          ],
+          "error_text_roi": [
+            55,
+            245,
+            145,
+            270
+          ],
+          "error_text_ink_bbox": [
+            58,
+            249,
+            136,
+            260
+          ],
+          "error_text_native_height_width": [
+            12,
+            79
+          ],
+          "error_text_normalized393_height_width": [
+            11.096471,
+            73.051765
+          ],
+          "error_icon_ink_bbox": [
+            33,
+            247,
+            49,
+            263
+          ],
+          "URL_label_roi": [
+            28,
+            286,
+            180,
+            315
+          ],
+          "URL_label_ink_bbox": [
+            32,
+            293,
+            93,
+            307
+          ],
+          "input_last_fill_row_to_error_first_ink_row_native": 8,
+          "input_last_fill_row_to_error_first_ink_row_normalized393": 7.397647,
+          "error_last_ink_row_to_URL_label_first_ink_row_native": 30,
+          "error_last_ink_row_to_URL_label_first_ink_row_normalized393": 27.741176,
+          "normal05_URL_label_ink_bbox": [
+            31,
+            277,
+            93,
+            291
+          ],
+          "name_error_URL_fill_origin_delta_native": 17,
+          "linebox_limit": "PDF bitmap lacks layout/semantics metadata; exact reference Text/Row linebox is not uniquely observable.17px red icon ink is measurable, not an asserted17px Row linebox."
+        },
+        "fresh936": {
+          "input_fill_bbox": [
+            30,
+            112,
+            362,
+            155
+          ],
+          "error_roi": [
+            30,
+            164,
+            145,
+            190
+          ],
+          "error_ink_bbox": [
+            32,
+            168,
+            131,
+            181
+          ],
+          "error_text_roi": [
+            48,
+            164,
+            145,
+            190
+          ],
+          "error_text_ink_bbox": [
+            50,
+            168,
+            131,
+            181
+          ],
+          "error_text_native_height_width": [
+            14,
+            82
+          ],
+          "error_icon_ink_bbox": [
+            32,
+            169,
+            43,
+            179
+          ],
+          "URL_label_roi": [
+            28,
+            205,
+            180,
+            235
+          ],
+          "URL_label_ink_bbox": [
+            31,
+            213,
+            93,
+            228
+          ],
+          "input_last_fill_row_to_error_first_ink_row": 13,
+          "error_last_ink_row_to_URL_label_first_ink_row": 32,
+          "normal05_URL_label_ink_bbox": [
+            31,
+            185,
+            93,
+            200
+          ],
+          "name_error_URL_fill_origin_delta": 28,
+          "name_error_URL_label_ink_top_delta": 28,
+          "actual_differential_error_Row_height": 20,
+          "linebox_reconstruction": {
+            "name_input_y_interval": [
+              112,
+              156
+            ],
+            "field_Column_extra_gap_before_error": [
+              156,
+              164
+            ],
+            "error_Row_and_Text_y_interval": [
+              164,
+              184
+            ],
+            "outer_field_gap_before_URL_label": [
+              184,
+              208
+            ],
+            "URL_label_y_interval": [
+              208,
+              232
+            ],
+            "ToolsField_name_y_interval": [
+              80,
+              184
+            ],
+            "normal05_ToolsField_name_y_interval": [
+              80,
+              156
+            ],
+            "basis": "Same actual44px name fill for normal05 and invalid21; only additional errorRow advances following URL fill and label28px. Compiled field Column gap8px therefore leaves actual20px Row/Text layout height. Cardpadding16, outer Column spacing24 and label/control spacing8 constrain these vertical intervals. Text glyphs168..181 lie inside20px linebox. No exact horizontal Text linebox inferred from ink."
+          }
+        },
+        "compiled_source_cause": {
+          "Column_arrangement": "Arrangement.spacedBy(8.dp)",
+          "error_Text_style": "HomeType.caption alias ToolsTypography.caption14sp/19sp; actual captured linebox20px",
+          "error_icon_size": "13dp; actual threshold ink11×12px",
+          "outer_form_spacing": "24dp",
+          "high_confidence": "Present nameError adds a new field child: measured20px Row plus existing8px child gap=28px URL displacement. The bitmap/reference effective displacement is17native/15.72normalized. This isolates the error block rather than changing validation/name keyboard/footer/callback.",
+          "uncertain": "Exact PDF error Text/Row linebox cannot be derived uniquely from its pixels; no source root cause for reference layout asserted."
+        },
+        "deltas_fresh_minus_reference_normalized393": {
+          "input_to_error_ink": 5.602353,
+          "error_ink_to_URL_label": 4.258824,
+          "error_text_ink_height": 2.903529,
+          "error_text_ink_width": 8.948235
+        },
+        "status": "PARTIAL",
+        "mutations": "Only this additive report section; no source/test/fixture/CI/implementation edits"
+      },
+      "candidate_geometry_prediction_only": {
+        "old_error_Row_gap_and_next_group": "20+8+24=52 normalized px from936 measured Row and source gaps",
+        "proposed_error_Row_gap_and_next_group": "Expected15+6+19=40 at fixture default scale",
+        "expected_compression": "12px, URL origin176→164; reference163.673normalized",
+        "limits": [
+          "15px errorRow and164px URL origin are predictions, not fresh validated geometry.",
+          "Existing936 screenshots/tests do not validate new candidate.",
+          "Next independent full CI and freshA21 plus normal05/22/Edit23/26 captures required.",
+          "No tests,CI,commit,patch/docs modifications performed by this task."
+        ]
+      },
+      "verification": {
+        "git_diff_check": "passed",
+        "whole_file_inverse_against936": "Both files reconstructed byte-for-byte by exact explicit inverse transforms",
+        "callback_proof": "Unchanged protected literals plus full unchanged ToolsRow and discard-dialog function checks"
+      },
+      "no_more_source_edits": true
+    }
+  },
+  "hostTests": {
+    "pdf85SourceScope": 6,
+    "authResults": 6,
+    "panelAuthSmoke": 18,
+    "total": 30,
+    "failures": 0
+  },
+  "A21IndependentParentReverseProof": {
+    "sha256": "1d9434e4d26d2bacaf6ca89ebb526905a33be6139aa3acdeeb419eb6c75968b6",
+    "evidence": {
+      "baseCommit": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+      "sourceNotModifiedByProof": true,
+      "files": [
+        {
+          "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+          "whole_file_explicit_inverse_equals936": true,
+          "baselineSha": "943e9f9e761f046df5687bfe0393c58c6dece298d3d85cbd2edc79650eafc541",
+          "candidateSha": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6"
+        },
+        {
+          "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+          "whole_file_explicit_inverse_equals936": true,
+          "baselineSha": "4d47d609d629b52d56399f001a64b51ba1e0c251d4d3437552eeda227bbeb438",
+          "candidateSha": "99231fe32edc94048b015c1de7b322b059c2f559b25aca6a6f71eebb010bbc0b"
+        }
+      ],
+      "candidateNotRendered": true
+    }
+  }
+}
