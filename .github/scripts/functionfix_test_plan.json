@@ -1,0 +1,22 @@
+{
+  "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+    "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt",
+    "tests": 4
+  },
+  "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+    "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+    "tests": 10
+  },
+  "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+    "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",
+    "tests": 12
+  },
+  "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+    "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
+    "tests": 13
+  },
+  "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+    "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+    "tests": 16
+  }
+}

@@ -224,8 +224,43 @@ def main():
             final_pdf_report = {'baseCommit': final_pdf['baseCommit'], 'patchSha256': final_pdf['patchSha256'],
                                 'changedOrAddedFiles': 4, 'frozenInputs': 375, 'expectedUnitTests': 487,
                                 'exactWholeFilePresentationTransforms': True, 'priorLayersUnchanged': True}
-        # Every PDF-frozen input is included here with its final, exact SHA.
-        # Only the explicit two intake adapter deltas can supersede that layer.
+        function_report = None
+        function_inputs = ROOT / 'updates/v2086-functionfix/inputs.json'
+        if function_inputs.exists():
+            from functionfix_source_scope import (validate_layer as validate_function_layer,
+                                                  validate_source_transforms, validate_new_tests,
+                                                  previous_files as function_previous_files)
+            assert final_pdf_report is not None, 'Function fixes require all complete prior layers'
+            previous = function_previous_files(ROOT)
+            assert final_files == previous, 'Function fix predecessor source is not exact'
+            function = json.loads(function_inputs.read_text())
+            validate_function_layer(function, previous)
+            function_patch = function_inputs.with_name('runtime.patch')
+            assert digest(function_patch) == function['patchSha256']
+            function_before = work / 'function-predecessor'
+            shutil.copytree(work / 'android-app', function_before / 'android-app')
+            for name, sha in previous.items():
+                assert digest(work / name) == sha, 'Function baseline source changed: ' + name
+            apply(function_patch, work)
+            validate_source_transforms(function_before, work)
+            validate_new_tests(work)
+            for name, sha in function['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Function source mismatch: ' + name
+            for name, sha in function['frozenFiles'].items():
+                assert digest(work / name) == sha, 'Function layer changed frozen input: ' + name
+            final_files.update(function['changedOrAddedFiles'])
+            function_report = {'baseCommit': function['baseCommit'], 'patchSha256': function['patchSha256'],
+                               'changedOrAddedFiles': len(function['changedOrAddedFiles']),
+                               'frozenInputs': len(function['frozenFiles']),
+                               'baselineUnitTests': function['baselineUnitTests'],
+                               'expectedUnitTests': function['expectedUnitTests'],
+                               'expectedTestXmlFiles': function['expectedTestXmlFiles'],
+                               'newTestCounts': function['newTestCounts'],
+                               'allOriginal487TestsPreserved': True,
+                               'rootScriptSha256': function['rootScriptSha256'],
+                               'runtimePayloadCount': 23}
+        # Every prior frozen input is compared against its precise final SHA.
+        # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)
         report = {'baseCommit': spec['baseCommit'], 'baseRun': spec['baseRun'],
                   'archiveSha256': spec['archiveSha256'], 'integrationPatchSha256': spec['patchSha256'],
@@ -241,6 +276,8 @@ def main():
             report['toolsIntakeLayer'] = intake_report
         if final_pdf_report is not None:
             report['finalPdfGeometryLayer'] = final_pdf_report
+        if function_report is not None:
+            report['functionFixLayer'] = function_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

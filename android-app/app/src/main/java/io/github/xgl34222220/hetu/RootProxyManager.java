@@ -58,10 +58,11 @@ final class RootProxyManager {
         final ProxyConfigLibrary.Entry source;
         final RootProxyPolicy policy;
         final ProxyAdblockRules.Snapshot adblock;
+        final RootFakeIpRanges fakeIps;
         final String startup,settingsSignature;
         final int tproxyPort,redirectPort,controllerPort;
-        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp,String signature){
-            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
+        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
+            profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
         }
     }
 
@@ -327,11 +328,15 @@ final class RootProxyManager {
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
-        writeStartupCopy(generated.yaml);
-        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
+        RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
+        // Private comments carry an already validated routing projection into start/boot.
+        // Keep the established startup argument protocol and the user's source untouched.
+        String startup=fakeIps.privateStartup(generated.yaml);
+        writeStartupCopy(startup);
+        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
     }
 
-    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
+    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
         return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
                 +"|dnsForward="+bit(prefs.getBoolean("proxyMihomoDnsForward",true))
@@ -342,7 +347,9 @@ final class RootProxyManager {
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
                 +"|sharedMacs="+policy.sharedBypassMacs
-                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges;
+                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges
+                +"|fake4="+fakeIps.ipv4+"|fake6="+fakeIps.ipv6
+                +"|lan4="+fakeIps.ipv4BypassCidrs+"|lan6="+fakeIps.ipv6BypassCidrs;
     }
 
     private void installHotReloadFiles(Prepared p)throws Exception{
@@ -381,7 +388,7 @@ final class RootProxyManager {
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
             int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
             Prepared p=prepare(profile,port);
-            String nextFingerprint=topologyFingerprint(profile,p.policy);
+            String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
             String liveFingerprint=prefs.getString("proxyRootTopologyFingerprint","");
             if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
                 throw new IOException("运行模式、应用范围、DNS、IPv6、TCP/UDP 或绕过策略已变化，请使用「重启」应用这些网络层设置");
@@ -437,8 +444,8 @@ final class RootProxyManager {
         return hex(digest.digest());
     }
 
-    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
-        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
+    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
+        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy,fakeIps);
     }
 
     JSONObject preflight(Prepared p)throws Exception{
@@ -528,8 +535,12 @@ final class RootProxyManager {
                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
                 ensureContinuityService(true);
                 trace.outcome="alreadyRunning";
+                int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
+                String liveMessage="Root 代理已在运行，已忽略重复启动请求";
+                if(appliedRevision>0&&appliedRevision<ProxyRuntimeSettings.RUNTIME_REVISION)
+                    liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                 JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
-                        .put("message","Root 代理已在运行，已忽略重复启动请求");
+                        .put("message",liveMessage);
                 if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartInstalled",false)){
                     try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                 }
@@ -604,7 +615,7 @@ final class RootProxyManager {
 
         trace.next("legacyCleanup");
         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
-        String capabilityKey=capabilityFingerprint(profile,policy);
+        String capabilityKey=capabilityFingerprint(profile,policy,p.fakeIps);
         boolean capabilityKnown=capabilityKey.equals(prefs.getString("proxyRootCapabilityFingerprint",""));
         stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
@@ -703,6 +714,8 @@ final class RootProxyManager {
                 .put("controllerPort",p.controllerPort)
                 .put("adblockRevision",p.adblock==null?"":p.adblock.revision)
                 .put("bypassCidrs",policy.cidrs)
+                .put("fakeIpV4",p.fakeIps.ipv4)
+                .put("fakeIpV6",p.fakeIps.ipv6)
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
         synchronized(ProxyAdblockSession.LOCK){
@@ -714,7 +727,7 @@ final class RootProxyManager {
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
-                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
+                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy,p.fakeIps))
                 // A completed network transaction consumes its captured request.
                 // Runtime fallbacks (for example adblock-chain degradation) are reported through
                 // their own effective/error fields; they must not create an endless "restart again"

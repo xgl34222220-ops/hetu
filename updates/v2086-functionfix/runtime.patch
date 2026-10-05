@@ -1,0 +1,2887 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 3624aeb..e36a1cc 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2085
+-        versionName = "0.12.15-v20-pdf"
++        versionCode = 2086
++        versionName = "0.12.16-v20-fix"
+     }
+
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index e447597..b91cf3d 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -21,6 +21,10 @@ START_ERROR="$RUN/last-start-error"
+ START_TIMING="$RUN/startup-timing"
+ LOCK_DIR="$RUN/.txn.lock"
+ CLEAN_SNAPSHOT_ACTIVE=0
++FAKE_IP_V4=""
++FAKE_IP_V6=""
++LAN_RETURN_V4="0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4"
++LAN_RETURN_V6="::1/128,fc00::/7,fe80::/10,ff00::/8"
+
+ BYPASS_MARK=0x08000000
+ BYPASS_MASK=0x08000000
+@@ -351,6 +355,74 @@ split_safe_cidrs(){
+   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
+   for X in "$@"; do case "$X" in ''|*[!0-9A-Fa-f:./]*|*//*|/*|*/) return 1;; esac; case "$X" in */*) ;; *) return 1;; esac; done
+ }
++# Validate only numeric literals; never resolve a hostname or execute configuration text.
++fake_ip_cidrs_valid(){
++  [ "${#2}" -le 16384 ] || return 1
++  printf '%s\n' "$2" | awk -v family="$1" '
++    BEGIN {ok=1}
++    {
++      if($0=="")next;
++      n=split($0,items,",");if(n>256){ok=0;exit}
++      for(i=1;i<=n;i++){
++        if(split(items[i],parts,"/")!=2 || parts[2]!~/^[0-9]+$/){ok=0;exit}
++        max=family==4?32:128;if(parts[2]+0>max){ok=0;exit}
++        addr=parts[1];
++        if(family==4){
++          if(split(addr,words,"\\.")!=4){ok=0;exit}
++          for(j=1;j<=4;j++)if(words[j]!~/^[0-9]+$/ || words[j]+0>255){ok=0;exit}
++        }else{
++          if(addr!~/^[0-9a-fA-F:]+$/ || index(addr,":::")>0){ok=0;exit}
++          if((substr(addr,1,1)==":" && substr(addr,1,2)!="::") ||
++             (substr(addr,length(addr),1)==":" && substr(addr,length(addr)-1)!="::")){ok=0;exit}
++          copy=addr;compressed=gsub(/::/,":",copy);if(compressed>1){ok=0;exit}
++          num=split(copy,words,":");segments=0;
++          for(j=1;j<=num;j++){
++            if(words[j]==""){if(!compressed){ok=0;exit}}else{
++              if(length(words[j])>4){ok=0;exit};segments++
++            }
++          }
++          if((compressed && segments>=8) || (!compressed && segments!=8)){ok=0;exit}
++        }
++      }
++    }
++    END {exit !ok}'
++}
++fake_ip_policy_valid(){
++  case "$FAKE_IP_V4$FAKE_IP_V6" in *,*) return 1;; esac
++  fake_ip_cidrs_valid 4 "$FAKE_IP_V4" && fake_ip_cidrs_valid 6 "$FAKE_IP_V6" &&
++    fake_ip_cidrs_valid 4 "$LAN_RETURN_V4" && fake_ip_cidrs_valid 6 "$LAN_RETURN_V6"
++}
++load_start_fake_ip_policy(){
++  FIP_FILE="$1"
++  FIP_TAIL=$(tail -n 5 "$FIP_FILE") || return 1
++  if [ "$(printf '%s\n' "$FIP_TAIL" | sed -n '1p')" != '# HETU_FAKE_IP_POLICY=1' ]; then
++    # Only the fixed terminal block is metadata. YAML scalar content elsewhere
++    # may contain identical text and cannot override an appended private policy.
++    printf '%s\n' "$FIP_TAIL" | grep -Eq '^# HETU_(FAKE_IP_POLICY|FAKE_IP_V4|FAKE_IP_V6|LAN_RETURN_V4|LAN_RETURN_V6)=' && return 1
++    return 0 # Legacy private copies keep their established defaults.
++  fi
++  FIP_2=$(printf '%s\n' "$FIP_TAIL" | sed -n '2p'); case "$FIP_2" in '# HETU_FAKE_IP_V4='*) FAKE_IP_V4=${FIP_2#*=};; *) return 1;; esac
++  FIP_3=$(printf '%s\n' "$FIP_TAIL" | sed -n '3p'); case "$FIP_3" in '# HETU_FAKE_IP_V6='*) FAKE_IP_V6=${FIP_3#*=};; *) return 1;; esac
++  FIP_4=$(printf '%s\n' "$FIP_TAIL" | sed -n '4p'); case "$FIP_4" in '# HETU_LAN_RETURN_V4='*) LAN_RETURN_V4=${FIP_4#*=};; *) return 1;; esac
++  FIP_5=$(printf '%s\n' "$FIP_TAIL" | sed -n '5p'); case "$FIP_5" in '# HETU_LAN_RETURN_V6='*) LAN_RETURN_V6=${FIP_5#*=};; *) return 1;; esac
++  fake_ip_policy_valid
++}
++load_session_fake_ip_policy(){
++  grep -q '^FAKE_IP_POLICY=' "$SESSION" || return 0
++  # A stopped core does not invalidate the immutable session/rule checksum.
++  # Refuse a different or damaged session instead of guessing a Kill Switch policy.
++  health_session_current || return 1
++  [ "$(grep -c '^FAKE_IP_POLICY=' "$SESSION")" = 1 ] &&
++    [ "$(sed -n 's/^FAKE_IP_POLICY=//p' "$SESSION")" = 1 ] || return 1
++  for FIP_KEY in FAKE_IP_V4 FAKE_IP_V6 LAN_RETURN_V4 LAN_RETURN_V6; do
++    [ "$(grep -c "^$FIP_KEY=" "$SESSION")" = 1 ] || return 1
++  done
++  FAKE_IP_V4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION")
++  FAKE_IP_V6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION")
++  LAN_RETURN_V4=$(sed -n 's/^LAN_RETURN_V4=//p' "$SESSION")
++  LAN_RETURN_V6=$(sed -n 's/^LAN_RETURN_V6=//p' "$SESSION")
++  fake_ip_policy_valid
++}
+ split_safe_ifaces(){
+   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
+   for X in "$@"; do case "$X" in ''|*[!A-Za-z0-9_.:@+-]*) return 1;; esac; [ "$X" != lo ] && [ "$X" != 'lo+' ] || return 1; done
+@@ -414,12 +486,14 @@ scoped_reject_unmarked_udp(){
+
+ bypass4(){
+   C="$1"; T="$2"; CIDRS="$3"
+-  for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
++  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
++  for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
+ }
+ bypass6(){
+   C="$1"; T="$2"; CIDRS="$3"
+-  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
++  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V6; IFS=$OLDIFS
++  for NET in "$@"; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
+ }
+
+@@ -860,6 +934,7 @@ wait_ready(){
+ }
+
+ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; printf 'DIRECT_GIDS=%s\n' "$DGIDS"; printf 'SHARED_BYPASS_MACS=%s\n' "$MACS";
++    printf 'FAKE_IP_POLICY=1\nFAKE_IP_V4=%s\nFAKE_IP_V6=%s\nLAN_RETURN_V4=%s\nLAN_RETURN_V6=%s\n' "$FAKE_IP_V4" "$FAKE_IP_V6" "$LAN_RETURN_V4" "$LAN_RETURN_V6"
+     printf 'DNS6_POLICY=%s\n' "${START_DNS6:-redirect}"
+     printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
+     L_TCP=0; L_UDP=0; L_DNS=0
+@@ -871,6 +946,7 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
+ watchdog(){
+   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
++  load_session_fake_ip_policy || exit 0
+   mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+   REC=$(cat "$PIDFILE" 2>/dev/null || true)
+   if [ "$REC" = "$COREPID" ]; then
+@@ -977,7 +1053,9 @@ start(){
+   fi
+   start_stage "ipv6-dns-capability"
+   select_dns6_policy
+-  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
++  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi
++  load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
++  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+   start_stage "cleanup-network"
+   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+   start_stage "stop-old-core"
+@@ -1030,7 +1108,7 @@ start(){
+   if [ "$START_V6" = enable ]; then
+     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
+     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
+-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
++    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
+     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
+   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
+
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
+index af2174a..34aa171 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
+@@ -5,6 +5,9 @@ import java.io.*;
+ import java.nio.charset.*;
+ import java.nio.file.*;
+ import java.util.*;
++import org.yaml.snakeyaml.DumperOptions;
++import org.yaml.snakeyaml.error.Mark;
++import org.yaml.snakeyaml.nodes.*;
+
+ /** Multiple source configurations per core. Runtime generation never rewrites the selected source file. */
+ final class ProxyConfigLibrary {
+@@ -27,7 +30,6 @@ final class ProxyConfigLibrary {
+
+     static final class Entry {final ProxyRuntimeProfile.Core core;final String name;final File file;Entry(ProxyRuntimeProfile.Core c,String n,File f){core=c;name=n;file=f;}}
+     static final class Subscription {final String name,url;final boolean placeholder;Subscription(String n,String u){name=n;url=u;placeholder=u.contains(PLACEHOLDER);}}
+-    private static final class Section {final int start,end;Section(int s,int e){start=s;end=e;}}
+     private static final class CollatorHolder {static final java.text.Collator ORDER=java.text.Collator.getInstance(Locale.CHINA);}
+
+     private File dir(ProxyRuntimeProfile.Core core){return new File(root,core.id);}
+@@ -82,26 +84,42 @@ final class ProxyConfigLibrary {
+     }
+
+     List<Subscription> subscriptions(Entry e)throws IOException{
+-        String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);ArrayList<Subscription> out=new ArrayList<>();if(s==null)return out;
+-        for(int i=s.start+1;i<s.end;i++){String t=lines[i].trim();if(indent(lines[i])!=2||t.isEmpty()||t.startsWith("#")||!t.endsWith(":"))continue;String name=unquote(t.substring(0,t.length()-1));String url="";for(int j=i+1;j<s.end;j++){String q=lines[j].trim();if(indent(lines[j])==2&&!q.isEmpty()&&!q.startsWith("#")&&q.endsWith(":"))break;if(indent(lines[j])>=4&&q.startsWith("url:")){url=unquote(stripComment(q.substring(4).trim()));break;}}if(!name.isEmpty()&&!url.isEmpty())out.add(new Subscription(name,url));}
++        SubscriptionYaml yaml=new SubscriptionYaml(read(e));ArrayList<Subscription> out=new ArrayList<>();if(yaml.providers==null)return out;
++        for(NodeTuple entry:yaml.providers.getValue()){String name=scalar(entry.getKeyNode()),url=scalar(RuntimeYaml15.inherited(entry.getValueNode(),"url"));if(!name.isEmpty()&&!url.isEmpty())out.add(new Subscription(name,url));}
+         return out;
+     }
+     boolean hasConfiguredSubscription(Entry e)throws IOException{List<Subscription> s=subscriptions(e);if(s.isEmpty())return true;for(Subscription x:s)if(!x.placeholder)return true;return false;}
+
+     void updateSubscription(Entry e,String name,String url)throws IOException{
+-        String n=providerName(name),u=subscriptionUrl(url);String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);if(s==null)throw new IOException("当前配置没有 proxy-providers 段");int begin=findProvider(lines,s,n);if(begin<0)throw new IOException("订阅不存在："+n);int end=providerEnd(lines,s,begin);boolean found=false;StringBuilder out=new StringBuilder();
+-        for(int i=0;i<lines.length;i++){String line=lines[i];if(i>begin&&i<end&&indent(line)>=4&&line.trim().startsWith("url:")){out.append(line,0,line.indexOf('u')).append("url: '").append(yamlSingle(u)).append("'\n");found=true;}else out.append(line).append('\n');}
+-        if(!found)throw new IOException("订阅缺少 url 字段，建议使用 YAML 编辑器修改");write(e,trimTerminal(out.toString()));
++        String n=providerName(name),u=subscriptionUrl(url);SubscriptionYaml yaml=new SubscriptionYaml(read(e));NodeTuple provider=yaml.provider(n);NodeTuple urlField=field(provider.getValueNode(),"url");
++        if(urlField==null||!(urlField.getValueNode() instanceof ScalarNode))throw new IOException("订阅缺少独立 url 字段，请在 YAML 编辑器修改模板");
++        Node value=urlField.getValueNode();yaml.local(value,provider.getValueNode());if(value.getStartMark().getLine()!=value.getEndMark().getLine()||yaml.references.getOrDefault(provider.getValueNode(),0)>1||yaml.references.getOrDefault(value,0)>1||yaml.index(provider.getValueNode().getStartMark())<yaml.index(provider.getKeyNode().getEndMark())||yaml.index(value.getStartMark())<yaml.index(urlField.getKeyNode().getEndMark()))throw unsupported();
++        yaml.edits.add(new Edit(yaml.index(value.getStartMark()),yaml.index(value.getEndMark()),quote(u)));saveSubscription(e,yaml);
+     }
+
+     void addSubscription(Entry e,String name,String url)throws IOException{
+-        String n=providerName(name),u=subscriptionUrl(url),source=normalize(read(e));String[] lines=source.split("\n",-1);Section s=providerSection(lines);if(s==null)throw new IOException("当前配置没有 proxy-providers 段");if(findProvider(lines,s,n)>=0)throw new IOException("订阅名称已存在");LinkedHashSet<String> existing=new LinkedHashSet<>();for(Subscription x:subscriptions(e))existing.add(x.name);
+-        String block="  "+n+":\n    <<: *BaseProvider\n    url: '"+yamlSingle(u)+"'\n    path: ./proxy_provider/"+fileToken(n)+".yaml\n    override:\n      skip-cert-verify: false\n      udp: true\n      additional-suffix: ' ["+yamlSingle(n)+"]'\n";
+-        StringBuilder out=new StringBuilder();for(int i=0;i<lines.length;i++){if(i==s.end)out.append(block);out.append(appendProviderToUse(lines[i],existing,n)).append('\n');}if(s.end==lines.length)out.append(block);write(e,trimTerminal(out.toString()));
++        String n=providerName(name),u=subscriptionUrl(url);SubscriptionYaml yaml=new SubscriptionYaml(read(e));yaml.blockProviders();
++        Set<String> existing=new LinkedHashSet<>();for(NodeTuple provider:yaml.providers.getValue())existing.add(scalar(provider.getKeyNode()));if(existing.contains(n))throw new IOException("订阅名称已存在");
++        int at=yaml.index(yaml.providers.getEndMark());Node base=yaml.anchor("BaseProvider");
++        if(base!=null&&(!(base instanceof MappingNode)||!"http".equals(scalar(RuntimeYaml15.inherited(base,"type")))||yaml.index(base.getEndMark())>at))throw unsupported();
++        String indent=spaces(yaml.providers.getValue().get(0).getKeyNode().getStartMark().getColumn());String child=indent+"  ",newline=yaml.newline;
++        String block=indent+quote(n)+":"+newline+child+(base==null?"type: http"+newline+child+"interval: 3600":"<<: *BaseProvider")+newline+child+"url: "+quote(u)+newline+child+"path: "+quote(yaml.path(n))+newline+child+"override:"+newline+child+"  skip-cert-verify: false"+newline+child+"  udp: true"+newline+child+"  additional-suffix: "+quote(" ["+n+"]")+newline;
++        yaml.edits.add(new Edit(at,at,(at>0&&yaml.source.charAt(at-1)!='\n'&&yaml.source.charAt(at-1)!='\r'?newline:"")+block));
++        yaml.changeGroupUses(existing,n,false);saveSubscription(e,yaml);
+     }
+
+     void deleteSubscription(Entry e,String name)throws IOException{
+-        String n=providerName(name);String[] lines=normalize(read(e)).split("\n",-1);Section s=providerSection(lines);if(s==null)throw new IOException("当前配置没有 proxy-providers 段");if(subscriptions(e).size()<=1)throw new IOException("至少保留一个订阅槽位；也可以直接使用 YAML 编辑器重构配置");int begin=findProvider(lines,s,n);if(begin<0)throw new IOException("订阅不存在："+n);int end=providerEnd(lines,s,begin);StringBuilder out=new StringBuilder();for(int i=0;i<lines.length;i++){if(i>=begin&&i<end)continue;out.append(removeProviderFromUse(lines[i],n)).append('\n');}write(e,trimTerminal(out.toString()));
++        String n=providerName(name);SubscriptionYaml yaml=new SubscriptionYaml(read(e));yaml.blockProviders();NodeTuple provider=yaml.provider(n);
++        int subscriptions=0;for(NodeTuple entry:yaml.providers.getValue())if(!scalar(RuntimeYaml15.inherited(entry.getValueNode(),"url")).isEmpty())subscriptions++;
++        if(subscriptions<=1)throw new IOException("至少保留一个订阅槽位；也可以直接使用 YAML 编辑器重构配置");
++        int begin=yaml.lineStart(yaml.index(provider.getKeyNode().getStartMark())),end=yaml.entryEnd(provider);yaml.edits.add(new Edit(begin,end,""));
++        yaml.changeGroupUses(Collections.singleton(n),n,true);saveSubscription(e,yaml);
++    }
++
++    private void saveSubscription(Entry entry,SubscriptionYaml yaml)throws IOException{
++        String result=yaml.result();new SubscriptionYaml(result);
++        if(!read(entry).equals(yaml.source))throw new IOException("配置已变化，请重新打开后重试；未修改源文件");
++        write(entry,result);
+     }
+
+     private static String uniqueName(File dir,String requested)throws IOException{
+@@ -119,22 +137,92 @@ final class ProxyConfigLibrary {
+     private void writeStreamAtomic(File target,InputStream source)throws IOException{File d=target.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,target.getName()+".new");int total=0;try(InputStream in=source;FileOutputStream out=new FileOutputStream(tmp,false)){byte[] b=new byte[8192];int n;while((n=in.read(b))!=-1){total+=n;if(total>LIMIT)throw new IOException("配置超过 4 MiB");out.write(b,0,n);}out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}if(total==0){tmp.delete();throw new IOException("配置为空");}replaceAtomic(tmp,target);}
+     private static void replaceAtomic(File tmp,File target)throws IOException{try{Files.move(tmp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}catch(Exception a){try{Files.move(tmp.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}catch(Exception b){tmp.delete();throw new IOException("无法保存配置");}}}
+
+-    private static Section providerSection(String[] l){int s=-1;for(int i=0;i<l.length;i++)if(indent(l[i])==0&&l[i].trim().startsWith("proxy-providers:")){s=i;break;}if(s<0)return null;int e=l.length;for(int i=s+1;i<l.length;i++){String t=l[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(l[i])==0){e=i;break;}}return new Section(s,e);}
+-    private static int findProvider(String[] l,Section s,String n){for(int i=s.start+1;i<s.end;i++){String t=l[i].trim();if(indent(l[i])==2&&t.endsWith(":")&&unquote(t.substring(0,t.length()-1)).equals(n))return i;}return -1;}
+-    private static int providerEnd(String[] l,Section s,int b){for(int i=b+1;i<s.end;i++){String t=l[i].trim();if(indent(l[i])==2&&!t.isEmpty()&&!t.startsWith("#")&&t.endsWith(":"))return i;}return s.end;}
+-    private static String appendProviderToUse(String line,Set<String> existing,String add){if(!line.trim().startsWith("use:"))return line;int a=line.indexOf('['),b=line.indexOf(']',a+1);if(a<0||b<0)return line;ArrayList<String> n=parseInlineList(line.substring(a+1,b));boolean managed=false;for(String x:n)if(existing.contains(x)){managed=true;break;}if(!managed||n.contains(add))return line;n.add(add);return line.substring(0,a+1)+String.join(", ",n)+line.substring(b);}
+-    private static String removeProviderFromUse(String line,String remove){if(!line.trim().startsWith("use:"))return line;int a=line.indexOf('['),b=line.indexOf(']',a+1);if(a<0||b<0)return line;ArrayList<String> n=parseInlineList(line.substring(a+1,b));if(!n.removeIf(remove::equals))return line;return line.substring(0,a+1)+String.join(", ",n)+line.substring(b);}
+-    private static ArrayList<String> parseInlineList(String s){ArrayList<String> o=new ArrayList<>();for(String p:s.split(",")){String n=unquote(p);if(!n.isEmpty())o.add(n);}return o;}
++    private static NodeTuple field(Node node,String name){if(node instanceof MappingNode)for(NodeTuple tuple:((MappingNode)node).getValue())if(name.equals(scalar(tuple.getKeyNode())))return tuple;return null;}
++    private static String scalar(Node node){return node instanceof ScalarNode?((ScalarNode)node).getValue():"";}
++    private static String quote(String value){return "'"+yamlSingle(value)+"'";}
++    private static String spaces(int count){char[] value=new char[count];Arrays.fill(value,' ');return new String(value);}
++    private static IOException unsupported(){return new IOException("此 YAML 使用共享别名或不能安全编辑的结构，请使用 YAML 编辑器；未修改源文件");}
++    private static final class Edit {final int start,end;final String value;Edit(int s,int e,String v){start=s;end=e;value=v;}}
++
++    /** Compose-only editing: marks locate the changed tokens, never dump or expand the document. */
++    private static final class SubscriptionYaml {
++        final String source,newline;final MappingNode root,providers;final List<Edit> edits=new ArrayList<>();
++        final Map<Node,Integer> references=new IdentityHashMap<>();final Set<Node> nodes=Collections.newSetFromMap(new IdentityHashMap<>());
++        SubscriptionYaml(String text)throws IOException{
++            source=text;newline=text.contains("\r\n")?"\r\n":text.indexOf('\r')>=0?"\r":"\n";root=(MappingNode)RuntimeYaml15.compose(text);
++            Deque<Node> pending=new ArrayDeque<>();pending.add(root);references.put(root,1);
++            while(!pending.isEmpty()){
++                Node node=pending.pop();if(!nodes.add(node))continue;
++                if(node instanceof MappingNode){Set<String> keys=new HashSet<>();for(NodeTuple tuple:((MappingNode)node).getValue()){
++                    if(tuple.getKeyNode() instanceof ScalarNode&&!keys.add(scalar(tuple.getKeyNode())))throw new IOException("配置包含重复 YAML 字段，请先在编辑器修正；未修改源文件");
++                    visit(tuple.getKeyNode(),pending);visit(tuple.getValueNode(),pending);
++                }}else if(node instanceof SequenceNode)for(Node child:((SequenceNode)node).getValue())visit(child,pending);
++            }
++            NodeTuple tuple=field(root,"proxy-providers");if(tuple==null)providers=null;else if(tuple.getValueNode() instanceof MappingNode)providers=(MappingNode)tuple.getValueNode();else throw unsupported();
++            if(providers!=null)for(NodeTuple entry:providers.getValue())if(!(entry.getKeyNode() instanceof ScalarNode)||!(entry.getValueNode() instanceof MappingNode))throw unsupported();
++        }
++        private void visit(Node node,Deque<Node> pending){references.put(node,references.getOrDefault(node,0)+1);pending.add(node);}
++        int index(Mark mark){return source.offsetByCodePoints(0,mark.getIndex());}
++        int lineStart(int at){while(at>0&&source.charAt(at-1)!='\n'&&source.charAt(at-1)!='\r')at--;return at;}
++        int lineEnd(int at){while(at<source.length()&&source.charAt(at)!='\n'&&source.charAt(at)!='\r')at++;if(at<source.length()&&source.charAt(at++)=='\r'&&at<source.length()&&source.charAt(at)=='\n')at++;return at;}
++        void local(Node node,Node owner)throws IOException{if(index(node.getStartMark())<index(owner.getStartMark())||index(node.getEndMark())>index(owner.getEndMark()))throw unsupported();}
++        Node anchor(String name)throws IOException{Node found=null;for(Node node:nodes)if(name.equals(node.getAnchor())){if(found!=null)throw unsupported();found=node;}return found;}
++        void blockProviders()throws IOException{
++            if(providers==null)throw new IOException("当前配置没有 proxy-providers 段");
++            NodeTuple tuple=field(root,"proxy-providers");
++            if(root.getFlowStyle()!=DumperOptions.FlowStyle.BLOCK||providers.getFlowStyle()!=DumperOptions.FlowStyle.BLOCK||references.getOrDefault(providers,0)>1||index(providers.getStartMark())<index(tuple.getKeyNode().getEndMark()))throw unsupported();
++            for(NodeTuple entry:providers.getValue())if(!source.substring(lineStart(index(entry.getKeyNode().getStartMark())),index(entry.getKeyNode().getStartMark())).trim().isEmpty())throw unsupported();
++        }
++        NodeTuple provider(String name)throws IOException{if(providers==null)throw new IOException("当前配置没有 proxy-providers 段");for(NodeTuple entry:providers.getValue())if(name.equals(scalar(entry.getKeyNode())))return entry;throw new IOException("订阅不存在："+name);}
++        String path(String name){Set<String> paths=new HashSet<>();for(NodeTuple entry:providers.getValue())paths.add(scalar(RuntimeYaml15.inherited(entry.getValueNode(),"path")));String token=fileToken(name),candidate="./proxy_provider/"+token+".yaml";for(int i=2;paths.contains(candidate);i++)candidate="./proxy_provider/"+token+"_"+i+".yaml";return candidate;}
++        int entryEnd(NodeTuple entry)throws IOException{
++            Node key=entry.getKeyNode(),value=entry.getValueNode();int begin=lineStart(index(key.getStartMark())),mark=index(value.getEndMark());
++            int bound=mark<index(key.getEndMark())?lineEnd(index(key.getEndMark())):value instanceof MappingNode&&((MappingNode)value).getFlowStyle()==DumperOptions.FlowStyle.BLOCK?(mark==source.length()?mark:lineStart(mark)):lineEnd(mark);
++            int end=begin;for(int at=begin;at<bound;){int next=Math.min(lineEnd(at),bound);String line=source.substring(at,next).trim();if(!line.isEmpty()&&!line.startsWith("#"))end=next;at=next;}
++            if(end<=begin)throw unsupported();return end;
++        }
++        void changeGroupUses(Set<String> managed,String name,boolean remove)throws IOException{
++            NodeTuple groupsField=field(root,"proxy-groups");if(groupsField==null)return;Node groups=groupsField.getValueNode();if(!(groups instanceof SequenceNode))throw unsupported();
++            for(Node group:((SequenceNode)groups).getValue()){
++                Node inherited=RuntimeYaml15.inherited(group,"use");if(inherited==null)continue;if(!(inherited instanceof SequenceNode))throw unsupported();
++                SequenceNode use=(SequenceNode)inherited;boolean affected=false;for(Node item:use.getValue())if(managed.contains(scalar(item)))affected=true;if(!affected)continue;
++                NodeTuple own=field(group,"use");if(own==null||own.getValueNode()!=use||references.getOrDefault(use,0)>1||references.getOrDefault(group,0)>1||index(use.getStartMark())<index(own.getKeyNode().getEndMark()))throw unsupported();
++                local(group,groups);local(use,group);
++                for(Node item:use.getValue())if(!(item instanceof ScalarNode)||item.getStartMark().getLine()!=item.getEndMark().getLine()||index(item.getStartMark())<index(use.getStartMark())||index(item.getEndMark())>index(use.getEndMark()))throw unsupported();
++                if(remove)removeUse(use,name);else if(use.getValue().stream().noneMatch(item->name.equals(scalar(item))))appendUse(use,name);
++            }
++        }
++        private void appendUse(SequenceNode use,String name)throws IOException{
++            List<Node> items=use.getValue();if(items.isEmpty())throw unsupported();
++            Node last=items.get(items.size()-1);int end=index(last.getEndMark());
++            if(use.getFlowStyle()==DumperOptions.FlowStyle.FLOW)edits.add(new Edit(end,end,", "+quote(name)));
++            else {int at=lineEnd(end),column=use.getStartMark().getColumn();if(!source.substring(lineStart(index(last.getStartMark())),index(last.getStartMark())).trim().equals("-"))throw unsupported();edits.add(new Edit(at,at,(at>0&&source.charAt(at-1)!='\n'&&source.charAt(at-1)!='\r'?newline:"")+spaces(column)+"- "+quote(name)+newline));}
++        }
++        private void removeUse(SequenceNode use,String name)throws IOException{
++            List<Node> items=use.getValue();List<Integer> keep=new ArrayList<>();for(int i=0;i<items.size();i++)if(!name.equals(scalar(items.get(i))))keep.add(i);
++            if(use.getFlowStyle()==DumperOptions.FlowStyle.FLOW){
++                Set<Integer> commas=new HashSet<>();for(int i=0;i<keep.size()-1;i++)commas.add(keep.get(i));
++                for(int i=0;i<items.size();i++){
++                    Node item=items.get(i);if(name.equals(scalar(item)))edits.add(new Edit(index(item.getStartMark()),index(item.getEndMark()),""));
++                    int from=index(item.getEndMark()),to=i+1<items.size()?index(items.get(i+1).getStartMark()):index(use.getEndMark())-1;
++                    int comma=comma(from,to);if(i+1<items.size()&&comma<0)throw unsupported();
++                    if(comma>=0&&(i+1<items.size()&&!commas.contains(i)||i+1==items.size()&&keep.isEmpty()))edits.add(new Edit(comma,comma+1,""));
++                }
++            }else {
++                boolean empty=keep.isEmpty();for(Node item:items)if(name.equals(scalar(item))){int start=lineStart(index(item.getStartMark())),end=index(item.getEndMark());String prefix=source.substring(start,index(item.getStartMark()));int dash=prefix.indexOf('-');if(dash<0||!prefix.substring(0,dash).trim().isEmpty()||!prefix.substring(dash+1).trim().isEmpty())throw unsupported();edits.add(new Edit(start+dash,end,empty?"[]":""));empty=false;}
++            }
++        }
++        private int comma(int from,int to)throws IOException{int comma=-1;boolean comment=false;for(int i=from;i<to;i++){char c=source.charAt(i);if(c=='\n'||c=='\r')comment=false;else if(!comment&&c=='#')comment=true;else if(!comment&&c==','){if(comma>=0)throw unsupported();comma=i;}else if(!comment&&!Character.isWhitespace(c))throw unsupported();}return comma;}
++        String result()throws IOException{
++            edits.sort(Comparator.comparingInt((Edit edit)->edit.start).thenComparingInt(edit->edit.end));int end=-1;for(Edit edit:edits){if(edit.start<end||edit.start<0||edit.end<edit.start||edit.end>source.length())throw unsupported();end=edit.end;}
++            StringBuilder result=new StringBuilder(source);for(int i=edits.size()-1;i>=0;i--){Edit edit=edits.get(i);result.replace(edit.start,edit.end,edit.value);}return result.toString();
++        }
++    }
+
+     static boolean coreAccepts(ProxyRuntimeProfile.Core core,String name){if(name==null)return false;int dot=name.lastIndexOf('.');return dot>0&&core.extensions.contains(name.substring(dot+1).toLowerCase(Locale.ROOT));}
+     static String safeName(String name)throws IOException{String n=name==null?"":name.trim();if(n.length()<3||n.length()>120||n.contains("/")||n.contains("\\")||n.contains("\u0000")||n.equals(".")||n.equals(".."))throw new IOException("配置名称无效");return n;}
+-    private static String providerName(String v)throws IOException{String n=v==null?"":v.trim();if(n.isEmpty()||n.length()>40||n.matches(".*[:\\[\\]{}#,\\r\\n].*"))throw new IOException("订阅名称无效");return n;}
++    private static String providerName(String v)throws IOException{String n=v==null?"":v.trim();if(n.isEmpty()||n.length()>40||n.chars().anyMatch(c->c<32||c==127))throw new IOException("订阅名称无效");return n;}
+     private static String subscriptionUrl(String v)throws IOException{String u=v==null?"":v.trim();if(u.length()<10||u.length()>4096||!(u.startsWith("https://")||u.startsWith("http://"))||u.contains("\n")||u.contains("\r"))throw new IOException("请输入有效的 http/https 订阅链接");return u;}
+     private static String fileToken(String s){return s.replaceAll("[^A-Za-z0-9\\p{L}._-]","_");}
+     private static String yamlSingle(String s){return s.replace("'","''");}
+-    private static String stripComment(String s){boolean q1=false,q2=false;for(int i=0;i<s.length();i++){char c=s.charAt(i);if(c=='\''&&!q2)q1=!q1;else if(c=='\"'&&!q1)q2=!q2;else if(c=='#'&&!q1&&!q2)return s.substring(0,i).trim();}return s.trim();}
+-    private static String unquote(String s){String x=s==null?"":s.trim();if(x.length()>=2&&((x.startsWith("'")&&x.endsWith("'"))||(x.startsWith("\"")&&x.endsWith("\""))))x=x.substring(1,x.length()-1);return x.replace("''","'");}
+-    private static int indent(String s){int n=0;while(n<s.length()&&(s.charAt(n)==' '||s.charAt(n)=='\t'))n++;return n;}
+-    private static String normalize(String s){return s.replace("\r\n","\n").replace('\r','\n');}
+-    private static String trimTerminal(String s){while(s.endsWith("\n\n"))s=s.substring(0,s.length()-1);return s;}
+ }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+index cf707aa..5778b82 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
+ import kotlinx.coroutines.async
+ import kotlinx.coroutines.awaitAll
+ import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.ensureActive
+ import kotlinx.coroutines.withContext
+ import kotlinx.coroutines.sync.Mutex
+ import kotlinx.coroutines.sync.withLock
+@@ -14,7 +15,10 @@ import java.io.IOException
+ import org.json.JSONArray
+ import org.json.JSONObject
+ import java.net.HttpURLConnection
++import java.net.InetSocketAddress
++import java.net.Proxy
+ import java.net.URL
++import kotlin.coroutines.coroutineContext
+
+ internal data class DashboardProviderUi(
+     val name: String,
+@@ -47,24 +51,81 @@ internal class ProxyDashboardRepository(context: Context) {
+     private val app = context.applicationContext
+     private val api = MihomoControllerClient(app)
+     private val controller = ProxyComposeController(app)
+-    private data class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>)
++    // Keep credentials private and out of generated data-class toString output.
++    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long) {
++        val stable: Boolean get() = runtimeEpoch >= 0L
++        override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
++            settings == other.settings && runtimeEpoch == other.runtimeEpoch
++        override fun hashCode(): Int = 31 * settings.hashCode() + runtimeEpoch.hashCode()
++    }
++    private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
+     private val probeSnapshotMutex = Mutex()
+     private var cachedProbeSnapshot: ProbeSnapshot? = null
+     private var probeSnapshotAt = 0L
++    private val probeIdentityKeys = setOf(
++        "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
++        "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
++        "proxyRootWanted", "proxyRootRuntimeRunning", "proxyRootLastStartupAt",
++        "proxyRootAppliedSettings", "proxyRootAppliedRuntimeRevision", "proxyRootTopologyFingerprint",
++        "proxyAdblockSessionGeneration", "proxyNetworkSessionId",
++    )
++
++    private fun probeIdentity(): ProbeIdentity {
++        val values = app.getSharedPreferences("hetu", 0).all
++        val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
++        val configKey = "proxySelectedConfig.${core.id}"
++        val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
++        settings["proxyBaseCore"] = core.id
++        // The configuration library may lazily persist this same default during a poll.
++        settings[configKey] = (values[configKey] as? String).orEmpty().ifBlank {
++            if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART)
++                ProxyConfigLibrary.BUNDLED_NAME else ""
++        }
++        // Ordinary status/health reads do not change this nonblocking control epoch.
++        return ProbeIdentity(settings, RootProxyManager.observationTicket())
++    }
++
++    private fun requireCurrentProbe(identity: ProbeIdentity) {
++        if (!identity.stable || probeIdentity() != identity)
++            throw IOException("代理或控制接口已变化，请重新测速")
++    }
++
++    private inline fun <T> readCurrentProbe(snapshot: ProbeSnapshot, read: () -> T): T {
++        requireCurrentProbe(snapshot.identity)
++        return try {
++            val measured = read()
++            requireCurrentProbe(snapshot.identity)
++            measured
++        } catch (cancel: CancellationException) { throw cancel }
++        catch (error: Exception) {
++            // A response from a superseded runtime is not a measurement for the new one,
++            // including a core-confirmed failure received after an endpoint switch.
++            requireCurrentProbe(snapshot.identity)
++            throw error
++        }
++    }
+
+     private suspend fun probeSnapshot(force: Boolean = false): ProbeSnapshot = probeSnapshotMutex.withLock {
++        val identity = probeIdentity()
++        requireCurrentProbe(identity)
+         val now = SystemClock.elapsedRealtime()
+         val cached = cachedProbeSnapshot
+-        if (!force && cached != null && now - probeSnapshotAt in 0L..1500L) return@withLock cached
++        if (!force && cached != null && cached.identity == identity && now - probeSnapshotAt in 0L..1500L) return@withLock cached
+         val raw = api.proxies()
++        coroutineContext.ensureActive()
++        requireCurrentProbe(identity)
+         val providerResponse = api.proxyProviders()
+-        ProbeSnapshot(mergeProxySnapshots(raw, providerResponse), parseProviders(providerResponse)).also {
++        coroutineContext.ensureActive()
++        requireCurrentProbe(identity)
++        ProbeSnapshot(mergeProxySnapshots(raw, providerResponse), parseProviders(providerResponse), identity).also {
++            requireCurrentProbe(identity)
+             cachedProbeSnapshot = it
+-            probeSnapshotAt = now
++            probeSnapshotAt = SystemClock.elapsedRealtime()
+         }
+     }
+
+     private fun probe(node: String, snapshot: ProbeSnapshot): Long {
++        requireCurrentProbe(snapshot.identity)
+         val leaf = selectedProxyName(snapshot.proxies, node)
+         val entry = snapshot.proxies.optJSONObject(leaf) ?: throw IOException("节点已更新，请刷新策略组")
+         val provider = snapshot.providers.firstOrNull { it.name == entry.optString("provider-name") }
+@@ -77,8 +138,10 @@ internal class ProxyDashboardRepository(context: Context) {
+                 }
+         val testUrl = provider?.testUrl?.takeIf { it.isNotBlank() } ?: group?.optString("testUrl").orEmpty()
+         val expected = provider?.expectedStatus ?: group?.optString("expectedStatus", "200-399") ?: "200-399"
+-        return if (provider != null) api.providerDelay(provider.name, leaf, testUrl, expected)
+-        else api.delay(leaf, testUrl, expected)
++        return readCurrentProbe(snapshot) {
++            if (provider != null) api.providerDelay(provider.name, leaf, testUrl, expected)
++            else api.delay(leaf, testUrl, expected)
++        }
+     }
+
+     private fun measuredProbe(node: String, snapshot: ProbeSnapshot): Long = try { probe(node, snapshot) }
+@@ -191,8 +254,14 @@ internal class ProxyDashboardRepository(context: Context) {
+         val results = LinkedHashMap<String, Long>()
+         for (chunk in targets.distinct().chunked(6)) {
+             coroutineScope {
+-                chunk.map { node -> async { node to measuredProbe(node, snapshot) } }.awaitAll()
+-            }.forEach { (node, value) -> results[node] = value }
++                chunk.map { node -> async {
++                    try { node to measuredProbe(node, snapshot) }
++                    catch (cancel: CancellationException) { throw cancel }
++                    // A controller/transport error has no new node measurement. Keep
++                    // successful siblings and let callers retain this node's old value.
++                    catch (_: IOException) { node to null }
++                } }.awaitAll()
++            }.forEach { (node, value) -> if (value != null) results[node] = value }
+         }
+         return results
+     }
+@@ -257,14 +326,22 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+     suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
+         val snapshot = probeSnapshot()
+         val leaf = selectedProxyName(snapshot.proxies, node)
+-        api.delayIpv6(leaf, snapshot.proxies.optJSONObject(leaf)?.optString("provider-name").orEmpty())
++        readCurrentProbe(snapshot) {
++            api.delayIpv6(leaf, snapshot.proxies.optJSONObject(leaf)?.optString("provider-name").orEmpty())
++        }
+     }
+
+     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
+         val sites = ProxyLatencyTargets.load(app)
++        // Hetu's UID is exempt from transparent Root interception. Explicitly enter
++        // the running local core so fake DNS and policy routing match the active
++        // runtime; the optional remote controller API is unrelated to this listener.
++        val egressPort = if (ProxyStatusBridge.rootProxyRunning(app))
++            MihomoStartupConfig.egressProbePort(app.getSharedPreferences("hetu", 0)
++                .getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)) else null
+         coroutineScope {
+             sites.map { target ->
+-                async { target.name to measureSiteLatency(target.url) }
++                async { target.name to measureSiteLatency(target.url, egressPort) }
+             }.awaitAll().toMap()
+         }
+     }
+@@ -279,10 +356,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+         parseRuleSets(api.ruleProviders()).firstOrNull { it.name == name }
+     }
+
+-    private fun measureSiteLatency(url: String): Long {
++    private suspend fun measureSiteLatency(url: String, egressPort: Int?): Long {
++        coroutineContext.ensureActive()
+         return try {
+             val started = SystemClock.elapsedRealtime()
+-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
++            val target = URL(url)
++            val opened = if (egressPort == null) target.openConnection()
++                else target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", egressPort)))
++            val connection = (opened as HttpURLConnection).apply {
+                 instanceFollowRedirects = true
+                 connectTimeout = 3_000
+                 readTimeout = 3_000
+@@ -292,12 +373,16 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+             }
+             try {
+                 val code = connection.responseCode
+-                if (code in 200..499) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
++                coroutineContext.ensureActive()
++                if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+             } finally {
+                 runCatching { connection.inputStream?.close() }
+                 connection.disconnect()
+             }
++        } catch (cancel: CancellationException) {
++            throw cancel
+         } catch (_: Exception) {
++            coroutineContext.ensureActive()
+             -1L
+         }
+     }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index 8420c3f..3e503ef 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 151;
++    static final int RUNTIME_REVISION = 152;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java
+new file mode 100644
+index 0000000..179c81e
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java
+@@ -0,0 +1,357 @@
++package io.github.xgl34222220.hetu;
++
++import java.io.IOException;
++import java.math.BigInteger;
++import java.util.ArrayDeque;
++import java.util.ArrayList;
++import java.util.Collections;
++import java.util.Deque;
++import java.util.IdentityHashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Set;
++import org.yaml.snakeyaml.nodes.MappingNode;
++import org.yaml.snakeyaml.nodes.Node;
++import org.yaml.snakeyaml.nodes.NodeTuple;
++import org.yaml.snakeyaml.nodes.ScalarNode;
++import org.yaml.snakeyaml.nodes.SequenceNode;
++import org.yaml.snakeyaml.nodes.Tag;
++
++/** Read-only Fake-IP routing metadata from the final, generated Mihomo YAML. */
++final class RootFakeIpRanges {
++    private static final String DEFAULT_IPV4 = "198.18.0.1/16";
++    private static final String PRIVATE_IPV4 = "0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4";
++    private static final String PRIVATE_IPV6 = "::1/128,fc00::/7,fe80::/10,ff00::/8";
++    final String ipv4;
++    final String ipv6;
++    final String ipv4BypassCidrs;
++    final String ipv6BypassCidrs;
++
++    private RootFakeIpRanges(String ipv4, String ipv6) throws IOException {
++        this.ipv4 = ipv4;
++        this.ipv6 = ipv6;
++        ipv4BypassCidrs = subtract(PRIVATE_IPV4, ipv4, 32);
++        ipv6BypassCidrs = subtract(PRIVATE_IPV6, ipv6, 128);
++    }
++
++    /**
++     * Annotate only the private generated startup copy, never the selected source.
++     * Remove pre-existing owned comments before appending the one final policy
++     * block, so subscription comments cannot impersonate our routing metadata.
++     * All unrelated bytes and YAML node semantics remain unchanged.
++     */
++    String privateStartup(String generatedYaml) throws IOException {
++        if (generatedYaml == null) throw failure("FAKE_IP_YAML");
++        List<int[]> scalars = scalarSpans(generatedYaml);
++        StringBuilder result = new StringBuilder(generatedYaml.length() + 512);
++        int start = 0;
++        int codePointStart = 0;
++        int scalarIndex = 0;
++        while (start < generatedYaml.length()) {
++            int newline = generatedYaml.indexOf('\n', start);
++            int end = newline < 0 ? generatedYaml.length() : newline;
++            String line = generatedYaml.substring(start, end);
++            int comment = ownedComment(line);
++            int point = codePointStart + Math.max(0, comment);
++            while (scalarIndex < scalars.size() && scalars.get(scalarIndex)[1] <= point) scalarIndex++;
++            boolean scalarContent = scalarIndex < scalars.size() && scalars.get(scalarIndex)[0] <= point;
++            if (comment < 0 || scalarContent) {
++                result.append(line);
++                if (newline >= 0) result.append('\n');
++            }
++            codePointStart += generatedYaml.codePointCount(start, newline < 0 ? end : end + 1);
++            start = newline < 0 ? generatedYaml.length() : newline + 1;
++        }
++        if (result.length() > 0 && result.charAt(result.length() - 1) != '\n') result.append('\n');
++        result.append("# HETU_FAKE_IP_POLICY=1\n")
++                .append("# HETU_FAKE_IP_V4=").append(ipv4).append('\n')
++                .append("# HETU_FAKE_IP_V6=").append(ipv6).append('\n')
++                .append("# HETU_LAN_RETURN_V4=").append(ipv4BypassCidrs).append('\n')
++                .append("# HETU_LAN_RETURN_V6=").append(ipv6BypassCidrs).append('\n');
++        return result.toString();
++    }
++
++    private static int ownedComment(String line) {
++        int start = 0;
++        while (start < line.length() && (line.charAt(start) == ' ' || line.charAt(start) == '\t')) start++;
++        boolean owned = line.startsWith("# HETU_FAKE_IP_POLICY=", start)
++                || line.startsWith("# HETU_FAKE_IP_V4=", start)
++                || line.startsWith("# HETU_FAKE_IP_V6=", start)
++                || line.startsWith("# HETU_LAN_RETURN_V4=", start)
++                || line.startsWith("# HETU_LAN_RETURN_V6=", start);
++        return owned ? start : -1;
++    }
++
++    private static List<int[]> scalarSpans(String source) throws IOException {
++        final Node root;
++        try { root = RuntimeYaml15.compose(source); }
++        catch (IOException invalid) { throw failure("FAKE_IP_YAML"); }
++        List<int[]> spans = new ArrayList<>();
++        Set<Node> visited = Collections.newSetFromMap(new IdentityHashMap<>());
++        Deque<Node> pending = new ArrayDeque<>();
++        pending.push(root);
++        while (!pending.isEmpty()) {
++            Node node = pending.pop();
++            if (!visited.add(node)) continue;
++            if (node instanceof ScalarNode) {
++                spans.add(new int[]{node.getStartMark().getIndex(), node.getEndMark().getIndex()});
++            } else if (node instanceof MappingNode) {
++                for (NodeTuple entry : ((MappingNode) node).getValue()) {
++                    pending.push(entry.getKeyNode());
++                    pending.push(entry.getValueNode());
++                }
++            } else if (node instanceof SequenceNode) {
++                for (Node item : ((SequenceNode) node).getValue()) pending.push(item);
++            }
++        }
++        spans.sort((a, b) -> Integer.compare(a[0], b[0]));
++        return spans;
++    }
++
++    /**
++     * Defaults match MetaCubeX/mihomo v1.19.30 config/config.go DefaultRawConfig:
++     * global IPv6 true, DNS enable/IPv6 false, redir-host, v4 198.18.0.1/16,
++     * no v6 Fake-IP range. Explicit empty ranges remain empty; no source edits.
++     * Only built-in private bypass ranges are subtracted. User CIDRs stay under
++     * the existing, explicit shell bypass rules and are never read here.
++     */
++    static RootFakeIpRanges parse(String generatedYaml, ProxyRuntimeProfile profile) throws IOException {
++        if (profile == null) throw failure("FAKE_IP_PROFILE");
++        boolean mihomo = profile.core == ProxyRuntimeProfile.Core.MIHOMO
++                || profile.core == ProxyRuntimeProfile.Core.MIHOMO_SMART;
++        boolean mode = profile.mode == ProxyRuntimeProfile.Mode.TPROXY
++                || profile.mode == ProxyRuntimeProfile.Mode.REDIRECT
++                || profile.mode == ProxyRuntimeProfile.Mode.ENHANCE;
++        if (!mihomo || !mode) return new RootFakeIpRanges("", "");
++
++        final Node root;
++        try {
++            root = RuntimeYaml15.compose(generatedYaml);
++        } catch (IOException invalid) {
++            // Even parser line/column details are excluded from this API.
++            throw failure("FAKE_IP_YAML");
++        }
++        Node dns = RuntimeYaml15.inherited(root, "dns");
++        if (isNull(dns)) return new RootFakeIpRanges("", "");
++        if (!(dns instanceof MappingNode)) throw failure("FAKE_IP_DNS");
++        if (!bool(RuntimeYaml15.inherited(dns, "enable"), false))
++            return new RootFakeIpRanges("", "");
++        // Mihomo DNSMode.UnmarshalText folds case, but does not trim input.
++        String enhancedMode = scalar(RuntimeYaml15.inherited(dns, "enhanced-mode"), "redir-host")
++                .toLowerCase(Locale.ROOT);
++        if (!"fake-ip".equals(enhancedMode)) return new RootFakeIpRanges("", "");
++
++        String ipv4 = range(RuntimeYaml15.inherited(dns, "fake-ip-range"), DEFAULT_IPV4, 32);
++        String ipv6 = "";
++        if (profile.ipv6 == ProxyRuntimeProfile.Ipv6.ENABLE
++                && bool(RuntimeYaml15.inherited(root, "ipv6"), true)
++                && bool(RuntimeYaml15.inherited(dns, "ipv6"), false)) {
++            ipv6 = range(RuntimeYaml15.inherited(dns, "fake-ip-range6"), "", 128);
++        }
++        return new RootFakeIpRanges(ipv4, ipv6);
++    }
++
++    private static boolean isNull(Node node) {
++        return node == null || Tag.NULL.equals(node.getTag());
++    }
++
++    private static String scalar(Node node, String fallback) throws IOException {
++        if (isNull(node)) return fallback;
++        if (!(node instanceof ScalarNode)) throw failure("FAKE_IP_FIELD");
++        return ((ScalarNode) node).getValue();
++    }
++
++    private static boolean bool(Node node, boolean fallback) throws IOException {
++        if (isNull(node)) return fallback;
++        String value = scalar(node, "").toLowerCase(Locale.ROOT);
++        // go-yaml accepts YAML 1.1 bool spellings when decoding into a bool.
++        switch (value) {
++            case "true": case "yes": case "y": case "on": return true;
++            case "false": case "no": case "n": case "off": return false;
++            default: throw failure("FAKE_IP_BOOLEAN");
++        }
++    }
++
++    private static String range(Node node, String fallback, int width) throws IOException {
++        String value = scalar(node, fallback);
++        if (value.isEmpty()) return "";
++        Cidr parsed = Cidr.parse(value, width);
++        // Validation permits ASCII digits, hexadecimal digits, '.', ':', '/'
++        // only. Do not trim unsafe whitespace or permit names/scopes/quotes.
++        // ip6tables policy metadata accepts hexadecimal IPv6 notation. Numeric
++        // embedded IPv4 remains valid source YAML; emit its equivalent prefix
++        // in pure IPv6 notation for the shell without changing that source.
++        return width == 128 && value.indexOf('.') >= 0 ? parsed.text() : value.toLowerCase(Locale.ROOT);
++    }
++
++    private static IOException failure(String category) {
++        return new IOException("Fake-IP 运行配置无效；未修改源文件 [" + category + "]");
++    }
++
++    private static String subtract(String defaults, String protectedRange, int width) throws IOException {
++        if (protectedRange.isEmpty()) return defaults;
++        Cidr fake = Cidr.parse(protectedRange, width);
++        List<String> result = new ArrayList<>();
++        for (String item : defaults.split(",")) {
++            Cidr bypass = Cidr.parse(item, width);
++            if (!bypass.contains(fake) && !fake.contains(bypass)) {
++                result.add(item);
++            } else if (!fake.contains(bypass)) {
++                // Aligned CIDRs overlap only by containment. At each split,
++                // retain the sibling outside fake, then follow its one child.
++                // Work is bounded by 32/128 bits, without recursive expansion.
++                Cidr current = bypass;
++                List<Cidr> pieces = new ArrayList<>();
++                while (current.bits < fake.bits) {
++                    int childBits = current.bits + 1;
++                    BigInteger step = BigInteger.ONE.shiftLeft(width - childBits);
++                    Cidr low = new Cidr(current.network, childBits, width);
++                    Cidr high = new Cidr(current.network.add(step), childBits, width);
++                    if (low.contains(fake)) {
++                        pieces.add(high);
++                        current = low;
++                    } else {
++                        pieces.add(low);
++                        current = high;
++                    }
++                }
++                pieces.sort((a, b) -> a.network.compareTo(b.network));
++                for (Cidr piece : pieces) result.add(piece.text());
++            }
++        }
++        return String.join(",", result);
++    }
++
++    private static final class Cidr {
++        final BigInteger network;
++        final int bits;
++        final int width;
++
++        Cidr(BigInteger address, int bits, int width) {
++            this.bits = bits;
++            this.width = width;
++            int hostBits = width - bits;
++            network = address.shiftRight(hostBits).shiftLeft(hostBits);
++        }
++
++        boolean contains(Cidr other) {
++            return width == other.width && bits <= other.bits
++                    && network.equals(other.network.shiftRight(width - bits).shiftLeft(width - bits));
++        }
++
++        static Cidr parse(String value, int width) throws IOException {
++            int slash = value.indexOf('/');
++            if (slash < 1 || slash != value.lastIndexOf('/') || slash == value.length() - 1)
++                throw failure("FAKE_IP_CIDR");
++            String prefix = value.substring(slash + 1);
++            if (prefix.length() > 3) throw failure("FAKE_IP_CIDR");
++            int bits = decimal(prefix, width, false);
++            String address = value.substring(0, slash);
++            BigInteger numeric = width == 32 ? ipv4(address) : ipv6(address);
++            return new Cidr(numeric, bits, width);
++        }
++
++        private static int decimal(String text, int maximum, boolean noLeadingZero) throws IOException {
++            if (text.isEmpty() || (noLeadingZero && text.length() > 1 && text.charAt(0) == '0'))
++                throw failure("FAKE_IP_CIDR");
++            int value = 0;
++            for (int i = 0; i < text.length(); i++) {
++                char c = text.charAt(i);
++                if (c < '0' || c > '9') throw failure("FAKE_IP_CIDR");
++                value = value * 10 + c - '0';
++                if (value > maximum) throw failure("FAKE_IP_CIDR");
++            }
++            return value;
++        }
++
++        private static BigInteger ipv4(String text) throws IOException {
++            String[] octets = text.split("\\.", -1);
++            if (octets.length != 4) throw failure("FAKE_IP_CIDR");
++            long result = 0;
++            for (String octet : octets) {
++                if (octet.length() > 3) throw failure("FAKE_IP_CIDR");
++                result = (result << 8) | decimal(octet, 255, true);
++            }
++            return BigInteger.valueOf(result);
++        }
++
++        private static BigInteger ipv6(String text) throws IOException {
++            if (text.indexOf(':') < 0 || text.length() > 45) throw failure("FAKE_IP_CIDR");
++            int compression = text.indexOf("::");
++            if (compression != text.lastIndexOf("::")) throw failure("FAKE_IP_CIDR");
++            List<Integer> left;
++            List<Integer> right;
++            if (compression < 0) {
++                left = groups(text, true);
++                right = new ArrayList<>();
++                if (left.size() != 8) throw failure("FAKE_IP_CIDR");
++            } else {
++                left = groups(text.substring(0, compression), false);
++                right = groups(text.substring(compression + 2), true);
++                if (left.size() + right.size() >= 8) throw failure("FAKE_IP_CIDR");
++            }
++            BigInteger result = BigInteger.ZERO;
++            for (int group : left) result = result.shiftLeft(16).or(BigInteger.valueOf(group));
++            result = result.shiftLeft(16 * (8 - left.size() - right.size()));
++            for (int group : right) result = result.shiftLeft(16).or(BigInteger.valueOf(group));
++            return result;
++        }
++
++        private static List<Integer> groups(String text, boolean allowIpv4End) throws IOException {
++            List<Integer> result = new ArrayList<>();
++            if (text.isEmpty()) return result;
++            String[] items = text.split(":", -1);
++            for (int index = 0; index < items.length; index++) {
++                String item = items[index];
++                if (item.indexOf('.') >= 0) {
++                    if (!allowIpv4End || index != items.length - 1) throw failure("FAKE_IP_CIDR");
++                    long v4 = ipv4(item).longValue();
++                    result.add((int) (v4 >>> 16));
++                    result.add((int) (v4 & 0xffff));
++                } else {
++                    if (item.isEmpty() || item.length() > 4) throw failure("FAKE_IP_CIDR");
++                    int value = 0;
++                    for (int i = 0; i < item.length(); i++) {
++                        char c = item.charAt(i);
++                        int digit = c >= '0' && c <= '9' ? c - '0'
++                                : c >= 'a' && c <= 'f' ? c - 'a' + 10
++                                : c >= 'A' && c <= 'F' ? c - 'A' + 10 : -1;
++                        if (digit < 0) throw failure("FAKE_IP_CIDR");
++                        value = (value << 4) | digit;
++                    }
++                    result.add(value);
++                }
++                if (result.size() > 8) throw failure("FAKE_IP_CIDR");
++            }
++            return result;
++        }
++
++        String text() {
++            if (width == 32) {
++                long address = network.longValue();
++                return ((address >>> 24) & 255) + "." + ((address >>> 16) & 255) + "."
++                        + ((address >>> 8) & 255) + "." + (address & 255) + "/" + bits;
++            }
++            int[] groups = new int[8];
++            for (int i = 0; i < 8; i++) groups[i] = network.shiftRight(16 * (7 - i)).intValue() & 0xffff;
++            int bestStart = -1, bestLength = 1;
++            for (int i = 0; i < 8;) {
++                if (groups[i] != 0) { i++; continue; }
++                int start = i;
++                while (i < 8 && groups[i] == 0) i++;
++                if (i - start > bestLength) { bestStart = start; bestLength = i - start; }
++            }
++            StringBuilder text = new StringBuilder();
++            for (int i = 0; i < 8;) {
++                if (i == bestStart) {
++                    text.append("::");
++                    i += bestLength;
++                } else {
++                    if (text.length() > 0 && text.charAt(text.length() - 1) != ':') text.append(':');
++                    text.append(Integer.toHexString(groups[i++]));
++                }
++            }
++            return text.append('/').append(bits).toString();
++        }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 4a3b426..ac3dc6b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -58,10 +58,11 @@ final class RootProxyManager {
+         final ProxyConfigLibrary.Entry source;
+         final RootProxyPolicy policy;
+         final ProxyAdblockRules.Snapshot adblock;
++        final RootFakeIpRanges fakeIps;
+         final String startup,settingsSignature;
+         final int tproxyPort,redirectPort,controllerPort;
+-        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp,String signature){
+-            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
++        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
++            profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
+         }
+     }
+
+@@ -327,11 +328,15 @@ final class RootProxyManager {
+         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
+         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
+         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
+-        writeStartupCopy(generated.yaml);
+-        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
++        RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
++        // Private comments carry an already validated routing projection into start/boot.
++        // Keep the established startup argument protocol and the user's source untouched.
++        String startup=fakeIps.privateStartup(generated.yaml);
++        writeStartupCopy(startup);
++        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
+     }
+
+-    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
++    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
+         return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
+                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
+                 +"|dnsForward="+bit(prefs.getBoolean("proxyMihomoDnsForward",true))
+@@ -342,7 +347,9 @@ final class RootProxyManager {
+                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
+                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
+                 +"|sharedMacs="+policy.sharedBypassMacs
+-                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges;
++                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges
++                +"|fake4="+fakeIps.ipv4+"|fake6="+fakeIps.ipv6
++                +"|lan4="+fakeIps.ipv4BypassCidrs+"|lan6="+fakeIps.ipv6BypassCidrs;
+     }
+
+     private void installHotReloadFiles(Prepared p)throws Exception{
+@@ -381,7 +388,7 @@ final class RootProxyManager {
+             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+             int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+             Prepared p=prepare(profile,port);
+-            String nextFingerprint=topologyFingerprint(profile,p.policy);
++            String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
+             String liveFingerprint=prefs.getString("proxyRootTopologyFingerprint","");
+             if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
+                 throw new IOException("运行模式、应用范围、DNS、IPv6、TCP/UDP 或绕过策略已变化，请使用「重启」应用这些网络层设置");
+@@ -437,8 +444,8 @@ final class RootProxyManager {
+         return hex(digest.digest());
+     }
+
+-    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
+-        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
++    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
++        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy,fakeIps);
+     }
+
+     JSONObject preflight(Prepared p)throws Exception{
+@@ -528,8 +535,12 @@ final class RootProxyManager {
+                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
+                 ensureContinuityService(true);
+                 trace.outcome="alreadyRunning";
++                int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
++                String liveMessage="Root 代理已在运行，已忽略重复启动请求";
++                if(appliedRevision>0&&appliedRevision<ProxyRuntimeSettings.RUNTIME_REVISION)
++                    liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
+                 JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
+-                        .put("message","Root 代理已在运行，已忽略重复启动请求");
++                        .put("message",liveMessage);
+                 if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartInstalled",false)){
+                     try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
+                 }
+@@ -604,7 +615,7 @@ final class RootProxyManager {
+
+         trace.next("legacyCleanup");
+         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
+-        String capabilityKey=capabilityFingerprint(profile,policy);
++        String capabilityKey=capabilityFingerprint(profile,policy,p.fakeIps);
+         boolean capabilityKnown=capabilityKey.equals(prefs.getString("proxyRootCapabilityFingerprint",""));
+         stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
+
+@@ -703,6 +714,8 @@ final class RootProxyManager {
+                 .put("controllerPort",p.controllerPort)
+                 .put("adblockRevision",p.adblock==null?"":p.adblock.revision)
+                 .put("bypassCidrs",policy.cidrs)
++                .put("fakeIpV4",p.fakeIps.ipv4)
++                .put("fakeIpV6",p.fakeIps.ipv6)
+                 .put("bypassInterfaces",policy.interfaces);
+         if(!warning.isEmpty())result.put("warning",warning);
+         synchronized(ProxyAdblockSession.LOCK){
+@@ -714,7 +727,7 @@ final class RootProxyManager {
+                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
+                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
+                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
+-                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
++                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy,p.fakeIps))
+                 // A completed network transaction consumes its captured request.
+                 // Runtime fallbacks (for example adblock-chain degradation) are reported through
+                 // their own effective/error fields; they must not create an endless "restart again"
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+index ecc3932..c2dfa9e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -233,6 +233,112 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     private val coldStartAt = SystemClock.elapsedRealtime()
+     private val measuredAt = HashMap<String, Long>()
+
++    private data class RuntimeRequest(val generation: Long)
++    private var runtimeRequestGeneration = 0L
++    private var requestSequence = 0L
++    private var runtimeRequestSettings = requestSettings()
++    private val nodeProbeOwners = HashMap<String, MutableSet<Long>>()
++    private val latestNodeProbe = HashMap<String, Long>()
++    private val groupProbeOwners = HashMap<String, Long>()
++    private var allProbeOwner: Long? = null
++    private var siteProbeOwner: Long? = null
++    private var latestProviderRead = 0L
++    private var latestSiteRead = 0L
++    private val providerTaskOwners = HashMap<String, Long>()
++    private var providersUpdateAllOwner: Long? = null
++
++    /** Ordinary polling must not invalidate a probe; a different core/API/config must. */
++    private fun requestSettings(): Map<String, Any?> {
++        val snapshot = prefs.all
++        val core = ProxyRuntimeProfile.Core.from(snapshot["proxyBaseCore"] as? String ?: "mihomo")
++        val configKey = "proxySelectedConfig.${core.id}"
++        val settings = snapshot.filterKeys { key ->
++            key in setOf("proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
++            "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
++            "proxyCustomDelayUrlEnabled", "proxyCustomDelayUrl") ||
++                key == configKey || key.startsWith("proxyLatencyTarget")
++        }.toMutableMap()
++        // ConfigLibrary lazily persists this same default during its first read.
++        // That bookkeeping must not invalidate the first ordinary controller snapshot.
++        settings["proxyBaseCore"] = core.id
++        settings[configKey] = (snapshot[configKey] as? String).orEmpty().ifBlank {
++            if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART)
++                ProxyConfigLibrary.BUNDLED_NAME else ""
++        }
++        return settings
++    }
++
++    private fun invalidateRuntimeRequests() {
++        runtimeRequestGeneration++
++        nodeProbeOwners.clear()
++        latestNodeProbe.clear()
++        groupProbeOwners.clear()
++        testingNodes.clear()
++        testingGroups.clear()
++        allProbeOwner = null
++        testingAll = false
++        siteProbeOwner = null
++        siteTesting = false
++        providerTaskOwners.keys.forEach { name -> if (providerTasks[name]?.running == true) providerTasks.remove(name) }
++        providerTaskOwners.clear()
++        providersUpdateAllOwner = null
++        providersUpdatingAll = false
++    }
++
++    private fun syncRequestSettings() {
++        val current = requestSettings()
++        if (current != runtimeRequestSettings) {
++            runtimeRequestSettings = current
++            invalidateRuntimeRequests()
++        }
++    }
++
++    private fun captureRuntimeRequest(): RuntimeRequest {
++        syncRequestSettings()
++        return RuntimeRequest(runtimeRequestGeneration)
++    }
++
++    private fun activeRuntimeRequest(): RuntimeRequest? {
++        val request = captureRuntimeRequest()
++        return request.takeIf { state.running && operation == null }
++    }
++
++    private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
++        syncRequestSettings()
++        return request.generation == runtimeRequestGeneration &&
++            (!requireRunning || (state.running && operation == null))
++    }
++
++    private fun holdNodeProbes(owner: Long, nodes: Collection<String>) {
++        nodes.forEach { node ->
++            nodeProbeOwners.getOrPut(node) { HashSet() }.add(owner)
++            latestNodeProbe[node] = owner
++            testingNodes[node] = true
++        }
++    }
++
++    private fun releaseNodeProbes(owner: Long, nodes: Collection<String>) {
++        nodes.forEach { node ->
++            val owners = nodeProbeOwners[node] ?: return@forEach
++            owners.remove(owner)
++            if (owners.isEmpty()) {
++                nodeProbeOwners.remove(node)
++                testingNodes.remove(node)
++            }
++        }
++    }
++
++    private fun applyNodeProbe(request: RuntimeRequest, owner: Long, node: String, value: Long, stamp: Long) {
++        if (currentRuntimeRequest(request) && (latestNodeProbe[node] ?: owner) <= owner) {
++            latestNodeProbe[node] = owner
++            delays[node] = value
++            measuredAt[node] = stamp
++        }
++    }
++
++    private fun beginProviderRead(): Long = (++requestSequence).also { latestProviderRead = it }
++    private fun beginSiteRead(): Long = (++requestSequence).also { latestSiteRead = it }
++
+     fun onForeground() {
+         reloadAppearance()
+         if (pollJob?.isActive == true) return
+@@ -300,13 +406,20 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
+     suspend fun refreshNow(): ProxyComposeState? {
+         var expectedState = state
++        var expectedRequest = captureRuntimeRequest()
+         val operationBefore = operation
+-        fun superseded() = state !== expectedState || operation != operationBefore
++        fun superseded() = state !== expectedState || operation != operationBefore ||
++            !currentRuntimeRequest(expectedRequest, requireRunning = false)
+         try {
+             val startedAt = SystemClock.elapsedRealtime()
+             val next = repo.state()
+             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
+             if (superseded()) return null
++            if (next.running != state.running ||
++                (next.corePid > 0 && state.corePid > 0 && next.corePid != state.corePid)) {
++                invalidateRuntimeRequests()
++                expectedRequest = captureRuntimeRequest()
++            }
+             val now = SystemClock.elapsedRealtime()
+             val controllerSampleValid = next.panelReady && !next.controllerReadFailed
+             val totalTx = TrafficStats.getTotalTxBytes()
+@@ -378,10 +491,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 coreVersion = ""
+             } else if (!next.controllerReadFailed) {
+                 if (providers.isEmpty() || now - lastProviderRefreshAt > 30_000L) {
++                    val request = captureRuntimeRequest()
++                    val owner = beginProviderRead()
+                     val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+                     if (superseded()) return null
+-                    lastProviderRefreshAt = now
+-                    if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
++                    if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
++                        lastProviderRefreshAt = now
++                        if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
++                    }
+                 }
+                 if (coreVersion.isBlank()) {
+                     val freshVersion = repo.coreVersion()
+@@ -453,12 +570,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             refreshing = true
+             try {
+                 refreshNow()
+-                if (state.running) {
++                val request = activeRuntimeRequest()
++                if (request != null) {
++                    val providerOwner = beginProviderRead()
++                    val siteOwner = beginSiteRead()
+                     coroutineScope {
+                         val p = async { try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null } }
+                         val s = async { try { repo.siteLatencies() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null } }
+-                        p.await()?.let { providers = it; lastProviderRefreshAt = SystemClock.elapsedRealtime() }
+-                        s.await()?.let { if (it.isNotEmpty()) { siteDelays = it; ProxyLatencyTargets.persistLast(prefs, it) } }
++                        p.await()?.let {
++                            if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
++                                providers = it
++                                lastProviderRefreshAt = SystemClock.elapsedRealtime()
++                            }
++                        }
++                        s.await()?.let {
++                            if (currentRuntimeRequest(request) && siteOwner == latestSiteRead && it.isNotEmpty()) {
++                                siteDelays = it
++                                ProxyLatencyTargets.persistLast(prefs, it)
++                            }
++                        }
+                     }
+                 }
+             } finally {
+@@ -486,6 +616,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     fun toggle() {
+         if (operation != null) return
+         val stopping = state.running
++        invalidateRuntimeRequests()
+         operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
+         viewModelScope.launch {
+             operationText = if (stopping) "正在停止…" else "正在启动…"
+@@ -534,6 +665,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     fun restart() {
+         if (operation != null || !state.running) return
++        invalidateRuntimeRequests()
+         operation = HxRunOp.Restart
+         viewModelScope.launch {
+             operationText = "正在重启…"
+@@ -558,6 +690,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     fun reload() {
+         if (operation != null || !state.running) return
++        invalidateRuntimeRequests()
+         operation = HxRunOp.Reload
+         viewModelScope.launch {
+             operationText = "正在重载配置…"
+@@ -591,7 +724,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
+
+-    fun bumpSettings() { settingsRevision++ }
++    fun bumpSettings() { syncRequestSettings(); settingsRevision++ }
+
+     /* ---------------- proxies ---------------- */
+
+@@ -623,13 +756,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         }
+     }
+
+-    private suspend fun probe(node: String) {
++    private suspend fun probe(node: String, request: RuntimeRequest, owner: Long) {
+         try {
+-            delays[node] = repo.delay(node)
+-            measuredAt[node] = SystemClock.elapsedRealtime()
++            applyNodeProbe(request, owner, node, repo.delay(node), SystemClock.elapsedRealtime())
+         } catch (failure: MihomoControllerClient.DelayFailure) {
+-            delays[node] = if (failure.timedOut) -1L else -2L
+-            measuredAt[node] = SystemClock.elapsedRealtime()
++            applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
+         } catch (cancel: CancellationException) {
+             throw cancel
+         } catch (_: Exception) {
+@@ -638,19 +769,24 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun testNode(node: String) {
+-        if (testingNodes[node] == true || !state.running) return
+-        testingNodes[node] = true
++        val request = activeRuntimeRequest() ?: return
++        if (testingNodes[node] == true) return
++        val owner = ++requestSequence
++        holdNodeProbes(owner, listOf(node))
+         viewModelScope.launch {
+-            try { probe(node) } finally { testingNodes.remove(node) }
++            try { probe(node, request, owner) } finally { releaseNodeProbes(owner, listOf(node)) }
+         }
+     }
+
+     fun testGroup(group: ProxyGroupUi) {
+-        if (testingGroups[group.name] == true || !state.running) return
++        val request = activeRuntimeRequest() ?: return
++        if (testingGroups[group.name] == true) return
+         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
+         if (targets.isEmpty()) return
++        val owner = ++requestSequence
++        groupProbeOwners[group.name] = owner
+         testingGroups[group.name] = true
+-        targets.forEach { testingNodes[it] = true }
++        holdNodeProbes(owner, targets)
+         viewModelScope.launch {
+             try {
+                 // Selector groups retain the parallel core endpoint. Automatic groups use
+@@ -660,48 +796,60 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 targets.forEach { node ->
+                     // Missing/invalid entries are not authoritative timeouts. Keep old readings.
+                     result[node]?.let { delay ->
+-                        delays[node] = delay
+-                        measuredAt[node] = stamp
++                        applyNodeProbe(request, owner, node, delay, stamp)
+                     }
+                 }
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                toast(errorText(error, "策略组测速失败"))
++                if (currentRuntimeRequest(request)) toast(errorText(error, "策略组测速失败"))
+             } finally {
+-                targets.forEach { testingNodes.remove(it) }
+-                testingGroups.remove(group.name)
++                releaseNodeProbes(owner, targets)
++                if (groupProbeOwners[group.name] == owner) {
++                    groupProbeOwners.remove(group.name)
++                    testingGroups.remove(group.name)
++                }
+             }
+         }
+     }
+
+     fun testAll() {
+-        if (testingAll || !state.running) return
++        val request = activeRuntimeRequest() ?: return
++        if (testingAll) return
++        val owner = ++requestSequence
++        val targets = (state.groups.flatMap { it.nodes.map { node -> node.name } } +
++            providers.flatMap { it.nodes } + delays.keys).distinct()
++            .filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }
++        allProbeOwner = owner
++        holdNodeProbes(owner, targets)
+         testingAll = true
+         viewModelScope.launch {
+             try {
+                 val result = repo.globalDelay()
+-                delays.putAll(result)
+                 val stamp = SystemClock.elapsedRealtime()
+-                result.keys.forEach { measuredAt[it] = stamp }
++                result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
+                 val ok = result.values.count { it > 0L }
+-                toast("测速完成：$ok / ${result.size} 个节点可用")
++                if (currentRuntimeRequest(request)) toast("测速完成：$ok / ${result.size} 个节点可用")
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                toast(errorText(error, "测速失败"))
++                if (currentRuntimeRequest(request)) toast(errorText(error, "测速失败"))
+             } finally {
+-                testingAll = false
++                releaseNodeProbes(owner, targets)
++                if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
+             }
+         }
+     }
+
+     private suspend fun measureSitesQuietly() {
++        val request = activeRuntimeRequest() ?: return
+         if (siteTesting) return
++        val owner = beginSiteRead()
++        siteProbeOwner = owner
+         siteTesting = true
+         try {
+             val measured = repo.siteLatencies()
+-            if (measured.isNotEmpty()) {
++            if (currentRuntimeRequest(request) && owner == latestSiteRead && measured.isNotEmpty()) {
+                 siteDelays = measured
+                 ProxyLatencyTargets.persistLast(prefs, measured)
+             }
+@@ -709,7 +857,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             throw cancel
+         } catch (_: Exception) {
+         } finally {
+-            siteTesting = false
++            if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
+         }
+     }
+
+@@ -736,22 +884,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun measureSites() {
+-        if (siteTesting || !state.running) return
++        val request = activeRuntimeRequest() ?: return
++        if (siteTesting) return
++        val owner = beginSiteRead()
++        siteProbeOwner = owner
+         siteTesting = true
+         viewModelScope.launch {
+             try {
+                 val measured = repo.siteLatencies()
+-                if (measured.isNotEmpty()) {
++                if (currentRuntimeRequest(request) && owner == latestSiteRead && measured.isNotEmpty()) {
+                     siteDelays = measured
+                     ProxyLatencyTargets.persistLast(prefs, measured)
+                 }
+-                if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
++                if (currentRuntimeRequest(request) && owner == latestSiteRead && measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                toast(errorText(error, "测速失败"))
++                if (currentRuntimeRequest(request) && owner == latestSiteRead) toast(errorText(error, "测速失败"))
+             } finally {
+-                siteTesting = false
++                if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
+             }
+         }
+     }
+@@ -882,78 +1033,112 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun loadProviders() {
+-        if (!state.running) return
++        val request = activeRuntimeRequest() ?: return
++        val owner = beginProviderRead()
+         viewModelScope.launch {
+             try {
+-                providers = repo.providers()
+-                lastProviderRefreshAt = SystemClock.elapsedRealtime()
++                val fresh = repo.providers()
++                if (currentRuntimeRequest(request) && owner == latestProviderRead) {
++                    providers = fresh
++                    lastProviderRefreshAt = SystemClock.elapsedRealtime()
++                }
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                toast(errorText(error, "订阅读取失败"))
++                if (currentRuntimeRequest(request) && owner == latestProviderRead) toast(errorText(error, "订阅读取失败"))
+             }
+         }
+     }
+
+     fun updateProvider(name: String) {
+-        if (providerTasks[name]?.running == true || !state.running) return
++        val request = activeRuntimeRequest() ?: return
++        if (providerTasks[name]?.running == true) return
++        val owner = ++requestSequence
++        providerTaskOwners[name] = owner
+         providerTasks[name] = HxTask(running = true)
+         viewModelScope.launch {
+             try {
+                 val fresh = repo.refreshProvider(name)
++                if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
+                 if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
+                 providerTasks[name] = HxTask(ok = true, message = "已更新")
+                 refreshNow()
+             } catch (cancel: CancellationException) {
+-                providerTasks.remove(name)
++                if (providerTaskOwners[name] == owner) providerTasks.remove(name)
+                 throw cancel
+             } catch (error: Exception) {
+-                providerTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
++                if (currentRuntimeRequest(request) && providerTaskOwners[name] == owner)
++                    providerTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
++            } finally {
++                if (providerTaskOwners[name] == owner) {
++                    providerTaskOwners.remove(name)
++                    if (providerTasks[name]?.running == true) providerTasks.remove(name)
++                }
+             }
+         }
+     }
+
+     fun updateAllProviders() {
+-        if (providersUpdatingAll || !state.running) return
++        val request = activeRuntimeRequest() ?: return
++        if (providersUpdatingAll) return
++        val owner = ++requestSequence
++        providersUpdateAllOwner = owner
+         providersUpdatingAll = true
+         viewModelScope.launch {
+             var ok = 0
+             var failed = 0
+             try {
+                 val targets = providers.ifEmpty { repo.providers() }
++                if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
+                 if (targets.isEmpty()) {
+                     toast("当前配置没有在线订阅（proxy-providers）")
+                     return@launch
+                 }
+-                targets.forEach { providerTasks[it.name] = HxTask(running = true) }
++                targets.forEach { providerTaskOwners[it.name] = owner; providerTasks[it.name] = HxTask(running = true) }
+                 for (chunk in targets.chunked(3)) {
++                    if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
+                     coroutineScope {
+                         chunk.map { item ->
+                             async {
++                                if (!currentRuntimeRequest(request) || providerTaskOwners[item.name] != owner) return@async
+                                 try {
+                                     repo.refreshProvider(item.name)
+-                                    providerTasks[item.name] = HxTask(ok = true, message = "已更新")
+-                                    ok++
++                                    if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
++                                        providerTasks[item.name] = HxTask(ok = true, message = "已更新")
++                                        ok++
++                                    }
+                                 } catch (cancel: CancellationException) {
+                                     throw cancel
+                                 } catch (error: Exception) {
+-                                    providerTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+-                                    failed++
++                                    if (currentRuntimeRequest(request) && providerTaskOwners[item.name] == owner) {
++                                        providerTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
++                                        failed++
++                                    }
+                                 }
+                             }
+                         }.awaitAll()
+                     }
+                 }
+-                providers = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+-                lastProviderRefreshAt = SystemClock.elapsedRealtime()
++                if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
++                val readOwner = beginProviderRead()
++                val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
++                if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
++                if (readOwner == latestProviderRead) {
++                    providers = fresh
++                    lastProviderRefreshAt = SystemClock.elapsedRealtime()
++                }
+                 toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")
+                 refreshNow()
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+-                toast(errorText(error, "订阅更新失败"))
++                if (currentRuntimeRequest(request) && providersUpdateAllOwner == owner) toast(errorText(error, "订阅更新失败"))
+             } finally {
+-                providersUpdatingAll = false
++                providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
++                    providerTaskOwners.remove(name)
++                    if (providerTasks[name]?.running == true) providerTasks.remove(name)
++                }
++                if (providersUpdateAllOwner == owner) { providersUpdateAllOwner = null; providersUpdatingAll = false }
+             }
+         }
+     }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
+index b36e274..24ee1bb 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
+@@ -146,13 +146,17 @@ internal fun PanelScreen(
+                 PanelTab.Groups -> panelGroupsTab(
+                     rows = rows, data = data, view = displayView,
+                     onToggleGroup = { name ->
++                        // Capture this card row before an accordion removes rows above it. The
++                        // stable lazy key matches panelGroupsTab; an old numeric index does not.
++                        val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
++                        val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
+                         val next = view.toggleGroup(name)
++                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                         onView(next)
+-                        if (name in next.expandedGroups) {
+-                            val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+-                            if (at >= 0) scope.launch {
+-                                if (motion) listState.animateScrollToItem(headerItems + at) else listState.scrollToItem(headerItems + at)
+-                            }
++                        if (anchor != null && at >= 0) {
++                            // Apply with the new rows on the next measure, retaining the tapped
++                            // header's visible offset instead of moving it to the top of the page.
++                            listState.requestScrollToItem(headerItems + at, -anchor.offset)
+                         }
+                     },
+                     onSelectNode = actions.onSelectNode,
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt
+new file mode 100644
+index 0000000..0259ba1
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt
+@@ -0,0 +1,158 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.MutableState
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.semantics.SemanticsActions
++import androidx.compose.ui.semantics.SemanticsProperties
++import androidx.compose.ui.test.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.dp
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.panel.*
++import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
++import kotlinx.coroutines.cancel
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/** Actual launcher adapter and PanelRoute interactions; no copy of the scroll-anchor algorithm. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class PanelExpansionAnchorTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private var vm: HetuViewModel? = null
++    private var latestView = PanelViewState()
++
++    @Before fun prepare() {
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putString("appearance", "light").putBoolean("enableBlur", false).commit()
++        app.getSharedPreferences("proxy_selector_preferences", 0).edit().clear().commit()
++    }
++
++    @After fun finish() { vm?.viewModelScope?.cancel() }
++
++    private fun name(index: Int) = "策略" + index.toString().padStart(2, '0')
++    private fun nodeName(group: Int, node: Int) = "节点${group.toString().padStart(2, '0')}-$node"
++    private fun groups(count: Int = 20, firstNodes: Int = 2): List<PanelGroup> = (1..count).map { group ->
++        val nodes = (1..if (group == 1) firstNodes else 2).map { PanelNode(nodeName(group, it), protocol = "VLESS") }
++        PanelGroup(name(group), "Selector", nodes, nodes.first().name)
++    }
++
++    private fun card(index: Int) = rule.onNodeWithTag("panel-group:${name(index)}", useUnmergedTree = true)
++    private fun list() = rule.onNode(hasScrollToIndexAction())
++    private fun settle() { rule.mainClock.advanceTimeBy(1000); rule.waitForIdle() }
++    private fun expectOpen(index: Int, open: Boolean) {
++        card(index).assert(SemanticsMatcher.expectValue(SemanticsProperties.StateDescription, if (open) "已展开" else "已收起"))
++    }
++    private fun expectSameTop(index: Int, before: Float) {
++        card(index).assertIsDisplayed()
++        assertEquals("Tapped group header must retain its visible position", before, card(index).getUnclippedBoundsInRoot().top.value, 2f)
++    }
++
++    private fun route(data: PanelData, initial: PanelViewState = PanelViewState(), fontScale: Float = 1f) {
++        latestView = initial
++        rule.setContent {
++            val density = LocalDensity.current
++            CompositionLocalProvider(LocalHetuMotionEnabled provides true,
++                LocalDensity provides Density(density.density, fontScale)) {
++                HetuHomeTheme(dark = false) {
++                    PanelRoute(data, PanelTab.Groups, {}, PanelActions(), initialView = initial,
++                        onViewChange = { latestView = it }, contentPadding = PaddingValues(bottom = 80.dp))
++                }
++            }
++        }
++        settle()
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    private fun injectState(target: HetuViewModel, state: ProxyComposeState) {
++        val field = HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
++        (field.get(target) as MutableState<ProxyComposeState>).value = state
++    }
++
++    @Test fun launcherLowerHalfExpansionRetainsTheTappedGroupPosition() {
++        val target = HetuViewModel(app).also { vm = it }
++        target.openPanel("proxies")
++        injectState(target, ProxyComposeState(running = true, panelReady = true, trafficMode = "rule",
++            groups = groups().map { group -> ProxyGroupUi(group.name, group.type, group.now,
++                group.nodes.map { ProxyNodeUi(it.name, it.protocol) }) }))
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides true) {
++                HetuAppTheme(appearance = "light", dynamic = false) { HetuRoot(target) }
++            }
++        }
++        settle()
++        val before = card(9).getUnclippedBoundsInRoot()
++        assertTrue("Fixture must exercise a lower-half card", before.top > rule.onRoot().getUnclippedBoundsInRoot().height / 2)
++        assertTrue("Tapped card must clear the real dock", before.bottom <= rule.onNodeWithTag("hetu-dock", useUnmergedTree = true).getUnclippedBoundsInRoot().top)
++        card(9).performClick()
++        settle()
++        expectSameTop(9, before.top.value)
++        expectOpen(9, true)
++        assertEquals("proxies", target.panelSection)
++    }
++
++    @Test fun collapsingAnEarlierLargeGroupKeepsTheClickedHeaderAnchored() {
++        val data = PanelData(status = PanelStatus.Running, groups = groups(firstNodes = 40))
++        val initial = PanelViewState(expandedGroups = listOf(name(1)),
++            layout = PanelGroupLayout(groupColumns = 1, compactNodes = true))
++        route(data, initial)
++        // The first visible item is a node row that the next accordion transition removes.
++        val lastNodeRow = PanelLogic.groupRows(data, initial).indexOfLast { it is PanelGroupRow.Nodes && it.group.name == name(1) }
++        list().performScrollToIndex(panelHeaderItemCount(data, initial) + lastNodeRow)
++        settle()
++        rule.onNodeWithTag("panel-node:${nodeName(1, 40)}").assertIsDisplayed()
++        val before = card(9).getUnclippedBoundsInRoot().top.value
++        assertTrue("Fixture must retain a non-top header", before > 400f)
++        card(9).performClick()
++        settle()
++        expectSameTop(9, before)
++        expectOpen(9, true)
++        assertEquals(listOf(name(9)), latestView.expandedGroups)
++        rule.onNodeWithTag("panel-node:${nodeName(1, 40)}").assertDoesNotExist()
++    }
++
++    @Test fun rapidSiblingExpansionsLeaveOnlyTheLatestGroupWithoutAQueuedJump() {
++        route(PanelData(status = PanelStatus.Running, groups = groups()))
++        val before = card(10).getUnclippedBoundsInRoot().top.value
++        val first = card(9).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
++        val latest = card(10).fetchSemanticsNode().config[SemanticsActions.OnClick].action!!
++        // Two actual card actions in one UI turn, before either layout/animation has finished.
++        rule.runOnUiThread { assertTrue(first()); assertTrue(latest()) }
++        settle()
++        expectSameTop(10, before)
++        expectOpen(9, false)
++        expectOpen(10, true)
++        assertEquals(listOf(name(10)), latestView.expandedGroups)
++        rule.onNodeWithTag("panel-node:${nodeName(9, 1)}").assertDoesNotExist()
++    }
++
++    @Test @Config(qualifiers = "zh-rCN-w320dp-h640dp-mdpi")
++    fun lastGroupOnASmallLargeFontScreenStaysVisibleAtItsOriginalOffset() {
++        route(PanelData(status = PanelStatus.Running, groups = groups(count = 12)), fontScale = 1.6f)
++        list().performScrollToNode(hasTestTag("panel-group:${name(12)}"))
++        settle()
++        val before = card(12).getUnclippedBoundsInRoot()
++        assertTrue("Adaptive layout must keep the final card full-width", before.width >= 280.dp)
++        card(12).performClick()
++        settle()
++        expectSameTop(12, before.top.value)
++        expectOpen(12, true)
++        assertEquals(listOf(name(12)), latestView.expandedGroups)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java
+new file mode 100644
+index 0000000..a68dc64
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java
+@@ -0,0 +1,46 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.ArrayDeque;
++import java.util.Collections;
++import java.util.Map;
++import kotlin.coroutines.Continuation;
++import org.json.JSONObject;
++import org.robolectric.annotation.Implementation;
++import org.robolectric.annotation.Implements;
++import org.robolectric.annotation.Resetter;
++
++/** Only runtime status and site transport are isolated; controller HTTP remains real. */
++public final class PanelRequestOwnershipShadows {
++    @Implements(value = RootProxyManager.class, isInAndroidSdk = false)
++    public static class RootStatus {
++        public static int pid = 77;
++        @Resetter public static void reset() { pid = 77; }
++        @Implementation public JSONObject status() throws Exception {
++            return new JSONObject().put("running", true).put("dataPlaneHealthy", true).put("pid", pid);
++        }
++    }
++
++    @Implements(value = ProxyDashboardRepository.class, isInAndroidSdk = false)
++    public static class Sites {
++        public static boolean pause;
++        public static Map<String, Long> value = Collections.emptyMap();
++        private static final ArrayDeque<Continuation<? super Map<String, Long>>> pending = new ArrayDeque<>();
++        @Resetter public static synchronized void reset() { pause = false; value = Collections.emptyMap(); pending.clear(); }
++        @Implementation public synchronized Object siteLatencies(Continuation<? super Map<String, Long>> done) {
++            if (pause) {
++                synchronized (Sites.class) { pending.add(done); }
++                return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED();
++            }
++            return value;
++        }
++        public static synchronized int pendingCount() { return pending.size(); }
++        public static void releaseFirst(Map<String, Long> result) {
++            Continuation<? super Map<String, Long>> done;
++            synchronized (Sites.class) { done = pending.poll(); }
++            if (done != null) done.resumeWith(result);
++        }
++        public static void releaseAll() {
++            while (pendingCount() > 0) releaseFirst(Collections.emptyMap());
++        }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt
+new file mode 100644
+index 0000000..02b0b91
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt
+@@ -0,0 +1,420 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.os.Looper
++import androidx.compose.runtime.MutableState
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++
++/** Real launcher ViewModel/repository/controller, with deterministic loopback responses. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    PanelRequestOwnershipShadows.RootStatus::class,
++    PanelRequestOwnershipShadows.Sites::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class PanelRequestOwnershipTest {
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private val servers = mutableListOf<MockWebServer>()
++    private val gates = mutableListOf<CountDownLatch>()
++    private val requests = Collections.synchronizedList(mutableListOf<RecordedRequest>())
++    @Volatile private var response: (RecordedRequest) -> MockResponse = { MockResponse().setResponseCode(404) }
++    private val groupA = ProxyGroupUi("A", "Selector", "shared", listOf(ProxyNodeUi("shared"), ProxyNodeUi("a")))
++    private val groupB = ProxyGroupUi("B", "Selector", "shared", listOf(ProxyNodeUi("shared"), ProxyNodeUi("b")))
++
++    @Before fun prepare() {
++        server = newServer { response(it) }
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putBoolean("proxyCustomApiEnabled", true)
++            .putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port)
++            .putBoolean("proxyApiHistoryEnabled", false).commit()
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77)
++        vm = HetuViewModel(app)
++        fixture("state", ProxyComposeState(running = true, panelReady = true, corePid = 77, groups = listOf(groupA, groupB)))
++        vm.delays["shared"] = 44L
++        response = ::normalResponse
++    }
++
++    @After fun finish() {
++        vm.viewModelScope.cancel()
++        gates.forEach { it.countDown() }
++        PanelRequestOwnershipShadows.Sites.releaseAll()
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        awaitActions()
++        servers.forEach { it.shutdown() }
++        assertEquals("Fixtures must not perform Root operations", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    private fun newServer(handler: (RecordedRequest) -> MockResponse): MockWebServer = MockWebServer().apply {
++        dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                requests += request
++                return handler(request)
++            }
++        }
++        start()
++        servers += this
++    }
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun CountDownLatch.hold() { check(await(8, TimeUnit.SECONDS)) { "Response gate not released" } }
++    private fun body(json: String) = MockResponse().setBody(json)
++    private fun paths() = synchronized(requests) { requests.map { it.path.orEmpty() } }
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue("$reason; requests=${paths()}, busy=${vm.testingNodes}, groups=${vm.testingGroups}", predicate())
++    }
++    private fun awaitActions() = eventually("ViewModel requests complete") {
++        vm.viewModelScope.coroutineContext[Job]!!.children.none { it.isActive }
++    }
++    @Suppress("UNCHECKED_CAST")
++    private fun fixture(name: String, value: Any?) {
++        val field = HetuViewModel::class.java.getDeclaredField(name + "\$delegate").apply { isAccessible = true }
++        (field.get(vm) as MutableState<Any?>).value = value
++    }
++    private fun stopFixture() {
++        fixture("state", vm.state.copy(running = false))
++        fixture("providers", emptyList<DashboardProviderUi>())
++    }
++    private fun changeApi(port: Int = server.port) {
++        vm.prefs.edit().putInt("proxyCustomApiPort", port).putString("proxyCustomApiSecret", "new-session").commit()
++        vm.bumpSettings()
++    }
++    private fun snapshot(sharedDelay: Long? = null): String {
++        val proxies = JSONObject()
++        for (group in listOf(groupA, groupB)) proxies.put(group.name, JSONObject()
++            .put("type", "Selector").put("now", group.now).put("all", JSONArray(group.nodes.map { it.name })))
++        for (node in listOf("shared", "a", "b")) proxies.put(node, JSONObject().put("type", "Shadowsocks").apply {
++            if (node == "shared" && sharedDelay != null) put("history", JSONArray().put(JSONObject().put("delay", sharedDelay)))
++        })
++        return JSONObject().put("proxies", proxies).toString()
++    }
++    private fun provider(name: String, updatedAt: String = "") = """{"providers":{"$name":{"vehicleType":"HTTP","updatedAt":"$updatedAt","proxies":["shared"]}}}"""
++    private fun fixtureProvider() = DashboardProviderUi("P", "HTTP", "", "", "before", 0L, 0L, 0L, 0L, setOf("shared"), false)
++    private fun normalResponse(req: RecordedRequest): MockResponse = when {
++        req.path == "/proxies" -> body(snapshot())
++        req.path == "/providers/proxies" -> body("""{"providers":{}}""")
++        req.path == "/connections" -> body("""{"connections":[]}""")
++        req.path == "/configs" -> body("""{"mode":"rule"}""")
++        req.path == "/version" -> body("""{"version":"fixture"}""")
++        req.requestUrl?.pathSegments?.lastOrNull() == "delay" -> body("""{"delay":12}""")
++        else -> MockResponse().setResponseCode(404)
++    }
++
++    @Test fun sharedGroupsKeepNodeBusyUntilEveryOwnerCompletes() {
++        val first = gate(); val second = gate()
++        response = { req -> when (req.requestUrl!!.encodedPath) {
++            "/group/A/delay" -> { first.hold(); body("""{"shared":81,"a":82}""") }
++            "/group/B/delay" -> { second.hold(); body("""{"shared":91,"b":92}""") }
++            else -> normalResponse(req)
++        } }
++        vm.testGroup(groupA); vm.testGroup(groupB)
++        eventually("Both groups reach controller") { paths().count { it.startsWith("/group/") } == 2 }
++        first.countDown()
++        eventually("First group completes") { vm.testingGroups["A"] != true }
++        assertEquals(true, vm.testingNodes["shared"])
++        assertEquals(true, vm.testingGroups["B"])
++        assertEquals(82L, vm.delays["a"])
++        second.countDown(); awaitActions()
++        assertTrue(vm.testingNodes.isEmpty())
++        assertEquals(91L, vm.delays["shared"])
++    }
++
++    @Test fun lateOlderGroupCannotOverwriteTheNewerSharedNodeResult() {
++        val old = gate()
++        response = { req -> when (req.requestUrl!!.encodedPath) {
++            "/group/A/delay" -> { old.hold(); body("""{"shared":999,"a":81}""") }
++            "/group/B/delay" -> body("""{"shared":90,"b":91}""")
++            else -> normalResponse(req)
++        } }
++        vm.testGroup(groupA)
++        eventually("Old group is in flight") { paths().any { it.startsWith("/group/A/") } }
++        vm.testGroup(groupB)
++        eventually("New group result applies") { vm.delays["shared"] == 90L }
++        assertEquals(true, vm.testingNodes["shared"])
++        old.countDown(); awaitActions()
++        assertEquals(90L, vm.delays["shared"])
++        assertEquals(81L, vm.delays["a"])
++    }
++
++    @Test fun apiChangeOldFinallyCannotClearTheNewSameGroupBusyFlag() {
++        val old = gate(); val fresh = gate()
++        response = { old.hold(); body("""{"shared":999}""") }
++        vm.testGroup(groupA)
++        eventually("Old group reaches controller") { paths().isNotEmpty() }
++        val next = newServer { fresh.hold(); body("""{"shared":22}""") }
++        changeApi(next.port)
++        vm.testGroup(groupA)
++        eventually("New group reaches new controller") { paths().size == 2 }
++        old.countDown()
++        eventually("Old request completes while new stays pending") {
++            vm.viewModelScope.coroutineContext[Job]!!.children.count { it.isActive } == 1
++        }
++        assertEquals(true, vm.testingGroups["A"])
++        assertEquals(true, vm.testingNodes["shared"])
++        assertEquals(44L, vm.delays["shared"])
++        fresh.countDown(); awaitActions()
++        assertEquals(22L, vm.delays["shared"])
++        assertTrue(vm.testingNodes.isEmpty())
++    }
++
++    @Test fun stoppingDropsALateGroupResultAndReleasesBusy() {
++        val old = gate()
++        response = { old.hold(); body("""{"shared":999}""") }
++        vm.testGroup(groupA)
++        eventually("Group reaches controller") { paths().isNotEmpty() }
++        stopFixture(); old.countDown(); awaitActions()
++        assertEquals(44L, vm.delays["shared"])
++        assertTrue(vm.testingNodes.isEmpty())
++        assertTrue(vm.testingGroups.isEmpty())
++    }
++
++    @Test fun olderIndividualProbeCannotOverwriteALaterGroupResult() {
++        val old = gate()
++        response = { req -> when {
++            req.requestUrl!!.encodedPath == "/proxies/shared/delay" -> { old.hold(); body("""{"delay":999}""") }
++            req.requestUrl!!.encodedPath == "/group/B/delay" -> body("""{"shared":90}""")
++            else -> normalResponse(req)
++        } }
++        vm.testNode("shared")
++        eventually("Individual probe reaches controller") { paths().any { it.startsWith("/proxies/shared/delay") } }
++        vm.testGroup(groupB)
++        eventually("New group result applies") { vm.delays["shared"] == 90L }
++        old.countDown(); awaitActions()
++        assertEquals(90L, vm.delays["shared"])
++        assertTrue(vm.testingNodes.isEmpty())
++    }
++
++    @Test fun olderGlobalProbeHoldsBusyButCannotOverwriteALaterGroupResult() {
++        val old = gate()
++        response = { req -> when {
++            req.requestUrl!!.encodedPath == "/proxies/shared/delay" -> { old.hold(); body("""{"delay":999}""") }
++            req.requestUrl!!.encodedPath == "/group/B/delay" -> body("""{"shared":90}""")
++            else -> normalResponse(req)
++        } }
++        vm.testAll()
++        assertEquals(true, vm.testingNodes["shared"])
++        eventually("Global shared probe reaches controller") { paths().any { it.startsWith("/proxies/shared/delay") } }
++        vm.testGroup(groupB)
++        eventually("New group result applies") { vm.delays["shared"] == 90L }
++        assertEquals(true, vm.testingNodes["shared"])
++        old.countDown(); awaitActions()
++        assertEquals(90L, vm.delays["shared"])
++        assertFalse(vm.testingAll)
++        assertTrue(vm.testingNodes.isEmpty())
++    }
++
++    @Test fun olderProviderReadCannotReplaceTheLatestProviderRead() {
++        val old = gate(); val reads = AtomicInteger()
++        response = { if (reads.incrementAndGet() == 1) { old.hold(); body(provider("old")) } else body(provider("fresh")) }
++        vm.loadProviders()
++        eventually("Old provider read reaches controller") { reads.get() == 1 }
++        vm.loadProviders()
++        eventually("Fresh providers apply") { vm.providers.singleOrNull()?.name == "fresh" }
++        old.countDown(); awaitActions()
++        assertEquals("fresh", vm.providers.single().name)
++    }
++
++    @Test fun stoppingDropsALateProviderRead() {
++        val old = gate()
++        response = { old.hold(); body(provider("old")) }
++        vm.loadProviders()
++        eventually("Provider read reaches controller") { paths().isNotEmpty() }
++        stopFixture(); old.countDown(); awaitActions()
++        assertTrue(vm.providers.isEmpty())
++        assertFalse(vm.state.running)
++    }
++
++    @Test fun apiChangeDropsOldProvidersAndAcceptsTheNewControllerProviders() {
++        val old = gate()
++        response = { old.hold(); body(provider("old")) }
++        vm.loadProviders()
++        eventually("Old provider read reaches controller") { paths().isNotEmpty() }
++        val next = newServer { body(provider("fresh")) }
++        changeApi(next.port); vm.loadProviders()
++        eventually("New controller providers apply") { vm.providers.singleOrNull()?.name == "fresh" }
++        old.countDown(); awaitActions()
++        assertEquals("fresh", vm.providers.single().name)
++    }
++
++    @Test fun stoppingDropsPullRefreshProvidersAndPersistedSiteResults() {
++        val old = gate(); val reads = AtomicInteger()
++        val before = vm.siteDelays.toMap()
++        PanelRequestOwnershipShadows.Sites.pause = true
++        response = { req -> if (req.path == "/providers/proxies" && reads.incrementAndGet() == 3) {
++            old.hold(); body(provider("late"))
++        } else normalResponse(req) }
++        vm.pullRefresh()
++        eventually("Pull refresh parallel reads are pending") { reads.get() == 3 && PanelRequestOwnershipShadows.Sites.pendingCount() == 1 }
++        stopFixture(); old.countDown()
++        PanelRequestOwnershipShadows.Sites.releaseFirst(mapOf("Baidu" to 999L))
++        awaitActions()
++        assertTrue(vm.providers.isEmpty())
++        assertEquals(before, vm.siteDelays)
++        assertEquals(before, ProxyLatencyTargets.lastResults(vm.prefs))
++        assertFalse(vm.refreshing)
++    }
++
++    @Test fun apiChangeDropsAnInFlightRefreshStateAndItsCoreHistory() {
++        val old = gate()
++        val before = vm.state
++        var completed = false
++        var result: ProxyComposeState? = null
++        response = { req -> when (req.path) {
++            "/configs" -> { old.hold(); normalResponse(req) }
++            "/proxies" -> body(snapshot(sharedDelay = 999L))
++            else -> normalResponse(req)
++        } }
++        vm.viewModelScope.launch { result = vm.refreshNow(); completed = true }
++        eventually("State read reaches old controller") { paths().contains("/configs") }
++        changeApi(); old.countDown()
++        eventually("Old state read completes") { completed }
++        assertNull(result)
++        assertSame(before, vm.state)
++        assertEquals(44L, vm.delays["shared"])
++    }
++
++    @Test fun externalPidChangeInvalidatesOldGroupAndProtectsANewOwner() {
++        val old = gate(); val fresh = gate(); val groupReads = AtomicInteger()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/A/delay") {
++            if (groupReads.incrementAndGet() == 1) { old.hold(); body("""{"shared":999}""") }
++            else { fresh.hold(); body("""{"shared":22}""") }
++        } else normalResponse(req) }
++        vm.testGroup(groupA)
++        eventually("Old group reaches controller") { groupReads.get() == 1 }
++        PanelRequestOwnershipShadows.RootStatus.pid = 88
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 88)
++        vm.prefs.edit().putLong("proxyRootHealthProbeElapsed", 0L).commit()
++        vm.viewModelScope.launch { vm.refreshNow() }
++        eventually("New PID is confirmed") { vm.state.corePid == 88 }
++        vm.testGroup(groupA)
++        eventually("New group starts in new PID session") { groupReads.get() == 2 }
++        old.countDown()
++        eventually("Only new group remains") { vm.viewModelScope.coroutineContext[Job]!!.children.count { it.isActive } == 1 }
++        assertEquals(true, vm.testingGroups["A"])
++        assertEquals(44L, vm.delays["shared"])
++        fresh.countDown(); awaitActions()
++        assertEquals(22L, vm.delays["shared"])
++    }
++
++    @Test fun ordinaryPollKeepsAnActiveGroupInTheSamePidSession() {
++        val old = gate()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/A/delay") {
++            old.hold(); body("""{"shared":22}""")
++        } else normalResponse(req) }
++        vm.testGroup(groupA)
++        eventually("Group reaches controller") { paths().any { it.startsWith("/group/A/") } }
++        var refreshed = false
++        vm.viewModelScope.launch { vm.refreshNow(); refreshed = true }
++        eventually("Ordinary poll completes") { refreshed }
++        assertEquals(true, vm.testingGroups["A"])
++        assertEquals(true, vm.testingNodes["shared"])
++        old.countDown(); awaitActions()
++        assertEquals(22L, vm.delays["shared"])
++    }
++
++    @Test fun oldSiteCompletionCannotClearOrOverwriteTheNewSessionSiteProbe() {
++        PanelRequestOwnershipShadows.Sites.pause = true
++        val before = vm.siteDelays.toMap()
++        vm.measureSites()
++        eventually("Old site probe is suspended") { PanelRequestOwnershipShadows.Sites.pendingCount() == 1 }
++        changeApi(); vm.measureSites()
++        eventually("New site probe is suspended") { PanelRequestOwnershipShadows.Sites.pendingCount() == 2 }
++        PanelRequestOwnershipShadows.Sites.releaseFirst(mapOf("Baidu" to 999L))
++        eventually("Old site probe completes") { vm.viewModelScope.coroutineContext[Job]!!.children.count { it.isActive } == 1 }
++        assertTrue(vm.siteTesting)
++        assertEquals(before, vm.siteDelays)
++        PanelRequestOwnershipShadows.Sites.releaseFirst(mapOf("Baidu" to 22L))
++        awaitActions()
++        assertFalse(vm.siteTesting)
++        assertEquals(22L, vm.siteDelays["Baidu"])
++        assertEquals(22L, ProxyLatencyTargets.lastResults(vm.prefs)["Baidu"])
++    }
++
++    @Test fun staleSingleProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask() {
++        val old = gate(); val fresh = gate(); val reads = AtomicInteger()
++        fixture("providers", listOf(fixtureProvider()))
++        response = { req -> when {
++            req.method == "PUT" && req.path == "/providers/proxies/P" -> MockResponse().setResponseCode(204)
++            req.path == "/providers/proxies" -> when (reads.incrementAndGet()) {
++                1 -> { old.hold(); body(provider("P", "old")) }
++                2 -> { fresh.hold(); body(provider("P", "fresh")) }
++                else -> body(provider("P", "fresh"))
++            }
++            else -> normalResponse(req)
++        } }
++        vm.updateProvider("P")
++        eventually("Old update readback is pending") { reads.get() == 1 }
++        changeApi(); vm.updateProvider("P")
++        eventually("New update readback is pending") { reads.get() == 2 }
++        old.countDown()
++        eventually("Old update completes") { vm.viewModelScope.coroutineContext[Job]!!.children.count { it.isActive } == 1 }
++        assertEquals("before", vm.providers.single().updatedAt)
++        assertEquals(true, vm.providerTasks["P"]?.running)
++        fresh.countDown(); awaitActions()
++        assertEquals("fresh", vm.providers.single().updatedAt)
++        assertEquals(true, vm.providerTasks["P"]?.ok)
++        assertEquals(false, vm.providerTasks["P"]?.running)
++    }
++
++    @Test fun staleBulkProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask() {
++        val old = gate(); val fresh = gate(); val reads = AtomicInteger()
++        fixture("providers", listOf(fixtureProvider()))
++        response = { req -> when {
++            req.method == "PUT" && req.path == "/providers/proxies/P" -> MockResponse().setResponseCode(204)
++            req.path == "/providers/proxies" -> when (reads.incrementAndGet()) {
++                1 -> { old.hold(); body(provider("P", "old")) }
++                2 -> { fresh.hold(); body(provider("P", "fresh")) }
++                else -> body(provider("P", "fresh"))
++            }
++            else -> normalResponse(req)
++        } }
++        vm.updateAllProviders()
++        eventually("Old bulk update readback is pending") { reads.get() == 1 }
++        changeApi(); vm.updateAllProviders()
++        eventually("New bulk update readback is pending") { reads.get() == 2 }
++        old.countDown()
++        eventually("Old bulk update completes") { vm.viewModelScope.coroutineContext[Job]!!.children.count { it.isActive } == 1 }
++        assertTrue(vm.providersUpdatingAll)
++        assertEquals(true, vm.providerTasks["P"]?.running)
++        assertEquals("before", vm.providers.single().updatedAt)
++        fresh.countDown(); awaitActions()
++        assertFalse(vm.providersUpdatingAll)
++        assertEquals("fresh", vm.providers.single().updatedAt)
++        assertEquals(true, vm.providerTasks["P"]?.ok)
++        assertEquals(false, vm.providerTasks["P"]?.running)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt
+new file mode 100644
+index 0000000..fc6ac21
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt
+@@ -0,0 +1,317 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.IOException
++import java.net.ServerSocket
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicBoolean
++import java.util.concurrent.atomic.AtomicReference
++
++/** Real repository HTTP requests: Root probes enter the local core, and waves retain partial success. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class ProxyDashboardProbeSafetyTest {
++    private val context: Context = ApplicationProvider.getApplicationContext()
++    private val prefs get() = context.getSharedPreferences("hetu", 0)
++    private val names = listOf("Baidu", "Cloudflare", "Google")
++    private val testUrl = "https://www.gstatic.com/generate_204"
++
++    @Before fun resetPreferences() {
++        prefs.edit().clear().commit()
++    }
++
++    private fun targets(vararg urls: String) {
++        ProxyLatencyTargets.save(prefs, names.mapIndexed { index, name ->
++            ProxyLatencyTarget(name, urls.getOrElse(index) { urls.first() })
++        })
++    }
++
++    private fun rootProxy(port: Int) {
++        prefs.edit().putBoolean("proxyRootRuntimeRunning", true).putBoolean("proxyRootWanted", true)
++            .putInt("proxyControllerPort", port - MihomoStartupConfig.EGRESS_PROBE_PORT_OFFSET).commit()
++    }
++
++    @Test fun runningRootUsesLocalPolicyListenerEvenWithAnUnrelatedCustomController() = runBlocking {
++        MockWebServer().use { proxy -> MockWebServer().use { customApi ->
++            proxy.start(); customApi.start()
++            rootProxy(proxy.port)
++            prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++                .putInt("proxyCustomApiPort", customApi.port).commit()
++            // The application must not resolve this name itself or send a controller request.
++            targets("http://latency.invalid/baidu", "http://latency.invalid/cloudflare", "http://latency.invalid/google")
++            repeat(3) { proxy.enqueue(MockResponse().setResponseCode(204)) }
++
++            val measured = ProxyDashboardRepository(context).siteLatencies()
++            assertEquals(names.toSet(), measured.keys)
++            assertTrue(measured.values.all { it > 0L })
++            assertEquals(3, proxy.requestCount)
++            assertEquals(0, customApi.requestCount)
++            val paths = (1..3).map { proxy.takeRequest(2, TimeUnit.SECONDS)!!.requestLine }
++            assertEquals(setOf(
++                "GET http://latency.invalid/baidu HTTP/1.1",
++                "GET http://latency.invalid/cloudflare HTTP/1.1",
++                "GET http://latency.invalid/google HTTP/1.1",
++            ), paths.toSet())
++        } }
++    }
++
++    @Test fun stoppedRootKeepsPhysicalDirectMeasurementDespiteAnOldRunningFlag() = runBlocking {
++        MockWebServer().use { origin -> MockWebServer().use { proxy ->
++            origin.start(); proxy.start()
++            rootProxy(proxy.port)
++            prefs.edit().putBoolean("proxyRootWanted", false).commit()
++            targets(origin.url("/physical").toString())
++            repeat(3) { origin.enqueue(MockResponse().setResponseCode(204)) }
++
++            assertTrue(ProxyDashboardRepository(context).siteLatencies().values.all { it > 0L })
++            assertEquals(3, origin.requestCount)
++            assertEquals(0, proxy.requestCount)
++            assertEquals("GET /physical HTTP/1.1", origin.takeRequest(2, TimeUnit.SECONDS)!!.requestLine)
++        } }
++    }
++
++    @Test fun anUnavailableRunningListenerNeverFallsBackToPhysicalDirect() = runBlocking {
++        MockWebServer().use { origin ->
++            origin.start()
++            val unavailablePort = ServerSocket(0).use { it.localPort }
++            rootProxy(unavailablePort)
++            targets(origin.url("/must-not-connect-direct").toString())
++            origin.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest) = MockResponse().setResponseCode(204)
++            }
++
++            assertEquals(names.associateWith { -1L }, ProxyDashboardRepository(context).siteLatencies())
++            assertEquals(0, origin.requestCount)
++        }
++    }
++
++    @Test fun authenticationAccessAndProxyErrorsAreNotSuccessfulWebsiteLatency() = runBlocking {
++        MockWebServer().use { proxy ->
++            proxy.start(); rootProxy(proxy.port)
++            targets("http://latency.invalid/401", "http://latency.invalid/403", "http://latency.invalid/407")
++            proxy.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    val code = request.requestLine.substringBefore(" HTTP/").substringAfterLast('/').toInt()
++                    return MockResponse().setResponseCode(code)
++                }
++            }
++
++            assertEquals(names.associateWith { -1L }, ProxyDashboardRepository(context).siteLatencies())
++            assertEquals(3, proxy.requestCount)
++        }
++    }
++
++    @Test fun ordinaryRedirectsRemainOnTheExplicitPolicyProxy() = runBlocking {
++        MockWebServer().use { proxy ->
++            proxy.start(); rootProxy(proxy.port)
++            targets("http://latency.invalid/redirect")
++            proxy.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse =
++                    if (request.requestLine.contains("/redirect ")) MockResponse().setResponseCode(302)
++                        .setHeader("Location", "http://redirect.invalid/final")
++                    else MockResponse().setResponseCode(204)
++            }
++
++            assertTrue(ProxyDashboardRepository(context).siteLatencies().values.all { it > 0L })
++            assertEquals(6, proxy.requestCount)
++            val lines = (1..6).map { proxy.takeRequest(2, TimeUnit.SECONDS)!!.requestLine }
++            assertEquals(3, lines.count { it == "GET http://redirect.invalid/final HTTP/1.1" })
++            assertEquals(3, lines.count { it == "GET http://latency.invalid/redirect HTTP/1.1" })
++        }
++    }
++
++    @Test fun cancellingEnteredWebsiteRequestsCannotPublishCompletedLatencies() = runBlocking {
++        MockWebServer().use { proxy ->
++            proxy.start(); rootProxy(proxy.port)
++            targets("http://latency.invalid/held")
++            val entered = CountDownLatch(3)
++            val release = CountDownLatch(1)
++            proxy.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    entered.countDown()
++                    check(release.await(6, TimeUnit.SECONDS)) { "Website fixture was not released" }
++                    return MockResponse().setResponseCode(204)
++                }
++            }
++            val published = AtomicBoolean(false)
++            val completion = AtomicReference<Throwable?>()
++            val job = launch(Dispatchers.Default) {
++                ProxyDashboardRepository(context).siteLatencies()
++                published.set(true)
++            }
++            job.invokeOnCompletion { completion.set(it) }
++            try {
++                assertTrue(entered.await(3, TimeUnit.SECONDS))
++                job.cancel()
++            } finally {
++                release.countDown()
++            }
++            job.join()
++            assertFalse(published.get())
++            assertTrue(job.isCancelled)
++            assertTrue(completion.get() is CancellationException)
++        }
++    }
++
++    private fun controller(server: MockWebServer, nodes: List<String>, selected: List<String> = nodes) {
++        server.start()
++        prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).commit()
++        val proxies = JSONObject()
++        nodes.forEach { name -> proxies.put(name, JSONObject().put("name", name).put("type", "Shadowsocks")) }
++        selected.forEachIndexed { index, name -> proxies.put("Group $index", JSONObject()
++            .put("name", "Group $index").put("type", "Selector").put("all", JSONArray(nodes))
++            .put("now", name).put("testUrl", testUrl)) }
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse = when (request.requestUrl!!.encodedPath) {
++                "/proxies" -> MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
++                "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                "/proxies/bad-auth/delay" -> MockResponse().setResponseCode(401)
++                "/proxies/core-timeout/delay" -> MockResponse().setResponseCode(504)
++                "/proxies/core-failure/delay" -> MockResponse().setResponseCode(503)
++                else -> MockResponse().setBody("{\"delay\":74}")
++            }
++        }
++    }
++
++    @Test fun globalWaveKeepsSuccessfulSiblingsLaterChunksAndOnlyConfirmedFailures() = runBlocking {
++        MockWebServer().use { server ->
++            val nodes = listOf("bad-auth", "healthy-a", "core-timeout", "core-failure", "healthy-b", "healthy-c", "healthy-d", "healthy-e")
++            controller(server, nodes)
++            val result = ProxyDashboardRepository(context).globalDelay()
++            val expected = nodes.filterNot { it == "bad-auth" }.associateWith {
++                when (it) { "core-timeout" -> -1L; "core-failure" -> -2L; else -> 74L }
++            }
++            assertEquals(expected, result)
++            // Applying returned measurements retains the old value for an API error.
++            val old = mutableMapOf("bad-auth" to 99L)
++            old.putAll(result)
++            assertEquals(99L, old["bad-auth"])
++            assertEquals(10, server.requestCount) // Two snapshots, every distinct leaf once.
++        }
++    }
++
++    @Test fun quickWaveRetainsSuccessWhenAnotherSelectedNodeHasAnApiError() = runBlocking {
++        MockWebServer().use { server ->
++            controller(server, listOf("bad-auth", "healthy"), listOf("bad-auth", "healthy", "healthy"))
++            assertEquals(mapOf("healthy" to 74L), ProxyDashboardRepository(context).quickDelay())
++            assertEquals(4, server.requestCount) // Repeated selections are probed once.
++        }
++    }
++
++    private fun selectApi(server: MockWebServer) {
++        prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).commit()
++    }
++
++    private fun switchingApi(server: MockWebServer, current: () -> Pair<String, Long>,
++        entered: CountDownLatch? = null, release: CountDownLatch? = null) {
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                val (leaf, measured) = current()
++                return when (request.requestUrl!!.encodedPath) {
++                    "/proxies" -> {
++                        entered?.countDown()
++                        if (release != null) check(release.await(6, TimeUnit.SECONDS)) { "Snapshot fixture was not released" }
++                        val group = JSONObject().put("name", "Route").put("type", "Selector")
++                            .put("all", JSONArray(listOf(leaf))).put("now", leaf).put("testUrl", testUrl)
++                        val proxies = JSONObject().put("Route", group).put(leaf,
++                            JSONObject().put("name", leaf).put("type", "Shadowsocks"))
++                        MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
++                    }
++                    "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                    "/proxies/$leaf/delay" -> MockResponse().setBody("{\"delay\":$measured}")
++                    else -> MockResponse().setResponseCode(404)
++                }
++            }
++        }
++        server.start()
++    }
++
++    @Test fun changingApiCoreConfigurationAndRuntimeCannotReusePreviousProbeMetadata() = runBlocking {
++        MockWebServer().use { first -> MockWebServer().use { second ->
++            val current = AtomicReference("B" to 74L)
++            switchingApi(first, { "A" to 65L })
++            switchingApi(second, { current.get() })
++            val repository = ProxyDashboardRepository(context)
++
++            selectApi(first)
++            assertEquals(65L, repository.delay("Route"))
++            selectApi(second)
++            assertEquals(74L, repository.delay("Route"))
++            // The same API can serve a new config/core/runtime with different leaves.
++            current.set("C" to 75L)
++            prefs.edit().putString("proxySelectedConfig.mihomo", "changed.yaml").commit()
++            assertEquals(75L, repository.delay("Route"))
++            current.set("D" to 76L)
++            prefs.edit().putString("proxyBaseCore", "mihomo-smart").commit()
++            assertEquals(76L, repository.delay("Route"))
++            current.set("E" to 77L)
++            prefs.edit().putString("proxyNetworkSessionId", "replacement-runtime").commit()
++            assertEquals(77L, repository.delay("Route"))
++            assertEquals(77L, repository.delay("Route")) // An unchanged identity still reuses metadata.
++
++            assertEquals(3, first.requestCount)
++            assertEquals(13, second.requestCount) // Four new snapshots and five measurements.
++            val secondPaths = (1..13).map { second.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
++            assertFalse(secondPaths.contains("/proxies/A/delay"))
++            assertEquals(4, secondPaths.count { it == "/proxies" })
++            assertEquals(4, secondPaths.count { it == "/providers/proxies" })
++        } }
++    }
++
++    @Test fun anOldSnapshotLoadIsRejectedBeforeItCanPolluteTheNewApiCache() = runBlocking {
++        MockWebServer().use { first -> MockWebServer().use { second ->
++            val entered = CountDownLatch(1)
++            val release = CountDownLatch(1)
++            switchingApi(first, { "A" to 65L }, entered, release)
++            switchingApi(second, { "B" to 74L })
++            selectApi(first)
++            val repository = ProxyDashboardRepository(context)
++            val published = AtomicBoolean(false)
++            val failure = AtomicReference<Throwable?>()
++            val old = launch(Dispatchers.Default) {
++                try {
++                    repository.delay("Route")
++                    published.set(true)
++                } catch (error: IOException) { failure.set(error) }
++            }
++            try {
++                assertTrue(entered.await(3, TimeUnit.SECONDS))
++                selectApi(second)
++            } finally {
++                release.countDown()
++            }
++            old.join()
++            assertFalse(published.get())
++            assertTrue(failure.get() is IOException)
++            assertEquals("代理或控制接口已变化，请重新测速", failure.get()!!.message)
++
++            assertEquals(74L, repository.delay("Route"))
++            assertEquals(74L, repository.delay("Route"))
++            assertEquals(1, first.requestCount) // Do not fetch another segment of an obsolete snapshot.
++            assertEquals(4, second.requestCount) // One B snapshot, then two B measurements.
++            val secondPaths = (1..4).map { second.takeRequest(2, TimeUnit.SECONDS)!!.requestUrl!!.encodedPath }
++            assertEquals(listOf("/proxies", "/providers/proxies", "/proxies/B/delay", "/proxies/B/delay"), secondPaths)
++        } }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java
+new file mode 100644
+index 0000000..69b03fc
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java
+@@ -0,0 +1,97 @@
++package io.github.xgl34222220.hetu;
++
++import android.app.Application;
++import androidx.test.core.app.ApplicationProvider;
++import java.io.ByteArrayInputStream;
++import java.io.IOException;
++import java.nio.charset.StandardCharsets;
++import java.util.*;
++import org.junit.Before;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.annotation.Config;
++import org.yaml.snakeyaml.nodes.*;
++import static org.junit.Assert.*;
++
++/** Import and mutate synthetic source files through the real library, then compose their saved bytes. */
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk={35},application=Application.class)
++public class ProxySubscriptionIntegrityTest {
++    private ProxyConfigLibrary library;
++    private static final ProxyRuntimeProfile.Core CORE=ProxyRuntimeProfile.Core.MIHOMO;
++    private static final String RULES="rules:\n  - DOMAIN,first.example,DIRECT # first remains first\n  - MATCH,DIRECT\n";
++    @Before public void createLibrary(){Application app=ApplicationProvider.getApplicationContext();library=new ProxyConfigLibrary(app);}
++    private ProxyConfigLibrary.Entry imported(String source)throws Exception{return library.importConfig(CORE,"subscription-integrity.yaml",new ByteArrayInputStream(source.getBytes(StandardCharsets.UTF_8)));}
++    private static Node value(Node node,String key){return RuntimeYaml15.inherited(node,key);}
++    private static String text(Node node){return ((ScalarNode)node).getValue();}
++    private static List<String> items(Node node){List<String> result=new ArrayList<>();for(Node item:((SequenceNode)node).getValue())result.add(text(item));return result;}
++    private Node saved(ProxyConfigLibrary.Entry entry)throws Exception{return RuntimeYaml15.compose(library.read(entry));}
++    private static Node group(Node root,int index){return ((SequenceNode)value(root,"proxy-groups")).getValue().get(index);}
++    private static String providers(){return "proxy-providers:\n  alpha:\n    type: http\n    url: 'https://alpha.example/sub'\n  beta:\n    type: http\n    url: 'https://beta.example/sub'\n";}
++    private interface Change {void run()throws Exception;}
++    private void unchanged(ProxyConfigLibrary.Entry entry,Change change)throws Exception{byte[] before=java.nio.file.Files.readAllBytes(entry.file.toPath());try{change.run();fail("unsafe subscription mutation succeeded");}catch(IOException expected){assertFalse(expected.getMessage().isEmpty());}assertArrayEquals(before,java.nio.file.Files.readAllBytes(entry.file.toPath()));}
++
++    @Test public void addWithoutTemplateWritesHttpAndUpdatesBothGroupListStyles()throws Exception{
++        for(String prefix:Arrays.asList(providers(),providers().replace("proxy-providers:\n","proxy-providers: &providers\n"))){
++        String source=prefix+"proxy-groups:\n  - name: Flow\n    type: select\n    use: [alpha, beta] # flow comment\n  - name: Block\n    type: select\n    use:\n      - alpha # existing item\n      - beta\n"+RULES;
++        ProxyConfigLibrary.Entry entry=imported(source);library.addSubscription(entry,"new provider","https://new.example/sub?x=1#part");Node root=saved(entry),added=value(value(root,"proxy-providers"),"new provider");
++        assertEquals("http",text(value(added,"type")));assertEquals("3600",text(value(added,"interval")));assertEquals("https://new.example/sub?x=1#part",text(value(added,"url")));
++        assertEquals(Arrays.asList("alpha","beta","new provider"),items(value(group(root,0),"use")));assertEquals(items(value(group(root,0),"use")),items(value(group(root,1),"use")));
++        assertFalse(library.read(entry).contains("*BaseProvider"));assertTrue(library.read(entry).endsWith(RULES));assertTrue(library.read(entry).contains("# flow comment"));assertTrue(library.read(entry).contains("# existing item"));
++        assertTrue(library.read(entry).startsWith(prefix));
++        }
++    }
++    @Test public void addWithRealHttpTemplateKeepsHeadersHealthCheckAndIntervalInheritance()throws Exception{
++        String base="base: &BaseProvider\n  type: http\n  interval: 7200\n  header:\n    User-Agent: ['original-agent']\n  health-check: {enable: true, url: 'https://health.example/204', interval: 123}\n";
++        ProxyConfigLibrary.Entry entry=imported(base+providers()+"proxy-groups: [{name: G, type: select, use: [alpha]}]\n"+RULES);library.addSubscription(entry,"extra","https://extra.example/sub");Node root=saved(entry),template=value(root,"base"),added=value(value(root,"proxy-providers"),"extra");
++        assertSame(template,value(added,"<<"));assertSame(value(template,"header"),value(added,"header"));assertSame(value(template,"health-check"),value(added,"health-check"));assertEquals("7200",text(value(added,"interval")));assertTrue(library.read(entry).startsWith(base));assertTrue(library.read(entry).endsWith(RULES));
++    }
++    @Test public void deleteRemovesAllFlowAndBlockReferencesAndRetainsOtherUse()throws Exception{
++        String unrelated="rule-providers:\n  alpha: {type: http, behavior: classical, url: 'https://rules.example/list'}\ncustom:\n  use: [alpha, beta] # not a proxy group\n";
++        String source=providers()+"# provider separator stays\nproxy-groups:\n  - {name: Flow, type: select, use: [alpha, beta, alpha]} # group comment\n  - name: Block\n    type: select\n    use:\n      - alpha # item comment stays\n      # between items stays\n      - beta\n"+unrelated+RULES;
++        ProxyConfigLibrary.Entry entry=imported(source);library.deleteSubscription(entry,"alpha");Node root=saved(entry);
++        assertNull(value(value(root,"proxy-providers"),"alpha"));assertEquals(Collections.singletonList("beta"),items(value(group(root,0),"use")));assertEquals(Collections.singletonList("beta"),items(value(group(root,1),"use")));
++        String result=library.read(entry);assertTrue(result.contains(unrelated));assertTrue(result.contains("# provider separator stays\n"));assertTrue(result.contains("# item comment stays"));assertTrue(result.contains("# between items stays"));assertTrue(result.endsWith(RULES));
++    }
++    @Test public void deletingOnlyUseValueKeepsAnEmptySequenceInBothStyles()throws Exception{
++        ProxyConfigLibrary.Entry entry=imported(providers()+"proxy-groups:\n  - {name: Flow, type: select, use: [alpha, alpha,]}\n  - name: Block\n    type: select\n    use:\n      - alpha # preserve this\n      - alpha\n"+RULES);library.deleteSubscription(entry,"alpha");Node root=saved(entry);
++        assertTrue(items(value(group(root,0),"use")).isEmpty());assertTrue(items(value(group(root,1),"use")).isEmpty());assertTrue(library.read(entry).contains("# preserve this"));
++    }
++    @Test public void quotedCommaHashAndEscapedProviderNamesAreNotSplitOrUnquotedIncorrectly()throws Exception{
++        String source="proxy-providers:\n  'O''Brien, #East': # header comment\n    type: http\n    url: 'https://east.example/sub#fragment'\n  \"back\\\\slash\": {type: http, url: \"https://west.example/sub\"}\nproxy-groups:\n  - {name: G, type: select, use: ['O''Brien, #East', \"back\\\\slash\"]}\n"+RULES;
++        ProxyConfigLibrary.Entry entry=imported(source);List<ProxyConfigLibrary.Subscription> subs=library.subscriptions(entry);assertEquals(2,subs.size());assertEquals("O'Brien, #East",subs.get(0).name);assertEquals("back\\slash",subs.get(1).name);assertEquals("https://east.example/sub#fragment",subs.get(0).url);
++        library.deleteSubscription(entry,"O'Brien, #East");Node root=saved(entry);assertEquals(Collections.singletonList("back\\slash"),items(value(group(root,0),"use")));assertTrue(library.read(entry).endsWith(RULES));
++    }
++    @Test public void addingQuotedNameRetainsOriginalCrLfEmojiAndUnrelatedSourceBytes()throws Exception{
++        String prefix="# \uD83D\uDE00 untouched\r\nmode: rule\r\n";String tail=("custom: {use: [alpha]} # unrelated\n"+RULES).replace("\n","\r\n");String source=prefix+(providers()+"proxy-groups: [{name: G, type: select, use: [alpha,]}]\n").replace("\n","\r\n")+tail;
++        ProxyConfigLibrary.Entry entry=imported(source);library.addSubscription(entry,"O'Brien, #new","https://new.example/sub?a='b'");Node root=saved(entry);assertEquals(Arrays.asList("alpha","O'Brien, #new"),items(value(group(root,0),"use")));
++        String result=library.read(entry);assertTrue(result.startsWith(prefix));assertTrue(result.endsWith(tail));assertFalse(result.replace("\r\n","").contains("\n"));assertEquals("https://new.example/sub?a='b'",text(value(value(value(root,"proxy-providers"),"O'Brien, #new"),"url")));
++    }
++    @Test public void flowUseCommentsAndTrailingCommasSurviveDeletion()throws Exception{
++        String groups="proxy-groups:\n  - name: G\n    type: select\n    use: [alpha, # first comment\n          beta, # survivor comment\n          alpha,] # after list\n";
++        ProxyConfigLibrary.Entry entry=imported(providers()+groups+RULES);library.deleteSubscription(entry,"alpha");Node root=saved(entry);assertEquals(Collections.singletonList("beta"),items(value(group(root,0),"use")));String result=library.read(entry);for(String comment:Arrays.asList("# first comment","# survivor comment","# after list"))assertTrue(result.contains(comment));
++    }
++    @Test public void sharedOrInheritedGroupUsesFailWithoutChangingAnySourceBytes()throws Exception{
++        for(String groups:Arrays.asList("shared: &shared [alpha, beta]\nproxy-groups: [{name: G, type: select, use: *shared}]\n","template: &G {type: select, use: [alpha, beta]}\nproxy-groups: [{name: G, <<: *G}]\n")){
++            ProxyConfigLibrary.Entry entry=imported(providers()+groups+RULES);unchanged(entry,()->library.deleteSubscription(entry,"alpha"));unchanged(entry,()->library.addSubscription(entry,"new","https://new.example/sub"));
++        }
++    }
++    @Test public void deletingAnAnchorStillUsedElsewhereFailsAndKeepsOriginalFile()throws Exception{
++        String source="proxy-providers:\n  alpha: &A {type: http, url: 'https://alpha.example/sub'}\n  beta: {type: http, url: 'https://beta.example/sub'}\ncustom: *A\nproxy-groups: [{name: G, type: select, use: [alpha, beta]}]\n"+RULES;
++        ProxyConfigLibrary.Entry entry=imported(source);unchanged(entry,()->library.deleteSubscription(entry,"alpha"));
++    }
++    @Test public void unsupportedContainersInvalidTemplatesAndDuplicateFieldsKeepOriginalFiles()throws Exception{
++        for(String source:Arrays.asList("proxy-providers: {alpha: {type: http, url: 'https://alpha.example/sub'}, beta: {type: http, url: 'https://beta.example/sub'}}\n"+RULES,"base: &BaseProvider {type: file, path: ./existing.yaml}\n"+providers()+RULES,providers()+"mode: rule\nmode: direct\n"+RULES,providers()+"broken: [}\n")){
++            ProxyConfigLibrary.Entry entry=imported(source);unchanged(entry,()->library.addSubscription(entry,"new","https://new.example/sub"));
++        }
++    }
++    @Test public void updatingAQuotedFlowUrlPreservesCommentsAndRejectsProviderAliases()throws Exception{
++        String source="proxy-providers:\n  'quoted provider': {type: http, url: 'https://old.example/sub#part'} # comment survives\n  beta: {type: http, url: 'https://beta.example/sub'}\n"+RULES;
++        ProxyConfigLibrary.Entry entry=imported(source);library.updateSubscription(entry,"quoted provider","https://new.example/sub?x='value'#part");String expected=source.replace("'https://old.example/sub#part'","'https://new.example/sub?x=''value''#part'");assertEquals(expected,library.read(entry));saved(entry);
++        ProxyConfigLibrary.Entry aliases=imported("proxy-providers:\n  alpha: &A {type: http, url: 'https://alpha.example/sub'}\n  beta: *A\n"+RULES);unchanged(aliases,()->library.updateSubscription(aliases,"beta","https://new.example/sub"));unchanged(aliases,()->library.updateSubscription(aliases,"alpha","https://new.example/sub"));
++    }
++    @Test public void aLastSubscriptionCannotBeDeletedAndNewCachePathsDoNotCollide()throws Exception{
++        ProxyConfigLibrary.Entry entry=imported("proxy-providers:\n  'a/b': {type: http, url: 'https://alpha.example/sub', path: './proxy_provider/a_b.yaml'}\n"+RULES);unchanged(entry,()->library.deleteSubscription(entry,"a/b"));library.addSubscription(entry,"a_b","https://new.example/sub");Node providers=value(saved(entry),"proxy-providers");assertNotEquals(text(value(value(providers,"a/b"),"path")),text(value(value(providers,"a_b"),"path")));assertTrue(library.read(entry).endsWith(RULES));
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java
+new file mode 100644
+index 0000000..d9c58ed
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java
+@@ -0,0 +1,244 @@
++package io.github.xgl34222220.hetu;
++
++import static org.junit.Assert.*;
++import java.io.IOException;
++import java.io.PrintWriter;
++import java.io.StringWriter;
++import java.math.BigInteger;
++import java.nio.charset.StandardCharsets;
++import java.util.Arrays;
++import org.junit.Test;
++import org.yaml.snakeyaml.nodes.Node;
++import org.yaml.snakeyaml.nodes.ScalarNode;
++
++/** Original numeric-only fixtures: no subscription, credentials, network or Root operations. */
++public class RootFakeIpRangesTest {
++    private static final String ACTIVE = "dns:\n  enable: true\n  enhanced-mode: fake-ip\n";
++    private static final String DUAL = ACTIVE + "  ipv6: true\n  fake-ip-range6: fdfe:dcba:9876::1/64\n";
++
++    private static ProxyRuntimeProfile profile(ProxyRuntimeProfile.Mode mode, ProxyRuntimeProfile.Ipv6 ipv6) {
++        return new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO, mode, ipv6,
++                ProxyRuntimeProfile.AppScope.BLACKLIST, ProxyRuntimeProfile.DnsHijack.TPROXY,
++                true, true, true, false, false);
++    }
++
++    private static RootFakeIpRanges parse(String yaml) throws IOException {
++        return RootFakeIpRanges.parse(yaml, profile(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.Ipv6.ENABLE));
++    }
++
++    private static void empty(RootFakeIpRanges ranges) {
++        assertEquals("", ranges.ipv4);
++        assertEquals("", ranges.ipv6);
++    }
++
++    private static IOException rejected(String yaml) {
++        try { parse(yaml); fail("invalid active Fake-IP input accepted"); return null; }
++        catch (IOException expected) { return expected; }
++    }
++
++    @Test public void officialDefaultsAndExplicitEmptyRangesAreDistinct() throws Exception {
++        RootFakeIpRanges defaults = parse(ACTIVE);
++        assertEquals("198.18.0.1/16", defaults.ipv4);
++        assertEquals("", defaults.ipv6);
++        assertEquals("198.18.0.1/16", parse(ACTIVE + "  fake-ip-range: null\n").ipv4);
++        assertEquals("", parse(ACTIVE + "  fake-ip-range: ''\n").ipv4);
++        assertEquals("", parse(ACTIVE + "  ipv6: true\n").ipv6);
++        assertEquals("", parse(ACTIVE + "  ipv6: true\n  fake-ip-range6: null\n").ipv6);
++    }
++
++    @Test public void mergePriorityAliasesAndExplicitFieldsUseTheReadOnlyNodeGraph() throws Exception {
++        String source = "# retained comment\r\nfirst: &first {enable: true, enhanced-mode: fake-ip, fake-ip-range: 10.9.0.1/16}\r\n"
++                + "second: &second {enable: false, fake-ip-range: 172.16.0.1/12}\r\n"
++                + "shared6: &shared6 fdfe:dcba:9876::1/64\r\n"
++                + "base: &base {ipv6: true, dns: {<<: [*first, *second], ipv6: true, fake-ip-range6: *shared6}}\r\n"
++                + "<<: *base\r\nsecret: '<synthetic-private-value>'\r\n";
++        byte[] before = source.getBytes(StandardCharsets.UTF_8);
++        RootFakeIpRanges merged = parse(source);
++        assertEquals("10.9.0.1/16", merged.ipv4);
++        assertEquals("fdfe:dcba:9876::1/64", merged.ipv6);
++        assertArrayEquals(before, source.getBytes(StandardCharsets.UTF_8));
++        assertEquals("192.168.2.1/24", parse("a: &a {enable: true, enhanced-mode: fake-ip, fake-ip-range: 10.0.0.1/8}\n"
++                + "dns: {<<: *a, fake-ip-range: 192.168.2.1/24}\n").ipv4);
++        empty(parse("a: &a {enable: true, enhanced-mode: fake-ip}\ndns: {<<: *a, enable: false}\n"));
++        assertEquals("198.18.0.1/16", parse("dns: &recursive {<<: *recursive, enable: true, enhanced-mode: fake-ip}\n").ipv4);
++    }
++
++    @Test public void disabledDnsMissingEnableAndOtherEnhancedModesReturnNoProtection() throws Exception {
++        for (String yaml : Arrays.asList("rules: [MATCH,DIRECT]\n", "dns: null\n",
++                "dns: {enhanced-mode: fake-ip}\n", "dns: {enable: false, enhanced-mode: fake-ip}\n",
++                "dns: {enable: true}\n", "dns: {enable: true, enhanced-mode: redir-host}\n")) {
++            empty(parse(yaml));
++        }
++        String upperYaml = "dns: {enable: true, enhanced-mode: FAKE-IP, fake-ip-range: 10.8.0.42/16}\n";
++        RootFakeIpRanges upper = parse(upperYaml);
++        RootFakeIpRanges lower = parse(upperYaml.replace("FAKE-IP", "fake-ip"));
++        assertEquals(lower.ipv4, upper.ipv4);
++        assertEquals(lower.ipv4BypassCidrs, upper.ipv4BypassCidrs);
++        String startup = upper.privateStartup(upperYaml);
++        assertTrue(startup.startsWith(upperYaml));
++        assertTrue(startup.contains("# HETU_FAKE_IP_V4=10.8.0.42/16\n"));
++        assertTrue(startup.contains("# HETU_LAN_RETURN_V4=" + lower.ipv4BypassCidrs + "\n"));
++        empty(parse("dns: {enable: true, enhanced-mode: ' fake-ip '}\n"));
++    }
++
++    @Test public void allUnsupportedModesAndOtherCoresAvoidParsingUnrelatedConfigs() throws Exception {
++        for (ProxyRuntimeProfile.Mode mode : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TUN,
++                ProxyRuntimeProfile.Mode.EBPF, ProxyRuntimeProfile.Mode.MIXED}) {
++            empty(RootFakeIpRanges.parse("not valid YAML [", profile(mode, ProxyRuntimeProfile.Ipv6.ENABLE)));
++        }
++        ProxyRuntimeProfile singBox = new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.SING_BOX,
++                ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.Ipv6.ENABLE,
++                ProxyRuntimeProfile.AppScope.BLACKLIST, ProxyRuntimeProfile.DnsHijack.OFF,
++                false, true, true, false, false);
++        empty(RootFakeIpRanges.parse("{not: JSON/config}", singBox));
++        for (ProxyRuntimeProfile.Mode mode : new ProxyRuntimeProfile.Mode[]{ProxyRuntimeProfile.Mode.TPROXY,
++                ProxyRuntimeProfile.Mode.REDIRECT, ProxyRuntimeProfile.Mode.ENHANCE}) {
++            assertEquals("198.18.0.1/16", RootFakeIpRanges.parse(ACTIVE, profile(mode, ProxyRuntimeProfile.Ipv6.ENABLE)).ipv4);
++        }
++        ProxyRuntimeProfile smart = new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO_SMART,
++                ProxyRuntimeProfile.Mode.ENHANCE, ProxyRuntimeProfile.Ipv6.ENABLE,
++                ProxyRuntimeProfile.AppScope.CORE, ProxyRuntimeProfile.DnsHijack.REDIRECT,
++                true, true, true, false, false);
++        assertEquals("fdfe:dcba:9876::1/64", RootFakeIpRanges.parse(DUAL, smart).ipv6);
++    }
++
++    @Test public void globalDnsAndProfileIpv6FlagsControlOnlyTheIpv6Protection() throws Exception {
++        assertEquals("fdfe:dcba:9876::1/64", parse(DUAL).ipv6); // global IPv6 defaults true
++        for (ProxyRuntimeProfile.Ipv6 guard : new ProxyRuntimeProfile.Ipv6[]{ProxyRuntimeProfile.Ipv6.BYPASS,
++                ProxyRuntimeProfile.Ipv6.STRICT, ProxyRuntimeProfile.Ipv6.DISABLE}) {
++            RootFakeIpRanges actual = RootFakeIpRanges.parse(DUAL, profile(ProxyRuntimeProfile.Mode.TPROXY, guard));
++            assertEquals("198.18.0.1/16", actual.ipv4);
++            assertEquals("", actual.ipv6);
++        }
++        assertEquals("", parse("ipv6: false\n" + DUAL).ipv6);
++        assertEquals("", parse(ACTIVE + "  fake-ip-range6: fdfe:dcba:9876::1/64\n").ipv6); // DNS IPv6 defaults false
++        assertEquals("", parse(ACTIVE + "  ipv6: false\n  fake-ip-range6: fdfe:dcba:9876::1/64\n").ipv6);
++        assertEquals("fdfe:dcba:9876::1/64", parse("ipv6: null\n" + DUAL).ipv6);
++    }
++
++    @Test public void numericCidrBoundariesAndIpv4EmbeddedIpv6AreAccepted() throws Exception {
++        assertEquals("0.0.0.0/0", parse(ACTIVE + "  fake-ip-range: 0.0.0.0/0\n").ipv4);
++        assertEquals("255.255.255.255/32", parse(ACTIVE + "  fake-ip-range: 255.255.255.255/32\n").ipv4);
++        for (String address : Arrays.asList("::/0", "ffff:ffff:ffff:ffff:ffff:ffff:ffff:ffff/128",
++                "2001:db8:0:0:1:2:3:4/64", "FD00::1/64")) {
++            assertEquals(address.toLowerCase(java.util.Locale.ROOT), parse(ACTIVE
++                    + "  ipv6: true\n  fake-ip-range6: '" + address + "'\n").ipv6);
++        }
++        String embedded = ACTIVE + "  ipv6: true\n  fake-ip-range6: ::ffff:192.0.2.1/128\n";
++        RootFakeIpRanges mapped = parse(embedded);
++        assertEquals("::ffff:c000:201/128", mapped.ipv6);
++        String startup = mapped.privateStartup(embedded);
++        assertTrue(startup.contains("  fake-ip-range6: ::ffff:192.0.2.1/128\n"));
++        assertTrue(startup.contains("# HETU_FAKE_IP_V6=::ffff:c000:201/128\n"));
++        assertEquals("::ffff:0:0/96", parse(ACTIVE
++                + "  ipv6: true\n  fake-ip-range6: ::ffff:192.0.2.1/96\n").ipv6);
++    }
++
++    @Test public void invalidIpv4AddressesPrefixesAndShellTokensAreRejectedWithoutLookup() {
++        for (String address : Arrays.asList("999.1.1.1/24", "256.0.0.1/8", "01.2.3.4/24", "127.1/8",
++                "localhost/8", "192.0.2.1/33", "192.0.2.1/-1", "192.0.2.1/+8", "192.0.2.1/8/9",
++                "192.0.2.1/24;echo private", " 192.0.2.1/24", "192.0.2.1/24 ", "fd00::/8")) {
++            IOException error = rejected(ACTIVE + "  fake-ip-range: '" + address + "'\n");
++            assertTrue(error.getMessage().contains("[FAKE_IP_CIDR]"));
++            assertFalse(error.getMessage().contains(address));
++            assertNull(error.getCause());
++        }
++    }
++
++    @Test public void invalidIpv6CompressionScopesGroupsAndFamilyAreRejected() {
++        for (String address : Arrays.asList("fd00:::1/64", "fd00::1::2/64", "fd00:1/64", "fd00::gg/64",
++                "fd00::1%wlan0/64", "[fd00::1]/64", "fd00::/129", "fd00::/-1", "fd00::/64;id",
++                "1:2:3:4:5:6:7:8:9/64", "1:2:3:4:5:6:7:8::/64", "::ffff:999.1.1.1/96",
++                "192.0.2.1/24", "::ffff:01.2.3.4/128")) {
++            IOException error = rejected(ACTIVE + "  ipv6: true\n  fake-ip-range6: '" + address + "'\n");
++            assertTrue(error.getMessage().contains("[FAKE_IP_CIDR]"));
++            assertFalse(error.getMessage().contains(address));
++            assertNull(error.getCause());
++        }
++    }
++
++    @Test public void malformedYamlShapesAndBooleansExposeOnlyConstantFailures() {
++        for (String yaml : Arrays.asList("secret: 'SYNTHETIC_PRIVATE'\ndns: [}\n", "dns: [SYNTHETIC_PRIVATE]\n",
++                "dns: {enable: SYNTHETIC_PRIVATE, enhanced-mode: fake-ip}\n",
++                ACTIVE + "  fake-ip-range: [SYNTHETIC_PRIVATE]\n", "ipv6: [SYNTHETIC_PRIVATE]\n" + DUAL)) {
++            IOException error = rejected(yaml);
++            assertTrue(error.getMessage().contains("[FAKE_IP_"));
++            assertFalse(error.getMessage().contains("SYNTHETIC_PRIVATE"));
++            assertNull(error.getCause());
++            StringWriter stack = new StringWriter();
++            error.printStackTrace(new PrintWriter(stack));
++            assertFalse(stack.toString().contains("SYNTHETIC_PRIVATE"));
++        }
++    }
++
++    @Test public void ipv4DefaultBypassSubtractsTheActualMaskedFakeRangeOnly() throws Exception {
++        RootFakeIpRanges baseline = parse(ACTIVE);
++        RootFakeIpRanges ranges = parse(ACTIVE + "  fake-ip-range: 10.8.0.42/16\n");
++        assertEquals("10.8.0.42/16", ranges.ipv4);
++        String replacement = "10.0.0.0/13,10.9.0.0/16,10.10.0.0/15,10.12.0.0/14,"
++                + "10.16.0.0/12,10.32.0.0/11,10.64.0.0/10,10.128.0.0/9";
++        assertEquals(baseline.ipv4BypassCidrs.replace("10.0.0.0/8", replacement), ranges.ipv4BypassCidrs);
++        assertEquals(baseline.ipv6BypassCidrs, ranges.ipv6BypassCidrs);
++        assertFalse(ranges.ipv4BypassCidrs.contains("10.8.0.0/16"));
++        assertEquals(baseline.ipv4BypassCidrs, parse(ACTIVE + "  fake-ip-range: 203.0.113.1/24\n").ipv4BypassCidrs);
++    }
++
++    @Test public void ipv6BypassSubtractionIsFiniteExactAndDoesNotBroadenPrivateRouting() throws Exception {
++        RootFakeIpRanges simple = parse(ACTIVE + "  ipv6: true\n  fake-ip-range6: fc00::1/8\n");
++        assertEquals("::1/128,fd00::/8,fe80::/10,ff00::/8", simple.ipv6BypassCidrs);
++        RootFakeIpRanges narrower = parse(DUAL);
++        assertEquals(60, narrower.ipv6BypassCidrs.split(",").length); // 57 fc00/7 fragments + three untouched
++        BigInteger volume = BigInteger.ZERO;
++        for (String range : narrower.ipv6BypassCidrs.split(",")) {
++            int bits = Integer.parseInt(range.substring(range.indexOf('/') + 1));
++            volume = volume.add(BigInteger.ONE.shiftLeft(128 - bits));
++            assertFalse(range.contains("fdfe:dcba:9876::/64"));
++        }
++        BigInteger privateVolume = BigInteger.ONE.add(BigInteger.ONE.shiftLeft(121))
++                .add(BigInteger.ONE.shiftLeft(118)).add(BigInteger.ONE.shiftLeft(120));
++        assertEquals(privateVolume.subtract(BigInteger.ONE.shiftLeft(64)), volume);
++        assertTrue(narrower.ipv6BypassCidrs.startsWith("::1/128,fc00::/8,"));
++        assertTrue(narrower.ipv6BypassCidrs.endsWith(",fe80::/10,ff00::/8"));
++    }
++
++    @Test public void fullFamilyRangesRemoveAllDefaultsWhileUserBypassesRemainOutsideThisModel() throws Exception {
++        RootFakeIpRanges all = parse(ACTIVE + "  fake-ip-range: 0.0.0.0/0\n"
++                + "  ipv6: true\n  fake-ip-range6: ::/0\n");
++        assertEquals("", all.ipv4BypassCidrs);
++        assertEquals("", all.ipv6BypassCidrs);
++        RootFakeIpRanges baseline = parse(ACTIVE);
++        RootFakeIpRanges userEntries = parse(ACTIVE + "user-bypass-cidrs: [10.8.0.0/16, 203.0.113.0/24]\n");
++        assertEquals(baseline.ipv4BypassCidrs, userEntries.ipv4BypassCidrs);
++        assertEquals(baseline.ipv6BypassCidrs, userEntries.ipv6BypassCidrs);
++        RootFakeIpRanges inactive = parse("dns: {enable: false, enhanced-mode: fake-ip, fake-ip-range: 0.0.0.0/0}\n");
++        assertEquals(baseline.ipv4BypassCidrs, inactive.ipv4BypassCidrs);
++        assertEquals(baseline.ipv6BypassCidrs, inactive.ipv6BypassCidrs);
++    }
++
++    @Test public void privateStartupCleansForgedOwnedCommentsAndAppendsOneSemanticNeutralTail() throws Exception {
++        String body = "# unrelated comment \uD83D\uDE00\r\nsecret: 'synthetic-private-value'\r\n"
++                + "dns: {enable: true, enhanced-mode: fake-ip, fake-ip-range: 10.8.0.42/16}\r\n"
++                + "notes: '# HETU_FAKE_IP_V4=keep-this-value'\r\n"
++                + "literal: |\r\n  # HETU_FAKE_IP_POLICY=keep-this-block-content\r\n"
++                + "  body \uD83D\uDE00\r\nmarker: done\r\n";
++        String forged = "  # HETU_FAKE_IP_POLICY=forged\r\n# HETU_FAKE_IP_V4=0.0.0.0/0\r\n"
++                + body + " # HETU_FAKE_IP_V6=::/0\n# HETU_LAN_RETURN_V4=malformed\n"
++                + "# HETU_LAN_RETURN_V6=forged\n# HETU_FAKE_IP_POLICY=99";
++        byte[] before = forged.getBytes(StandardCharsets.UTF_8);
++        RootFakeIpRanges ranges = parse(forged);
++        String startup = ranges.privateStartup(forged);
++        String tail = "# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4=" + ranges.ipv4
++                + "\n# HETU_FAKE_IP_V6=" + ranges.ipv6 + "\n# HETU_LAN_RETURN_V4="
++                + ranges.ipv4BypassCidrs + "\n# HETU_LAN_RETURN_V6=" + ranges.ipv6BypassCidrs + "\n";
++        assertEquals(body + tail, startup);
++        assertEquals(startup, ranges.privateStartup(startup));
++        assertArrayEquals(before, forged.getBytes(StandardCharsets.UTF_8));
++        Node root = RuntimeYaml15.compose(startup);
++        assertEquals("synthetic-private-value", ((ScalarNode) RuntimeYaml15.inherited(root, "secret")).getValue());
++        assertEquals("# HETU_FAKE_IP_V4=keep-this-value", ((ScalarNode) RuntimeYaml15.inherited(root, "notes")).getValue());
++        assertEquals("# HETU_FAKE_IP_POLICY=keep-this-block-content\nbody \uD83D\uDE00\n",
++                ((ScalarNode) RuntimeYaml15.inherited(root, "literal")).getValue());
++        assertEquals(ranges.ipv4, parse(startup).ipv4);
++        assertFalse(ranges.toString().contains("synthetic-private-value"));
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index 2477f85..7b1ee7a 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -36,7 +36,7 @@ class Runtime146ContractTest {
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+         // V20.74 deploys the corrected snapshot on the next explicit Start/Restart.
+-        assertEquals(151, ProxyRuntimeSettings.RUNTIME_REVISION)
++        assertEquals(152, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))

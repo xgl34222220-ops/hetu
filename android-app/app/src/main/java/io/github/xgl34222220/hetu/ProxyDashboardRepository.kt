@@ -7,6 +7,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -14,7 +15,10 @@ import java.io.IOException
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
+import java.net.InetSocketAddress
+import java.net.Proxy
 import java.net.URL
+import kotlin.coroutines.coroutineContext
 
 internal data class DashboardProviderUi(
     val name: String,
@@ -47,24 +51,81 @@ internal class ProxyDashboardRepository(context: Context) {
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
-    private data class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>)
+    // Keep credentials private and out of generated data-class toString output.
+    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long) {
+        val stable: Boolean get() = runtimeEpoch >= 0L
+        override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
+            settings == other.settings && runtimeEpoch == other.runtimeEpoch
+        override fun hashCode(): Int = 31 * settings.hashCode() + runtimeEpoch.hashCode()
+    }
+    private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
     private val probeSnapshotMutex = Mutex()
     private var cachedProbeSnapshot: ProbeSnapshot? = null
     private var probeSnapshotAt = 0L
+    private val probeIdentityKeys = setOf(
+        "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
+        "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
+        "proxyRootWanted", "proxyRootRuntimeRunning", "proxyRootLastStartupAt",
+        "proxyRootAppliedSettings", "proxyRootAppliedRuntimeRevision", "proxyRootTopologyFingerprint",
+        "proxyAdblockSessionGeneration", "proxyNetworkSessionId",
+    )
+
+    private fun probeIdentity(): ProbeIdentity {
+        val values = app.getSharedPreferences("hetu", 0).all
+        val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
+        val configKey = "proxySelectedConfig.${core.id}"
+        val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
+        settings["proxyBaseCore"] = core.id
+        // The configuration library may lazily persist this same default during a poll.
+        settings[configKey] = (values[configKey] as? String).orEmpty().ifBlank {
+            if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART)
+                ProxyConfigLibrary.BUNDLED_NAME else ""
+        }
+        // Ordinary status/health reads do not change this nonblocking control epoch.
+        return ProbeIdentity(settings, RootProxyManager.observationTicket())
+    }
+
+    private fun requireCurrentProbe(identity: ProbeIdentity) {
+        if (!identity.stable || probeIdentity() != identity)
+            throw IOException("代理或控制接口已变化，请重新测速")
+    }
+
+    private inline fun <T> readCurrentProbe(snapshot: ProbeSnapshot, read: () -> T): T {
+        requireCurrentProbe(snapshot.identity)
+        return try {
+            val measured = read()
+            requireCurrentProbe(snapshot.identity)
+            measured
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) {
+            // A response from a superseded runtime is not a measurement for the new one,
+            // including a core-confirmed failure received after an endpoint switch.
+            requireCurrentProbe(snapshot.identity)
+            throw error
+        }
+    }
 
     private suspend fun probeSnapshot(force: Boolean = false): ProbeSnapshot = probeSnapshotMutex.withLock {
+        val identity = probeIdentity()
+        requireCurrentProbe(identity)
         val now = SystemClock.elapsedRealtime()
         val cached = cachedProbeSnapshot
-        if (!force && cached != null && now - probeSnapshotAt in 0L..1500L) return@withLock cached
+        if (!force && cached != null && cached.identity == identity && now - probeSnapshotAt in 0L..1500L) return@withLock cached
         val raw = api.proxies()
+        coroutineContext.ensureActive()
+        requireCurrentProbe(identity)
         val providerResponse = api.proxyProviders()
-        ProbeSnapshot(mergeProxySnapshots(raw, providerResponse), parseProviders(providerResponse)).also {
+        coroutineContext.ensureActive()
+        requireCurrentProbe(identity)
+        ProbeSnapshot(mergeProxySnapshots(raw, providerResponse), parseProviders(providerResponse), identity).also {
+            requireCurrentProbe(identity)
             cachedProbeSnapshot = it
-            probeSnapshotAt = now
+            probeSnapshotAt = SystemClock.elapsedRealtime()
         }
     }
 
     private fun probe(node: String, snapshot: ProbeSnapshot): Long {
+        requireCurrentProbe(snapshot.identity)
         val leaf = selectedProxyName(snapshot.proxies, node)
         val entry = snapshot.proxies.optJSONObject(leaf) ?: throw IOException("节点已更新，请刷新策略组")
         val provider = snapshot.providers.firstOrNull { it.name == entry.optString("provider-name") }
@@ -77,8 +138,10 @@ internal class ProxyDashboardRepository(context: Context) {
                 }
         val testUrl = provider?.testUrl?.takeIf { it.isNotBlank() } ?: group?.optString("testUrl").orEmpty()
         val expected = provider?.expectedStatus ?: group?.optString("expectedStatus", "200-399") ?: "200-399"
-        return if (provider != null) api.providerDelay(provider.name, leaf, testUrl, expected)
-        else api.delay(leaf, testUrl, expected)
+        return readCurrentProbe(snapshot) {
+            if (provider != null) api.providerDelay(provider.name, leaf, testUrl, expected)
+            else api.delay(leaf, testUrl, expected)
+        }
     }
 
     private fun measuredProbe(node: String, snapshot: ProbeSnapshot): Long = try { probe(node, snapshot) }
@@ -191,8 +254,14 @@ internal class ProxyDashboardRepository(context: Context) {
         val results = LinkedHashMap<String, Long>()
         for (chunk in targets.distinct().chunked(6)) {
             coroutineScope {
-                chunk.map { node -> async { node to measuredProbe(node, snapshot) } }.awaitAll()
-            }.forEach { (node, value) -> results[node] = value }
+                chunk.map { node -> async {
+                    try { node to measuredProbe(node, snapshot) }
+                    catch (cancel: CancellationException) { throw cancel }
+                    // A controller/transport error has no new node measurement. Keep
+                    // successful siblings and let callers retain this node's old value.
+                    catch (_: IOException) { node to null }
+                } }.awaitAll()
+            }.forEach { (node, value) -> if (value != null) results[node] = value }
         }
         return results
     }
@@ -257,14 +326,22 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
         val snapshot = probeSnapshot()
         val leaf = selectedProxyName(snapshot.proxies, node)
-        api.delayIpv6(leaf, snapshot.proxies.optJSONObject(leaf)?.optString("provider-name").orEmpty())
+        readCurrentProbe(snapshot) {
+            api.delayIpv6(leaf, snapshot.proxies.optJSONObject(leaf)?.optString("provider-name").orEmpty())
+        }
     }
 
     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
         val sites = ProxyLatencyTargets.load(app)
+        // Hetu's UID is exempt from transparent Root interception. Explicitly enter
+        // the running local core so fake DNS and policy routing match the active
+        // runtime; the optional remote controller API is unrelated to this listener.
+        val egressPort = if (ProxyStatusBridge.rootProxyRunning(app))
+            MihomoStartupConfig.egressProbePort(app.getSharedPreferences("hetu", 0)
+                .getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)) else null
         coroutineScope {
             sites.map { target ->
-                async { target.name to measureSiteLatency(target.url) }
+                async { target.name to measureSiteLatency(target.url, egressPort) }
             }.awaitAll().toMap()
         }
     }
@@ -279,10 +356,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         parseRuleSets(api.ruleProviders()).firstOrNull { it.name == name }
     }
 
-    private fun measureSiteLatency(url: String): Long {
+    private suspend fun measureSiteLatency(url: String, egressPort: Int?): Long {
+        coroutineContext.ensureActive()
         return try {
             val started = SystemClock.elapsedRealtime()
-            val connection = (URL(url).openConnection() as HttpURLConnection).apply {
+            val target = URL(url)
+            val opened = if (egressPort == null) target.openConnection()
+                else target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", egressPort)))
+            val connection = (opened as HttpURLConnection).apply {
                 instanceFollowRedirects = true
                 connectTimeout = 3_000
                 readTimeout = 3_000
@@ -292,12 +373,16 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             }
             try {
                 val code = connection.responseCode
-                if (code in 200..499) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
+                coroutineContext.ensureActive()
+                if (code in 200..399) (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L) else -1L
             } finally {
                 runCatching { connection.inputStream?.close() }
                 connection.disconnect()
             }
+        } catch (cancel: CancellationException) {
+            throw cancel
         } catch (_: Exception) {
+            coroutineContext.ensureActive()
             -1L
         }
     }

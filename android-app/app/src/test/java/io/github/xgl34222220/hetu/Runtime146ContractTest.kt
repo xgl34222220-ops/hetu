@@ -36,7 +36,7 @@ class Runtime146ContractTest {
     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
         val p = prefs()
         // V20.74 deploys the corrected snapshot on the next explicit Start/Restart.
-        assertEquals(151, ProxyRuntimeSettings.RUNTIME_REVISION)
+        assertEquals(152, ProxyRuntimeSettings.RUNTIME_REVISION)
         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))

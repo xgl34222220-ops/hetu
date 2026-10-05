@@ -146,13 +146,17 @@ internal fun PanelScreen(
                 PanelTab.Groups -> panelGroupsTab(
                     rows = rows, data = data, view = displayView,
                     onToggleGroup = { name ->
+                        // Capture this card row before an accordion removes rows above it. The
+                        // stable lazy key matches panelGroupsTab; an old numeric index does not.
+                        val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
+                        val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
                         val next = view.toggleGroup(name)
+                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
                         onView(next)
-                        if (name in next.expandedGroups) {
-                            val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
-                            if (at >= 0) scope.launch {
-                                if (motion) listState.animateScrollToItem(headerItems + at) else listState.scrollToItem(headerItems + at)
-                            }
+                        if (anchor != null && at >= 0) {
+                            // Apply with the new rows on the next measure, retaining the tapped
+                            // header's visible offset instead of moving it to the top of the page.
+                            listState.requestScrollToItem(headerItems + at, -anchor.offset)
                         }
                     },
                     onSelectNode = actions.onSelectNode,

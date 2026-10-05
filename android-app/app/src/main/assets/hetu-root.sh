@@ -21,6 +21,10 @@ START_ERROR="$RUN/last-start-error"
 START_TIMING="$RUN/startup-timing"
 LOCK_DIR="$RUN/.txn.lock"
 CLEAN_SNAPSHOT_ACTIVE=0
+FAKE_IP_V4=""
+FAKE_IP_V6=""
+LAN_RETURN_V4="0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4"
+LAN_RETURN_V6="::1/128,fc00::/7,fe80::/10,ff00::/8"
 
 BYPASS_MARK=0x08000000
 BYPASS_MASK=0x08000000
@@ -351,6 +355,74 @@ split_safe_cidrs(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do case "$X" in ''|*[!0-9A-Fa-f:./]*|*//*|/*|*/) return 1;; esac; case "$X" in */*) ;; *) return 1;; esac; done
 }
+# Validate only numeric literals; never resolve a hostname or execute configuration text.
+fake_ip_cidrs_valid(){
+  [ "${#2}" -le 16384 ] || return 1
+  printf '%s\n' "$2" | awk -v family="$1" '
+    BEGIN {ok=1}
+    {
+      if($0=="")next;
+      n=split($0,items,",");if(n>256){ok=0;exit}
+      for(i=1;i<=n;i++){
+        if(split(items[i],parts,"/")!=2 || parts[2]!~/^[0-9]+$/){ok=0;exit}
+        max=family==4?32:128;if(parts[2]+0>max){ok=0;exit}
+        addr=parts[1];
+        if(family==4){
+          if(split(addr,words,"\\.")!=4){ok=0;exit}
+          for(j=1;j<=4;j++)if(words[j]!~/^[0-9]+$/ || words[j]+0>255){ok=0;exit}
+        }else{
+          if(addr!~/^[0-9a-fA-F:]+$/ || index(addr,":::")>0){ok=0;exit}
+          if((substr(addr,1,1)==":" && substr(addr,1,2)!="::") ||
+             (substr(addr,length(addr),1)==":" && substr(addr,length(addr)-1)!="::")){ok=0;exit}
+          copy=addr;compressed=gsub(/::/,":",copy);if(compressed>1){ok=0;exit}
+          num=split(copy,words,":");segments=0;
+          for(j=1;j<=num;j++){
+            if(words[j]==""){if(!compressed){ok=0;exit}}else{
+              if(length(words[j])>4){ok=0;exit};segments++
+            }
+          }
+          if((compressed && segments>=8) || (!compressed && segments!=8)){ok=0;exit}
+        }
+      }
+    }
+    END {exit !ok}'
+}
+fake_ip_policy_valid(){
+  case "$FAKE_IP_V4$FAKE_IP_V6" in *,*) return 1;; esac
+  fake_ip_cidrs_valid 4 "$FAKE_IP_V4" && fake_ip_cidrs_valid 6 "$FAKE_IP_V6" &&
+    fake_ip_cidrs_valid 4 "$LAN_RETURN_V4" && fake_ip_cidrs_valid 6 "$LAN_RETURN_V6"
+}
+load_start_fake_ip_policy(){
+  FIP_FILE="$1"
+  FIP_TAIL=$(tail -n 5 "$FIP_FILE") || return 1
+  if [ "$(printf '%s\n' "$FIP_TAIL" | sed -n '1p')" != '# HETU_FAKE_IP_POLICY=1' ]; then
+    # Only the fixed terminal block is metadata. YAML scalar content elsewhere
+    # may contain identical text and cannot override an appended private policy.
+    printf '%s\n' "$FIP_TAIL" | grep -Eq '^# HETU_(FAKE_IP_POLICY|FAKE_IP_V4|FAKE_IP_V6|LAN_RETURN_V4|LAN_RETURN_V6)=' && return 1
+    return 0 # Legacy private copies keep their established defaults.
+  fi
+  FIP_2=$(printf '%s\n' "$FIP_TAIL" | sed -n '2p'); case "$FIP_2" in '# HETU_FAKE_IP_V4='*) FAKE_IP_V4=${FIP_2#*=};; *) return 1;; esac
+  FIP_3=$(printf '%s\n' "$FIP_TAIL" | sed -n '3p'); case "$FIP_3" in '# HETU_FAKE_IP_V6='*) FAKE_IP_V6=${FIP_3#*=};; *) return 1;; esac
+  FIP_4=$(printf '%s\n' "$FIP_TAIL" | sed -n '4p'); case "$FIP_4" in '# HETU_LAN_RETURN_V4='*) LAN_RETURN_V4=${FIP_4#*=};; *) return 1;; esac
+  FIP_5=$(printf '%s\n' "$FIP_TAIL" | sed -n '5p'); case "$FIP_5" in '# HETU_LAN_RETURN_V6='*) LAN_RETURN_V6=${FIP_5#*=};; *) return 1;; esac
+  fake_ip_policy_valid
+}
+load_session_fake_ip_policy(){
+  grep -q '^FAKE_IP_POLICY=' "$SESSION" || return 0
+  # A stopped core does not invalidate the immutable session/rule checksum.
+  # Refuse a different or damaged session instead of guessing a Kill Switch policy.
+  health_session_current || return 1
+  [ "$(grep -c '^FAKE_IP_POLICY=' "$SESSION")" = 1 ] &&
+    [ "$(sed -n 's/^FAKE_IP_POLICY=//p' "$SESSION")" = 1 ] || return 1
+  for FIP_KEY in FAKE_IP_V4 FAKE_IP_V6 LAN_RETURN_V4 LAN_RETURN_V6; do
+    [ "$(grep -c "^$FIP_KEY=" "$SESSION")" = 1 ] || return 1
+  done
+  FAKE_IP_V4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION")
+  FAKE_IP_V6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION")
+  LAN_RETURN_V4=$(sed -n 's/^LAN_RETURN_V4=//p' "$SESSION")
+  LAN_RETURN_V6=$(sed -n 's/^LAN_RETURN_V6=//p' "$SESSION")
+  fake_ip_policy_valid
+}
 split_safe_ifaces(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do case "$X" in ''|*[!A-Za-z0-9_.:@+-]*) return 1;; esac; [ "$X" != lo ] && [ "$X" != 'lo+' ] || return 1; done
@@ -414,12 +486,14 @@ scoped_reject_unmarked_udp(){
 
 bypass4(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
+  for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 bypass6(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V6; IFS=$OLDIFS
+  for NET in "$@"; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 
@@ -860,6 +934,7 @@ wait_ready(){
 }
 
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; printf 'DIRECT_GIDS=%s\n' "$DGIDS"; printf 'SHARED_BYPASS_MACS=%s\n' "$MACS";
+    printf 'FAKE_IP_POLICY=1\nFAKE_IP_V4=%s\nFAKE_IP_V6=%s\nLAN_RETURN_V4=%s\nLAN_RETURN_V6=%s\n' "$FAKE_IP_V4" "$FAKE_IP_V6" "$LAN_RETURN_V4" "$LAN_RETURN_V6"
     printf 'DNS6_POLICY=%s\n' "${START_DNS6:-redirect}"
     printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
     L_TCP=0; L_UDP=0; L_DNS=0
@@ -871,6 +946,7 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
+  load_session_fake_ip_policy || exit 0
   mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
@@ -977,7 +1053,9 @@ start(){
   fi
   start_stage "ipv6-dns-capability"
   select_dns6_policy
-  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi
+  load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
+  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   start_stage "stop-old-core"
@@ -1030,7 +1108,7 @@ start(){
   if [ "$START_V6" = enable ]; then
     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
+    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
