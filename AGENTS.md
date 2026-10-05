@@ -1,3 +1,9 @@
+## 当前验收状态：274aa0d 首轮未启动与同提交续跑
+
+应用274aa0d2f80dad39884bd3d079a2e02c86a90abd /run37366522056于19:55:28UTC排队，attempt1在20:10观测为completed/failure；build111952930609与旧对照111952930932均cancelled且steps=null，无产物，安装skipped。不是已知源码编译失败，取消者/原因无证据。14次原状态快照及两job日志404BlobNotFound完整原响应已保存docs/qa/20261005-v2085-274aa0d-acceptance-failure.json，SHA2c80bf0e4eed6015fd286506ad2718e548f3d4e4b01fc035819e4c860fabe54f。所有487单测/51XML、新264图、双API64/21/401→200、安全门禁与cleanup均未执行或无证据，不使用273旧成功补齐，也不写伪Root0。
+
+用户已明确授权必要重跑；root在先归档/核实原run终态及精确SHA之后只调用一次rerun_failed_workflow_run_jobs，20:12:14UTC sameSHA/run attempt2 queued。原CI保留、无取消操作、未新建重复workflow，源/门禁/测试不改；本次只有文档证据checkpoint，不触发新CI。当前源候选仍274，自己的新动态验收待执行；本地61host与完整四源变换通过仅证明源码边界。Google真机帐号认证故障仍未定位/修复未验证；缺当前故障日志及正常代理同刻对照，不操作手机或帐号。旧成功/失败和V20.83 a93交付全部保留。
+
 ## 当前接续：2730954独立验收归档与工具接入后的四处PDF收尾
 
 原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui，2730954591393c1b81f747cef72adb8940c5a82c / Actions37360879852于2026-10-05 19:33:56UTC整体success。自己的49XML479/0失败错误跳过，原422保留；双API各64=59导航+5控制器认证、21配色、Root mutation0、Bearer六路径各19条200、原偏好/端口/KVM/进程清理均通过，严格53项原始证据PASS。真实273APK134827739字节/SHA82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c，非最终交付。130页原PDF与当前捕获逐SHA核验，18对新实际重开、112页字节相同继承；首页panel43张42张全同，剩一张仅隔离夹具端口47023→33407且完整图已打开。静态图不等于动效或全部130回调验收，字面像素1:1仍未全部通过。

@@ -1,0 +1,35 @@
+{
+  "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "predecessorCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+  "changedPresentationInputs": 4,
+  "frozenInputs": 375,
+  "requiredEffectiveInputs": 379,
+  "fourCompleteSourceTransformsVerified": true,
+  "tenHistoricalLayerSha256": {
+    "updates/v2082-new-ui/inputs.json": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+    "updates/v2082-new-ui/integration.patch": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "updates/v2083-ui-polish/inputs.json": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+    "updates/v2083-ui-polish/ui.patch": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+    "updates/v2084-controller-auth/inputs.json": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+    "updates/v2084-controller-auth/runtime.patch": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+    "updates/v2085-pdf-tools-settings/inputs.json": "46cbff55a3621b544acb10bd72c0fffe1ffd17469bb856630ea32683ae08024f",
+    "updates/v2085-pdf-tools-settings/runtime.patch": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+    "updates/v2085-tools-intake/inputs.json": "7604e646cad209c2fc2a606196d478f76cd41005f5d47ad3e37dbc84ac58339c",
+    "updates/v2085-tools-intake/runtime.patch": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b"
+  },
+  "intakeFiveInputsIdenticalToPredecessor": true,
+  "allExistingAndroidTestsUnchangedFromPredecessor": true,
+  "HxMenusWholeFileFrozen": true,
+  "homePanelSourceDiffFrom492": [],
+  "hostChecksPassed": 61,
+  "candidateOwnBuildAndInstalledAcceptance": "pending; own487/51XML and dualAPI evidence required",
+  "completeEffectiveSourceVerifiedLocally": false,
+  "unavailableUnchangedPayloads": [
+    "mihomo arm64",
+    "mihomo x86_64",
+    "core arm64",
+    "core x86_64"
+  ],
+  "realDeviceGooglePlayFixVerified": false
+}
