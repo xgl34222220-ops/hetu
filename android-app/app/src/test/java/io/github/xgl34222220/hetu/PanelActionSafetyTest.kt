@@ -123,7 +123,7 @@ class PanelActionSafetyTest {
             if (predicate()) return
             Thread.sleep(10)
         }
-        assertTrue(reason, predicate())
+        assertTrue("$reason [panelReady=${vm.state.panelReady}, readFailed=${vm.state.controllerReadFailed}, pendingSelection=${vm.pendingSelection.keys}, historyPaused=${PanelActionRuntimeShadows.HistoryRecord.pause}, requestPaths=${requestSnapshot().map { it.path }}]", predicate())
     }
 
     private fun gate() = CountDownLatch(1).also { gates += it }

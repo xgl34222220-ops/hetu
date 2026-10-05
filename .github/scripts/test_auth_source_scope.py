@@ -6,11 +6,31 @@ from auth_source_scope import (AUTH_FILES, BASE_ANDROID_APP_TREE, BASE_COMMIT, B
                                BUILD_FILE, NEW_TEST_CLASSES, NEW_TEST_COUNTS, PACKAGE,
                                PREVIOUS_INPUTS_SHA256, PREVIOUS_PATCH_SHA256,
                                TEST_PACKAGE, validate_layer, validate_scope,
-                               validate_version_only)
+                               validate_version_only, HISTORY_FIXTURE, validate_history_fixture_only,
+                               SAFETY_FIXTURE, validate_safety_diagnostics_only)
 from ui_source_scope import validate_scope as validate_ui_scope
 
 
 class AuthenticationScope(unittest.TestCase):
+    def test_old_action_safety_assertion_can_only_gain_failure_details(self):
+        before = 'assertTrue(reason, predicate())'
+        after = 'assertTrue("$reason [panelReady=${vm.state.panelReady}, readFailed=${vm.state.controllerReadFailed}, pendingSelection=${vm.pendingSelection.keys}, historyPaused=${PanelActionRuntimeShadows.HistoryRecord.pause}, requestPaths=${requestSnapshot().map { it.path }}]", predicate())'
+        validate_scope([SAFETY_FIXTURE])
+        validate_safety_diagnostics_only(before, after)
+        for modified in (after.replace('predicate()', 'true'), after + '\n// unrelated change'):
+            with self.assertRaises(AssertionError):
+                validate_safety_diagnostics_only(before, modified)
+
+    def test_history_fixture_can_only_add_cross_thread_visibility(self):
+        before = 'public static class HistoryRecord {\n        public static boolean pause;\n        public static Continuation<? super kotlin.Unit> pending;\n} // Root boundary unchanged'
+        after = before.replace('static boolean pause', 'static volatile boolean pause').replace('static Continuation', 'static volatile Continuation')
+        validate_scope([HISTORY_FIXTURE])
+        validate_history_fixture_only(before, after)
+        for modified in (after.replace('Root boundary unchanged', 'Root boundary changed'),
+                         after.replace('volatile boolean pause', 'volatile boolean skip')):
+            with self.assertRaises(AssertionError):
+                validate_history_fixture_only(before, modified)
+
     def test_exact_authentication_production_files_are_allowed(self):
         validate_scope(AUTH_FILES | {BUILD_FILE})
 

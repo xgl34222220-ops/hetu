@@ -15,6 +15,8 @@ import tempfile
 
 from ui_source_scope import BASE_COMMIT, BASE_RUN, PREVIOUS_INPUTS_SHA256, validate_scope, validate_version_only
 from auth_source_scope import (validate_layer as validate_auth_layer,
+                               HISTORY_FIXTURE, validate_history_fixture_only,
+                               SAFETY_FIXTURE, validate_safety_diagnostics_only,
                                validate_version_only as validate_auth_version_only,
                                PREVIOUS_INPUTS_SHA256 as AUTH_PREVIOUS_INPUTS_SHA256,
                                PREVIOUS_PATCH_SHA256 as AUTH_PREVIOUS_PATCH_SHA256)
@@ -106,8 +108,14 @@ def main():
             runtime_patch = AUTH_INPUTS.with_name('runtime.patch')
             assert digest(runtime_patch) == auth['patchSha256'], 'Authentication patch changed without input update'
             previous_gradle = (work / 'android-app/app/build.gradle.kts').read_text()
+            previous_history_fixture = (work / HISTORY_FIXTURE).read_text()
+            previous_safety_fixture = (work / SAFETY_FIXTURE).read_text()
             apply(runtime_patch, work)
             validate_auth_version_only(previous_gradle, (work / 'android-app/app/build.gradle.kts').read_text())
+            if HISTORY_FIXTURE in auth['changedOrAddedFiles']:
+                validate_history_fixture_only(previous_history_fixture, (work / HISTORY_FIXTURE).read_text())
+            if SAFETY_FIXTURE in auth['changedOrAddedFiles']:
+                validate_safety_diagnostics_only(previous_safety_fixture, (work / SAFETY_FIXTURE).read_text())
             for name, sha in auth['changedOrAddedFiles'].items():
                 assert digest(work / name) == sha, 'Authentication source mismatch: ' + name
                 assert sha != final_files.get(name), 'Unchanged input recorded as an authentication delta: ' + name

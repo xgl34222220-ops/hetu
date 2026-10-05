@@ -35,8 +35,10 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt": "f068702e01fe4c3d41773de22d4f1a326aaede3843033e5c1cc5839118f63cd4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "393bbe3130133cfb9d0757d7ba4ccbe7a6e0690ef8e82af4ae818c545ba7cd26",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt": "3102f56bef1b548b81fc4f3b3afbbee6e6add701eeee755a4cb9ff71a037a098",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "6e59e8d83ed822a000efe2896cf76d7fcbb8b8ce5aa00fed3c1963a4fcbedaf0",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "00be367591bad3e98e71e7e4e2ca8abb356e63ea2822e20ad447d61375ed22f8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java": "731faceeed3768376ea022d32b1fb891f74ce1cd375b4737f2e11953208f3a2c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt": "5cc8b464acb8fc5469d99efa900d3547c134a1b13f85a26e81e19c479c928c80",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt": "01757ef4f531771e81231a693f18c57dc1c3f07ec84a1fa4b2d5618525cbe44b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "83cd5d6d1128a4156a0b77fa27a0c2bd8cba0874947feb22fb44c38fe0df0859"
   },
@@ -45,5 +47,5 @@
   "manifestAndPermissionsUnchanged": true,
   "unchangedOutsideAuthScope": true,
   "reproducedSourceMatchesCheckout": true,
-  "patchSha256": "018e15fa6f2a6b62e5182d1908353c6db7a35d337d252d2445e44731a8c0542c"
+  "patchSha256": "b61ec340dc9fca79083d62b721765dac5a558b5b044922c16c5a7db646788bab"
 }

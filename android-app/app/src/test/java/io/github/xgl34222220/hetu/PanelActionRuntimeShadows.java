@@ -35,8 +35,8 @@ public final class PanelActionRuntimeShadows {
 
     @Implements(value = ProxyApiHistoryStore.class, isInAndroidSdk = false)
     public static class HistoryRecord {
-        public static boolean pause;
-        public static Continuation<? super kotlin.Unit> pending;
+        public static volatile boolean pause;
+        public static volatile Continuation<? super kotlin.Unit> pending;
         @Resetter public static void reset() { pause = false; pending = null; }
         @Implementation public Object record(Context app, long upload, long download,
                 java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {

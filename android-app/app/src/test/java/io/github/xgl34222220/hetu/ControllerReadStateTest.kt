@@ -29,6 +29,8 @@ import org.robolectric.annotation.Resetter
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 import kotlin.coroutines.Continuation
 
 /** Actual controller HTTP reads with isolated healthy Root and /proc boundaries. */
@@ -60,6 +62,7 @@ class ControllerReadStateTest {
     private lateinit var controller: ProxyComposeController
     private var vm: HetuViewModel? = null
     private val release = CountDownLatch(1)
+    private val controllerReadEntered = CountDownLatch(1)
     @Volatile private var rejectedPath: String? = null
     @Volatile private var responseCode = 401
     @Volatile private var generation = 1
@@ -67,11 +70,17 @@ class ControllerReadStateTest {
     @Volatile private var holdConfigs = false
 
     @Before fun prepare() {
+        // Kotlin companion fields survive individual Robolectric method sandboxes;
+        // each read-only assertion must compare against this method's own history.
+        HistoryAudit.reset()
         app = ApplicationProvider.getApplicationContext()
         server = MockWebServer().apply {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
-                    if (holdConfigs && request.path == "/configs") check(release.await(6, TimeUnit.SECONDS))
+                    if (holdConfigs && request.path == "/configs") {
+                        controllerReadEntered.countDown()
+                        check(release.await(6, TimeUnit.SECONDS))
+                    }
                     if (request.path == rejectedPath || rejectedPath == "*") return MockResponse()
                         .setResponseCode(responseCode).setBody("fixture-custom-secret fixture-local-secret private response")
                     if (malformed && request.path == "/connections") return MockResponse().setBody("broken json")
@@ -204,18 +213,21 @@ class ControllerReadStateTest {
 
     @Test fun cancellationDuringControllerReadPropagatesWithoutPublishingState() = runBlocking {
         holdConfigs = true
-        var published = false
-        var cancelled = false
+        val published = AtomicBoolean(false)
+        val completion = AtomicReference<Throwable?>()
         val job = launch(Dispatchers.Default) {
-            try { controller.state(); published = true }
-            catch (error: CancellationException) { cancelled = true; throw error }
+            controller.state()
+            published.set(true)
         }
+        job.invokeOnCompletion { completion.set(it) }
         assertNotNull(server.takeRequest(3, TimeUnit.SECONDS))
+        assertTrue("Cancellation must interrupt an entered controller read", controllerReadEntered.await(3, TimeUnit.SECONDS))
         job.cancel()
         release.countDown()
         job.join()
-        assertFalse(published)
-        assertTrue(cancelled)
+        assertFalse("Cancelled controller read must not publish a state", published.get())
+        assertTrue("Controller read must complete as cancelled", job.isCancelled)
+        assertTrue("Controller cancellation must propagate", completion.get() is CancellationException)
         assertTrue(HistoryAudit.samples.isEmpty())
     }
 }

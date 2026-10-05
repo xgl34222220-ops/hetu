@@ -6,6 +6,8 @@
 
 首轮 `7536b695` / Actions `37243939715`：应用编译与载荷/ABI/图标通过；新增 ToastFeedbackTest 显式导入 `assertExists` 编译失败，单测未执行，lint 与本轮 API35/36 安装 skipped。已仅移除错误导入并保留实际渲染断言，独立补丁重新生成；原失败证据保留于 `docs/ci/V20.84_FIRST_FAILURE.json`，修正后的完整重跑尚未验证。
 
+第二轮 `934bc32` / Actions `37244396784`：实际 47 XML / 422 tests / 3 failures / 0 errors/skipped，lint/最终 APK signer 与双 API 安装 skipped。保留 `docs/ci/V20.84_SECOND_FAILURE.json`。新测试显式清空静态历史夹具并等待实际读取闸门后验证取消；旧 HistoryRecord 的 pause/pending 增加 volatile，原安全断言仅增加失败详情。原 392 与新增 30 数量不变；第三轮仍须完整验证，字段可见性不是已确认的生产根因。
+
 原 23 载荷、Root runtime 151、核心/native/service.d、签名、Manifest/权限与依赖不变。无 hook、不操作用户设备/网络/安全设置、不永久删除数据、不合并主分支或正式发布。手机实际鉴权恢复、K80/OEM/KernelSU、真机 Root 与长期网络仍未验证。详细范围见 `docs/V20.84_CONTROLLER_AUTH.md`。
 
 ## 上次交付：V20.83 工具、设置与首页面板交互（构建及独立安装验收通过）

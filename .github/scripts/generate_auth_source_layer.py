@@ -19,6 +19,7 @@ from auth_source_scope import (BASE_ANDROID_APP_TREE, BASE_COMMIT, BASE_RUN,
                                BASE_TESTS, NEW_TEST_CLASSES, NEW_TEST_COUNTS, PREVIOUS_INPUTS_SHA256,
                                PREVIOUS_PATCH_SHA256, VERSION_CODE, VERSION_NAME,
                                validate_layer, validate_scope, validate_version_only)
+from auth_source_scope import HISTORY_FIXTURE, validate_history_fixture_only, SAFETY_FIXTURE, validate_safety_diagnostics_only
 from ui_source_scope import PREVIOUS_INPUTS_SHA256 as UI82_INPUTS_SHA256
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -79,6 +80,12 @@ def main():
         validate_scope(changes)
         validate_version_only((fixture / 'android-app/app/build.gradle.kts').read_text(),
                               (ROOT / 'android-app/app/build.gradle.kts').read_text())
+        if HISTORY_FIXTURE in changes:
+            validate_history_fixture_only((fixture / HISTORY_FIXTURE).read_text(),
+                                          (ROOT / HISTORY_FIXTURE).read_text())
+        if SAFETY_FIXTURE in changes:
+            validate_safety_diagnostics_only((fixture / SAFETY_FIXTURE).read_text(),
+                                            (ROOT / SAFETY_FIXTURE).read_text())
         layer = {
             'schema': 1, 'baseCommit': BASE_COMMIT, 'baseRun': BASE_RUN,
             'baseAndroidAppTree': BASE_ANDROID_APP_TREE,

@@ -41,14 +41,30 @@ EXPECTED_TESTS = BASE_TESTS + sum(NEW_TEST_COUNTS.values())
 TEST_FILES = frozenset(TEST_PACKAGE + name + extension
                        for name in NEW_TEST_CLASSES for extension in ('.java', '.kt'))
 BUILD_FILE = 'android-app/app/build.gradle.kts'
+HISTORY_FIXTURE = TEST_PACKAGE + 'PanelActionRuntimeShadows.java'
+SAFETY_FIXTURE = TEST_PACKAGE + 'PanelActionSafetyTest.kt'
 
 
 def validate_scope(changes):
     names = set(changes)
     assert all(not Path(name).is_absolute() and '..' not in Path(name).parts
                for name in names), 'Authentication source path escapes the checkout'
-    blocked = sorted(names - AUTH_FILES - TEST_FILES - {BUILD_FILE})
+    blocked = sorted(names - AUTH_FILES - TEST_FILES - {BUILD_FILE, HISTORY_FIXTURE, SAFETY_FIXTURE})
     assert not blocked, 'Authentication patch changes protected input: ' + str(blocked)
+
+
+def validate_history_fixture_only(before, after):
+    original = 'public static class HistoryRecord {\n        public static boolean pause;\n        public static Continuation<? super kotlin.Unit> pending;'
+    replacement = 'public static class HistoryRecord {\n        public static volatile boolean pause;\n        public static volatile Continuation<? super kotlin.Unit> pending;'
+    assert before.count(original) == 1, 'Expected original cross-thread history fixture'
+    assert after == before.replace(original, replacement), 'History fixture changed beyond cross-thread visibility'
+
+
+def validate_safety_diagnostics_only(before, after):
+    original = 'assertTrue(reason, predicate())'
+    replacement = 'assertTrue("$reason [panelReady=${vm.state.panelReady}, readFailed=${vm.state.controllerReadFailed}, pendingSelection=${vm.pendingSelection.keys}, historyPaused=${PanelActionRuntimeShadows.HistoryRecord.pause}, requestPaths=${requestSnapshot().map { it.path }}]", predicate())'
+    assert before.count(original) == 1, 'Expected original eventual assertion'
+    assert after == before.replace(original, replacement), 'Original action safety assertions changed beyond failure diagnostics'
 
 
 def validate_version_only(before, after):
