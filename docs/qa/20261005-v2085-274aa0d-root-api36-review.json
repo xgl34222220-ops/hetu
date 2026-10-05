@@ -1,0 +1,336 @@
+{
+  "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "actualProducerAttempt": 4,
+  "actualProducerJobId": 111978206731,
+  "artifactId": 11371747785,
+  "artifactZipSha256": "fc56e8312c094622deeeb8d04c4a4863e583d1f1aa485db86c9cb4e0360826ad",
+  "reviewer": "/root",
+  "apiLevel": 36,
+  "actualRawChecks": {
+    "checks": [
+      {
+        "name": "01-home",
+        "result": "passed"
+      },
+      {
+        "name": "00-language-selected",
+        "result": "passed"
+      },
+      {
+        "name": "01-home-language-restored",
+        "result": "passed"
+      },
+      {
+        "name": "01-home-new-ui",
+        "result": "passed"
+      },
+      {
+        "name": "02-panel-stopped",
+        "result": "passed"
+      },
+      {
+        "name": "02-panel-new-ui-overview",
+        "result": "passed"
+      },
+      {
+        "name": "02-panel-new-ui-rulesets",
+        "result": "passed"
+      },
+      {
+        "name": "03-tools",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-entry",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-stop",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-root-error-details",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-root-error-expanded",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-environment",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-overflow",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-document-picker",
+        "result": "passed"
+      },
+      {
+        "name": "scripts-import-cancelled",
+        "result": "passed"
+      },
+      {
+        "name": "04-settings",
+        "result": "passed"
+      },
+      {
+        "name": "boot-settings",
+        "result": "passed"
+      },
+      {
+        "name": "boot-root-denial-visible",
+        "result": "passed"
+      },
+      {
+        "name": "boot-denial-keeps-toggle-off",
+        "result": "passed"
+      },
+      {
+        "name": "05-about",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-entry",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-without-root",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-storage-bound-visible",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-truncation-visible",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-copy-action",
+        "result": "passed"
+      },
+      {
+        "name": "network-events-full-history-preserved",
+        "result": "passed"
+      },
+      {
+        "name": "safe-session-repair-entry",
+        "result": "passed"
+      },
+      {
+        "name": "safe-session-repair-root-denial",
+        "result": "passed"
+      },
+      {
+        "name": "06-web-panels",
+        "result": "passed"
+      },
+      {
+        "name": "07-native-webview",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "08-native-webview-disconnected",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "09-webview-back",
+        "result": "passed"
+      },
+      {
+        "name": "reference-03B-040-native-overview",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "reference-03B-041-native-groups",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "reference-03B-042-native-connections",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "reference-03B-043-native-node-dialog",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "reference-03B-044-native-switch-failure",
+        "result": "passed",
+        "evidence": "actual Android WebView DOM + native adb screenshot"
+      },
+      {
+        "name": "custom-palette-00-TonalSpot-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-01-Neutral-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-02-Vibrant-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-03-Expressive-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-04-Rainbow-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-05-FruitSalad-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-06-Monochrome-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-07-Fidelity-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-08-TonalSpot-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-09-Neutral-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-10-Vibrant-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-11-Expressive-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-12-Rainbow-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-13-FruitSalad-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-14-Monochrome-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-15-Fidelity-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-16-Vibrant-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-17-Vibrant-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-18-Fidelity-dark",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-19-FruitSalad-light",
+        "result": "passed"
+      },
+      {
+        "name": "custom-palette-20-Expressive-dark",
+        "result": "passed"
+      },
+      {
+        "name": "panel-controller-401-first-read",
+        "result": "passed",
+        "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+      },
+      {
+        "name": "panel-controller-401-api-settings",
+        "result": "passed",
+        "evidence": "actual NativeCompose ApiSheet opened by native tap"
+      },
+      {
+        "name": "panel-controller-401-retry",
+        "result": "passed",
+        "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+      },
+      {
+        "name": "panel-controller-200-recovered",
+        "result": "passed",
+        "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+      },
+      {
+        "name": "panel-controller-fixture-cleanup",
+        "result": "passed",
+        "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+      }
+    ],
+    "passed": 64,
+    "legacyChecksPassed": 59,
+    "paletteCasesPassed": 21,
+    "newPanelAuthChecks": [
+      {
+        "name": "panel-controller-401-first-read",
+        "result": "passed",
+        "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+      },
+      {
+        "name": "panel-controller-401-api-settings",
+        "result": "passed",
+        "evidence": "actual NativeCompose ApiSheet opened by native tap"
+      },
+      {
+        "name": "panel-controller-401-retry",
+        "result": "passed",
+        "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+      },
+      {
+        "name": "panel-controller-200-recovered",
+        "result": "passed",
+        "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+      },
+      {
+        "name": "panel-controller-fixture-cleanup",
+        "result": "passed",
+        "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+      }
+    ],
+    "fixtureOnly": true,
+    "rootMutationActions": 0,
+    "rootSetupDenialAttempts": 1,
+    "apiLevel": 36,
+    "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation."
+  },
+  "rawFiles": {
+    "results.json": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/results.json",
+      "sha256": "50e71a140bfa1d09697ea7cd0e02f1ba76504245861a61efb3e64784605b0d2a"
+    },
+    "runner-lifecycle.json": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/runner-lifecycle.json",
+      "sha256": "363af60a8a0a982e534260ce14c7e859f58e03c88ba7fcffab5a925a1db0e543"
+    },
+    "webview-forward-cleanup.json": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/webview-forward-cleanup.json",
+      "sha256": "e8df8659c3c910a642a43bfa6d2e5de07645a2a20094af46c41158337020e13c"
+    }
+  },
+  "runnerLifecycleResult": "PASS",
+  "forwardCleanupEntries": 2,
+  "allForwardCleanupRemoved": true,
+  "overallRun53Acceptance": "All4latestjobs success; strict53 fullarchive and finalpaired5pixelreview remain separately required",
+  "GoogleRealAccountAuthenticationVerified": false
+}

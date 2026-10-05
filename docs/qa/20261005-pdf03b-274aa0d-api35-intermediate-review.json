@@ -1,0 +1,781 @@
+{
+  "schema": 1,
+  "created_utc": "2026-10-05T21:12:54.824793+00:00",
+  "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "run_id": 37366522056,
+  "producing_attempt": 2,
+  "purpose": "Intermediate actualAPI35 five-page visual review only. API36 requiredprimary remains awaiting its own executed attempt/artifact.",
+  "artifact": {
+    "id": 11369762515,
+    "zip_path": "/workspace/scratch/3788973cf567/attachments/85c4406e-dd59-43d7-bf1e-30d57041aee1/github-actions-artifact-11369762515.zip",
+    "zip_sha256": "1dc9a7bfe017d98f9812d8f87c039b943e64c0ab37b081203b53129dcb100993",
+    "zip_bytes": 3362836,
+    "digest_independently_verified": true,
+    "api_level": 35,
+    "extracted_root": "/tmp/hetu-ci-latest-274aa0d/api35",
+    "association": "Google and parent supplied exact own source/run/producingattempt2/API35 artifact; reviewer independently hashes downloadedZIP and original frames."
+  },
+  "counts": {
+    "pages": 5,
+    "actually_opened_full_size_pairs": 5,
+    "native_pngs_hash_verified": 5,
+    "native_DOM_XML_pairs_read": 5,
+    "pixel1to1_pass": 0,
+    "required_API36_primary_completed": 0
+  },
+  "version": {
+    "path": "/tmp/hetu-ci-latest-274aa0d/api35/version.txt",
+    "sha256": "1e66fe55018d1270fb993e257efbe7c237973701b328c9ac5ffbadbe0da984cd",
+    "actual_read": "    versionCode=2085 minSdk=26 targetSdk=35\n    versionName=0.12.15-v20-pdf"
+  },
+  "pages": [
+    {
+      "page": 40,
+      "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "run_id": 37366522056,
+      "producing_attempt": 2,
+      "api_level": 35,
+      "artifact_id": 11369762515,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-040-native-overview.png",
+      "capture_sha256": "56bdac53e00fa54f4f0c97547ca16e0babee4dfe720a46c83c969d9d1351d817",
+      "capture_size": [
+        394,
+        852
+      ],
+      "reference_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-40.png",
+      "reference_sha256": "276f4b602026a5f4ec24796b93d4c674265a4e270077162b8007ec02e1a11ae4",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-274aa0d-api35-native-pairs/03B-40-pair.png",
+      "pair_sha256": "e8479c697d9aa0b1d5253ff14874e533c1cbfd530a4c10a32c8e55319d3b1d60",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-040-native-overview.dom.json",
+        "sha256": "3fda4bf1950176f51c0e4dbe822c25b5c49d85facd7548bb3da2aebb1c4711fd",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n核心版本\nMihomo v1.19.0\n当前连接\n18\n策略组\n12\n累计流量\n↑ 624 KB · ↓ 165 MB",
+          "status": "已连接",
+          "metricCount": 4,
+          "groupCount": 0,
+          "connectionCount": 0,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-040-native-overview.xml",
+        "sha256": "61a1b5c322f730ee3199195bd2d168d4b791ac6cd32409c69f287275da7fd94f",
+        "node_count": 33,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "核心版本",
+          "Mihomo v1.19.0",
+          "当前连接",
+          "18",
+          "策略组",
+          "12",
+          "累计流量",
+          "↑ 624 KB · ↓ 165 MB"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_executed_by_this_review": false,
+      "observations": [
+        "Four metric cards, cube/link/layers/traffic glyphs and Connected green tick pill actual full-size viewed. The owned controller endpoint29090 is intentionally different from PDF9090."
+      ],
+      "supplement_only_API35": true,
+      "counted_as_required_API36_primary": false,
+      "RGB_body24to804_difference_bbox_vs_historical273_API36": null
+    },
+    {
+      "page": 41,
+      "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "run_id": 37366522056,
+      "producing_attempt": 2,
+      "api_level": 35,
+      "artifact_id": 11369762515,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-041-native-groups.png",
+      "capture_sha256": "419fab8977f92e509002c579d9052ed3791da0373328fa80ba90cc66a1113996",
+      "capture_size": [
+        394,
+        852
+      ],
+      "reference_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-41.png",
+      "reference_sha256": "3795070fff7258d21424e21885f555939b065bfce1f90e2b205222621731bb3d",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-274aa0d-api35-native-pairs/03B-41-pair.png",
+      "pair_sha256": "537186546d5b944b984a1aac70a3de19800a9c7fa1d8d9c683ab6ac9cbb0a3ec",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-041-native-groups.dom.json",
+        "sha256": "517fa9dcbfc8236cdd68b62408d55e5c95f57d642ca30cbc81246c264ae19765",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-041-native-groups.xml",
+        "sha256": "60c8ab6a5b8c2dd90dd5ab9bb993d6f309f087925cdbcf90dcdba1f928907e57",
+        "node_count": 81,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "节点选择",
+          "URLTest · 6 节点",
+          "香港 01",
+          "节点选择：选择节点",
+          "手动选择",
+          "Selector · 6 节点",
+          "香港 02",
+          "手动选择：选择节点",
+          "故障转移",
+          "Fallback · 6 节点",
+          "日本 01",
+          "故障转移：选择节点",
+          "AI 稳定",
+          "Fallback · 6 节点",
+          "日本 02",
+          "AI 稳定：选择节点",
+          "香港节点",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "香港节点：选择节点",
+          "日本节点",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "日本节点：选择节点",
+          "台湾节点",
+          "Fallback · 6 节点",
+          "香港 01",
+          "台湾节点：选择节点",
+          "新加坡节点",
+          "Fallback · 6 节点",
+          "香港 02",
+          "新加坡节点：选择节点",
+          "其他节点",
+          "Fallback · 6 节点",
+          "日本 01",
+          "其他节点：选择节点",
+          "流媒体",
+          "Fallback · 6 节点",
+          "日本 02",
+          "流媒体：选择节点",
+          "自动选择",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "自动选择：选择节点",
+          "备用选择",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "备用选择：选择节点"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_executed_by_this_review": false,
+      "observations": [
+        "Groups tab, subtitle Connected inline tick, slider/circle/shield/AI bolt glyphs actual viewed. Twelve truthful fixture groups and six nodes differ from PDF sample content; no data omitted to imitate four visible reference cards."
+      ],
+      "supplement_only_API35": true,
+      "counted_as_required_API36_primary": false,
+      "RGB_body24to804_difference_bbox_vs_historical273_API36": [
+        38,
+        174,
+        51,
+        329
+      ]
+    },
+    {
+      "page": 42,
+      "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "run_id": 37366522056,
+      "producing_attempt": 2,
+      "api_level": 35,
+      "artifact_id": 11369762515,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-042-native-connections.png",
+      "capture_sha256": "f4ddb2731576946054739e8407ea825b71c8f514d43b8b0e2a9b755a31d6dbef",
+      "capture_size": [
+        394,
+        852
+      ],
+      "reference_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-42.png",
+      "reference_sha256": "78cbcecfee547597d71083af12fe75d93275d79d72167159f9683fd5c159ffd5",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-274aa0d-api35-native-pairs/03B-42-pair.png",
+      "pair_sha256": "c34236f2995a6da2abcff88b383245150651ff7e47f0723ca48abaf4355bf9e1",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-042-native-connections.dom.json",
+        "sha256": "971e161a3f629f51dda0ff172df578d07863b8bc96018abeb1079a2a57d4cb12",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\napi.example.com\n节点选择 → 香港 01\n↑1 KB\n↓1 MB\ndownload.example.com\n节点选择 → 香港 02\n↑2 KB\n↓2 MB\n203.0.113.20\n节点选择 → 日本 01\n↑3 KB\n↓3 MB\nupdates.example.com\n节点选择 → 日本 02\n↑4 KB\n↓4 MB\n192.0.2.53\n节点选择 → 新加坡 01\n↑5 KB\n↓5 MB\napi.example.com\n节点选择 → 台湾 01\n↑6 KB\n↓6 MB\ndownload.example.com\n节点选择 → 香港 01\n↑7 KB\n↓7 MB\n203.0.113.20\n节点选择 → 香港 02\n↑8 KB\n↓8 MB\nupdates.example.com\n节点选择 → 日本 01\n↑9 KB\n↓9 MB\n192.0.2.53\n节点选择 → 日本 02\n↑10 KB\n↓10 MB\napi.example.com\n节点选择 → 新加坡 01\n↑11 KB\n↓11 MB\ndownload.example.com\n节点选择 → 台湾 01\n↑12 KB\n↓12 MB\n203.0.113.20\n节点选择 → 香港 01\n↑13 KB\n↓13 MB\nupdates.example.com\n节点选择 → 香港 02\n↑14 KB\n↓14 MB\n192.0.2.53\n节点选择 → 日本 01\n↑15 KB\n↓15 MB\napi.example.com\n节点选择 → 日本 02\n↑16 KB\n↓16 MB\ndownload.example.com\n节点选择 → 新加坡 01\n↑17 KB\n↓17 MB\n203.0.113.20\n节点选择 → 台湾 01\n↑18 KB\n↓18 MB",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 0,
+          "connectionCount": 18,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-042-native-connections.xml",
+        "sha256": "f5f6f5108cb8572f74ce5cc715a833926a1c0dcf74efde938184e22d239b273f",
+        "node_count": 129,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "api.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "1 KB",
+          "↓",
+          "1 MB",
+          "download.example.com",
+          "节点选择 → 香港 02",
+          "↑",
+          "2 KB",
+          "↓",
+          "2 MB",
+          "203.0.113.20",
+          "节点选择 → 日本 01",
+          "↑",
+          "3 KB",
+          "↓",
+          "3 MB",
+          "updates.example.com",
+          "节点选择 → 日本 02",
+          "↑",
+          "4 KB",
+          "↓",
+          "4 MB",
+          "192.0.2.53",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "5 KB",
+          "↓",
+          "5 MB",
+          "api.example.com",
+          "节点选择 → 台湾 01",
+          "↑",
+          "6 KB",
+          "↓",
+          "6 MB",
+          "download.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "7 KB",
+          "↓",
+          "7 MB",
+          "203.0.113.20",
+          "节点选择 → 香港 02",
+          "↑",
+          "8 KB",
+          "↓",
+          "8 MB",
+          "updates.example.com",
+          "节点选择 → 日本 01",
+          "↑",
+          "9 KB",
+          "↓",
+          "9 MB",
+          "192.0.2.53",
+          "节点选择 → 日本 02",
+          "↑",
+          "10 KB",
+          "↓",
+          "10 MB",
+          "api.example.com",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "11 KB",
+          "↓",
+          "11 MB",
+          "download.example.com",
+          "节点选择 → 台湾 01",
+          "↑",
+          "12 KB",
+          "↓",
+          "12 MB",
+          "203.0.113.20",
+          "节点选择 → 香港 01",
+          "↑",
+          "13 KB",
+          "↓",
+          "13 MB",
+          "updates.example.com",
+          "节点选择 → 香港 02",
+          "↑",
+          "14 KB",
+          "↓",
+          "14 MB",
+          "192.0.2.53",
+          "节点选择 → 日本 01",
+          "↑",
+          "15 KB",
+          "↓",
+          "15 MB",
+          "api.example.com",
+          "节点选择 → 日本 02",
+          "↑",
+          "16 KB",
+          "↓",
+          "16 MB",
+          "download.example.com",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "17 KB",
+          "↓",
+          "17 MB",
+          "203.0.113.20",
+          "节点选择 → 台湾 01",
+          "↑",
+          "18 KB",
+          "↓",
+          "18 MB"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_executed_by_this_review": false,
+      "observations": [
+        "Connections tab, green endpoint dot, link glyphs and directional blue/green values actual viewed. Eighteen real fixture connections differ from PDF four sample rows; this is recorded as fixture content."
+      ],
+      "supplement_only_API35": true,
+      "counted_as_required_API36_primary": false,
+      "RGB_body24to804_difference_bbox_vs_historical273_API36": null
+    },
+    {
+      "page": 43,
+      "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "run_id": 37366522056,
+      "producing_attempt": 2,
+      "api_level": 35,
+      "artifact_id": 11369762515,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-043-native-node-dialog.png",
+      "capture_sha256": "d2129566f508303c2d60c5cf8c44bc9a31cfa67a4b60540ae14032735f1d68cb",
+      "capture_size": [
+        394,
+        852
+      ],
+      "reference_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-43.png",
+      "reference_sha256": "c034159b7b7654af8776550c2be0dbf4f58eca7511f2631b522c0cd7f358e05d",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-274aa0d-api35-native-pairs/03B-43-pair.png",
+      "pair_sha256": "bacea1a369e620d9f13af12eeac3d5ae2604d54b3f1f4b0be52d3dbe28ba14ad",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-043-native-node-dialog.dom.json",
+        "sha256": "98e12fefe1034a74fe2944516acfc576374499c4cb0dfbdb07b7c2d9e9f64984",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n节点选择\n香港 01\n香港 02\n日本 01\n日本 02\n新加坡 01\n台湾 01\n取消",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": true,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-043-native-node-dialog.xml",
+        "sha256": "144fd3041b737c8557a3a2b88c58ef0d3da3e144cf1aa6a75fab59dad4b2c4d4",
+        "node_count": 17,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "节点选择",
+          "节点选择",
+          "香港 01",
+          "香港 02",
+          "日本 01",
+          "日本 02",
+          "新加坡 01",
+          "台湾 01",
+          "取消"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_executed_by_this_review": false,
+      "observations": [
+        "Actual node-choice dialog has six options, first HongKong01 selected and Cancel footer. DOM nodeDialogOpen=true; visible original measured300x355px."
+      ],
+      "supplement_only_API35": true,
+      "counted_as_required_API36_primary": false,
+      "RGB_body24to804_difference_bbox_vs_historical273_API36": [
+        38,
+        174,
+        51,
+        329
+      ]
+    },
+    {
+      "page": 44,
+      "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "run_id": 37366522056,
+      "producing_attempt": 2,
+      "api_level": 35,
+      "artifact_id": 11369762515,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-044-native-switch-failure.png",
+      "capture_sha256": "923694d0ca83ef55787b88a444e1371732c9673139eec9e659c775b51451aacf",
+      "capture_size": [
+        394,
+        852
+      ],
+      "reference_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-44.png",
+      "reference_sha256": "f67e4ee9e099114bc09e1f2198399eeb4535b6daa04c090c15e6f7bcf1a8e45b",
+      "actually_opened_full_size_pair": true,
+      "pair_path": "/tmp/b-274aa0d-api35-native-pairs/03B-44-pair.png",
+      "pair_sha256": "1c928ba53a7f220b65c1fb04f48f530c2463eca3780a0d785a8ca5de332a9506",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-044-native-switch-failure.dom.json",
+        "sha256": "202deaf6dcfe8e4a9aa4ca005b59d8dc23d9ba448f5b515a0fa09f50f9447b2c",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n提示\n切换失败：HTTP 503\n确定",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": true,
+          "noticeMessage": "切换失败：HTTP 503"
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api35/reference-03B-044-native-switch-failure.xml",
+        "sha256": "e953ed6f0a926970d29988982e9c565a985cc722edc41a8f1b13ea6677108cf7",
+        "node_count": 11,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "提示",
+          "提示",
+          "切换失败：HTTP 503",
+          "确定"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "pixel_1to1_pass": false,
+      "all_callbacks_executed_by_this_review": false,
+      "observations": [
+        "Actual failure notice is open, says HTTP503 and Confirm. DOM nodeDialogOpen=false, noticeOpen=true, firstSelected remainsHongKong01, equal previous chooser state; no successful-selection or Google-account claim.",
+        "Notice surface115px, body74px and footer41px actual measured; notice-only footer fix retained."
+      ],
+      "supplement_only_API35": true,
+      "counted_as_required_API36_primary": false,
+      "RGB_body24to804_difference_bbox_vs_historical273_API36": [
+        38,
+        174,
+        51,
+        329
+      ]
+    }
+  ],
+  "measurements": [
+    {
+      "page": 43,
+      "method": "Bounding bright dialog pixels using minRGB > threshold inside stated ROI. Stable across225/230/235/240; no screenshot rescale for current measurement. Reference units normalized by394/425 raster width.",
+      "current": [
+        {
+          "threshold": 225,
+          "bbox": [
+            47,
+            237,
+            347,
+            592
+          ],
+          "width": 300,
+          "height": 355
+        },
+        {
+          "threshold": 230,
+          "bbox": [
+            47,
+            237,
+            347,
+            592
+          ],
+          "width": 300,
+          "height": 355
+        },
+        {
+          "threshold": 235,
+          "bbox": [
+            47,
+            237,
+            347,
+            592
+          ],
+          "width": 300,
+          "height": 355
+        },
+        {
+          "threshold": 240,
+          "bbox": [
+            47,
+            237,
+            347,
+            592
+          ],
+          "width": 300,
+          "height": 355
+        }
+      ],
+      "reference": [
+        {
+          "threshold": 225,
+          "bbox": [
+            50,
+            322,
+            375,
+            704
+          ],
+          "width": 325,
+          "height": 382,
+          "width_normalized": 301.29411764705884,
+          "height_normalized": 354.1364705882353
+        },
+        {
+          "threshold": 230,
+          "bbox": [
+            50,
+            322,
+            375,
+            704
+          ],
+          "width": 325,
+          "height": 382,
+          "width_normalized": 301.29411764705884,
+          "height_normalized": 354.1364705882353
+        },
+        {
+          "threshold": 235,
+          "bbox": [
+            50,
+            322,
+            375,
+            704
+          ],
+          "width": 325,
+          "height": 382,
+          "width_normalized": 301.29411764705884,
+          "height_normalized": 354.1364705882353
+        },
+        {
+          "threshold": 240,
+          "bbox": [
+            50,
+            322,
+            375,
+            704
+          ],
+          "width": 325,
+          "height": 382,
+          "width_normalized": 301.29411764705884,
+          "height_normalized": 354.1364705882353
+        }
+      ],
+      "current_roi": [
+        20,
+        180,
+        375,
+        650
+      ],
+      "reference_roi": [
+        20,
+        250,
+        405,
+        760
+      ]
+    },
+    {
+      "page": 44,
+      "method": "Bounding bright dialog pixels using minRGB > threshold inside stated ROI. Stable across225/230/235/240; no screenshot rescale for current measurement. Reference units normalized by394/425 raster width.",
+      "current": [
+        {
+          "threshold": 225,
+          "bbox": [
+            78,
+            357,
+            316,
+            472
+          ],
+          "width": 238,
+          "height": 115
+        },
+        {
+          "threshold": 230,
+          "bbox": [
+            78,
+            357,
+            316,
+            472
+          ],
+          "width": 238,
+          "height": 115
+        },
+        {
+          "threshold": 235,
+          "bbox": [
+            78,
+            357,
+            316,
+            472
+          ],
+          "width": 238,
+          "height": 115
+        },
+        {
+          "threshold": 240,
+          "bbox": [
+            78,
+            357,
+            316,
+            472
+          ],
+          "width": 238,
+          "height": 115
+        }
+      ],
+      "reference": [
+        {
+          "threshold": 225,
+          "bbox": [
+            85,
+            441,
+            341,
+            564
+          ],
+          "width": 256,
+          "height": 123,
+          "width_normalized": 237.3270588235294,
+          "height_normalized": 114.02823529411765
+        },
+        {
+          "threshold": 230,
+          "bbox": [
+            85,
+            441,
+            341,
+            564
+          ],
+          "width": 256,
+          "height": 123,
+          "width_normalized": 237.3270588235294,
+          "height_normalized": 114.02823529411765
+        },
+        {
+          "threshold": 235,
+          "bbox": [
+            85,
+            441,
+            341,
+            564
+          ],
+          "width": 256,
+          "height": 123,
+          "width_normalized": 237.3270588235294,
+          "height_normalized": 114.02823529411765
+        },
+        {
+          "threshold": 240,
+          "bbox": [
+            85,
+            441,
+            341,
+            564
+          ],
+          "width": 256,
+          "height": 123,
+          "width_normalized": 237.3270588235294,
+          "height_normalized": 114.02823529411765
+        }
+      ],
+      "current_roi": [
+        50,
+        300,
+        350,
+        600
+      ],
+      "reference_roi": [
+        50,
+        400,
+        375,
+        610
+      ],
+      "current_divider_y": 431,
+      "current_body_height": 74,
+      "current_footer_height": 41,
+      "reference_divider_y": 520,
+      "reference_body_height_raw": 79,
+      "reference_footer_height_raw": 44,
+      "reference_body_height_normalized": 73.23764705882353,
+      "reference_footer_height_normalized": 40.790588235294116,
+      "reference_total_height_normalized": 114.02823529411765,
+      "current_total_height": 115,
+      "current_background_surface": 238,
+      "remaining_under1px_normalized_total_height_difference_not_inferred_as_source_bug": true
+    }
+  ],
+  "remaining_high_confidence_new_production_layout_defects": [],
+  "conclusion": "No new high-confidence source layout defect in these five current API35 states; existing notice-onlyCSS yields115/41 and node dialog remains300x355. Literalpixel1:1false; truthful fixture/OEM/UI raster differences retained.",
+  "partial_primary_report_unchanged": {
+    "path": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-274aa0d-visual-review.json",
+    "sha256": "7d504f08a5fac8aa34fdd9d0c5cf626658bc7e46dd4137280cc31a04d30e6d52",
+    "native40to44_status": "WAITING ownAPI36, noAPI35 substituted"
+  },
+  "limits": [
+    "This reviewer opened images and read captured DOM/XML; did not execute UI callbacks or authentication during review.",
+    "Other-agent API35 64/21/Root0/Bearer/cleanup results are not independently asserted by this visual-only report.",
+    "API35 intermediate does not establish overall53/API36 success or Google account authentication; root cause remainsunknown.",
+    "No production source, tests, inputs, patch, mainB report or CI modified."
+  ]
+}

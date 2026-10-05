@@ -1,0 +1,38 @@
+{
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "priorAttempt": 3,
+  "preservedTerminalArchive": "docs/qa/20261005-v2085-274aa0d-attempt3-terminal-observed.json",
+  "preservedTerminalArchiveSha256": "145d1fd4fa4027730d4e3ba1af7248c311a60bef5dbf7cdbbc92f2c7aafefb54",
+  "authorizedAction": "User expressly permits required samebranch CI retries and followup fixes",
+  "action": "github_rerun_failed_workflow_run_jobs",
+  "response": {
+    "content": [
+      {
+        "type": "text",
+        "text": "Action completed."
+      }
+    ],
+    "structuredContent": {
+      "success": true
+    },
+    "isError": false
+  },
+  "onlyUnpassedJobsAtRequest": [
+    "Installed APK on Android API36",
+    "Reproduce V20.74 custom palette crash on API36"
+  ],
+  "originalSuccessfulBuildAndApi35Retained": true,
+  "observedImmediatelyAfterRequest": {
+    "runAttempt": 3,
+    "status": "queued",
+    "runStartedAt": "2026-10-05T21:09:17Z"
+  },
+  "noNewWorkflowOrSourceCommit": true,
+  "sourceGatesEnvironmentPermissionsTestsChanged": false,
+  "ciCancelledByThisTask": false,
+  "applicationAcceptanceStillPendingApi36AndBaseline": true,
+  "realGoogleAccountAcceptanceStillUnverified": true
+}

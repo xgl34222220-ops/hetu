@@ -23,7 +23,13 @@
   "HxMenusWholeFileFrozen": true,
   "homePanelSourceDiffFrom492": [],
   "hostChecksPassed": 61,
-  "candidateOwnBuildAndInstalledAcceptance": "Own build487/51XML,379effectiveinputs,100hostguards andAPI35 64/21passed; API36 singlejob retry queued and historicalbaseline canceled. Whole53 not yetPASS.",
+  "candidateOwnBuildAndInstalledAcceptance": {
+    "result": "PASS",
+    "runId": 37366522056,
+    "strictEvidenceChecks": 53,
+    "archivedEvidence": "docs/qa/20261005-v2085-274aa0d-installation-success.json",
+    "sha256": "5190c9f3f1aa5c623cdf1e3f6b3164f1121b7db78aeb18ac9a93e8ba7b636461"
+  },
   "completeEffectiveSourceVerifiedLocally": false,
   "unavailableUnchangedPayloads": [
     "mihomo arm64",

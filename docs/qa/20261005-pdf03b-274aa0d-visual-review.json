@@ -4,8 +4,8 @@
   "created_utc": "2026-10-05T20:41:26.777101+00:00",
   "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
   "run_id": 37366522056,
-  "run_attempt": 2,
-  "review_status": "COMPONENT43 COMPLETE; WAITING own API36 installed primary40-44. No overall48 native completion claimed.",
+  "run_attempt": 4,
+  "review_status": "FINAL COMPLETE48 own274aa0d primary:43attempt2 components+5freshownAPI36 attempt4 native actually opened; notice115/footer41/body74 and node300x355 reverified; literalpixel1:1false",
   "ui_artifact": {
     "id": 11371015758,
     "zip_path": "/workspace/scratch/3788973cf567/attachments/8e00c953-c7bc-4a58-91cf-17375fd14a4f/github-actions-artifact-11371015758.zip",
@@ -50,20 +50,26 @@
       47,
       48
     ],
-    "installed_native_pages_reviewed": 0,
-    "installed_pages_waiting": [
+    "installed_native_pages_reviewed": 5,
+    "installed_pages_waiting": [],
+    "browser_pages_counted_as_installation": 0,
+    "literal_pixel_1to1_pass": 0,
+    "fresh_primary_pngs_total": 48,
+    "complete_primary_page_coverage": 48,
+    "actually_opened_full_size_pair_true": 8,
+    "actually_opened_full_size_pair_false": 40,
+    "installed_native_pages": [
       40,
       41,
       42,
       43,
       44
     ],
-    "browser_pages_counted_as_installation": 0,
-    "literal_pixel_1to1_pass": 0,
-    "fresh_primary_pngs_total": 43,
-    "complete_primary_page_coverage": 43,
-    "actually_opened_full_size_pair_true": 3,
-    "actually_opened_full_size_pair_false": 45
+    "distinct_fresh_primary_png_hashes": 48,
+    "fresh_native_pairs_actually_opened": 5,
+    "pairedVisualOpenedInThisFinalReview_true": 8,
+    "pairedVisualOpenedInThisFinalReview_false": 40,
+    "high_confidence_new_production_layout_defects_in_reviewed_states": 0
   },
   "validation_status": {
     "JUnit_XML_count": 51,
@@ -654,7 +660,7 @@
     },
     "own_intake_consolidation_path": "/workspace/scratch/3788973cf567/tmp/ui85-274aa0d/evidence/out/verification/tools-intake-tests.json",
     "own_intake_consolidation_sha256": "aa31b2ca39d28519874deca7ead45fde1a1d7663e1bede890f23d9da06f6c287",
-    "native_installation": "WAITING; no previous native result reused"
+    "native_installation": "OwnAPI36 attempt4 installed/launched and64 checks passed in fresh actual raw results; this is isolated fixture evidence, not realGoogle account proof"
   },
   "source_at_capture_checks": [
     {
@@ -821,7 +827,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 2,
@@ -864,7 +871,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 3,
@@ -907,7 +915,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 4,
@@ -950,7 +959,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 5,
@@ -993,7 +1003,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 6,
@@ -1036,7 +1047,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 7,
@@ -1079,7 +1091,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 8,
@@ -1122,7 +1135,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 9,
@@ -1164,7 +1178,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 10,
@@ -1207,7 +1222,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 11,
@@ -1250,7 +1266,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 12,
@@ -1293,7 +1310,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 13,
@@ -1337,7 +1355,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 14,
@@ -1380,7 +1399,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 15,
@@ -1423,7 +1443,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 16,
@@ -1466,7 +1487,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 17,
@@ -1509,7 +1531,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 18,
@@ -1552,7 +1575,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 19,
@@ -1595,7 +1619,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 20,
@@ -1638,7 +1663,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 21,
@@ -1681,7 +1707,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 22,
@@ -1724,7 +1751,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 23,
@@ -1767,7 +1795,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 24,
@@ -1810,7 +1839,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 25,
@@ -1853,7 +1883,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 26,
@@ -1896,7 +1927,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 27,
@@ -1939,7 +1971,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 28,
@@ -1981,7 +2014,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 29,
@@ -2024,7 +2058,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 30,
@@ -2067,7 +2102,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 31,
@@ -2110,7 +2146,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 32,
@@ -2153,7 +2190,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 33,
@@ -2196,7 +2234,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 34,
@@ -2239,7 +2278,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 35,
@@ -2281,7 +2321,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 36,
@@ -2324,7 +2365,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 37,
@@ -2367,7 +2409,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 38,
@@ -2410,7 +2453,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 39,
@@ -2453,7 +2497,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 40,
@@ -2464,17 +2509,85 @@
       "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
       "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
       "run_id": 37366522056,
-      "actually_opened_full_size_pair": false,
-      "pairedVisualOpenedInThisFinalReview": false,
+      "actually_opened_full_size_pair": true,
+      "pairedVisualOpenedInThisFinalReview": true,
       "pixel_1to1_pass": false,
       "all_callbacks_for_this_page_executed_by_review": false,
-      "capture_path": null,
-      "capture_sha256": null,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-040-native-overview.png",
+      "capture_sha256": "bbd6a0eb4c8df954d43a53556be0fcce735fb36ec081801ac4a8d7b3024a3bdb",
       "capture_kind": "installed-Android-native-WebView",
-      "current_capture_status": "WAITING own run attempt2 API36 fresh installation artifact; no old native substituted",
+      "current_capture_status": "own274aa0d fresh API36 attempt4 installed native actually opened",
       "old_native_accepted_as_fresh": false,
       "browser_accepted_as_installation": false,
-      "observations": []
+      "observations": [
+        "Own attempt4 API36 native full-size image and actual PDF pair opened: four metric cards, cube/link/layers/traffic glyphs and green Connected tick pill. Current DOM metricCount4 and own XML labels corroborate image.",
+        "Owned loopback endpoint127.0.0.1:29090 differs from PDF9090 by fixture configuration; not substituted with PDF data."
+      ],
+      "artifact_id": 11371747785,
+      "producing_attempt": 4,
+      "producing_job_id": 111978206731,
+      "apiLevel": 36,
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_domain": "Own attempt4 installed API36 AndroidWebView, isolated loopback controller127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "pair_path": "/tmp/b-274aa0d-api36-native-pairs/03B-40-pair.png",
+      "pair_sha256": "8d5b02e5177ae0469b0beff9cd97de64219b54fd691536791c3e63be5a9f6c20",
+      "API35_intermediate_accepted_as_API36": false,
+      "review_method": "Actual own attempt4 fresh394x852 original and full actual PDF original opened together; corresponding own DOM/XML read and PNG hash independently verified. Historical native and API35 images not used as current primary.",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-040-native-overview.dom.json",
+        "sha256": "3fda4bf1950176f51c0e4dbe822c25b5c49d85facd7548bb3da2aebb1c4711fd",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n核心版本\nMihomo v1.19.0\n当前连接\n18\n策略组\n12\n累计流量\n↑ 624 KB · ↓ 165 MB",
+          "status": "已连接",
+          "metricCount": 4,
+          "groupCount": 0,
+          "connectionCount": 0,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-040-native-overview.xml",
+        "sha256": "9ebfbb9de8fa86b7da1fbf22898bc9762788487f0042e9e95d73a695aab763fe",
+        "node_count": 30,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "核心版本",
+          "Mihomo v1.19.0",
+          "当前连接",
+          "18",
+          "策略组",
+          "12",
+          "累计流量",
+          "↑ 624 KB · ↓ 165 MB"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGB_diff_bbox_vs_historical2730954_API36": [
+        16,
+        6,
+        24,
+        18
+      ],
+      "RGB_body24to804_diff_bbox_vs_historical2730954_API36": null
     },
     {
       "page": 41,
@@ -2485,17 +2598,125 @@
       "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
       "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
       "run_id": 37366522056,
-      "actually_opened_full_size_pair": false,
-      "pairedVisualOpenedInThisFinalReview": false,
+      "actually_opened_full_size_pair": true,
+      "pairedVisualOpenedInThisFinalReview": true,
       "pixel_1to1_pass": false,
       "all_callbacks_for_this_page_executed_by_review": false,
-      "capture_path": null,
-      "capture_sha256": null,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-041-native-groups.png",
+      "capture_sha256": "f26f230ccaa20983186a49edc3e8f5f9bb01fd5afbb1ddc7afd073335231aacc",
       "capture_kind": "installed-Android-native-WebView",
-      "current_capture_status": "WAITING own run attempt2 API36 fresh installation artifact; no old native substituted",
+      "current_capture_status": "own274aa0d fresh API36 attempt4 installed native actually opened",
       "old_native_accepted_as_fresh": false,
       "browser_accepted_as_installation": false,
-      "observations": []
+      "observations": [
+        "Own attempt4 API36 Groups pair opened: inline Connected tick, slider/circle/shield icons and AI stable bolt are present. DOM groupCount12, firstSelectedHongKong01.",
+        "Twelve live fixture groups and six-node options differ from PDF sample counts/selections; legal content remains and extra groups are not hidden to match sample rows."
+      ],
+      "artifact_id": 11371747785,
+      "producing_attempt": 4,
+      "producing_job_id": 111978206731,
+      "apiLevel": 36,
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_domain": "Own attempt4 installed API36 AndroidWebView, isolated loopback controller127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "pair_path": "/tmp/b-274aa0d-api36-native-pairs/03B-41-pair.png",
+      "pair_sha256": "564e6d3d5837ec3499bb4733693a0211cecf80cbe48c87b45ce88cf04fa095f6",
+      "API35_intermediate_accepted_as_API36": false,
+      "review_method": "Actual own attempt4 fresh394x852 original and full actual PDF original opened together; corresponding own DOM/XML read and PNG hash independently verified. Historical native and API35 images not used as current primary.",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-041-native-groups.dom.json",
+        "sha256": "517fa9dcbfc8236cdd68b62408d55e5c95f57d642ca30cbc81246c264ae19765",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-041-native-groups.xml",
+        "sha256": "96d29c2b2d5061a5dbec1a4b00c0f500c200cf1caac7fc76cba6a7aeaa97854a",
+        "node_count": 69,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "✓",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "节点选择",
+          "URLTest · 6 节点",
+          "香港 01",
+          "节点选择：选择节点",
+          "手动选择",
+          "Selector · 6 节点",
+          "香港 02",
+          "手动选择：选择节点",
+          "故障转移",
+          "Fallback · 6 节点",
+          "日本 01",
+          "故障转移：选择节点",
+          "AI 稳定",
+          "Fallback · 6 节点",
+          "日本 02",
+          "AI 稳定：选择节点",
+          "香港节点",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "香港节点：选择节点",
+          "日本节点",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "日本节点：选择节点",
+          "台湾节点",
+          "Fallback · 6 节点",
+          "香港 01",
+          "台湾节点：选择节点",
+          "新加坡节点",
+          "Fallback · 6 节点",
+          "香港 02",
+          "新加坡节点：选择节点",
+          "其他节点",
+          "Fallback · 6 节点",
+          "日本 01",
+          "其他节点：选择节点",
+          "流媒体",
+          "Fallback · 6 节点",
+          "日本 02",
+          "流媒体：选择节点",
+          "自动选择",
+          "Fallback · 6 节点",
+          "新加坡 01",
+          "自动选择：选择节点",
+          "备用选择",
+          "Fallback · 6 节点",
+          "台湾 01",
+          "备用选择：选择节点"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGB_diff_bbox_vs_historical2730954_API36": [
+        16,
+        6,
+        24,
+        18
+      ],
+      "RGB_body24to804_diff_bbox_vs_historical2730954_API36": null
     },
     {
       "page": 42,
@@ -2506,17 +2727,132 @@
       "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
       "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
       "run_id": 37366522056,
-      "actually_opened_full_size_pair": false,
-      "pairedVisualOpenedInThisFinalReview": false,
+      "actually_opened_full_size_pair": true,
+      "pairedVisualOpenedInThisFinalReview": true,
       "pixel_1to1_pass": false,
       "all_callbacks_for_this_page_executed_by_review": false,
-      "capture_path": null,
-      "capture_sha256": null,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-042-native-connections.png",
+      "capture_sha256": "a5f4cd201316306260a9fdb66deafc37ed11cec2afb7ed3dc0cdab47161c08e6",
       "capture_kind": "installed-Android-native-WebView",
-      "current_capture_status": "WAITING own run attempt2 API36 fresh installation artifact; no old native substituted",
+      "current_capture_status": "own274aa0d fresh API36 attempt4 installed native actually opened",
       "old_native_accepted_as_fresh": false,
       "browser_accepted_as_installation": false,
-      "observations": []
+      "observations": [
+        "Own attempt4 API36 Connections pair opened: endpoint green dot, link glyphs, directional blue/green values, row dividers. DOM connectionCount18.",
+        "Hostnames/routes/transferred values differ from PDF sample by fixture data; complete real fixture rows remain scrollable."
+      ],
+      "artifact_id": 11371747785,
+      "producing_attempt": 4,
+      "producing_job_id": 111978206731,
+      "apiLevel": 36,
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_domain": "Own attempt4 installed API36 AndroidWebView, isolated loopback controller127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "pair_path": "/tmp/b-274aa0d-api36-native-pairs/03B-42-pair.png",
+      "pair_sha256": "c803c4e8b0fd69af1c6d03c754328a13313467b0e25f858fd02fc137e746a5c9",
+      "API35_intermediate_accepted_as_API36": false,
+      "review_method": "Actual own attempt4 fresh394x852 original and full actual PDF original opened together; corresponding own DOM/XML read and PNG hash independently verified. Historical native and API35 images not used as current primary.",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-042-native-connections.dom.json",
+        "sha256": "971e161a3f629f51dda0ff172df578d07863b8bc96018abeb1079a2a57d4cb12",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\napi.example.com\n节点选择 → 香港 01\n↑1 KB\n↓1 MB\ndownload.example.com\n节点选择 → 香港 02\n↑2 KB\n↓2 MB\n203.0.113.20\n节点选择 → 日本 01\n↑3 KB\n↓3 MB\nupdates.example.com\n节点选择 → 日本 02\n↑4 KB\n↓4 MB\n192.0.2.53\n节点选择 → 新加坡 01\n↑5 KB\n↓5 MB\napi.example.com\n节点选择 → 台湾 01\n↑6 KB\n↓6 MB\ndownload.example.com\n节点选择 → 香港 01\n↑7 KB\n↓7 MB\n203.0.113.20\n节点选择 → 香港 02\n↑8 KB\n↓8 MB\nupdates.example.com\n节点选择 → 日本 01\n↑9 KB\n↓9 MB\n192.0.2.53\n节点选择 → 日本 02\n↑10 KB\n↓10 MB\napi.example.com\n节点选择 → 新加坡 01\n↑11 KB\n↓11 MB\ndownload.example.com\n节点选择 → 台湾 01\n↑12 KB\n↓12 MB\n203.0.113.20\n节点选择 → 香港 01\n↑13 KB\n↓13 MB\nupdates.example.com\n节点选择 → 香港 02\n↑14 KB\n↓14 MB\n192.0.2.53\n节点选择 → 日本 01\n↑15 KB\n↓15 MB\napi.example.com\n节点选择 → 日本 02\n↑16 KB\n↓16 MB\ndownload.example.com\n节点选择 → 新加坡 01\n↑17 KB\n↓17 MB\n203.0.113.20\n节点选择 → 台湾 01\n↑18 KB\n↓18 MB",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 0,
+          "connectionCount": 18,
+          "nodeDialogOpen": false,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-042-native-connections.xml",
+        "sha256": "181f9d42c1befbddd223aa240a78507800e3fcaaf0e78b70bdf804c6962cdedb",
+        "node_count": 77,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "河图 WebUI",
+          "127.0.0.1:29090",
+          "已连接",
+          "面板页面",
+          "概览",
+          "策略组",
+          "连接",
+          "api.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "1 KB",
+          "↓",
+          "1 MB",
+          "download.example.com",
+          "节点选择 → 香港 02",
+          "↑",
+          "2 KB",
+          "↓",
+          "2 MB",
+          "203.0.113.20",
+          "节点选择 → 日本 01",
+          "↑",
+          "3 KB",
+          "↓",
+          "3 MB",
+          "updates.example.com",
+          "节点选择 → 日本 02",
+          "↑",
+          "4 KB",
+          "↓",
+          "4 MB",
+          "192.0.2.53",
+          "节点选择 → 新加坡 01",
+          "↑",
+          "5 KB",
+          "↓",
+          "5 MB",
+          "api.example.com",
+          "节点选择 → 台湾 01",
+          "↑",
+          "6 KB",
+          "↓",
+          "6 MB",
+          "download.example.com",
+          "节点选择 → 香港 01",
+          "↑",
+          "7 KB",
+          "↓",
+          "7 MB",
+          "203.0.113.20",
+          "节点选择 → 香港 02",
+          "↑",
+          "8 KB",
+          "↓",
+          "8 MB",
+          "updates.example.com",
+          "节点选择 → 日本 01",
+          "↑",
+          "9 KB",
+          "↓",
+          "9 MB",
+          "192.0.2.53",
+          "节点选择 → 日本 02",
+          "↑"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGB_diff_bbox_vs_historical2730954_API36": [
+        16,
+        6,
+        24,
+        18
+      ],
+      "RGB_body24to804_diff_bbox_vs_historical2730954_API36": null
     },
     {
       "page": 43,
@@ -2527,17 +2863,77 @@
       "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
       "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
       "run_id": 37366522056,
-      "actually_opened_full_size_pair": false,
-      "pairedVisualOpenedInThisFinalReview": false,
+      "actually_opened_full_size_pair": true,
+      "pairedVisualOpenedInThisFinalReview": true,
       "pixel_1to1_pass": false,
       "all_callbacks_for_this_page_executed_by_review": false,
-      "capture_path": null,
-      "capture_sha256": null,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-043-native-node-dialog.png",
+      "capture_sha256": "caf41ecac247ee1978e9db42448a4a2f55adf1f296b6af4b12a73ef18668ee6e",
       "capture_kind": "installed-Android-native-WebView",
-      "current_capture_status": "WAITING own run attempt2 API36 fresh installation artifact; no old native substituted",
+      "current_capture_status": "own274aa0d fresh API36 attempt4 installed native actually opened",
       "old_native_accepted_as_fresh": false,
       "browser_accepted_as_installation": false,
-      "observations": []
+      "observations": [
+        "Own attempt4 API36 node chooser pair opened: six options, firstHongKong01 selected, Cancel footer. DOM nodeDialogOpen=true/noticeOpen=false; actual measured dialog300x355px."
+      ],
+      "artifact_id": 11371747785,
+      "producing_attempt": 4,
+      "producing_job_id": 111978206731,
+      "apiLevel": 36,
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_domain": "Own attempt4 installed API36 AndroidWebView, isolated loopback controller127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "pair_path": "/tmp/b-274aa0d-api36-native-pairs/03B-43-pair.png",
+      "pair_sha256": "b2629fe03b26d84de2cbe6d40661260f921d3988d146296ef86a0731395876bb",
+      "API35_intermediate_accepted_as_API36": false,
+      "review_method": "Actual own attempt4 fresh394x852 original and full actual PDF original opened together; corresponding own DOM/XML read and PNG hash independently verified. Historical native and API35 images not used as current primary.",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-043-native-node-dialog.dom.json",
+        "sha256": "98e12fefe1034a74fe2944516acfc576374499c4cb0dfbdb07b7c2d9e9f64984",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n节点选择\n香港 01\n香港 02\n日本 01\n日本 02\n新加坡 01\n台湾 01\n取消",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": true,
+          "noticeOpen": false,
+          "noticeMessage": ""
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-043-native-node-dialog.xml",
+        "sha256": "13f5f47a9974b28cb68981f652b999dfa4404eae420b20f02db4dba649252515",
+        "node_count": 17,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "节点选择",
+          "节点选择",
+          "香港 01",
+          "香港 02",
+          "日本 01",
+          "日本 02",
+          "新加坡 01",
+          "台湾 01",
+          "取消"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGB_diff_bbox_vs_historical2730954_API36": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "RGB_body24to804_diff_bbox_vs_historical2730954_API36": null
     },
     {
       "page": 44,
@@ -2548,17 +2944,73 @@
       "actual_source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
       "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
       "run_id": 37366522056,
-      "actually_opened_full_size_pair": false,
-      "pairedVisualOpenedInThisFinalReview": false,
+      "actually_opened_full_size_pair": true,
+      "pairedVisualOpenedInThisFinalReview": true,
       "pixel_1to1_pass": false,
       "all_callbacks_for_this_page_executed_by_review": false,
-      "capture_path": null,
-      "capture_sha256": null,
+      "capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-044-native-switch-failure.png",
+      "capture_sha256": "21c11bbe65668509519daf78005a2e76ef5f4be4cddbaafd2e503f4e87afff16",
       "capture_kind": "installed-Android-native-WebView",
-      "current_capture_status": "WAITING own run attempt2 API36 fresh installation artifact; no old native substituted",
+      "current_capture_status": "own274aa0d fresh API36 attempt4 installed native actually opened",
       "old_native_accepted_as_fresh": false,
       "browser_accepted_as_installation": false,
-      "observations": []
+      "observations": [
+        "Own attempt4 API36 failure-notice pair opened: visible HTTP503/Confirm. DOM nodeDialogOpen=false/noticeOpen=true and firstSelectedHongKong01 remains the pre-attempt node. Native input log records real isolated taps; this reviewer did not execute callbacks.",
+        "Actual notice238x115px, body74px, footer41px, divider431. Stable across225/230/235/240 brightness thresholds. Notice-only CSS retains correct compact footer; generic node chooser unchanged."
+      ],
+      "artifact_id": 11371747785,
+      "producing_attempt": 4,
+      "producing_job_id": 111978206731,
+      "apiLevel": 36,
+      "capture_size": [
+        394,
+        852
+      ],
+      "capture_domain": "Own attempt4 installed API36 AndroidWebView, isolated loopback controller127.0.0.1:29090",
+      "actually_opened_full_size_raw": true,
+      "pair_path": "/tmp/b-274aa0d-api36-native-pairs/03B-44-pair.png",
+      "pair_sha256": "36b31219a1d644bcf17c01dc48c967f7be90cec70bfd2f93e6e456c512a2a501",
+      "API35_intermediate_accepted_as_API36": false,
+      "review_method": "Actual own attempt4 fresh394x852 original and full actual PDF original opened together; corresponding own DOM/XML read and PNG hash independently verified. Historical native and API35 images not used as current primary.",
+      "actual_dom": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-044-native-switch-failure.dom.json",
+        "sha256": "202deaf6dcfe8e4a9aa4ca005b59d8dc23d9ba448f5b515a0fa09f50f9447b2c",
+        "read": {
+          "text": "河图 WebUI\n127.0.0.1:29090\n已连接\n概览\n策略组\n连接\n节点选择\nURLTest · 6 节点\n香港 01\n香港 01\n手动选择\nSelector · 6 节点\n香港 02\n香港 02\n故障转移\nFallback · 6 节点\n日本 01\n日本 01\nAI 稳定\nFallback · 6 节点\n日本 02\n日本 02\n香港节点\nFallback · 6 节点\n新加坡 01\n新加坡 01\n日本节点\nFallback · 6 节点\n台湾 01\n台湾 01\n台湾节点\nFallback · 6 节点\n香港 01\n香港 01\n新加坡节点\nFallback · 6 节点\n香港 02\n香港 02\n其他节点\nFallback · 6 节点\n日本 01\n日本 01\n流媒体\nFallback · 6 节点\n日本 02\n日本 02\n自动选择\nFallback · 6 节点\n新加坡 01\n新加坡 01\n备用选择\nFallback · 6 节点\n台湾 01\n台湾 01\n提示\n切换失败：HTTP 503\n确定",
+          "status": "已连接",
+          "metricCount": 0,
+          "groupCount": 12,
+          "connectionCount": 0,
+          "firstSelected": "香港 01",
+          "nodeDialogOpen": false,
+          "noticeOpen": true,
+          "noticeMessage": "切换失败：HTTP 503"
+        }
+      },
+      "actual_xml": {
+        "path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-044-native-switch-failure.xml",
+        "sha256": "f1e0ce67a479969e608602914db6915291953b7688f444de365e20a6a56d81ca",
+        "node_count": 11,
+        "packages": [
+          "io.github.xgl34222220.hetu"
+        ],
+        "text_nodes_read": [
+          "河图 WebUI",
+          "提示",
+          "提示",
+          "切换失败：HTTP 503",
+          "确定"
+        ],
+        "rotation": "0"
+      },
+      "frame_hash_manifest_matches_independent_hash": true,
+      "RGB_diff_bbox_vs_historical2730954_API36": [
+        16,
+        6,
+        44,
+        18
+      ],
+      "RGB_body24to804_diff_bbox_vs_historical2730954_API36": null
     },
     {
       "page": 45,
@@ -2601,7 +3053,8 @@
       ],
       "observations": [
         "No new image geometry/state/text change. Current source checks below distinguish the unrelated notification-only ToolScreens presentation delta."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 46,
@@ -2645,7 +3098,8 @@
         "Actual owned backend is http://localhost:59395/ instead of prior localhost:32773 and PDF 127.0.0.1:3000. Independently computed all changed RGB bbox is [155,199,200,212], exactly port digits; all remaining pixels match2730954.",
         "Checking/connected/unavailable state glyphs, buttons and full explanation remain visible; actual version fixture and HTTP503 error remain truthful and are not copied from PDF sample.",
         "No new high-confidence production layout difference is introduced by this capture; literal pixel equality remains false."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 47,
@@ -2689,7 +3143,8 @@
         "Actual owned backend is http://localhost:59395/ instead of prior localhost:32773 and PDF 127.0.0.1:3000. Independently computed all changed RGB bbox is [155,199,200,212], exactly port digits; all remaining pixels match2730954.",
         "Checking/connected/unavailable state glyphs, buttons and full explanation remain visible; actual version fixture and HTTP503 error remain truthful and are not copied from PDF sample.",
         "No new high-confidence production layout difference is introduced by this capture; literal pixel equality remains false."
-      ]
+      ],
+      "producing_attempt": 2
     },
     {
       "page": 48,
@@ -2733,14 +3188,971 @@
         "Actual owned backend is http://localhost:59395/ instead of prior localhost:32773 and PDF 127.0.0.1:3000. Independently computed all changed RGB bbox is [155,199,200,212], exactly port digits; all remaining pixels match2730954.",
         "Checking/connected/unavailable state glyphs, buttons and full explanation remain visible; actual version fixture and HTTP503 error remain truthful and are not copied from PDF sample.",
         "No new high-confidence production layout difference is introduced by this capture; literal pixel equality remains false."
-      ]
+      ],
+      "producing_attempt": 2
     }
   ],
   "limits": [
-    "Literal pixel1:1 is false; PDF source raster/OEM chrome and fixture content differ. No unsupported pixel-perfect success claim.",
-    "Only byte-identical component pages inherit the precisely hashed matching2730954 actual review; fresh changed component pairs were actually opened.",
-    "Own API36 fresh native40-44 still required before complete48 review. Browser screenshots do not satisfy installation evidence.",
-    "This report is visual/source/test evidence only; it does not establish real Google account authentication or root cause, nor real-user-device repair.",
-    "No source, tests, patch, inputs, CI or device were modified during this visual review."
-  ]
+    "Literal pixel1:1 remainsfalse; no unsupported pixel-perfect success claim.",
+    "Forty byte-identical component pages explicitly inherit the precisely hashed matching2730954 actual review; the three changed component pairs and five fresh ownAPI36 native pairs were actually opened in this final review.",
+    "OwnUI producingattempt2 and ownAPI36 producingattempt4 are independently identified sameapp/samerun artifacts. API35/historical/browser frames are not substituted for native36 primary.",
+    "CI native tap evidence and64 fixture checks are recorded; reviewer did not execute all page callbacks. Neither64 nor487 is actual Google account authentication or real-user-device repair proof; rootcause remainsunknown.",
+    "This report does not assert global CI53 time-chain closure; detailed auth/CI closure belongs to parent/Google reviewer.",
+    "No source, tests, patch, inputs, CI or device modified during this visual review."
+  ],
+  "ui_producing_attempt": 2,
+  "native_producing_attempt": 4,
+  "updated_utc": "2026-10-05T21:37:13.296281+00:00",
+  "native_artifact": {
+    "id": 11371747785,
+    "application_commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+    "run_id": 37366522056,
+    "producing_attempt": 4,
+    "producing_job_id": 111978206731,
+    "zip_path": "/workspace/scratch/3788973cf567/attachments/3800df9e-1a23-498c-8cc8-80e4cdd29570/github-actions-artifact-11371747785.zip",
+    "zip_sha256": "fc56e8312c094622deeeb8d04c4a4863e583d1f1aa485db86c9cb4e0360826ad",
+    "zip_bytes": 3804018,
+    "digest_independently_verified": true,
+    "extracted_root": "/tmp/hetu-ci-latest-274aa0d/api36",
+    "api_level": 36,
+    "identity_association": "Parent and Google associated ownattempt4 job/artifact with same app/run. Reviewer independently hashed ZIP and own primaryPNG/DOM/XML and read version/install/launch/preflight; API35 and historical images not substituted.",
+    "native_frame_hash_manifest": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/native-webview-frame-hashes.json",
+      "sha256": "8f9be7f30f8f6c25dc1d3de91fd6ea0e1c4f358970f366bb3396ebb3a3a54325",
+      "read": {
+        "reference-03B-040-native-overview.png": "bbd6a0eb4c8df954d43a53556be0fcce735fb36ec081801ac4a8d7b3024a3bdb",
+        "reference-03B-041-native-groups.png": "f26f230ccaa20983186a49edc3e8f5f9bb01fd5afbb1ddc7afd073335231aacc",
+        "reference-03B-042-native-connections.png": "a5f4cd201316306260a9fdb66deafc37ed11cec2afb7ed3dc0cdab47161c08e6",
+        "reference-03B-043-native-node-dialog.png": "caf41ecac247ee1978e9db42448a4a2f55adf1f296b6af4b12a73ef18668ee6e",
+        "reference-03B-044-native-switch-failure.png": "21c11bbe65668509519daf78005a2e76ef5f4be4cddbaafd2e503f4e87afff16"
+      }
+    },
+    "installed_version": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/version.txt",
+      "sha256": "1e66fe55018d1270fb993e257efbe7c237973701b328c9ac5ffbadbe0da984cd",
+      "actual_read": "    versionCode=2085 minSdk=26 targetSdk=35\n    versionName=0.12.15-v20-pdf"
+    },
+    "install_result": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/install.txt",
+      "sha256": "a36a69371713a3b8d889292cf4df86d9b24ab4c872b26b6c64de7e265d152114",
+      "actual_read": "candidate/Hetu-0.12.15-v20-pdf.apk: 1 file pushed, 0 skipped. 292.1 MB/s (134833109 bytes in 0.440s)\nPerforming Push Install\nSuccess\n"
+    },
+    "launch_result": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/launch.txt",
+      "sha256": "ac06351ccb12a22928626c39a05dec9f0d8e00f25c2733dffb68fce96209f70b",
+      "actual_read": "Starting: Intent { cmp=io.github.xgl34222220.hetu/.LauncherOfficial }\nStatus: ok\nLaunchState: COLD\nActivity: io.github.xgl34222220.hetu/.HetuActivity\nTotalTime: 2460\nWaitTime: 2462\nComplete\n"
+    },
+    "owned_target_preflight": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/panel-target-preflight.json",
+      "sha256": "70e811ff4a64e3e2239bb13fe9ef718f5df18e5c6a6bf76b7c7076b2d6582105",
+      "actual_read": {
+        "avd": "hetu-smoke",
+        "apiLevel": 36,
+        "ownedSession": "9009d8bf2a764708a7c7876e45117b58",
+        "runnerPid": 2577,
+        "launcherPid": 2591,
+        "launcherStartTicks": 17398,
+        "supervisorPid": 2593,
+        "emulatorPids": [
+          2594
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      }
+    }
+  },
+  "native_acceptance_raw": {
+    "path": "/tmp/hetu-ci-latest-274aa0d/api36/results.json",
+    "sha256": "50e71a140bfa1d09697ea7cd0e02f1ba76504245861a61efb3e64784605b0d2a",
+    "actual_read": {
+      "checks": [
+        {
+          "name": "01-home",
+          "result": "passed"
+        },
+        {
+          "name": "00-language-selected",
+          "result": "passed"
+        },
+        {
+          "name": "01-home-language-restored",
+          "result": "passed"
+        },
+        {
+          "name": "01-home-new-ui",
+          "result": "passed"
+        },
+        {
+          "name": "02-panel-stopped",
+          "result": "passed"
+        },
+        {
+          "name": "02-panel-new-ui-overview",
+          "result": "passed"
+        },
+        {
+          "name": "02-panel-new-ui-rulesets",
+          "result": "passed"
+        },
+        {
+          "name": "03-tools",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-entry",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-stop",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-root-error-details",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-root-error-expanded",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-environment",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-overflow",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-document-picker",
+          "result": "passed"
+        },
+        {
+          "name": "scripts-import-cancelled",
+          "result": "passed"
+        },
+        {
+          "name": "04-settings",
+          "result": "passed"
+        },
+        {
+          "name": "boot-settings",
+          "result": "passed"
+        },
+        {
+          "name": "boot-root-denial-visible",
+          "result": "passed"
+        },
+        {
+          "name": "boot-denial-keeps-toggle-off",
+          "result": "passed"
+        },
+        {
+          "name": "05-about",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-entry",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-without-root",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-storage-bound-visible",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-truncation-visible",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-copy-action",
+          "result": "passed"
+        },
+        {
+          "name": "network-events-full-history-preserved",
+          "result": "passed"
+        },
+        {
+          "name": "safe-session-repair-entry",
+          "result": "passed"
+        },
+        {
+          "name": "safe-session-repair-root-denial",
+          "result": "passed"
+        },
+        {
+          "name": "06-web-panels",
+          "result": "passed"
+        },
+        {
+          "name": "07-native-webview",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "08-native-webview-disconnected",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "09-webview-back",
+          "result": "passed"
+        },
+        {
+          "name": "reference-03B-040-native-overview",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "reference-03B-041-native-groups",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "reference-03B-042-native-connections",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "reference-03B-043-native-node-dialog",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "reference-03B-044-native-switch-failure",
+          "result": "passed",
+          "evidence": "actual Android WebView DOM + native adb screenshot"
+        },
+        {
+          "name": "custom-palette-00-TonalSpot-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-01-Neutral-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-02-Vibrant-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-03-Expressive-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-04-Rainbow-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-05-FruitSalad-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-06-Monochrome-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-07-Fidelity-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-08-TonalSpot-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-09-Neutral-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-10-Vibrant-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-11-Expressive-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-12-Rainbow-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-13-FruitSalad-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-14-Monochrome-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-15-Fidelity-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-16-Vibrant-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-17-Vibrant-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-18-Fidelity-dark",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-19-FruitSalad-light",
+          "result": "passed"
+        },
+        {
+          "name": "custom-palette-20-Expressive-dark",
+          "result": "passed"
+        },
+        {
+          "name": "panel-controller-401-first-read",
+          "result": "passed",
+          "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+        },
+        {
+          "name": "panel-controller-401-api-settings",
+          "result": "passed",
+          "evidence": "actual NativeCompose ApiSheet opened by native tap"
+        },
+        {
+          "name": "panel-controller-401-retry",
+          "result": "passed",
+          "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+        },
+        {
+          "name": "panel-controller-200-recovered",
+          "result": "passed",
+          "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+        },
+        {
+          "name": "panel-controller-fixture-cleanup",
+          "result": "passed",
+          "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+        }
+      ],
+      "passed": 64,
+      "legacyChecksPassed": 59,
+      "paletteCasesPassed": 21,
+      "newPanelAuthChecks": [
+        {
+          "name": "panel-controller-401-first-read",
+          "result": "passed",
+          "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+        },
+        {
+          "name": "panel-controller-401-api-settings",
+          "result": "passed",
+          "evidence": "actual NativeCompose ApiSheet opened by native tap"
+        },
+        {
+          "name": "panel-controller-401-retry",
+          "result": "passed",
+          "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+        },
+        {
+          "name": "panel-controller-200-recovered",
+          "result": "passed",
+          "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+        },
+        {
+          "name": "panel-controller-fixture-cleanup",
+          "result": "passed",
+          "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+        }
+      ],
+      "fixtureOnly": true,
+      "rootMutationActions": 0,
+      "rootSetupDenialAttempts": 1,
+      "apiLevel": 36,
+      "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation."
+    },
+    "result_check_count_independently_counted": 64,
+    "summary": {
+      "passed": 64,
+      "legacyChecksPassed": 59,
+      "newPanelAuthChecks": 5,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "fixtureOnly": true,
+      "apiLevel": 36
+    },
+    "cleanup": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/emulator-cleanup.json",
+      "sha256": "d26ce3a91ec5d87281c4b17d42c8ea4d84978f899abb219da2dc07f3a1b6605a",
+      "actual_read": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2594,
+        "returncode": 0
+      }
+    },
+    "forward_cleanup": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/webview-forward-cleanup.json",
+      "sha256": "e8df8659c3c910a642a43bfa6d2e5de07645a2a20094af46c41158337020e13c",
+      "actual_read": [
+        {
+          "app_pid": 2369,
+          "local_port": 36025,
+          "removed": true
+        },
+        {
+          "app_pid": 2369,
+          "local_port": 42703,
+          "removed": true
+        }
+      ]
+    },
+    "runner_lifecycle": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/runner-lifecycle.json",
+      "sha256": "363af60a8a0a982e534260ce14c7e859f58e03c88ba7fcffab5a925a1db0e543",
+      "actual_read": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      }
+    },
+    "Google_valid_Bearer_request_count": {
+      "value": 19,
+      "source": "Google evidence reviewer own raw audit; detailed authentication and strict CI53 closure delegated to that reviewer and parent, not claimed as Google account authentication here"
+    }
+  },
+  "native_input_and_requests": {
+    "native_input": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/native-webview-input.json",
+      "sha256": "dd90d734a505e192974350086e18831130935cdd648f8589583d3bc4c5d74263",
+      "actual_read": [
+        {
+          "label": "策略组",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "连接",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            320,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "策略组",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            137
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "节点选择：选择节点",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            263,
+            261
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "香港 02",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            197,
+            354
+          ],
+          "input": "native adb tap"
+        },
+        {
+          "label": "确定",
+          "webview_bounds": [
+            0,
+            24,
+            394,
+            804
+          ],
+          "document_nodes": 2,
+          "viewport": [
+            394,
+            780
+          ],
+          "tap": [
+            277,
+            452
+          ],
+          "input": "native adb tap"
+        }
+      ]
+    },
+    "webview_fixture_requests": {
+      "path": "/tmp/hetu-ci-latest-274aa0d/api36/native-webview-fixture-requests.json",
+      "sha256": "e30170c539a2ec0043edd9ab040e37711d81975f6878105f8863b00e5b29f368",
+      "actual_read": [
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/favicon.ico"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "PUT",
+          "path": "/proxies/%E8%8A%82%E7%82%B9%E9%80%89%E6%8B%A9",
+          "valid_fixture_request": true
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/version"
+        },
+        {
+          "method": "GET",
+          "path": "/proxies"
+        },
+        {
+          "method": "GET",
+          "path": "/connections"
+        }
+      ]
+    },
+    "executed_by_CI_isolated_fixture": true,
+    "executed_by_this_reviewer": false
+  },
+  "production_layout_recheck": {
+    "measurements": [
+      {
+        "page": 43,
+        "current_actual_capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-043-native-node-dialog.png",
+        "current_actual_capture_sha256": "caf41ecac247ee1978e9db42448a4a2f55adf1f296b6af4b12a73ef18668ee6e",
+        "actual_current_roi": [
+          20,
+          180,
+          375,
+          650
+        ],
+        "method": "Original pixel surface bbox via minRGB > threshold, stable225/230/235/240; no geometry inferred from thumbnails or vendor font raster. Reference compared at394/425 width normalization.",
+        "current_measurements": [
+          {
+            "threshold": 225,
+            "bbox": [
+              47,
+              237,
+              347,
+              592
+            ],
+            "width": 300,
+            "height": 355
+          },
+          {
+            "threshold": 230,
+            "bbox": [
+              47,
+              237,
+              347,
+              592
+            ],
+            "width": 300,
+            "height": 355
+          },
+          {
+            "threshold": 235,
+            "bbox": [
+              47,
+              237,
+              347,
+              592
+            ],
+            "width": 300,
+            "height": 355
+          },
+          {
+            "threshold": 240,
+            "bbox": [
+              47,
+              237,
+              347,
+              592
+            ],
+            "width": 300,
+            "height": 355
+          }
+        ],
+        "reference_raw_bbox": [
+          50,
+          322,
+          375,
+          704
+        ],
+        "reference_raw_size": [
+          325,
+          382
+        ],
+        "reference_normalized_size": [
+          301.29411764705884,
+          354.1364705882353
+        ],
+        "node_dialog_layout_unchanged": true
+      },
+      {
+        "page": 44,
+        "current_actual_capture_path": "/tmp/hetu-ci-latest-274aa0d/api36/reference-03B-044-native-switch-failure.png",
+        "current_actual_capture_sha256": "21c11bbe65668509519daf78005a2e76ef5f4be4cddbaafd2e503f4e87afff16",
+        "actual_current_roi": [
+          50,
+          300,
+          350,
+          600
+        ],
+        "method": "Original pixel surface bbox via minRGB > threshold, stable225/230/235/240; no geometry inferred from thumbnails or vendor font raster. Reference compared at394/425 width normalization.",
+        "current_measurements": [
+          {
+            "threshold": 225,
+            "bbox": [
+              78,
+              357,
+              316,
+              472
+            ],
+            "width": 238,
+            "height": 115
+          },
+          {
+            "threshold": 230,
+            "bbox": [
+              78,
+              357,
+              316,
+              472
+            ],
+            "width": 238,
+            "height": 115
+          },
+          {
+            "threshold": 235,
+            "bbox": [
+              78,
+              357,
+              316,
+              472
+            ],
+            "width": 238,
+            "height": 115
+          },
+          {
+            "threshold": 240,
+            "bbox": [
+              78,
+              357,
+              316,
+              472
+            ],
+            "width": 238,
+            "height": 115
+          }
+        ],
+        "current_divider_y": 431,
+        "current_body_height": 74,
+        "current_footer_height": 41,
+        "current_total_height": 115,
+        "reference_raw_bbox": [
+          85,
+          441,
+          341,
+          564
+        ],
+        "reference_raw_total_height": 123,
+        "reference_raw_divider_y": 520,
+        "reference_raw_body_height": 79,
+        "reference_raw_footer_height": 44,
+        "reference_normalized_size": [
+          237.3270588235294,
+          114.02823529411765
+        ],
+        "reference_normalized_body_height": 73.23764705882353,
+        "reference_normalized_footer_height": 40.790588235294116,
+        "remaining_total_height_normalized_difference_below1px_not_inferred_as_source_bug": true
+      }
+    ],
+    "remaining_high_confidence_new_source_layout_defects": [],
+    "result": "No new high-confidence production layout defect in own reviewed48 states. Truthful fixture content, OEM/status/navigation chrome, font raster and normalized subpixel differences are not promoted to source defects.",
+    "literal_pixel_1to1": false,
+    "all_callbacks_executed_by_reviewer": false
+  },
+  "API35_intermediate_review": {
+    "path": "/tmp/hetu-03b-274aa0d-api35-intermediate-review.json",
+    "sha256": "0f3ec65be5834455dc04637da939dde9fb04e54e07fb946ccefc9743df4cb954",
+    "supplement_only": true,
+    "counted_as_API36_primary": false
+  }
 }

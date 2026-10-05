@@ -2,6 +2,14 @@
 
 功能生产源已编译/23载荷/687ABI通过，但原新run37376676669的Runtime unit tests在新增PanelExpansionAnchorTest的DpRect height/width类型误用处编译失败；0实际XML，Android单测、lint、当前双API未执行，不记542或Root0成功。原failure与历史对照success分别保留，未取消CI。根任务只修两处边界计算的尺寸类型（使用.value边差），原断言/阈值/4测试/542目标/56XML及全部生产文件不变；新层patch5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f，20新host+47原source再次通过，本地382缺4、CI完整386仍必须重建。详见docs/qa/20261006-v2086-anchor-fixture-compilation-candidate.json；196原host证明属于7b8首轮字节不改写。继续原branch新提交独立验收，不拿首轮或旧274/ec成功替代。
 
+截至2026-10-05T21:45Z，再读远端已到3b68da93082e43263e2cfae8011c05fa7fdcff14；既有功能任务已修两个测试夹具类型并保留7b8失败，新run37377929368正在执行。本任务保留其追加源/层/失败文档，不重复修改、不取消或重跑其CI。当前新版功能测试结果待其自己的新run完成；274的487/53PASS仅属于274。
+
+## 分支协调：274 CI 已通过且 PDF 差异已记录，后续功能候选由既有任务独立续验
+
+截至2026-10-05T21:43:51Z，远端原分支已由既有功能任务从1d184b5追加7b8de498dc3c4cd7d044bdbee0e7efe2233d7953；本任务ff保留该实现，不重复改其源码、不取消或重跑其CI。37376676669@7b8 attempt1的build已完成APK编译，但compileDebugUnitTestKotlin在PanelExpansionAnchorTest.kt:101/151发生Int/Dp类型/receiver不符，542/56XML尚未执行通过，lint/新包交付/双API安装未执行通过。原日志和全部job状态见docs/qa/20261005-function-owner-7b8-failure-observation.json；由原功能任务继续修编译及自己新验收，不用274的487/53PASS替代。
+
+下述274 PDF收口是受测应用274aa0d /37366522056的历史版本证据。130 map/currentReviewCommit、home/panel freeze/source及Google/测试APK严格绑定274，不代表最新7b8运行路由或panel修复已经验收。保留新任务全部源/CI/层/文档与失败证据；本笔仅追加证据文档，不回退源、不扩大权限、不操作用户设备。
+
 ## 当前接续：V20.86 用户授权功能修复（源已收口，尚未 Android 验收）
 
 用户提供河图下 Google Play 身份验证错误及 BoxProxy 下同账号正常的截图，明确要求修复功能缺陷和策略组展开大幅上跳。本轮授权允许修复实际 launcher 的策略交互、运行路由、测速请求归属及订阅编辑；旧纯呈现 freeze 对这些明确范围不再阻止修复。保留当前设计、原功能入口/显式节点定位、原工具接入、四处 PDF 收尾、六历史补丁层、权限、签名、22 原载荷与原自启脚本。不引入 hook、不操作用户手机/账号、不清数据、不合并 main 或正式发布。
@@ -11,6 +19,22 @@
 已确认策略展开无条件滚顶、fake-IP落私网默认RETURN、IPv6共享DNS漏MAC、首页网站探测绕过运行核心且错误HTTP被接受、批次测速异常丢成功结果、共享测速/订阅迟到结果覆盖与busy归属、跨API短缓存、添加无BaseProvider锚点及删除块状use/共享锚点编辑缺陷。本地22命令/196 Python回归及主机Java检查通过，详见本轮source-host-proof；继续实际编译、全量单测、lint、23载荷/ABI/签名及API35/36隔离安装。旧核心覆盖安装后须由用户点击一次代理「重启」应用新脚本，不能强制重启已有连接。
 
 截图未给出故障时配置、DNS、实际Play/GMS UID链路或认证响应，真实Google账号错误唯一根因及真机修复仍未验证；AOSP及延迟测试不证明Google登录修复。本地Java/shell回归与Android新CI分别报告。详见docs/FUNCTION_FIX_20261006.md。
+
+## 本轮收口：274aa0d 独立 CI 与 PDF 证据，真实 Google 问题仍未定位
+
+截至2026-10-05T21:42:22.463860+00:00，原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui；受测应用提交274aa0d2f80dad39884bd3d079a2e02c86a90abd / Actions37366522056整轮completed/success，严格53项本轮原始证据PASS。应用build/UI/APK与API35实际producer为attempt2，API36及历史对照为其后续补验；最新attempt的新job元数据ID不冒称重新执行过保留的成功build/API35。初轮和后续各次排队取消/日志404、单job及failed-jobs恢复请求全部保留；取消者/原因未证实，不归因源码/节点。没有取消CI，没有跳过门禁或删原测试。
+
+自己的51份原XML487项、0失败/错误/跳过，原422全部继续；原479加intake8。CI实际379有效输入逐SHA与生成源一致，最后4呈现修改/375冻结、旧五层10inputs/patch字节原样，100host守卫(61+39)、23载荷、687构造ABI零缺失、lint及固定签名通过。本地仍缺4个不入Git原载荷，不能称本地完整有效源。全部已适配工具接入功能/授权helper和新增8测试保留；ec owner自身attempt3成功仅作协调证据，不代替274验收。
+
+本轮API35/36各64=59导航+5控制器认证、21配色，Root mutation0；Bearer六路径真实HTTP200分别19/19条，401先读、重试入口在200前可用、原偏好/reverse/forward/KVM/launcher/emulator清理均通过。前台轮询存在，不把200独占归因于重试点击。新旧AVD身份、路径、PID/session、nonce及nonRoot安全门禁实际执行。历史对照使用固定旧2074/ea8569...APK，在本轮隔离AOSP36实际复现SchemeTonalSpot NoSuchMethodError，ABI596引用/12缺失与清理证据已归档；旧整包签名字节身份与本job未直接apksigner重读区别保留。新274签名已在自己的build直接核实。
+
+本次附件03A49/03B48/0433原PDF已实际读取、逐页入口清单保留。130当前捕获/原稿SHA全部复核，125受控组件/原生Activity图加5自己的API36安装WebView图；16对本次实际重开、114页按完整相同字节继承，另有自己的API35五native实开补充报告。新Adblock字幕实际193×11对原193.264×11.096；通知25/26的字14、body181/180、行距35/34、蓝色/视觉内缩已在新图实核，22–24无退化、9目标7行及原回调/配置保留。首页panel43图42逐字节/RGBA同，另一全图实读仅端口47023→57531，source492→274无差；静态图不替代真机动效验收。
+
+130页严格字面像素1:1与全部130逐页回调/I-O仍未全部通过：A44量化标题/卡片gap微差、04/11字墨gap及字体/指针/阴影/OS/真实内容状态残差仍如实记载，未找到可唯一证明的新增窄源修法，原字体、自动定位、完整合法内容及真实数据继续保留。现有有效功能、核心、签名、权限、home/panel布局动效与无hook约束保持。
+
+197434.jpg为Google帐号认证错误+重试/Hot Air Balloon，非CAPTCHA。历史GMS不同链路/流量、HTTP200–499直测和本轮控制器401→200都不足定位GooglePlay帐号故障。缺当前故障时认证响应/DNS答案/实际UID分流代理链与正常代理同刻对照；真实根因未建立、真机修复未验证。AOSP无GMS/用户帐号，不操作用户手机、退出帐号、清数据或改网络安全设置。未合并main、正式发布或部署；V20.83 a93交付及全部原失败记录保留。
+
+最终测试APK134833109字节/SHA256 b58438e74239312a7cbd32c8675827ee2e3e7b256b59dfb879b06891171b29e3，六artifact ZIP、六part及整包实际双人核实；只作为原测试分支产物。详情见docs/qa/20261005-v2085-274aa0d-installation-success.json、三份274逐页报告、PDF map、home/panel freeze、Google evidence及APK delivery记录。
 
 ## 当前检查点：274aa0d 构建/API35 已通过，单 job 续验中
 

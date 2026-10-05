@@ -1,0 +1,194 @@
+{
+  "result": "PASS",
+  "applicationWorkflowSource": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "actualProducingAttempt": 4,
+  "actualProducingJobId": 111978206122,
+  "artifact": {
+    "kind": "baseline",
+    "artifact_id": 11371150549,
+    "artifactSource": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+    "expectedSource": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+    "run_id": 37366522056,
+    "runAttempt": 4,
+    "producingJobId": 111978206122,
+    "bytes": 683986,
+    "digest": "sha256:f8f3b7d354196ae8588b29b87cef3df5ba83626b4264c8d1f62c1a036bb6e92c",
+    "zip": "/workspace/scratch/3788973cf567/attachments/6b534a95-881f-441b-bd69-6a898950b84d/github-actions-artifact-11371150549.zip",
+    "fileId": "file_00000000880481fda41085b7a893cb06",
+    "target": "/tmp/hetu-ci-latest-274aa0d/baseline2074",
+    "evidenceBase": "/tmp/hetu-ci-latest-274aa0d"
+  },
+  "historicalApkResults": {
+    "result": "expected_failure_reproduced",
+    "apkSha256": "ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f",
+    "versionCode": 2074,
+    "accent": "#EF4444",
+    "palette": "TonalSpot",
+    "appearance": "light",
+    "screen": "ProxyScriptsActivity",
+    "exception": "NoSuchMethodError",
+    "apiLevel": 36,
+    "fixtureOnly": true,
+    "limitations": "Controlled AOSP reproduction of historical APK. No phone Root or network validation."
+  },
+  "materialKolorAbi": {
+    "apkSha256": "ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f",
+    "dexCount": 10,
+    "constructorReferences": 596,
+    "missingConstructors": [
+      [
+        "Lcom/materialkolor/dynamiccolor/MaterialDynamicColors;",
+        "<init>",
+        "(Z)V"
+      ],
+      [
+        "Lcom/materialkolor/dynamiccolor/MaterialDynamicColors;",
+        "<init>",
+        "(ZILkotlin/jvm/internal/DefaultConstructorMarker;)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/DynamicScheme;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;Lcom/materialkolor/scheme/Variant;ZDLcom/materialkolor/palettes/TonalPalette;Lcom/materialkolor/palettes/TonalPalette;Lcom/materialkolor/palettes/TonalPalette;Lcom/materialkolor/palettes/TonalPalette;Lcom/materialkolor/palettes/TonalPalette;Lcom/materialkolor/palettes/TonalPalette;)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeContent;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeExpressive;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeFidelity;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeFruitSalad;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeMonochrome;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeNeutral;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeRainbow;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeTonalSpot;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ],
+      [
+        "Lcom/materialkolor/scheme/SchemeVibrant;",
+        "<init>",
+        "(Lcom/materialkolor/hct/Hct;ZD)V"
+      ]
+    ],
+    "compatible": false,
+    "expectedIncompatibleBaseline": true
+  },
+  "originalCrashRecord": "time=1791235039984\napp=0.12.4-v20 (2074)\nandroid=36\nmodel=Android SDK built for x86_64\nscreen=ProxyScriptsActivity\nthread=main\nexception=java.lang.NoSuchMethodError\n  at com.materialkolor.ktx.DynamicSchemeKt.toDynamicScheme-Iv8Zu3U(DynamicScheme.kt:41)\n  at com.materialkolor.ktx.DynamicSchemeKt.DynamicScheme-9lyMwEc(DynamicScheme.kt:135)\n  at com.materialkolor.DynamicColorSchemeKt.dynamicColorScheme-mm0v_cE(DynamicColorScheme.kt:111)\n  at com.materialkolor.DynamicColorSchemeKt.rememberDynamicColorScheme-_oUZ5uA(DynamicColorScheme.kt:60)\n  at com.materialkolor.DynamicMaterialThemeState.getColorScheme(DynamicMaterialThemeState.kt:342)\n  at com.materialkolor.DynamicMaterialThemeKt.DynamicMaterialTheme(DynamicMaterialTheme.kt:170)\n  at com.materialkolor.DynamicMaterialThemeKt.DynamicMaterialTheme-7VznAdA(DynamicMaterialTheme.kt:74)\n  at io.github.xgl34222220.hetu.ui.HetuThemeKt.HetuTheme(HetuTheme.kt:248)\n  at io.github.xgl34222220.hetu.ProxyScriptsActivity.onCreate$lambda$0(ProxyScriptsActivity.kt:63)\n  at io.github.xgl34222220.hetu.ProxyScriptsActivity$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:122)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:52)\n  at androidx.compose.ui.platform.ComposeView.Content(ComposeView.android.kt:615)\n  at androidx.compose.ui.platform.AbstractComposeView.ensureCompositionCreated$lambda$0$0(ComposeView.android.kt:335)\n  at androidx.compose.ui.platform.AbstractComposeView.$r8$lambda$haJlVCuyZDQPMe6uz0Clg0Uri0w(Unknown Source:0)\n  at androidx.compose.ui.platform.AbstractComposeView$$ExternalSyntheticLambda0.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:122)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:52)\n  at androidx.compose.runtime.CompositionLocalKt.CompositionLocalProvider(CompositionLocal.kt:408)\n  at androidx.compose.ui.platform.CompositionLocalsKt.ProvideCommonCompositionLocals(CompositionLocals.kt:255)\n  at androidx.compose.ui.platform.ComposeViewContext.ProvideCompositionLocals$lambda$4(ComposeViewContext.android.kt:518)\n  at androidx.compose.ui.platform.ComposeViewContext$$ExternalSyntheticLambda4.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:122)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:52)\n  at androidx.compose.runtime.CompositionLocalKt.CompositionLocalProvider(CompositionLocal.kt:408)\n  at androidx.compose.ui.platform.ComposeViewContext.ProvideCompositionLocals$ui(ComposeViewContext.android.kt:490)\n  at androidx.compose.ui.platform.WrappedComposition.setContent$lambda$0$1(Wrapper.android.kt:126)\n  at androidx.compose.ui.platform.WrappedComposition.$r8$lambda$6M750dKfgrqZayQXx8RTdC0WEQA(Unknown Source:0)\n  at androidx.compose.ui.platform.WrappedComposition$$ExternalSyntheticLambda1.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:122)\n  at androidx.compose.runtime.internal.ComposableLambdaImpl.invoke(ComposableLambda.kt:52)\n  at androidx.compose.runtime.internal.Expect_jvmKt.invokeComposable(Expect.jvmAndAndroid.kt:26)\n  at androidx.compose.runtime.GapComposer.doCompose-aFTiNEg(GapComposer.kt:2643)\n  at androidx.compose.runtime.GapComposer.composeContent--ZbOJvo$runtime(GapComposer.kt:2545)\n  at androidx.compose.runtime.CompositionImpl.composeContent(Composition.kt:905)\n  at androidx.compose.runtime.Recomposer.composeInitial$runtime(Recomposer.kt:1178)\n  at androidx.compose.runtime.CompositionImpl.composeInitial(Composition.kt:735)\n  at androidx.compose.runtime.CompositionImpl.setContent(Composition.kt:702)\n  at androidx.compose.ui.platform.WrappedComposition.setContent$lambda$0(Wrapper.android.kt:123)\n  at androidx.compose.ui.platform.WrappedComposition$$ExternalSyntheticLambda2.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.ui.platform.AndroidComposeView.setOnReadyForComposition(AndroidComposeView.android.kt:2324)\n  at androidx.compose.ui.platform.WrappedComposition.setContent(Wrapper.android.kt:105)\n  at androidx.compose.ui.platform.WrappedComposition.onStateChanged(Wrapper.android.kt:155)\n  at androidx.lifecycle.LifecycleRegistry$ObserverWithState.dispatchEvent(LifecycleRegistry.jvm.kt:316)\n  at androidx.lifecycle.LifecycleRegistry.addObserver(LifecycleRegistry.jvm.kt:193)\n  at androidx.compose.ui.platform.WrappedComposition.setContent$lambda$0(Wrapper.android.kt:120)\n  at androidx.compose.ui.platform.WrappedComposition$$ExternalSyntheticLambda2.invoke(D8$$SyntheticClass:0)\n  at androidx.compose.ui.platform.AndroidComposeView.onAttachedToWindow(AndroidComposeView.android.kt:2395)\n",
+  "actualNoSuchMethodErrorLines": [
+    "E/ComposeInternal( 2699): java.lang.NoSuchMethodError: No direct method <init>(Lcom/materialkolor/hct/Hct;ZD)V in class Lcom/materialkolor/scheme/SchemeTonalSpot; or its super classes (declaration of 'com.materialkolor.scheme.SchemeTonalSpot' appears in /data/app/~~P3JZgYcWSlnLBBZXmY-ycQ==/io.github.xgl34222220.hetu-4-ueRHAsoq19uJlZ0K3CIA==/base.apk!classes9.dex)",
+    "E/AndroidRuntime( 2699): java.lang.NoSuchMethodError: No direct method <init>(Lcom/materialkolor/hct/Hct;ZD)V in class Lcom/materialkolor/scheme/SchemeTonalSpot; or its super classes (declaration of 'com.materialkolor.scheme.SchemeTonalSpot' appears in /data/app/~~P3JZgYcWSlnLBBZXmY-ycQ==/io.github.xgl34222220.hetu-4-ueRHAsoq19uJlZ0K3CIA==/base.apk!classes9.dex)"
+  ],
+  "lifecycle": {
+    "result": "PASS",
+    "kvm_before": {
+      "uid": 0,
+      "gid": 993,
+      "mode": 432,
+      "rdev": 2792
+    },
+    "runner_uid": 1001,
+    "runner_groups": [
+      4,
+      100,
+      118,
+      999,
+      1001
+    ],
+    "privileged_emulator_process": true,
+    "smoke_exit": 0,
+    "launcher_reaped": true,
+    "kvm_after": {
+      "uid": 0,
+      "gid": 993,
+      "mode": 432,
+      "rdev": 2792
+    }
+  },
+  "cleanup": {
+    "emulator_started": true,
+    "emulator_reaped": true,
+    "pid": 2587,
+    "returncode": 0
+  },
+  "historicalSignedApkIdentity": {
+    "actualFixedWholeApkSha256": "ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f",
+    "samePinnedSignedApkBytes": true,
+    "directApksignerCertificateReadExecutedThisJob": false,
+    "certificateInference": "Whole APK SHA pins all signed bytes of the historical known artifact; a signer fingerprint was not freshly extracted in this job. New274 application certificate is separately directly verified by its actual producer2 build."
+  },
+  "crashNativeFrameActuallyOpened": true,
+  "nativeFrameObservation": "Launcher visible after expected historical ProxyScriptsActivity crash; AndroidRuntime and application crash record, not picture alone, establish expected NoSuchMethodError.",
+  "originalFiles": {
+    "/tmp/hetu-ci-latest-274aa0d/job-111978206122-complete.log": {
+      "bytes": 43643,
+      "sha256": "3391821804e57c6b6f03aa21a1c795f27d3448eee3ea3b7c513f7df719ce7a90"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/results.json": {
+      "bytes": 443,
+      "sha256": "b24f1608b5d915cd582efba206c8d6c4844899709cb4c8fc2271241cdf4cfbde"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/v2074-materialkolor-abi.json": {
+      "bytes": 1981,
+      "sha256": "1367d6895c141dde2bbf80fcb721c862611d5dba79c6a1ade1eef1943de660a7"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/expected-v2074-palette-crash-record.txt": {
+      "bytes": 4841,
+      "sha256": "59fd7ac61abdecf897e51444d52147cd1d278f23a21d306c29e159af09bece47"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/expected-v2074-palette-crash-logcat.txt": {
+      "bytes": 543737,
+      "sha256": "ea87dd21e9a9a9d42e29f359989ade782d78187ad18afc5927536b0976ec5a0d"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/expected-v2074-palette-crash.png": {
+      "bytes": 305587,
+      "sha256": "1f412d3683a250dd3c874a94523b7fe77e60d1b03501e3772c13ec6a502060c3"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/runner-lifecycle.json": {
+      "bytes": 372,
+      "sha256": "363af60a8a0a982e534260ce14c7e859f58e03c88ba7fcffab5a925a1db0e543"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/emulator-cleanup.json": {
+      "bytes": 92,
+      "sha256": "e234339e36e1925a1e5b1843f1415a89c920988d3cea43ec57672d8a74ccf0d2"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/version.txt": {
+      "bytes": 70,
+      "sha256": "fe8e6ebf9e534f664b7b09b492790eb5fddb1b922316015ec468fad840da9064"
+    },
+    "/tmp/hetu-ci-latest-274aa0d/baseline2074/install.txt": {
+      "bytes": 128,
+      "sha256": "66a227cbb7302812fb88177d45d754ac0a991d2fc41b5ae2a4c070879a897ee9"
+    }
+  },
+  "notNewAppAcceptance": true,
+  "doesNotValidateGooglePlayAuthentication": true,
+  "userDeviceActions": []
+}

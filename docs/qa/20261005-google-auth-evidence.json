@@ -10,7 +10,29 @@
     "retryAndHotAirBalloon": true,
     "captcha": false,
     "accountAvatarVisible": true,
-    "authenticationInference": "Visible avatar and message do not establish current account token validity, successful login, or node fault; no account action performed."
+    "authenticationInference": "Visible avatar and message do not establish current account token validity, successful login, or node fault; no account action performed.",
+    "currentRoundReview": {
+      "reviewer": "parent/root",
+      "sourceAcceptanceRound": "274aa0d",
+      "actuallyReopenedFullImage": true,
+      "dateUtc": "2026-10-05",
+      "sameOriginalSha256": true,
+      "interpretation": "Authentication text, retry and Hot Air Balloon; not CAPTCHA. No account-token validity, node blame or device fix inferred."
+    },
+    "independentCurrentRoundReview": {
+      "actuallyOpenedFullImageBy": "google_evidence_review subagent",
+      "openedAtUtc": "2026-10-05T21:15:05.148802+00:00",
+      "path": "/workspace/scratch/3788973cf567/upload/197434.jpg",
+      "bytes": 142170,
+      "sha256": "7a3712651f1db9b872879672cf60cb7d2f5d3e4dc480f89c20defc8d4d944428",
+      "visibleText": "需要进行身份验证。您需要登录自己的 Google 帐号。",
+      "retryVisible": true,
+      "HotAirBalloonVisible": true,
+      "accountAvatarVisible": true,
+      "captcha": false,
+      "inference": "Message identifies authentication requirement; avatar does not establish valid account tokens or successful Google authentication. No node cause or device fix established.",
+      "userDeviceActions": []
+    }
   },
   "historicalEvidence": {
     "source": "2026-10-03 user diagnostic message recovered from prior conversation; cross-checked AGENTS.md, docs/V20.75_THEME_COMPAT.md and docs/V20.76_SESSION_FILTER.md",
@@ -64,10 +86,10 @@
     ]
   },
   "sourceEvidence": {
-    "applicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+    "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
     "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN in TCP/UDP proxy interception/guard paths. This is not a statement that own-process DNS is direct.",
     "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
-    "currentChanges": "Latest2730954 tools/settings presentation preserves bounded Google metadata classifier and underlying DNS, routing, credentials, hooks and permissions. Exact2730954 CI frozen-source gates passed; pending workspace candidates supply no acceptance evidence. Its isolated Mihomo controller401→200 results do not locate or fix user Google Play account authentication.",
+    "currentChanges": "Exact274aa0d tools-intake and measured tools/settings presentation passed its frozen-source/core boundaries and additive487/51XML acceptance, retaining original479/422. Existing authentication, proxy/DNS core, credentials, hooks and permissions have no demonstrated Google Play root-cause change. Disposable Mihomo controller401→200 results prove controller handling only; actual Play UID, DNS/routes and account-authentication traces remain absent.",
     "dnsPolicy": "install_dns_redirect4/6 use mark,uid0,interface,blacklist returns and scoped TCP/UDP:53 redirect; neither accepts DUIDS nor calls direct_uid_returns. Actual resolver/packet UID and failure-time answers unavailable.",
     "defaultGoogleProbeTarget": {
       "source": "ProxyLatencyTargets.kt",
@@ -81,9 +103,57 @@
       "936ffac87a81ef056e3c006987667e9d56baf5bc",
       "26a0906ed9765c04de1316cdcf99cd0460d9d276",
       "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
-      "01b66345f645aa168d56400ccc89313d3932f3f8"
+      "01b66345f645aa168d56400ccc89313d3932f3f8",
+      "2730954591393c1b81f747cef72adb8940c5a82c"
     ],
-    "workflowRun": 37360879852
+    "workflowRun": 37366522056,
+    "currentCorePinnedReview": {
+      "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "previousVerifiedApplication": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "files": [
+        {
+          "path": "android-app/app/src/main/assets/hetu-root.sh",
+          "sha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+          "bytes": 102138,
+          "sameOriginalBytesAsPreviousVerified273": true
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+          "sha256": "021fd591563782c4d7d7b06a1a0d9d219ba986d32c6cc393387987571cc374e6",
+          "bytes": 94091,
+          "sameOriginalBytesAsPreviousVerified273": true
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java",
+          "sha256": "03c4b503fa94cd484f27ca6c0a731fb33b56289bbc9ccb18e3f7b1d93254c223",
+          "bytes": 1534,
+          "sameOriginalBytesAsPreviousVerified273": true
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java",
+          "sha256": "a3a17c2b466442df5e27e95b08e4fb448cbd1f332300cf0c6bcdb8621ac85b54",
+          "bytes": 16431,
+          "sameOriginalBytesAsPreviousVerified273": true
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt",
+          "sha256": "a1097ffb612e77af429304f02c42ac8724c25cbf8a38f46d4199bdd593f57ff8",
+          "bytes": 17350,
+          "sameOriginalBytesAsPreviousVerified273": true
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt",
+          "sha256": "c7660825ec4cd13df71e8e0ec958ec588a5d969da5b8316b99c9bc05c6b06f7d",
+          "bytes": 3196,
+          "sameOriginalBytesAsPreviousVerified273": true
+        }
+      ],
+      "sourceReview": "Pinned git show bytes; no use of pending workspace source",
+      "proved": "These six authentication classifier, proxy manager/policy, DNS/root script and own-process probe sources are unchanged from prior verified273 application. This does not prove current device state or actual Google authentication.",
+      "rootCause": "not-established",
+      "deviceFix": "not-verified",
+      "deviceActions": []
+    }
   },
   "proved": [
     "Some historical GMS connections reached the core and had bidirectional counters",
@@ -115,38 +185,102 @@
       37342421613,
       37346239863,
       37353575277,
-      37360879852
+      37360879852,
+      37366522056
     ],
     "googleFirewallMockTests": 17,
     "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",
     "aospGoogleAccount": "No user account or actual GMS authentication in AOSP fixture",
     "latestVerifiedApplication": {
-      "commit": "2730954591393c1b81f747cef72adb8940c5a82c",
-      "runId": 37360879852,
+      "commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "runId": 37366522056,
+      "runAttempt": 4,
       "runConclusion": "success",
-      "completedAtUtc": "2026-10-05T19:33:56Z",
-      "artifactEvidence": "docs/qa/20261005-v2085-2730954-installation-success.json",
+      "completedAtUtc": "2026-10-05T21:33:24Z",
+      "artifactEvidence": "docs/qa/20261005-v2085-274aa0d-installation-success.json",
       "strictEvidenceChecksPassed": 53,
-      "runtimeUnitTests": 479,
-      "runtimeUnitXmlFiles": 49,
+      "runtimeUnitTests": 487,
+      "runtimeUnitXmlFiles": 51,
+      "preservedRuntimeUnitTests": {
+        "originalAuthenticationBoundary": 422,
+        "previousPdfBoundary": 479
+      },
       "googleConnectionClassifierTests": 8,
       "googleConnectionClassifierXml": {
-        "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
-        "sha256": "c92d4fe6b8296e303d2a885335db16ef3891d06c7b336e5055d18c6f304c7dbd",
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-274aa0d/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+        "sha256": "9ab8afd6c99a8adf0ea30c5bc2ee47c05e70ac4129a2a135dd21ef83535c7a1f",
         "tests": 8,
         "failures": 0,
         "errors": 0,
         "skipped": 0
       },
-      "apkBytes": 134827739,
-      "apkSha256": "82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c",
+      "apkBytes": 134833109,
+      "apkSha256": "b58438e74239312a7cbd32c8675827ee2e3e7b256b59dfb879b06891171b29e3",
       "controllerLoopbackOnly": true,
       "GooglePlayAccountAuthenticationProved": false,
       "nextSourceCandidateAccepted": false,
-      "sourceEvidenceProvenance": "Exact2730954 fresh CI logs, raw XML and artifacts; pending workspace source/layer excluded.",
+      "sourceEvidenceProvenance": "Exact274aa0d producing attempt2 build/UI/API35 and single-job API36/baseline retry lineage; all own raw logs, original XML and artifact bytes independently checked. No other source/run or pending workspace code used.",
+      "attemptLineage": {
+        "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+        "runId": 37366522056,
+        "applicationBuildAndUi": {
+          "actualProducingAttempt": 2,
+          "actualProducingJobId": 111958672585,
+          "freshUiArtifactId": 11371015758,
+          "freshManifestArtifactId": 11370765854,
+          "notReexecutedByApi36SingleJobRetry": true
+        },
+        "api35": {
+          "actualProducingAttempt": 2,
+          "actualProducingJobId": 111967310512,
+          "freshArtifactId": 11369762515,
+          "notReexecutedByApi36SingleJobRetry": true
+        },
+        "api36": {
+          "attempt2JobId": 111967310459,
+          "attempt2Conclusion": "cancelled",
+          "attempt2ExecutedSteps": 0,
+          "singleJobRetryReportedByParentAtUtc": "2026-10-05T20:52:53Z",
+          "observedActualNewAttempt": 3,
+          "newActualJobId": 111972733304,
+          "acceptance": "PASS; own64/21/Root0/19 valid Bearer/time chain/5 native frame+DOM+XML/cleanup actually verified",
+          "attempt3Conclusion": "cancelled",
+          "attempt3ExecutedSteps": 0,
+          "attempt3ObservedEvidence": "docs/qa/20261005-v2085-274aa0d-attempt3-api36-cancel-observed.json",
+          "observedFailedOnlyRetryAttempt": 4,
+          "attempt4CurrentJobId": 111978206731,
+          "actualProducingAttempt": 4,
+          "actualProducingJobId": 111978206731,
+          "actualFreshArtifactId": 11371747785,
+          "attempt4InitialStatus": "queued at2026-10-05T21:10:12Z",
+          "attempt4Conclusion": "success"
+        },
+        "baseline": {
+          "attempt2JobId": 111958672958,
+          "attempt2Conclusion": "cancelled",
+          "latestAttempt3MetadataJobId": 111972777979,
+          "acceptance": "PASS; actual expected historical crash and complete cleanup verified",
+          "attempt4CurrentJobId": 111978206122,
+          "actualProducingAttempt": 4,
+          "actualProducingJobId": 111978206122,
+          "actualFreshArtifactId": 11371150549,
+          "attempt4InitialStatus": "queued at2026-10-05T21:10:12Z",
+          "attempt4Conclusion": "success"
+        },
+        "cancellationActorAndReason": "not-established",
+        "subagentCiActions": [],
+        "originalFailureArtifactsRetained": true,
+        "scope": "Same source and same run; latest retained metadata IDs are distinct from actual producing jobs.",
+        "sameRunFailedOnlyRetryReportedByParentAtUtc": "2026-10-05T21:09:17Z",
+        "overallLatestAttempt": 4,
+        "overallRunConclusion": "success"
+      },
       "api35": {
-        "jobId": 111940875609,
-        "artifactId": 11367328067,
+        "jobId": 111967310512,
+        "producingAttempt": 2,
+        "latestMetadataJobId": 111978208589,
+        "artifactId": 11369762515,
+        "artifactZipSha256": "1dc9a7bfe017d98f9812d8f87c039b943e64c0ab37b081203b53129dcb100993",
         "checksPassed": 64,
         "newControllerAuthenticationChecks": 5,
         "paletteCasesPassed": 21,
@@ -160,11 +294,11 @@
           "/rules",
           "/version"
         ],
-        "retryWhile401AtMonotonic": 821.094796946,
-        "retryReadyAtMonotonic": 825.950669143,
-        "fixture200AtMonotonic": 825.950670025,
-        "retryAfterFixture200AtMonotonic": 825.950713216,
-        "first200AtMonotonic": 825.987830466,
+        "retryWhile401AtMonotonic": 834.052476816,
+        "retryReadyAtMonotonic": 841.324324981,
+        "fixture200AtMonotonic": 841.324326089,
+        "retryAfterFixture200AtMonotonic": 841.324370608,
+        "first200AtMonotonic": 841.393144165,
         "exclusiveRetryRecoveryClaimed": false,
         "preferencesSha256Restored": true,
         "reverseRestored": true,
@@ -174,8 +308,11 @@
         "forwardsRemoved": true
       },
       "api36": {
-        "jobId": 111940875419,
-        "artifactId": 11368065372,
+        "jobId": 111978206731,
+        "producingAttempt": 4,
+        "latestMetadataJobId": 111978206731,
+        "artifactId": 11371747785,
+        "artifactZipSha256": "fc56e8312c094622deeeb8d04c4a4863e583d1f1aa485db86c9cb4e0360826ad",
         "checksPassed": 64,
         "newControllerAuthenticationChecks": 5,
         "paletteCasesPassed": 21,
@@ -189,11 +326,11 @@
           "/rules",
           "/version"
         ],
-        "retryWhile401AtMonotonic": 818.736193095,
-        "retryReadyAtMonotonic": 824.04581465,
-        "fixture200AtMonotonic": 824.045815872,
-        "retryAfterFixture200AtMonotonic": 824.045872788,
-        "first200AtMonotonic": 824.085465728,
+        "retryWhile401AtMonotonic": 892.57425802,
+        "retryReadyAtMonotonic": 897.427917479,
+        "fixture200AtMonotonic": 897.427918381,
+        "retryAfterFixture200AtMonotonic": 897.427962604,
+        "first200AtMonotonic": 897.471360949,
         "exclusiveRetryRecoveryClaimed": false,
         "preferencesSha256Restored": true,
         "reverseRestored": true,
@@ -445,6 +582,89 @@
           "emulatorReaped": true,
           "forwardsRemoved": true
         }
+      },
+      {
+        "commit": "2730954591393c1b81f747cef72adb8940c5a82c",
+        "runId": 37360879852,
+        "runConclusion": "success",
+        "completedAtUtc": "2026-10-05T19:33:56Z",
+        "artifactEvidence": "docs/qa/20261005-v2085-2730954-installation-success.json",
+        "strictEvidenceChecksPassed": 53,
+        "runtimeUnitTests": 479,
+        "runtimeUnitXmlFiles": 49,
+        "googleConnectionClassifierTests": 8,
+        "googleConnectionClassifierXml": {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+          "sha256": "c92d4fe6b8296e303d2a885335db16ef3891d06c7b336e5055d18c6f304c7dbd",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "apkBytes": 134827739,
+        "apkSha256": "82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c",
+        "controllerLoopbackOnly": true,
+        "GooglePlayAccountAuthenticationProved": false,
+        "nextSourceCandidateAccepted": false,
+        "sourceEvidenceProvenance": "Exact2730954 fresh CI logs, raw XML and artifacts; pending workspace source/layer excluded.",
+        "api35": {
+          "jobId": 111940875609,
+          "artifactId": 11367328067,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "paletteCasesPassed": 21,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 19,
+          "bearerPaths": [
+            "/configs",
+            "/connections",
+            "/providers/proxies",
+            "/proxies",
+            "/rules",
+            "/version"
+          ],
+          "retryWhile401AtMonotonic": 821.094796946,
+          "retryReadyAtMonotonic": 825.950669143,
+          "fixture200AtMonotonic": 825.950670025,
+          "retryAfterFixture200AtMonotonic": 825.950713216,
+          "first200AtMonotonic": 825.987830466,
+          "exclusiveRetryRecoveryClaimed": false,
+          "preferencesSha256Restored": true,
+          "reverseRestored": true,
+          "kvmRestored": true,
+          "launcherReaped": true,
+          "emulatorReaped": true,
+          "forwardsRemoved": true
+        },
+        "api36": {
+          "jobId": 111940875419,
+          "artifactId": 11368065372,
+          "checksPassed": 64,
+          "newControllerAuthenticationChecks": 5,
+          "paletteCasesPassed": 21,
+          "rootMutationActions": 0,
+          "validBearerHTTP200": 19,
+          "bearerPaths": [
+            "/configs",
+            "/connections",
+            "/providers/proxies",
+            "/proxies",
+            "/rules",
+            "/version"
+          ],
+          "retryWhile401AtMonotonic": 818.736193095,
+          "retryReadyAtMonotonic": 824.04581465,
+          "fixture200AtMonotonic": 824.045815872,
+          "retryAfterFixture200AtMonotonic": 824.045872788,
+          "first200AtMonotonic": 824.085465728,
+          "exclusiveRetryRecoveryClaimed": false,
+          "preferencesSha256Restored": true,
+          "reverseRestored": true,
+          "kvmRestored": true,
+          "launcherReaped": true,
+          "emulatorReaped": true,
+          "forwardsRemoved": true
+        }
       }
     ],
     "historicalFailedApplications": [
@@ -457,6 +677,40 @@
         "runtimeFailures": 1,
         "failedTest": "SettingsPickerParity58Test.rootSettingsChoiceWidthsStayCompact",
         "installedNavigationAndControllerAuthentication": "NOT_EXECUTED"
+      }
+    ],
+    "workflowAttemptObservations": [
+      {
+        "commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+        "runId": 37366522056,
+        "artifactEvidence": "docs/qa/20261005-v2085-274aa0d-acceptance-failure.json",
+        "sha256": "2c80bf0e4eed6015fd286506ad2718e548f3d4e4b01fc035819e4c860fabe54f",
+        "observed": "Attempt1 queued cancellation and skipped install; no application build/test execution.",
+        "actorAndCause": "not-established; we did not cancel CI"
+      },
+      {
+        "commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+        "runId": 37366522056,
+        "artifactEvidence": "docs/qa/20261005-v2085-274aa0d-attempt2-baseline-cancel-observed.json",
+        "sha256": "73aace5d83c4316e9d5b2c402a5913ee2ab02fbda427a13fe594c49cfedbf1b1",
+        "observed": "Required historical crash baseline cancelled before execution in attempt2; retained as cancellation evidence.",
+        "actorAndCause": "not-established; we did not cancel CI"
+      },
+      {
+        "commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+        "runId": 37366522056,
+        "artifactEvidence": "docs/qa/20261005-v2085-274aa0d-attempt2-api36-cancel-observed.json",
+        "sha256": "253776e467df0382b3afc6e1a5bbfe8e9e92a1b9521433f0331b78193209b78f",
+        "observed": "Attempt2 API36 cancelled in queue before execution; app build and API35 own results preserved. Later retry acceptance separately checked.",
+        "actorAndCause": "not-established; we did not cancel CI"
+      },
+      {
+        "commit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+        "runId": 37366522056,
+        "artifactEvidence": "docs/qa/20261005-v2085-274aa0d-attempt3-api36-cancel-observed.json",
+        "sha256": "5b65418b163a20a9725a3c4e70d2e8705f1c77badbb7be4544a1a5c36d675293",
+        "observed": "Attempt3 single-job API36 retry again cancelled in queue before execution; required baseline remained cancelled, own application build and API35 were retained without re-execution.",
+        "actorAndCause": "not-established; we did not cancel CI"
       }
     ]
   },
@@ -479,5 +733,5 @@
     "text": "Mihomo 控制接口返回401: {\"message\":\"Unauthorized\"}",
     "scope": "Old app controller read error, already addressed in V20.84/controller tests; different from Play Store Google account authentication. This image supplies no Play fault-time HTTP/TLS/DNS evidence."
   },
-  "currentSource": "2730954591393c1b81f747cef72adb8940c5a82c"
+  "currentSource": "274aa0d2f80dad39884bd3d079a2e02c86a90abd"
 }

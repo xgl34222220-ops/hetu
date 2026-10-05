@@ -7,7 +7,7 @@
   "partCount": 6,
   "allSixArtifactAndPartHashesVerified": true,
   "fullApkHashVerified": true,
-  "installedAcceptance": "pending; do not treat transfer verification as installed success",
+  "installedAcceptance": "PASS own274 strict53/487XML/API35+36 64checks/21palette; realGoogleAccountAuthenticationUnverified",
   "transportManifestArtifactId": 11370765854,
   "transportParts": [
     {
@@ -46,5 +46,11 @@
       "artifactBytes": 9004123,
       "artifactDigest": "sha256:31e352184f594dffd78bdd0c1890c3119d54703efa36f049c09f0de20dc522f6"
     }
-  ]
+  ],
+  "ownInstallationEvidence": "docs/qa/20261005-v2085-274aa0d-installation-success.json",
+  "ownInstallationEvidenceSha256": "5190c9f3f1aa5c623cdf1e3f6b3164f1121b7db78aeb18ac9a93e8ba7b636461",
+  "savedForFinalDelivery": true,
+  "deliveredInFinalResponse": false,
+  "saveSucceeded": true,
+  "finalResponseWillLinkThisVerifiedApk": true
 }
