@@ -151,6 +151,7 @@ private fun SubscriptionCard(
                 modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.Link,
                 subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
+                subtitleMaxLines = 1,
                 subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
                 subtitleColor = if (item.placeholder) c.warn else c.t3,
                 enabled = !state.busy,
@@ -206,9 +207,10 @@ internal fun ToolsRenameConfigDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.ConfigGrid,
         title = "重命名配置", confirmLabel = "保存", onConfirm = onConfirm, onCancel = onCancel,
         modifier = modifier, confirmLoading = overlay.saving,
-    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml") }
+    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml", compact = true) }
 }
 
 /** Page 10. */
@@ -220,6 +222,7 @@ internal fun ToolsDeleteConfigDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.ConfigGrid,
         title = "删除配置？",
         text = "「${overlay.config}」将被永久删除。" + if (overlay.isCurrent) "\n删除后会切换回内置模板。" else "",
         confirmLabel = "删除", confirmKind = ToolsConfirmKind.Danger,
@@ -236,6 +239,7 @@ internal fun ToolsDeleteSubscriptionDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.ConfigGrid,
         title = "删除订阅？",
         text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
         confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,

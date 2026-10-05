@@ -62,6 +62,7 @@ internal fun ToolsSubscriptionScreen(
 @Composable
 internal fun ToolsDiscardFormDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.Stacked,
         title = "放弃填写？",
         text = "已填写的内容还没有保存，返回会放弃这些修改。",
         confirmLabel = "放弃", confirmKind = ToolsConfirmKind.Danger,

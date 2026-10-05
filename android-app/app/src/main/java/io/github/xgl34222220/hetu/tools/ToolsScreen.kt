@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.text.font.FontWeight
 import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
@@ -100,7 +102,7 @@ internal fun ToolsScreen(
                 .padding(contentPadding)
                 .verticalScroll(scroll)
                 .windowInsetsPadding(WindowInsets.statusBars)
-                .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 26.dp),
+                .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 66.dp),
             verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
         ) {
             Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
@@ -144,8 +146,9 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
                 title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
                 icon = entry.icon(),
                 subtitle = ht(if (brief) entry.brief else entry.summary),
+                subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
                 onClick = { onOpen(entry) },
-                modifier = Modifier.heightIn(min = 80.dp),
+                modifier = Modifier.heightIn(min = 72.dp),
                 trailing = { ToolsChevron() },
             )
         }

@@ -1074,12 +1074,12 @@ internal val LocalHxSheetClose = staticCompositionLocalOf<(() -> Unit) -> Unit> 
 
 /** Monospace text viewer (logs, diagnostics, generated config). */
 @Composable
-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false) {
+internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false, referenceDocument: Boolean = false) {
     val context = LocalContext.current
     val c = Hx.colors
     HxSheet(onDismiss = onDismiss) {
         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
             if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
             if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
                 Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
@@ -1099,7 +1099,7 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
         ) {
             Text(
                 text.ifBlank { "（空）" },
-                fontFamily = if (wrapLines) FontFamily.Default else FontFamily.Monospace,
+                fontFamily = if (wrapLines && !referenceDocument) FontFamily.Default else FontFamily.Monospace,
                 fontSize = 11.5.sp,
                 lineHeight = 16.sp,
                 color = c.text,
@@ -1125,6 +1125,7 @@ internal fun HxChoiceSheet(
     trailingReferenceRadios: Boolean = false,
     presentation: HxChoicePresentation = HxChoicePresentation.Standard,
     menuWidthOverride: Dp? = null,
+    maxVisibleChoices: Int? = null,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -1162,6 +1163,21 @@ internal fun HxChoiceSheet(
                         }
                         if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
                     }
+                }
+            } else if (maxVisibleChoices != null) {
+                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 40).dp).verticalScroll(rememberScrollState())) {
+choices.forEachIndexed { index, choice ->
+                HxMenuItem(
+                    choice.label,
+                    onClick = { close { onPick(choice.id) } },
+                    description = choice.description,
+                    selected = choice.id == selected,
+                    selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
+                    enabled = choice.enabled,
+                    choicePresentation = presentation,
+                )
+                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
+            }
                 }
             } else choices.forEachIndexed { index, choice ->
                 HxMenuItem(

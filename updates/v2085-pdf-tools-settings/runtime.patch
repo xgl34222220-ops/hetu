@@ -55,6 +55,32 @@ index 3f7ba83..8fd1b33 100644
          item {
              OtherCard(card) {
                  OtherLabel("代理能力")
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
+index 7c958c3..01566ac 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
+@@ -432,7 +432,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     }
+     val selected = files.firstOrNull { it.path == selectedPath }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = selected?.name ?: "core.log",
+         largeTitle = false,
+         compactTitleFontSizeSp = 20f,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+index 7f55bf3..9fd87b0 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+@@ -384,7 +384,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         evaluate()
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = "网络匹配",
+         largeTitle = false,
+         compactTitleFontSizeSp = 20f,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 index 56730b7..4a3b426 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
@@ -98,8 +124,37 @@ index 56730b7..4a3b426 100644
              if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
          }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
          try{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
+index 1a9af21..2e4214d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
+@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.graphics.toArgb
+ import androidx.compose.ui.platform.LocalContext
+ import androidx.compose.ui.platform.testTag
+ import androidx.compose.ui.text.font.FontWeight
+@@ -76,7 +77,15 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
+     val context = LocalContext.current
+     val t = LocalHetuTokens.current
+     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
+-    val editorColors = remember(dark) { HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark) }
++    val editorSurface = Hx.colors.surface
++    val editorColors = remember(dark, editorSurface) {
++        HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark).apply {
++            val background = editorSurface.toArgb()
++            setColor(io.github.rosemoe.sora.widget.schemes.EditorColorScheme.WHOLE_BACKGROUND, background)
++            setColor(io.github.rosemoe.sora.widget.schemes.EditorColorScheme.LINE_NUMBER_BACKGROUND, background)
++            if (!dark) setColor(HetuYamlLanguage.YAML_KEY, 0xFF005CFF.toInt())
++        }
++    }
+     val scope = rememberCoroutineScope()
+     val repo = remember { RuntimeFilesRepository(context) }
+     var editor by remember { mutableStateOf<CodeEditor?>(null) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..7e10516 100644
+index be09cbe..669144f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -178,6 +178,7 @@ internal fun HxPage(
@@ -119,8 +174,62 @@ index be09cbe..7e10516 100644
          Brush.verticalGradient(listOf(pageCanvas, pageCanvas))
      } else {
          Brush.verticalGradient(
+@@ -1073,12 +1074,12 @@ internal val LocalHxSheetClose = staticCompositionLocalOf<(() -> Unit) -> Unit>
+ 
+ /** Monospace text viewer (logs, diagnostics, generated config). */
+ @Composable
+-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false) {
++internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false, referenceDocument: Boolean = false) {
+     val context = LocalContext.current
+     val c = Hx.colors
+     HxSheet(onDismiss = onDismiss) {
+         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+-            Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
++            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+             if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
+             if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
+                 Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
+@@ -1098,7 +1099,7 @@ internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onR
+         ) {
+             Text(
+                 text.ifBlank { "（空）" },
+-                fontFamily = if (wrapLines) FontFamily.Default else FontFamily.Monospace,
++                fontFamily = if (wrapLines && !referenceDocument) FontFamily.Default else FontFamily.Monospace,
+                 fontSize = 11.5.sp,
+                 lineHeight = 16.sp,
+                 color = c.text,
+@@ -1124,6 +1125,7 @@ internal fun HxChoiceSheet(
+     trailingReferenceRadios: Boolean = false,
+     presentation: HxChoicePresentation = HxChoicePresentation.Standard,
+     menuWidthOverride: Dp? = null,
++    maxVisibleChoices: Int? = null,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+@@ -1162,6 +1164,21 @@ internal fun HxChoiceSheet(
+                         if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
+                     }
+                 }
++            } else if (maxVisibleChoices != null) {
++                Column(Modifier.fillMaxWidth().heightIn(max = (maxVisibleChoices * 40).dp).verticalScroll(rememberScrollState())) {
++choices.forEachIndexed { index, choice ->
++                HxMenuItem(
++                    choice.label,
++                    onClick = { close { onPick(choice.id) } },
++                    description = choice.description,
++                    selected = choice.id == selected,
++                    selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
++                    enabled = choice.enabled,
++                    choicePresentation = presentation,
++                )
++                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
++            }
++                }
+             } else choices.forEachIndexed { index, choice ->
+                 HxMenuItem(
+                     choice.label,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
-index 088770f..9821ac3 100644
+index 088770f..8b9333b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 @@ -146,7 +146,7 @@ internal fun AppListScreen(vm: HetuViewModel) {
@@ -150,6 +259,13 @@ index 088770f..9821ac3 100644
          item(key = "brand") {
              val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
                  listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
+@@ -566,5 +566,5 @@ internal fun AboutScreen(vm: HetuViewModel) {
+         }
+     }
+ 
+-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true) }
++    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 index b06fbb2..a064443 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
@@ -228,7 +344,7 @@ index ddc05df..f35e74c 100644
              SettingsSection {
                  SettingsGroup {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..aabe007 100644
+index b68a65b..4ba1f61 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -285,6 +401,19 @@ index b68a65b..aabe007 100644
          item(key = "preflight") {
              SettingsSection {
                  SettingsGroup(title = "运行预检") {
+@@ -1055,9 +1055,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         actions.toList() != initialActions || labels.toList() != initialLabels
+ 
+     val targetOptions = listOf(
+-        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "Configs" to "配置页",
+-        "Providers" to "订阅页", "Tools" to "工具", "Settings" to "设置",
+-        "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗",
++        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
++        "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗", "Tools" to "工具", "Settings" to "设置",
++        "Configs" to "配置页", "Providers" to "订阅页",
+     )
+     val actionOptions = listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
+     val refreshOptions = listOf(2, 3, 5, 10, 30, 60)
 @@ -1086,7 +1086,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          onBack()
      }
@@ -294,11 +423,78 @@ index b68a65b..aabe007 100644
          title = "通知详细设置",
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
+@@ -1171,6 +1171,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                 presentation = HxChoicePresentation.Notification,
+                 title = "点击通知打开",
+                 choices = targetOptions.map { HxChoice(it.first, it.second) },
++                maxVisibleChoices = 7,
+                 selected = target,
+                 onPick = { target = it; picker = null },
+                 onDismiss = { picker = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-index e3bff78..bea7dbb 100644
+index e3bff78..1efe4fd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
-@@ -201,7 +201,7 @@ internal fun ToolsRow(
+@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.RowScope
+ import androidx.compose.foundation.layout.WindowInsets
+ import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxHeight
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.heightIn
+@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
+@@ -52,6 +54,7 @@ import androidx.compose.ui.text.AnnotatedString
+ import androidx.compose.ui.text.SpanStyle
+ import androidx.compose.ui.text.TextStyle
+ import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.input.ImeAction
+ import androidx.compose.ui.text.input.KeyboardType
+ import androidx.compose.ui.text.style.TextAlign
+@@ -84,8 +87,8 @@ internal object ToolsDims {
+     val dialogShape = RoundedCornerShape(20.dp)
+     val menuItemShape = RoundedCornerShape(10.dp)
+     val keyShape = RoundedCornerShape(8.dp)
+-    val dialogMaxWidth = 340.dp
+-    val menuMinWidth = 168.dp
++    val dialogMaxWidth = 288.dp
++    val menuMinWidth = 154.dp
+     val menuMaxWidth = 280.dp
+ }
+ 
+@@ -95,7 +98,7 @@ internal object ToolsType {
+     val menuItem = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp)
+     val emptyTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+     val readOnlyValue = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+-    val url = HomeType.rowSub.copy(fontSize = 14.sp, lineHeight = 19.sp)
++    val url = HomeType.rowSub.copy(fontSize = 13.sp, lineHeight = 19.sp)
+ }
+ 
+ /* ------------------------------------------------------------------ */
+@@ -167,7 +170,7 @@ internal fun ToolsCardHeader(
+     ) {
+         Icon(icon, null, Modifier.size(26.dp), tint = c.t1)
+         Column(Modifier.weight(1f)) {
+-            Text(ht(title), color = c.t1, style = HomeType.section, maxLines = 1)
++            Text(ht(title), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
+             if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         if (trailing != null) trailing()
+@@ -196,12 +199,13 @@ internal fun ToolsRow(
+     compact: Boolean = false,
+     enabled: Boolean = true,
+     endPadding: Dp = 16.dp,
++    subtitleMaxLines: Int = 2,
+     onClick: (() -> Unit)? = null,
+     trailing: (@Composable RowScope.() -> Unit)? = null,
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -307,8 +503,138 @@ index e3bff78..bea7dbb 100644
      val source = remember { MutableInteractionSource() }
      val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
      Row(
+@@ -214,9 +218,9 @@ internal fun ToolsRow(
+         if (icon != null) Icon(icon, null, Modifier.size(26.dp), tint = iconTint)
+         Column(Modifier.weight(1f)) {
+             Text(title, color = titleColor, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-            if (subtitle != null) Text(subtitle, color = subtitleColor, style = subtitleStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
++            if (subtitle != null) Text(subtitle, color = subtitleColor, style = subtitleStyle, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis)
+         }
+-        if (trailing != null) trailing()
++        if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { trailing() }
+     }
+ }
+ 
+@@ -267,14 +271,31 @@ internal fun ToolsField(
+     monospace: Boolean = false,
+     readOnly: Boolean = false,
+     keyboardType: KeyboardType = KeyboardType.Text,
++    compact: Boolean = false,
+ ) {
+     val c = LocalHomeColors.current
+-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+         if (readOnly) {
+-            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
++            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.label.copy(fontWeight = FontWeight.SemiBold))
+             Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         } else {
+-            HomeTextField(ht(label), value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = ht(placeholder))
++            Text(ht(label), color = c.t1, style = if (compact) HomeType.caption else HomeType.label.copy(fontWeight = FontWeight.SemiBold))
++            BasicTextField(
++                value = value, onValueChange = onValueChange,
++                modifier = Modifier.fillMaxWidth(), singleLine = true,
++                textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium,
++                    fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),
++                keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),
++                decorationBox = { inner ->
++                    Box(Modifier.fillMaxWidth().heightIn(min = if (compact) 42.dp else 48.dp)
++                        .clip(HomeDims.controlShape).background(c.sunken)
++                        .then(if (error != null) Modifier.border(.75.dp, c.bad.copy(alpha = .7f), HomeDims.controlShape) else Modifier)
++                        .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
++                        if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
++                        inner()
++                    }
++                },
++            )
+         }
+         if (error != null) {
+             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+@@ -396,6 +417,7 @@ internal fun ToolsDangerButton(
+ /* ------------------------------------------------------------------ */
+ 
+ internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
++internal enum class ToolsDialogActions { Filled, ConfigGrid, Stacked }
+ 
+ /**
+  * The inside of a confirmation dialog: centred title and message, optional form content,
+@@ -411,30 +433,46 @@ internal fun ToolsDialogCard(
+     modifier: Modifier = Modifier,
+     text: String? = null,
+     confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
++    actions: ToolsDialogActions = ToolsDialogActions.Filled,
+     cancelLabel: String = "取消",
+     confirmLoading: Boolean = false,
+     content: (@Composable ColumnScope.() -> Unit)? = null,
+ ) {
+     val c = LocalHomeColors.current
+-    Column(
+-        modifier
+-            .widthIn(max = ToolsDims.dialogMaxWidth)
+-            .fillMaxWidth()
+-            .shadow(24.dp, ToolsDims.dialogShape)
+-            .clip(ToolsDims.dialogShape)
+-            .background(c.surface)
+-            .border(1.dp, c.line, ToolsDims.dialogShape)
+-            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
+-    ) {
+-        Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
+-        if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
+-        if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
+-        Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-            HomeButton(cancelLabel, onCancel, Modifier.weight(1f), enabled = !confirmLoading)
+-            when (confirmKind) {
+-                ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
+-                ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)
+-                ToolsConfirmKind.DangerSoft -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), soft = true, loading = confirmLoading)
++    Column(modifier.widthIn(max = ToolsDims.dialogMaxWidth).fillMaxWidth()
++        .shadow(24.dp, ToolsDims.dialogShape).clip(ToolsDims.dialogShape).background(c.surface)) {
++        Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 24.dp,
++            bottom = if (actions == ToolsDialogActions.ConfigGrid) 20.dp else 0.dp)) {
++            Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
++            if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
++            if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
++        }
++        if (actions == ToolsDialogActions.ConfigGrid) {
++            ToolsHairline()
++            Row(Modifier.fillMaxWidth().height(56.dp)) {
++                @Composable fun action(label: String, tint: Color, callback: () -> Unit) {
++                    Box(Modifier.weight(1f).fillMaxHeight().clickable(enabled = !confirmLoading, role = Role.Button, onClick = callback), contentAlignment = Alignment.Center) {
++                        if (confirmLoading && label == confirmLabel) HomeSpinner(size = 18.dp, color = tint)
++                        else Text(ht(label), color = tint, style = HomeType.button)
++                    }
++                }
++                action(cancelLabel, if (content == null) c.accent else c.t2, onCancel)
++                Box(Modifier.width(.5.dp).fillMaxHeight().background(c.line.copy(alpha = .5f)))
++                action(confirmLabel, if (confirmKind == ToolsConfirmKind.Primary) c.accent else c.bad, onConfirm)
++            }
++        } else if (actions == ToolsDialogActions.Stacked) {
++            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                HomeButton(cancelLabel, onCancel, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
++                ToolsDangerButton(confirmLabel, onConfirm, Modifier.fillMaxWidth(), soft = confirmKind == ToolsConfirmKind.DangerSoft, loading = confirmLoading)
++            }
++        } else {
++            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
++                when (confirmKind) {
++                    ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
++                    ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)
++                    ToolsConfirmKind.DangerSoft -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), soft = true, loading = confirmLoading)
++                }
+             }
+         }
+     }
+@@ -461,7 +499,7 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
+     val haptics = LocalHomeHaptics.current
+     Column(
+         modifier
+-            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
++            .width(ToolsDims.menuMinWidth)
+             .shadow(16.dp, HomeDims.menuShape)
+             .clip(HomeDims.menuShape)
+             .background(c.surface)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-index e9d3077..6dd5858 100644
+index e9d3077..c47941e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 @@ -92,9 +92,9 @@ private fun ConfigCard(
@@ -330,7 +656,7 @@ index e9d3077..6dd5858 100644
          ToolsRow(
              title = AnnotatedString(ht("编辑当前 YAML")),
              icon = ToolsIcons.Pencil,
-@@ -141,16 +140,15 @@ private fun SubscriptionCard(
+@@ -141,18 +140,18 @@ private fun SubscriptionCard(
              trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null) },
          )
          if (state.subscriptions.isEmpty()) {
@@ -347,8 +673,11 @@ index e9d3077..6dd5858 100644
 +                modifier = Modifier.padding(horizontal = 10.dp),
                  icon = ToolsIcons.Link,
                  subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
++                subtitleMaxLines = 1,
                  subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
-@@ -164,7 +162,6 @@ private fun SubscriptionCard(
+                 subtitleColor = if (item.placeholder) c.warn else c.t3,
+                 enabled = !state.busy,
+@@ -164,7 +163,6 @@ private fun SubscriptionCard(
                  },
              )
          }
@@ -356,6 +685,164 @@ index e9d3077..6dd5858 100644
          ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
      }
  }
+@@ -209,9 +207,10 @@ internal fun ToolsRenameConfigDialogCard(
+     modifier: Modifier = Modifier,
+ ) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.ConfigGrid,
+         title = "重命名配置", confirmLabel = "保存", onConfirm = onConfirm, onCancel = onCancel,
+         modifier = modifier, confirmLoading = overlay.saving,
+-    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml") }
++    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml", compact = true) }
+ }
+ 
+ /** Page 10. */
+@@ -223,6 +222,7 @@ internal fun ToolsDeleteConfigDialogCard(
+     modifier: Modifier = Modifier,
+ ) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.ConfigGrid,
+         title = "删除配置？",
+         text = "「${overlay.config}」将被永久删除。" + if (overlay.isCurrent) "\n删除后会切换回内置模板。" else "",
+         confirmLabel = "删除", confirmKind = ToolsConfirmKind.Danger,
+@@ -239,6 +239,7 @@ internal fun ToolsDeleteSubscriptionDialogCard(
+     modifier: Modifier = Modifier,
+ ) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.ConfigGrid,
+         title = "删除订阅？",
+         text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
+         confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
+index 7e58000..d8dd716 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
+@@ -61,7 +61,7 @@ internal object ToolsTypography {
+     val barSubtitle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
+     val sheetTitle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
+     val heroStatus = TextStyle(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
+-    val rowTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
++    val rowTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
+     val body = TextStyle(fontSize = 16.sp, lineHeight = 23.sp)
+     val bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
+     val rowSub = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
+@@ -184,7 +184,7 @@ internal fun ToolsButton(
+         HomeButtonKind.Ghost -> Color.Transparent to c.accent
+     }
+     Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
+-        .clip(ToolsDesignDims.controlShape).background(fill)
++        .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)
+         .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
+         .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
+             role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
+index 2b98b46..ae98331 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt
+@@ -202,7 +202,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
+                         Row(
+                             Modifier
+                                 .fillMaxWidth()
+-                                .heightIn(min = HomeDims.touch)
++                                .heightIn(min = 32.dp)
+                                 .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
+                                 .padding(start = 16.dp + 20.dp * item.level, end = 12.dp),
+                             verticalAlignment = Alignment.CenterVertically,
+@@ -245,8 +245,10 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
+     HomeSheetContent(
+         title = title, modifier = modifier, onClose = onKeepDraft,
+         footer = {
+-            HomeButton("保留草稿", onKeepDraft, Modifier.weight(1f), kind = HomeButtonKind.Soft)
+-            HomeButton("重新读取", onReload, Modifier.weight(1f), kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
++            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                HomeButton("保留草稿", onKeepDraft, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft)
++                HomeButton("重新读取", onReload, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
++            }
+         },
+     ) { Text(text, Modifier.padding(horizontal = 4.dp), color = c.t2, style = ToolsType.dialogText) }
+ }
+@@ -259,6 +261,7 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
+ @Composable
+ internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier, loading: Boolean = false) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.Stacked,
+         title = "放弃草稿并重新读取？",
+         text = "重新读取成功后，本页未保存的修改和撤销记录会被替换为当前配置的最新内容。\n读取失败会继续保留草稿。",
+         confirmLabel = "放弃并读取", confirmKind = ToolsConfirmKind.DangerSoft, confirmLoading = loading,
+@@ -270,6 +273,7 @@ internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> U
+ @Composable
+ internal fun ToolsDiscardEditsDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.Stacked,
+         title = "放弃修改？", text = "当前修改还没有保存。",
+         confirmLabel = "放弃", confirmKind = ToolsConfirmKind.DangerSoft,
+         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
+index a60a9d7..2bb5c4e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt
+@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.statusBars
+ import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.layout.width
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
+@@ -371,7 +372,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
+     val haptics = LocalHomeHaptics.current
+     Column(
+         modifier
+-            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
++            .width(168.dp)
+             .shadow(16.dp, HomeDims.menuShape)
+             .clip(HomeDims.menuShape)
+             .background(c.surface)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
+index 7a05ec8..c7f7a26 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
+@@ -31,6 +31,8 @@ import androidx.compose.ui.draw.alpha
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.compose.ui.text.font.FontWeight
+ import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
+ import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
+ import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
+@@ -100,7 +102,7 @@ internal fun ToolsScreen(
+                 .padding(contentPadding)
+                 .verticalScroll(scroll)
+                 .windowInsetsPadding(WindowInsets.statusBars)
+-                .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 26.dp),
++                .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 66.dp),
+             verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
+         ) {
+             Row(Modifier.fillMaxWidth().padding(start = 12.dp, bottom = 4.dp).height(HomeDims.touch), verticalAlignment = Alignment.CenterVertically) {
+@@ -144,8 +146,9 @@ private fun ToolsGroup(group: ToolsGroupSpec, query: String, brief: Boolean, onO
+                 title = toolsHighlighted(title, ToolsCatalog.highlight(title, query)),
+                 icon = entry.icon(),
+                 subtitle = ht(if (brief) entry.brief else entry.summary),
++                subtitleStyle = HomeType.rowSub.copy(fontSize = 16.sp, fontWeight = FontWeight.SemiBold),
+                 onClick = { onOpen(entry) },
+-                modifier = Modifier.heightIn(min = 80.dp),
++                modifier = Modifier.heightIn(min = 72.dp),
+                 trailing = { ToolsChevron() },
+             )
+         }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
+index c5175b2..ade3e2e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
+@@ -62,6 +62,7 @@ internal fun ToolsSubscriptionScreen(
+ @Composable
+ internal fun ToolsDiscardFormDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
+     ToolsDialogCard(
++        actions = ToolsDialogActions.Stacked,
+         title = "放弃填写？",
+         text = "已填写的内容还没有保存，返回会放弃这些修改。",
+         confirmLabel = "放弃", confirmKind = ToolsConfirmKind.Danger,
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java
 new file mode 100644
 index 0000000..50d3531
@@ -609,7 +1096,7 @@ index 0000000..10c9644
 +internal fun Pdf85C25Editor() = Frame { Editor() }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
 new file mode 100644
-index 0000000..cc9e835
+index 0000000..8851c36
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
 @@ -0,0 +1,204 @@
@@ -687,7 +1174,7 @@ index 0000000..cc9e835
 +
 +/** [scrolled] > 0 shows the lower half of the page (规则 section), as on concept page 44. */
 +@Composable
-+private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock, scrolled: Int = 0) {
++private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock.copy(modeKnown = true, ruleMode = true), scrolled: Int = 0) {
 +    ToolsAdblockScreen(
 +        state = state, onBack = {}, onHelp = {}, onRefresh = {}, onEnabledChange = {}, onSwitchToRuleMode = null, onPickRecent = {}, onLevelChange = {},
 +        onUpdate = {}, onSourceChange = { _, _ -> }, onAddDomain = {}, onRemoveDomain = { _, _ -> }, onStandaloneDnsChange = {}, onCnameChange = {}, onRetry = {},

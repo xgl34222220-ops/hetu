@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -21,6 +22,7 @@ import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -52,6 +54,7 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -84,8 +87,8 @@ internal object ToolsDims {
     val dialogShape = RoundedCornerShape(20.dp)
     val menuItemShape = RoundedCornerShape(10.dp)
     val keyShape = RoundedCornerShape(8.dp)
-    val dialogMaxWidth = 340.dp
-    val menuMinWidth = 168.dp
+    val dialogMaxWidth = 288.dp
+    val menuMinWidth = 154.dp
     val menuMaxWidth = 280.dp
 }
 
@@ -95,7 +98,7 @@ internal object ToolsType {
     val menuItem = TextStyle(fontSize = 14.5.sp, lineHeight = 20.sp)
     val emptyTitle = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
     val readOnlyValue = TextStyle(fontSize = 17.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
-    val url = HomeType.rowSub.copy(fontSize = 14.sp, lineHeight = 19.sp)
+    val url = HomeType.rowSub.copy(fontSize = 13.sp, lineHeight = 19.sp)
 }
 
 /* ------------------------------------------------------------------ */
@@ -167,7 +170,7 @@ internal fun ToolsCardHeader(
     ) {
         Icon(icon, null, Modifier.size(26.dp), tint = c.t1)
         Column(Modifier.weight(1f)) {
-            Text(ht(title), color = c.t1, style = HomeType.section, maxLines = 1)
+            Text(ht(title), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
             if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         if (trailing != null) trailing()
@@ -196,6 +199,7 @@ internal fun ToolsRow(
     compact: Boolean = false,
     enabled: Boolean = true,
     endPadding: Dp = 16.dp,
+    subtitleMaxLines: Int = 2,
     onClick: (() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
@@ -214,9 +218,9 @@ internal fun ToolsRow(
         if (icon != null) Icon(icon, null, Modifier.size(26.dp), tint = iconTint)
         Column(Modifier.weight(1f)) {
             Text(title, color = titleColor, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = subtitleColor, style = subtitleStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (subtitle != null) Text(subtitle, color = subtitleColor, style = subtitleStyle, maxLines = subtitleMaxLines, overflow = TextOverflow.Ellipsis)
         }
-        if (trailing != null) trailing()
+        if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) { trailing() }
     }
 }
 
@@ -267,14 +271,31 @@ internal fun ToolsField(
     monospace: Boolean = false,
     readOnly: Boolean = false,
     keyboardType: KeyboardType = KeyboardType.Text,
+    compact: Boolean = false,
 ) {
     val c = LocalHomeColors.current
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         if (readOnly) {
-            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
+            Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.label.copy(fontWeight = FontWeight.SemiBold))
             Text(value, Modifier.padding(horizontal = 2.dp), color = c.t1, style = ToolsType.readOnlyValue, maxLines = 1, overflow = TextOverflow.Ellipsis)
         } else {
-            HomeTextField(ht(label), value, onValueChange, monospace = monospace, isError = error != null, keyboardType = keyboardType, placeholder = ht(placeholder))
+            Text(ht(label), color = c.t1, style = if (compact) HomeType.caption else HomeType.label.copy(fontWeight = FontWeight.SemiBold))
+            BasicTextField(
+                value = value, onValueChange = onValueChange,
+                modifier = Modifier.fillMaxWidth(), singleLine = true,
+                textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium,
+                    fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),
+                keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),
+                decorationBox = { inner ->
+                    Box(Modifier.fillMaxWidth().heightIn(min = if (compact) 42.dp else 48.dp)
+                        .clip(HomeDims.controlShape).background(c.sunken)
+                        .then(if (error != null) Modifier.border(.75.dp, c.bad.copy(alpha = .7f), HomeDims.controlShape) else Modifier)
+                        .padding(horizontal = 14.dp, vertical = 10.dp), contentAlignment = Alignment.CenterStart) {
+                        if (value.isEmpty()) Text(ht(placeholder), color = c.t3, style = HomeType.body)
+                        inner()
+                    }
+                },
+            )
         }
         if (error != null) {
             Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -396,6 +417,7 @@ internal fun ToolsDangerButton(
 /* ------------------------------------------------------------------ */
 
 internal enum class ToolsConfirmKind { Primary, Danger, DangerSoft }
+internal enum class ToolsDialogActions { Filled, ConfigGrid, Stacked }
 
 /**
  * The inside of a confirmation dialog: centred title and message, optional form content,
@@ -411,30 +433,46 @@ internal fun ToolsDialogCard(
     modifier: Modifier = Modifier,
     text: String? = null,
     confirmKind: ToolsConfirmKind = ToolsConfirmKind.Primary,
+    actions: ToolsDialogActions = ToolsDialogActions.Filled,
     cancelLabel: String = "取消",
     confirmLoading: Boolean = false,
     content: (@Composable ColumnScope.() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
-    Column(
-        modifier
-            .widthIn(max = ToolsDims.dialogMaxWidth)
-            .fillMaxWidth()
-            .shadow(24.dp, ToolsDims.dialogShape)
-            .clip(ToolsDims.dialogShape)
-            .background(c.surface)
-            .border(1.dp, c.line, ToolsDims.dialogShape)
-            .padding(start = 20.dp, end = 20.dp, top = 24.dp, bottom = 16.dp),
-    ) {
-        Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
-        if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
-        if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
-        Row(Modifier.fillMaxWidth().padding(top = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeButton(cancelLabel, onCancel, Modifier.weight(1f), enabled = !confirmLoading)
-            when (confirmKind) {
-                ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
-                ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)
-                ToolsConfirmKind.DangerSoft -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), soft = true, loading = confirmLoading)
+    Column(modifier.widthIn(max = ToolsDims.dialogMaxWidth).fillMaxWidth()
+        .shadow(24.dp, ToolsDims.dialogShape).clip(ToolsDims.dialogShape).background(c.surface)) {
+        Column(Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 24.dp,
+            bottom = if (actions == ToolsDialogActions.ConfigGrid) 20.dp else 0.dp)) {
+            Text(ht(title), Modifier.fillMaxWidth(), color = c.t1, style = ToolsType.dialogTitle, textAlign = TextAlign.Center)
+            if (text != null) Text(ht(text), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = ToolsType.dialogText, textAlign = TextAlign.Center)
+            if (content != null) Column(Modifier.fillMaxWidth().padding(top = 16.dp), content = content)
+        }
+        if (actions == ToolsDialogActions.ConfigGrid) {
+            ToolsHairline()
+            Row(Modifier.fillMaxWidth().height(56.dp)) {
+                @Composable fun action(label: String, tint: Color, callback: () -> Unit) {
+                    Box(Modifier.weight(1f).fillMaxHeight().clickable(enabled = !confirmLoading, role = Role.Button, onClick = callback), contentAlignment = Alignment.Center) {
+                        if (confirmLoading && label == confirmLabel) HomeSpinner(size = 18.dp, color = tint)
+                        else Text(ht(label), color = tint, style = HomeType.button)
+                    }
+                }
+                action(cancelLabel, if (content == null) c.accent else c.t2, onCancel)
+                Box(Modifier.width(.5.dp).fillMaxHeight().background(c.line.copy(alpha = .5f)))
+                action(confirmLabel, if (confirmKind == ToolsConfirmKind.Primary) c.accent else c.bad, onConfirm)
+            }
+        } else if (actions == ToolsDialogActions.Stacked) {
+            Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeButton(cancelLabel, onCancel, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
+                ToolsDangerButton(confirmLabel, onConfirm, Modifier.fillMaxWidth(), soft = confirmKind == ToolsConfirmKind.DangerSoft, loading = confirmLoading)
+            }
+        } else {
+            Row(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeButton(cancelLabel, onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = !confirmLoading)
+                when (confirmKind) {
+                    ToolsConfirmKind.Primary -> HomeButton(confirmLabel, onConfirm, Modifier.weight(1f), kind = HomeButtonKind.Primary, loading = confirmLoading)
+                    ToolsConfirmKind.Danger -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), loading = confirmLoading)
+                    ToolsConfirmKind.DangerSoft -> ToolsDangerButton(confirmLabel, onConfirm, Modifier.weight(1f), soft = true, loading = confirmLoading)
+                }
             }
         }
     }
@@ -461,7 +499,7 @@ internal fun ToolsMenuCard(entries: List<ToolsMenuEntry>, modifier: Modifier = M
     val haptics = LocalHomeHaptics.current
     Column(
         modifier
-            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
+            .width(ToolsDims.menuMinWidth)
             .shadow(16.dp, HomeDims.menuShape)
             .clip(HomeDims.menuShape)
             .background(c.surface)

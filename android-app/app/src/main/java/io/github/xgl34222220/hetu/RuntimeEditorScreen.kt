@@ -29,6 +29,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -76,7 +77,15 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
     val context = LocalContext.current
     val t = LocalHetuTokens.current
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val editorColors = remember(dark) { HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark) }
+    val editorSurface = Hx.colors.surface
+    val editorColors = remember(dark, editorSurface) {
+        HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark).apply {
+            val background = editorSurface.toArgb()
+            setColor(io.github.rosemoe.sora.widget.schemes.EditorColorScheme.WHOLE_BACKGROUND, background)
+            setColor(io.github.rosemoe.sora.widget.schemes.EditorColorScheme.LINE_NUMBER_BACKGROUND, background)
+            if (!dark) setColor(HetuYamlLanguage.YAML_KEY, 0xFF005CFF.toInt())
+        }
+    }
     val scope = rememberCoroutineScope()
     val repo = remember { RuntimeFilesRepository(context) }
     var editor by remember { mutableStateOf<CodeEditor?>(null) }

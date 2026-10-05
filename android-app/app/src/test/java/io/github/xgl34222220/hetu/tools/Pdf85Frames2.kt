@@ -72,7 +72,7 @@ private fun Diag() {
 
 /** [scrolled] > 0 shows the lower half of the page (规则 section), as on concept page 44. */
 @Composable
-private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock, scrolled: Int = 0) {
+private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock.copy(modeKnown = true, ruleMode = true), scrolled: Int = 0) {
     ToolsAdblockScreen(
         state = state, onBack = {}, onHelp = {}, onRefresh = {}, onEnabledChange = {}, onSwitchToRuleMode = null, onPickRecent = {}, onLevelChange = {},
         onUpdate = {}, onSourceChange = { _, _ -> }, onAddDomain = {}, onRemoveDomain = { _, _ -> }, onStandaloneDnsChange = {}, onCnameChange = {}, onRetry = {},

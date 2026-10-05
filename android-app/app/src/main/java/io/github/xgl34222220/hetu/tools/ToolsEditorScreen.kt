@@ -202,7 +202,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To
                         Row(
                             Modifier
                                 .fillMaxWidth()
-                                .heightIn(min = HomeDims.touch)
+                                .heightIn(min = 32.dp)
                                 .clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }
                                 .padding(start = 16.dp + 20.dp * item.level, end = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
@@ -245,8 +245,10 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
     HomeSheetContent(
         title = title, modifier = modifier, onClose = onKeepDraft,
         footer = {
-            HomeButton("保留草稿", onKeepDraft, Modifier.weight(1f), kind = HomeButtonKind.Soft)
-            HomeButton("重新读取", onReload, Modifier.weight(1f), kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
+            Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                HomeButton("保留草稿", onKeepDraft, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft)
+                HomeButton("重新读取", onReload, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
+            }
         },
     ) { Text(text, Modifier.padding(horizontal = 4.dp), color = c.t2, style = ToolsType.dialogText) }
 }
@@ -259,6 +261,7 @@ private fun DraftConflictSheet(title: String, text: String, onKeepDraft: () -> U
 @Composable
 internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier, loading: Boolean = false) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.Stacked,
         title = "放弃草稿并重新读取？",
         text = "重新读取成功后，本页未保存的修改和撤销记录会被替换为当前配置的最新内容。\n读取失败会继续保留草稿。",
         confirmLabel = "放弃并读取", confirmKind = ToolsConfirmKind.DangerSoft, confirmLoading = loading,
@@ -270,6 +273,7 @@ internal fun ToolsReloadDraftDialogCard(onConfirm: () -> Unit, onCancel: () -> U
 @Composable
 internal fun ToolsDiscardEditsDialogCard(onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
     ToolsDialogCard(
+        actions = ToolsDialogActions.Stacked,
         title = "放弃修改？", text = "当前修改还没有保存。",
         confirmLabel = "放弃", confirmKind = ToolsConfirmKind.DangerSoft,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,

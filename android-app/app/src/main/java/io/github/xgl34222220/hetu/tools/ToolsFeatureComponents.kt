@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -371,7 +372,7 @@ internal fun ToolsOptionMenuCard(options: List<ToolsMenuOption>, modifier: Modif
     val haptics = LocalHomeHaptics.current
     Column(
         modifier
-            .widthIn(min = ToolsDims.menuMinWidth, max = ToolsDims.menuMaxWidth)
+            .width(168.dp)
             .shadow(16.dp, HomeDims.menuShape)
             .clip(HomeDims.menuShape)
             .background(c.surface)

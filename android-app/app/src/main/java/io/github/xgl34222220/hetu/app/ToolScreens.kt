@@ -1055,9 +1055,9 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         actions.toList() != initialActions || labels.toList() != initialLabels
 
     val targetOptions = listOf(
-        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略", "Configs" to "配置页",
-        "Providers" to "订阅页", "Tools" to "工具", "Settings" to "设置",
-        "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗",
+        "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
+        "PanelSheet" to "面板浮窗", "StrategySheet" to "策略浮窗", "Tools" to "工具", "Settings" to "设置",
+        "Configs" to "配置页", "Providers" to "订阅页",
     )
     val actionOptions = listOf("reload" to "重载", "restart" to "重启", "stop" to "停止", "hide" to "隐藏通知", "none" to "无")
     val refreshOptions = listOf(2, 3, 5, 10, 30, 60)
@@ -1171,6 +1171,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 presentation = HxChoicePresentation.Notification,
                 title = "点击通知打开",
                 choices = targetOptions.map { HxChoice(it.first, it.second) },
+                maxVisibleChoices = 7,
                 selected = target,
                 onPick = { target = it; picker = null },
                 onDismiss = { picker = null },

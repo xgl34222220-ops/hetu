@@ -21,7 +21,7 @@
     }
   ],
   "scope": "130 supplied PDF states only; home and panel frozen",
-  "visualReview": "All rendered pages inspected in indexed eight-page contact sheets; fine layout comparison remains pending. Historical images are evidence of earlier fixtures, not this round.",
+  "visualReview": "All 130 reference pages read. This round's 125 available native component screenshots inspected against PDF; remaining five built-in WebUI states await installed run. Fixture data and un-emulated OS chrome differ; no pixel parity pass is claimed.",
   "pages": [
     {
       "document": "03A",
@@ -32,8 +32,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-001-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -44,8 +46,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-002-tools-collapsed.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-002-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -56,8 +60,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-003-tools-search.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-003-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -68,8 +74,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-004-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -80,8 +88,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-005-add-subscription-empty.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-005-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -92,8 +102,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-006-current-config-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-006-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -104,8 +116,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-007-other-config-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-007-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -116,8 +130,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-008-bundled-config-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-008-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -128,8 +144,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-009-rename-config.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-009-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -140,8 +158,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-010-delete-config.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-010-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -152,8 +172,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-011-delete-subscription.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-011-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -164,8 +186,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-012-discard-import.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-012-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -176,8 +200,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-013-yaml-outline.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-013-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -188,8 +214,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-014-yaml-selection-conflict.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-014-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -200,8 +228,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-015-yaml-validation-error.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-015-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -212,8 +242,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-016-yaml-read-error.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-016-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -224,8 +256,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-017-yaml-external-conflict.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-017-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -236,8 +270,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-018-yaml-reload-confirm.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-018-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -248,8 +284,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-019-yaml-discard.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-019-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -260,8 +298,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-020-import-link-invalid.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-020-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -272,8 +312,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-021-subscription-empty-name.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-021-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -284,8 +326,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-022-subscription-invalid-url.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-022-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -296,8 +340,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-023-edit-subscription-invalid.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-023-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -308,8 +354,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-024-import-link.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-024-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -320,8 +368,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-025-yaml-editor.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-025-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -332,8 +382,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-026-edit-subscription.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-026-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -344,8 +396,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-027-import-file-empty.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-027-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -356,8 +410,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-028-app-blacklist.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-028-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -368,8 +424,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-029-app-sort.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-029-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -380,8 +438,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-030-app-more.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-030-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -392,8 +452,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-031-app-whitelist.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-031-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -404,8 +466,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-032-app-core-mode.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-032-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -416,8 +480,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-033-app-search.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-033-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -428,8 +494,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-034-core-three-cards.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-034-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -440,8 +508,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-035-core-download-progress.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-035-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -452,8 +522,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-036-bypass-rules.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-036-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -464,8 +536,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-037-bypass-discard.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-037-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -476,8 +550,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-038-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -488,8 +564,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-039-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -500,8 +578,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-040-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -512,8 +592,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-041-diagnostic-startup.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-041-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -524,8 +606,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-042-diagnostic-recovery.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-042-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -536,8 +620,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-043-diagnostic-network.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-043-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -548,8 +634,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-044-adblock-rules.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-044-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -560,8 +648,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-045-adblock-status.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-045-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -572,8 +662,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-046-adblock-help.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-046-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -584,8 +676,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-047-adblock-add-allow.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-047-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -596,8 +690,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-048-adblock-add-block.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-048-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03A",
@@ -608,8 +704,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03A-049-adblock-whitelist-confirm.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03A-049-current.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -620,8 +718,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-001-adblock-global-warning.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-001-adblock-global-warning.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -632,8 +732,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-002-log-files.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-002-log-files.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -644,8 +746,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-003-log-file-picker.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-003-log-file-picker.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -656,8 +760,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-004-log-clear.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-004-log-clear.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -668,8 +774,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-005-log-search-expanded.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-005-log-search-expanded.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -680,8 +788,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-006-scripts.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-006-scripts.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -692,8 +802,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-007-scripts-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-007-scripts-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -704,8 +816,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-008-pre-start-hook.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-008-pre-start-hook.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -716,8 +830,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-009-post-stop-hook.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-009-post-stop-hook.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -728,8 +844,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-010-script-delete.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-010-script-delete.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -740,8 +858,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-011-script-environment.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-011-script-environment.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -752,8 +872,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-012-runtime-editor.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-012-runtime-editor.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -764,8 +886,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-013-files-list.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-013-files-list.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -776,8 +900,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-014-files-subfolder-search.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-014-files-subfolder-search.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -788,8 +914,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-015-files-more.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-015-files-more.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -800,8 +928,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-016-file-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-016-file-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -812,8 +942,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-017-folder-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-017-folder-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -824,8 +956,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-018-files-new-file.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-018-files-new-file.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -836,8 +970,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-019-files-new-folder.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-019-files-new-folder.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -848,8 +984,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-020-files-download.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-020-files-download.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -860,8 +998,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-021-files-download-invalid.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-021-files-download-invalid.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -872,8 +1012,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-022-files-rename.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-022-files-rename.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -884,8 +1026,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-023-file-delete.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-023-file-delete.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -896,8 +1040,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-024-folder-delete.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-024-folder-delete.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -908,8 +1054,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-025-files-name-unchanged.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-025-files-name-unchanged.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -920,8 +1068,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-026-runtime-editor-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-026-runtime-editor-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -932,8 +1082,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-027-runtime-editor-jump.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-027-runtime-editor-jump.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -944,8 +1096,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-028-runtime-editor-discard.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-028-runtime-editor-discard.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -956,8 +1110,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-029-runtime-editor-search.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-029-runtime-editor-search.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -968,8 +1124,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-030-network-match.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-030-network-match.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -980,8 +1138,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-031-match-action.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-031-match-action.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -992,8 +1152,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-032-unmatch-action.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-032-unmatch-action.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1004,8 +1166,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-033-web-panels.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-033-web-panels.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1016,8 +1180,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-034-add-web-panel.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-034-add-web-panel.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1028,8 +1194,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-035-edit-web-panel.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-035-edit-web-panel.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1040,8 +1208,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-036-delete-web-panel.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-036-delete-web-panel.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1052,8 +1222,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-037-local-mode.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-037-local-mode.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1064,8 +1236,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-038-custom-web-container.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-038-custom-web-container.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1076,8 +1250,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-039-substore-web-container.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-039-substore-web-container.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1088,8 +1264,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "pending-installed-capture",
+      "currentInteractionValidation": "pending",
+      "currentCapture": null,
+      "currentScreenshotReviewed": false
     },
     {
       "document": "03B",
@@ -1100,8 +1278,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "pending-installed-capture",
+      "currentInteractionValidation": "pending",
+      "currentCapture": null,
+      "currentScreenshotReviewed": false
     },
     {
       "document": "03B",
@@ -1112,8 +1292,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "pending-installed-capture",
+      "currentInteractionValidation": "pending",
+      "currentCapture": null,
+      "currentScreenshotReviewed": false
     },
     {
       "document": "03B",
@@ -1124,8 +1306,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "pending-installed-capture",
+      "currentInteractionValidation": "pending",
+      "currentCapture": null,
+      "currentScreenshotReviewed": false
     },
     {
       "document": "03B",
@@ -1136,8 +1320,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "pending-installed-capture",
+      "currentInteractionValidation": "pending",
+      "currentCapture": null,
+      "currentScreenshotReviewed": false
     },
     {
       "document": "03B",
@@ -1148,8 +1334,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "sub-store.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1160,8 +1348,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-046-substore-checking.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-046-substore-checking.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1172,8 +1362,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-047-substore-connected.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-047-substore-connected.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "03B",
@@ -1184,8 +1376,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "03B-048-substore-unavailable.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "03B-048-substore-unavailable.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1196,8 +1390,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": null,
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "settings-hub.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1208,8 +1404,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-002-settings-collapsed.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-002-settings-collapsed.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1220,8 +1418,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-003-basic-proxy.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-003-basic-proxy.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1232,8 +1432,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-004-advanced-settings.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-004-advanced-settings.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1244,8 +1446,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-005-resource-limits.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-005-resource-limits.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1256,8 +1460,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-006-startup-download.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-006-startup-download.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1268,8 +1474,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-007-default-panel.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-007-default-panel.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1280,8 +1488,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-008-theme.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-008-theme.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1292,8 +1502,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-009-theme-motion.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-009-theme-motion.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1304,8 +1516,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-010-backup.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-010-backup.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1316,8 +1530,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-011-notification.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-011-notification.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1328,8 +1544,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-012-notification-actions.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-012-notification-actions.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1340,8 +1558,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-013-about.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-013-about.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1352,8 +1572,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-014-startup-config.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-014-startup-config.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1364,8 +1586,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-015-core-choice.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-015-core-choice.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1376,8 +1600,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-016-run-mode-choice.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-016-run-mode-choice.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1388,8 +1614,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-017-ipv6-choice.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-017-ipv6-choice.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1400,8 +1628,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-018-default-panel-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-018-default-panel-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1412,8 +1642,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-019-language-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-019-language-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1424,8 +1656,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-020-top-blur-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-020-top-blur-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1436,8 +1670,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-021-scale-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-021-scale-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1448,8 +1684,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-022-refresh-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-022-refresh-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1460,8 +1698,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-023-target-menu.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-023-target-menu.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1472,8 +1712,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-024-action-one.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-024-action-one.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1484,8 +1726,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-025-action-two.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-025-action-two.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1496,8 +1740,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-026-action-three.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-026-action-three.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1508,8 +1754,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-027-dns-dialog.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-027-dns-dialog.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1520,8 +1768,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-028-restore-confirm.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-028-restore-confirm.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1532,8 +1782,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-029-mirror-dialog.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-029-mirror-dialog.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1544,8 +1796,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-030-mirror-invalid.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-030-mirror-invalid.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1556,8 +1810,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-031-mihomo-license.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-031-mihomo-license.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1568,8 +1824,10 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-032-adguard-license.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-032-adguard-license.png",
+      "currentScreenshotReviewed": true
     },
     {
       "document": "04",
@@ -1580,8 +1838,12 @@
       "sourceExists": true,
       "referenceImageRead": true,
       "historicalCapture": "04-033-lucide-license.png",
-      "currentPixelParity": "pending",
-      "currentInteractionValidation": "pending"
+      "currentPixelParity": "reviewed-differences-pending",
+      "currentInteractionValidation": "pending",
+      "currentCapture": "04-033-lucide-license.png",
+      "currentScreenshotReviewed": true
     }
-  ]
+  ],
+  "currentReviewCommit": "18909201b6168687cac4e1de5ece68db36938fda",
+  "currentReviewRun": 37292555012
 }

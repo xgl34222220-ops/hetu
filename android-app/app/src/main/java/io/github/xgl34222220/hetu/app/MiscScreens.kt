@@ -566,5 +566,5 @@ internal fun AboutScreen(vm: HetuViewModel) {
         }
     }
 
-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true) }
+    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
 }

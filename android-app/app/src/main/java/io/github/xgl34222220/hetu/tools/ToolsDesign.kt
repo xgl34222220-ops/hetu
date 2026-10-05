@@ -61,7 +61,7 @@ internal object ToolsTypography {
     val barSubtitle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
     val sheetTitle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
     val heroStatus = TextStyle(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
-    val rowTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold)
+    val rowTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
     val body = TextStyle(fontSize = 16.sp, lineHeight = 23.sp)
     val bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
     val rowSub = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
@@ -184,7 +184,7 @@ internal fun ToolsButton(
         HomeButtonKind.Ghost -> Color.Transparent to c.accent
     }
     Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
-        .clip(ToolsDesignDims.controlShape).background(fill)
+        .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)
         .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
         .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
             role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
