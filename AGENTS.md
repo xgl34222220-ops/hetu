@@ -1,4 +1,10 @@
-## 当前接续：936ffac 原始失败证据与菜单宽度期望续验
+## 当前接续：26a0906 新单测通过与A21最后3dp留白候选
+
+26a0906ed9765c04de1316cdcf99cd0460d9d276 /37342421613已真实完成build/lint/固定签名、23载荷和687ABI零缺失；实际新49XML479/0失败/0错误/0跳过，原SettingsPicker58两测试含宽度case执行通过。新UI11359219809/264PNG、ZIP SHA a3039879cdcdd67370b6afb5ff5152597a45af7407b9af7be8fa7b1081228fa3；API35/36仍在本轮原生导航/WebView验收，未取消，不将其未完成结果称为通过。936原失败与939旧成功均保留。
+
+新A21实读发现errorRow实际18px（非预计15），URL相对cardTop167对原163.673，input→error墨迹10对7.398，而error→URLlabel28已接近27.741。最后候选仅Add nameError非空caller的errorSpacing6→3dp；字体12/14/.4、后gap19、其余null/default24及所有回调逐字保持，整文件逆转等26a。预测URL164、前墨迹7、后28，必须以自己的新提交和新图核实。40修改/332冻结/372重建与五项边界门禁通过，证据docs/qa/20261005-v2085-A21-final-gap-candidate.json。GooglePlay根因仍未定位/真机修复未验证；不要把控制器401→200或旧包当新Google成功。
+
+## 936ffac 原始失败证据与菜单宽度期望续验
 
 应用936ffac87a81ef056e3c006987667e9d56baf5bc / Actions37338269235已经真实编译并产出264新组件图、23载荷与687配色ABI零缺失，但原49XML为479项/478通过/1失败/0错误/0跳过；SettingsPickerParity58Test.rootSettingsChoiceWidthsStayCompact在第11行仍硬编码Mode184，下一行IPv6也仍184，与实际附PDF04新原生214相冲。实际新图Mode214对原图归一213.60、IPv6214对212.68；Core174对173.85且能力禁用门禁保留。不能把这轮记为通过；lint、最终APK签名/运输manifest、API35/36安装59+5+21及401→200均未执行。原完整日志与49原XML已归档docs/qa/20261005-v2085-936ffac-acceptance-failure.json，不覆盖先前成功/失败。
 

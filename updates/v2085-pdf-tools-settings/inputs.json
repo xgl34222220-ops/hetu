@@ -5,7 +5,7 @@
   "previousPatchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
   "versionCode": 2085,
   "versionName": "0.12.15-v20-pdf",
-  "patchSha256": "dc77846d7c9ea6e6c74260e7369aa35f9dc425eb743aa52b3d07cafa4837e1ce",
+  "patchSha256": "7d60109b050d8e5b2e8bfa304ee1954893b61d41b7aadaa9ca90c5aee4cf76c3",
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "233cda9f3a372510cc9335f3f628a25216a64c5ae9ed2d66a4054948b04206f3",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java": "03c4b503fa94cd484f27ca6c0a731fb33b56289bbc9ccb18e3f7b1d93254c223",
@@ -37,7 +37,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt": "db63a5968aaf03c3cd19ed47cf186e74797216f77cd511252e6040c6638e07ce",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt": "5d2d2a16bc53414e17f73d22cbd93100b3c5b9dac3eb20b1122965a27f477e16",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "f3ee1a7387013d61a78fcee3ea6d20f588abb6edac949aa284a9b4ffebdde5e4",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "99231fe32edc94048b015c1de7b322b059c2f559b25aca6a6f71eebb010bbc0b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt": "5aa26917857d95c7d6fccd530f1b56fbcde2cc91798337eb32ac0cd04073dddc",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt": "91713cb65cd173c6332040ca49cb49cdb9071373ddf5ee25757c7dd5c06aea58",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "ed8c66a03a4384b3fe6cd9dd425785010e9f57b5a8498c10880ed7d296c1c317",

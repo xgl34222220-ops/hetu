@@ -3209,7 +3209,7 @@ index 7a05ec8..e0545b4 100644
              )
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
-index c5175b2..50f9475 100644
+index c5175b2..e11edaf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt
 @@ -2,12 +2,16 @@ package io.github.xgl34222220.hetu.tools
@@ -3240,7 +3240,7 @@ index c5175b2..50f9475 100644
 +                    ToolsField("订阅名称", form.name, onNameChange, placeholder = "例如 主订阅", error = form.nameError,
 +                        inputMinHeight = 43.dp, inputVerticalPadding = 9.5.dp,
 +                        errorStyle = if (form.nameError != null) ToolsTypography.caption.copy(fontSize = 12.sp, lineHeight = 14.sp, letterSpacing = 0.4.sp) else null,
-+                        errorSpacing = if (form.nameError != null) 6.dp else null)
++                        errorSpacing = if (form.nameError != null) 3.dp else null)
                  } else {
 -                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。")
 +                    ToolsField("订阅名称", form.name, {}, readOnly = true, hint = "名称用于策略组引用，可在 YAML 编辑器中统一修改。",
