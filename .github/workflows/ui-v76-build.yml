@@ -40,6 +40,8 @@ jobs:
         python3 .github/scripts/test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
 
         '
+    - name: Verify PDF layer preserves frozen UI and diagnostic boundaries
+      run: python3 .github/scripts/test_pdf85_source_scope.py
     - name: Verify independent authentication source and test-evidence boundaries
       run: 'set -euo pipefail
 
@@ -111,7 +113,7 @@ jobs:
     - uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 9.5.0
-    - name: Export effective V20.84 source
+    - name: Export effective V20.85 source
       run: 'set -euo pipefail
 
         tar -czf /tmp/Hetu-V20.85-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md

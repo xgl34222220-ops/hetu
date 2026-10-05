@@ -42,6 +42,19 @@ index 0000000..9b72347
 +        return false;
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+index 3f7ba83..8fd1b33 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+@@ -53,7 +53,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
+     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
+ 
+-    HxPage(title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
++    HxPage(flatCanvas = true, title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+         item {
+             OtherCard(card) {
+                 OtherLabel("代理能力")
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 index 56730b7..4a3b426 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
@@ -85,11 +98,105 @@ index 56730b7..4a3b426 100644
              if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
          }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
          try{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+index be09cbe..7e10516 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -178,6 +178,7 @@ internal fun HxPage(
+     compactTitleFontSizeSp: Float = 18f,
+     largeTitleBottomPadding: Dp = 10.dp,
+     canvasColor: Color? = null,
++    flatCanvas: Boolean = false,
+     referenceLabel: String? = null,
+     content: LazyListScope.() -> Unit,
+ ) {
+@@ -213,7 +214,7 @@ internal fun HxPage(
+     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
+ 
+     val pageHaze = rememberHazeState()
+-    val pageBrush = if (c.dark) {
++    val pageBrush = if (c.dark || flatCanvas) {
+         Brush.verticalGradient(listOf(pageCanvas, pageCanvas))
+     } else {
+         Brush.verticalGradient(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+index 088770f..9821ac3 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -146,7 +146,7 @@ internal fun AppListScreen(vm: HetuViewModel) {
+         if (descending) sorted.asReversed() else sorted
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = ht("应用管理"),
+         onBack = { nav.pop() },
+         largeTitle = false,
+@@ -333,7 +333,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
+         }
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = ht("核心管理"),
+         largeTitle = false,
+         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
+@@ -503,7 +503,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
+     }
+ 
+     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
+-    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
++    HxPage(flatCanvas = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
+         item(key = "brand") {
+             val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
+                 listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index b06fbb2..c3785a8 100644
+index b06fbb2..a064443 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-@@ -562,7 +562,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -199,7 +199,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+     }
+ 
+     if (subPage == "backup") {
+-        HxPage(
++        HxPage(flatCanvas = true,
+             title = ht("备份与恢复"),
+             subtitle = "管理配置与偏好数据",
+             largeTitle = false,
+@@ -252,7 +252,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+         val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
+         val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
+         val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
+-        HxPage(
++        HxPage(flatCanvas = true,
+             title = ht("开机启动与下载"),
+             largeTitle = false,
+             compactTitleFontSizeSp = 20f,
+@@ -309,7 +309,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+             }
+         }
+     } else if (subPage == "defaultPanel") {
+-        HxPage(
++        HxPage(flatCanvas = true,
+             title = ht("默认面板"),
+             largeTitle = false,
+             compactTitleFontSizeSp = 20f,
+@@ -353,7 +353,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+ 
+     if (subPage == null) {
+     top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
+-        HxPage(
++        HxPage(flatCanvas = true,
+             title = ht("设置"),
+             scrollToTopSignal = vm.reselect,
+             // The collapsed reference begins at the appearance group. Retain enough
+@@ -557,12 +557,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
+     val c = Hx.colors
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = ht("基础代理配置"),
          onBack = { nav.pop() },
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
@@ -98,6 +205,95 @@ index b06fbb2..c3785a8 100644
      ) {
          item(key = "core") {
              SettingsSection {
+@@ -851,7 +851,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         revision++
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = ht("主题设置"),
+         subtitle = null,
+         onBack = onBack,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
+index ddc05df..f35e74c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
+@@ -67,7 +67,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+             catch (error: Exception) { message = error.message ?: "导出失败" }
+         }
+     }
+-    HxPage(title = "启动配置", subtitle = "河图生成的最终 Mihomo 运行副本", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
++    HxPage(flatCanvas = true, title = "启动配置", subtitle = "河图生成的最终 Mihomo 运行副本", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+         item(key = "actions") {
+             SettingsSection {
+                 SettingsGroup {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index b68a65b..aabe007 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     }
+     BackHandler(enabled = dirty) { confirmLeave = true }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = "绕过规则",
+         largeTitle = false,
+         subtitle = "这些地址与接口在 Root 层直接放行，不进入 Mihomo",
+@@ -335,7 +335,7 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         return true
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = "共享网络",
+         largeTitle = false,
+         subtitle = "热点、USB 与局域网转发流量",
+@@ -432,7 +432,7 @@ internal fun CnIpScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     val prefs = vm.prefs
+     val c = Hx.colors
+     var enabled by remember { mutableStateOf(prefs.getBoolean("proxyCnIpDirect", false)) }
+-    HxPage(title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
++    HxPage(flatCanvas = true, title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
+         item(key = "note") { HxNote("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。") }
+         item(key = "main") {
+             SettingsSection {
+@@ -467,7 +467,7 @@ internal fun RuntimeCoreScreen(vm: HetuViewModel, onBack: () -> Unit, onOpenCore
+     val c = Hx.colors
+     var revision by remember { mutableIntStateOf(0) }
+     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
+-    HxPage(title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
++    HxPage(flatCanvas = true, title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
+         item(key = "note") { HxNote("修改运行核心后，下次启动或重启代理生效。下载、更新与维护在「内核管理」。") }
+         item(key = "cores") {
+             HxSection {
+@@ -638,7 +638,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+     }
+     val showSearch = searching || path != root
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = "文件管理",
+         largeTitle = true,
+         largeTitleFontSizeSp = 36f,
+@@ -909,7 +909,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         }
+     }
+ 
+-    HxPage(title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
++    HxPage(flatCanvas = true, title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
+         item(key = "preflight") {
+             SettingsSection {
+                 SettingsGroup(title = "运行预检") {
+@@ -1086,7 +1086,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         onBack()
+     }
+ 
+-    HxPage(
++    HxPage(flatCanvas = true,
+         title = "通知详细设置",
+         largeTitle = false,
+         compactTitleFontSizeSp = 20f,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
 index e3bff78..bea7dbb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
@@ -206,10 +402,10 @@ index 0000000..50d3531
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt
 new file mode 100644
-index 0000000..00bfddf
+index 0000000..10c9644
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,201 @@
 +package io.github.xgl34222220.hetu.tools
 +
 +import androidx.compose.foundation.background
@@ -225,6 +421,12 @@ index 0000000..00bfddf
 +import androidx.compose.ui.Modifier
 +import androidx.compose.ui.draw.clip
 +import androidx.compose.ui.unit.dp
++import androidx.compose.material.icons.Icons
++import androidx.compose.material.icons.rounded.Home
++import io.github.xgl34222220.hetu.ui.DockItem
++import io.github.xgl34222220.hetu.ui.HetuGlassDock
++import io.github.xgl34222220.hetu.ConceptDockIcons
++import dev.chrisbanes.haze.HazeState
 +import io.github.xgl34222220.hetu.home.HetuHomeTheme
 +import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 +import io.github.xgl34222220.hetu.home.LocalHomeColors
@@ -260,7 +462,15 @@ index 0000000..00bfddf
 +
 +@Composable
 +private fun Root(state: ToolsRootState, scrolled: Int = 0) {
-+    ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
++    Box(Modifier.fillMaxSize()) {
++        ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
++        HetuGlassDock(
++            items = listOf(DockItem("首页", Icons.Rounded.Home, 1.12f), DockItem("面板", ConceptDockIcons.Chain),
++                DockItem("工具", ConceptDockIcons.Grid), DockItem("设置", ConceptDockIcons.Settings)),
++            selected = 2, onSelect = {}, hazeState = remember { HazeState() }, backdrop = null,
++            modifier = Modifier.align(Alignment.BottomCenter),
++        )
++    }
 +}
 +
 +@Composable
@@ -397,7 +607,6 @@ index 0000000..00bfddf
 +
 +@Composable
 +internal fun Pdf85C25Editor() = Frame { Editor() }
-+
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
 new file mode 100644
 index 0000000..cc9e835

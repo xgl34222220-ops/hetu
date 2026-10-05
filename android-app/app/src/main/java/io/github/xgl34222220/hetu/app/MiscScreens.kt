@@ -146,7 +146,7 @@ internal fun AppListScreen(vm: HetuViewModel) {
         if (descending) sorted.asReversed() else sorted
     }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = ht("应用管理"),
         onBack = { nav.pop() },
         largeTitle = false,
@@ -333,7 +333,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
         }
     }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = ht("核心管理"),
         largeTitle = false,
         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
@@ -503,7 +503,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
     }
 
     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
-    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
+    HxPage(flatCanvas = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
         item(key = "brand") {
             val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
                 listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),

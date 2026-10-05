@@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
     BackHandler(enabled = dirty) { confirmLeave = true }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = "绕过规则",
         largeTitle = false,
         subtitle = "这些地址与接口在 Root 层直接放行，不进入 Mihomo",
@@ -335,7 +335,7 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         return true
     }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = "共享网络",
         largeTitle = false,
         subtitle = "热点、USB 与局域网转发流量",
@@ -432,7 +432,7 @@ internal fun CnIpScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val prefs = vm.prefs
     val c = Hx.colors
     var enabled by remember { mutableStateOf(prefs.getBoolean("proxyCnIpDirect", false)) }
-    HxPage(title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, title = "CNIP 设置", subtitle = "中国大陆 IPv4 / IPv6 自动直连", onBack = onBack, largeTitle = false) {
         item(key = "note") { HxNote("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。") }
         item(key = "main") {
             SettingsSection {
@@ -467,7 +467,7 @@ internal fun RuntimeCoreScreen(vm: HetuViewModel, onBack: () -> Unit, onOpenCore
     val c = Hx.colors
     var revision by remember { mutableIntStateOf(0) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
-    HxPage(title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, title = "运行核心", subtitle = "选择负责 Root 代理运行的核心", onBack = onBack, largeTitle = false) {
         item(key = "note") { HxNote("修改运行核心后，下次启动或重启代理生效。下载、更新与维护在「内核管理」。") }
         item(key = "cores") {
             HxSection {
@@ -638,7 +638,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
     }
     val showSearch = searching || path != root
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = "文件管理",
         largeTitle = true,
         largeTitleFontSizeSp = 36f,
@@ -909,7 +909,7 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
     }
 
-    HxPage(title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
+    HxPage(flatCanvas = true, title = "诊断与维护", subtitle = "预检、运行副本、诊断信息与紧急恢复", onBack = onBack, largeTitle = false) {
         item(key = "preflight") {
             SettingsSection {
                 SettingsGroup(title = "运行预检") {
@@ -1086,7 +1086,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         onBack()
     }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = "通知详细设置",
         largeTitle = false,
         compactTitleFontSizeSp = 20f,

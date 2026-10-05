@@ -199,7 +199,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
     }
 
     if (subPage == "backup") {
-        HxPage(
+        HxPage(flatCanvas = true,
             title = ht("备份与恢复"),
             subtitle = "管理配置与偏好数据",
             largeTitle = false,
@@ -252,7 +252,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
         val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
         val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
-        HxPage(
+        HxPage(flatCanvas = true,
             title = ht("开机启动与下载"),
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
@@ -309,7 +309,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
             }
         }
     } else if (subPage == "defaultPanel") {
-        HxPage(
+        HxPage(flatCanvas = true,
             title = ht("默认面板"),
             largeTitle = false,
             compactTitleFontSizeSp = 20f,
@@ -353,7 +353,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
 
     if (subPage == null) {
     top.yukonga.miuix.kmp.theme.MiuixTheme(colors = miuixColors) {
-        HxPage(
+        HxPage(flatCanvas = true,
             title = ht("设置"),
             scrollToTopSignal = vm.reselect,
             // The collapsed reference begins at the appearance group. Retain enough
@@ -557,7 +557,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     val c = Hx.colors
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = ht("基础代理配置"),
         onBack = { nav.pop() },
         largeTitle = false,
@@ -851,7 +851,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
         revision++
     }
 
-    HxPage(
+    HxPage(flatCanvas = true,
         title = ht("主题设置"),
         subtitle = null,
         onBack = onBack,

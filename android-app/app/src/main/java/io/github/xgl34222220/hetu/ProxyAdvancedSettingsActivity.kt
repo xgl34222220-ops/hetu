@@ -53,7 +53,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
 
-    HxPage(title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
+    HxPage(flatCanvas = true, title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
         item {
             OtherCard(card) {
                 OtherLabel("代理能力")

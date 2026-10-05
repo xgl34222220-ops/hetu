@@ -178,6 +178,7 @@ internal fun HxPage(
     compactTitleFontSizeSp: Float = 18f,
     largeTitleBottomPadding: Dp = 10.dp,
     canvasColor: Color? = null,
+    flatCanvas: Boolean = false,
     referenceLabel: String? = null,
     content: LazyListScope.() -> Unit,
 ) {
@@ -213,7 +214,7 @@ internal fun HxPage(
     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
 
     val pageHaze = rememberHazeState()
-    val pageBrush = if (c.dark) {
+    val pageBrush = if (c.dark || flatCanvas) {
         Brush.verticalGradient(listOf(pageCanvas, pageCanvas))
     } else {
         Brush.verticalGradient(

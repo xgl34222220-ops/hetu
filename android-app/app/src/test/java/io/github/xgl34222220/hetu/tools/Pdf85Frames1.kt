@@ -13,6 +13,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.Home
+import io.github.xgl34222220.hetu.ui.DockItem
+import io.github.xgl34222220.hetu.ui.HetuGlassDock
+import io.github.xgl34222220.hetu.ConceptDockIcons
+import dev.chrisbanes.haze.HazeState
 import io.github.xgl34222220.hetu.home.HetuHomeTheme
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.home.LocalHomeColors
@@ -48,7 +54,15 @@ private fun BoxScope.SheetLayer(content: @Composable () -> Unit) { io.github.xgl
 
 @Composable
 private fun Root(state: ToolsRootState, scrolled: Int = 0) {
-    ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
+    Box(Modifier.fillMaxSize()) {
+        ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
+        HetuGlassDock(
+            items = listOf(DockItem("首页", Icons.Rounded.Home, 1.12f), DockItem("面板", ConceptDockIcons.Chain),
+                DockItem("工具", ConceptDockIcons.Grid), DockItem("设置", ConceptDockIcons.Settings)),
+            selected = 2, onSelect = {}, hazeState = remember { HazeState() }, backdrop = null,
+            modifier = Modifier.align(Alignment.BottomCenter),
+        )
+    }
 }
 
 @Composable
@@ -185,4 +199,3 @@ internal fun Pdf85C24ImportLink() = Frame { Import(ToolsSamples.importLink) }
 
 @Composable
 internal fun Pdf85C25Editor() = Frame { Editor() }
-
