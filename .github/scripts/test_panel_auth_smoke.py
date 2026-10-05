@@ -64,11 +64,28 @@ class PanelAuthSmokeTests(unittest.TestCase):
    with self.assertRaisesRegex(AssertionError,'owned fresh emulator'):self.module.panel_fixture_target()
   self.assertEqual([(('get-serialno',),{})],[(c.args,c.kwargs) for c in adb.call_args_list])
  def test_other_avd_is_refused(self):
-  with patch.object(self.module,'adb',side_effect=['emulator-5554','retained-user-avd\nOK']):
+  with patch.object(self.module,'verify_owned_emulator_target',return_value={'apiLevel':35}),patch.object(self.module,'adb',side_effect=['emulator-5554','retained-user-avd\nOK']):
    with self.assertRaisesRegex(AssertionError,'Unexpected AVD'):self.module.panel_fixture_target()
  def test_guest_root_shell_is_refused(self):
-  with patch.object(self.module,'adb',side_effect=['emulator-5554','hetu-smoke\nOK','1','0']):
+  with patch.object(self.module,'verify_owned_emulator_target',return_value={'apiLevel':35}),patch.object(self.module,'adb',side_effect=['emulator-5554','hetu-smoke\nOK','1','0']):
    with self.assertRaisesRegex(AssertionError,'non-root AOSP shell'):self.module.panel_fixture_target()
+ def test_empty_console_reply_requires_and_accepts_live_owned_host_proof(self):
+  proof={'apiLevel':35,'avd':'hetu-smoke','ownedSession':'current-owned-session'}
+  with patch.object(self.module,'verify_owned_emulator_target',return_value=proof) as verify,patch.object(self.module,'adb',side_effect=['emulator-5554','','1','2000','35']),patch.object(self.module,'write_fixture_preferences') as write:
+   target=self.module.panel_fixture_target()
+  verify.assert_called_once_with(os.environ)
+  self.assertEqual('current-owned-session',target['ownedSession'])
+  self.assertEqual([],target['consoleAvdReply']);self.assertTrue(target['nonRootShell'])
+  write.assert_not_called()
+ def test_missing_host_proof_refuses_target_before_console_or_preference_write(self):
+  with patch.object(self.module,'verify_owned_emulator_target',side_effect=RuntimeError('Missing current owned emulator session')),patch.object(self.module,'adb',return_value='emulator-5554') as adb,patch.object(self.module,'write_fixture_preferences') as write:
+   with self.assertRaisesRegex(RuntimeError,'owned emulator session'):self.module.panel_fixture_target()
+  self.assertEqual([(('get-serialno',),{})],[(call.args,call.kwargs) for call in adb.call_args_list])
+  write.assert_not_called()
+ def test_owned_avd_and_guest_api_must_match_before_preference_write(self):
+  with patch.object(self.module,'verify_owned_emulator_target',return_value={'apiLevel':35}),patch.object(self.module,'adb',side_effect=['emulator-5554','','1','2000','36']),patch.object(self.module,'write_fixture_preferences') as write:
+   with self.assertRaisesRegex(AssertionError,'differs from owned AOSP AVD'):self.module.panel_fixture_target()
+  write.assert_not_called()
  def test_failure_requires_native401_and_never_accepts_zero_overview(self):
   self.module.assert_panel_read_failure(self.failure())
   root=self.failure();root.append(self.node('运行概况'));root.append(self.node('0'))

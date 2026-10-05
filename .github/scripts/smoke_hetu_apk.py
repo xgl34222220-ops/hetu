@@ -12,6 +12,7 @@ OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parent
 from mock_webview_controller import controller_fixture, panel_controller_fixture, PANEL_AUTH_SECRET
 from native_webview_bounds import webview_bounds
 from native_scroll_bounds import scroll_bounds, scroll_gesture
+from run_hetu_emulator import verify_owned_emulator_target
 checks=[]
 def adb(*args, timeout=90, check=True):
  try:
@@ -288,13 +289,17 @@ def panel_fixture_target():
  # Refuse preference injection outside the existing owned fresh AOSP job.
  serial=adb('get-serialno').strip()
  assert serial=='emulator-5554',('Not the owned fresh emulator',serial)
- avd=adb('emu','avd','name').splitlines()
- assert avd and avd[0].strip()=='hetu-smoke',('Unexpected AVD',avd)
+ owned=verify_owned_emulator_target(os.environ)
+ # Console commands are fire-and-forget. An empty reply is not an identity;
+ # the live host supervisor is mandatory, while conflicting console names fail.
+ avd=[line.strip() for line in adb('emu','avd','name').splitlines() if line.strip() and line.strip()!='OK']
+ assert not avd or avd==['hetu-smoke'],('Unexpected AVD',avd)
  assert adb('shell','getprop','ro.kernel.qemu').strip()=='1','Panel fixture requires an emulator'
  assert adb('shell','id','-u').strip()=='2000','Panel fixture requires the non-root AOSP shell'
  api=int(adb('shell','getprop','ro.build.version.sdk').strip())
  assert api in (35,36),('Unexpected fixture API',api)
- return {'serial':serial,'avd':'hetu-smoke','apiLevel':api,'nonRootShell':True}
+ assert api==owned['apiLevel'],('Guest API differs from owned AOSP AVD',api,owned['apiLevel'])
+ return dict(owned,serial=serial,nonRootShell=True,consoleAvdReply=avd)
 
 def panel_fixture_preferences(original,port):
  root=ET.fromstring(original)
@@ -508,6 +513,8 @@ def main():
   except subprocess.TimeoutExpired:stable=0
   time.sleep(5)
  else:raise AssertionError('Package manager/boot animation did not settle')
+ if os.environ.get('HETU_EXPECT_NEW_UI')=='1' and int(os.environ.get('HETU_EXPECTED_VERSION','0'))>=2084:
+  (OUT/'panel-target-preflight.json').write_text(json.dumps(panel_fixture_target(),indent=2)+'\n')
  adb('shell','input','keyevent','82');time.sleep(3)
  apk=next(Path('candidate').glob('*.apk'))
  installed=adb('install','--no-streaming','-r',str(apk),timeout=600)

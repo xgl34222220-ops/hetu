@@ -1,4 +1,4 @@
-## 当前续接：V20.84 控制接口鉴权与面板缺测状态（待本轮完整 CI）
+## 当前续接：V20.84 控制接口鉴权与面板缺测状态（构建通过，安装续验待核）
 
 继续 `test/v20.76-new-ui`，以已实际编译的 `a93a756d8578cf3afa60ee090405535ad097e49e` 为底座；其完整 Actions `37240041766` 现四 job 均 success，保留下面交付时记录的原状态。本轮 versionCode 2084 / `0.12.14-v20-auth`，独立追加 `updates/v2084-controller-auth/runtime.patch`，原 V20.82/83 清单及补丁字节不变。
 
@@ -9,6 +9,10 @@
 第二轮 `934bc32` / Actions `37244396784`：实际 47 XML / 422 tests / 3 failures / 0 errors/skipped，lint/最终 APK signer 与双 API 安装 skipped。保留 `docs/ci/V20.84_SECOND_FAILURE.json`。新测试显式清空静态历史夹具并等待实际读取闸门后验证取消；旧 HistoryRecord 的 pause/pending 增加 volatile，原安全断言仅增加失败详情。原 392 与新增 30 数量不变；第三轮仍须完整验证，字段可见性不是已确认的生产根因。
 
 第三轮 `6666bd8c` / Actions `37269048184`：实际 422/1 failure/0 error/skipped，新 30 全过；仅原 stop/history latch 失败，诊断显示 panelReady=true/readFailed=false/historyPaused=true，volatile 未解决。证据保留 `docs/ci/V20.84_THIRD_FAILURE.json`。两套 Shadow 针对同一个 Kotlin history 单例存在夹具绑定冲突疑点；第四轮统一复用原可暂停 HistoryRecord，仅补只读采样审计并显式核对实际绑定，不改生产历史保护或原断言，仍待完整重跑。
+
+第四轮实际编译 `121e0ab99904e7ea862b1dcb350a59169aeab0cd` / Actions `37270231154`：build `111635473569` 与旧崩溃复现 `111635473860` success；47 XML / 422 tests（原 392 +新增 30）/ 0 failures/errors/skipped，lint 0 Error/Fatal、298 Warning/7 Hint，23 载荷、687 ABI 引用零缺失与固定签名通过。整体仍为 failure：API35 `111638870907`、API36 `111638870864` 在新增夹具目标检查因 console AVD 名称返回空而拒绝，尚未执行新增鉴权 5 项；两 artifact 无 results.json，不推算原 59/21 或新 64 通过。保留 `docs/ci/V20.84_FOURTH_FAILURE.json`。
+
+仅修测试监督进程与目标识别，不改 Android 编译输入：固定 APK `Hetu-0.12.14-v20-auth.apk`，134727773 bytes，SHA256 `33d60ce01b63f40c6b6ccd8c63c5dd1ea38b85d4d25e37c32f48130c4207ff50`；其 Android 源码树 `2954ad5c83131050acd3ffd52eb63d8689a8de33`。待严格固定原 build/job、源码树、产物 ZIP 摘要、实际 422 XML、载荷/ABI/证书的双 API 安装续测，原 59 +新增 5 项与 21 配色全部保留。续测提交不作为重新编译提交，原第四轮 full-run failure 不改写为 success。
 
 原 23 载荷、Root runtime 151、核心/native/service.d、签名、Manifest/权限与依赖不变。无 hook、不操作用户设备/网络/安全设置、不永久删除数据、不合并主分支或正式发布。手机实际鉴权恢复、K80/OEM/KernelSU、真机 Root 与长期网络仍未验证。详细范围见 `docs/V20.84_CONTROLLER_AUTH.md`。
 
