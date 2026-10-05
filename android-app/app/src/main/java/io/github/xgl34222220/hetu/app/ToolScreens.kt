@@ -790,7 +790,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) -> 
     if (downloadDialog) {
         HxFormDialog(
             title = "下载到当前目录",
-            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, hideMessageOnError = true, highlightError = false, plainFields = true,
+            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, centerTitleOnError = true, hideMessageOnError = true, highlightError = false, plainFields = true,
             message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
             fields = listOf(
                 HxField("下载地址", placeholder = "https://example.com/file.yaml"),

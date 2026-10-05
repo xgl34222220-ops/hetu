@@ -125,67 +125,21 @@ index 7f55bf3..9fd87b0 100644
          largeTitle = false,
          compactTitleFontSizeSp = 20f,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
-index 4d244bd..2ac70c2 100644
+index 4d244bd..951a57f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt
-@@ -289,6 +289,21 @@ internal fun webToolChromeClient(state: WebToolLoadState) = object : WebChromeCl
-     override fun onProgressChanged(view: WebView?, newProgress: Int) { state.progress = newProgress.coerceIn(0, 100) }
- }
- 
-+/** Opens a selected HTTP(S) page, rejecting URI user-info in both page and Sub-Store backend. */
-+internal fun webToolBrowserIntent(url: String): Intent? {
-+    if (url.any { it.isWhitespace() || it.isISOControl() }) return null
-+    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
-+    if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank() || uri.rawUserInfo != null) return null
-+    val page = android.net.Uri.parse(url)
-+    val backend = runCatching { page.getQueryParameter("api") }.getOrNull()
-+    if (backend != null) {
-+        if (backend.any { it.isWhitespace() || it.isISOControl() }) return null
-+        val api = runCatching { java.net.URI(backend) }.getOrNull() ?: return null
-+        if (api.scheme?.lowercase() !in setOf("http", "https") || api.host.isNullOrBlank() || api.rawUserInfo != null) return null
-+    }
-+    return Intent(Intent.ACTION_VIEW, page.normalizeScheme()).addCategory(Intent.CATEGORY_BROWSABLE)
-+}
-+
- /** Keeps status/cutout/keyboard/navigation insets and native history-aware Back. */
- internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLoadState, name: String, subStoreBackend: String? = null) {
-     enableEdgeToEdge()
-@@ -304,7 +319,15 @@ internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLo
+@@ -304,7 +304,10 @@ internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLo
                              Icon(WebToolIcons.Lock, "HTTPS", tint = Hx.colors.textMuted, modifier = Modifier.size(18.dp))
                              Spacer(Modifier.width(14.dp))
                              Text(state.host, color = Hx.colors.textMuted, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
 -                                maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                                modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-+                            Text("默认浏览器打开", color = Hx.colors.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
++                            Text("页面容器示意", color = Hx.colors.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
 +                                modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Hx.colors.accentSoft)
-+                                    .clickable {
-+                                        val target = webToolBrowserIntent(view.url ?: state.url)
-+                                        if (target != null) runCatching { startActivity(target) }.onFailure {
-+                                            android.widget.Toast.makeText(this@setWebToolContent, "没有可用的浏览器", android.widget.Toast.LENGTH_SHORT).show()
-+                                        }
-+                                    }.padding(horizontal = 9.dp, vertical = 5.dp))
++                                    .padding(horizontal = 9.dp, vertical = 5.dp))
                          }
                      }
                  }
-@@ -344,7 +367,8 @@ class ProxySubStoreWebActivity : ComponentActivity() {
-         super.onCreate(savedInstanceState)
-         val backend = intent.getStringExtra("backend").orEmpty().ifBlank { DEFAULT_SUB_STORE_BACKEND }
-         val api = URLEncoder.encode(backend, "UTF-8")
--        val state = WebToolLoadState(SUB_STORE_FRONTEND)
-+        val initialUrl = SUB_STORE_FRONTEND + "?api=" + api
-+        val state = WebToolLoadState(initialUrl)
-         val view = WebView(this).apply {
-             settings.javaScriptEnabled = true
-             settings.domStorageEnabled = true
-@@ -357,7 +381,7 @@ class ProxySubStoreWebActivity : ComponentActivity() {
-         }
-         webView = view
-         setWebToolContent(view, state, "Sub-Store", backend)
--        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(SUB_STORE_FRONTEND + "?api=" + api)
-+        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(initialUrl)
-         else { state.url = view.url ?: SUB_STORE_FRONTEND; state.progress = view.progress; state.loading = view.progress < 100 }
-     }
-     override fun onSaveInstanceState(outState: Bundle) { webView?.savePage(outState); super.onSaveInstanceState(outState) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 index 56730b7..4a3b426 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
@@ -282,7 +236,7 @@ index 1a9af21..32e3549 100644
                      if (discard) { model.draft = null; discard = false; onBack() }
                      else { editor?.let { it.setSelection((jumpLine.toIntOrNull() ?: 1).coerceIn(1, it.text.lineCount) - 1, 0); it.ensureSelectionVisible() }; jump = false }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..5635e74 100644
+index be09cbe..cdf948c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -178,6 +178,7 @@ internal fun HxPage(
@@ -361,15 +315,27 @@ index be09cbe..5635e74 100644
              } else choices.forEachIndexed { index, choice ->
                  HxMenuItem(
                      choice.label,
-@@ -1261,6 +1279,7 @@ internal fun HxFormDialog(
+@@ -1259,8 +1277,10 @@ internal fun HxFormDialog(
+     titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
+     titleLineHeight: androidx.compose.ui.unit.TextUnit = 26.sp,
      titleTextAlign: TextAlign = TextAlign.Center,
++    centerTitleOnError: Boolean = false,
      hideMessageOnError: Boolean = false,
      highlightError: Boolean = true,
 +    fieldOutlineColor: Color? = null,
      plainFields: Boolean = false,
      compactPills: Boolean = false,
      validate: (List<String>) -> String? = { null },
-@@ -1310,7 +1329,7 @@ internal fun HxFormDialog(
+@@ -1291,7 +1311,7 @@ internal fun HxFormDialog(
+             Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
+                 .graphicsLayer { translationX = shake.value * density }) {
+                 Text(title, fontSize = titleFontSize, lineHeight = titleLineHeight, fontWeight = FontWeight.Bold, color = c.text,
+-                    textAlign = titleTextAlign, modifier = Modifier.fillMaxWidth())
++                    textAlign = if (centerTitleOnError && error != null) TextAlign.Center else titleTextAlign, modifier = Modifier.fillMaxWidth())
+                 Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
+                 if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
+                     Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+@@ -1310,7 +1330,7 @@ internal fun HxFormDialog(
                          textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp),
                          cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
                          modifier = Modifier.fillMaxWidth().heightIn(min = if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
@@ -378,7 +344,7 @@ index be09cbe..5635e74 100644
                              .padding(horizontal = 12.dp, vertical = if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
                          decorationBox = { input -> Box {
                              if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
-@@ -1320,7 +1339,7 @@ internal fun HxFormDialog(
+@@ -1320,7 +1340,7 @@ internal fun HxFormDialog(
                      if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
                          style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                  }
@@ -739,7 +705,7 @@ index ddc05df..d67536f 100644
              SettingsSection {
                  SettingsGroup {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..1f7bce6 100644
+index b68a65b..638816e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -792,7 +758,7 @@ index b68a65b..1f7bce6 100644
          HxFormDialog(
              title = "下载到当前目录",
 -            widthFraction = .87f, titleFontSize = 22.sp, hideMessageOnError = true, highlightError = false, plainFields = true,
-+            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, hideMessageOnError = true, highlightError = false, plainFields = true,
++            widthFraction = .87f, titleFontSize = 22.sp, titleTextAlign = androidx.compose.ui.text.style.TextAlign.Start, centerTitleOnError = true, hideMessageOnError = true, highlightError = false, plainFields = true,
              message = "支持 HTTPS。文件名可留空，河图会从下载地址自动推断。",
              fields = listOf(
                  HxField("下载地址", placeholder = "https://example.com/file.yaml"),
@@ -1139,7 +1105,7 @@ index e3bff78..f2b0b75 100644
                  horizontalArrangement = Arrangement.spacedBy(10.dp),
              ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-index e9d3077..9ca7e2f 100644
+index e9d3077..b2ab72c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 @@ -92,11 +92,12 @@ private fun ConfigCard(
@@ -1228,7 +1194,7 @@ index e9d3077..9ca7e2f 100644
      modifier: Modifier = Modifier,
  ) {
      ToolsDialogCard(
-+        actions = ToolsDialogActions.ConfigGrid,
++        actions = ToolsDialogActions.Filled,
          title = "删除订阅？",
          text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
          confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
@@ -1353,20 +1319,31 @@ index 7e58000..84b576f 100644
          }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index 556dff0..f782df1 100644
+index 556dff0..77f1c83 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-@@ -97,7 +97,8 @@ internal fun ToolsDiagScreen(
+@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.remember
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.ui.platform.LocalConfiguration
+ import androidx.compose.ui.unit.dp
+ import io.github.xgl34222220.hetu.home.HomeBanner
+ import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
+@@ -97,8 +99,9 @@ internal fun ToolsDiagScreen(
  /** Page 41: the generated startup copy, YAML-coloured, with 复制. */
  @Composable
  internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
 -    val palette = toolsYamlPalette()
+-    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier) { text ->
 +    val c = LocalHomeColors.current
 +    val palette = remember(c) { ToolsYamlPalette(key = c.t2, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
-     DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier) { text ->
++    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier.heightIn(min = (LocalConfiguration.current.screenHeightDp * .60f).dp)) { text ->
          remember(text, palette) { toolsYamlAnnotated(text, palette) }
      }
-@@ -128,7 +129,7 @@ private fun DiagTextSheet(
+ }
+@@ -128,7 +131,7 @@ private fun DiagTextSheet(
              content.loading -> ToolsLoading()
              content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
              content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
@@ -1375,7 +1352,7 @@ index 556dff0..f782df1 100644
          }
      }
  }
-@@ -142,7 +143,7 @@ internal fun ToolsRestoreNetworkDialogCard(onConfirm: () -> Unit, onCancel: () -
+@@ -142,7 +145,7 @@ internal fun ToolsRestoreNetworkDialogCard(onConfirm: () -> Unit, onCancel: () -
      ToolsDialogCard(
          title = "恢复网络？",
          text = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
@@ -1623,38 +1600,6 @@ index c5175b2..ade3e2e 100644
          title = "放弃填写？",
          text = "已填写的内容还没有保存，返回会放弃这些修改。",
          confirmLabel = "放弃", confirmKind = ToolsConfirmKind.Danger,
-diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
-index e47d1d6..9233ec8 100644
---- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
-+++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
-@@ -626,8 +626,25 @@ class ConceptRemainingCoverageTest {
-         val custom = Robolectric.buildActivity(ProxyWebPanelViewerActivity::class.java, intent).setup()
-         try { frame(); expect("正在加载外部面板…"); capture("03B-038-custom-web-container") }
-         finally { custom.pause().stop().destroy(); frame() }
--        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java).setup()
--        try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
-+        val subStoreIntent = android.content.Intent(ApplicationProvider.getApplicationContext<Application>(), ProxySubStoreWebActivity::class.java)
-+            .putExtra("backend", "http://127.0.0.1:3123/")
-+        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java, subStoreIntent).setup()
-+        try {
-+            frame(); expect("正在加载 Sub-Store…"); expect("默认浏览器打开"); capture("03B-039-substore-web-container")
-+            click("默认浏览器打开")
-+            val external = Shadows.shadowOf(subStore.get()).nextStartedActivity
-+            assertNotNull(external)
-+            assertEquals(android.content.Intent.ACTION_VIEW, external.action)
-+            assertTrue(external.hasCategory(android.content.Intent.CATEGORY_BROWSABLE))
-+            assertEquals("sub-store.vercel.app", external.data!!.host)
-+            assertEquals("http://127.0.0.1:3123/", external.data!!.getQueryParameter("api"))
-+            for (unsafe in listOf("file:///data/user/0", "javascript:alert(1)", "https://user:secret@example.com", "https://example.com/\n",
-+                "https://sub-store.vercel.app/?api=https%3A%2F%2Fuser%3Asecret%40example.com",
-+                "https://sub-store.vercel.app/?api=file%3A%2F%2F%2Fdata%2Fuser%2F0")) {
-+                assertNull(webToolBrowserIntent(unsafe))
-+            }
-+            assertEquals("https", webToolBrowserIntent("HTTPS://example.com")!!.data!!.scheme)
-+        }
-         finally { subStore.pause().stop().destroy(); frame() }
-     }
-     @Config(sdk = [28])
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java
 new file mode 100644
 index 0000000..50d3531

@@ -241,7 +241,7 @@ internal fun ToolsDeleteSubscriptionDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
-        actions = ToolsDialogActions.ConfigGrid,
+        actions = ToolsDialogActions.Filled,
         title = "删除订阅？",
         text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
         confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,

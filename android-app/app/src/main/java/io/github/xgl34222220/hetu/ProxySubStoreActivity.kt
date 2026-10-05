@@ -289,21 +289,6 @@ internal fun webToolChromeClient(state: WebToolLoadState) = object : WebChromeCl
     override fun onProgressChanged(view: WebView?, newProgress: Int) { state.progress = newProgress.coerceIn(0, 100) }
 }
 
-/** Opens a selected HTTP(S) page, rejecting URI user-info in both page and Sub-Store backend. */
-internal fun webToolBrowserIntent(url: String): Intent? {
-    if (url.any { it.isWhitespace() || it.isISOControl() }) return null
-    val uri = runCatching { java.net.URI(url) }.getOrNull() ?: return null
-    if (uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank() || uri.rawUserInfo != null) return null
-    val page = android.net.Uri.parse(url)
-    val backend = runCatching { page.getQueryParameter("api") }.getOrNull()
-    if (backend != null) {
-        if (backend.any { it.isWhitespace() || it.isISOControl() }) return null
-        val api = runCatching { java.net.URI(backend) }.getOrNull() ?: return null
-        if (api.scheme?.lowercase() !in setOf("http", "https") || api.host.isNullOrBlank() || api.rawUserInfo != null) return null
-    }
-    return Intent(Intent.ACTION_VIEW, page.normalizeScheme()).addCategory(Intent.CATEGORY_BROWSABLE)
-}
-
 /** Keeps status/cutout/keyboard/navigation insets and native history-aware Back. */
 internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLoadState, name: String, subStoreBackend: String? = null) {
     enableEdgeToEdge()
@@ -320,14 +305,9 @@ internal fun ComponentActivity.setWebToolContent(view: WebView, state: WebToolLo
                             Spacer(Modifier.width(14.dp))
                             Text(state.host, color = Hx.colors.textMuted, fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.weight(1f), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                            Text("默认浏览器打开", color = Hx.colors.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                            Text("页面容器示意", color = Hx.colors.accent, fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
                                 modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(Hx.colors.accentSoft)
-                                    .clickable {
-                                        val target = webToolBrowserIntent(view.url ?: state.url)
-                                        if (target != null) runCatching { startActivity(target) }.onFailure {
-                                            android.widget.Toast.makeText(this@setWebToolContent, "没有可用的浏览器", android.widget.Toast.LENGTH_SHORT).show()
-                                        }
-                                    }.padding(horizontal = 9.dp, vertical = 5.dp))
+                                    .padding(horizontal = 9.dp, vertical = 5.dp))
                         }
                     }
                 }
@@ -367,8 +347,7 @@ class ProxySubStoreWebActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val backend = intent.getStringExtra("backend").orEmpty().ifBlank { DEFAULT_SUB_STORE_BACKEND }
         val api = URLEncoder.encode(backend, "UTF-8")
-        val initialUrl = SUB_STORE_FRONTEND + "?api=" + api
-        val state = WebToolLoadState(initialUrl)
+        val state = WebToolLoadState(SUB_STORE_FRONTEND)
         val view = WebView(this).apply {
             settings.javaScriptEnabled = true
             settings.domStorageEnabled = true
@@ -381,7 +360,7 @@ class ProxySubStoreWebActivity : ComponentActivity() {
         }
         webView = view
         setWebToolContent(view, state, "Sub-Store", backend)
-        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(initialUrl)
+        if (!view.restoreSavedPage(savedInstanceState)) view.loadUrl(SUB_STORE_FRONTEND + "?api=" + api)
         else { state.url = view.url ?: SUB_STORE_FRONTEND; state.progress = view.progress; state.loading = view.progress < 100 }
     }
     override fun onSaveInstanceState(outState: Bundle) { webView?.savePage(outState); super.onSaveInstanceState(outState) }

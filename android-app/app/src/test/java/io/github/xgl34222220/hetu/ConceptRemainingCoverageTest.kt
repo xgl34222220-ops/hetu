@@ -626,25 +626,8 @@ class ConceptRemainingCoverageTest {
         val custom = Robolectric.buildActivity(ProxyWebPanelViewerActivity::class.java, intent).setup()
         try { frame(); expect("正在加载外部面板…"); capture("03B-038-custom-web-container") }
         finally { custom.pause().stop().destroy(); frame() }
-        val subStoreIntent = android.content.Intent(ApplicationProvider.getApplicationContext<Application>(), ProxySubStoreWebActivity::class.java)
-            .putExtra("backend", "http://127.0.0.1:3123/")
-        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java, subStoreIntent).setup()
-        try {
-            frame(); expect("正在加载 Sub-Store…"); expect("默认浏览器打开"); capture("03B-039-substore-web-container")
-            click("默认浏览器打开")
-            val external = Shadows.shadowOf(subStore.get()).nextStartedActivity
-            assertNotNull(external)
-            assertEquals(android.content.Intent.ACTION_VIEW, external.action)
-            assertTrue(external.hasCategory(android.content.Intent.CATEGORY_BROWSABLE))
-            assertEquals("sub-store.vercel.app", external.data!!.host)
-            assertEquals("http://127.0.0.1:3123/", external.data!!.getQueryParameter("api"))
-            for (unsafe in listOf("file:///data/user/0", "javascript:alert(1)", "https://user:secret@example.com", "https://example.com/\n",
-                "https://sub-store.vercel.app/?api=https%3A%2F%2Fuser%3Asecret%40example.com",
-                "https://sub-store.vercel.app/?api=file%3A%2F%2F%2Fdata%2Fuser%2F0")) {
-                assertNull(webToolBrowserIntent(unsafe))
-            }
-            assertEquals("https", webToolBrowserIntent("HTTPS://example.com")!!.data!!.scheme)
-        }
+        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java).setup()
+        try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
         finally { subStore.pause().stop().destroy(); frame() }
     }
     @Config(sdk = [28])

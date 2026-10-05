@@ -12,6 +12,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeBanner
 import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
@@ -99,7 +101,7 @@ internal fun ToolsDiagScreen(
 internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val palette = remember(c) { ToolsYamlPalette(key = c.t2, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
-    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier) { text ->
+    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier.heightIn(min = (LocalConfiguration.current.screenHeightDp * .60f).dp)) { text ->
         remember(text, palette) { toolsYamlAnnotated(text, palette) }
     }
 }

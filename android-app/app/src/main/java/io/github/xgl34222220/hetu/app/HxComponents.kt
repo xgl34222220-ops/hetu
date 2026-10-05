@@ -1277,6 +1277,7 @@ internal fun HxFormDialog(
     titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
     titleLineHeight: androidx.compose.ui.unit.TextUnit = 26.sp,
     titleTextAlign: TextAlign = TextAlign.Center,
+    centerTitleOnError: Boolean = false,
     hideMessageOnError: Boolean = false,
     highlightError: Boolean = true,
     fieldOutlineColor: Color? = null,
@@ -1310,7 +1311,7 @@ internal fun HxFormDialog(
             Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
                 .graphicsLayer { translationX = shake.value * density }) {
                 Text(title, fontSize = titleFontSize, lineHeight = titleLineHeight, fontWeight = FontWeight.Bold, color = c.text,
-                    textAlign = titleTextAlign, modifier = Modifier.fillMaxWidth())
+                    textAlign = if (centerTitleOnError && error != null) TextAlign.Center else titleTextAlign, modifier = Modifier.fillMaxWidth())
                 Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
                 if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
                     Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
