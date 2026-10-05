@@ -1,0 +1,133 @@
+{
+  "schema": 1,
+  "testedSourceCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+  "applicationCommit": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3",
+  "branch": "test/v20.76-new-ui",
+  "checkedAtUtc": "2026-10-05T20:39:52.699126+00:00",
+  "ci": {
+    "run": 37363630612,
+    "latestAttempt": 3,
+    "result": "success",
+    "url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+    "buildRetainedFromAttempt": 2
+  },
+  "apk": {
+    "filename": "Hetu-v20.85-tools-ec211b9.apk",
+    "bytes": 134830139,
+    "sha256": "3f4bba7ffad66e30aaa57d27f1b83849423b03aa6caea5745c8e79c64bd5d314",
+    "package": "io.github.xgl34222220.hetu",
+    "versionCode": 2085,
+    "versionName": "0.12.15-v20-pdf",
+    "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+    "payloadHashesRecomputed": 23,
+    "materialKolorConstructorReferences": 687,
+    "missingConstructors": 0
+  },
+  "androidTests": {
+    "actualTestcases": 487,
+    "xmlFiles": 51,
+    "retainedOriginalTests": 479,
+    "addedTests": 8,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "newSuites": {
+      "ToolsDiagIntakeTest": 3,
+      "ToolsDnsConsentIntakeTest": 5
+    }
+  },
+  "lint": {
+    "errors": 0,
+    "fatal": 0,
+    "warnings": 299,
+    "hints": 7
+  },
+  "toolsIntakeSourceProof": {
+    "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+    "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+    "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+    "changedOrAddedFiles": 5,
+    "frozenInputs": 374,
+    "homeAndPanelUnchanged": true,
+    "runtimePayloadsUnchanged": true,
+    "manifestDependenciesAndSigningUnchanged": true,
+    "baselineUnitTests": 479,
+    "expectedUnitTests": 487,
+    "newTestCounts": {
+      "tools.ToolsDnsConsentIntakeTest": 5,
+      "tools.ToolsDiagIntakeTest": 3
+    }
+  },
+  "changedOrAddedFilesSha256": {
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt": "1a83d54414116b349d59089632a7e45f2baea3a1ed7bc2251e2e3b2f43985046",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt": "221a287029500477c66ed85f868cc04cdfa6c20ccaec0e4a97e347a17577ce6b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsVpnConsent.kt": "319e49e6cbb5a284c145568cbbea521055dc181c25dd702b5d1ace3e5e90a903",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDiagIntakeTest.kt": "c118074aa458ec2b248fdaf8cbda560c5e56c3ab49afeb0d1a690681c5bf989c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDnsConsentIntakeTest.kt": "b627fdfabfbf2f0e616539abaad5a40057fc136be1a026f6842b1bf276913863"
+  },
+  "installation": {
+    "35": {
+      "checksPassed": 64,
+      "legacyChecks": 59,
+      "panelAuthChecks": 5,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "fixtureOnly": true,
+      "preferencesAndPortsRestored": true,
+      "kvmAndProcessesRestored": true
+    },
+    "36": {
+      "checksPassed": 64,
+      "legacyChecks": 59,
+      "panelAuthChecks": 5,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "fixtureOnly": true,
+      "preferencesAndPortsRestored": true,
+      "kvmAndProcessesRestored": true
+    }
+  },
+  "independentEvidenceChecks": {
+    "passed": 149,
+    "failed": 0,
+    "reportSha256": "81c3f5e6306823697bb8ee724aa70a572bf776dfc36ba1a743bd01ce93468e50"
+  },
+  "evidenceFiles": {
+    "ui_zip": {
+      "bytes": 14683610,
+      "sha256": "1d4dd82a05cc3e8e2d38d209104deaa1fbe2f7a9daf547d475e152314f59ea18"
+    },
+    "apk_manifest_zip": {
+      "bytes": 2301,
+      "sha256": "b8e6efcdc6242ab4da9363712736a1fcf850c29ded35ddf936fa574d8938be7d"
+    },
+    "apk": {
+      "bytes": 134830139,
+      "sha256": "3f4bba7ffad66e30aaa57d27f1b83849423b03aa6caea5745c8e79c64bd5d314"
+    },
+    "api35_zip": {
+      "bytes": 3362064,
+      "sha256": "c2879e373c9925c34aab3162d2816159fec92c06e5045d987338b2240ca1c7ce"
+    },
+    "api36_zip": {
+      "bytes": 3807915,
+      "sha256": "a143f1d263f340156e9510254fc420bda1eac2235e711268cba8d60a1b3a8152"
+    }
+  },
+  "limits": {
+    "realDeviceRootNetworkingVerified": false,
+    "realGoogleAccountAuthenticationVerified": false,
+    "fullConceptPixelAcceptanceComplete": false,
+    "sourceTarIndependentlyRehashed": false,
+    "apkCryptographicVerification": "CI apksigner passed; Python audit independently checks matching APK hash, certificate report and payload bytes"
+  },
+  "laterPdfCandidate": {
+    "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+    "observedBranchHead": "69e9ab6a2f8031d3b5c9ea3ec2e7126e3233287d",
+    "sourceCommitDescendant": true,
+    "allFiveIntakeInputsPreserved": true,
+    "independentCiRun": 37366522056,
+    "observedCiStatus": "queued",
+    "includedInThisApk": false
+  }
+}
