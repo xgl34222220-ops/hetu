@@ -1,9 +1,9 @@
-name: Hetu V20.84 controller authentication and read-state repair
+name: Hetu V20.85 PDF tools and settings continuation
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: hetu-v2084-${{ github.ref }}
+  group: hetu-v2085-${{ github.ref }}
   cancel-in-progress: false
 jobs:
   build:
@@ -35,23 +35,33 @@ jobs:
         \ --output out/verification/network-journal-stress.json\npython3 tools/qa/test_network_journal_symbols.py --before out/verification/v2080-network-journal.java\
         \ --output out/verification/network-journal-symbols.json\n"
     - name: Verify presentation patch cannot alter runtime or dependency inputs
-      run: |
-        set -euo pipefail
+      run: 'set -euo pipefail
+
         python3 .github/scripts/test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
+
+        '
     - name: Verify independent authentication source and test-evidence boundaries
-      run: |
-        set -euo pipefail
+      run: 'set -euo pipefail
+
         python3 .github/scripts/test_auth_source_scope.py 2>&1 | tee out/verification/auth-source-scope-tests.txt
+
         python3 .github/scripts/test_auth_test_results.py 2>&1 | tee out/verification/auth-test-evidence-tests.txt
+
+        '
     - name: Regress actual tool viewport gesture bounds
-      run: |
-        set -euo pipefail
+      run: 'set -euo pipefail
+
         python3 .github/scripts/test_native_scroll_bounds.py 2>&1 | tee out/verification/native-scroll-bounds-tests.txt
+
+        '
     - name: Regress isolated controller authentication installation fixtures
-      run: |
-        set -euo pipefail
+      run: 'set -euo pipefail
+
         python3 .github/scripts/test_mock_webview_controller.py 2>&1 | tee out/verification/mock-controller-fixture-tests.txt
+
         python3 .github/scripts/test_panel_auth_smoke.py 2>&1 | tee out/verification/panel-auth-smoke-tests.txt
+
+        '
     - name: Regress observed nested WebView document topology without weakening surface guards
       run: 'set -euo pipefail
 
@@ -104,17 +114,17 @@ jobs:
     - name: Export effective V20.84 source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.84-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.85-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.84-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.85-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.84-effective-source
-        path: /tmp/Hetu-V20.84-effective-source.tar.gz
+        name: Hetu-V20.85-effective-source
+        path: /tmp/Hetu-V20.85-effective-source.tar.gz
     - name: Record resolved MaterialKolor ABI dependencies
       working-directory: android-app
       run: 'set -euo pipefail
@@ -144,27 +154,36 @@ jobs:
         \ --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest' --tests '*AppCrashReportTest'\
         \ --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest' --tests '*ProxyAdblockExportTest'\
         \ --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest' --tests '*ProxyNetworkJournalTest' --tests '*NetworkDiagnosticsTest'\
-        \ --tests '*NetworkRecoveryStressTest' --tests '*JournalReliabilityTest' --tests '*NewUiIntegrationTest' --tests '*NewUiShell83Test' --tests '*NewHomePanelInteractionTest' --tests '*UI83ToolsTest' --tests '*UI83EditorHistoryTest' --tests '*ToastFeedbackTest' --tests '*ControllerAuthenticationTest' --tests '*LegacyControllerCredentialTest' --tests '*ControllerReadStateTest' --tests '*PanelControllerErrorTest' --stacktrace\n"
+        \ --tests '*NetworkRecoveryStressTest' --tests '*JournalReliabilityTest' --tests '*NewUiIntegrationTest' --tests '*NewUiShell83Test'\
+        \ --tests '*NewHomePanelInteractionTest' --tests '*UI83ToolsTest' --tests '*UI83EditorHistoryTest' --tests '*ToastFeedbackTest'\
+        \ --tests '*ControllerAuthenticationTest' --tests '*LegacyControllerCredentialTest' --tests '*ControllerReadStateTest' --tests\
+        \ '*PanelControllerErrorTest' --tests '*GoogleConnectionEvidenceTest' --tests '*ToolsPdf85Test' --stacktrace\n"
       working-directory: android-app
     - name: Android lint compatibility gate
       run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
       working-directory: android-app
     - name: Consolidate native and browser state evidence
-      run: |
-        set -euo pipefail
-        python3 .github/scripts/verify_auth_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
-        python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 422 --browser-evidence out/verification/webui-browser --browser-commit "$GITHUB_SHA"
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/verify_pdf85_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
+
+        python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests 479 --browser-evidence out/verification/webui-browser
+        --browser-commit "$GITHUB_SHA"
+
+        '
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.84-UI-verification
+        name: Hetu-V20.85-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
 
           android-app/app/build/reports/lint-results-debug.*
+
+          android-app/app/build/outputs/pdf85/
 
           android-app/app/build/outputs/ui83/
 
@@ -192,7 +211,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2084'' versionName=''0.12.14-v20-auth''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2085'' versionName=''0.12.15-v20-pdf''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -219,7 +238,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.84-APK-manifest
+        name: Hetu-V20.85-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -232,42 +251,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part00
+        name: Hetu-V20.85-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part01
+        name: Hetu-V20.85-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part02
+        name: Hetu-V20.85-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part03
+        name: Hetu-V20.85-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part04
+        name: Hetu-V20.85-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.84-APK-part05
+        name: Hetu-V20.85-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -310,6 +329,13 @@ jobs:
 
         test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        python3 -c ''import sys; sys.path.insert(0,".github/scripts"); from run_hetu_emulator import prepare_owned_avd_identity; from
+        pathlib import Path; import os; prepare_owned_avd_identity(Path(os.environ["ANDROID_AVD_HOME"])/"hetu-smoke.avd/config.ini")''
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
+
         sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d'' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
         cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
@@ -327,7 +353,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2084'
+        HETU_EXPECTED_VERSION: '2085'
         HETU_EXPECT_NEW_UI: '1'
       run: 'set -euo pipefail
 
@@ -350,7 +376,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.84-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.85-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -411,6 +437,13 @@ jobs:
 
         test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        python3 -c ''import sys; sys.path.insert(0,".github/scripts"); from run_hetu_emulator import prepare_owned_avd_identity; from
+        pathlib import Path; import os; prepare_owned_avd_identity(Path(os.environ["ANDROID_AVD_HOME"])/"hetu-smoke.avd/config.ini")''
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
+
         sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d'' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
 
         cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
@@ -469,6 +502,7 @@ jobs:
     - updates/v2082-new-ui/**
     - updates/v2083-ui-polish/**
     - updates/v2084-controller-auth/**
+    - updates/v2085-pdf-tools-settings/**
     - .github/scripts/**
     - .github/workflows/ui-v76-build.yml
     - tools/qa/**

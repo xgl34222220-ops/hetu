@@ -1,0 +1,768 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 2a760ec..3624aeb 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2084
+-        versionName = "0.12.14-v20-auth"
++        versionCode = 2085
++        versionName = "0.12.15-v20-pdf"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java
+new file mode 100644
+index 0000000..9b72347
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java
+@@ -0,0 +1,23 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.Locale;
++import java.util.Set;
++
++/** Read-only connection classification. No token, cookie, account or HTTP-body collection. */
++final class GoogleConnectionEvidence {
++    static final String LIMITATION = "仅连接元数据：Google 可达、204 响应或双向流量均不能证明帐号认证成功；未读取帐号、Cookie 或认证令牌。";
++    private static final String[] DOMAINS = {"google.com", "googleapis.com", "gstatic.com", "googleusercontent.com", "ggpht.com", "gvt1.com"};
++    private static final String[] PACKAGES = {"com.google.android.gms", "com.google.android.gsf", "com.android.vending"};
++
++    static boolean matches(String process, String host, int uid, Set<Integer> knownUids) {
++        if (uid >= 0 && knownUids != null && knownUids.contains(uid)) return true;
++        String name = process == null ? "" : process.trim().toLowerCase(Locale.ROOT);
++        for (String pkg : PACKAGES) if (name.equals(pkg) || name.startsWith(pkg + ":")) return true;
++        String domain = host == null ? "" : host.trim().toLowerCase(Locale.ROOT);
++        if (domain.endsWith(".")) domain = domain.substring(0, domain.length() - 1);
++        // Metadata host only; URLs, ports and suffix lookalikes are not Google identity.
++        if (domain.indexOf('/') >= 0 || domain.indexOf(':') >= 0 || domain.indexOf('@') >= 0) return false;
++        for (String suffix : DOMAINS) if (domain.equals(suffix) || domain.endsWith("." + suffix)) return true;
++        return false;
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 56730b7..4a3b426 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -1034,7 +1034,12 @@ final class RootProxyManager {
+             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
+             org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
+             StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
+-            int count=0,otherCount=0;
++            int count=0,otherCount=0,googleCount=0;
++            java.util.Set<Integer> googleUids=new java.util.HashSet<>();
++            for(String pkg:new String[]{"com.google.android.gms","com.google.android.gsf","com.android.vending"}) {
++                try { googleUids.add(context.getPackageManager().getApplicationInfo(pkg,0).uid); } catch(Exception ignored) {}
++            }
++            StringBuilder googleConnections=new StringBuilder(GoogleConnectionEvidence.LIMITATION).append('\n');
+             StringBuilder other=new StringBuilder();
+             for(int i=0;connections!=null&&i<connections.length();i++){
+                 JSONObject connection=connections.optJSONObject(i);
+@@ -1046,10 +1051,11 @@ final class RootProxyManager {
+                         ||destination.contains("telegram")||destination.contains("twitter")||destination.equals("x.com")
+                         ||destination.endsWith(".x.com")||process.contains("telegram")||process.contains("twitter")||process.contains("chrome");
+                 boolean wechat=DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid);
+-                // Busy browsers must not consume the quota before WeChat is inspected.
+-                if(wechat ? count>=25 : !affected||otherCount>=10)continue;
+-                StringBuilder destinationText=wechat?matched:other;
+-                int number=wechat?++count:++otherCount;
++                boolean googleConnection=GoogleConnectionEvidence.matches(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),googleUids);
++                // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
++                if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
++                StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
++                int number=wechat?++count:googleConnection?++googleCount:++otherCount;
+                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
+                         .append(" uid=").append(metadata.optInt("uid",-1))
+                         .append(" host=").append(metadata.optString("host"))
+@@ -1062,6 +1068,8 @@ final class RootProxyManager {
+             }
+             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
+             report.section("微信连接（仅元数据）",matched.toString(),6000);
++            if(googleCount==0)googleConnections.append("当前没有可识别的 Google/GMS/Play 连接；可能被应用绕过、已经断连或缺少核心进程元数据，认证状态仍未验证。\n");
++            report.section("Google/GMS/Play 连接（认证状态未验证）",googleConnections.toString(),6000);
+             if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
+         }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
+         try{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index b06fbb2..c3785a8 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -562,7 +562,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+         onBack = { nav.pop() },
+         largeTitle = false,
+         compactTitleFontSizeSp = 20f,
+-        canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
++        canvasColor = c.canvas,
+     ) {
+         item(key = "core") {
+             SettingsSection {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
+index e3bff78..bea7dbb 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt
+@@ -201,7 +201,7 @@ internal fun ToolsRow(
+ ) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+-    val base = modifier.fillMaxWidth().background(if (selected) c.accentSoft else Color.Transparent)
++    val base = modifier.fillMaxWidth().then(if (selected) Modifier.clip(HomeDims.controlShape) else Modifier).background(if (selected) c.accentSoft else Color.Transparent)
+     val source = remember { MutableInteractionSource() }
+     val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+     Row(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
+index e9d3077..6dd5858 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
+@@ -92,9 +92,9 @@ private fun ConfigCard(
+     HomeCard(Modifier.fillMaxWidth()) {
+         ToolsCardHeader(ToolsIcons.Folder, "配置管理")
+         state.configs.forEach { config ->
+-            HomeDivider()
+             ToolsRow(
+                 title = AnnotatedString(config.name),
++                modifier = Modifier.padding(horizontal = 10.dp),
+                 icon = ToolsIcons.File,
+                 subtitle = ht(config.caption),
+                 selected = config.current,
+@@ -114,7 +114,6 @@ private fun ConfigCard(
+                 },
+             )
+         }
+-        HomeDivider()
+         ToolsRow(
+             title = AnnotatedString(ht("编辑当前 YAML")),
+             icon = ToolsIcons.Pencil,
+@@ -141,16 +140,15 @@ private fun SubscriptionCard(
+             trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null) },
+         )
+         if (state.subscriptions.isEmpty()) {
+-            HomeDivider()
+             Text(
+                 ht("当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。"),
+                 Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t2, style = HomeType.note,
+             )
+         }
+         state.subscriptions.forEach { item ->
+-            HomeDivider()
+             ToolsRow(
+                 title = AnnotatedString(item.name),
++                modifier = Modifier.padding(horizontal = 10.dp),
+                 icon = ToolsIcons.Link,
+                 subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
+                 subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
+@@ -164,7 +162,6 @@ private fun SubscriptionCard(
+                 },
+             )
+         }
+-        HomeDivider()
+         ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+     }
+ }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java
+new file mode 100644
+index 0000000..50d3531
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java
+@@ -0,0 +1,38 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.Collections;
++import org.junit.Test;
++import static org.junit.Assert.*;
++
++public class GoogleConnectionEvidenceTest {
++    @Test public void authenticationAndPlayDomainsAreIncluded() {
++        for (String host : new String[]{"accounts.google.com", "android.clients.google.com", "play.googleapis.com", "oauth2.googleapis.com"})
++            assertTrue(host, GoogleConnectionEvidence.matches("", host, -1, Collections.emptySet()));
++    }
++    @Test public void googleMetadataIsCaseInsensitiveAndAcceptsDnsRootDot() {
++        assertTrue(GoogleConnectionEvidence.matches("", "Accounts.Google.Com.", -1, null));
++    }
++    @Test public void suffixLookalikesDoNotConsumeReservedGoogleQuota() {
++        for (String host : new String[]{"notgoogle.com", "google.com.evil.example", "mygoogleapis.com", "accounts.google.com@example.org", "https://accounts.google.com/"})
++            assertFalse(host, GoogleConnectionEvidence.matches("chrome", host, -1, null));
++    }
++    @Test public void googleSystemProcessesMatchEvenWhenHostIsMissing() {
++        for (String process : new String[]{"com.google.android.gms", "com.google.android.gms:persistent", "com.google.android.gsf", "com.android.vending"})
++            assertTrue(process, GoogleConnectionEvidence.matches(process, "", -1, null));
++    }
++    @Test public void processLookalikesDoNotMatch() {
++        assertFalse(GoogleConnectionEvidence.matches("com.google.android.gms.fake", "", -1, null));
++        assertFalse(GoogleConnectionEvidence.matches("com.android.vending.evil", "", -1, null));
++    }
++    @Test public void resolvedUidCanMatchIpOnlyConnection() {
++        assertTrue(GoogleConnectionEvidence.matches("", "", 10123, Collections.singleton(10123)));
++        assertFalse(GoogleConnectionEvidence.matches("", "", 10124, Collections.singleton(10123)));
++    }
++    @Test public void unknownUidNeverProvesGoogleOwnership() {
++        assertFalse(GoogleConnectionEvidence.matches("", "", -1, Collections.singleton(-1)));
++    }
++    @Test public void transportEvidenceExplicitlyDoesNotClaimAuthentication() {
++        assertTrue(GoogleConnectionEvidence.LIMITATION.contains("不能证明帐号认证成功"));
++        assertTrue(GoogleConnectionEvidence.LIMITATION.contains("未读取帐号、Cookie 或认证令牌"));
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt
+new file mode 100644
+index 0000000..00bfddf
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt
+@@ -0,0 +1,188 @@
++package io.github.xgl34222220.hetu.tools
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxScope
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++
++/* ------------------------------------------------------------------ */
++/*  One preview per concept page: C01–C25 = 03A 工具上册 第 1–25 页.     */
++/*  Dialogs, sheets and menus use their production windows;  */
++/*  fixtures are test-only and do not change runtime data.             */
++/* ------------------------------------------------------------------ */
++
++private const val W = 392
++private const val H = 850
++
++@Composable
++private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
++    io.github.xgl34222220.hetu.HetuAppTheme(appearance = if (dark) "dark" else "light", dynamic = false) {
++        ToolsConceptTheme {
++            Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
++        }
++    }
++}
++
++@Composable
++private fun BoxScope.Scrim() {
++    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
++}
++
++@Composable
++private fun BoxScope.DialogLayer(content: @Composable () -> Unit) { ToolsDialog(onDismiss = {}) { content() } }
++
++@Composable
++private fun BoxScope.SheetLayer(content: @Composable () -> Unit) { io.github.xgl34222220.hetu.home.HomeModalSheet(onDismiss = {}) { content() } }
++
++@Composable
++private fun Root(state: ToolsRootState, scrolled: Int = 0) {
++    ToolsScreen(state, onToggleSearch = {}, onQueryChange = {}, onOpen = {}, scroll = rememberScrollState(initial = scrolled))
++}
++
++@Composable
++private fun Configs(state: ToolsConfigState = ToolsSamples.configState, menuFor: String? = null) {
++    ToolsConfigScreen(
++        state = state, menuFor = menuFor, onBack = {}, onImport = {}, onSelectConfig = {}, onOpenMenu = {}, onDismissMenu = {},
++        onMenuItem = { _, _ -> }, onEditYaml = {}, onAddSubscription = {}, onEditSubscription = {}, onDeleteSubscription = {}, onRetry = {},
++    )
++}
++
++
++@Composable
++private fun Subscription(form: ToolsSubscriptionForm) {
++    ToolsSubscriptionScreen(form, onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
++}
++
++@Composable
++private fun Import(form: ToolsImportForm) {
++    ToolsImportScreen(form, pickedFile = null, onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {})
++}
++
++@Composable
++private fun Editor(state: ToolsEditorState = ToolsSamples.editorDraft, text: String = ToolsSamples.yaml) {
++    val buffer = remember(text) { ToolsYamlEditorState(text) }
++    ToolsEditorScreen(state, buffer, onBack = {}, onSave = {}, onOutline = {}, onValidate = {}, onDismissBanner = {}, onReload = {})
++}
++
++/* ------------------------------ 工具 ------------------------------ */
++
++@Composable
++internal fun Pdf85C01ToolsExpanded() = Frame { Root(ToolsRootState()) }
++
++@Composable
++internal fun Pdf85C02ToolsCollapsed() = Frame { Root(ToolsRootState(), scrolled = 600) }
++
++@Composable
++internal fun Pdf85C03ToolsSearch() = Frame { Root(ToolsSamples.rootSearch) }
++
++/* ------------------------------ 配置与订阅 ------------------------------ */
++
++@Composable
++internal fun Pdf85C04Configs() = Frame { Configs() }
++
++@Composable
++internal fun Pdf85C05AddSubscription() = Frame { Subscription(ToolsSamples.addSubscription) }
++
++@Composable
++internal fun Pdf85C06MenuCurrent() = Frame { Configs(menuFor = ToolsSamples.configs[0].name) }
++
++@Composable
++internal fun Pdf85C07MenuOther() = Frame { Configs(menuFor = ToolsSamples.configs[1].name) }
++
++@Composable
++internal fun Pdf85C08MenuBundled() = Frame { Configs(menuFor = ToolsSamples.configs[2].name) }
++
++@Composable
++internal fun Pdf85C09Rename() = Frame {
++    Configs()
++    DialogLayer { ToolsRenameConfigDialogCard(ToolsConfigOverlay.Rename("工作.yaml", "工作专用.yaml"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C10DeleteConfig() = Frame {
++    Configs()
++    DialogLayer { ToolsDeleteConfigDialogCard(ToolsConfigOverlay.DeleteConfig("日常.yaml", isCurrent = true), onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C11DeleteSubscription() = Frame {
++    Configs()
++    DialogLayer { ToolsDeleteSubscriptionDialogCard(ToolsConfigOverlay.DeleteSubscription("日常.yaml", "主订阅"), onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C12ImportDiscard() = Frame {
++    Import(ToolsSamples.importLink)
++    DialogLayer { ToolsDiscardFormDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++/* ------------------------------ 配置编辑 ------------------------------ */
++
++@Composable
++internal fun Pdf85C13Outline() = Frame {
++    Editor()
++    SheetLayer { ToolsOutlineSheetContent(ToolsYaml.outline(ToolsSamples.yaml), onJump = {}, onClose = {}) }
++}
++
++@Composable
++internal fun Pdf85C14SaveConflict() = Frame {
++    Editor()
++    SheetLayer { ToolsSaveConflictSheetContent("工作.yaml", onKeepDraft = {}, onReload = {}) }
++}
++
++@Composable
++internal fun Pdf85C15Invalid() = Frame { Editor(ToolsSamples.editorInvalid, ToolsSamples.yamlInvalid) }
++
++@Composable
++internal fun Pdf85C16LoadFailed() = Frame { Editor(ToolsSamples.editorLoadFailed, "") }
++
++@Composable
++internal fun Pdf85C17SourceChanged() = Frame {
++    Editor()
++    SheetLayer { ToolsSourceChangedSheetContent(onKeepDraft = {}, onReload = {}) }
++}
++
++@Composable
++internal fun Pdf85C18ConfirmReload() = Frame {
++    Editor()
++    DialogLayer { ToolsReloadDraftDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C19ConfirmDiscard() = Frame {
++    Editor()
++    DialogLayer { ToolsDiscardEditsDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++/* ------------------------------ 表单校验 ------------------------------ */
++
++@Composable
++internal fun Pdf85C20ImportUrlInvalid() = Frame { Import(ToolsSamples.importLinkInvalid) }
++
++@Composable
++internal fun Pdf85C21AddNameEmpty() = Frame { Subscription(ToolsSamples.addSubscriptionNameEmpty) }
++
++@Composable
++internal fun Pdf85C22AddUrlInvalid() = Frame { Subscription(ToolsSamples.addSubscriptionUrlInvalid) }
++
++@Composable
++internal fun Pdf85C23EditUrlInvalid() = Frame { Subscription(ToolsSamples.editSubscriptionUrlInvalid) }
++
++@Composable
++internal fun Pdf85C24ImportLink() = Frame { Import(ToolsSamples.importLink) }
++
++@Composable
++internal fun Pdf85C25Editor() = Frame { Editor() }
++
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
+new file mode 100644
+index 0000000..cc9e835
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt
+@@ -0,0 +1,204 @@
++package io.github.xgl34222220.hetu.tools
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxScope
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++
++/* ------------------------------------------------------------------ */
++/*  One preview per concept page: C26–C49 = 03A 工具上册 第 26–49 页.    */
++/*  Dialogs, sheets and menus use their production windows;  */
++/*  fixtures are test-only and do not change runtime data.             */
++/* ------------------------------------------------------------------ */
++
++private const val W = 392
++private const val H = 850
++
++@Composable
++private fun Frame(dark: Boolean = false, content: @Composable BoxScope.() -> Unit) {
++    io.github.xgl34222220.hetu.HetuAppTheme(appearance = if (dark) "dark" else "light", dynamic = false) {
++        ToolsConceptTheme {
++            Box(Modifier.fillMaxSize().background(LocalHomeColors.current.bg), content = content)
++        }
++    }
++}
++
++@Composable
++private fun BoxScope.Scrim() {
++    Box(Modifier.matchParentSize().background(LocalHomeColors.current.scrim))
++}
++
++@Composable
++private fun BoxScope.DialogLayer(content: @Composable () -> Unit) { ToolsDialog(onDismiss = {}) { content() } }
++
++@Composable
++private fun BoxScope.SheetLayer(content: @Composable () -> Unit) { io.github.xgl34222220.hetu.home.HomeModalSheet(onDismiss = {}) { content() } }
++
++
++@Composable
++private fun Apps(state: ToolsAppsState, menu: ToolsAppsMenu? = null) {
++    ToolsAppsScreen(
++        state = state, menu = menu, onBack = {}, onToggleSearch = {}, onQueryChange = {}, onScopeChange = {}, onToggleApp = {}, onSelectAll = {},
++        onOpenMenu = {}, onDismissMenu = {}, onSortChange = {}, onToggleDescending = {}, onToggleSystem = {}, onClear = {}, onRefresh = {}, onRetry = {},
++    )
++}
++
++@Composable
++private fun Cores(state: ToolsCoresState) {
++    ToolsCoresScreen(state, onBack = {}, onCheck = {}, onPrimary = { _, _ -> }, onImport = {}, onRetry = {})
++}
++
++@Composable
++private fun Bypass(state: ToolsBypassState) {
++    ToolsBypassScreen(state, onBack = {}, onSave = {}, onDraftChange = {}, onRetry = {})
++}
++
++@Composable
++private fun Diag() {
++    ToolsDiagScreen(ToolsFeatureSamples.diag, onBack = {}, onPreflight = {}, onStartupConfig = {}, onReport = {}, onRestore = {})
++}
++
++/** [scrolled] > 0 shows the lower half of the page (规则 section), as on concept page 44. */
++@Composable
++private fun Adblock(state: ToolsAdblockState = ToolsFeatureSamples.adblock, scrolled: Int = 0) {
++    ToolsAdblockScreen(
++        state = state, onBack = {}, onHelp = {}, onRefresh = {}, onEnabledChange = {}, onSwitchToRuleMode = null, onPickRecent = {}, onLevelChange = {},
++        onUpdate = {}, onSourceChange = { _, _ -> }, onAddDomain = {}, onRemoveDomain = { _, _ -> }, onStandaloneDnsChange = {}, onCnameChange = {}, onRetry = {},
++        scroll = rememberScrollState(initial = scrolled),
++    )
++}
++
++private const val RulesScroll = 100_000
++
++/* ------------------------------ 订阅 / 导入（沿用 Part 1 屏幕） ------------------------------ */
++
++@Composable
++internal fun Pdf85C26EditSubscription() = Frame {
++    ToolsSubscriptionScreen(ToolsSubscriptionForm.edit(ToolsSamples.subscriptions[0]), onNameChange = {}, onUrlChange = {}, onSave = {}, onBack = {})
++}
++
++@Composable
++internal fun Pdf85C27ImportFile() = Frame {
++    ToolsImportScreen(
++        ToolsImportForm(tab = ToolsImportTab.File), pickedFile = remember { ToolsPickedFile("旅行.yaml", "18 KB") },
++        onTabChange = {}, onUrlChange = {}, onNameChange = {}, onPickFile = {}, onImport = {}, onBack = {},
++    )
++}
++
++/* ------------------------------ 应用管理 ------------------------------ */
++
++@Composable
++internal fun Pdf85C28AppsBlacklist() = Frame { Apps(ToolsFeatureSamples.appsBlacklist) }
++
++@Composable
++internal fun Pdf85C29AppsSortMenu() = Frame {
++    Apps(ToolsFeatureSamples.appsBlacklist, ToolsAppsMenu.Sort)
++}
++
++@Composable
++internal fun Pdf85C30AppsMoreMenu() = Frame {
++    Apps(ToolsFeatureSamples.appsBlacklist, ToolsAppsMenu.More)
++}
++
++@Composable
++internal fun Pdf85C31AppsWhitelist() = Frame { Apps(ToolsFeatureSamples.appsWhitelist) }
++
++@Composable
++internal fun Pdf85C32AppsCore() = Frame { Apps(ToolsFeatureSamples.appsCore) }
++
++@Composable
++internal fun Pdf85C33AppsSearch() = Frame { Apps(ToolsFeatureSamples.appsSearch) }
++
++/* ------------------------------ 核心管理 ------------------------------ */
++
++@Composable
++internal fun Pdf85C34Cores() = Frame { Cores(ToolsFeatureSamples.coresIdle) }
++
++@Composable
++internal fun Pdf85C35CoresDownloading() = Frame { Cores(ToolsFeatureSamples.coresDownloading) }
++
++/* ------------------------------ 绕过规则 / 共享网络 / CNIP ------------------------------ */
++
++@Composable
++internal fun Pdf85C36Bypass() = Frame { Bypass(ToolsFeatureSamples.bypass) }
++
++@Composable
++internal fun Pdf85C37BypassDiscard() = Frame {
++    Bypass(ToolsFeatureSamples.bypassDirty)
++    DialogLayer { ToolsDiscardChangesDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C38Share() = Frame {
++    ToolsShareScreen(ToolsFeatureSamples.share, onBack = {}, onRefresh = {}, onSave = {}, onDraftChange = {}, onRetry = {})
++}
++
++@Composable
++internal fun Pdf85C39CnIp() = Frame { ToolsCnIpScreen(ToolsFeatureSamples.cnIp, onBack = {}, onEnabledChange = {}) }
++
++/* ------------------------------ 诊断与维护 ------------------------------ */
++
++@Composable
++internal fun Pdf85C40Diag() = Frame { Diag() }
++
++@Composable
++internal fun Pdf85C41StartupConfig() = Frame {
++    Diag()
++    SheetLayer { ToolsStartupConfigSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.startupConfig), onCopy = {}) }
++}
++
++@Composable
++internal fun Pdf85C42RestoreNetwork() = Frame {
++    Diag()
++    DialogLayer { ToolsRestoreNetworkDialogCard(onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C43Report() = Frame {
++    Diag()
++    SheetLayer { ToolsReportSheetContent(ToolsDiagText(loading = false, text = ToolsFeatureSamples.report), onCopy = {}) }
++}
++
++/* ------------------------------ 广告过滤 ------------------------------ */
++
++@Composable
++internal fun Pdf85C44AdblockRules() = Frame { Adblock(scrolled = RulesScroll) }
++
++@Composable
++internal fun Pdf85C45AdblockStatus() = Frame { Adblock() }
++
++@Composable
++internal fun Pdf85C46AdblockHelp() = Frame {
++    Adblock()
++    SheetLayer { ToolsAdblockHelpSheetContent(onClose = {}) }
++}
++
++@Composable
++internal fun Pdf85C47AddAllow() = Frame {
++    Adblock(scrolled = RulesScroll)
++    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = true, draft = "example.com"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C48AddBlock() = Frame {
++    Adblock(scrolled = RulesScroll)
++    DialogLayer { ToolsAddDomainDialogCard(ToolsAdOverlay.AddDomain(allow = false, draft = "ads.example.net"), onDraftChange = {}, onConfirm = {}, onCancel = {}) }
++}
++
++@Composable
++internal fun Pdf85C49ConfirmAllow() = Frame {
++    Adblock()
++    DialogLayer { ToolsConfirmAllowDialogCard(ToolsAdOverlay.ConfirmAllow("ads.example.com"), onConfirm = {}, onCancel = {}) }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt
+new file mode 100644
+index 0000000..b701bc9
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt
+@@ -0,0 +1,152 @@
++package io.github.xgl34222220.hetu.tools
++
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.view.View
++import android.view.Gravity
++import android.view.WindowManager
++import android.view.inspector.WindowInspector
++import androidx.activity.ComponentActivity
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onAllNodesWithContentDescription
++import androidx.compose.ui.test.onNodeWithContentDescription
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.test.performScrollTo
++import androidx.compose.ui.test.performScrollToNode
++import androidx.compose.ui.test.hasScrollToIndexAction
++import androidx.compose.ui.test.hasClickAction
++import androidx.compose.ui.test.hasAnyDescendant
++import androidx.compose.ui.test.hasAnySibling
++import androidx.compose.ui.test.hasText
++import androidx.test.core.app.ApplicationProvider
++import java.io.File
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++
++import io.github.xgl34222220.hetu.*
++/** Actual current production tools components and real overlay windows on offline fixture states.
++ * Images are layout evidence only; no network/Root state is injected into the installed app. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class ToolsPdf85Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private fun snapshotAfter(name: String, content: @Composable () -> Unit, afterSet: () -> Unit) {
++        rule.setContent { HetuAppTheme(appearance = "light", dynamic = false) {
++            CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides false) {
++                Box(Modifier.fillMaxSize()) { content() }
++            }
++        } }
++        rule.waitForIdle()
++        rule.mainClock.advanceTimeBy(1000)
++        rule.waitForIdle()
++        afterSet()
++        rule.waitForIdle()
++        rule.mainClock.advanceTimeBy(350)
++        rule.waitForIdle()
++        rule.runOnIdle {
++            val decor = rule.activity.window.decorView
++            assertTrue("Window must be laid out", decor.width > 0 && decor.height > 0)
++            val bitmap = Bitmap.createBitmap(decor.width, decor.height, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(bitmap)
++            val roots = WindowInspector.getGlobalWindowViews().filter { it.width > 0 && it.height > 0 && it.isShown }
++            val ordered = buildList {
++                if (roots.none { it === decor }) add(decor)
++                addAll(roots)
++            }
++            val drawn = HashSet<View>()
++            ordered.forEach { root ->
++                if (!drawn.add(root)) return@forEach
++                val location = IntArray(2)
++                root.getLocationOnScreen(location)
++                val params = root.layoutParams as? WindowManager.LayoutParams
++                // Match the real WM placement/dimming, as the full state capture does.
++                // Robolectric otherwise reports a separate dialog decor at (0, 0).
++                if (root !== decor && params != null) {
++                    val placed = android.graphics.Rect()
++                    Gravity.apply(params.gravity, root.width, root.height,
++                        android.graphics.Rect(0, 0, decor.width, decor.height), params.x, params.y, placed)
++                    location[0] = placed.left
++                    location[1] = placed.top
++                    if ((params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0) {
++                        canvas.drawColor(android.graphics.Color.argb((params.dimAmount * 255).toInt(), 0, 0, 0))
++                    }
++                }
++                canvas.save()
++                canvas.translate(location[0].toFloat(), location[1].toFloat())
++                root.draw(canvas)
++                canvas.restore()
++            }
++            val file = File(System.getProperty("hetu.qa.output", "build/outputs/pdf85"), "$name.png")
++            file.parentFile!!.mkdirs()
++            file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
++            bitmap.recycle()
++            assertTrue("Screenshot must contain bytes", file.length() > 0)
++        }
++    }
++    @Test fun page01() = snapshotAfter("03A-001-current", { Pdf85C01ToolsExpanded() }) {}
++    @Test fun page02() = snapshotAfter("03A-002-current", { Pdf85C02ToolsCollapsed() }) {}
++    @Test fun page03() = snapshotAfter("03A-003-current", { Pdf85C03ToolsSearch() }) {}
++    @Test fun page04() = snapshotAfter("03A-004-current", { Pdf85C04Configs() }) {}
++    @Test fun page05() = snapshotAfter("03A-005-current", { Pdf85C05AddSubscription() }) {}
++    @Test fun page06() = snapshotAfter("03A-006-current", { Pdf85C06MenuCurrent() }) {}
++    @Test fun page07() = snapshotAfter("03A-007-current", { Pdf85C07MenuOther() }) {}
++    @Test fun page08() = snapshotAfter("03A-008-current", { Pdf85C08MenuBundled() }) {}
++    @Test fun page09() = snapshotAfter("03A-009-current", { Pdf85C09Rename() }) {}
++    @Test fun page10() = snapshotAfter("03A-010-current", { Pdf85C10DeleteConfig() }) {}
++    @Test fun page11() = snapshotAfter("03A-011-current", { Pdf85C11DeleteSubscription() }) {}
++    @Test fun page12() = snapshotAfter("03A-012-current", { Pdf85C12ImportDiscard() }) {}
++    @Test fun page13() = snapshotAfter("03A-013-current", { Pdf85C13Outline() }) {}
++    @Test fun page14() = snapshotAfter("03A-014-current", { Pdf85C14SaveConflict() }) {}
++    @Test fun page15() = snapshotAfter("03A-015-current", { Pdf85C15Invalid() }) {}
++    @Test fun page16() = snapshotAfter("03A-016-current", { Pdf85C16LoadFailed() }) {}
++    @Test fun page17() = snapshotAfter("03A-017-current", { Pdf85C17SourceChanged() }) {}
++    @Test fun page18() = snapshotAfter("03A-018-current", { Pdf85C18ConfirmReload() }) {}
++    @Test fun page19() = snapshotAfter("03A-019-current", { Pdf85C19ConfirmDiscard() }) {}
++    @Test fun page20() = snapshotAfter("03A-020-current", { Pdf85C20ImportUrlInvalid() }) {}
++    @Test fun page21() = snapshotAfter("03A-021-current", { Pdf85C21AddNameEmpty() }) {}
++    @Test fun page22() = snapshotAfter("03A-022-current", { Pdf85C22AddUrlInvalid() }) {}
++    @Test fun page23() = snapshotAfter("03A-023-current", { Pdf85C23EditUrlInvalid() }) {}
++    @Test fun page24() = snapshotAfter("03A-024-current", { Pdf85C24ImportLink() }) {}
++    @Test fun page25() = snapshotAfter("03A-025-current", { Pdf85C25Editor() }) {}
++    @Test fun page26() = snapshotAfter("03A-026-current", { Pdf85C26EditSubscription() }) {}
++    @Test fun page27() = snapshotAfter("03A-027-current", { Pdf85C27ImportFile() }) {}
++    @Test fun page28() = snapshotAfter("03A-028-current", { Pdf85C28AppsBlacklist() }) {}
++    @Test fun page29() = snapshotAfter("03A-029-current", { Pdf85C29AppsSortMenu() }) {}
++    @Test fun page30() = snapshotAfter("03A-030-current", { Pdf85C30AppsMoreMenu() }) {}
++    @Test fun page31() = snapshotAfter("03A-031-current", { Pdf85C31AppsWhitelist() }) {}
++    @Test fun page32() = snapshotAfter("03A-032-current", { Pdf85C32AppsCore() }) {}
++    @Test fun page33() = snapshotAfter("03A-033-current", { Pdf85C33AppsSearch() }) {}
++    @Test fun page34() = snapshotAfter("03A-034-current", { Pdf85C34Cores() }) {}
++    @Test fun page35() = snapshotAfter("03A-035-current", { Pdf85C35CoresDownloading() }) {}
++    @Test fun page36() = snapshotAfter("03A-036-current", { Pdf85C36Bypass() }) {}
++    @Test fun page37() = snapshotAfter("03A-037-current", { Pdf85C37BypassDiscard() }) {}
++    @Test fun page38() = snapshotAfter("03A-038-current", { Pdf85C38Share() }) {}
++    @Test fun page39() = snapshotAfter("03A-039-current", { Pdf85C39CnIp() }) {}
++    @Test fun page40() = snapshotAfter("03A-040-current", { Pdf85C40Diag() }) {}
++    @Test fun page41() = snapshotAfter("03A-041-current", { Pdf85C41StartupConfig() }) {}
++    @Test fun page42() = snapshotAfter("03A-042-current", { Pdf85C42RestoreNetwork() }) {}
++    @Test fun page43() = snapshotAfter("03A-043-current", { Pdf85C43Report() }) {}
++    @Test fun page44() = snapshotAfter("03A-044-current", { Pdf85C44AdblockRules() }) {}
++    @Test fun page45() = snapshotAfter("03A-045-current", { Pdf85C45AdblockStatus() }) {}
++    @Test fun page46() = snapshotAfter("03A-046-current", { Pdf85C46AdblockHelp() }) {}
++    @Test fun page47() = snapshotAfter("03A-047-current", { Pdf85C47AddAllow() }) {}
++    @Test fun page48() = snapshotAfter("03A-048-current", { Pdf85C48AddBlock() }) {}
++    @Test fun page49() = snapshotAfter("03A-049-current", { Pdf85C49ConfirmAllow() }) {}
++}

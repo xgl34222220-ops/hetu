@@ -1034,7 +1034,12 @@ final class RootProxyManager {
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
             org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
             StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
-            int count=0,otherCount=0;
+            int count=0,otherCount=0,googleCount=0;
+            java.util.Set<Integer> googleUids=new java.util.HashSet<>();
+            for(String pkg:new String[]{"com.google.android.gms","com.google.android.gsf","com.android.vending"}) {
+                try { googleUids.add(context.getPackageManager().getApplicationInfo(pkg,0).uid); } catch(Exception ignored) {}
+            }
+            StringBuilder googleConnections=new StringBuilder(GoogleConnectionEvidence.LIMITATION).append('\n');
             StringBuilder other=new StringBuilder();
             for(int i=0;connections!=null&&i<connections.length();i++){
                 JSONObject connection=connections.optJSONObject(i);
@@ -1046,10 +1051,11 @@ final class RootProxyManager {
                         ||destination.contains("telegram")||destination.contains("twitter")||destination.equals("x.com")
                         ||destination.endsWith(".x.com")||process.contains("telegram")||process.contains("twitter")||process.contains("chrome");
                 boolean wechat=DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid);
-                // Busy browsers must not consume the quota before WeChat is inspected.
-                if(wechat ? count>=25 : !affected||otherCount>=10)continue;
-                StringBuilder destinationText=wechat?matched:other;
-                int number=wechat?++count:++otherCount;
+                boolean googleConnection=GoogleConnectionEvidence.matches(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),googleUids);
+                // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
+                if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
+                StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
+                int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                         .append(" uid=").append(metadata.optInt("uid",-1))
                         .append(" host=").append(metadata.optString("host"))
@@ -1062,6 +1068,8 @@ final class RootProxyManager {
             }
             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
             report.section("微信连接（仅元数据）",matched.toString(),6000);
+            if(googleCount==0)googleConnections.append("当前没有可识别的 Google/GMS/Play 连接；可能被应用绕过、已经断连或缺少核心进程元数据，认证状态仍未验证。\n");
+            report.section("Google/GMS/Play 连接（认证状态未验证）",googleConnections.toString(),6000);
             if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
         }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
         try{

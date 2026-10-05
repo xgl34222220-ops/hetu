@@ -92,9 +92,9 @@ private fun ConfigCard(
     HomeCard(Modifier.fillMaxWidth()) {
         ToolsCardHeader(ToolsIcons.Folder, "配置管理")
         state.configs.forEach { config ->
-            HomeDivider()
             ToolsRow(
                 title = AnnotatedString(config.name),
+                modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.File,
                 subtitle = ht(config.caption),
                 selected = config.current,
@@ -114,7 +114,6 @@ private fun ConfigCard(
                 },
             )
         }
-        HomeDivider()
         ToolsRow(
             title = AnnotatedString(ht("编辑当前 YAML")),
             icon = ToolsIcons.Pencil,
@@ -141,16 +140,15 @@ private fun SubscriptionCard(
             trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null) },
         )
         if (state.subscriptions.isEmpty()) {
-            HomeDivider()
             Text(
                 ht("当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。"),
                 Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t2, style = HomeType.note,
             )
         }
         state.subscriptions.forEach { item ->
-            HomeDivider()
             ToolsRow(
                 title = AnnotatedString(item.name),
+                modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.Link,
                 subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
                 subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
@@ -164,7 +162,6 @@ private fun SubscriptionCard(
                 },
             )
         }
-        HomeDivider()
         ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
     }
 }

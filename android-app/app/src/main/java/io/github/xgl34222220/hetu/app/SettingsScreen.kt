@@ -562,7 +562,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         onBack = { nav.pop() },
         largeTitle = false,
         compactTitleFontSizeSp = 20f,
-        canvasColor = if (c.dark) c.canvas else Color(0xFFF2F0F9),
+        canvasColor = c.canvas,
     ) {
         item(key = "core") {
             SettingsSection {

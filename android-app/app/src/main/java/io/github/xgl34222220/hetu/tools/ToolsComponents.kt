@@ -201,7 +201,7 @@ internal fun ToolsRow(
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    val base = modifier.fillMaxWidth().background(if (selected) c.accentSoft else Color.Transparent)
+    val base = modifier.fillMaxWidth().then(if (selected) Modifier.clip(HomeDims.controlShape) else Modifier).background(if (selected) c.accentSoft else Color.Transparent)
     val source = remember { MutableInteractionSource() }
     val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
     Row(

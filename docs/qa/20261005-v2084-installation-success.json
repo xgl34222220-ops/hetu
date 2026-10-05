@@ -1,0 +1,39 @@
+{
+  "run": 37290571286,
+  "conclusion": "success",
+  "apis": [
+    {
+      "installationTestCommit": "fc7544df739c1e75d888d058ea1e15957f800e5c",
+      "installationTestRun": 37290571286,
+      "applicationCommit": "121e0ab99904e7ea862b1dcb350a59169aeab0cd",
+      "buildRun": 37270231154,
+      "sourceRunConclusion": "failure",
+      "apiLevel": 35,
+      "checksPassed": 64,
+      "legacyChecksPassed": 59,
+      "newPanelAuthChecksPassed": 5,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "boundary": "This separate run executes all current installed checks against the immutable compiled APK; the original full run remains failed."
+    },
+    {
+      "installationTestCommit": "fc7544df739c1e75d888d058ea1e15957f800e5c",
+      "installationTestRun": 37290571286,
+      "applicationCommit": "121e0ab99904e7ea862b1dcb350a59169aeab0cd",
+      "buildRun": 37270231154,
+      "sourceRunConclusion": "failure",
+      "apiLevel": 36,
+      "checksPassed": 64,
+      "legacyChecksPassed": 59,
+      "newPanelAuthChecksPassed": 5,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "boundary": "This separate run executes all current installed checks against the immutable compiled APK; the original full run remains failed."
+    }
+  ],
+  "retainedFailedRuns": [
+    37274761297,
+    37290034997
+  ],
+  "notGoogleAuthenticationEvidence": true
+}

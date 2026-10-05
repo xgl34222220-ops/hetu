@@ -130,6 +130,30 @@ def main():
                            'baselineUnitTests': auth['baselineUnitTests'],
                            'expectedUnitTests': auth['expectedUnitTests'],
                            'newTestCounts': auth['newTestCounts']}
+        pdf_report = None
+        pdf_inputs = ROOT / 'updates/v2085-pdf-tools-settings/inputs.json'
+        if pdf_inputs.exists():
+            from pdf85_source_scope import validate_layer as validate_pdf_layer, validate_changes
+            pdf = json.loads(pdf_inputs.read_text())
+            validate_pdf_layer(pdf)
+            assert digest(AUTH_INPUTS)==pdf['previousInputsSha256']
+            assert digest(AUTH_INPUTS.with_name('runtime.patch'))==pdf['previousPatchSha256']
+            pdf_patch=pdf_inputs.with_name('runtime.patch')
+            assert digest(pdf_patch)==pdf['patchSha256']
+            gradle_path='android-app/app/build.gradle.kts'
+            root_path='android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java'
+            before_gradle=(work/gradle_path).read_text()
+            before_root=(work/root_path).read_text()
+            for name, sha in pdf['frozenFiles'].items():
+                assert digest(work/name)==sha and digest(ROOT/name)==sha, 'Frozen input changed: '+name
+            apply(pdf_patch,work)
+            validate_changes(before_gradle,(work/gradle_path).read_text(),before_root,(work/root_path).read_text())
+            for name, sha in pdf['changedOrAddedFiles'].items():
+                assert digest(work/name)==sha and sha!=final_files.get(name), 'PDF source mismatch: '+name
+            final_files.update(pdf['changedOrAddedFiles'])
+            pdf_report={'patchSha256':pdf['patchSha256'],'frozenInputs':len(pdf['frozenFiles']),
+                        'homeAndPanelUnchanged':True,'runtimePayloadsUnchanged':True,
+                        'manifestDependenciesAndSigningUnchanged':True,'expectedUnitTests':479}
         for name, sha in final_files.items():
             assert digest(work / name) == sha, 'Generated source input regressed: ' + name
             assert digest(ROOT / name) == sha, 'Checkout differs from generated source: ' + name
@@ -146,6 +170,8 @@ def main():
             report['presentationLayer'] = layer_report
         if auth_report is not None:
             report['controllerAuthenticationLayer'] = auth_report
+        if pdf_report is not None:
+            report['pdfReferenceLayer'] = pdf_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 
