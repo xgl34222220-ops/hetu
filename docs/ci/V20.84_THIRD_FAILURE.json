@@ -1,0 +1,50 @@
+{
+  "schema": 1,
+  "version": "V20.84",
+  "candidateCommit": "6666bd8c59e8d50385e9ec822c23057349b5eeeb",
+  "ciRun": 37269048184,
+  "attempt": 1,
+  "conclusion": "failure",
+  "buildJob": 111631931322,
+  "units": {
+    "xmlFiles": 47,
+    "tests": 422,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  "newAuthenticationTests": {
+    "tests": 30,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failures": [
+    {
+      "suite": "TEST-io.github.xgl34222220.hetu.PanelActionSafetyTest",
+      "test": "stopDuringHistorySuspensionCannotPersistOldRunningSnapshot",
+      "message": "java.lang.AssertionError: History record suspended [panelReady=true, readFailed=false, pendingSelection=androidx.compose.runtime.snapshots.SnapshotMapKeySet@70e851aa, historyPaused=true, requestPaths=[/proxies/SELECT, /configs, /proxies, /providers/proxies, /connections, /providers/proxies, /version]]",
+      "stack": "java.lang.AssertionError: History record suspended [panelReady=true, readFailed=false, pendingSelection=androidx.compose.runtime.snapshots.SnapshotMapKeySet@70e851aa, historyPaused=true, requestPaths=[/proxies/SELECT, /configs, /proxies, /providers/proxies, /connections, /providers/proxies, /version]]\n\tat org.junit.Assert.fail(Assert.java:89)\n\tat org.junit.Assert.assertTrue(Assert.java:42)\n\tat io.github.xgl34222220.hetu.PanelActionSafetyTest.eventually(PanelActionSafetyTest.kt:126)\n\tat io.github.xgl34222220.hetu.PanelActionSafetyTest.stopDuringHistorySuspensionCannotPersistOldRunningSnapshot(PanelActionSafetyTest.kt:455)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:524)\n\tat org.robolectric.internal.SandboxTestRunner.executeInSandbox(SandboxTestRunner.java:494)\n\tat org.robolectric.internal.SandboxTestRunner.access$900(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$7.evaluate(SandboxTestRunner.java:442)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.robolectric.internal.SandboxTestRunner.access$600(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$6.evaluate(SandboxTestRunner.java:333)\n\tat org.robolectric.internal.SandboxTestRunner$3.evaluate(SandboxTestRunner.java:233)\n\tat org.robolectric.internal.SandboxTestRunner$5.lambda$evaluate$0(SandboxTestRunner.java:317)\n\tat org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:101)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n"
+    }
+  ],
+  "productionApkCompilation": "success",
+  "runtimePayloadAbiAndIconGates": "success",
+  "lintExecuted": false,
+  "apkSignerGateExecuted": false,
+  "api35Installation": "skipped",
+  "api36Installation": "skipped",
+  "historicalCrashJob": {
+    "id": 111631931480,
+    "conclusion": "success"
+  },
+  "verificationArtifact": {
+    "id": 11328370266,
+    "bytes": 12139740,
+    "zipSha256": "c091e0ffa534f8e2d42518ccb5a1d958af04f272fa08d33ce3fcdb37197f873d"
+  },
+  "causeBoundary": "The controller read succeeded and original test HistoryRecord.pause was visible, but pending was never set. Volatile alone did not fix the test. Newly introduced HistoryAudit and original HistoryRecord both shadowed the same Kotlin singleton; cached shadow binding is a concrete fixture conflict hypothesis, not a proven production defect.",
+  "correction": "Use the same original suspend-capable HistoryRecord shadow for both suites; add read-only sample audit, clear it explicitly, and assert the actual singleton shadow type. Preserve original stop/history assertions and production guards.",
+  "originalActionSafetyAssertionsPreserved": true,
+  "productionInputsUnchangedByThisCorrection": true,
+  "failureEvidenceRetained": true
+}

@@ -35,9 +35,9 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt": "f068702e01fe4c3d41773de22d4f1a326aaede3843033e5c1cc5839118f63cd4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "393bbe3130133cfb9d0757d7ba4ccbe7a6e0690ef8e82af4ae818c545ba7cd26",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt": "3102f56bef1b548b81fc4f3b3afbbee6e6add701eeee755a4cb9ff71a037a098",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "00be367591bad3e98e71e7e4e2ca8abb356e63ea2822e20ad447d61375ed22f8",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "337d0ac9b486cbfb83578c35572ca7c3c50b4250c3a08554d20c542f92f76061",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java": "731faceeed3768376ea022d32b1fb891f74ce1cd375b4737f2e11953208f3a2c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java": "2b01a451e6dcf62d626f4d0d16e5d297a93dba761bb5eb421e6ea6f09b40acaf",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt": "5cc8b464acb8fc5469d99efa900d3547c134a1b13f85a26e81e19c479c928c80",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt": "01757ef4f531771e81231a693f18c57dc1c3f07ec84a1fa4b2d5618525cbe44b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "83cd5d6d1128a4156a0b77fa27a0c2bd8cba0874947feb22fb44c38fe0df0859"
@@ -47,5 +47,5 @@
   "manifestAndPermissionsUnchanged": true,
   "unchangedOutsideAuthScope": true,
   "reproducedSourceMatchesCheckout": true,
-  "patchSha256": "b61ec340dc9fca79083d62b721765dac5a558b5b044922c16c5a7db646788bab"
+  "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee"
 }

@@ -37,9 +37,11 @@ public final class PanelActionRuntimeShadows {
     public static class HistoryRecord {
         public static volatile boolean pause;
         public static volatile Continuation<? super kotlin.Unit> pending;
-        @Resetter public static void reset() { pause = false; pending = null; }
+        public static final java.util.List<kotlin.Pair<Long, Long>> samples = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        @Resetter public static void reset() { pause = false; pending = null; samples.clear(); }
         @Implementation public Object record(Context app, long upload, long download,
                 java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {
+            samples.add(new kotlin.Pair<>(upload, download));
             if (pause) { pending = done; return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED(); }
             return kotlin.Unit.INSTANCE;
         }

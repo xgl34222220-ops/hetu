@@ -1,7 +1,6 @@
 package io.github.xgl34222220.hetu
 
 import android.app.Application
-import android.content.Context
 import android.os.Looper
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
@@ -22,41 +21,24 @@ import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
 import org.robolectric.Shadows.shadowOf
 import org.robolectric.annotation.Config
-import org.robolectric.annotation.Implementation
-import org.robolectric.annotation.Implements
 import org.robolectric.annotation.LooperMode
-import org.robolectric.annotation.Resetter
+import org.robolectric.shadow.api.Shadow
 import java.time.Duration
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
-import kotlin.coroutines.Continuation
 
 /** Actual controller HTTP reads with isolated healthy Root and /proc boundaries. */
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [35], application = Application::class, shadows = [
     PanelActionRuntimeShadows.RootStatus::class,
     PanelActionRuntimeShadows.RuntimeSample::class,
-    ControllerReadStateTest.HistoryAudit::class,
+    PanelActionRuntimeShadows.HistoryRecord::class,
     PanelActionRuntimeShadows.NoRoot::class,
 ])
 @LooperMode(LooperMode.Mode.PAUSED)
 class ControllerReadStateTest {
-    @Implements(value = ProxyApiHistoryStore::class, isInAndroidSdk = false)
-    class HistoryAudit {
-        @Implementation
-        fun record(app: Context, upload: Long, download: Long, connections: List<*>,
-                   now: Long, done: Continuation<Unit>): Any {
-            samples += upload to download
-            return Unit
-        }
-        companion object {
-            val samples = mutableListOf<Pair<Long, Long>>()
-            @JvmStatic @Resetter fun reset() { samples.clear() }
-        }
-    }
-
     private lateinit var app: Application
     private lateinit var server: MockWebServer
     private lateinit var controller: ProxyComposeController
@@ -70,9 +52,10 @@ class ControllerReadStateTest {
     @Volatile private var holdConfigs = false
 
     @Before fun prepare() {
-        // Kotlin companion fields survive individual Robolectric method sandboxes;
-        // each read-only assertion must compare against this method's own history.
-        HistoryAudit.reset()
+        // Share the original suspend-capable history shadow and isolate this method's audit.
+        PanelActionRuntimeShadows.HistoryRecord.reset()
+        PanelActionRuntimeShadows.RuntimeSample.reset()
+        PanelActionRuntimeShadows.NoRoot.reset()
         app = ApplicationProvider.getApplicationContext()
         server = MockWebServer().apply {
             dispatcher = object : Dispatcher() {
@@ -102,6 +85,8 @@ class ControllerReadStateTest {
             .putString("proxyControllerSecret", "fixture-local-secret").putBoolean("proxyApiHistoryEnabled", true).commit()
         PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77,
             rssBytes = 8192L, elapsedSeconds = 123L)
+        assertTrue("History singleton must use the original suspend-capable shadow",
+            Shadow.extract<Any>(ProxyApiHistoryStore) is PanelActionRuntimeShadows.HistoryRecord)
         controller = ProxyComposeController(app)
     }
 
@@ -125,7 +110,7 @@ class ControllerReadStateTest {
         assertFalse(state.controllerError.contains("fixture-custom-secret"))
         assertFalse(state.controllerError.contains("fixture-local-secret"))
         assertTrue(state.groups.isEmpty())
-        assertTrue(HistoryAudit.samples.isEmpty())
+        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
     }
 
     @Test fun successfulGroupsThenUnauthorizedConnectionsCannotPublishPartialSnapshot() = runBlocking {
@@ -175,7 +160,7 @@ class ControllerReadStateTest {
         val oldUpRate = model.upRate
         val downTrend = model.rateHistory.toList()
         val upTrend = model.upHistory.toList()
-        val history = HistoryAudit.samples.toList()
+        val history = PanelActionRuntimeShadows.HistoryRecord.samples.toList()
         assertTrue(downTrend.isNotEmpty())
         assertEquals(2, history.size)
 
@@ -195,7 +180,7 @@ class ControllerReadStateTest {
         assertEquals(oldUpRate, model.upRate)
         assertEquals(downTrend, model.rateHistory.toList())
         assertEquals(upTrend, model.upHistory.toList())
-        assertEquals(history, HistoryAudit.samples)
+        assertEquals(history, PanelActionRuntimeShadows.HistoryRecord.samples)
         assertTrue(model.state.running && model.state.dataPlaneHealthy)
 
         rejectedPath = null
@@ -208,7 +193,7 @@ class ControllerReadStateTest {
         assertEquals("node-3", model.state.groups.single().now)
         assertEquals(6000L, model.state.downloadTotal)
         assertEquals(downTrend.size + 1, model.rateHistory.size)
-        assertEquals(history.size + 1, HistoryAudit.samples.size)
+        assertEquals(history.size + 1, PanelActionRuntimeShadows.HistoryRecord.samples.size)
     }
 
     @Test fun cancellationDuringControllerReadPropagatesWithoutPublishingState() = runBlocking {
@@ -228,6 +213,6 @@ class ControllerReadStateTest {
         assertFalse("Cancelled controller read must not publish a state", published.get())
         assertTrue("Controller read must complete as cancelled", job.isCancelled)
         assertTrue("Controller cancellation must propagate", completion.get() is CancellationException)
-        assertTrue(HistoryAudit.samples.isEmpty())
+        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
     }
 }

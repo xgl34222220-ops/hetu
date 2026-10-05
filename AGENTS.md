@@ -8,6 +8,8 @@
 
 第二轮 `934bc32` / Actions `37244396784`：实际 47 XML / 422 tests / 3 failures / 0 errors/skipped，lint/最终 APK signer 与双 API 安装 skipped。保留 `docs/ci/V20.84_SECOND_FAILURE.json`。新测试显式清空静态历史夹具并等待实际读取闸门后验证取消；旧 HistoryRecord 的 pause/pending 增加 volatile，原安全断言仅增加失败详情。原 392 与新增 30 数量不变；第三轮仍须完整验证，字段可见性不是已确认的生产根因。
 
+第三轮 `6666bd8c` / Actions `37269048184`：实际 422/1 failure/0 error/skipped，新 30 全过；仅原 stop/history latch 失败，诊断显示 panelReady=true/readFailed=false/historyPaused=true，volatile 未解决。证据保留 `docs/ci/V20.84_THIRD_FAILURE.json`。两套 Shadow 针对同一个 Kotlin history 单例存在夹具绑定冲突疑点；第四轮统一复用原可暂停 HistoryRecord，仅补只读采样审计并显式核对实际绑定，不改生产历史保护或原断言，仍待完整重跑。
+
 原 23 载荷、Root runtime 151、核心/native/service.d、签名、Manifest/权限与依赖不变。无 hook、不操作用户设备/网络/安全设置、不永久删除数据、不合并主分支或正式发布。手机实际鉴权恢复、K80/OEM/KernelSU、真机 Root 与长期网络仍未验证。详细范围见 `docs/V20.84_CONTROLLER_AUTH.md`。
 
 ## 上次交付：V20.83 工具、设置与首页面板交互（构建及独立安装验收通过）

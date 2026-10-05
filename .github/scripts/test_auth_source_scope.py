@@ -7,7 +7,7 @@ from auth_source_scope import (AUTH_FILES, BASE_ANDROID_APP_TREE, BASE_COMMIT, B
                                PREVIOUS_INPUTS_SHA256, PREVIOUS_PATCH_SHA256,
                                TEST_PACKAGE, validate_layer, validate_scope,
                                validate_version_only, HISTORY_FIXTURE, validate_history_fixture_only,
-                               SAFETY_FIXTURE, validate_safety_diagnostics_only)
+                               SAFETY_FIXTURE, validate_safety_diagnostics_only, HISTORY_REPLACEMENTS)
 from ui_source_scope import validate_scope as validate_ui_scope
 
 
@@ -21,13 +21,16 @@ class AuthenticationScope(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 validate_safety_diagnostics_only(before, modified)
 
-    def test_history_fixture_can_only_add_cross_thread_visibility(self):
-        before = 'public static class HistoryRecord {\n        public static boolean pause;\n        public static Continuation<? super kotlin.Unit> pending;\n} // Root boundary unchanged'
-        after = before.replace('static boolean pause', 'static volatile boolean pause').replace('static Continuation', 'static volatile Continuation')
+    def test_history_fixture_can_only_add_cross_thread_visibility_and_audit(self):
+        before = '\n'.join(original for original, _ in HISTORY_REPLACEMENTS) + '\n// Root boundary unchanged'
+        after = before
+        for original, replacement in HISTORY_REPLACEMENTS:
+            after = after.replace(original, replacement)
         validate_scope([HISTORY_FIXTURE])
         validate_history_fixture_only(before, after)
         for modified in (after.replace('Root boundary unchanged', 'Root boundary changed'),
-                         after.replace('volatile boolean pause', 'volatile boolean skip')):
+                         after.replace('volatile boolean pause', 'volatile boolean skip'),
+                         after.replace('samples.add(new kotlin.Pair<>(upload, download))', 'samples.clear()')):
             with self.assertRaises(AssertionError):
                 validate_history_fixture_only(before, modified)
 

@@ -835,14 +835,13 @@ index 0000000..2c0d79e
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
 new file mode 100644
-index 0000000..0cf3b78
+index 0000000..366297a
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
-@@ -0,0 +1,233 @@
+@@ -0,0 +1,218 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
-+import android.content.Context
 +import android.os.Looper
 +import androidx.lifecycle.viewModelScope
 +import androidx.test.core.app.ApplicationProvider
@@ -863,41 +862,24 @@ index 0000000..0cf3b78
 +import org.robolectric.RobolectricTestRunner
 +import org.robolectric.Shadows.shadowOf
 +import org.robolectric.annotation.Config
-+import org.robolectric.annotation.Implementation
-+import org.robolectric.annotation.Implements
 +import org.robolectric.annotation.LooperMode
-+import org.robolectric.annotation.Resetter
++import org.robolectric.shadow.api.Shadow
 +import java.time.Duration
 +import java.util.concurrent.CountDownLatch
 +import java.util.concurrent.TimeUnit
 +import java.util.concurrent.atomic.AtomicBoolean
 +import java.util.concurrent.atomic.AtomicReference
-+import kotlin.coroutines.Continuation
 +
 +/** Actual controller HTTP reads with isolated healthy Root and /proc boundaries. */
 +@RunWith(RobolectricTestRunner::class)
 +@Config(sdk = [35], application = Application::class, shadows = [
 +    PanelActionRuntimeShadows.RootStatus::class,
 +    PanelActionRuntimeShadows.RuntimeSample::class,
-+    ControllerReadStateTest.HistoryAudit::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
 +    PanelActionRuntimeShadows.NoRoot::class,
 +])
 +@LooperMode(LooperMode.Mode.PAUSED)
 +class ControllerReadStateTest {
-+    @Implements(value = ProxyApiHistoryStore::class, isInAndroidSdk = false)
-+    class HistoryAudit {
-+        @Implementation
-+        fun record(app: Context, upload: Long, download: Long, connections: List<*>,
-+                   now: Long, done: Continuation<Unit>): Any {
-+            samples += upload to download
-+            return Unit
-+        }
-+        companion object {
-+            val samples = mutableListOf<Pair<Long, Long>>()
-+            @JvmStatic @Resetter fun reset() { samples.clear() }
-+        }
-+    }
-+
 +    private lateinit var app: Application
 +    private lateinit var server: MockWebServer
 +    private lateinit var controller: ProxyComposeController
@@ -911,9 +893,10 @@ index 0000000..0cf3b78
 +    @Volatile private var holdConfigs = false
 +
 +    @Before fun prepare() {
-+        // Kotlin companion fields survive individual Robolectric method sandboxes;
-+        // each read-only assertion must compare against this method's own history.
-+        HistoryAudit.reset()
++        // Share the original suspend-capable history shadow and isolate this method's audit.
++        PanelActionRuntimeShadows.HistoryRecord.reset()
++        PanelActionRuntimeShadows.RuntimeSample.reset()
++        PanelActionRuntimeShadows.NoRoot.reset()
 +        app = ApplicationProvider.getApplicationContext()
 +        server = MockWebServer().apply {
 +            dispatcher = object : Dispatcher() {
@@ -943,6 +926,8 @@ index 0000000..0cf3b78
 +            .putString("proxyControllerSecret", "fixture-local-secret").putBoolean("proxyApiHistoryEnabled", true).commit()
 +        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77,
 +            rssBytes = 8192L, elapsedSeconds = 123L)
++        assertTrue("History singleton must use the original suspend-capable shadow",
++            Shadow.extract<Any>(ProxyApiHistoryStore) is PanelActionRuntimeShadows.HistoryRecord)
 +        controller = ProxyComposeController(app)
 +    }
 +
@@ -966,7 +951,7 @@ index 0000000..0cf3b78
 +        assertFalse(state.controllerError.contains("fixture-custom-secret"))
 +        assertFalse(state.controllerError.contains("fixture-local-secret"))
 +        assertTrue(state.groups.isEmpty())
-+        assertTrue(HistoryAudit.samples.isEmpty())
++        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
 +    }
 +
 +    @Test fun successfulGroupsThenUnauthorizedConnectionsCannotPublishPartialSnapshot() = runBlocking {
@@ -1016,7 +1001,7 @@ index 0000000..0cf3b78
 +        val oldUpRate = model.upRate
 +        val downTrend = model.rateHistory.toList()
 +        val upTrend = model.upHistory.toList()
-+        val history = HistoryAudit.samples.toList()
++        val history = PanelActionRuntimeShadows.HistoryRecord.samples.toList()
 +        assertTrue(downTrend.isNotEmpty())
 +        assertEquals(2, history.size)
 +
@@ -1036,7 +1021,7 @@ index 0000000..0cf3b78
 +        assertEquals(oldUpRate, model.upRate)
 +        assertEquals(downTrend, model.rateHistory.toList())
 +        assertEquals(upTrend, model.upHistory.toList())
-+        assertEquals(history, HistoryAudit.samples)
++        assertEquals(history, PanelActionRuntimeShadows.HistoryRecord.samples)
 +        assertTrue(model.state.running && model.state.dataPlaneHealthy)
 +
 +        rejectedPath = null
@@ -1049,7 +1034,7 @@ index 0000000..0cf3b78
 +        assertEquals("node-3", model.state.groups.single().now)
 +        assertEquals(6000L, model.state.downloadTotal)
 +        assertEquals(downTrend.size + 1, model.rateHistory.size)
-+        assertEquals(history.size + 1, HistoryAudit.samples.size)
++        assertEquals(history.size + 1, PanelActionRuntimeShadows.HistoryRecord.samples.size)
 +    }
 +
 +    @Test fun cancellationDuringControllerReadPropagatesWithoutPublishingState() = runBlocking {
@@ -1069,7 +1054,7 @@ index 0000000..0cf3b78
 +        assertFalse("Cancelled controller read must not publish a state", published.get())
 +        assertTrue("Controller read must complete as cancelled", job.isCancelled)
 +        assertTrue("Controller cancellation must propagate", completion.get() is CancellationException)
-+        assertTrue(HistoryAudit.samples.isEmpty())
++        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt
@@ -1186,20 +1171,26 @@ index 0000000..7293696
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
-index e3cd960..e1b6a60 100644
+index e3cd960..be46b08 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
-@@ -35,8 +35,8 @@ public final class PanelActionRuntimeShadows {
+@@ -35,11 +35,13 @@ public final class PanelActionRuntimeShadows {
 
      @Implements(value = ProxyApiHistoryStore.class, isInAndroidSdk = false)
      public static class HistoryRecord {
 -        public static boolean pause;
 -        public static Continuation<? super kotlin.Unit> pending;
+-        @Resetter public static void reset() { pause = false; pending = null; }
 +        public static volatile boolean pause;
 +        public static volatile Continuation<? super kotlin.Unit> pending;
-         @Resetter public static void reset() { pause = false; pending = null; }
++        public static final java.util.List<kotlin.Pair<Long, Long>> samples = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
++        @Resetter public static void reset() { pause = false; pending = null; samples.clear(); }
          @Implementation public Object record(Context app, long upload, long download,
                  java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {
++            samples.add(new kotlin.Pair<>(upload, download));
+             if (pause) { pending = done; return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED(); }
+             return kotlin.Unit.INSTANCE;
+         }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
 index e40a275..0f9e4a9 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt

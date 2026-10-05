@@ -53,11 +53,22 @@ def validate_scope(changes):
     assert not blocked, 'Authentication patch changes protected input: ' + str(blocked)
 
 
+HISTORY_REPLACEMENTS = (
+    ('public static class HistoryRecord {\n        public static boolean pause;\n        public static Continuation<? super kotlin.Unit> pending;',
+     'public static class HistoryRecord {\n        public static volatile boolean pause;\n        public static volatile Continuation<? super kotlin.Unit> pending;\n        public static final java.util.List<kotlin.Pair<Long, Long>> samples = java.util.Collections.synchronizedList(new java.util.ArrayList<>());'),
+    ('@Resetter public static void reset() { pause = false; pending = null; }',
+     '@Resetter public static void reset() { pause = false; pending = null; samples.clear(); }'),
+    ('java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {',
+     'java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {\n            samples.add(new kotlin.Pair<>(upload, download));'),
+)
+
+
 def validate_history_fixture_only(before, after):
-    original = 'public static class HistoryRecord {\n        public static boolean pause;\n        public static Continuation<? super kotlin.Unit> pending;'
-    replacement = 'public static class HistoryRecord {\n        public static volatile boolean pause;\n        public static volatile Continuation<? super kotlin.Unit> pending;'
-    assert before.count(original) == 1, 'Expected original cross-thread history fixture'
-    assert after == before.replace(original, replacement), 'History fixture changed beyond cross-thread visibility'
+    expected = before
+    for original, replacement in HISTORY_REPLACEMENTS:
+        assert before.count(original) == 1, 'Expected original suspend-capable history fixture'
+        expected = expected.replace(original, replacement)
+    assert after == expected, 'History fixture changed beyond visibility and read-only audit'
 
 
 def validate_safety_diagnostics_only(before, after):
