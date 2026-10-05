@@ -1,3 +1,4 @@
+# Fixed manifest ZIP member layout independently checked against the original artifact.
 name: Hetu V20.84 fixed APK installation continuation
 permissions:
   contents: read
