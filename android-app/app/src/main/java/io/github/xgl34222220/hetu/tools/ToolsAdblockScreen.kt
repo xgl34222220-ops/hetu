@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -89,7 +90,7 @@ internal fun ToolsAdblockScreen(
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
     Column(modifier.fillMaxSize().background(c.bg)) {
-        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = "在 Mihomo 内按域名拦截广告与追踪") {
+        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null) {
             HomeIconButton(ToolsFeatureIcons.CircleHelp, "说明", onHelp)
             HomeIconButton(HomeIcons.RefreshCw, "重新检测", onRefresh, enabled = idle)
         }
@@ -244,6 +245,7 @@ private fun LevelCard(state: ToolsAdblockState, idle: Boolean, onLevelChange: (T
                     referenceOuterPadding = 6.dp,
                     referenceVisualHeight = 42.dp,
                     referenceTouchHeight = 47.dp,
+                    referenceSegmentShape = RoundedCornerShape(percent = 50),
                 )
             }
             Text(state.note, color = c.t2, style = HomeType.note)

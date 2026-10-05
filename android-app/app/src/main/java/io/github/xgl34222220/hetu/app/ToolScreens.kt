@@ -1169,6 +1169,14 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         when (kind) {
             "refresh" -> HxChoiceSheet(
                 presentation = HxChoicePresentation.Notification,
+                menuWidthOverride = 148.dp,
+                menuAnchorEndInset = 0.dp,
+                menuItemFontSizeSp = 16f,
+                menuItemMinimumHeight = 42.dp,
+                menuItemVerticalPadding = 9.dp,
+                menuContentTopPadding = 6.dp,
+                menuContentBottomPadding = 6.dp,
+                menuSelectedHorizontalPadding = 5.dp,
                 title = "刷新频率",
                 choices = refreshOptions.map { HxChoice(it.toString(), "$it 秒") },
                 selected = refresh.toString(),
@@ -1177,6 +1185,14 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
             )
             "target" -> HxChoiceSheet(
                 presentation = HxChoicePresentation.Notification,
+                menuWidthOverride = 134.dp,
+                menuAnchorEndInset = 3.dp,
+                menuItemFontSizeSp = 13f,
+                menuItemMinimumHeight = 34.dp,
+                menuItemVerticalPadding = 6.dp,
+                menuContentTopPadding = 5.dp,
+                menuContentBottomPadding = 5.dp,
+                menuRowPresentation = HxChoicePresentation.Settings,
                 title = "点击通知打开",
                 choices = targetOptions.map { HxChoice(it.first, it.second) },
                 maxVisibleChoices = 7,
@@ -1186,6 +1202,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
             )
             else -> HxChoiceSheet(
                 presentation = HxChoicePresentation.Notification,
+                menuWidthOverride = 141.dp,
+                menuAnchorEndInset = 1.dp,
+                menuItemFontSizeSp = 16f,
+                menuItemMinimumHeight = 40.dp,
+                menuItemVerticalPadding = 8.dp,
+                menuContentTopPadding = 3.dp,
+                menuContentBottomPadding = 9.dp,
+                menuSelectedHorizontalPadding = 3.dp,
+                menuDividers = false,
                 title = "快捷按钮 ${index + 1}",
                 choices = actionOptions.map { HxChoice(it.first, it.second) },
                 selected = actions.getOrNull(index),

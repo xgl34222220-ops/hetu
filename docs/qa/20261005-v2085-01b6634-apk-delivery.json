@@ -1,0 +1,59 @@
+{
+  "applicationCommit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+  "runId": 37353575277,
+  "apkName": "Hetu-V20.85-Test-01b6634.apk",
+  "apkBytes": 134823359,
+  "apkSha256": "78785c46c716093b7b1d1f78808dc62529cbe723bab33ceaff95bb18cec2c11e",
+  "partCount": 6,
+  "allSixArtifactAndPartHashesVerified": true,
+  "fullApkHashVerified": true,
+  "installedAcceptance": "PASS; own01b6634 API35/36 and53 evidence checks",
+  "transportManifestArtifactId": 11364142963,
+  "transportParts": [
+    {
+      "index": 0,
+      "artifactId": 11364232721,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:6641f5af7ebcc53edbc64a963be93308887c29feb82ad31a9b89d4bf579c5e7f"
+    },
+    {
+      "index": 1,
+      "artifactId": 11364088284,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:fde3f3f917b6735e24ceef0f70263bf120a57c13cbc406078cbdd39bbda28819"
+    },
+    {
+      "index": 2,
+      "artifactId": 11364247665,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:8a0b31cac9719122eab9934ea13a0adcf1bcd1bdb98c068241f21b776a4a728f"
+    },
+    {
+      "index": 3,
+      "artifactId": 11364182817,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:f05125cdf03fc89022ecdaabd1d17653b762121470776e17959501d434d137e3"
+    },
+    {
+      "index": 4,
+      "artifactId": 11363763787,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:d121885257cf037fbf693f7257ca3c81affa42624913a9f6d1f8a3f0692f7038"
+    },
+    {
+      "index": 5,
+      "artifactId": 11363654365,
+      "artifactBytes": 8994373,
+      "artifactDigest": "sha256:fbf6d9593c3eee822242aab066bc4d893fd82d96fe6c207e3564e44a3d430b4d"
+    }
+  ],
+  "candidateAdditionalShapeCorrection": "Fresh01b6634 A44 actual shape cross-sections differ from original capsule despite135/42/108x37 dimension match; local nullable shape successor requires ownCI",
+  "deliveredAsFinalPackage": false,
+  "literal130PagePixelParityAccepted": false,
+  "GooglePlayFixVerified": false,
+  "installationEvidence": "docs/qa/20261005-v2085-01b6634-installation-success.json",
+  "installationEvidenceSha256": "481d4c799d8f60553c1824644120390f91e5a98785866799e9ecf5b96f287bd0",
+  "strictEvidenceChecksPassed": 53,
+  "artifactSaved": false,
+  "currentSuccessorCapsuleAndNotificationMenusAcceptance": "not executed; source candidate requires ownCI"
+}

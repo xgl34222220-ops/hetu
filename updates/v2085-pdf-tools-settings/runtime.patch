@@ -571,7 +571,7 @@ index 3f3f5cd..4722bed 100644
                      null -> HxDot(tint, 9.dp)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index be09cbe..efdaadb 100644
+index be09cbe..8da1a5f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -72,6 +72,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
@@ -695,15 +695,60 @@ index be09cbe..efdaadb 100644
                  color = c.text,
              )
          }
-@@ -1124,6 +1151,7 @@ internal fun HxChoiceSheet(
+@@ -1124,6 +1151,16 @@ internal fun HxChoiceSheet(
      trailingReferenceRadios: Boolean = false,
      presentation: HxChoicePresentation = HxChoicePresentation.Standard,
      menuWidthOverride: Dp? = null,
 +    maxVisibleChoices: Int? = null,
++    menuItemVerticalPadding: Dp? = null,
++    menuItemMinimumHeight: Dp? = null,
++    menuItemFontSizeSp: Float? = null,
++    menuAnchorEndInset: Dp? = null,
++    menuContentTopPadding: Dp? = null,
++    menuContentBottomPadding: Dp? = null,
++    menuRowPresentation: HxChoicePresentation? = null,
++    menuDividers: Boolean? = null,
++    menuSelectedHorizontalPadding: Dp? = null,
  ) {
      val c = Hx.colors
      val haptics = rememberHetuHaptics()
-@@ -1162,6 +1190,27 @@ internal fun HxChoiceSheet(
+@@ -1138,7 +1175,34 @@ internal fun HxChoiceSheet(
+             HxChoicePresentation.Notification -> 148.dp
+             else -> if (trailingReferenceRadios) 200.dp else if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
+         }
+-        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth) { close ->
++        val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&
++            (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||
++                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)
++        val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)
++        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,
++            anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,
++            verticalPadding = if (scopedOuterPadding) 0.dp else 6.dp) { close ->
++            @Composable fun notificationMenuItem(choice: HxChoice) {
++                @Composable fun item() {
++                    HxMenuItem(
++                        choice.label,
++                        onClick = { close { onPick(choice.id) } },
++                        description = choice.description,
++                        selected = choice.id == selected,
++                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
++                        enabled = choice.enabled,
++                        choicePresentation = menuRowPresentation ?: presentation,
++                        compact = menuItemVerticalPadding != null,
++                        compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,
++                        minimumHeight = menuItemMinimumHeight ?: 0.dp,
++                        labelFontSizeSp = menuItemFontSizeSp,
++                    )
++                }
++                if (menuSelectedHorizontalPadding != null && choice.id == selected) {
++                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }
++                } else item()
++            }
++            if (scopedOuterPadding) Spacer(Modifier.height(menuContentTopPadding ?: 6.dp))
+             if (referenceRadios) {
+                 Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+                     textAlign = if (trailingReferenceRadios) TextAlign.Start else TextAlign.Center, fontSize = if (trailingReferenceRadios) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = c.text)
+@@ -1162,8 +1226,30 @@ internal fun HxChoiceSheet(
                          if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
                      }
                  }
@@ -711,7 +756,7 @@ index be09cbe..efdaadb 100644
 +                val density = LocalDensity.current
 +                var visibleRowsHeight by remember(maxVisibleChoices, choices) { mutableStateOf<Int?>(null) }
 +                @Composable fun choiceRow(index: Int, choice: HxChoice) {
-+                HxMenuItem(
++                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
 +                    choice.label,
 +                    onClick = { close { onPick(choice.id) } },
 +                    description = choice.description,
@@ -720,6 +765,7 @@ index be09cbe..efdaadb 100644
 +                    enabled = choice.enabled,
 +                    choicePresentation = presentation,
 +                )
++                if (!scopedNotification || menuDividers != false)
 +                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
 +                }
 +                Column(Modifier.fillMaxWidth().heightIn(max = visibleRowsHeight?.let { with(density) { it.toDp() } } ?: (maxVisibleChoices * 48.5f).dp).verticalScroll(rememberScrollState())) {
@@ -729,9 +775,26 @@ index be09cbe..efdaadb 100644
 +                    choices.drop(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index + maxVisibleChoices, choice) }
 +                }
              } else choices.forEachIndexed { index, choice ->
-                 HxMenuItem(
+-                HxMenuItem(
++                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
                      choice.label,
-@@ -1256,11 +1305,20 @@ internal fun HxFormDialog(
+                     onClick = { close { onPick(choice.id) } },
+                     description = choice.description,
+@@ -1172,11 +1258,13 @@ internal fun HxChoiceSheet(
+                     enabled = choice.enabled,
+                     choicePresentation = presentation,
+                 )
++                if (!scopedNotification || menuDividers != false)
+                 if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
+             }
+             if (!footer.isNullOrBlank()) {
+                 Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+             }
++            if (scopedOuterPadding) Spacer(Modifier.height(menuContentBottomPadding ?: 6.dp))
+         }
+         return
+     }
+@@ -1256,11 +1344,20 @@ internal fun HxFormDialog(
      messageBelowFields: Boolean = false,
      errorField: (String) -> Int? = { null },
      widthFraction: Float? = null,
@@ -752,7 +815,7 @@ index be09cbe..efdaadb 100644
      plainFields: Boolean = false,
      compactPills: Boolean = false,
      validate: (List<String>) -> String? = { null },
-@@ -1286,12 +1344,12 @@ internal fun HxFormDialog(
+@@ -1286,12 +1383,12 @@ internal fun HxFormDialog(
          if (problem != null) { error = problem; shakeTick++ }
          else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
      }
@@ -767,7 +830,7 @@ index be09cbe..efdaadb 100644
                  Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
                  if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
                      Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-@@ -1299,7 +1357,7 @@ internal fun HxFormDialog(
+@@ -1299,7 +1396,7 @@ internal fun HxFormDialog(
                  }
                  fields.forEachIndexed { index, field ->
                      if (index > 0) Spacer(Modifier.height(12.dp))
@@ -776,7 +839,7 @@ index be09cbe..efdaadb 100644
                      Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp))
                      androidx.compose.foundation.text.BasicTextField(
                          value = values[index].value,
-@@ -1307,11 +1365,11 @@ internal fun HxFormDialog(
+@@ -1307,11 +1404,11 @@ internal fun HxFormDialog(
                          singleLine = field.singleLine,
                          maxLines = if (field.singleLine) 1 else 6,
                          keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
@@ -792,7 +855,7 @@ index be09cbe..efdaadb 100644
                          decorationBox = { input -> Box {
                              if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
                              input()
-@@ -1320,7 +1378,7 @@ internal fun HxFormDialog(
+@@ -1320,7 +1417,7 @@ internal fun HxFormDialog(
                      if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
                          style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
                  }
@@ -801,7 +864,7 @@ index be09cbe..efdaadb 100644
                      Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
                  }
                  AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-@@ -1328,7 +1386,7 @@ internal fun HxFormDialog(
+@@ -1328,7 +1425,7 @@ internal fun HxFormDialog(
                  }
                  if (!configFooter) {
                      Spacer(Modifier.height(14.dp))
@@ -1428,7 +1491,7 @@ index ddc05df..1d8602b 100644
                      }
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b68a65b..5c92504 100644
+index b68a65b..bd42cd8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -237,7 +237,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -1583,19 +1646,64 @@ index b68a65b..5c92504 100644
                          picker = "target" to -1
                      }
                  }
-@@ -1171,6 +1179,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1161,6 +1169,14 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         when (kind) {
+             "refresh" -> HxChoiceSheet(
                  presentation = HxChoicePresentation.Notification,
++                menuWidthOverride = 148.dp,
++                menuAnchorEndInset = 0.dp,
++                menuItemFontSizeSp = 16f,
++                menuItemMinimumHeight = 42.dp,
++                menuItemVerticalPadding = 9.dp,
++                menuContentTopPadding = 6.dp,
++                menuContentBottomPadding = 6.dp,
++                menuSelectedHorizontalPadding = 5.dp,
+                 title = "刷新频率",
+                 choices = refreshOptions.map { HxChoice(it.toString(), "$it 秒") },
+                 selected = refresh.toString(),
+@@ -1169,14 +1185,32 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             )
+             "target" -> HxChoiceSheet(
+                 presentation = HxChoicePresentation.Notification,
++                menuWidthOverride = 134.dp,
++                menuAnchorEndInset = 3.dp,
++                menuItemFontSizeSp = 13f,
++                menuItemMinimumHeight = 34.dp,
++                menuItemVerticalPadding = 6.dp,
++                menuContentTopPadding = 5.dp,
++                menuContentBottomPadding = 5.dp,
++                menuRowPresentation = HxChoicePresentation.Settings,
                  title = "点击通知打开",
                  choices = targetOptions.map { HxChoice(it.first, it.second) },
 +                maxVisibleChoices = 7,
                  selected = target,
                  onPick = { target = it; picker = null },
                  onDismiss = { picker = null },
+             )
+             else -> HxChoiceSheet(
+                 presentation = HxChoicePresentation.Notification,
++                menuWidthOverride = 141.dp,
++                menuAnchorEndInset = 1.dp,
++                menuItemFontSizeSp = 16f,
++                menuItemMinimumHeight = 40.dp,
++                menuItemVerticalPadding = 8.dp,
++                menuContentTopPadding = 3.dp,
++                menuContentBottomPadding = 9.dp,
++                menuSelectedHorizontalPadding = 3.dp,
++                menuDividers = false,
+                 title = "快捷按钮 ${index + 1}",
+                 choices = actionOptions.map { HxChoice(it.first, it.second) },
+                 selected = actions.getOrNull(index),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index 97cc0f0..ebd1beb 100644
+index 97cc0f0..e6bf760 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-@@ -21,17 +21,23 @@ import androidx.compose.foundation.verticalScroll
+@@ -17,21 +17,28 @@ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.windowInsetsPadding
+ import androidx.compose.foundation.rememberScrollState
+ import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.foundation.verticalScroll
  import androidx.compose.material3.Icon
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
@@ -1619,7 +1727,16 @@ index 97cc0f0..ebd1beb 100644
  import io.github.xgl34222220.hetu.home.HomeBanner
  import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
  import io.github.xgl34222220.hetu.home.HomeButtonKind
-@@ -110,9 +116,9 @@ internal fun ToolsAdblockScreen(
+@@ -83,7 +90,7 @@ internal fun ToolsAdblockScreen(
+     val ready = state.load is ToolsLoad.Ready
+     val idle = ready && !state.busy
+     Column(modifier.fillMaxSize().background(c.bg)) {
+-        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = "在 Mihomo 内按域名拦截广告与追踪") {
++        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null) {
+             HomeIconButton(ToolsFeatureIcons.CircleHelp, "说明", onHelp)
+             HomeIconButton(HomeIcons.RefreshCw, "重新检测", onRefresh, enabled = idle)
+         }
+@@ -110,9 +117,9 @@ internal fun ToolsAdblockScreen(
                      DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
                      DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
                      HomeCard(Modifier.fillMaxWidth()) {
@@ -1632,7 +1749,7 @@ index 97cc0f0..ebd1beb 100644
                      }
                  }
              }
-@@ -127,8 +133,8 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
+@@ -127,8 +134,8 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val soft: Color
  private fun statusLook(state: ToolsAdblockState): StatusLook {
      val c = LocalHomeColors.current
      return when (state.status) {
@@ -1643,7 +1760,7 @@ index 97cc0f0..ebd1beb 100644
          ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.sunken, "已开启", "启动代理后自动验证运行链。")
          ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnSoft, "运行链未确认", "尚未确认规则模式及广告规则加载；下拉刷新后重试验证。")
          ToolsAdStatus.Off -> StatusLook(ToolsFeatureIcons.ShieldOff, c.t3, c.sunken, "已关闭", "代理仅负责转发，不执行广告规则。")
-@@ -140,10 +146,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
+@@ -140,10 +147,13 @@ private fun StatusCard(state: ToolsAdblockState, idle: Boolean, onEnabledChange:
      val c = LocalHomeColors.current
      val look = statusLook(state)
      val number = if (state.enabled) c.accent else c.t3
@@ -1659,7 +1776,7 @@ index 97cc0f0..ebd1beb 100644
              }
              Column(Modifier.weight(1f)) {
                  Text(ht(look.title), color = look.tint, style = HomeType.heroStatus, maxLines = 1, overflow = TextOverflow.Ellipsis)
-@@ -198,7 +207,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
+@@ -198,7 +208,7 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
      val c = LocalHomeColors.current
      ToolsRow(
          AnnotatedString(title),
@@ -1668,7 +1785,7 @@ index 97cc0f0..ebd1beb 100644
          iconTint = if (ok) c.good else c.t3,
          subtitle = detail, compact = true,
      )
-@@ -223,14 +232,20 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
+@@ -223,14 +233,21 @@ private fun RecentCard(recent: List<String>, onPick: (String) -> Unit) {
  private fun LevelCard(state: ToolsAdblockState, idle: Boolean, onLevelChange: (ToolsAdLevel) -> Unit) {
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
@@ -1692,12 +1809,13 @@ index 97cc0f0..ebd1beb 100644
 +                    referenceOuterPadding = 6.dp,
 +                    referenceVisualHeight = 42.dp,
 +                    referenceTouchHeight = 47.dp,
++                    referenceSegmentShape = RoundedCornerShape(percent = 50),
 +                )
 +            }
              Text(state.note, color = c.t2, style = HomeType.note)
          }
      }
-@@ -241,18 +256,20 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
+@@ -241,18 +258,20 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
          ToolsCardTitle("规则源") {
@@ -1720,7 +1838,7 @@ index 97cc0f0..ebd1beb 100644
      }
  }
  
-@@ -260,12 +277,12 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
+@@ -260,12 +279,12 @@ private fun SourcesCard(state: ToolsAdblockState, idle: Boolean, onUpdate: () ->
  private fun DomainCard(title: String, addLabel: String, domains: List<String>, idle: Boolean, onAdd: () -> Unit, onRemove: (String) -> Unit) {
      val c = LocalHomeColors.current
      HomeCard(Modifier.fillMaxWidth()) {
@@ -1736,7 +1854,7 @@ index 97cc0f0..ebd1beb 100644
              }
          }
      }
-@@ -278,13 +295,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
+@@ -278,13 +297,13 @@ private fun DomainCard(title: String, addLabel: String, domains: List<String>, i
  @Composable
  internal fun ToolsAdblockHelpSheetContent(onClose: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
@@ -1754,7 +1872,7 @@ index 97cc0f0..ebd1beb 100644
          }
      }
  }
-@@ -305,9 +322,9 @@ internal fun ToolsAddDomainDialogCard(
+@@ -305,9 +324,9 @@ internal fun ToolsAddDomainDialogCard(
      ToolsDialogCard(
          title = if (overlay.allow) "添加白名单" else "添加黑名单",
          text = "输入域名，匹配它及其所有子域名，\n例如 example.com。",
@@ -1766,7 +1884,7 @@ index 97cc0f0..ebd1beb 100644
  }
  
  /** Page 49: reached by tapping a row of 最近拦截. */
-@@ -315,10 +332,10 @@ internal fun ToolsAddDomainDialogCard(
+@@ -315,10 +334,10 @@ internal fun ToolsAddDomainDialogCard(
  internal fun ToolsConfirmAllowDialogCard(overlay: ToolsAdOverlay.ConfirmAllow, onConfirm: () -> Unit, onCancel: () -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      ToolsDialogCard(
@@ -2558,10 +2676,10 @@ index 8ac0639..d8e467e 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-index 7e58000..eaec16f 100644
+index 7e58000..78b93dd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
-@@ -18,7 +18,12 @@ import androidx.compose.ui.Alignment
+@@ -18,7 +18,13 @@ import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.draw.alpha
@@ -2570,11 +2688,12 @@ index 7e58000..eaec16f 100644
 +import androidx.compose.ui.geometry.Offset
 +import androidx.compose.ui.geometry.Size
  import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.Shape
 +import androidx.compose.ui.graphics.drawscope.Stroke
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.contentDescription
-@@ -29,6 +34,7 @@ import androidx.compose.ui.text.TextStyle
+@@ -29,6 +35,7 @@ import androidx.compose.ui.text.TextStyle
  import androidx.compose.ui.text.font.FontFamily
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
@@ -2582,7 +2701,7 @@ index 7e58000..eaec16f 100644
  import androidx.compose.ui.unit.dp
  import androidx.compose.ui.unit.sp
  import io.github.xgl34222220.hetu.HomeContinuousShape
-@@ -61,7 +67,7 @@ internal object ToolsTypography {
+@@ -61,7 +68,7 @@ internal object ToolsTypography {
      val barSubtitle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
      val sheetTitle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
      val heroStatus = TextStyle(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
@@ -2591,7 +2710,7 @@ index 7e58000..eaec16f 100644
      val body = TextStyle(fontSize = 16.sp, lineHeight = 23.sp)
      val bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
      val rowSub = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
-@@ -138,7 +144,8 @@ internal fun ToolsSurfaceCard(
+@@ -138,7 +145,8 @@ internal fun ToolsSurfaceCard(
  
  @Composable
  internal fun ToolsHairline(modifier: Modifier = Modifier) {
@@ -2601,7 +2720,7 @@ index 7e58000..eaec16f 100644
  }
  
  @Composable
-@@ -173,6 +180,12 @@ internal fun ToolsButton(
+@@ -173,6 +181,12 @@ internal fun ToolsButton(
      icon: ImageVector? = null,
      enabled: Boolean = true,
      loading: Boolean = false,
@@ -2614,7 +2733,7 @@ index 7e58000..eaec16f 100644
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
-@@ -180,19 +193,35 @@ internal fun ToolsButton(
+@@ -180,19 +194,35 @@ internal fun ToolsButton(
      val (fill, foreground) = when (kind) {
          HomeButtonKind.Primary -> c.accent to c.onAccent
          HomeButtonKind.Secondary -> c.surface to c.t1
@@ -2656,7 +2775,7 @@ index 7e58000..eaec16f 100644
      }
  }
  
-@@ -229,14 +258,16 @@ internal fun ToolsSheetContent(
+@@ -229,14 +259,16 @@ internal fun ToolsSheetContent(
      onClose: (() -> Unit)? = null,
      trailing: (@Composable RowScope.() -> Unit)? = null,
      footer: (@Composable RowScope.() -> Unit)? = null,
@@ -2675,7 +2794,7 @@ index 7e58000..eaec16f 100644
              Column(Modifier.weight(1f)) {
                  Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
                  if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
-@@ -259,17 +290,54 @@ internal fun <T> ToolsSegmented(
+@@ -259,17 +291,55 @@ internal fun <T> ToolsSegmented(
      onSelect: (T) -> Unit,
      modifier: Modifier = Modifier,
      enabled: Boolean = true,
@@ -2684,6 +2803,7 @@ index 7e58000..eaec16f 100644
 +    referenceOuterPadding: Dp? = null,
 +    referenceVisualHeight: Dp? = null,
 +    referenceTouchHeight: Dp? = null,
++    referenceSegmentShape: Shape? = null,
  ) {
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
@@ -2705,7 +2825,7 @@ index 7e58000..eaec16f 100644
 +                Modifier.weight(1f).heightIn(min = 44.dp)
 +                    .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
 +                    .padding(vertical = inset)
-+                    .clip(ToolsDesignDims.segmentShape)
++                    .clip(referenceSegmentShape ?: ToolsDesignDims.segmentShape)
 +                    .background(if (selected == key) c.accentSoft else Color.Transparent)
 +                    .padding(vertical = 9.dp - inset)
              }

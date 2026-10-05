@@ -1152,6 +1152,15 @@ internal fun HxChoiceSheet(
     presentation: HxChoicePresentation = HxChoicePresentation.Standard,
     menuWidthOverride: Dp? = null,
     maxVisibleChoices: Int? = null,
+    menuItemVerticalPadding: Dp? = null,
+    menuItemMinimumHeight: Dp? = null,
+    menuItemFontSizeSp: Float? = null,
+    menuAnchorEndInset: Dp? = null,
+    menuContentTopPadding: Dp? = null,
+    menuContentBottomPadding: Dp? = null,
+    menuRowPresentation: HxChoicePresentation? = null,
+    menuDividers: Boolean? = null,
+    menuSelectedHorizontalPadding: Dp? = null,
 ) {
     val c = Hx.colors
     val haptics = rememberHetuHaptics()
@@ -1166,7 +1175,34 @@ internal fun HxChoiceSheet(
             HxChoicePresentation.Notification -> 148.dp
             else -> if (trailingReferenceRadios) 200.dp else if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
         }
-        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth) { close ->
+        val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&
+            (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||
+                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)
+        val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)
+        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,
+            anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,
+            verticalPadding = if (scopedOuterPadding) 0.dp else 6.dp) { close ->
+            @Composable fun notificationMenuItem(choice: HxChoice) {
+                @Composable fun item() {
+                    HxMenuItem(
+                        choice.label,
+                        onClick = { close { onPick(choice.id) } },
+                        description = choice.description,
+                        selected = choice.id == selected,
+                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
+                        enabled = choice.enabled,
+                        choicePresentation = menuRowPresentation ?: presentation,
+                        compact = menuItemVerticalPadding != null,
+                        compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,
+                        minimumHeight = menuItemMinimumHeight ?: 0.dp,
+                        labelFontSizeSp = menuItemFontSizeSp,
+                    )
+                }
+                if (menuSelectedHorizontalPadding != null && choice.id == selected) {
+                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }
+                } else item()
+            }
+            if (scopedOuterPadding) Spacer(Modifier.height(menuContentTopPadding ?: 6.dp))
             if (referenceRadios) {
                 Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     textAlign = if (trailingReferenceRadios) TextAlign.Start else TextAlign.Center, fontSize = if (trailingReferenceRadios) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = c.text)
@@ -1194,7 +1230,7 @@ internal fun HxChoiceSheet(
                 val density = LocalDensity.current
                 var visibleRowsHeight by remember(maxVisibleChoices, choices) { mutableStateOf<Int?>(null) }
                 @Composable fun choiceRow(index: Int, choice: HxChoice) {
-                HxMenuItem(
+                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
                     choice.label,
                     onClick = { close { onPick(choice.id) } },
                     description = choice.description,
@@ -1203,6 +1239,7 @@ internal fun HxChoiceSheet(
                     enabled = choice.enabled,
                     choicePresentation = presentation,
                 )
+                if (!scopedNotification || menuDividers != false)
                 if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
                 }
                 Column(Modifier.fillMaxWidth().heightIn(max = visibleRowsHeight?.let { with(density) { it.toDp() } } ?: (maxVisibleChoices * 48.5f).dp).verticalScroll(rememberScrollState())) {
@@ -1212,7 +1249,7 @@ internal fun HxChoiceSheet(
                     choices.drop(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index + maxVisibleChoices, choice) }
                 }
             } else choices.forEachIndexed { index, choice ->
-                HxMenuItem(
+                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
                     choice.label,
                     onClick = { close { onPick(choice.id) } },
                     description = choice.description,
@@ -1221,11 +1258,13 @@ internal fun HxChoiceSheet(
                     enabled = choice.enabled,
                     choicePresentation = presentation,
                 )
+                if (!scopedNotification || menuDividers != false)
                 if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
             }
             if (!footer.isNullOrBlank()) {
                 Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
             }
+            if (scopedOuterPadding) Spacer(Modifier.height(menuContentBottomPadding ?: 6.dp))
         }
         return
     }

@@ -23,6 +23,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -295,6 +296,7 @@ internal fun <T> ToolsSegmented(
     referenceOuterPadding: Dp? = null,
     referenceVisualHeight: Dp? = null,
     referenceTouchHeight: Dp? = null,
+    referenceSegmentShape: Shape? = null,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -312,7 +314,7 @@ internal fun <T> ToolsSegmented(
                 Modifier.weight(1f).heightIn(min = 44.dp)
                     .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
                     .padding(vertical = inset)
-                    .clip(ToolsDesignDims.segmentShape)
+                    .clip(referenceSegmentShape ?: ToolsDesignDims.segmentShape)
                     .background(if (selected == key) c.accentSoft else Color.Transparent)
                     .padding(vertical = 9.dp - inset)
             }

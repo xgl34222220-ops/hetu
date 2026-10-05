@@ -63,6 +63,8 @@ def validate_shared_page(before,after):
     expected=expected.replace('    flatCanvas: Boolean = false,\n    referenceLabel:','    flatCanvas: Boolean = false,\n    referenceTopBar: Boolean = false,\n    referenceLabel:',1)
     expected=expected.replace('style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = FontWeight.SemiBold),','style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = if (referenceTopBar) FontWeight.Bold else FontWeight.SemiBold),',1)
     expected=expected.replace('Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)','Icon(if (referenceTopBar) io.github.xgl34222220.hetu.home.HomeIcons.ChevronLeft else Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)',1)
+    from pdf85_notification_menu_scope import apply_notification_menu_presentation
+    expected = apply_notification_menu_presentation(expected)
     assert after==expected, 'Shared page changes must be opt-in only; default home/panel path frozen'
 
 
