@@ -393,13 +393,32 @@ def capture_panel_when(labels,name,counts=None):
   time.sleep(1)
  raise AssertionError(('Native panel state did not become visible',name,labels,counts,last))
 
-def tap_panel_retry(root):
+def panel_retry_control(root):
  parents={child:parent for parent in root.iter() for child in parent}
  matches=[n for n in root.iter('node') if n.get('text')=='重试' or n.get('content-desc')=='重试']
  assert len(matches)==1,('Expected one real native retry control',len(matches))
  node=matches[0]
  while node.get('clickable')!='true' and node in parents:node=parents[node]
- assert node.get('clickable')=='true' and node.get('enabled')=='true',node.attrib
+ assert node.get('clickable')=='true',node.attrib
+ return node
+
+def wait_panel_retry_ready(root,timeout=30):
+ # Foreground polls can retain the401 message while disabling retry in flight.
+ # Only wait for a fresh real enabled control while the fixture remains401.
+ # Missing/ambiguous controls, WebView or an invented overview still fail.
+ deadline=time.monotonic()+timeout
+ while True:
+  assert_panel_read_failure(root)
+  node=panel_retry_control(root)
+  if node.get('enabled')=='true':return root
+  assert node.get('enabled')=='false',node.attrib
+  assert time.monotonic()<deadline,('Native panel retry stayed disabled',node.attrib)
+  time.sleep(.25)
+  root,_=ui()
+
+def tap_panel_retry(root):
+ node=panel_retry_control(root)
+ assert node.get('enabled')=='true',node.attrib
  x1,y1,x2,y2=map(int,re.findall(r'\d+',node.get('bounds','')))
  assert x2>x1 and y2>y1,node.attrib
  tapped=time.monotonic()
@@ -442,12 +461,14 @@ def panel_controller_auth_cases(component):
      adb('shell','input','keyevent','4');time.sleep(1)
      root=capture_panel_when(['无法读取面板','HTTP 401'],'panel-controller-401-api-return')
      assert_panel_read_failure(root)
-     denied_tap=tap_panel_retry(root)
+     denied_tap=tap_panel_retry(wait_panel_retry_ready(root))
      report['retryWhile401']=denied_tap
      root=capture_panel_when(['无法读取面板','HTTP 401'],'panel-controller-401-retry')
      assert_panel_read_failure(root)
      assert any(r.get('status')==401 and r.get('timeMonotonic',0)>=denied_tap['timeMonotonic'] for r in requests),'No actual HTTP401 request after native retry input'
      checks.append({'name':'panel-controller-401-retry','result':'passed','evidence':'native retry input while fixture remained401; subsequent HTTP401 and explicit error UI'})
+     root=wait_panel_retry_ready(root)
+     report['retryReadyBeforeFixture200']={'observedAtMonotonic':time.monotonic(),'enabled':True,'source':'fresh native XML while fixture remained401'}
      report['fixture200AtMonotonic']=time.monotonic();mode.set_status(200)
      # Send retry using bounds from the just-captured real error state. A2s
      # foreground poll may win this race; record timing and never claim that

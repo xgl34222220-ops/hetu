@@ -114,6 +114,22 @@ class PanelAuthSmokeTests(unittest.TestCase):
   with patch.object(self.module,'adb') as adb:
    with self.assertRaises(AssertionError):self.module.tap_panel_retry(root)
    adb.assert_not_called()
+ def test_retry_readiness_waits_for_native_enabled_state_without_input(self):
+  disabled=self.failure();disabled[-1].set('enabled','false');ready=self.failure()
+  with patch.object(self.module,'ui',return_value=(ready,'')) as ui,patch.object(self.module.time,'sleep') as sleep,patch.object(self.module,'adb') as adb:
+   self.assertIs(ready,self.module.wait_panel_retry_ready(disabled))
+  ui.assert_called_once();sleep.assert_called_once_with(.25);adb.assert_not_called()
+ def test_disabled_retry_timeout_never_taps_or_fabricates_success(self):
+  disabled=self.failure();disabled[-1].set('enabled','false')
+  with patch.object(self.module.time,'monotonic',side_effect=[10,12]),patch.object(self.module,'adb') as adb,patch.object(self.module,'ui') as ui:
+   with self.assertRaisesRegex(AssertionError,'stayed disabled'):self.module.wait_panel_retry_ready(disabled,timeout=1)
+  adb.assert_not_called();ui.assert_not_called();self.assertEqual([],self.module.checks)
+ def test_retry_readiness_never_accepts_overview_or_webview_as401(self):
+  for root in [self.overview(),self.failure()]:
+   if '运行概况' not in self.module.panel_labels(root):root.append(self.node('',**{'class':'android.webkit.WebView'}))
+   with patch.object(self.module,'adb') as adb:
+    with self.assertRaises(AssertionError):self.module.wait_panel_retry_ready(root)
+    adb.assert_not_called()
  def test_scenario_failure_restores_preferences_and_removes_only_owned_reverse(self):
   stored=[self.original];reverses=['emulator-5554 tcp:29999 tcp:49999'];calls=[]
   def adb(*args,**kwargs):

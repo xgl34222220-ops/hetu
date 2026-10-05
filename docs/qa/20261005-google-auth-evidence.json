@@ -1,0 +1,98 @@
+{
+  "observedAtUtc": "2026-10-05",
+  "currentRootCause": "not-established",
+  "realDeviceFix": "not-verified",
+  "screenshot": {
+    "filename": "197434.jpg",
+    "sha256": "7a3712651f1db9b872879672cf60cb7d2f5d3e4dc480f89c20defc8d4d944428",
+    "actuallyOpened": true,
+    "text": "需要进行身份验证。您需要登录自己的 Google 帐号。",
+    "retryAndHotAirBalloon": true,
+    "captcha": false
+  },
+  "historicalEvidence": {
+    "source": "2026-10-03 user diagnostic message recovered from prior conversation; cross-checked AGENTS.md, docs/V20.75_THEME_COMPAT.md and docs/V20.76_SESSION_FILTER.md",
+    "sameTimeAsCurrentScreenshot": false,
+    "appVersionCode": 2074,
+    "rootVersion": 149,
+    "sessionFault": "session-manifest-missing",
+    "dataPlaneHealthy": false,
+    "googleFirewall": {
+      "checked": 6,
+      "removed": 0,
+      "failed": 0
+    },
+    "dns": {
+      "mode": "tproxy",
+      "port": 11053,
+      "ipv6": "disable",
+      "ipv6DnsPolicy": "blocked-no-nat",
+      "resolvedAnswers": "not-recovered"
+    },
+    "directUids": [
+      10696
+    ],
+    "connections": [
+      {
+        "uid": 10121,
+        "host": "people-pa.googleapis.com",
+        "destinationPort": 443,
+        "rule": "RuleSet/Google",
+        "redactedChain": [
+          "exit A",
+          "节点选择",
+          "Google"
+        ],
+        "upload": 5929,
+        "download": 3458,
+        "start": "2026-10-03T22:47:12.88678896+08:00"
+      },
+      {
+        "host": "mtalk.google.com",
+        "destinationPort": 5228,
+        "rule": "DomainKeyword/mtalk.google",
+        "redactedChain": [
+          "exit B",
+          "故障转移"
+        ],
+        "upload": 2417,
+        "download": 9855,
+        "start": "truncated in source; not reconstructed"
+      }
+    ]
+  },
+  "sourceEvidence": {
+    "applicationCommit": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
+    "selfUidBypass": "RootProxyPolicy.load adds own application UID to directUidRanges; hetu-root.sh applies owner RETURN for direct UID",
+    "siteLatency": "ProxyDashboardRepository.measureSiteLatency issues own-process URL.openConnection GET; HTTP200..499 are accepted as latency samples, not Google account authentication",
+    "currentChanges": "Only bounded connection metadata classification/quota; no new Root/controller requests, DNS/routing changes, credentials/cookies/tokens, hooks or permissions"
+  },
+  "proved": [
+    "Some historical GMS connections reached the core and had bidirectional counters",
+    "Historical Google services used different rule/chain selections",
+    "Own-process direct probes and GMS proxy connections are different paths"
+  ],
+  "notProved": [
+    "Current Google account authentication success",
+    "Node fault as the root cause",
+    "DNS answer correctness at failure time",
+    "Same-time comparison against the working alternative proxy",
+    "Current persistence of historical Root149 session defect"
+  ],
+  "isolatedTests": {
+    "classifierTests": 8,
+    "passedInRuns": [
+      37292555012,
+      37293354486
+    ],
+    "googleFirewallMockTests": 17,
+    "controller401to200": "Different service: Mihomo controller loopback fixture; not Google authentication",
+    "aospGoogleAccount": "No user account or actual GMS authentication in AOSP fixture"
+  },
+  "neededExistingEvidence": [
+    "Fault-time Hetu diagnostic connection metadata and DNS/core logs",
+    "Same-time connection/DNS/rule/chain evidence from the working alternative proxy",
+    "Existing Google/GMS authentication error record with credentials and tokens removed"
+  ],
+  "deviceActions": []
+}
