@@ -1,0 +1,98 @@
+<?xml version='1.0' encoding='utf-8'?>
+<hierarchy rotation="0">
+  <node class="android.widget.FrameLayout" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+    <node class="android.widget.FrameLayout" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+      <node class="android.widget.FrameLayout" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+        <node class="androidx.compose.ui.platform.ComposeView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+            <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+              <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+                <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+                  <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+                    <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,0][394,852]">
+                      <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="true" bounds="[0,0][394,852]">
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[26,102][380,154]">
+                          <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[26,102][99,154]" />
+                        </node>
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,176][380,332]">
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,176][380,254]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,192][192,218]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,218][226,238]" />
+                          </node>
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,254][380,332]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,270][192,296]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,296][229,316]" />
+                          </node>
+                        </node>
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,354][380,510]">
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,354][380,432]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,370][173,396]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,396][226,416]" />
+                          </node>
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,432][380,510]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,448][155,474]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,474][211,494]" />
+                          </node>
+                        </node>
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,532][380,766]">
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,532][380,610]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,548][173,574]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,574][211,594]" />
+                          </node>
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,610][380,688]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,626][210,652]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,652][211,672]" />
+                          </node>
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,688][380,766]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,704][155,730]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,730][197,736]" />
+                          </node>
+                        </node>
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,788][380,852]">
+                          <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[14,788][380,852]">
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,804][118,830]" />
+                            <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[80,830][182,850]" />
+                          </node>
+                        </node>
+                      </node>
+                    </node>
+                  </node>
+                  <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[24,732][370,796]">
+                    <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[24,732][370,796]" />
+                    <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[28,736][366,792]">
+                      <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[28,736][112,792]">
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[28,736][112,792]" content-desc="首页" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[43,728][97,782]" />
+                        <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[57,770][83,788]" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[28,736][112,792]" />
+                      </node>
+                      <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[112,736][196,792]">
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[112,736][196,792]" content-desc="面板" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[130,731][178,779]" />
+                        <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[141,770][167,788]" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[112,736][196,792]" />
+                      </node>
+                      <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[196,736][281,792]">
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[196,736][281,792]" content-desc="工具" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[215,731][263,779]" />
+                        <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[226,770][252,788]" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[196,736][281,792]" />
+                      </node>
+                      <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[281,736][366,792]">
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[281,736][366,792]" content-desc="设置" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[300,731][348,779]" />
+                        <node class="android.widget.TextView" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[311,770][337,788]" />
+                        <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[281,736][366,792]" />
+                      </node>
+                    </node>
+                  </node>
+                </node>
+              </node>
+            </node>
+          </node>
+        </node>
+      </node>
+    </node>
+    <node class="android.view.View" package="io.github.xgl34222220.hetu" enabled="true" scrollable="false" bounds="[0,804][394,852]" />
+  </node>
+</hierarchy>

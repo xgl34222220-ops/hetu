@@ -1,0 +1,750 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2066
+-        versionName = "0.11.6-v20"
++        versionCode = 2067
++        versionName = "0.11.7-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+@@ -222,7 +222,12 @@
+             val keys = raw.keys()
+             while (keys.hasNext()) {
+                 val name = keys.next()
+-                put(name, raw.optLong(name, -1L))
++                // JSONObject.optLong coerces malformed/missing values to a false timeout.
++                // The core contract is an integer measurement, including explicit 0 / -1.
++                when (val value = raw.opt(name)) {
++                    is Int -> put(name, value.toLong())
++                    is Long -> put(name, value)
++                }
+             }
+         }
+     }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -297,10 +297,16 @@
+         wanState = "stale",
+     )
+ 
+-    suspend fun refreshNow() {
++    /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
++    suspend fun refreshNow(): ProxyComposeState? {
++        var expectedState = state
++        val operationBefore = operation
++        fun superseded() = state !== expectedState || operation != operationBefore
+         try {
+             val startedAt = SystemClock.elapsedRealtime()
+             val next = repo.state()
++            // A later stop/config/state update owns the UI. The next fresh poll can still apply.
++            if (superseded()) return null
+             val now = SystemClock.elapsedRealtime()
+             val totalTx = TrafficStats.getTotalTxBytes()
+             val totalRx = TrafficStats.getTotalRxBytes()
+@@ -320,7 +326,7 @@
+                 lastLocalAt = now
+             }
+             // Right after process start a recovering core may briefly look stopped.
+-            if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return
++            if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return null
+ 
+             if (next.panelReady && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
+                 val elapsed = now - lastAt
+@@ -343,6 +349,7 @@
+             val sampled = if (next.running) {
+                 try { inspector.sample() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { sampleValid = false; runtime }
+             } else ProxyRuntimeSnapshot()
++            if (superseded()) return null
+             val sameProcess = sampled.pid > 0 && sampled.pid == runtime.pid
+             val cpuAvailable = sampleValid && sameProcess && lastSystemTicks > 0L && sampled.systemTicks > lastSystemTicks && sampled.processTicks >= lastProcessTicks
+             if (cpuAvailable) {
+@@ -370,16 +377,23 @@
+                 coreVersion = ""
+             } else {
+                 if (providers.isEmpty() || now - lastProviderRefreshAt > 30_000L) {
++                    val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
++                    if (superseded()) return null
+                     lastProviderRefreshAt = now
+-                    val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+                     if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
+                 }
+-                if (coreVersion.isBlank()) coreVersion = repo.coreVersion()
+-            }
+-
++                if (coreVersion.isBlank()) {
++                    val freshVersion = repo.coreVersion()
++                    if (superseded()) return null
++                    coreVersion = freshVersion
++                }
++            }
++
++            if (superseded()) return null
+             state = if (next.running && !next.panelReady) {
+                 next.copy(groups = state.groups, connections = state.connections)
+             } else next
++            expectedState = state
+             if (next.running) startupError = null
+             if (next.panelReady) {
+                 lastAt = now
+@@ -387,13 +401,16 @@
+                 lastDown = next.downloadTotal
+                 // Opt-in local traffic/connection history (「测速与 API」→ 历史采集).
+                 try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
++                if (superseded()) return null
+             }
+             loadedOnce = true
+             persistSnapshot(next, sampled)
++            return next
+         } catch (cancel: CancellationException) {
+             throw cancel
+         } catch (_: Exception) {
+             // Polling errors are shown through state.message on the next good read.
++            return null
+         }
+     }
+ 
+@@ -562,12 +579,23 @@
+     /* ---------------- proxies ---------------- */
+ 
+     fun select(group: String, node: String) {
+-        if (pendingSelection.containsKey(group)) return
++        if (!state.running || operation != null || pendingSelection.containsKey(group)) return
++        val current = state.groups.firstOrNull { it.name == group } ?: return
++        if (current.now == node || current.nodes.none { it.name == node }) return
+         pendingSelection[group] = node
+         viewModelScope.launch {
+             try {
++                // A stale callback can outlive its screen or race with a stop/config refresh.
++                if (!state.running || operation != null ||
++                    state.groups.none { it.name == group && it.nodes.any { candidate -> candidate.name == node } }) return@launch
+                 repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false))
+-                refreshNow()
++                // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
++                if (!state.running || operation != null) return@launch
++                val fresh = refreshNow()
++                if (!state.running || operation != null) return@launch
++                val actual = fresh?.takeIf { it.running && it.panelReady }
++                    ?.groups?.firstOrNull { it.name == group }?.now
++                check(actual == node) { "核心尚未确认所选节点，当前为 ${actual.orEmpty().ifBlank { "未知" }}" }
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+@@ -614,8 +642,11 @@
+                 val result = repo.groupDelay(group.name)
+                 val stamp = SystemClock.elapsedRealtime()
+                 targets.forEach { node ->
+-                    delays[node] = result[node] ?: -1L
+-                    measuredAt[node] = stamp
++                    // Missing/invalid entries are not authoritative timeouts. Keep old readings.
++                    result[node]?.let { delay ->
++                        delays[node] = delay
++                        measuredAt[node] = stamp
++                    }
+                 }
+             } catch (cancel: CancellationException) {
+                 throw cancel
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+@@ -159,6 +159,9 @@
+     val groupColumns = if (forceSingleColumn) 1 else options.groupColumns.coerceIn(1, 2)
+     val nodeColumns = if (forceSingleColumn) 1 else options.columns.coerceIn(1, 2)
+ 
++    // Filtering selects visible groups/nodes, never the authoritative group stats
++    // or the target set for a whole-group latency action.
++    val groupsByName = state.groups.associateBy { it.name }
+     val visibleGroups = panelGroups11(state.groups, query, state.trafficMode, options)
+     val expanded = visibleGroups.firstOrNull { it.name == activeExpandedName && it.name in expandedNames }
+         ?: visibleGroups.lastOrNull { it.name in expandedNames }
+@@ -170,9 +173,9 @@
+             add(PxGroupRow(row))
+             row.filter { it.name in expandedNames }.forEach { expanded ->
+                 val ordered = projectStrategyNodes(expanded.nodes, options.sort, options.descending, vm.delays)
+-                val q = query.trim()
+-                val nodes = if (q.isBlank() || expanded.name.contains(q, true)) ordered else ordered.filter {
+-                    it.name.contains(q, true) || it.provider.contains(q, true) || it.type.contains(q, true)
++                val terms = query.trim().split(Regex("\\s+")).filter(String::isNotEmpty)
++                val nodes = if (terms.isEmpty() || terms.all { expanded.name.contains(it, true) }) ordered else ordered.filter { node ->
++                    terms.all { term -> node.name.contains(term, true) || node.provider.contains(term, true) || node.type.contains(term, true) }
+                 }
+                 add(PxPanelHead(expanded, nodes.size))
+                 val sections = if (options.providers) nodes.groupBy { it.provider.ifBlank { "配置内节点" } }
+@@ -319,7 +322,7 @@
+                         entry.groups.forEach { group ->
+                             StrategyGroupCard(
+                                 vm = vm,
+-                                group = group,
++                                group = groupsByName[group.name] ?: group,
+                                 expanded = group.name in expandedNames,
+                                 compact = options.groupCompact,
+                                 nameOverflow = options.nameOverflow,
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+@@ -331,6 +331,31 @@
+         click("关闭")
+         click("搜索"); replace(0, "香港"); capture("02-019-search")
+     }
++    @Test fun strategySearchKeepsActualGroupCountsAndCurrentNode() {
++        runningFixture()
++        fixture("state", vm.state.copy(groups = vm.state.groups.take(1)))
++        vm.openPanel("proxies")
++        show { HetuRoot(vm) }
++        expect("URLTest  6/8")
++        click("搜索"); replace(0, "日本 01")
++        expect("URLTest  6/8")
++        expect("香港 01")
++        rule.runOnUiThread {
++            assertEquals(8, vm.state.groups.first().nodes.size)
++            assertEquals("香港 01", vm.state.groups.first().now)
++        }
++    }
++    @Test fun strategyMultiTermSearchKeepsMatchingNodeRows() {
++        runningFixture()
++        fixture("state", vm.state.copy(groups = vm.state.groups.take(1)))
++        vm.openPanel("proxies"); show { HetuRoot(vm) }
++        click("节点选择"); expect("日本 01"); expect("日本 02")
++        click("搜索"); replace(0, "日本 VLESS")
++        expect("日本 01"); expect("日本 02")
++        rule.runOnUiThread { assertFalse(exists("香港 02")) }
++        replace(0, "")
++        expect("香港 02")
++    }
+     @Test fun strategyFilterAndApiDraft() {
+         runningFixture(); vm.openPanel("proxies")
+         show { HetuRoot(vm) }
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
+@@ -0,0 +1,62 @@
++package io.github.xgl34222220.hetu;
++
++import android.content.Context;
++import kotlin.coroutines.Continuation;
++import org.json.JSONObject;
++import org.robolectric.annotation.Implementation;
++import org.robolectric.annotation.Implements;
++import org.robolectric.annotation.Resetter;
++
++/** Test-only runtime boundaries. Actual controller requests use loopback MockWebServer. */
++public final class PanelActionRuntimeShadows {
++    @Implements(value = RootProxyManager.class, isInAndroidSdk = false)
++    public static class RootStatus {
++        @Implementation public JSONObject status() throws Exception {
++            return new JSONObject().put("running", true).put("dataPlaneHealthy", true);
++        }
++    }
++
++    @Implements(value = ProxyRuntimeInspector.class, isInAndroidSdk = false)
++    public static class RuntimeSample {
++        public static ProxyRuntimeSnapshot value = new ProxyRuntimeSnapshot();
++        public static boolean pause;
++        public static Continuation<? super ProxyRuntimeSnapshot> pending;
++        @Resetter public static void reset() { value = new ProxyRuntimeSnapshot(); pause = false; pending = null; }
++        @Implementation public Object sample(Continuation<? super ProxyRuntimeSnapshot> done) {
++            if (pause) { pending = done; return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED(); }
++            return value;
++        }
++        public static void release() {
++            Continuation<? super ProxyRuntimeSnapshot> done = pending;
++            pending = null;
++            if (done != null) done.resumeWith(value);
++        }
++    }
++
++    @Implements(value = ProxyApiHistoryStore.class, isInAndroidSdk = false)
++    public static class HistoryRecord {
++        public static boolean pause;
++        public static Continuation<? super kotlin.Unit> pending;
++        @Resetter public static void reset() { pause = false; pending = null; }
++        @Implementation public Object record(Context app, long upload, long download,
++                java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {
++            if (pause) { pending = done; return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED(); }
++            return kotlin.Unit.INSTANCE;
++        }
++        public static void release() {
++            Continuation<? super kotlin.Unit> done = pending;
++            pending = null;
++            if (done != null) done.resumeWith(kotlin.Unit.INSTANCE);
++        }
++    }
++
++    @Implements(value = RootBridge.class, isInAndroidSdk = false)
++    public static class NoRoot {
++        public static int calls;
++        @Resetter public static void reset() { calls = 0; }
++        @Implementation public static RootBridge.Result rootShell(Context app, String command, long timeout) {
++            calls++;
++            throw new SecurityException("Root commands are forbidden in panel action fixtures");
++        }
++    }
++}
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+@@ -0,0 +1,463 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.os.Looper
++import androidx.compose.runtime.MutableState
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import okhttp3.mockwebserver.SocketPolicy
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++
++/** Current ViewModel, repository and HTTP client; no Root, live core, or external network. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    PanelActionRuntimeShadows.RootStatus::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class PanelActionSafetyTest {
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private val requests = Collections.synchronizedList(mutableListOf<RecordedRequest>())
++    private val gates = mutableListOf<CountDownLatch>()
++    private val messages = mutableListOf<String>()
++    private lateinit var collector: CoroutineScope
++    private val group = ProxyGroupUi("SELECT", "Selector", "old", listOf(
++        ProxyNodeUi("old"), ProxyNodeUi("new"), ProxyNodeUi("untested"), ProxyNodeUi("DIRECT"),
++    ))
++    @Volatile private var response: (RecordedRequest) -> MockResponse = { MockResponse().setResponseCode(404) }
++
++    @Before fun prepare() {
++        requests.clear()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    requests += request
++                    return response(request)
++                }
++            }
++            start()
++        }
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putBoolean("proxyCustomApiEnabled", true)
++            .putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port)
++            .putBoolean("proxyApiHistoryEnabled", false)
++            .commit()
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77, rssBytes = 2048L, elapsedSeconds = 123L)
++        vm = HetuViewModel(app)
++        fixtureState(ProxyComposeState(running = true, panelReady = true, groups = listOf(group)))
++        vm.delays["old"] = 44L
++        vm.delays["new"] = 65L
++        collector = CoroutineScope(Dispatchers.Main.immediate)
++        collector.launch { vm.messages.collect { messages += it } }
++        shadowOf(Looper.getMainLooper()).idle()
++    }
++
++    @After fun finish() {
++        vm.viewModelScope.cancel()
++        gates.forEach { it.countDown() }
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        eventually("All action flags clear after scope cancellation") {
++            vm.pendingSelection.isEmpty() && vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty()
++        }
++        collector.cancel()
++        server.shutdown()
++        assertEquals("Fixture must never call Root", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    private fun fixture(name: String, value: Any?) {
++        val field = HetuViewModel::class.java.getDeclaredField(name + "\$delegate").apply { isAccessible = true }
++        (field.get(vm) as MutableState<Any?>).value = value
++    }
++    private fun fixtureState(state: ProxyComposeState) = fixture("state", state)
++    private fun stoppedFixture() {
++        fixtureState(vm.state.copy(running = false))
++        fixture("runtime", ProxyRuntimeSnapshot())
++        fixture("providers", emptyList<DashboardProviderUi>())
++        fixture("coreVersion", "")
++        vm.prefs.edit().putBoolean("proxyUiLastRunning", false)
++            .putLong("proxyUiLastRss", 0L).putLong("proxyUiLastElapsed", 0L).commit()
++    }
++    private fun assertStoppedSnapshot() {
++        assertFalse(vm.state.running)
++        assertFalse(vm.runtime.running)
++        assertEquals(0L, vm.runtime.rssBytes)
++        assertEquals(0L, vm.runtime.elapsedSeconds)
++        assertTrue(vm.providers.isEmpty())
++        assertEquals("", vm.coreVersion)
++        assertFalse(vm.prefs.getBoolean("proxyUiLastRunning", true))
++        assertEquals(0L, vm.prefs.getLong("proxyUiLastRss", -1L))
++        assertEquals(0L, vm.prefs.getLong("proxyUiLastElapsed", -1L))
++    }
++
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue(reason, predicate())
++    }
++
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun CountDownLatch.hold() { check(await(6, TimeUnit.SECONDS)) { "Fixture gate not released" } }
++    private fun body(value: String) = MockResponse().setBody(value)
++    private fun requestSnapshot() = synchronized(requests) { requests.toList() }
++    private fun selectionSnapshot(now: String = "new", includeGroup: Boolean = true): String {
++        val proxies = JSONObject()
++        if (includeGroup) proxies.put("SELECT", JSONObject()
++            .put("type", "Selector").put("now", now).put("all", org.json.JSONArray(listOf("old", "new", "untested"))))
++        for (name in listOf("old", "new", "untested")) proxies.put(name, JSONObject().put("type", "Shadowsocks"))
++        return JSONObject().put("proxies", proxies).toString()
++    }
++    private fun selectionResponses(
++        now: String = "new", includeGroup: Boolean = true, putCode: Int = 204,
++        putGate: CountDownLatch? = null, readGate: CountDownLatch? = null, readCode: Int = 200, connectionCode: Int = 200,
++        providerGate: CountDownLatch? = null, versionGate: CountDownLatch? = null,
++    ) {
++        val providerReads = java.util.concurrent.atomic.AtomicInteger()
++        response = { req -> when {
++            req.method == "PUT" && req.path == "/proxies/SELECT" -> {
++                putGate?.hold()
++                MockResponse().setResponseCode(putCode).apply { if (putCode != 204) setBody("rejected by fixture") }
++            }
++            req.path == "/proxies" -> {
++                readGate?.hold()
++                body(selectionSnapshot(now, includeGroup)).setResponseCode(readCode)
++            }
++            req.path == "/providers/proxies" -> {
++                if (providerGate != null && providerReads.incrementAndGet() > 1) {
++                    providerGate.hold()
++                    body("""{"providers":{"late":{"vehicleType":"HTTP","proxies":["old","new"]}}}""")
++                } else body("{\"providers\":{}}")
++            }
++            req.path == "/connections" -> body("{\"connections\":[]}").setResponseCode(connectionCode)
++            req.path == "/configs" -> body("{\"mode\":\"rule\"}")
++            req.path == "/version" -> { versionGate?.hold(); body("{\"version\":\"fixture\"}") }
++            else -> MockResponse().setResponseCode(404)
++        } }
++    }
++    private fun awaitSelection() = eventually("Selection pending flag cleared") { vm.pendingSelection.isEmpty() }
++    private fun awaitGroup() = eventually("Probe busy flags cleared") { vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty() }
++    private fun assertNonconfirmation() {
++        eventually("Missing acknowledgement must report failure") { messages.any { it.contains("核心尚未确认") } }
++        assertFalse(vm.state.groups.any { it.name == "SELECT" && it.now == "new" })
++    }
++
++    @Test fun completeGroupResultUsesCoreEndpointWithoutChangingSelection() {
++        response = { body("""{"old":81,"new":0,"untested":-1,"outside":12}""") }
++        vm.testGroup(group)
++        assertTrue(vm.testingGroups["SELECT"] == true)
++        awaitGroup()
++        assertEquals(mapOf("old" to 81L, "new" to 0L, "untested" to -1L), vm.delays.toMap())
++        assertEquals("old", vm.state.groups.single().now)
++        assertTrue(vm.pendingSelection.isEmpty())
++        val request = requestSnapshot().single()
++        assertEquals("GET", request.method)
++        assertEquals(listOf("group", "SELECT", "delay"), request.requestUrl!!.pathSegments)
++        assertEquals("5000", request.requestUrl!!.queryParameter("timeout"))
++        assertFalse(vm.delays.containsKey("DIRECT"))
++    }
++
++    @Test fun partialGroupResultPreservesMissingMeasurementsAndUnknownNodes() {
++        response = { body("""{"old":81}""") }
++        vm.testGroup(group)
++        awaitGroup()
++        assertEquals(81L, vm.delays["old"])
++        assertEquals(65L, vm.delays["new"])
++        assertFalse("Missing entry must remain unknown", vm.delays.containsKey("untested"))
++    }
++
++    @Test fun malformedGroupEntriesCannotBecomeTimeouts() {
++        response = { body("""{"old":null,"new":"timeout","untested":{"delay":12}}""") }
++        vm.testGroup(group)
++        awaitGroup()
++        assertEquals(mapOf("old" to 44L, "new" to 65L), vm.delays.toMap())
++    }
++
++    @Test fun repositoryRejectsMalformedValuesButKeepsExactIntegersAndExplicitTimeout() {
++        response = { body("""{"positive":123,"zero":0,"timeout":-1,"large":9007199254740993,"text":"53","fraction":1.5,"null":null,"bool":true,"array":[],"object":{}}""") }
++        val values = kotlinx.coroutines.runBlocking { vm.repo.groupDelay("SELECT") }
++        assertEquals(mapOf("positive" to 123L, "zero" to 0L, "timeout" to -1L, "large" to 9007199254740993L), values)
++    }
++
++    @Test fun malformedWholeResponsePreservesMeasurementsAndClearsBusyFlags() {
++        response = { body("not JSON") }
++        vm.testGroup(group)
++        awaitGroup()
++        assertEquals(mapOf("old" to 44L, "new" to 65L), vm.delays.toMap())
++        assertTrue(messages.isNotEmpty())
++    }
++
++    @Test fun failedGroupResponsePreservesMeasurementsAndClearsBusyFlags() {
++        response = { body("controller unavailable").setResponseCode(503) }
++        vm.testGroup(group)
++        awaitGroup()
++        assertEquals(mapOf("old" to 44L, "new" to 65L), vm.delays.toMap())
++        assertTrue(messages.isNotEmpty())
++    }
++
++    @Test fun disconnectedGroupResponsePreservesMeasurementsAndClearsBusyFlags() {
++        response = { MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST) }
++        vm.testGroup(group)
++        awaitGroup()
++        assertEquals(mapOf("old" to 44L, "new" to 65L), vm.delays.toMap())
++    }
++
++    @Test fun cancelledGroupResponseDoesNotApplyLateMeasurementsAndClearsBusyFlags() {
++        val responseGate = gate()
++        response = { responseGate.hold(); body("""{"old":999,"new":888}""") }
++        vm.testGroup(group)
++        eventually("Group HTTP reached fixture") { requests.isNotEmpty() }
++        vm.viewModelScope.cancel()
++        responseGate.countDown()
++        awaitGroup()
++        assertEquals(mapOf("old" to 44L, "new" to 65L), vm.delays.toMap())
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun duplicateGroupProbeIsSuppressed() {
++        val responseGate = gate()
++        response = { responseGate.hold(); body("""{"old":81}""") }
++        vm.testGroup(group)
++        vm.testGroup(group)
++        eventually("First group HTTP reached fixture") { requests.isNotEmpty() }
++        responseGate.countDown()
++        awaitGroup()
++        assertEquals(1, requests.size)
++    }
++
++    @Test fun delayedSelectionWaitsForReadbackAndSurvivesNavigationWithNoDuplicatePut() {
++        val readGate = gate()
++        selectionResponses(readGate = readGate)
++        vm.select("SELECT", "new")
++        vm.select("SELECT", "untested")
++        eventually("Readback started") { requestSnapshot().any { it.path == "/proxies" } }
++        assertEquals("old", vm.state.groups.single().now)
++        assertEquals("new", vm.pendingSelection["SELECT"])
++        vm.tab = HxTab.Home
++        vm.onBackground()
++        vm.openPanel("proxies")
++        assertEquals("new", vm.pendingSelection["SELECT"])
++        readGate.countDown()
++        awaitSelection()
++        assertEquals("new", vm.state.groups.single().now)
++        assertEquals(HxTab.Panel, vm.tab)
++        assertEquals("proxies", vm.panelSection)
++        assertEquals(1, requestSnapshot().count { it.method == "PUT" })
++        assertEquals("new", JSONObject(requestSnapshot().single { it.method == "PUT" }.body.readUtf8()).getString("name"))
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun rejectedSelectionRetainsActualSelectionAndClearsPending() {
++        selectionResponses(putCode = 400)
++        vm.select("SELECT", "new")
++        awaitSelection()
++        assertEquals("old", vm.state.groups.single().now)
++        assertEquals(1, requests.size)
++        assertTrue(messages.any { it.contains("切换失败") })
++    }
++
++    @Test fun unchangedReadbackReportsNonconfirmation() {
++        selectionResponses(now = "old")
++        vm.select("SELECT", "new")
++        awaitSelection()
++        assertNonconfirmation()
++        assertEquals("old", vm.state.groups.single().now)
++    }
++
++    @Test fun mismatchedReadbackUsesActualStateAndReportsNonconfirmation() {
++        selectionResponses(now = "untested")
++        vm.select("SELECT", "new")
++        awaitSelection()
++        assertNonconfirmation()
++        assertEquals("untested", vm.state.groups.single().now)
++    }
++
++    @Test fun removedGroupReadbackDoesNotConfirmSelection() {
++        selectionResponses(includeGroup = false)
++        vm.select("SELECT", "new")
++        awaitSelection()
++        assertNonconfirmation()
++        assertTrue(vm.state.groups.isEmpty())
++    }
++
++    @Test fun failedReadbackDoesNotConfirmSelectionDespiteSuccessfulConnectionRead() {
++        selectionResponses(readCode = 500)
++        vm.select("SELECT", "new")
++        awaitSelection()
++        assertNonconfirmation()
++    }
++
++    @Test fun cancelledSelectionKeepsActualSelectionAndClearsPending() {
++        val putGate = gate()
++        selectionResponses(putGate = putGate)
++        vm.select("SELECT", "new")
++        eventually("Selection PUT reached fixture") { requests.isNotEmpty() }
++        vm.viewModelScope.cancel()
++        putGate.countDown()
++        awaitSelection()
++        assertEquals("old", vm.state.groups.single().now)
++        assertEquals(1, requests.size)
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun stoppedStateRejectsStaleSelectionCallback() {
++        selectionResponses()
++        fixtureState(vm.state.copy(running = false))
++        vm.select("SELECT", "new")
++        assertTrue("Stopped callback must not become pending", vm.pendingSelection.isEmpty())
++        assertEquals(0, requests.size)
++    }
++
++    @Test fun selectionCompletionAfterStopDoesNotRestartReadbackOrRestoreRunningState() {
++        val putGate = gate()
++        selectionResponses(putGate = putGate)
++        vm.select("SELECT", "new")
++        eventually("Selection PUT reached fixture") { requests.isNotEmpty() }
++        fixtureState(vm.state.copy(running = false))
++        putGate.countDown()
++        awaitSelection()
++        assertFalse(vm.state.running)
++        assertEquals("old", vm.state.groups.single().now)
++        assertEquals(1, requests.size)
++    }
++
++    @Test fun removedGroupAndAlreadySelectedNodeDoNotSendNewRequests() {
++        selectionResponses()
++        vm.select("SELECT", "old")
++        assertTrue("Already selected callback must not become pending", vm.pendingSelection.isEmpty())
++        fixtureState(vm.state.copy(groups = emptyList()))
++        vm.select("SELECT", "new")
++        assertTrue("Removed group callback must not become pending", vm.pendingSelection.isEmpty())
++        assertEquals(0, requests.size)
++    }
++    @Test fun stopDuringReadbackDoesNotRestoreStaleRunningSnapshot() {
++        val readGate = gate()
++        selectionResponses(readGate = readGate)
++        vm.select("SELECT", "new")
++        eventually("Selection readback reached fixture") { requestSnapshot().any { it.path == "/proxies" } }
++        stoppedFixture()
++        readGate.countDown()
++        awaitSelection()
++        assertStoppedSnapshot()
++        assertFalse("Stopped state must survive a late running snapshot", vm.state.running)
++        assertEquals("old", vm.state.groups.single().now)
++        assertTrue(messages.isEmpty())
++        val fresh = kotlinx.coroutines.runBlocking { vm.refreshNow() }
++        assertTrue("A subsequent fresh read can observe a real running core", fresh?.running == true)
++        assertTrue(vm.state.running)
++        assertEquals("new", vm.state.groups.single().now)
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    @Test fun stopOperationDuringReadbackCannotApplyOrConfirmSelection() {
++        val readGate = gate()
++        selectionResponses(readGate = readGate)
++        vm.select("SELECT", "new")
++        eventually("Selection readback reached fixture") { requestSnapshot().any { it.path == "/proxies" } }
++        val field = HetuViewModel::class.java.getDeclaredField("operation\$delegate").apply { isAccessible = true }
++        (field.get(vm) as MutableState<HxRunOp?>).value = HxRunOp.Stop
++        readGate.countDown()
++        awaitSelection()
++        assertEquals("old", vm.state.groups.single().now)
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun unreadableControllerCannotConfirmUsingCachedSelection() {
++        val readGate = gate()
++        selectionResponses(readGate = readGate, readCode = 500, connectionCode = 500)
++        vm.select("SELECT", "new")
++        eventually("Selection readback reached fixture") { requestSnapshot().any { it.path == "/proxies" } }
++        fixtureState(vm.state.copy(groups = listOf(group.copy(now = "new"))))
++        readGate.countDown()
++        awaitSelection()
++        assertEquals("Cached display remains available", "new", vm.state.groups.single().now)
++        assertTrue("A superseded response must not replace newer visible state", vm.state.panelReady)
++        assertTrue("Cached group is not a fresh acknowledgement", messages.any { it.contains("核心尚未确认") })
++    }
++
++    @Test fun removedNodeDoesNotSendNewSelectionRequest() {
++        selectionResponses()
++        fixtureState(vm.state.copy(groups = listOf(group.copy(nodes = listOf(ProxyNodeUi("old"))))))
++        vm.select("SELECT", "new")
++        assertTrue(vm.pendingSelection.isEmpty())
++        assertEquals(0, requests.size)
++    }
++
++    @Test fun stopDuringRuntimeSampleCannotWriteLateRuntimeOrPersistedRunning() {
++        PanelActionRuntimeShadows.RuntimeSample.pause = true
++        selectionResponses()
++        vm.select("SELECT", "new")
++        eventually("Runtime sample suspended") { PanelActionRuntimeShadows.RuntimeSample.pending != null }
++        stoppedFixture()
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        awaitSelection()
++        assertStoppedSnapshot()
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun stopDuringProviderReadCannotWriteLateProvidersOrPersistedRunning() {
++        val providerGate = gate()
++        selectionResponses(providerGate = providerGate)
++        vm.select("SELECT", "new")
++        eventually("Fresh provider read started") { requestSnapshot().count { it.path == "/providers/proxies" } == 2 }
++        stoppedFixture()
++        providerGate.countDown()
++        awaitSelection()
++        assertStoppedSnapshot()
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun stopDuringVersionReadCannotWriteLateVersionOrPersistedRunning() {
++        val versionGate = gate()
++        selectionResponses(versionGate = versionGate)
++        vm.select("SELECT", "new")
++        eventually("Version read started") { requestSnapshot().any { it.path == "/version" } }
++        stoppedFixture()
++        versionGate.countDown()
++        awaitSelection()
++        assertStoppedSnapshot()
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun stopDuringHistorySuspensionCannotPersistOldRunningSnapshot() {
++        PanelActionRuntimeShadows.HistoryRecord.pause = true
++        selectionResponses()
++        vm.select("SELECT", "new")
++        eventually("History record suspended") { PanelActionRuntimeShadows.HistoryRecord.pending != null }
++        stoppedFixture()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        awaitSelection()
++        assertStoppedSnapshot()
++        assertTrue(messages.isEmpty())
++    }
++
++}

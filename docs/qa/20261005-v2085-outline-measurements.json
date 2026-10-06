@@ -1,0 +1,385 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-05T14:44:44.027799+00:00",
+  "scope": "PDF03A13 original/reference versus actual7cf native outline sheet presentation measurement and pending source change proof",
+  "status": {
+    "source_candidate": "pending-unbuilt-unrendered",
+    "pixel_1_to_1_acceptance": false,
+    "callback_device_acceptance_for_candidate": false,
+    "ci_started_or_cancelled_by_agent": false,
+    "source_edits_after_first_completion": false,
+    "temporary_measurement_json_only": true
+  },
+  "repo": {
+    "path": "/workspace/scratch/3788973cf567/hetu",
+    "branch": "test/v20.76-new-ui",
+    "head": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "assigned_capture_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "assigned_capture_identity_basis": "Parent task identifies the actual7cf native capture; exact PNG byte hash independently checked against the extracted pdf85 artifact image."
+  },
+  "original_pdf": {
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+    "sha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+    "size_bytes": 9214377,
+    "page_count": 49,
+    "page_1_based": 13,
+    "page_viewport_points": [
+      0.0,
+      0.0,
+      425.0,
+      950.0
+    ],
+    "embedded_image_xref": 29,
+    "embedded_image_encoding": "DCTDecode JPEG",
+    "embedded_image_dimensions_px": [
+      850,
+      1850
+    ],
+    "embedded_image_sha256": "2d838e799703c43692622392514cfc993cb14d63cd9e14bdbf272ba194f53005",
+    "embedded_image_size_bytes": 188382,
+    "extraction_method": "PyMuPDF extract_image(xref=29), decoded with Pillow only for numeric pixel measurements; not written as a separate JPEG file"
+  },
+  "actually_opened_images": {
+    "reference": {
+      "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-13.png",
+      "sha256": "8dc64411d28c465950231967532af1e51d370360fc9149ee1b1773ab4461cc40",
+      "size_bytes": 254494,
+      "dimensions_px": [
+        425,
+        950
+      ],
+      "actually_opened_with_view_image": true
+    },
+    "native_actual7cf": {
+      "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-013-current.png",
+      "sha256": "487c9e3526304831b131e68ede11e12f9970e1c91d54be84874f0cadb69c117b",
+      "size_bytes": 49888,
+      "dimensions_px": [
+        393,
+        852
+      ],
+      "actually_opened_with_view_image": true
+    },
+    "reference_native_pair": {
+      "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf-03A-review/page-13.jpg",
+      "sha256": "1745ae16e92727c3406a7db7e6b0be9519ff16ed1ec42cb44a1f3576fab47a64",
+      "size_bytes": 141866,
+      "dimensions_px": [
+        835,
+        978
+      ],
+      "actually_opened_with_view_image": true
+    }
+  },
+  "captureSHA": {
+    "native_png_sha256": "487c9e3526304831b131e68ede11e12f9970e1c91d54be84874f0cadb69c117b",
+    "assigned_application_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "native_artifact_path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf-evidence/android-app/app/build/outputs/pdf85/03A-013-current.png",
+    "native_artifact_sha256": "487c9e3526304831b131e68ede11e12f9970e1c91d54be84874f0cadb69c117b",
+    "working_native_matches_pdf85_artifact_byte_for_byte": true,
+    "historical_concept_remaining_capture_not_used_as_current_native": true
+  },
+  "measurement_method": {
+    "bbox_format": "[left, top, right_exclusive, bottom_exclusive] unless explicitly inclusive y-runs",
+    "geometry_units": "Original embedded JPEG pixels; normalized logical values multiply by 393/850 to compare against the supplied 393px-wide native capture. This is a width-normalized estimate, not independently measured device dp.",
+    "white_row_detection": "Mean red and green in x=[300,690), y=[970,1760) >245; JPEG threshold approximates the central white fill boundary.",
+    "sheet_top_detection": "Mean red and green in x=[400,450), first y>=750 >220.",
+    "blue_label_detection": "B>R+60, R<100 and G>80 inside each pill y-run, x=[40,700).",
+    "color_method": "Median RGB over selected areas of the original JPEG; JPEG compression and raster effects remain."
+  },
+  "reference_measurements": {
+    "outline_sheet_crop_bbox_original": [
+      0,
+      859,
+      850,
+      1850
+    ],
+    "first_pill_bbox_original_approx": [
+      31,
+      986,
+      820,
+      1043
+    ],
+    "pill_center_y_runs_inclusive_original": [
+      [
+        986,
+        1042
+      ],
+      [
+        1053,
+        1110
+      ],
+      [
+        1123,
+        1179
+      ],
+      [
+        1192,
+        1249
+      ],
+      [
+        1262,
+        1319
+      ],
+      [
+        1331,
+        1389
+      ],
+      [
+        1401,
+        1458
+      ],
+      [
+        1471,
+        1528
+      ],
+      [
+        1541,
+        1599
+      ],
+      [
+        1611,
+        1673
+      ],
+      [
+        1686,
+        1744
+      ]
+    ],
+    "pill_height_original_px": [
+      57,
+      58,
+      57,
+      58,
+      58,
+      59,
+      58,
+      58,
+      59,
+      63,
+      59
+    ],
+    "median_pill_height_original_px": 58.0,
+    "median_pitch_original_px": 69.75,
+    "normalization_scale_393_over_850": 0.4623529411764706,
+    "median_pill_height_width_normalized": 26.816470588235294,
+    "median_pitch_width_normalized": 32.249117647058824,
+    "pill_outer_gutter_original_approx_px": 31,
+    "pill_outer_gutter_width_normalized_approx": 14.332941176470587,
+    "top_label_start_original_px": 65,
+    "nested_label_start_original_px": 125,
+    "nested_indent_original_px": 60,
+    "nested_indent_width_normalized": 27.741176470588236,
+    "top_label_inner_padding_original_approx_px": 34,
+    "top_label_inner_padding_width_normalized_approx": 15.719999999999999,
+    "label_blue_glyph_bbox_original_exclusive": [
+      [
+        66,
+        1004,
+        218,
+        1031
+      ],
+      [
+        65,
+        1072,
+        188,
+        1093
+      ],
+      [
+        66,
+        1140,
+        137,
+        1162
+      ],
+      [
+        66,
+        1210,
+        179,
+        1238
+      ],
+      [
+        66,
+        1280,
+        121,
+        1307
+      ],
+      [
+        65,
+        1349,
+        111,
+        1371
+      ],
+      [
+        66,
+        1419,
+        283,
+        1446
+      ],
+      [
+        125,
+        1489,
+        186,
+        1511
+      ],
+      [
+        66,
+        1565,
+        248,
+        1587
+      ],
+      [
+        125,
+        1631,
+        234,
+        1657
+      ],
+      [
+        66,
+        1705,
+        130,
+        1727
+      ]
+    ],
+    "typography_visual_finding": "Reference labels are proportional sans-serif and visibly bold; the actual7cf current native labels are normal monospace. The raster does not encode an authoritative font family/name or sp value.",
+    "pill_fill_median_rgb": [
+      248,
+      247,
+      253
+    ],
+    "pill_fill_median_hex": "#F8F7FD",
+    "sheet_top_median_rgb": [
+      243,
+      243,
+      253
+    ],
+    "sheet_top_median_hex": "#F3F3FD",
+    "sheet_bottom_median_rgb": [
+      239,
+      241,
+      254
+    ],
+    "sheet_bottom_median_hex": "#EFF1FE",
+    "color_sample_regions": {
+      "sheet_top": [
+        340,
+        880,
+        690,
+        900
+      ],
+      "pill_fill_first": [
+        340,
+        986,
+        690,
+        1042
+      ],
+      "sheet_bottom": [
+        340,
+        1790,
+        690,
+        1810
+      ]
+    },
+    "reference_visible_subtitle": false,
+    "native_visible_subtitle": "点击跳转到对应区段",
+    "native_current_visual_finding": "Plain continuous surface with separator rows, normal monospace label text, and the extra visible subtitle."
+  },
+  "pending_source_change": {
+    "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+    "function": "ToolsOutlineSheetContent",
+    "function_line_1_based": 193,
+    "only_source_file_edited_by_agent": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+    "imports_added": [
+      "import androidx.compose.foundation.shape.RoundedCornerShape",
+      "import androidx.compose.ui.graphics.Brush",
+      "import androidx.compose.ui.graphics.Color"
+    ],
+    "import_removed": "import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider",
+    "changes": [
+      "Remove visible instructional subtitle from this helper invocation.",
+      "Remove the enclosing continuous HomeCard and divider rows.",
+      "Use a local measured light-mode vertical background gradient #F3F3FD to #EFF1FE; retain c.surface background in dark mode.",
+      "Keep 32dp minimum clickable rows; place 2dp vertical inset around rounded c.surface pills, giving default-font visual pill height28dp and inter-pill gap4dp.",
+      "Use existing HomeType.bodySmall at14sp/21sp with FontWeight.Bold for proportional label text.",
+      "Use label start padding14dp plus28dp per item.level, and end padding8dp."
+    ],
+    "candidate_layout_values_dp": {
+      "clickable_row_min_height": 32,
+      "vertical_pill_inset_each_side": 2,
+      "default_visual_pill_height": 28,
+      "inter_pill_visual_gap": 4,
+      "label_start_padding": 14,
+      "indent_per_level": 28,
+      "end_padding": 8,
+      "scroll_max_height": 420
+    },
+    "candidate_typography": {
+      "existing_style": "HomeType.bodySmall",
+      "font_size_sp": 14,
+      "line_height_sp": 21,
+      "font_weight": "Bold",
+      "font_family": "Existing proportional/default family; no new named font"
+    },
+    "interactive_preservation": "Role.Button, exact haptic/onJump lambda, onClose argument, numeric caption, chevron, scroll state/max height, and empty state preserved. The subtitle text is deliberately removed; no new hidden accessibility text was added.",
+    "reversal_proof": {
+      "reverse_helper_and_imports_restores_head_byte_for_byte": true,
+      "reversed_source_sha256": "c6b742ba998d81c2b929f4b08a59ee0f05df72d79c553026659bc4ae8e9ef0c7",
+      "head_source_sha256": "c6b742ba998d81c2b929f4b08a59ee0f05df72d79c553026659bc4ae8e9ef0c7",
+      "pending_source_sha256": "0580af44ae6a6a4b86eacddfd46f61040027ea752b9495a8589e85860ef5bd77",
+      "fragments": {
+        "click_role_haptic_jump": {
+          "source_text": ".clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "close_callback_argument": {
+          "source_text": "onClose = onClose",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "scroll_max_height": {
+          "source_text": "heightIn(max = 420.dp)",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "scroll_state": {
+          "source_text": "rememberScrollState()",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "hit_row_min_height": {
+          "source_text": ".heightIn(min = 32.dp)",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "numeric_caption": {
+          "source_text": "Text(item.line.toString(), color = c.t3, style = HomeType.caption.copy(fontFeatureSettings = \"tnum\"))",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        },
+        "chevron": {
+          "source_text": "ToolsChevron()",
+          "head_occurrences": 1,
+          "pending_occurrences": 1,
+          "exactly_preserved": true
+        }
+      },
+      "empty_state_byte_identical": true
+    },
+    "selected_file_diff_check": {
+      "command": "git diff --check -- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+      "exit_code": 0,
+      "stdout": "",
+      "stderr": ""
+    },
+    "selected_file_numstat": "25\t20\tandroid-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+    "shared_helpers_or_route_modified": false,
+    "implementation_pending_own_build_and_render": true,
+    "unchanged_shared_sheet_header_geometry": "ToolsSheetContent remains reused unchanged. This record does not claim exact overall sheet/header geometry or rendered candidate parity."
+  }
+}

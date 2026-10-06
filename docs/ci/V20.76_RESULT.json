@@ -1,0 +1,130 @@
+{
+  "schema": 1,
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.75-theme-compat",
+  "previousBranchHead": "069a7ed3f0b0da13c3cf3ed1e91feec4f558c8de",
+  "applicationCommit": "a48ece29289a34b1812c67fa0f82e0252362efc3",
+  "appVersionCode": 2076,
+  "appVersionName": "0.12.6-v20",
+  "rootRuntimeRevision": 151,
+  "workflowRun": 37157127775,
+  "conclusion": "success",
+  "jobs": {
+    "build": 111302699779,
+    "api35": 111304868284,
+    "api36": 111304868305,
+    "old2074CrashApi36": 111302699934
+  },
+  "apk": {
+    "bytes": 133334390,
+    "sha256": "d3c481f34a08134107ab9c7f9b5ae397164f446988ea41428420f7faa17726d0",
+    "rootAssetSha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+    "bootAssetSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+  },
+  "signingCertificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+  "unit": {
+    "tests": {
+      "tests": 278,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "selected": [
+      {
+        "suite": "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      {
+        "suite": "io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    ]
+  },
+  "shell": {
+    "rootHealth": 26,
+    "googleFirewall": 17,
+    "boot": 17,
+    "scope": "isolated owned fixtures; network commands mocked"
+  },
+  "installedUi": [
+    {
+      "api": 35,
+      "checks": 50,
+      "paletteCases": 21,
+      "repairChecks": [
+        {
+          "name": "safe-session-repair-entry",
+          "result": "passed"
+        },
+        {
+          "name": "safe-session-repair-root-denial",
+          "result": "passed"
+        }
+      ],
+      "rootMutationActions": 0,
+      "version": "versionCode=2076 minSdk=26 targetSdk=35\n    versionName=0.12.6-v20"
+    },
+    {
+      "api": 36,
+      "checks": 50,
+      "paletteCases": 21,
+      "repairChecks": [
+        {
+          "name": "safe-session-repair-entry",
+          "result": "passed"
+        },
+        {
+          "name": "safe-session-repair-root-denial",
+          "result": "passed"
+        }
+      ],
+      "rootMutationActions": 0,
+      "version": "versionCode=2076 minSdk=26 targetSdk=35\n    versionName=0.12.6-v20"
+    }
+  ],
+  "packagedRuntimeEntries": 23,
+  "materialKolorConstructorReferences": 687,
+  "missingConstructors": 0,
+  "historicalFailureRuns": [
+    37153935413,
+    37154487527,
+    37155426151
+  ],
+  "artifacts": {
+    "apk": 11286615208,
+    "manifest": 11286615210,
+    "verification": 11286497583,
+    "source": 11286382896,
+    "api35Smoke": 11286479426,
+    "api36Smoke": 11287040240,
+    "oldCrashSmoke": 11286068711
+  },
+  "limits": [
+    "No user phone access or changes",
+    "No real KernelSU/ColorOS reboot or boot restoration validation",
+    "Root health shell scope: IPv4 TPROXY; full IPv6/TUN/eBPF not validated",
+    "No long-term network switching or proof intermittent Google outages and message delay are resolved",
+    "ENOENT cache-eviction path reproduced and repaired; exact historical device trigger not proven",
+    "Metadata repair does not deploy runtime 151 or replace boot entry; original baseline must remain intact",
+    "Hard kill between manifest directory moves fails closed and retains original backup",
+    "Immutable export generations retained; long-term cross-process reclamation not implemented"
+  ],
+  "merged": false,
+  "released": false,
+  "userDeviceTouched": false,
+  "securityPermissionsExpanded": false,
+  "formallyDeployed": false
+}

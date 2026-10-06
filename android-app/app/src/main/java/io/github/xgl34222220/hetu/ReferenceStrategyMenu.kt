@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import android.content.SharedPreferences
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.Icon
 import top.yukonga.miuix.kmp.icon.MiuixIcons
@@ -18,52 +19,119 @@ import top.yukonga.miuix.kmp.menu.WindowIconDropdownMenu
 
 /** Native cascading menus stay attached to the tapped toolbar button. */
 @Composable
-internal fun ReferenceStrategyMenu() {
-    val prefs = LocalContext.current.getSharedPreferences("proxy_selector_preferences", 0)
+internal fun ReferenceStrategyMenu(prefsOverride: SharedPreferences? = null) {
+    val context = LocalContext.current
+    val panelMode = prefsOverride != null
+    val prefs = prefsOverride ?: context.getSharedPreferences("proxy_selector_preferences", 0)
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
-            revision++
+            if (!panelMode || key?.startsWith("proxySelector") == true) revision++
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
-    val entries = remember(revision) {
-        fun choice(key: String, fallback: String, values: List<Pair<String,String>>) =
-            values.map { (value,label) ->
-                DropdownItem(label, selected = prefs.getString(key, fallback) == value,
-                    onClick = { prefs.edit().putString(key, value).apply() })
+    val entries = remember(revision, prefs, panelMode) {
+        fun stringChoice(key: String, fallback: String, values: List<Pair<String, String>>) =
+            values.map { (value, label) ->
+                DropdownItem(
+                    label,
+                    selected = prefs.getString(key, fallback).orEmpty().ifBlank { fallback } == value,
+                    onClick = { prefs.edit().putString(key, value).apply() },
+                )
             }
-        fun columns(modeKey: String, countKey: String) = buildList {
-            add(DropdownItem("自动", selected = prefs.getString(modeKey, "auto") == "auto",
-                onClick = { prefs.edit().putString(modeKey, "auto").apply() }))
-            (1..4).forEach { n ->
-                add(DropdownItem("$n 列",
-                    selected = prefs.getString(modeKey, "auto") != "auto" && prefs.getInt(countKey, 1) == n,
-                    onClick = { prefs.edit().putString(modeKey, "fixed").putInt(countKey, n).apply() }))
+        if (panelMode) {
+            fun columnChoice(key: String) = listOf(
+                DropdownItem("1 列", selected = prefs.getInt(key, 2) == 1, onClick = { prefs.edit().putInt(key, 1).apply() }),
+                DropdownItem("2 列", selected = prefs.getInt(key, 2) != 1, onClick = { prefs.edit().putInt(key, 2).apply() }),
+            )
+            listOf(
+                DropdownEntry(
+                    listOf(
+                        DropdownItem(
+                            "排序方式",
+                            children = stringChoice(
+                                "proxySelectorNodeSort",
+                                "config",
+                                listOf("config" to "按配置", "name" to "名称", "latency" to "延迟"),
+                            ),
+                        ),
+                        DropdownItem(
+                            "倒序",
+                            selected = prefs.getBoolean("proxySelectorSortDescending", false),
+                            onClick = {
+                                prefs.edit().putBoolean(
+                                    "proxySelectorSortDescending",
+                                    !prefs.getBoolean("proxySelectorSortDescending", false),
+                                ).apply()
+                            },
+                        ),
+                        DropdownItem("节点列数", children = columnChoice("proxySelectorNodeColumns")),
+                        DropdownItem(
+                            "节点密度",
+                            children = stringChoice(
+                                "proxySelectorDensity",
+                                "standard",
+                                listOf("standard" to "标准", "compact" to "紧凑"),
+                            ),
+                        ),
+                        DropdownItem("策略列数", children = columnChoice("proxySelectorGroupColumns")),
+                        DropdownItem(
+                            "策略密度",
+                            children = stringChoice(
+                                "proxySelectorGroupDensity",
+                                "standard",
+                                listOf("standard" to "标准", "compact" to "紧凑"),
+                            ),
+                        ),
+                        DropdownItem(
+                            "名称显示",
+                            children = stringChoice(
+                                "proxySelectorNameOverflow",
+                                "clip",
+                                listOf("clip" to "单行截断", "wrap" to "自动换行"),
+                            ),
+                        ),
+                    ),
+                ),
+            )
+        } else {
+            fun columns(modeKey: String, countKey: String) = buildList {
+                add(DropdownItem("自动", selected = prefs.getString(modeKey, "auto") == "auto",
+                    onClick = { prefs.edit().putString(modeKey, "auto").apply() }))
+                (1..4).forEach { n ->
+                    add(DropdownItem("$n 列",
+                        selected = prefs.getString(modeKey, "auto") != "auto" && prefs.getInt(countKey, 1) == n,
+                        onClick = { prefs.edit().putString(modeKey, "fixed").putInt(countKey, n).apply() }))
+                }
             }
+            listOf(DropdownEntry(listOf(
+                DropdownItem("节点排序", children = stringChoice("node_sort_mode", "defaultsort",
+                    listOf("defaultsort" to "按配置", "name" to "名称", "latency" to "延迟"))),
+                DropdownItem("倒序", selected = prefs.getBoolean("node_sort_descending", false),
+                    onClick = { prefs.edit().putBoolean("node_sort_descending",
+                        !prefs.getBoolean("node_sort_descending", false)).apply() }),
+                DropdownItem("策略栏数", children = columns("group_column_mode", "group_column_count")),
+                DropdownItem("节点栏数", children = columns("node_column_mode", "node_column_count")),
+                DropdownItem("策略密度", children = stringChoice("group_density", "standard",
+                    listOf("standard" to "标准", "compact" to "紧凑"))),
+                DropdownItem("节点密度", children = stringChoice("node_density", "standard",
+                    listOf("standard" to "标准", "compact" to "紧凑"))),
+                DropdownItem("名称显示", children = stringChoice("name_overflow_mode", "clip",
+                    listOf("clip" to "截断隐藏", "scroll" to "滚动显示", "wrap" to "自动换行"))),
+            )))
         }
-        listOf(DropdownEntry(listOf(
-            DropdownItem("节点排序", children = choice("node_sort_mode", "defaultsort",
-                listOf("defaultsort" to "按配置", "name" to "名称", "latency" to "延迟"))),
-            DropdownItem("倒序", selected = prefs.getBoolean("node_sort_descending", false),
-                onClick = { prefs.edit().putBoolean("node_sort_descending",
-                    !prefs.getBoolean("node_sort_descending", false)).apply() }),
-            DropdownItem("策略栏数", children = columns("group_column_mode", "group_column_count")),
-            DropdownItem("节点栏数", children = columns("node_column_mode", "node_column_count")),
-            DropdownItem("策略密度", children = choice("group_density", "standard",
-                listOf("standard" to "标准", "compact" to "紧凑"))),
-            DropdownItem("节点密度", children = choice("node_density", "standard",
-                listOf("standard" to "标准", "compact" to "紧凑"))),
-            DropdownItem("名称显示", children = choice("name_overflow_mode", "clip",
-                listOf("clip" to "截断隐藏", "scroll" to "滚动显示", "wrap" to "自动换行"))),
-        )))
     }
-    WindowIconCascadingDropdownMenu(entries, modifier = Modifier.size(44.dp).testTag("strategy-layout-menu"),
-        minWidth = 44.dp, minHeight = 44.dp) {
+    WindowIconCascadingDropdownMenu(
+        entries,
+        modifier = Modifier.size(44.dp).testTag("strategy-layout-menu"),
+        minWidth = 44.dp,
+        minHeight = 44.dp,
+    ) {
         Icon(MiuixIcons.Sort, "排序与布局", Modifier.size(21.dp), tint = LocalHetuTokens.current.textPrimary)
     }
 }
+
 
 @Composable
 internal fun ReferenceStrategyFilterMenu() {

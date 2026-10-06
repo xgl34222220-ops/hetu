@@ -1,0 +1,104 @@
+name: Reproduce Hetu scripts on Android 16
+'on':
+  push:
+    branches:
+    - test/v20.73-scripts-boot
+    paths:
+    - .github/workflows/hetu-scripts-repro.yml
+    - .github/scripts/repro_hetu_scripts.py
+  workflow_dispatch: null
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hetu-scripts-repro-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  android16-repro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+    - name: Download verified V20.72 APK
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: gh run download 37110586606 --repo "$GITHUB_REPOSITORY" --name Hetu-APK
+        --dir candidate
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Prepare official AOSP emulator
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export ANDROID_AVD_HOME="$RUNNER_TEMP/hetu-avd"
+
+        mkdir -p "$ANDROID_AVD_HOME"
+
+        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+        AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-36;default;x86_64''
+        2>&1 | tee out/android-smoke/sdk-prepare.log
+
+        "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
+
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke
+        --path "$ANDROID_AVD_HOME/hetu-smoke.avd" --package ''system-images;android-36;default;x86_64''
+        2>&1 | tee out/android-smoke/avd-prepare.log
+
+        test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d''
+        "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
+
+        hw.lcd.width=393
+
+        hw.lcd.height=852
+
+        hw.lcd.density=160
+
+        hw.ramSize=2048
+
+        EOF
+
+        '
+    - name: Reproduce scripts entry on Android 16
+      env:
+        HETU_EXPECTED_VERSION: '2072'
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+
+        test -x "$ANDROID_HOME/platform-tools/adb"
+
+        "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
+
+        # Uses only this runner''s existing KVM or sudo access. No device permission,
+
+        # group, ACL or SELinux changes; owned supervisor verifies process cleanup.
+
+        cp .github/scripts/repro_hetu_scripts.py .github/scripts/smoke_hetu_apk.py
+
+        python3 .github/scripts/run_hetu_emulator.py
+
+        '
+    - name: Upload Android smoke evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.72-Android16-scripts-repro
+        path: out/android-smoke/
+        if-no-files-found: warn

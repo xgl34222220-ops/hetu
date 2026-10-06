@@ -1,0 +1,799 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index ea477ae..755f950 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2077
+-        versionName = "0.12.7-v20"
++        versionCode = 2078
++        versionName = "0.12.8-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index c5d8184..7643a42 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -346,6 +346,15 @@ internal class ProxyComposeController(context: Context) {
+     suspend fun closeAll() = withContext(Dispatchers.IO) { api.closeAll() }
+     suspend fun closeConnection(id: String) = withContext(Dispatchers.IO) { api.closeConnection(id) }
+     suspend fun diagnostics(): String = withContext(Dispatchers.IO) { root.diagnostics() }
++    suspend fun networkEvents(): String = withContext(Dispatchers.IO) {
++        ProxyNetworkJournal(app).recent() + "\n\n当前记录状态：\n" +
++            "networkEpoch=${prefs.getLong("proxyNetworkEpoch", 0)}\n" +
++            "physicalNetwork=${prefs.getString("proxyPhysicalNetworkState", "unknown")}\n" +
++            "integrity=${prefs.getString("proxyNetworkIntegrity", "unknown")}\n" +
++            "egress=${prefs.getString("proxyPolicyEgressState", "unverified")}\n" +
++            "journalDropped=${prefs.getLong("proxyNetworkJournalDropped", 0)}\n" +
++            "journalError=${prefs.getString("proxyNetworkJournalError", "") }"
++    }
+     suspend fun repairSessionRecord(): String = withContext(Dispatchers.IO) { root.repairSessionRecord().optString("message") }
+     suspend fun startupConfig(): String = withContext(Dispatchers.IO) { root.prepare(ProxyRuntimeProfile.load(prefs)).startup }
+ 
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java
+new file mode 100644
+index 0000000..3590e6b
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java
+@@ -0,0 +1,141 @@
++package io.github.xgl34222220.hetu;
++
++import android.content.Context;
++import android.os.SystemClock;
++import java.io.*;
++import java.nio.charset.StandardCharsets;
++import java.util.*;
++import org.json.*;
++
++/** App-private, append-only diagnostic metadata. No exception messages or network addresses. */
++final class ProxyNetworkJournal {
++    enum Stage { NETWORK_CHANGE, RECOVERY_REQUEST, REPAIR_RESULT, HEALTH_RESULT, EGRESS_REQUEST, EGRESS_TARGET_RESULT, EGRESS_RESULT, STALE_RESULT }
++    enum Target { GOOGLE_204, CLOUDFLARE_204 }
++    enum Outcome { WAITING, CHECKING, READY, UNVERIFIED, CAPTIVE, BLOCKED, REACHABLE, HEALTHY, DEGRADED, UPGRADE_REQUIRED, STOPPED, UNKNOWN, REQUESTED, ACKNOWLEDGED, FAILED, DISCARDED }
++    static final class Event {
++        final String id;
++        final String line;
++        Event(String id,String line){this.id=id;this.line=line;}
++    }
++    private static final Object FILE_LOCK=new Object();
++    private static final int RECENT_LIMIT=64, READ_BYTES=128*1024;
++    private final File directory;
++    private final int chunkBytes;
++    private File active;
++
++    ProxyNetworkJournal(Context context){this(new File(context.getNoBackupFilesDir(),"hetu-network-events"),256*1024);}
++    ProxyNetworkJournal(File directory,int chunkBytes){this.directory=directory;this.chunkBytes=Math.max(1024,chunkBytes);}
++
++    static Outcome outcome(String value){
++        try{return Outcome.valueOf(value.toUpperCase(Locale.ROOT).replace('-','_'));}
++        catch(Exception ignored){return Outcome.UNKNOWN;}
++    }
++    static Event capture(Stage stage,long epoch,Outcome outcome,int resultCode,Throwable error,String parent){
++        String id=UUID.randomUUID().toString();
++        try{
++            JSONObject record=new JSONObject().put("schema",1).put("id",id)
++                    .put("timeMs",System.currentTimeMillis()).put("elapsedMs",SystemClock.elapsedRealtime())
++                    .put("stage",stage.name()).put("epoch",epoch).put("outcome",outcome.name()).put("code",resultCode);
++            // A correlation is always a generated UUID, never arbitrary user text.
++            if(parent!=null&&parent.matches("[a-f0-9-]{36}"))record.put("parent",parent);
++            JSONArray causes=new JSONArray();
++            Set<Throwable> seen=Collections.newSetFromMap(new IdentityHashMap<>());
++            for(Throwable cause=error;cause!=null&&causes.length()<4&&seen.add(cause);cause=cause.getCause()){
++                JSONObject entry=new JSONObject().put("type",bounded(cause.getClass().getName()));
++                JSONArray frames=new JSONArray();
++                StackTraceElement[] trace=cause.getStackTrace();
++                for(int i=0;i<Math.min(trace.length,3);i++)frames.put(bounded(trace[i].getClassName())+"."+bounded(trace[i].getMethodName())+":"+trace[i].getLineNumber());
++                entry.put("frames",frames);causes.put(entry);
++            }
++            if(causes.length()>0)record.put("causes",causes);
++            String line=record.toString();
++            if(line.getBytes(StandardCharsets.UTF_8).length>8192)throw new IllegalArgumentException("event too large");
++            return new Event(id,line);
++        }catch(JSONException impossible){throw new IllegalStateException(impossible);}
++    }
++
++    private static String bounded(String text){return text.length()>160?text.substring(0,160):text;}
++
++    static Event captureHealth(long epoch,Outcome outcome,String fault,Throwable error){
++        Event base=capture(Stage.HEALTH_RESULT,epoch,outcome,0,error,null);
++        try{
++            JSONObject record=new JSONObject(base.line);
++            JSONArray faults=new JSONArray();
++            if(fault!=null&&!fault.isEmpty())for(String code:fault.split(",")){
++                if(faults.length()>=16)break;
++                boolean known=code.matches("session-manifest-missing|health-read-failed|not-running|transaction-in-progress|core-(identity(-read)?|exited)|watchdog-(missing|exited|identity(-read)?)|routing-journal|native-device|socket-read|ipv[46]-(policy-rule|local-route|rule-read|route-read)|listener-[0-9]{1,5}-(tcp|udp)|[46]-(nat|mangle|filter)-(read|hook|HETU_[A-Z0-9]+)");
++                faults.put(known?code:"unclassified-fault");
++            }
++            record.put("faults",faults);return new Event(base.id,record.toString());
++        }catch(JSONException impossible){throw new IllegalStateException(impossible);}
++    }
++
++    static Event captureEgress(long epoch,Target target,int code,Throwable error,String parent){
++        Event base=capture(Stage.EGRESS_TARGET_RESULT,epoch,code==204?Outcome.REACHABLE:Outcome.UNVERIFIED,code,error,parent);
++        try{return new Event(base.id,new JSONObject(base.line).put("target",target.name()).toString());}
++        catch(JSONException impossible){throw new IllegalStateException(impossible);}
++    }
++
++    void append(Event event)throws IOException{
++        byte[] line=(event.line+"\n").getBytes(StandardCharsets.UTF_8);
++        synchronized(FILE_LOCK){
++            if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("journal-directory");
++            if(active==null||active.length()+line.length>chunkBytes){
++                File[] files=files();
++                File latest=files.length==0?null:files[files.length-1];
++                if(latest!=null&&latest.length()+line.length<=chunkBytes)active=latest;
++                else{
++                    long next=latest==null?1:Long.parseLong(latest.getName().substring(7,27))+1;
++                    active=new File(directory,String.format(Locale.ROOT,"events-%020d.jsonl",next));
++                }
++            }
++            boolean incomplete=false;
++            if(active.length()>0)try(RandomAccessFile tail=new RandomAccessFile(active,"r")){
++                tail.seek(tail.length()-1);incomplete=tail.read()!=10;
++            }
++            try(FileOutputStream stream=new FileOutputStream(active,true)){
++                // A killed writer's partial line remains evidence; separate the next record.
++                if(incomplete)stream.write('\n');
++                stream.write(line);stream.getChannel().force(false);
++            }
++        }
++    }
++
++    private File[] files()throws IOException{
++        File[] files=directory.listFiles((dir,name)->name.matches("events-[0-9]{20}\\.jsonl"));
++        if(files==null)throw new IOException("journal-list");
++        Arrays.sort(files,Comparator.comparing(File::getName));return files;
++    }
++
++    String recent(){
++        synchronized(FILE_LOCK){
++            if(!directory.exists())return "尚无网络事件记录；网站可达与网络完整性分别核验。";
++            try{
++                File[] files=files();
++                ArrayDeque<String> recent=new ArrayDeque<>();
++                int remaining=READ_BYTES,unreadable=0;
++                for(int i=files.length-1;i>=0&&remaining>0&&recent.size()<RECENT_LIMIT;i--){
++                    byte[] tail;
++                    long offset;
++                    try(RandomAccessFile input=new RandomAccessFile(files[i],"r")){
++                        int size=(int)Math.min(input.length(),remaining);offset=input.length()-size;
++                        tail=new byte[size];input.seek(offset);input.readFully(tail);remaining-=size;
++                    }
++                    String text=new String(tail,StandardCharsets.UTF_8);
++                    if(offset>0){int newline=text.indexOf('\n');text=newline<0?"":text.substring(newline+1);}
++                    String[] lines=text.split("\n");
++                    for(int j=lines.length-1;j>=0&&recent.size()<RECENT_LIMIT;j--){
++                        if(lines[j].isEmpty())continue;
++                        try{JSONObject record=new JSONObject(lines[j]);
++                            if(record.optInt("schema")!=1||!record.has("id"))throw new JSONException("schema");
++                            recent.addFirst(record.toString());
++                        }catch(JSONException invalid){unreadable++;}
++                    }
++                }
++                return "最近网络事件（最多 64 条 / 128 KiB）；旧分段保留。\n网站可达与规则 / DNS / 守护完整性分别核验。\n"
++                        +"segments="+files.length+" shown="+recent.size()+" unreadableLines="+unreadable+"\n"
++                        +(recent.isEmpty()?"尚无完整网络事件记录":String.join("\n",recent));
++            }catch(IOException error){return "网络事件暂不可读："+error.getClass().getSimpleName()+"；不代表网络健康。";}
++        }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+index 2023d6c..69f3423 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@ -21,6 +21,15 @@ public final class ProxyNetworkMatchService extends Service {
+     private final NetworkEpoch<Network> networkEvents=new NetworkEpoch<>();
+     private final ProxyNetworkState networkState=new ProxyNetworkState();
+     private ScheduledFuture<?> networkRefreshTask;
++    private ProxyNetworkJournal journal;
++    private final ExecutorService journalWorker=new ThreadPoolExecutor(1,1,0L,TimeUnit.MILLISECONDS,
++            new ArrayBlockingQueue<>(128));
++    private String lastHealthTraceSignature="";
++    private String lastHealthTraceId="";
++    private long lastHealthTraceAt;
++    private final java.util.concurrent.atomic.AtomicLong droppedJournalEvents=new java.util.concurrent.atomic.AtomicLong();
++    interface EgressRequest { int code(String target,int port)throws Exception; }
++    private EgressRequest egressRequest=this::fetchEgressCode;
+     private final ProxyTaskCoalescer evaluations=new ProxyTaskCoalescer(worker,this::evaluateNow);
+     private volatile boolean destroyed;
+     private long automaticStopGeneration;
+@@ -33,6 +42,8 @@ public final class ProxyNetworkMatchService extends Service {
+         super.onCreate();
+         prefs=getSharedPreferences("hetu",MODE_PRIVATE);
+         cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
++        journal=new ProxyNetworkJournal(getApplicationContext());
++        droppedJournalEvents.set(prefs.getLong("proxyNetworkJournalDropped",0L));
+         bootRestores=new ProxyRestoreScheduler((task,delayMs)->metrics.schedule(()->{
+             try{worker.execute(task);}catch(RejectedExecutionException stopped){}
+         },delayMs,TimeUnit.MILLISECONDS),this::restoreWantedProxyAfterBoot);
+@@ -130,6 +141,7 @@ public final class ProxyNetworkMatchService extends Service {
+         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
+         worker.shutdownNow();
+         metrics.shutdownNow();
++        journalWorker.shutdown(); // Drain accepted diagnostic records; preserve history.
+         super.onDestroy();
+     }
+     @Override public android.os.IBinder onBind(Intent i){return null;}
+@@ -184,6 +196,8 @@ public final class ProxyNetworkMatchService extends Service {
+                     .putString("proxyPolicyEgressState","unverified")
+                     .putLong("proxyPolicyEgressCheckedAt",0L)
+                     .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false)).apply();
++            recordEvent(ProxyNetworkJournal.Stage.NETWORK_CHANGE,route,
++                    ProxyNetworkJournal.outcome(networkState.state().name()),0,null,null);
+             if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
+             if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
+                 if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
+@@ -204,7 +218,7 @@ public final class ProxyNetworkMatchService extends Service {
+                 .putString("proxyLastNetworkObservationReason",reason+"-changed-connections-preserved").apply()))return;
+         // Refresh only Hetu-owned state in place. A new default does not prove
+         // old connections failed, so preserve the core and all live connections.
+-        repairLiveNetworkIntegrity();
++        repairLiveNetworkIntegrity(route);
+         if(networkEvents.isCurrent(route))probeEgressIfPending();
+     }
+ 
+@@ -216,16 +230,61 @@ public final class ProxyNetworkMatchService extends Service {
+         }
+     }
+ 
+-    private void repairLiveNetworkIntegrity(){
+-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
++    private String recordEvent(ProxyNetworkJournal.Stage stage,NetworkEpoch.Snapshot<Network> route,
++            ProxyNetworkJournal.Outcome outcome,int code,Throwable error,String parent){
++        ProxyNetworkJournal.Event event=ProxyNetworkJournal.capture(stage,route.epoch,outcome,code,error,parent);
++        enqueueEvent(event);
++        return event.id;
++    }
++
++    private void enqueueEvent(ProxyNetworkJournal.Event event){
++        try{journalWorker.execute(()->{
++            try{journal.append(event);prefs.edit().remove("proxyNetworkJournalError").apply();}
++            catch(Exception unavailable){prefs.edit().putString("proxyNetworkJournalError",unavailable.getClass().getSimpleName())
++                    .putLong("proxyNetworkJournalDropped",droppedJournalEvents.incrementAndGet()).apply();}
++        });}catch(RejectedExecutionException fullOrStopped){
++            prefs.edit().putLong("proxyNetworkJournalDropped",droppedJournalEvents.incrementAndGet()).apply();
++        }
++    }
++
++    private synchronized String recordHealth(NetworkEpoch.Snapshot<Network> route,String integrity,String fault,Throwable error){
++        String signature=route.epoch+"|"+integrity+"|"+fault+"|"+(error==null?"":error.getClass().getName());
++        long now=SystemClock.elapsedRealtime();
++        // Record transitions and at most one repeated identical observation per minute.
++        if(signature.equals(lastHealthTraceSignature)&&now-lastHealthTraceAt<60000L)return lastHealthTraceId;
++        lastHealthTraceSignature=signature;lastHealthTraceAt=now;
++        ProxyNetworkJournal.Event event=ProxyNetworkJournal.captureHealth(route.epoch,
++                ProxyNetworkJournal.outcome(integrity),fault,error);
++        enqueueEvent(event);lastHealthTraceId=event.id;
++        return lastHealthTraceId;
++    }
++
++    private void staleResult(NetworkEpoch.Snapshot<Network> route,String parent){
++        recordEvent(ProxyNetworkJournal.Stage.STALE_RESULT,route,ProxyNetworkJournal.Outcome.DISCARDED,0,null,parent);
++    }
++
++    private void repairLiveNetworkIntegrity(NetworkEpoch.Snapshot<Network> route){
++        if(destroyed||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
++        final long ticket=RootProxyManager.observationTicket();
++        if(ticket<0L)return;
++        String trace=recordEvent(ProxyNetworkJournal.Stage.RECOVERY_REQUEST,route,ProxyNetworkJournal.Outcome.REQUESTED,0,null,null);
+         try{
+-            RootBridge.rootShell(getApplicationContext(),
++            RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),
+                     "P=$(cat /data/adb/hetu/run/core.pid 2>/dev/null || true); "
+-                            +"case \"$P\" in ''|*[!0-9]*) exit 0;; esac; "
+-                            +"/data/adb/hetu/hetu-root.sh repair-network \"$P\" >/dev/null 2>&1 || true",
++                            +"case \"$P\" in ''|*[!0-9]*) exit 3;; esac; "
++                            +"/data/adb/hetu/hetu-root.sh repair-network \"$P\" >/dev/null 2>&1",
+                     6000L);
+-        }catch(Exception ignored){}
+-        checkLiveNetworkIntegrity();
++            String id=recordEvent(ProxyNetworkJournal.Stage.REPAIR_RESULT,route,
++                    result.ok()?ProxyNetworkJournal.Outcome.ACKNOWLEDGED:ProxyNetworkJournal.Outcome.FAILED,result.code,null,trace);
++            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
++                    .putInt("proxyNetworkRepairExit",result.code).putString("proxyNetworkRepairTraceId",id).apply()))staleResult(route,id);
++        }catch(Exception failure){
++            String id=recordEvent(ProxyNetworkJournal.Stage.REPAIR_RESULT,route,ProxyNetworkJournal.Outcome.FAILED,-1,failure,trace);
++            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
++                    .putInt("proxyNetworkRepairExit",-1).putString("proxyNetworkRepairTraceId",id).apply()))staleResult(route,id);
++        }
++        // A successful shell invocation only acknowledges the request; health is checked independently.
++        if(networkEvents.isCurrent(route))checkLiveNetworkIntegrity();
+     }
+ 
+     private void scheduleWorker(Runnable task,long delayMs){
+@@ -400,16 +459,22 @@ public final class ProxyNetworkMatchService extends Service {
+         try{
+             JSONObject health=new RootProxyManager(getApplicationContext()).networkHealth();
+             String integrity=health.optString("networkIntegrity","unknown");
+-            SharedPreferences.Editor editor=prefs.edit()
++            String id=recordHealth(route,integrity,health.optString("networkFault",""),null);
++            SharedPreferences.Editor editor=prefs.edit().putString("proxyNetworkHealthTraceId",id)
+                     .putString("proxyNetworkIntegrity",integrity)
+                     .putString("proxyNetworkFault",health.optString("networkFault",""))
+                     .putLong("proxyNetworkCheckedAt",System.currentTimeMillis());
++            editor.remove("proxyNetworkHealthReadError");
+             if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
+             else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
+             // Unknown/old-script observations are never treated as proof of failure.
+-            publishNetworkObservation(route,ticket,editor::apply);
+-        }catch(Exception ignored){
+-            publishNetworkObservation(route,ticket,()->prefs.edit().putString("proxyNetworkIntegrity","unknown").apply());
++            if(!publishNetworkObservation(route,ticket,editor::apply))staleResult(route,id);
++        }catch(Exception failure){
++            String id=recordHealth(route,"unknown","health-read-failed",failure);
++            if(!publishNetworkObservation(route,ticket,()->prefs.edit()
++                    .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","health-read-failed")
++                    .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).putString("proxyNetworkHealthTraceId",id)
++                    .putString("proxyNetworkHealthReadError",failure.getClass().getSimpleName()).apply()))staleResult(route,id);
+         }
+     }
+ 
+@@ -426,27 +491,29 @@ public final class ProxyNetworkMatchService extends Service {
+             lastPolicyProbeAt=now;
+         }
+         int port=MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
+-        String error=""; boolean success=false;
++        String error=""; boolean success=false; int responseCode=-1; Throwable probeFailure=null;
++        String request=recordEvent(ProxyNetworkJournal.Stage.EGRESS_REQUEST,route,ProxyNetworkJournal.Outcome.REQUESTED,0,null,null);
+         // Explicit loopback proxy; no DIRECT fallback, node switch, connection flush
+         // or core restart on a slow/blocked website. These requests obey current rules.
+-        for(String target:new String[]{"https://www.gstatic.com/generate_204","https://cp.cloudflare.com/generate_204"}){
+-            java.net.HttpURLConnection connection=null;
++        String[] targets={"https://www.gstatic.com/generate_204","https://cp.cloudflare.com/generate_204"};
++        for(int index=0;index<targets.length;index++){
++            if(destroyed||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false)){staleResult(route,request);return;}
+             try{
+-                java.net.Proxy proxy=new java.net.Proxy(java.net.Proxy.Type.HTTP,new java.net.InetSocketAddress("127.0.0.1",port));
+-                connection=(java.net.HttpURLConnection)new java.net.URL(target).openConnection(proxy);
+-                connection.setConnectTimeout(2500); connection.setReadTimeout(2500);
+-                connection.setInstanceFollowRedirects(false); connection.setUseCaches(false);
+-                connection.setRequestProperty("Connection","close");
+-                int code=connection.getResponseCode();
+-                if(code==204){success=true;break;}
+-                error="HTTP "+code;
+-            }catch(Exception e){error=e.getClass().getSimpleName()+": "+String.valueOf(e.getMessage());}
+-            finally{if(connection!=null)connection.disconnect();}
++                responseCode=egressRequest.code(targets[index],port);probeFailure=null;
++                success=responseCode==204;
++                if(!success)error="HTTP "+responseCode;
++            }catch(Exception e){probeFailure=e;responseCode=-1;error=e.getClass().getSimpleName();}
++            ProxyNetworkJournal.Event observation=ProxyNetworkJournal.captureEgress(route.epoch,
++                    index==0?ProxyNetworkJournal.Target.GOOGLE_204:ProxyNetworkJournal.Target.CLOUDFLARE_204,responseCode,probeFailure,request);
++            enqueueEvent(observation);
++            if(success)break;
+         }
+         // Discard results from a completed stop or a network handover.
+-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!networkEvents.isCurrent(route))return;
+-        if(error.length()>260)error=error.substring(0,260);
+-        SharedPreferences.Editor edit=prefs.edit()
++        String id=recordEvent(ProxyNetworkJournal.Stage.EGRESS_RESULT,route,
++                success?ProxyNetworkJournal.Outcome.REACHABLE:ProxyNetworkJournal.Outcome.UNVERIFIED,responseCode,probeFailure,request);
++        if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||!networkEvents.isCurrent(route)){staleResult(route,id);return;}
++        error=error+"（记录 "+id+"）";
++        SharedPreferences.Editor edit=prefs.edit().putString("proxyPolicyEgressTraceId",id)
+                 .putString("proxyPolicyEgressState",success?"reachable":"unverified")
+                 .putLong("proxyPolicyEgressCheckedAt",System.currentTimeMillis());
+         if(success){
+@@ -456,7 +523,18 @@ public final class ProxyNetworkMatchService extends Service {
+             edit.putBoolean("proxyRootEgressPending",true).putString("proxyRootEgressProbeLastError",error)
+                     .putString("proxyRootEgressWarning","按规则出口暂未验证通过；未重启核心、未改节点："+error);
+         }
+-        publishNetworkObservation(route,ticket,edit::apply);
++        if(!publishNetworkObservation(route,ticket,edit::apply))staleResult(route,id);
++    }
++
++    private int fetchEgressCode(String target,int port)throws Exception{
++        java.net.Proxy proxy=new java.net.Proxy(java.net.Proxy.Type.HTTP,new java.net.InetSocketAddress("127.0.0.1",port));
++        java.net.HttpURLConnection connection=(java.net.HttpURLConnection)new java.net.URL(target).openConnection(proxy);
++        try{
++            connection.setConnectTimeout(2500);connection.setReadTimeout(2500);
++            connection.setInstanceFollowRedirects(false);connection.setUseCaches(false);
++            connection.setRequestProperty("Connection","close");
++            return connection.getResponseCode();
++        }finally{connection.disconnect();}
+     }
+ 
+     private void updateAdblockMetrics(){
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 887faf4..c532f0c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -956,6 +956,7 @@ final class RootProxyManager {
+         RootBridge.requireWorkerThread();
+         DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
+         report.section("上次应用闪退（本地记录）",AppCrashReport.read(context),16384);
++        report.section("网络事件记录（本地，可独立于 Root 读取）",new ProxyNetworkJournal(context).recent(),65536);
+         StringBuilder events=new StringBuilder("time=").append(new Date())
+                 .append("\napp=").append(BuildConfig.VERSION_NAME)
+                 .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
+@@ -976,7 +977,10 @@ final class RootProxyManager {
+                 "proxySelectorDisconnectOnSelect","proxyLastSelectionAt","proxyLastSelectionGroup",
+                 "proxyLastSelectionClosed","proxyLastSelectionCloseFailed",
+                 "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
+-                "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
++                "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt",
++                "proxyNetworkEpoch","proxyPhysicalNetworkState","proxyLastNetworkCallback","proxyLastNetworkCallbackAt",
++                "proxyNetworkHealthTraceId","proxyNetworkHealthReadError","proxyPolicyEgressTraceId",
++                "proxyNetworkRepairExit","proxyNetworkRepairTraceId","proxyNetworkJournalError","proxyNetworkJournalDropped"}){
+             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
+         }
+         report.section("版本与最近运行事件",events.toString(),6000);
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index 0351a62..6bf5b13 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.DriveFileRenameOutline
+ import androidx.compose.material.icons.rounded.Edit
+ import androidx.compose.material.icons.rounded.FileUpload
+ import androidx.compose.material.icons.rounded.Folder
++import androidx.compose.material.icons.rounded.History
+ import androidx.compose.material.icons.rounded.HealthAndSafety
+ import androidx.compose.material.icons.rounded.FolderOpen
+ import androidx.compose.material.icons.rounded.Inventory2
+@@ -960,6 +961,14 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         onClick = { task("diag") { sheet = "消息与网络诊断" to vm.controller.diagnostics() } },
+                     ) { if (busy == "diag") HxSpinner(16.dp) else HxChevron() }
+                     SettingsDivider()
++                    SettingsRow(
++                        "网络事件记录",
++                        subtitle = "查看切网、核验与错误编号；无需 Root",
++                        icon = Icons.Rounded.History,
++                        iconTint = c.textMuted,
++                        onClick = { task("network-events") { sheet = "网络事件记录" to vm.controller.networkEvents() } },
++                    ) { if (busy == "network-events") HxSpinner(16.dp) else HxChevron() }
++                    SettingsDivider()
+                     SettingsRow(
+                         "修复运行记录",
+                         subtitle = "核对原会话基线、规则、DNS 与守护进程；保留现有连接",
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt
+new file mode 100644
+index 0000000..916b985
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt
+@@ -0,0 +1,190 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.NetworkCapabilities
++import android.net.LinkProperties
++import androidx.test.core.app.ApplicationProvider
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.android.controller.ServiceController
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implements
++import org.robolectric.annotation.Implementation
++import org.robolectric.shadows.ShadowNetwork
++import org.robolectric.shadows.ShadowNetworkCapabilities
++import org.robolectric.shadow.api.Shadow
++import org.robolectric.util.ReflectionHelpers
++import java.util.concurrent.ExecutorService
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.ThreadPoolExecutor
++import java.io.File
++
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class DiagnosticsBridgeShadow {
++    companion object {
++        var integrity = "degraded"
++        var fault = "listener-11053-udp"
++        var deny = false
++        var repairExit = 91
++        var duringHealth: (() -> Unit)? = null
++        val commands = mutableListOf<String>()
++        @JvmStatic @Implementation fun hasRoot(context: Context): Boolean = true
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            commands += command
++            require(!command.contains("service.d") && !command.contains("'start'") && !command.contains("'stop'"))
++            if (command.contains("repair-network")) return RootBridge.Result(repairExit, "")
++            require(command.endsWith("'network-health'"))
++            val callback = duringHealth; duringHealth = null; callback?.invoke()
++            if (deny) return RootBridge.Result(126, "private-error-message-with-TOPSECRET")
++            return RootBridge.Result(0, JSONObject().put("ok", true).put("networkIntegrity", integrity)
++                .put("networkFault", fault).put("dataPlaneHealthy", integrity == "healthy").toString())
++        }
++    }
++}
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [DiagnosticsBridgeShadow::class])
++class NetworkDiagnosticsTest {
++    private lateinit var controller: ServiceController<ProxyNetworkMatchService>
++    private lateinit var service: ProxyNetworkMatchService
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++    @Before fun prepare() {
++        prefs.edit().clear().commit()
++        DiagnosticsBridgeShadow.commands.clear(); DiagnosticsBridgeShadow.deny = false
++        DiagnosticsBridgeShadow.integrity = "degraded"; DiagnosticsBridgeShadow.fault = "listener-11053-udp"
++        DiagnosticsBridgeShadow.repairExit = 91; DiagnosticsBridgeShadow.duringHealth = null
++        controller = Robolectric.buildService(ProxyNetworkMatchService::class.java).create(); service = controller.get()
++        ReflectionHelpers.getField<ExecutorService>(service, "metrics").shutdownNow()
++        ReflectionHelpers.getField<ExecutorService>(service, "worker").shutdownNow()
++        prefs.edit().putBoolean("proxyRootWanted", true).putString("proxyNetworkIntegrity", "degraded")
++            .putString("proxyNetworkFault", "watchdog-missing").putString("proxyPolicyEgressState", "reachable").commit()
++    }
++    @After fun finish() {
++        controller.destroy()
++        ReflectionHelpers.getField<ExecutorService>(service, "journalWorker").awaitTermination(5, TimeUnit.SECONDS)
++    }
++    private fun call(name: String, vararg args: Any) {
++        val method = ProxyNetworkMatchService::class.java.declaredMethods.single { it.name == name }
++        method.isAccessible = true
++        val worker = Executors.newSingleThreadExecutor()
++        try { worker.submit { method.invoke(service, *args) }.get() } finally { worker.shutdownNow() }
++        ReflectionHelpers.getField<ExecutorService>(service, "journalWorker").submit {}.get()
++    }
++    private fun recent() = ProxyNetworkJournal(app).recent()
++    private fun readyNetwork() {
++        val network = ShadowNetwork.newInstance(101)
++        val callback = ReflectionHelpers.getField<ConnectivityManager.NetworkCallback>(service, "cb")
++        callback.onAvailable(network)
++        val caps = NetworkCapabilities(); val shadow = Shadow.extract<ShadowNetworkCapabilities>(caps)
++        shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
++        shadow.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++        callback.onCapabilitiesChanged(network, caps)
++        callback.onLinkPropertiesChanged(network, LinkProperties().apply { interfaceName = "wlan0" })
++    }
++
++    @Test fun failedHealthReadHasFreshUnknownStateTimestampAndTraceWithoutClaimingHealth() {
++        DiagnosticsBridgeShadow.deny = true; call("checkLiveNetworkIntegrity")
++        assertEquals("unknown", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals("health-read-failed", prefs.getString("proxyNetworkFault", ""))
++        assertTrue(prefs.getLong("proxyNetworkCheckedAt", 0) > 0)
++        val id = prefs.getString("proxyNetworkHealthTraceId", "")!!
++        assertEquals(36, id.length); assertTrue(recent().contains(id))
++        assertTrue(recent().contains("java.io.IOException")); assertFalse(recent().contains("TOPSECRET"))
++        assertEquals("reachable", prefs.getString("proxyPolicyEgressState", ""))
++    }
++    @Test fun laterHealthSuccessKeepsTheEarlierFailureRecord() {
++        DiagnosticsBridgeShadow.deny = true; call("checkLiveNetworkIntegrity")
++        val failed = prefs.getString("proxyNetworkHealthTraceId", "")!!
++        DiagnosticsBridgeShadow.deny = false; DiagnosticsBridgeShadow.integrity = "healthy"
++        DiagnosticsBridgeShadow.fault = ""; call("checkLiveNetworkIntegrity")
++        assertEquals("healthy", prefs.getString("proxyNetworkIntegrity", ""))
++        assertTrue(recent().contains(failed)); assertTrue(recent().contains("health-read-failed"))
++        assertFalse(prefs.contains("proxyNetworkHealthReadError"))
++    }
++    @Test fun failedJournalWriteDoesNotChangeHealthOrWantedIntent() {
++        val blocked = File(app.noBackupFilesDir, "blocked-journal-parent"); blocked.writeText("fixture")
++        ReflectionHelpers.setField(service, "journal", ProxyNetworkJournal(blocked, 1024))
++        DiagnosticsBridgeShadow.integrity = "healthy"; DiagnosticsBridgeShadow.fault = ""
++        call("checkLiveNetworkIntegrity")
++        assertEquals("healthy", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals("IOException", prefs.getString("proxyNetworkJournalError", ""))
++        assertEquals(1L, prefs.getLong("proxyNetworkJournalDropped", 0))
++        assertTrue(prefs.getBoolean("proxyRootWanted", false))
++    }
++    @Test fun oldHealthAfterNetworkChangeIsRecordedButCannotOverwriteCurrentObservation() {
++        DiagnosticsBridgeShadow.integrity = "healthy"; DiagnosticsBridgeShadow.fault = ""
++        DiagnosticsBridgeShadow.duringHealth = {
++            ReflectionHelpers.getField<ConnectivityManager.NetworkCallback>(service, "cb")
++                .onAvailable(ShadowNetwork.newInstance(202))
++        }
++        call("checkLiveNetworkIntegrity")
++        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals("watchdog-missing", prefs.getString("proxyNetworkFault", ""))
++        assertTrue(recent().contains("STALE_RESULT")); assertTrue(recent().contains("DISCARDED"))
++    }
++    @Test fun repairExitFailureIsVisibleAndDoesNotTurnIntoNetworkHealthSuccess() {
++        val route = ReflectionHelpers.getField<NetworkEpoch<android.net.Network>>(service, "networkEvents").snapshot()
++        call("repairLiveNetworkIntegrity", route)
++        assertEquals(91, prefs.getInt("proxyNetworkRepairExit", 0))
++        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
++        assertTrue(recent().contains("REPAIR_RESULT")); assertTrue(recent().contains("\"code\":91"))
++        val command = DiagnosticsBridgeShadow.commands.first { it.contains("repair-network") }
++        assertTrue(command.endsWith(">/dev/null 2>&1")); assertFalse(command.endsWith("|| true"))
++    }
++    @Test fun saturatedJournalQueueDoesNotBlockCallbacksAndReportsDroppedEvidence() {
++        val writer = ReflectionHelpers.getField<ThreadPoolExecutor>(service, "journalWorker")
++        val entered = CountDownLatch(1); val release = CountDownLatch(1)
++        writer.execute { entered.countDown(); release.await(5, TimeUnit.SECONDS) }
++        assertTrue(entered.await(5, TimeUnit.SECONDS))
++        try {
++            val callback = ReflectionHelpers.getField<ConnectivityManager.NetworkCallback>(service, "cb")
++            repeat(140) { callback.onAvailable(ShadowNetwork.newInstance(1000 + it)) }
++            assertEquals(128, writer.queue.size)
++            assertTrue(prefs.getLong("proxyNetworkJournalDropped", 0) > 0)
++            assertTrue(prefs.getBoolean("proxyRootWanted", false))
++            assertTrue(DiagnosticsBridgeShadow.commands.isEmpty())
++        } finally { release.countDown(); writer.shutdown() }
++        assertTrue(writer.awaitTermination(15, TimeUnit.SECONDS))
++    }
++    @Test fun alternateTargetSuccessKeepsFirstFailureAndCannotMaskStructuralFault() {
++        readyNetwork(); var requests = 0
++        ReflectionHelpers.setField(service, "egressRequest", ProxyNetworkMatchService.EgressRequest { _, _ ->
++            requests++; if (requests == 1) 503 else 204
++        })
++        call("probeEgressIfPending")
++        assertEquals(2, requests)
++        assertEquals("reachable", prefs.getString("proxyPolicyEgressState", ""))
++        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
++        val results = recent().lineSequence().filter { it.startsWith("{") }.map { JSONObject(it) }.toList()
++        val targets = results.filter { it.getString("stage") == "EGRESS_TARGET_RESULT" }
++        assertEquals(listOf(503, 204), targets.map { it.getInt("code") })
++        assertEquals(listOf("GOOGLE_204", "CLOUDFLARE_204"), targets.map { it.getString("target") })
++        assertEquals(1, targets.map { it.getString("parent") }.toSet().size)
++        assertTrue(DiagnosticsBridgeShadow.commands.isEmpty())
++    }
++    @Test fun handoverDuringFirstProbeDiscardsResultAndDoesNotRequestSecondTarget() {
++        readyNetwork(); var requests = 0
++        ReflectionHelpers.setField(service, "egressRequest", ProxyNetworkMatchService.EgressRequest { _, _ ->
++            requests++
++            ReflectionHelpers.getField<ConnectivityManager.NetworkCallback>(service, "cb")
++                .onAvailable(ShadowNetwork.newInstance(102))
++            503
++        })
++        call("probeEgressIfPending")
++        assertEquals(1, requests)
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", ""))
++        assertTrue(recent().contains("STALE_RESULT"))
++        assertTrue(DiagnosticsBridgeShadow.commands.isEmpty())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt
+new file mode 100644
+index 0000000..70921f2
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt
+@@ -0,0 +1,123 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.File
++import java.io.IOException
++import java.util.concurrent.Executors
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class ProxyNetworkJournalTest {
++    @get:Rule val temporary = TemporaryFolder()
++    private fun event(error: Throwable? = null, parent: String? = null) = ProxyNetworkJournal.capture(
++        ProxyNetworkJournal.Stage.EGRESS_RESULT, 7, ProxyNetworkJournal.Outcome.UNVERIFIED, 503, error, parent)
++    private fun records(directory: File) = directory.listFiles()!!.sortedBy { it.name }
++        .flatMap { it.readLines().filter(String::isNotEmpty) }.map { JSONObject(it) }
++
++    @Test fun exceptionMessagesAddressesAndCredentialsNeverEnterRecords() {
++        val hidden = "https://example.invalid/token?secret=TOPSECRET SSID=PRIVATE user@private.invalid /data/private"
++        val cause = IOException(hidden)
++        cause.stackTrace = arrayOf(StackTraceElement("CoreWorker", "check", "worker.java", 42))
++        val captured = event(IllegalStateException(hidden, cause), "not-a-generated-id")
++        assertFalse(captured.line.contains(hidden)); assertFalse(captured.line.contains("TOPSECRET"))
++        assertFalse(captured.line.contains("SSID")); assertFalse(captured.line.contains("private.invalid"))
++        val record = JSONObject(captured.line)
++        assertFalse(record.has("parent"))
++        assertEquals("java.io.IOException", record.getJSONArray("causes").getJSONObject(1).getString("type"))
++        assertTrue(captured.line.contains("CoreWorker.check:42"))
++    }
++    @Test fun onlyKnownStructuralFaultCodesAreRecorded() {
++        val captured = ProxyNetworkJournal.captureHealth(3, ProxyNetworkJournal.Outcome.DEGRADED,
++            "session-manifest-missing,listener-11053-udp,watchdog-missing,https://private.invalid/token", null)
++        val faults = JSONObject(captured.line).getJSONArray("faults")
++        assertEquals("session-manifest-missing", faults.getString(0))
++        assertEquals("listener-11053-udp", faults.getString(1))
++        assertEquals("watchdog-missing", faults.getString(2))
++        assertEquals("unclassified-fault", faults.getString(3))
++        assertFalse(captured.line.contains("private.invalid"))
++    }
++    @Test fun laterHealthyObservationPreservesFailureAndBothTraceIds() {
++        val dir = temporary.newFolder(); val journal = ProxyNetworkJournal(dir, 4096)
++        val failed = ProxyNetworkJournal.captureHealth(1, ProxyNetworkJournal.Outcome.UPGRADE_REQUIRED, "session-manifest-missing", null)
++        val healthy = ProxyNetworkJournal.captureHealth(1, ProxyNetworkJournal.Outcome.HEALTHY, "", null)
++        journal.append(failed); journal.append(healthy)
++        val recent = journal.recent()
++        assertTrue(recent.contains(failed.id)); assertTrue(recent.contains(healthy.id))
++        assertTrue(recent.contains("session-manifest-missing")); assertTrue(recent.contains("HEALTHY"))
++    }
++    @Test fun rotationRetainsOldSegmentsByteForByte() {
++        val dir = temporary.newFolder(); val journal = ProxyNetworkJournal(dir, 1024)
++        journal.append(event()); val first = dir.listFiles()!!.single(); val bytes = first.readBytes()
++        // Fill the first chunk, then compare after a subsequent rollover.
++        while (dir.listFiles()!!.size == 1) journal.append(event())
++        val completed = first.readBytes(); assertTrue(completed.size >= bytes.size)
++        repeat(20) { journal.append(event()) }
++        assertArrayEquals(completed, first.readBytes()); assertTrue(dir.listFiles()!!.size > 2)
++    }
++    @Test fun partialWriteIsRetainedAndNextCompleteRecordRemainsReadable() {
++        val dir = temporary.newFolder(); val journal = ProxyNetworkJournal(dir, 4096)
++        journal.append(event()); val file = dir.listFiles()!!.single()
++        file.appendText("{incomplete-record")
++        val next = event(); journal.append(next)
++        assertTrue(file.readText().contains("{incomplete-record\n"))
++        assertTrue(journal.recent().contains(next.id)); assertTrue(journal.recent().contains("unreadableLines=1"))
++    }
++    @Test fun restartFindsRetainedSegmentsAndAppendsInsteadOfReplacing() {
++        val dir = temporary.newFolder(); val first = event()
++        ProxyNetworkJournal(dir, 1024).append(first)
++        val restarted = ProxyNetworkJournal(dir, 1024); val second = event(); restarted.append(second)
++        assertTrue(restarted.recent().contains(first.id)); assertTrue(restarted.recent().contains(second.id))
++        assertEquals(2, records(dir).size)
++    }
++    @Test fun concurrentAppendsProduceWholeUniqueRecords() {
++        val dir = temporary.newFolder(); val journal = ProxyNetworkJournal(dir, 4096)
++        val workers = Executors.newFixedThreadPool(8)
++        try { (1..128).map { workers.submit { journal.append(event()) } }.forEach { it.get() } }
++        finally { workers.shutdownNow() }
++        val records = records(dir)
++        assertEquals(128, records.size); assertEquals(128, records.map { it.getString("id") }.toSet().size)
++    }
++    @Test fun recentViewIsBoundedWithoutDeletingOlderRecords() {
++        val dir = temporary.newFolder(); val journal = ProxyNetworkJournal(dir, 256 * 1024)
++        val first = event(); journal.append(first); repeat(1000) { journal.append(event()) }
++        val recent = journal.recent()
++        assertEquals(64, recent.lineSequence().count { it.startsWith("{") })
++        assertFalse(recent.contains(first.id)); assertEquals(first.id, records(dir).first().getString("id"))
++        assertEquals(1001, records(dir).size)
++    }
++    @Test fun causeDepthAndFramesHaveFiniteBounds() {
++        var error: Throwable = IOException("secret")
++        repeat(20) { error = IllegalStateException("secret", error) }
++        error.stackTrace = Array(30) { StackTraceElement("Worker", "check", "file.java", it) }
++        val record = JSONObject(event(error).line)
++        assertEquals(4, record.getJSONArray("causes").length())
++        assertEquals(3, record.getJSONArray("causes").getJSONObject(0).getJSONArray("frames").length())
++        assertTrue(record.has("elapsedMs")); assertTrue(record.has("timeMs"))
++    }
++    @Test fun applicationJournalUsesStablePrivateDirectoryAndNeedsNoRoot() {
++        val app = ApplicationProvider.getApplicationContext<Application>(); val first = event()
++        ProxyNetworkJournal(app).append(first)
++        assertTrue(File(app.noBackupFilesDir, "hetu-network-events").isDirectory)
++        assertFalse(File(app.cacheDir, "hetu-network-events").exists())
++        assertTrue(ProxyNetworkJournal(app).recent().contains(first.id))
++    }
++    @Test fun separateTargetsKeepFailedAndSuccessfulResultsLinkedToOneRequest() {
++        val request = event()
++        val first = ProxyNetworkJournal.captureEgress(7, ProxyNetworkJournal.Target.GOOGLE_204, 503, null, request.id)
++        val second = ProxyNetworkJournal.captureEgress(7, ProxyNetworkJournal.Target.CLOUDFLARE_204, 204, null, request.id)
++        assertEquals("GOOGLE_204", JSONObject(first.line).getString("target"))
++        assertEquals("UNVERIFIED", JSONObject(first.line).getString("outcome"))
++        assertEquals("REACHABLE", JSONObject(second.line).getString("outcome"))
++        assertEquals(request.id, JSONObject(first.line).getString("parent"))
++        assertEquals(request.id, JSONObject(second.line).getString("parent"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
+index 508beed..44194bf 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt
+@@ -22,6 +22,7 @@ import org.robolectric.shadows.ShadowNetwork
+ import org.robolectric.shadows.ShadowNetworkCapabilities
+ import java.net.InetAddress
+ import java.util.concurrent.ExecutorService
++import java.util.concurrent.TimeUnit
+ 
+ /** Real service callbacks and publication fence, with all Root/HTTP workers stopped. */
+ @RunWith(RobolectricTestRunner::class)
+@@ -47,7 +48,10 @@ class RootNetworkRecoveryTest {
+         epochs = ReflectionHelpers.getField(service, "networkEvents")
+         prefs.edit().putBoolean("proxyRootWanted", true).commit()
+     }
+-    @After fun finish() { if (!destroyed) controller.destroy() }
++    @After fun finish() {
++        if (!destroyed) controller.destroy()
++        ReflectionHelpers.getField<ExecutorService>(service, "journalWorker").awaitTermination(5, TimeUnit.SECONDS)
++    }
+ 
+     private fun capabilities(validated: Boolean = false, captive: Boolean = false, physical: Boolean = true): NetworkCapabilities {
+         val value = NetworkCapabilities()

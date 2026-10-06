@@ -1,0 +1,89 @@
+{
+  "schema": 1,
+  "repository": "https://github.com/google/j2objc",
+  "licenseBlobSha": "b4210b80b5b6a4239c537b01edb6130e00f670ca",
+  "retrievedAt": "2026-10-04",
+  "sources": [
+    {
+      "file": "JSON.java",
+      "sourceBlobSha": "1b32e698d010458b1797d96b85cc020b183fc3bc",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/1b32e698d010458b1797d96b85cc020b183fc3bc",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "5e15ce6d844157998a28296692c8779b93d4953f16ce5d6beca38256fca97bd3"
+    },
+    {
+      "file": "JSONArray.java",
+      "sourceBlobSha": "e331f22c2eea646dd464a42036d21ef64905f145",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/e331f22c2eea646dd464a42036d21ef64905f145",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "1bf1c563a0ca0de67af0de47c66226f4b46b5167404441e13be187c8a055c01c"
+    },
+    {
+      "file": "JSONException.java",
+      "sourceBlobSha": "05e1dddc9aa4666dc89175d144288f9d9aa08ce4",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/05e1dddc9aa4666dc89175d144288f9d9aa08ce4",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "b2b6d54e7421027d10f421714589a5f32caceb942843e054de9bbd7980187d6e"
+    },
+    {
+      "file": "JSONObject.java",
+      "sourceBlobSha": "0cd485267dbdf82aff9bd2e0e9fa2e704786ddb6",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/0cd485267dbdf82aff9bd2e0e9fa2e704786ddb6",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "6c93698a66ed27c989ea31eaa867a60a739460c6237b759478643fcdc1c19b67"
+    },
+    {
+      "file": "JSONStringer.java",
+      "sourceBlobSha": "1c93ff45eb18c87b5872e110ab84691c15b69b7f",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/1c93ff45eb18c87b5872e110ab84691c15b69b7f",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "a45477d85bb927c9ff672d32dafc3f8bb62ab4583c9ff11f5685c47b6bf1cbde"
+    },
+    {
+      "file": "JSONTokener.java",
+      "sourceBlobSha": "b381c5de9be44f285df22a1fd18baafe32ec610e",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/b381c5de9be44f285df22a1fd18baafe32ec610e",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "d3489e578d509c4c3f1c909375b84e18001feac088d1fac644244600ed19161d"
+    },
+    {
+      "file": "NonNull.java",
+      "sourceBlobSha": "5c7703ee5f4519f1fb039bcdc9ac146def8ba9f2",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/5c7703ee5f4519f1fb039bcdc9ac146def8ba9f2",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "ba978cc8949d7134e91e908554b2eb8b0a1b2b704a1606262fd6fa065d8ae1f2"
+    },
+    {
+      "file": "Nullable.java",
+      "sourceBlobSha": "de89c7ac7767730c3475a7d5381f2bfb148ab5e1",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/de89c7ac7767730c3475a7d5381f2bfb148ab5e1",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "25e329552813cddde98bff8397da9bd1034a42a171523e281eb33a82484a638c"
+    },
+    {
+      "file": "UnsupportedAppUsage.java",
+      "sourceBlobSha": "2dd485940302ba076d36e6df81108d3688f77658",
+      "sourceBlobApi": "https://api.github.com/repos/google/j2objc/git/blobs/2dd485940302ba076d36e6df81108d3688f77658",
+      "license": "Apache-2.0",
+      "purpose": "QA only; retained copyright/license headers; no APK inclusion",
+      "localTransform": "Patch transport may normalize the final newline; local SHA256 recorded separately.",
+      "localSha256": "c905f559d4029f9d5a1f7c626a9355e152de27b7b5570e254ab0d551fccf0174"
+    }
+  ]
+}

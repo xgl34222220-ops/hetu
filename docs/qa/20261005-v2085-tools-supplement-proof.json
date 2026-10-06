@@ -1,0 +1,114 @@
+{
+  "applicationBaseline": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "scope": "Only four assigned tools source files modified by this supplement; no patch, guards, tests, CI, commits or other source files touched. Prior Advanced and ToolScreens assignments already reported separately.",
+  "sourceEvidence": "/tmp/hetu_adblock44_49_text_measurements_7cf.json",
+  "changes": {
+    "03A22": "URL ToolsField errorAfterHint=adding; add only hint then error; footer top7dp iff adding and urlError exists, otherwise28dp.",
+    "03A23": "Editing remains error then hint; footer28dp.",
+    "03A44": "Only standalone DNS subtitle style12sp/17sp; nullable switch helper override defaults to original style. Reference ink212.682x11.096dp at available227dp.",
+    "03A49": "Only confirmation domain text proportional Default at original14sp/21sp and c.t2; domain data, maxLines2, overflow, callbacks untouched."
+  },
+  "files": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+      "currentSha256": "f1bfa9f0d4d59aefd6d0c752b3ca8dff3de1cf8bf1048b370eefd6f2487d71a7",
+      "beforeSha256": "404f1c5a0b1b0057ce24ee4b5fb13f6d1e91aa939a4237558559f977a4542d5c",
+      "reverseSha256": "404f1c5a0b1b0057ce24ee4b5fb13f6d1e91aa939a4237558559f977a4542d5c",
+      "reverseEqualsBefore": true,
+      "normalized7cfSha256": "404f1c5a0b1b0057ce24ee4b5fb13f6d1e91aa939a4237558559f977a4542d5c",
+      "normalizedEquals7cf": true,
+      "priorSharedChange": null,
+      "reversedPresentationChanges": [
+        {
+          "current": "    errorAfterHint: Boolean = false,\n",
+          "prior": ""
+        },
+        {
+          "current": "        if (errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)\n",
+          "prior": ""
+        },
+        {
+          "current": "        if (!errorAfterHint && hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)",
+          "prior": "        if (hint != null) Text(ht(hint), Modifier.padding(horizontal = 2.dp), color = c.t3, style = HomeType.caption)"
+        }
+      ]
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+      "currentSha256": "c1d410ce4a44a48cf08003e7fe8ed27bd71ca0abaf2e1bf0680ffce28f8b8f03",
+      "beforeSha256": "3e5eca8e9d15f24265da82f4fae17d48570ccdf8a3b873d085250baeced11d39",
+      "reverseSha256": "3e5eca8e9d15f24265da82f4fae17d48570ccdf8a3b873d085250baeced11d39",
+      "reverseEqualsBefore": true,
+      "normalized7cfSha256": "a4463e8549f86860631e7548bcd7aa7cede9053330337c8eb72acf9f9b49ca40",
+      "normalizedEquals7cf": true,
+      "priorSharedChange": "Root approved footer top28dp before this task; reversed separately only for comparison.",
+      "reversedPresentationChanges": [
+        {
+          "current": "                    errorAfterHint = adding,\n",
+          "prior": ""
+        },
+        {
+          "current": "Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp))",
+          "prior": "Column(Modifier.padding(top = 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp))"
+        }
+      ]
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt",
+      "currentSha256": "42ef0e8242b1ffdef0c787d384857e3e8494ace330c85c555425c05a0d9bf319",
+      "beforeSha256": "3aa91c3ceb01ab5b890fc146a239356d7cbc86c2335076886653068ffff54711",
+      "reverseSha256": "3aa91c3ceb01ab5b890fc146a239356d7cbc86c2335076886653068ffff54711",
+      "reverseEqualsBefore": true,
+      "normalized7cfSha256": "3aa91c3ceb01ab5b890fc146a239356d7cbc86c2335076886653068ffff54711",
+      "normalizedEquals7cf": true,
+      "priorSharedChange": null,
+      "reversedPresentationChanges": [
+        {
+          "current": "import androidx.compose.ui.text.TextStyle\n",
+          "prior": ""
+        },
+        {
+          "current": "    subtitleStyle: TextStyle? = null,\n",
+          "prior": ""
+        },
+        {
+          "current": "subtitleStyle = subtitleStyle ?: (if (monospaceSubtitle) ToolsType.url else HomeType.rowSub)",
+          "prior": "subtitleStyle = if (monospaceSubtitle) ToolsType.url else HomeType.rowSub"
+        }
+      ]
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+      "currentSha256": "4a1bc9588d99a6b360dd7c38fa62a93a115b33f19fc8799c444b3c6c19ceeb54",
+      "beforeSha256": "c5528a73c16267de1e60c9f2532d041589018f50d857906bb4c7fcbef96bf631",
+      "reverseSha256": "c5528a73c16267de1e60c9f2532d041589018f50d857906bb4c7fcbef96bf631",
+      "reverseEqualsBefore": true,
+      "normalized7cfSha256": "c5528a73c16267de1e60c9f2532d041589018f50d857906bb4c7fcbef96bf631",
+      "normalizedEquals7cf": true,
+      "priorSharedChange": null,
+      "reversedPresentationChanges": [
+        {
+          "current": "import androidx.compose.ui.text.font.FontFamily\n",
+          "prior": ""
+        },
+        {
+          "current": "import androidx.compose.ui.unit.sp\n",
+          "prior": ""
+        },
+        {
+          "current": "enabled = idle, subtitleStyle = HomeType.rowSub.copy(fontSize = 12.sp, lineHeight = 17.sp)",
+          "prior": "enabled = idle"
+        },
+        {
+          "current": "Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t2, style = HomeType.mono.copy(fontFamily = FontFamily.Default)",
+          "prior": "Text(overlay.domain, Modifier.fillMaxWidth(), color = c.t1, style = HomeType.mono"
+        }
+      ]
+    }
+  ],
+  "diffCheck": "git diff --check exit0",
+  "limits": [
+    "No compilation or runtime verification performed by this agent; parent will build fixed input.",
+    "New typography geometry and visual single-line fit require new artifact comparison; no pixel1:1 pass asserted."
+  ]
+}

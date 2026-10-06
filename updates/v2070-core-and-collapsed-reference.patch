@@ -1,0 +1,374 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2069
+-        versionName = "0.11.9-v20"
++        versionCode = 2070
++        versionName = "0.12.0-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
+@@ -23,6 +23,17 @@
+ import java.util.zip.GZIPInputStream
+ import java.util.zip.ZipInputStream
+ import javax.net.ssl.HttpsURLConnection
++
++/** Presentation of the actual transfer callback; an unknown total stays unknown. */
++internal fun coreDownloadProgressText(done: Long, total: Long): String {
++    fun bytes(value: Long): String = when {
++        value >= 1_000_000L -> "%.1f MB".format(Locale.ROOT, value / 1_000_000.0)
++        value >= 1_000L -> "%.1f KB".format(Locale.ROOT, value / 1_000.0)
++        else -> "$value B"
++    }
++    val transferred = bytes(done.coerceAtLeast(0L))
++    return "正在下载 · " + if (total > 0L) "$transferred / ${bytes(total)}" else transferred
++}
+ 
+ internal data class ProxyCoreRemoteStatus(
+     val id: String,
+@@ -166,12 +177,7 @@
+         val asset = resolve(source) ?: throw IOException("没有适配 ${abiLabel()} 的 Android 核心")
+         onProgress("下载 ${core.label} ${asset.version}…")
+         val archive = download(asset) { done, total ->
+-            if (total > 0L) {
+-                val percent = ((done * 100L) / total).coerceIn(0L, 100L)
+-                onProgress("下载 ${core.label} · $percent%")
+-            } else {
+-                onProgress("下载 ${core.label} · ${human(done)}")
+-            }
++            onProgress(coreDownloadProgressText(done, total))
+         }
+         val extracted = File(app.cacheDir, "proxy-core-${core.id}-${System.nanoTime()}.bin")
+         try {
+@@ -587,12 +593,6 @@
+         return connection
+     }
+ 
+-    private fun human(value: Long): String = when {
+-        value >= 1_048_576L -> "%.1f MiB".format(Locale.ROOT, value / 1_048_576.0)
+-        value >= 1024L -> "%.0f KiB".format(Locale.ROOT, value / 1024.0)
+-        else -> "$value B"
+-    }
+-
+     companion object {
+         private const val PREFS = "hetu_core_updates"
+         private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
+@@ -48,11 +48,22 @@
+ @Composable
+ internal fun CoreConceptButton(text: String,onClick: () -> Unit,modifier: Modifier=Modifier,icon: ImageVector?=null,enabled:Boolean=true,busy:Boolean=false,tone:HxTone=HxTone.Accent,filled:Boolean=true) {
+     val c=Hx.colors
+-    val foreground=if(!enabled)c.textFaint else if(filled)c.onAccent else tone.fg()
+-    Row(modifier.heightIn(min=50.dp).clip(RoundedCornerShape(18.dp)).background(if(!enabled)c.surfaceMuted else if(filled)tone.fg() else c.surfaceMuted)
+-        .clickable(enabled=enabled&&!busy,onClick=onClick).padding(horizontal=10.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
+-        if(busy){HxSpinner(17.dp,foreground);Spacer(Modifier.width(7.dp))}
+-        Text(text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines=1)
++    val actionable = enabled && !busy
++    val foreground = when {
++        busy -> c.onAccent
++        !enabled -> c.textFaint.copy(alpha = .6f)
++        filled -> c.onAccent
++        else -> tone.fg()
++    }
++    val background = when {
++        busy -> c.textFaint.copy(alpha = .45f)
++        !enabled || !filled -> c.surfaceMuted
++        else -> tone.fg()
++    }
++    Row(modifier.heightIn(min=50.dp).clip(RoundedCornerShape(18.dp)).background(background)
++        .clickable(enabled=actionable,onClick={ if (actionable) onClick() }).padding(horizontal=10.dp,vertical=10.dp),verticalAlignment=Alignment.CenterVertically,horizontalArrangement=Arrangement.Center) {
++        if(busy){HxSpinner(21.dp,foreground);Spacer(Modifier.width(9.dp))}
++        Text(if (busy) "处理中" else text,fontSize=18.sp,fontWeight=FontWeight.SemiBold,color=foreground,maxLines=1)
+     }
+ }
+ 
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+@@ -392,13 +392,15 @@
+     }
+     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+     val bottom = HxDockHeight + 10.dp + navInset + 14.dp
+-    // The dock tucks away while reading down a list and returns on any upward scroll.
++    // The concept's collapsed Tools/Settings pages retain their root navigation.
++    // Other root pages keep their existing scroll behavior; child routes own no dock.
+     var dockVisible by remember { mutableStateOf(true) }
+     val page = vm.tab.name
+     LaunchedEffect(page) { dockVisible = true }
+-    val dockScroll = remember {
++    val dockScroll = remember(page) {
+         object : NestedScrollConnection {
+             override fun onPostScroll(consumed: Offset, available: Offset, source: NestedScrollSource): Offset {
++                if (page == "Tools" || page == "Settings") return Offset.Zero
+                 if (consumed.y < -18f) dockVisible = false
+                 else if (consumed.y > 12f || available.y > 0f) dockVisible = true
+                 return Offset.Zero
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -335,25 +335,40 @@
+     HxPage(
+         title = ht("核心管理"),
+         largeTitle = false,
+-        subtitle = if (vm.coreVersion.isNotBlank()) "运行中：${vm.coreVersion}" else "内置 Mihomo，可在线更新",
+         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
+         actions = { HxBarAction(Icons.Rounded.Refresh, "检查更新", onClick = { load(true) }, busy = checking) },
+     ) {
++        item(key = "core-runtime-status") {
++            Text(
++                when {
++                    !vm.state.running -> "代理未运行"
++                    vm.coreVersion.isNotBlank() -> "运行中：${vm.coreVersion}"
++                    else -> "代理运行中"
++                },
++                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 28.dp),
++                fontSize = 15.sp,
++                lineHeight = 20.sp,
++                fontWeight = FontWeight.SemiBold,
++                color = c.textMuted,
++                textAlign = TextAlign.Center,
++            )
++        }
+         if (statuses.isEmpty()) {
+             item(key = "loading") { HxSkeletonRows(3) }
+         }
+         items(cards, key = { it.first }) { (family, status) ->
+             val core = ProxyRuntimeProfile.Core.from(status.id)
+             val busy = working == status.id
+-            SettingsSection {
+-                HxCard(padding = PaddingValues(16.dp)) {
+-                    Row(verticalAlignment = Alignment.CenterVertically) {
++            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 14.dp)) {
++                HxCard(padding = PaddingValues(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 16.dp)) {
++                    Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                         CoreConceptGlyph(status.id)
+-                        Spacer(Modifier.width(12.dp))
++                        Spacer(Modifier.width(16.dp))
+                         Column(Modifier.weight(1f)) {
+                             Row(verticalAlignment = Alignment.CenterVertically) {
+                                 Text(coreManagerDisplayName(status.id, status.label),
+-                                    modifier = Modifier.hxAnchorSource().clickable(enabled = working == null) { variantMenu = family },
++                                    modifier = Modifier.weight(1f, fill = status.updateAvailable).hxAnchorSource().clickable(enabled = working == null) { variantMenu = family },
++                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold), color = c.text)
+                                 if (status.updateAvailable) {
+                                     Spacer(Modifier.width(8.dp))
+@@ -375,20 +390,18 @@
+                         }
+                     }
+                     if (busy && progress.isNotBlank()) {
+-                        Row(Modifier.padding(top = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+-                            HxSpinner(12.dp)
+-                            Spacer(Modifier.width(8.dp))
+-                            Text(progress, style = MaterialTheme.typography.bodySmall.merge(HxNumberStyle), color = c.accent, maxLines = 2)
++                        Row(Modifier.padding(start = 78.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
++                            HxSpinner(20.dp)
++                            Spacer(Modifier.width(10.dp))
++                            Text(progress, style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold), color = c.textMuted, maxLines = 2)
+                         }
+-                        val percent = Regex("(\\d{1,3})%").find(progress)?.groupValues?.get(1)?.toFloatOrNull()
+-                        if (percent != null) HxProgressBar((percent / 100f).coerceIn(0f, 1f), modifier = Modifier.padding(top = 10.dp))
+                     } else if (status.message.isNotBlank()) {
+                         Text(status.message, style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp), color = c.textMuted, modifier = Modifier.padding(top = 10.dp))
+                     }
+-                    Spacer(Modifier.height(14.dp))
++                    Spacer(Modifier.height(if (busy && progress.isNotBlank()) 14.dp else 16.dp))
+                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                         CoreConceptButton(
+-                            if (status.downloaded) "更新" else "下载",
++                            if (status.downloaded || status.bundled) "更新" else "下载",
+                             onClick = {
+                                 working = status.id
+                                 progress = ""
+@@ -408,6 +421,7 @@
+                             },
+                             icon = Icons.Rounded.CloudDownload,
+                             busy = busy,
++                            filled = status.downloaded || status.bundled,
+                             enabled = working == null && status.canDownload,
+                             modifier = Modifier.weight(1f),
+                         )
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -99,6 +99,8 @@
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.layout.onSizeChanged
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
+ import androidx.core.content.ContextCompat
+@@ -116,6 +118,8 @@
+     var choice by remember { mutableStateOf<String?>(null) }
+     var subPage by remember { mutableStateOf(initialSubPage) }
+     var restoreUri by remember { mutableStateOf<Uri?>(null) }
++    val density = LocalDensity.current
++    var firstGroupHeightPx by remember { mutableIntStateOf(0) }
+ 
+     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri: Uri? ->
+         if (uri != null) scope.launch {
+@@ -330,7 +334,10 @@
+         HxPage(
+             title = ht("设置"),
+             scrollToTopSignal = vm.reselect,
+-            bottomPadding = bottomPadding,
++            // The collapsed reference begins at the appearance group. Retain enough
++            // measured trailing space to scroll the first group above the toolbar,
++            // even on a tall viewport; do not shrink rows or hard-code a device height.
++            bottomPadding = bottomPadding + with(density) { firstGroupHeightPx.toDp() },
+             largeTitleStartPadding = 26.dp,
+             largeTitleTopPadding = 26.dp,
+             largeTitleFontSizeSp = 36f,
+@@ -338,19 +345,21 @@
+             canvasColor = c.canvas,
+         ) {
+             item(key = "proxy-config") {
+-                MiuixSettingsCard {
+-                    MiuixSettingsArrow(
+-                        title = ht("基础代理配置"),
+-                        summary = ht("核心、模式与当前配置"),
+-                        icon = Icons.Rounded.Tune,
+-                        onClick = { open(RootTproxyActivity::class.java) },
+-                    )
+-                    MiuixSettingsArrow(
+-                        title = ht("高级代理配置"),
+-                        summary = ht("性能、DNS 与资源限制"),
+-                        icon = Icons.Rounded.Dns,
+-                        onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
+-                    )
++                Box(Modifier.onSizeChanged { firstGroupHeightPx = it.height }) {
++                    MiuixSettingsCard {
++                        MiuixSettingsArrow(
++                            title = ht("基础代理配置"),
++                            summary = ht("核心、模式与当前配置"),
++                            icon = Icons.Rounded.Tune,
++                            onClick = { open(RootTproxyActivity::class.java) },
++                        )
++                        MiuixSettingsArrow(
++                            title = ht("高级代理配置"),
++                            summary = ht("性能、DNS 与资源限制"),
++                            icon = Icons.Rounded.Dns,
++                            onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
++                        )
++                    }
+                 }
+             }
+ 
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -491,8 +491,20 @@
+         } finally { controller.pause().stop().destroy(); frame() }
+     }
+     @Test fun toolsAndSettingsCollapsedHeaders() {
+-        vm.tab=HxTab.Tools; show { HetuRoot(vm) }; swipeUp(); capture("03A-002-tools-collapsed")
+-        rule.runOnUiThread { vm.tab=HxTab.Settings }; frame(); swipeUp(); capture("04-002-settings-collapsed")
++        fun assertDockVisibleAfterScroll() = rule.runOnUiThread {
++            val dock = nativeNodes().single { it.config.getOrNull(SemanticsProperties.TestTag) == "hetu-dock" }
++            val viewportBottom = rule.activity.window.decorView.height.toFloat()
++            assertTrue("Collapsed root pages retain the reference dock within the viewport",
++                dock.boundsInWindow.height >= 48f && dock.boundsInWindow.top < viewportBottom - 40f && dock.boundsInWindow.bottom <= viewportBottom + 1f)
++        }
++        vm.tab=HxTab.Tools; show { HetuRoot(vm) }; swipeUp(); assertDockVisibleAfterScroll(); capture("03A-002-tools-collapsed")
++        rule.runOnUiThread { vm.tab=HxTab.Settings }; frame(); swipeUp(); assertDockVisibleAfterScroll(); capture("04-002-settings-collapsed")
++        rule.runOnUiThread {
++            val basic = nativeNodes().filter { "基础代理配置" in labels(it) }
++            assertTrue("The first settings group can scroll above the collapsed reference header",
++                basic.none { it.boundsInWindow.height > 0f && it.boundsInWindow.bottom > 52f })
++        }
++        click("默认面板"); expectDock(false); back(); expectDock(true); assertDockVisibleAfterScroll()
+     }
+     @Test fun appListModesSortMenuAndSearch() {
+         val apps = listOf("微信" to "com.example.chat", "浏览器" to "com.example.browser", "应用商店" to "com.example.store", "地图" to "com.example.maps", "音乐" to "com.example.music", "设置" to "com.example.settings")
+@@ -581,11 +593,49 @@
+     }
+     @Config(shadows = [RemainingCoreDownloadShadow::class])
+     @Test fun coreDownloadProgressIsOnlyAnInMemoryCallbackFixture() {
++        assertEquals("正在下载 · 6.4 MB / 12.8 MB", coreDownloadProgressText(6_400_000L, 12_800_000L))
++        assertEquals("正在下载 · 1.5 KB", coreDownloadProgressText(1_500L, -1L))
++        assertEquals("正在下载 · 0 B", coreDownloadProgressText(0L, 0L))
++        // A cached version is not evidence that the proxy is currently running.
++        rule.runOnUiThread { fixture("coreVersion", "Mihomo stale-fixture") }
+         show { CoresScreen(vm) {} }; expectEventually("Xray")
+-        click("下载", 0); expectEventually("下载 Mihomo · 42%")
++        expect("代理未运行")
++        rule.runOnUiThread { assertFalse(exists("运行中：Mihomo stale-fixture")) }
++        click("更新"); expectEventually("正在下载 · 6.4 MB / 12.8 MB"); expect("处理中")
++        fun actionNodes(label: String): List<SemanticsNode> = nativeNodes().filter { label in labels(it) }.mapNotNull { start ->
++            generateSequence(start) { it.parent }.firstOrNull { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++        }.distinctBy { it.id }
++        rule.runOnUiThread {
++            listOf("处理中" to 1, "下载" to 2, "导入" to 3, "Mihomo" to 1, "Xray" to 1, "sing-box" to 1).forEach { (label, count) ->
++                val nodes = actionNodes(label)
++                assertEquals("Action count for $label", count, nodes.size)
++                nodes.forEach { assertTrue("$label must be disabled during download", it.config.contains(SemanticsProperties.Disabled)) }
++            }
++            assertFalse("Byte progress must not also render a percentage bar", nativeNodes().any {
++                it.config.getOrNull(SemanticsProperties.ProgressBarRangeInfo)?.let { range -> range != ProgressBarRangeInfo.Indeterminate } == true
++            })
++        }
+         capture("03A-035-core-download-progress")
++        // Even a direct accessibility invocation cannot start a duplicate transfer or import.
++        click("处理中"); click("下载", 0); click("导入", 0)
+         assertEquals(1, RemainingCoreDownloadShadow.calls)
++        rule.runOnUiThread { assertNull(Shadows.shadowOf(rule.activity).nextStartedActivityForResult) }
++        rule.runOnUiThread { RemainingCoreDownloadShadow.emitProgress(9_600_000L, 12_800_000L) }; frame()
++        expectEventually("正在下载 · 9.6 MB / 12.8 MB")
++        rule.runOnUiThread { RemainingCoreDownloadShadow.emitProgress(9_600_000L, -1L) }; frame()
++        expectEventually("正在下载 · 9.6 MB")
+         rule.runOnUiThread { RemainingCoreDownloadShadow.cancelFixture() }; frame()
++        expect("更新")
++        rule.runOnUiThread {
++            assertFalse(exists("处理中"))
++            assertFalse(exists("正在下载 · 9.6 MB"))
++            assertFalse(actionNodes("更新").single().config.contains(SemanticsProperties.Disabled))
++        }
++        click("更新"); expectEventually("处理中")
++        assertEquals(2, RemainingCoreDownloadShadow.calls)
++        rule.runOnUiThread { RemainingCoreDownloadShadow.cancelFixture() }; frame()
++        rule.runOnUiThread { fixture("state", vm.state.copy(running = true)); fixture("coreVersion", "Mihomo test-fixture") }; frame()
++        expect("运行中：Mihomo test-fixture")
+         assertTrue(RemainingRootBridgeShadow.commands.isEmpty())
+     }
+ }
+@@ -620,4 +670,3 @@
+         }
+     }
+ }
+-
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingCoreDownloadShadow.java
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingCoreDownloadShadow.java
+@@ -11,8 +11,9 @@
+ @Implements(value = ProxyCoreDownloadManager.class, isInAndroidSdk = false, callThroughByDefault = false)
+ public class RemainingCoreDownloadShadow {
+     private static Continuation<? super ProxyCoreRemoteStatus> pending;
++    private static Function1<? super String, Unit> progressCallback;
+     public static int calls;
+-    @Resetter public static void reset() { pending=null; calls=0; }
++    @Resetter public static void reset() { pending=null; progressCallback=null; calls=0; }
+     @Implementation public Object statuses(boolean network, Continuation<? super List<ProxyCoreRemoteStatus>> done) {
+         if (network) throw new SecurityException("Network core status is forbidden in this fixture");
+         return Arrays.asList(
+@@ -22,11 +23,16 @@
+     }
+     @Implementation public Object downloadOrUpdate(ProxyRuntimeProfile.Core core, Function1<? super String, Unit> progress, Continuation<? super ProxyCoreRemoteStatus> done) {
+         if (pending != null) throw new SecurityException("Duplicate fixture download");
+-        calls++; pending=done; progress.invoke("下载 Mihomo · 42%");
++        calls++; pending=done; progressCallback=progress;
++        emitProgress(6_400_000L, 12_800_000L);
+         return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED();
+     }
++    public static void emitProgress(long downloadedBytes, long totalBytes) {
++        if (pending == null || progressCallback == null) throw new IllegalStateException("No controlled download is pending");
++        progressCallback.invoke(ProxyCoreDownloadManagerKt.coreDownloadProgressText(downloadedBytes, totalBytes));
++    }
+     public static void cancelFixture() {
+-        Continuation<? super ProxyCoreRemoteStatus> done=pending; pending=null;
++        Continuation<? super ProxyCoreRemoteStatus> done=pending; pending=null; progressCallback=null;
+         if (done!=null) done.resumeWith(kotlin.ResultKt.createFailure(new java.util.concurrent.CancellationException("Controlled fixture ended")));
+     }
+ }

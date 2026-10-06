@@ -1,0 +1,206 @@
+{
+  "schemaVersion": 1,
+  "createdUtc": "2026-10-05T19:33:35.046484+00:00",
+  "baselineApplicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "baselineWorkflowRunId": 37360879852,
+  "status": "SOURCE_CANDIDATE_IMPLEMENTED_NOT_COMPILED_NOT_CAPTURE_VERIFIED",
+  "source_edits_stopped": true,
+  "sourcesWritten": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt"
+  ],
+  "scope": "仅ToolsTopBar默认null的subtitleStyle呈现参数与ToolsAdblock唯一caller12sp。保留19sp行高、Medium字重、其它字体属性、滚动逻辑、标题/动作/所有回调及胶囊47dp源约束。",
+  "exactTransformsAndWholeFileInverse": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+      "compiled273SHA256": "7fa9afa64664706bb8eb0aa7c306d1ac59e59de3f20de489fd5325e6f7754b13",
+      "candidateSHA256": "447ed4f5132b3b6eb50de15a2f7700022d166b20732ee1c348c6c801a456eb7d",
+      "exactTransforms": [
+        {
+          "before": "    subtitle: String? = null,\n    actions: @Composable RowScope.() -> Unit = {},\n",
+          "after": "    subtitle: String? = null,\n    subtitleStyle: TextStyle? = null,\n    actions: @Composable RowScope.() -> Unit = {},\n",
+          "count": 1,
+          "baselineBeforeCount": 1,
+          "candidateAfterCount": 1
+        },
+        {
+          "before": "            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,\n",
+          "after": "            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,\n",
+          "count": 1,
+          "baselineBeforeCount": 1,
+          "candidateAfterCount": 1
+        }
+      ],
+      "candidateMatchesOnlyExactTransforms": true,
+      "wholeFileInverseEquals2730954": true,
+      "inverseSHA256": "7fa9afa64664706bb8eb0aa7c306d1ac59e59de3f20de489fd5325e6f7754b13",
+      "unifiedDiff": "--- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt@2730954\n+++ android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt@candidate\n@@ -232,6 +232,7 @@\n     onBack: () -> Unit,\n     modifier: Modifier = Modifier,\n     subtitle: String? = null,\n+    subtitleStyle: TextStyle? = null,\n     actions: @Composable RowScope.() -> Unit = {},\n ) {\n     val c = LocalHomeColors.current\n@@ -244,7 +245,7 @@\n         }\n         Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {\n             Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)\n-            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,\n+            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,\n                 maxLines = 1, overflow = TextOverflow.Ellipsis)\n         }\n     }\n"
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+      "compiled273SHA256": "2297a5681811287817a41c6b721a36b8e1550aef622865075f9bd1f99dd3d968",
+      "candidateSHA256": "8d5393b85b3c4e2274fb4abcda6e7090b7329f1d9806040bc6667c5015ef2b35",
+      "exactTransforms": [
+        {
+          "before": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null) {\n",
+          "after": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {\n",
+          "count": 1,
+          "baselineBeforeCount": 1,
+          "candidateAfterCount": 1
+        }
+      ],
+      "candidateMatchesOnlyExactTransforms": true,
+      "wholeFileInverseEquals2730954": true,
+      "inverseSHA256": "2297a5681811287817a41c6b721a36b8e1550aef622865075f9bd1f99dd3d968",
+      "unifiedDiff": "--- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt@2730954\n+++ android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt@candidate\n@@ -90,7 +90,7 @@\n     val ready = state.load is ToolsLoad.Ready\n     val idle = ready && !state.busy\n     Column(modifier.fillMaxSize().background(c.bg)) {\n-        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null) {\n+        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {\n             HomeIconButton(ToolsFeatureIcons.CircleHelp, \"说明\", onHelp)\n             HomeIconButton(HomeIcons.RefreshCw, \"重新检测\", onRefresh, enabled = idle)\n         }\n"
+    }
+  ],
+  "defaultAndCallbackProof": {
+    "defaultNullableSubtitleStyle": null,
+    "sharedBarSubtitleStill14sp19spMedium": true,
+    "nullDefaultResolvesExactlyExistingStyle": true,
+    "parameterBeforeActionsRetainsTrailingLambda": true,
+    "directToolsTopBarAliasCallsitesActuallyRead": [
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+        "line": 86,
+        "text": "HomeTopBar(title = \"编辑配置\", onBack = onBack) {"
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "line": 138,
+        "text": "HomeTopBar(title = title, onBack = onBack, subtitle = subtitle, actions = actions)"
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt",
+        "line": 91,
+        "text": "ToolsTopBar(title = \"应用管理\", onBack = onBack) {"
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+        "line": 93,
+        "text": "HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {"
+      }
+    ],
+    "allCurrentDirectCallsUseNamedArgsOrTrailingActions": true,
+    "titleStyleHeightPaddingColorsMaxLinesOverflowUnchanged": true,
+    "TopBar64or78HeightsUnchanged": true,
+    "referenceSegmentLoopWholeTailByteEqual": true,
+    "segmentLoopTailSHA256": "f7b9468a81bd3a017ccce40fcb39f261c90350c58570ccefa0eeced84e28039c",
+    "allAdblockContentFromExistingHelpRefreshActionsDownWholeTailByteEqual": true,
+    "adblockBodySHA256": "11bfd2b407d842b0fe769db0c3fb7e24d719cb1849d931fc2d18f28fa7b051f7",
+    "scroll0SubtitleExpressionBytePreserved": true,
+    "onlyScopedCallerFontCopy12": true,
+    "fontLineHeight19WeightMediumLetterSpacingOtherPropertiesPreservedByCopy": true,
+    "otherSevenToolCompleteFilesFrozen": [
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "currentSHA256": "506ac22816e0cd84a277e609112cd19650499819605ed3c1f4602aad4b3252c5",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+        "currentSHA256": "af5ce76a084b900157203798452e4745d9a383c7092098e4b6c9a52b29a002ec",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+        "currentSHA256": "e61d1e59f8936409edf54971c2fa1034add4fef1f50df1c7ccca9e47e7ac2e2a",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+        "currentSHA256": "d63a4ac64dea68128edfc61c97a28ef13c1bd46e83756a0691b46f97888d6b97",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt",
+        "currentSHA256": "5aa26917857d95c7d6fccd530f1b56fbcde2cc91798337eb32ac0cd04073dddc",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt",
+        "currentSHA256": "8bb72974b9a084a2ccb7fe8bf6e08a4519dea4cfab5f23fa300f2422afd402db",
+        "wholeFileEqualsCompiled273": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+        "currentSHA256": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+        "wholeFileEqualsCompiled273": true
+      }
+    ],
+    "Pdf85Frames2EntireFileFrozenTo273": true,
+    "Pdf85Frames2SHA256": "80e56e19535bf69a86a856287f09fc7a30c99838216c0407da4a43ac31acc564",
+    "HomePanelDefaultsNoMutation": true
+  },
+  "actualPreviousMeasurements": {
+    "review273Path": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-2730954-visual-review.json",
+    "review273SHA256": "699173c1ae083731d5ef65abab082929e8cc56ffadabd09c1ed7f520faf4091f",
+    "old01ReportSHA256Immutable": "02db54b73c26903fb9f651002af88fd2f2235d816eb1edf858cb19a5e110e90a",
+    "actualFullSizeOriginalAndCurrentA45A49AlreadyOpened": true,
+    "originalA45InkSizeRaw425": [
+      209,
+      12
+    ],
+    "originalA45InkSizeNormalized393": [
+      193.2635294117647,
+      11.096470588235293
+    ],
+    "compiled273A45InkSize": [
+      224,
+      13
+    ],
+    "compiled273StyleFontSizeSp": 14,
+    "sourceCandidateStyleFontSizeSp": 12,
+    "subtitleStatusAndStagePreservation": "原45/49有字幕，零滚动保留；44/47/48正滚动null表达式保留。49背景仍顶页保护状态/运行链/最近拦截，不改fixture。",
+    "childActualReviewPath": "/tmp/hetu_03a_2730954_A21_A45_A49_readonly.json",
+    "childActualReviewSHA256": "b311e3f9b4b62940dfad5e87198858c9dd77f4138b8e928a504fdb2ea838bedd"
+  },
+  "predictionNotAcceptance": {
+    "linearFontAdvancePredictionWidthPx": 192.0,
+    "linearInkHeightPredictionPx": 11.142857142857142,
+    "expectedApproxInkSize": [
+      192,
+      11
+    ],
+    "referenceNormalizedInkSize": [
+      193.2635294117647,
+      11.096470588235293
+    ],
+    "predictionWidthMinusReference": -1.2635294117646936,
+    "note": "192×11是线性近似；native hinting/字距/AA可能改变实际墨迹。需要自己的新提交/CI/截图才能判定，未宣称候选图通过。19sp物理行盒保持，未凭预测改padding/lineHeight。"
+  },
+  "validationStatus": {
+    "wholeFileInverse2Of2": "PASS",
+    "staticSourceDefaultCallbackStageAudit": "PASS",
+    "ownCandidateCompile": "NOT_EXECUTED",
+    "ownCandidateUnitOrScreenshotTests": "NOT_EXECUTED",
+    "ownCandidateActualImageMeasurements": "NOT_EXECUTED",
+    "ownCandidateNativeInstallNavigationAuthentication": "NOT_EXECUTED",
+    "GoogleAccountAuthentication": "NOT_PROVED"
+  },
+  "requiredFreshValidation": [
+    "自己的新应用提交、完整构建/单测/guard/安装验收，不借用273通过。",
+    "实际打开新45/49与原PDF同尺寸，量字幕墨迹宽/高/位置并确认19sp行盒和正确入口背景。",
+    "核44正滚动副标题仍不显示、胶囊/正文源约束保持；保留A44未定唯一修法gap证据。",
+    "新49captureSHA逐页核验；仅完整字节相同页可继承旧实读证据。"
+  ],
+  "excludedWrites": [
+    "globalToolsTypography.barSubtitle",
+    "Home",
+    "panel",
+    "fixtures",
+    "tests",
+    "runtime.patch",
+    "inputs.json",
+    "guards",
+    "CI",
+    "old273report",
+    "old01report",
+    "commit",
+    "push",
+    "phone",
+    "account",
+    "device security/network"
+  ]
+}

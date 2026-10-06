@@ -1,0 +1,140 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2062
+-        versionName = "0.11.2-v20"
++        versionCode = 2063
++        versionName = "0.11.3-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+@@ -117,36 +117,27 @@
+     }
+ 
+     if (choice == "dns") {
+-        AlertDialog(
+-            onDismissRequest = { choice = null },
+-            containerColor = Hx.colors.surface,
+-            title = { Text("DNS 劫持策略", modifier = Modifier.fillMaxWidth(), textAlign = androidx.compose.ui.text.style.TextAlign.Center, fontSize = 20.sp, fontWeight = FontWeight.Bold) },
+-            text = {
+-                Column {
+-                    listOf(
+-                        OtherChoice("TPROXY", "tproxy"),
+-                        OtherChoice("REDIRECT", "redirect"),
+-                        OtherChoice("关闭", "off"),
+-                    ).forEach { item ->
+-                        Row(
+-                            Modifier.fillMaxWidth().clickable {
+-                                putString("proxyDnsHijack", item.value)
+-                                if (item.value == "off") prefs.edit().putBoolean("proxyMihomoDnsForward", false).apply()
+-                                else prefs.edit().putBoolean("proxyMihomoDnsForward", true).apply()
+-                                revision++
+-                                choice = null
+-                            }.padding(vertical = 14.dp),
+-                            verticalAlignment = Alignment.CenterVertically,
+-                        ) {
+-                            Text(item.label, modifier = Modifier.weight(1f), color = Hx.colors.text, fontSize = 17.sp)
+-                            RadioButton(selected = profile.dnsHijack.id == item.value, onClick = null)
+-                        }
+-                    }
++        HxReferenceDialog(onDismiss = { choice = null }, widthFraction = .65f, contentPadding = 24.dp) {
++            Text("DNS 劫持策略", modifier = Modifier.fillMaxWidth(),
++                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
++                fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
++            Spacer(Modifier.height(6.dp))
++            listOf(OtherChoice("TPROXY", "tproxy"), OtherChoice("REDIRECT", "redirect"), OtherChoice("关闭", "off")).forEach { item ->
++                Row(Modifier.fillMaxWidth().height(45.dp).clickable {
++                    putString("proxyDnsHijack", item.value)
++                    prefs.edit().putBoolean("proxyMihomoDnsForward", item.value != "off").apply()
++                    revision++
++                    choice = null
++                }, verticalAlignment = Alignment.CenterVertically) {
++                    Text(item.label, modifier = Modifier.weight(1f), color = Hx.colors.text, fontSize = 19.sp)
++                    RadioButton(selected = profile.dnsHijack.id == item.value, onClick = null,
++                        modifier = Modifier.size(24.dp))
+                 }
+-            },
+-            confirmButton = {},
+-            dismissButton = { TextButton(onClick = { choice = null }) { Text("取消") } },
+-        )
++            }
++            Spacer(Modifier.height(6.dp))
++            Text("取消", color = Hx.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
++                modifier = Modifier.align(Alignment.End).clickable { choice = null }.padding(vertical = 4.dp))
++        }
+     }
+ }
+ 
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt
+@@ -95,7 +95,7 @@
+ <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+ <title>河图 WebUI</title>
+ <style>
+-:root{color-scheme:light dark;--bg:#eceefb;--surface:#f9f8fe;--inset:#f1f2fc;--text:#171a24;--muted:#666c7d;--line:#e2e5f3;--blue:#287aff;--soft:#e6ecff;--green:#00b85c;--red:#ee4351}
++:root{color-scheme:light dark;--bg:#edf1fd;--surface:#f9faff;--inset:#f1f2fc;--text:#171a24;--muted:#666c7d;--line:#e2e5f3;--blue:#0068ff;--soft:#e6ecff;--green:#00b85c;--red:#ee4351}
+ @media(prefers-color-scheme:dark){:root{--bg:#0e0f13;--surface:#181a20;--inset:#22252d;--text:#ebedf2;--muted:#9ca2b0;--line:#2a2e37;--blue:#7ea6ff;--soft:#1d2c52;--green:#4ade80;--red:#f87171}}
+ *{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:-apple-system,BlinkMacSystemFont,"Roboto","Segoe UI",sans-serif;color:var(--text)}
+ button,select{font:inherit}button{cursor:pointer;-webkit-tap-highlight-color:transparent}button:disabled{opacity:.5;cursor:default}button:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+@@ -105,11 +105,11 @@
+ .status{position:absolute;right:0;top:28px;display:flex;align-items:center;gap:4px;border:1px solid #b4dfd0;border-radius:999px;padding:4px 7px;color:#269f7b;background:#edf9f4;font-size:10px;line-height:15px;font-weight:650}.status .mark{border-radius:50%;background:currentColor;width:15px;height:15px;position:relative}.status .mark:after{content:'✓';position:absolute;inset:0;color:white;text-align:center;font-size:11px;line-height:15px}.status.error{color:var(--red);border-color:var(--red);background:var(--surface)}.status.error .mark:after{content:'!'}
+ .tabs{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;margin:0 1px 12px}.tabs button{border:1px solid #d1d7ee;border-radius:14px;padding:10px 8px;background:#e7eafb;color:var(--muted);font-size:15px;line-height:18px;font-weight:650}.tabs button.active{background:var(--surface);color:var(--text)}
+ .card{background:var(--surface);border-radius:20px;margin-bottom:12px;overflow:hidden}.metric{display:flex;align-items:center;min-height:80px;padding:17px 18px;gap:26px}.glyph{width:26px;height:26px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+-.title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:13px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:14px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:12px;line-height:18px;font-weight:650}
+-.node-picker{border:1px solid var(--line);border-radius:12px;background:var(--inset);color:var(--text);padding:9px 12px;min-width:0;width:60%;font-size:13px;line-height:18px;display:flex;align-items:center;justify-content:space-between;gap:8px}.node-picker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.node-picker .glyph{width:16px;height:16px;stroke-width:1.6}
+-.connections{padding:0 14px}.connection{display:flex;align-items:center;gap:26px;padding:15px 4px;border-top:1px solid var(--line)}.connection:first-child{border-top:0}.connection>div{min-width:0}.traffic{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;line-height:20px;margin-top:1px;font-weight:600}.up{color:var(--blue)}.down{color:var(--green)}.traffic i{font-style:normal;font-size:21px;vertical-align:-1px;margin-right:5px}
++.title{font-size:18px;line-height:24px;font-weight:700;overflow-wrap:anywhere}.sub{font-size:15px;line-height:19px;color:var(--muted);overflow-wrap:anywhere}.metric .sub{font-size:15px}.group{padding:18px}.group-head{display:flex;align-items:center;gap:26px}.node{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:12px}.pill{display:block;max-width:42%;min-width:96px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:center;padding:7px 12px;border-radius:999px;background:var(--soft);color:var(--blue);font-size:14px;line-height:18px;font-weight:650}
++.node-picker{border:1px solid var(--line);border-radius:12px;background:var(--inset);color:var(--text);padding:9px 12px;min-width:0;width:60%;font-size:15px;line-height:18px;display:flex;align-items:center;justify-content:space-between;gap:8px}.node-picker span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.node-picker .glyph{width:16px;height:16px;stroke-width:1.6}
++.connections{padding:0 14px}.connection{display:flex;align-items:center;gap:26px;padding:15px 4px;border-top:1px solid var(--line)}.connection:first-child{border-top:0}.connection>div{min-width:0}.traffic{display:flex;flex-wrap:wrap;gap:12px;font-size:14px;line-height:20px;margin-top:1px;font-weight:600}.up{color:var(--blue)}.down{color:var(--green)}.traffic i{font-style:normal;font-size:21px;vertical-align:-1px;margin-right:5px}
+ .empty{padding:30px 18px;text-align:center;color:var(--muted);font-size:14px;line-height:22px}.error{color:var(--red)}.retry{display:block;margin:16px auto 0;background:var(--blue);color:white;border:0;border-radius:12px;padding:10px 24px}
+-dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);width:min(300px,calc(100vw - 40px));max-height:80vh;padding:0;box-shadow:0 14px 42px #0002}dialog::backdrop{background:#10182788}.dialog-title{font-size:20px;line-height:27px;font-weight:700;padding:18px 22px 8px}.node-options{max-height:48vh;overflow:auto;padding:0 17px}.node-option{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);display:flex;align-items:center;gap:23px;text-align:left;width:100%;padding:12px 5px;font-size:14px;line-height:18px}.node-option:last-child{border-bottom:0}.radio{width:20px;height:20px;flex:none;border:1.5px solid var(--muted);border-radius:50%;position:relative}.node-option.selected .radio{border:2px solid var(--blue)}.node-option.selected .radio:after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--blue)}.dialog-footer{border-top:1px solid var(--line);display:flex;justify-content:flex-end;padding:7px 13px}.dialog-footer button{border:0;color:var(--blue);background:transparent;padding:8px 10px;font-size:14px;line-height:18px;font-weight:650}#notice{width:min(238px,calc(100vw - 40px));border-radius:13px}#notice .dialog-title{font-size:18px;padding:17px 20px 2px}#notice-message{padding:0 20px 12px;font-size:13px;line-height:20px;overflow-wrap:anywhere}
++dialog{border:0;border-radius:22px;background:var(--surface);color:var(--text);width:min(300px,calc(100vw - 40px));max-height:80vh;padding:0;box-shadow:0 14px 42px #0002}dialog::backdrop{background:#10182788}.dialog-title{font-size:20px;line-height:27px;font-weight:700;padding:18px 22px 8px}.node-options{max-height:48vh;overflow:auto;padding:0 17px}.node-option{border:0;border-bottom:1px solid var(--line);background:transparent;color:var(--text);display:flex;align-items:center;gap:23px;text-align:left;width:100%;padding:11px 5px;font-size:16px;line-height:18px}.node-option:last-child{border-bottom:0}.radio{width:20px;height:20px;flex:none;border:1.5px solid var(--muted);border-radius:50%;position:relative}.node-option.selected .radio{border:2px solid var(--blue)}.node-option.selected .radio:after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--blue)}.dialog-footer{border-top:1px solid var(--line);display:flex;justify-content:flex-end;padding:5px 13px}.dialog-footer button{border:0;color:var(--blue);background:transparent;padding:8px 10px;font-size:16px;line-height:18px;font-weight:650}#notice{width:min(238px,calc(100vw - 40px));border-radius:13px}#notice .dialog-title{font-size:18px;padding:17px 20px 2px}#notice-message{padding:0 20px 8px;font-size:14px;line-height:20px;overflow-wrap:anywhere}
+ @media(prefers-color-scheme:dark){.tabs button{background:var(--inset);border-color:var(--line)}.status{background:var(--surface)}}
+ @media(max-width:350px){.title{font-size:16px}.group-head,.metric,.connection{gap:17px}.pill{min-width:74px}.node{gap:8px}.status{top:6px}}
+ </style>
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
+@@ -386,7 +386,7 @@
+     onClick: () -> Unit,
+ ) {
+     val c = Hx.colors
+-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 9.dp)
++    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp)
+         .clip(RoundedCornerShape(18.dp)).background(c.surface)) {
+         HxSwipeAction(label = "断开", icon = Icons.Rounded.LinkOff, onAction = onClose) {
+             ConnectionContent(item, rate, onClick)
+@@ -398,7 +398,7 @@
+ private fun ConnectionContent(item: ProxyConnectionUi, rate: PanelConnectionRate?, onClick: () -> Unit) {
+     val c = Hx.colors
+     Column(Modifier.fillMaxWidth().background(c.surface).clickable(onClick = onClick)
+-        .padding(horizontal = 12.dp, vertical = 9.dp)) {
++        .padding(horizontal = 12.dp, vertical = 11.dp)) {
+         Row(verticalAlignment = Alignment.CenterVertically) {
+             Text(item.host, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold,
+                 color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+@@ -620,7 +620,7 @@
+         }
+         Spacer(Modifier.height(8.dp))
+         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+-            Text("IP", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = c.textMuted)
++            Text("IP", style = MaterialTheme.typography.bodySmall, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = c.textMuted)
+             Spacer(Modifier.width(10.dp))
+             AnimatedContent(
+                 targetState = address ?: "—",
+@@ -635,6 +635,9 @@
+                 Text(
+                     ip,
+                     style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
++                    fontSize = 18.sp,
++                    textAlign = androidx.compose.ui.text.style.TextAlign.End,
++                    modifier = Modifier.fillMaxWidth(),
+                     fontWeight = FontWeight.SemiBold,
+                     color = c.text,
+                     maxLines = 1,

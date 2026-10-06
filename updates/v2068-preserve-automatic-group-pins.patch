@@ -1,0 +1,115 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2067
+-        versionName = "0.11.7-v20"
++        versionCode = 2068
++        versionName = "0.11.8-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
+@@ -215,6 +215,28 @@
+         probe(node, probeSnapshot())
+     }
+ 
++    /**
++     * Mihomo's /group/{name}/delay clears fixed selection on non-Selector groups
++     * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
++     * clear and reapply a pin, which could briefly reroute live traffic.
++     */
++    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
++        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
++        val snapshot = probeSnapshot(force = true)
++        val results = LinkedHashMap<String, Long>()
++        for (chunk in targets.distinct().chunked(6)) {
++            val measured = coroutineScope {
++                chunk.map { node -> async {
++                    try { node to measuredProbe(node, snapshot) }
++                    catch (cancel: CancellationException) { throw cancel }
++                    catch (_: IOException) { node to null }
++                } }.awaitAll()
++            }
++            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
++        }
++        results
++    }
++
+     /** Core-parallel group latency probe used by strategy-card delay taps. */
+     suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
+         val raw = api.groupDelay(group)
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -636,10 +636,9 @@
+         targets.forEach { testingNodes[it] = true }
+         viewModelScope.launch {
+             try {
+-                // Mihomo's group endpoint measures the whole strategy group in one parallel core
+-                // operation. This avoids serial timeout waves where every visible delay is already
+-                // known but the group pill keeps spinning on a few unreachable nodes.
+-                val result = repo.groupDelay(group.name)
++                // Selector groups retain the parallel core endpoint. Automatic groups use
++                // bounded leaf probes because that endpoint silently clears their fixed choice.
++                val result = repo.groupDelay(group, targets)
+                 val stamp = SystemClock.elapsedRealtime()
+                 targets.forEach { node ->
+                     // Missing/invalid entries are not authoritative timeouts. Keep old readings.
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+@@ -460,4 +460,52 @@
+         assertTrue(messages.isEmpty())
+     }
+ 
++
++    private fun automaticProbe(type: String, malformedNew: Boolean = false): String {
++        val automatic = group.copy(type = type)
++        fixtureState(vm.state.copy(groups = listOf(automatic)))
++        val fixed = java.util.concurrent.atomic.AtomicReference("old")
++        response = { request ->
++            val path = request.requestUrl!!.encodedPath
++            when {
++                path == "/proxies" -> {
++                    val snapshot = JSONObject(selectionSnapshot("old"))
++                    snapshot.getJSONObject("proxies").getJSONObject("SELECT")
++                        .put("type", type).put("fixed", fixed.get())
++                    body(snapshot.toString())
++                }
++                path == "/providers/proxies" -> body("""{"providers":{}}""")
++                path == "/group/SELECT/delay" -> {
++                    // Upstream ab405bad groups.go explicitly clears non-Selector fixed selection.
++                    fixed.set("")
++                    body("""{"old":31,"new":42,"untested":53}""")
++                }
++                path == "/proxies/old/delay" -> body("""{"delay":31}""")
++                path == "/proxies/new/delay" -> body(if (malformedNew) "{}" else """{"delay":42}""")
++                path == "/proxies/untested/delay" -> body("""{"delay":53}""")
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        vm.testGroup(automatic)
++        eventually("Automatic group probe completes") { vm.testingGroups.isEmpty() }
++        return fixed.get()
++    }
++    @Test fun urlTestGroupProbeNeverCallsTheUnfixingGroupEndpoint() {
++        assertEquals("old", automaticProbe("URLTest"))
++        assertFalse(requestSnapshot().any { it.requestUrl!!.encodedPath.startsWith("/group/") })
++        assertEquals(31L, vm.delays["old"])
++        assertEquals(42L, vm.delays["new"])
++    }
++    @Test fun fallbackGroupProbeNeverCallsTheUnfixingGroupEndpoint() {
++        assertEquals("old", automaticProbe("Fallback"))
++        assertFalse(requestSnapshot().any { it.requestUrl!!.encodedPath.startsWith("/group/") })
++        assertEquals("old", vm.state.groups.single().now)
++    }
++    @Test fun automaticGroupMalformedNodeResultRetainsItsEarlierMeasurement() {
++        automaticProbe("URLTest", malformedNew = true)
++        assertEquals(65L, vm.delays["new"])
++        assertEquals(31L, vm.delays["old"])
++        assertEquals(53L, vm.delays["untested"])
++        assertTrue(vm.testingNodes.isEmpty())
++    }
+ }

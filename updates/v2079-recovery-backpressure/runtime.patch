@@ -1,0 +1,429 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 755f950..7ff03aa 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2078
+-        versionName = "0.12.8-v20"
++        versionCode = 2079
++        versionName = "0.12.9-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index 7643a42..8c61eb4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -349,6 +349,7 @@ internal class ProxyComposeController(context: Context) {
+     suspend fun networkEvents(): String = withContext(Dispatchers.IO) {
+         ProxyNetworkJournal(app).recent() + "\n\n当前记录状态：\n" +
+             "networkEpoch=${prefs.getLong("proxyNetworkEpoch", 0)}\n" +
++            "networkSession=${prefs.getString("proxyNetworkSessionId", "unknown")}\n" +
+             "physicalNetwork=${prefs.getString("proxyPhysicalNetworkState", "unknown")}\n" +
+             "integrity=${prefs.getString("proxyNetworkIntegrity", "unknown")}\n" +
+             "egress=${prefs.getString("proxyPolicyEgressState", "unverified")}\n" +
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+index 69f3423..d1cec88 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@ -17,10 +17,15 @@ public final class ProxyNetworkMatchService extends Service {
+     private ConnectivityManager cm;
+     private ConnectivityManager.NetworkCallback cb;
+     private final ExecutorService worker=Executors.newSingleThreadExecutor();
+-    private final ScheduledExecutorService metrics=Executors.newScheduledThreadPool(2);
++    private final ScheduledThreadPoolExecutor metrics=createMetrics();
++    private static final Object SERVICE_SESSION_LOCK=new Object();
++    private final String networkSessionId=UUID.randomUUID().toString();
+     private final NetworkEpoch<Network> networkEvents=new NetworkEpoch<>();
+     private final ProxyNetworkState networkState=new ProxyNetworkState();
+     private ScheduledFuture<?> networkRefreshTask;
++    private NetworkEpoch.Snapshot<Network> pendingRecoveryRoute;
++    private String pendingRecoveryReason;
++    private final ProxyTaskCoalescer networkRecoveries=new ProxyTaskCoalescer(worker,this::recoverQueuedNetwork);
+     private ProxyNetworkJournal journal;
+     private final ExecutorService journalWorker=new ThreadPoolExecutor(1,1,0L,TimeUnit.MILLISECONDS,
+             new ArrayBlockingQueue<>(128));
+@@ -41,6 +46,7 @@ public final class ProxyNetworkMatchService extends Service {
+     @Override public void onCreate(){
+         super.onCreate();
+         prefs=getSharedPreferences("hetu",MODE_PRIVATE);
++        initializeNetworkSession();
+         cm=(ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+         journal=new ProxyNetworkJournal(getApplicationContext());
+         droppedJournalEvents.set(prefs.getLong("proxyNetworkJournalDropped",0L));
+@@ -54,6 +60,36 @@ public final class ProxyNetworkMatchService extends Service {
+         metrics.scheduleWithFixedDelay(this::maintainProxyRuntime,7000L,12000L,TimeUnit.MILLISECONDS);
+     }
+ 
++    private static ScheduledThreadPoolExecutor createMetrics(){
++        ScheduledThreadPoolExecutor executor=new ScheduledThreadPoolExecutor(2);
++        executor.setRemoveOnCancelPolicy(true);
++        executor.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
++        executor.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
++        return executor;
++    }
++
++    private void initializeNetworkSession(){
++        synchronized(SERVICE_SESSION_LOCK){
++            // Persisted observations describe the previous observer instance.
++            // Keep its journal; wait for fresh callback/health/probe evidence.
++            prefs.edit().putString("proxyNetworkSessionId",networkSessionId)
++                    .putLong("proxyNetworkEpoch",0L).putString("proxyPhysicalNetworkState","checking")
++                    .putString("proxyPolicyEgressState","unverified").putLong("proxyPolicyEgressCheckedAt",0L)
++                    .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false))
++                    .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","service-recreated")
++                    .putLong("proxyNetworkCheckedAt",0L)
++                    .remove("proxyNetworkHealthTraceId").remove("proxyPolicyEgressTraceId")
++                    .remove("proxyRootEgressVerifiedAt").apply();
++        }
++    }
++
++    private boolean publishServiceObservation(long ticket,Runnable action){
++        synchronized(SERVICE_SESSION_LOCK){
++            if(destroyed||!networkSessionId.equals(prefs.getString("proxyNetworkSessionId","")))return false;
++            return RootProxyManager.publishObservation(ticket,action);
++        }
++    }
++
+     @Override public int onStartCommand(Intent i,int f,int id){
+         String action=i==null?"":i.getAction();
+         if(RootAutostart.ACTION_RUNNING.equals(action)&&prefs.getBoolean("proxyRootAutoStart",false)){
+@@ -136,8 +172,9 @@ public final class ProxyNetworkMatchService extends Service {
+     @Override public void onDestroy(){
+         destroyed=true;
+         evaluations.close();
++        networkRecoveries.close();
+         bootRestores.close();
+-        synchronized(networkEvents){if(networkRefreshTask!=null)networkRefreshTask.cancel(false);networkEvents.reset();}
++        synchronized(networkEvents){if(networkRefreshTask!=null)networkRefreshTask.cancel(false);pendingRecoveryRoute=null;networkEvents.reset();}
+         if(cb!=null)try{cm.unregisterNetworkCallback(cb);}catch(Exception ignored){}
+         worker.shutdownNow();
+         metrics.shutdownNow();
+@@ -199,17 +236,34 @@ public final class ProxyNetworkMatchService extends Service {
+             recordEvent(ProxyNetworkJournal.Stage.NETWORK_CHANGE,route,
+                     ProxyNetworkJournal.outcome(networkState.state().name()),0,null,null);
+             if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
++            pendingRecoveryRoute=null;
+             if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
+                 if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
+-                try{networkRefreshTask=metrics.schedule(()->{
+-                    try{worker.execute(()->recoverNetwork(route,reason));}
+-                    catch(RejectedExecutionException stopped){}
+-                },2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
++                try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
++                        2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
+             }
+         }
+         evaluate();
+     }
+ 
++    private void queueNetworkRecovery(NetworkEpoch.Snapshot<Network> route,String reason){
++        synchronized(networkEvents){
++            if(destroyed||route.network==null||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
++            pendingRecoveryRoute=route;pendingRecoveryReason=reason;
++            // Reuse the existing coalescer: one queued task, plus a current task.
++            networkRecoveries.request();
++        }
++    }
++
++    private void recoverQueuedNetwork(){
++        final NetworkEpoch.Snapshot<Network> route;
++        final String reason;
++        synchronized(networkEvents){
++            route=pendingRecoveryRoute;reason=pendingRecoveryReason;pendingRecoveryRoute=null;
++        }
++        if(route!=null)recoverNetwork(route,reason);
++    }
++
+     private void recoverNetwork(NetworkEpoch.Snapshot<Network> route,String reason){
+         if(destroyed||route.network==null||!networkEvents.isCurrent(route)||!prefs.getBoolean("proxyRootWanted",false))return;
+         long ticket=RootProxyManager.observationTicket();
+@@ -226,7 +280,7 @@ public final class ProxyNetworkMatchService extends Service {
+         synchronized(networkEvents){
+             if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return false;
+             if(!networkEvents.isCurrent(route))return false;
+-            return RootProxyManager.publishObservation(ticket,action);
++            return publishServiceObservation(ticket,action);
+         }
+     }
+ 
+@@ -400,7 +454,7 @@ public final class ProxyNetworkMatchService extends Service {
+             RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
+             ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
+             if(state!=ProxyContinuity.ProcessState.UNKNOWN){
+-                if(!RootProxyManager.publishObservation(ticket,()->prefs.edit()
++                if(!publishServiceObservation(ticket,()->prefs.edit()
+                         .putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply()))
+                     return ProxyContinuity.ProcessState.UNKNOWN;
+             }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index c532f0c..ceb2927 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -980,7 +980,7 @@ final class RootProxyManager {
+                 "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt",
+                 "proxyNetworkEpoch","proxyPhysicalNetworkState","proxyLastNetworkCallback","proxyLastNetworkCallbackAt",
+                 "proxyNetworkHealthTraceId","proxyNetworkHealthReadError","proxyPolicyEgressTraceId",
+-                "proxyNetworkRepairExit","proxyNetworkRepairTraceId","proxyNetworkJournalError","proxyNetworkJournalDropped"}){
++                "proxyNetworkRepairExit","proxyNetworkRepairTraceId","proxyNetworkJournalError","proxyNetworkJournalDropped","proxyNetworkSessionId"}){
+             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
+         }
+         report.section("版本与最近运行事件",events.toString(),6000);
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt
+new file mode 100644
+index 0000000..a7f6e49
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt
+@@ -0,0 +1,249 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.LinkProperties
++import android.net.Network
++import android.net.NetworkCapabilities
++import androidx.test.core.app.ApplicationProvider
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.android.controller.ServiceController
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implementation
++import org.robolectric.annotation.Implements
++import org.robolectric.shadow.api.Shadow
++import org.robolectric.shadows.ShadowNetwork
++import org.robolectric.shadows.ShadowNetworkCapabilities
++import org.robolectric.util.ReflectionHelpers
++import java.net.InetAddress
++import java.util.ArrayDeque
++import java.util.concurrent.*
++
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class RecoveryStressBridgeShadow {
++    companion object {
++        val commands = CopyOnWriteArrayList<String>()
++        var health = "degraded"
++        var duringHealth: (() -> Unit)? = null
++        var duringCore: (() -> Unit)? = null
++        var duringRepair: (() -> Unit)? = null
++        var core = "1"
++        @JvmStatic @Implementation fun hasRoot(context: Context) = true
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            commands += command
++            require(!command.contains("service.d") && !command.contains("'start'") && !command.contains("'stop'"))
++            if (command.contains("repair-network")) {
++                val callback = duringRepair; duringRepair = null; callback?.invoke()
++                return RootBridge.Result(91, "private-fixture-error")
++            }
++            if (command.endsWith("'network-health'")) {
++                val callback = duringHealth; duringHealth = null; callback?.invoke()
++                return RootBridge.Result(0, JSONObject().put("ok", true).put("networkIntegrity", health)
++                    .put("networkFault", if (health == "healthy") "" else "watchdog-missing")
++                    .put("dataPlaneHealthy", health == "healthy").toString())
++            }
++            require(command.contains("/proc/\$P/exe"))
++            val callback = duringCore; duringCore = null; callback?.invoke()
++            return RootBridge.Result(if (core == "?") 126 else 0, core)
++        }
++    }
++}
++
++/** Virtual time and a withheld worker queue, using real Service methods and callbacks. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [RecoveryStressBridgeShadow::class])
++class NetworkRecoveryStressTest {
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private lateinit var service: ProxyNetworkMatchService
++    private lateinit var controller: ServiceController<ProxyNetworkMatchService>
++    private lateinit var callback: ConnectivityManager.NetworkCallback
++    private lateinit var epochs: NetworkEpoch<Network>
++    private val controllers = mutableListOf<ServiceController<ProxyNetworkMatchService>>()
++    private val manual = ManualWorker()
++    private val timer = ManualTimer()
++    private val a = ShadowNetwork.newInstance(401)
++    private val b = ShadowNetwork.newInstance(402)
++
++    @Before fun prepare() {
++        prefs.edit().clear().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
++            .putString("proxyNetworkIntegrity", "healthy").putString("proxyPolicyEgressState", "reachable")
++            .putLong("proxyPolicyEgressCheckedAt", 999L).putLong("proxyNetworkCheckedAt", 999L)
++            .putLong("proxyRootEgressVerifiedAt", 999L).putString("proxyNetworkHealthTraceId", "old-trace").commit()
++        RecoveryStressBridgeShadow.commands.clear(); RecoveryStressBridgeShadow.health = "degraded"
++        RecoveryStressBridgeShadow.core = "1"; RecoveryStressBridgeShadow.duringCore = null
++        RecoveryStressBridgeShadow.duringHealth = null; RecoveryStressBridgeShadow.duringRepair = null
++        controller = create(); service = controller.get()
++        ReflectionHelpers.setField(service, "worker", manual)
++        ReflectionHelpers.setField(service, "metrics", timer)
++        ReflectionHelpers.setField(service, "networkRecoveries", ProxyTaskCoalescer(manual) { invoke(service, "recoverQueuedNetwork") })
++        ReflectionHelpers.setField(service, "egressRequest", ProxyNetworkMatchService.EgressRequest { _, _ -> 503 })
++        callback = ReflectionHelpers.getField(service, "cb"); epochs = ReflectionHelpers.getField(service, "networkEvents")
++    }
++    private fun create(): ServiceController<ProxyNetworkMatchService> {
++        val c = Robolectric.buildService(ProxyNetworkMatchService::class.java).create(); controllers += c
++        ReflectionHelpers.getField<ExecutorService>(c.get(), "metrics").shutdownNow()
++        ReflectionHelpers.getField<ExecutorService>(c.get(), "worker").shutdownNow()
++        return c
++    }
++    @After fun finish() {
++        controllers.forEach { it.destroy() }
++        controllers.forEach { ReflectionHelpers.getField<ExecutorService>(it.get(), "journalWorker").awaitTermination(10, TimeUnit.SECONDS) }
++        timer.shutdownNow(); manual.shutdownNow()
++    }
++    private fun invoke(target: ProxyNetworkMatchService, name: String, vararg args: Any): Any? {
++        val m = ProxyNetworkMatchService::class.java.declaredMethods.single { it.name == name }; m.isAccessible = true
++        return m.invoke(target, *args)
++    }
++    private fun offMain(task: () -> Any?): Any? {
++        val thread = Executors.newSingleThreadExecutor()
++        try { return thread.submit<Any?> { task() }.get(30, TimeUnit.SECONDS) } finally { thread.shutdownNow() }
++    }
++    private fun caps() = NetworkCapabilities().also {
++        val s = Shadow.extract<ShadowNetworkCapabilities>(it)
++        s.addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET); s.addCapability(NetworkCapabilities.NET_CAPABILITY_NOT_VPN)
++        s.addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
++    }
++    private fun links(last: Int = 53) = LinkProperties().apply {
++        interfaceName = "wlan0"
++        ReflectionHelpers.callInstanceMethod<Boolean>(this, "addDnsServer",
++            ReflectionHelpers.ClassParameter.from(InetAddress::class.java, InetAddress.getByName("192.0.2.$last")))
++    }
++    private fun ready(n: Network = a, dns: Int = 53) {
++        callback.onAvailable(n); callback.onCapabilitiesChanged(n, caps()); callback.onLinkPropertiesChanged(n, links(dns))
++    }
++    private fun repairCount() = RecoveryStressBridgeShadow.commands.count { it.contains("repair-network") }
++    private fun drain() {
++        offMain { manual.drain() }
++        val writer = ReflectionHelpers.getField<ExecutorService>(service, "journalWorker")
++        if (writer.isShutdown) assertTrue(writer.awaitTermination(10, TimeUnit.SECONDS)) else writer.submit {}.get()
++    }
++
++    @Test fun recreationInvalidatesPersistedHealthAndEgressWithoutChangingWantedOrCoreFlag() {
++        assertEquals("unknown", prefs.getString("proxyNetworkIntegrity", "")); assertEquals("service-recreated", prefs.getString("proxyNetworkFault", ""))
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", "")); assertEquals(0L, prefs.getLong("proxyNetworkCheckedAt", -1))
++        assertEquals(0L, prefs.getLong("proxyPolicyEgressCheckedAt", -1)); assertFalse(prefs.contains("proxyNetworkHealthTraceId"))
++        assertFalse(prefs.contains("proxyRootEgressVerifiedAt")); assertTrue(prefs.getBoolean("proxyRootEgressPending", false))
++        assertTrue(prefs.getBoolean("proxyRootWanted", false)); assertTrue(prefs.getBoolean("proxyRootRuntimeRunning", false))
++        assertEquals(36, prefs.getString("proxyNetworkSessionId", "")!!.length)
++    }
++    @Test fun sustainedAbaDnsBlockedAndLateCallbacksKeepOneQueuedRecoveryForLatestEpoch() {
++        repeat(512) { i ->
++            val n = if (i % 2 == 0) a else b; val old = if (n == a) b else a
++            ready(n, 53 + i % 2); callback.onBlockedStatusChanged(n, true); callback.onBlockedStatusChanged(n, false)
++            val current = epochs.snapshot()
++            callback.onLost(old); callback.onLinkPropertiesChanged(old, links(99)); callback.onBlockedStatusChanged(old, true)
++            assertSame(current, epochs.snapshot()); timer.fire(); assertEquals(1, manual.queue.size)
++        }
++        drain(); assertEquals(1, repairCount()); assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", ""))
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", "")); assertEquals(91, prefs.getInt("proxyNetworkRepairExit", 0))
++        assertEquals(0, manual.queue.size)
++    }
++    @Test fun manualStopCancelsAlreadyQueuedRecoveryAndProbe() {
++        ready(); timer.fire(); assertEquals(1, manual.queue.size)
++        prefs.edit().putBoolean("proxyRootWanted", false).commit(); drain()
++        assertTrue(RecoveryStressBridgeShadow.commands.isEmpty()); assertEquals(0, manual.queue.size)
++    }
++    @Test fun cancelledTimerRacingWithBlockedNetworkCannotQueueRootWork() {
++        ready(); callback.onBlockedStatusChanged(a, true); timer.fire(includeCancelled = true); drain()
++        assertEquals("blocked", epochs.snapshot().status); assertTrue(RecoveryStressBridgeShadow.commands.isEmpty())
++    }
++    @Test fun dnsChangeAfterTimerFiredInvalidatesQueuedRecoveryUntilNewDebounce() {
++        ready(); timer.fire(); callback.onLinkPropertiesChanged(a, links(54)); drain(); assertEquals(0, repairCount())
++        timer.fire(); drain(); assertEquals(1, repairCount())
++    }
++    @Test fun newEpochDuringRepairRunsOneFreshAttemptAndRejectsOldExitPublication() {
++        ready(); timer.fire()
++        RecoveryStressBridgeShadow.duringRepair = { ready(b); timer.fire() }
++        drain(); assertEquals(2, repairCount()); assertEquals(0, manual.queue.size)
++        assertTrue(ProxyNetworkJournal(app).recent().contains("STALE_RESULT"))
++    }
++    @Test fun duplicateCallbacksAfterFailureDoNotGenerateContinuousRepairs() {
++        ready(); timer.fire(); drain()
++        repeat(1000) { ready() }; timer.fire(); drain(); assertEquals(1, repairCount())
++    }
++    @Test fun lateHealthAfterBlockedDnsUnblockedCombinationCannotPublishHealthy() {
++        ready(); prefs.edit().putString("proxyNetworkIntegrity", "degraded").commit()
++        RecoveryStressBridgeShadow.health = "healthy"
++        RecoveryStressBridgeShadow.duringHealth = {
++            callback.onBlockedStatusChanged(a, true); callback.onLinkPropertiesChanged(a, links(55)); callback.onBlockedStatusChanged(a, false)
++        }
++        offMain { invoke(service, "checkLiveNetworkIntegrity") }
++        assertEquals("degraded", prefs.getString("proxyNetworkIntegrity", "")); assertEquals(0L, prefs.getLong("proxyPolicyEgressCheckedAt", -1))
++    }
++    @Test fun newServiceSessionRejectsOldInstanceCoreAndNetworkResultsEvenWithoutDestroyCallback() {
++        ready(); val route = epochs.snapshot(); val previous = prefs.getString("proxyNetworkSessionId", "")
++        create(); assertNotEquals(previous, prefs.getString("proxyNetworkSessionId", ""))
++        RecoveryStressBridgeShadow.core = "0"
++        assertEquals(ProxyContinuity.ProcessState.UNKNOWN, offMain { invoke(service, "probeCoreState") })
++        assertTrue(prefs.getBoolean("proxyRootRuntimeRunning", false))
++        assertFalse(service.publishNetworkObservation(route, RootProxyManager.observationTicket()) { throw AssertionError("old session published") })
++    }
++    @Test fun serviceCloseCancelsQueuedRecoveryDespiteRacingTimer() {
++        ready(); timer.fire(); controller.destroy(); controllers.remove(controller)
++        timer.fire(includeCancelled = true); drain(); assertEquals(0, repairCount())
++    }
++    @Test fun realTimerPolicyRemovesThousandsOfCancelledTasksImmediately() {
++        val m = ProxyNetworkMatchService::class.java.getDeclaredMethod("createMetrics"); m.isAccessible = true
++        val executor = m.invoke(null) as ScheduledThreadPoolExecutor
++        try {
++            repeat(4096) { executor.schedule({}, 1, TimeUnit.DAYS).cancel(false) }
++            assertEquals(0, executor.queue.size)
++        } finally { executor.shutdownNow() }
++    }
++    @Test fun persistentRetryIsCoalescedAndCloseDuringAttemptSuppressesReschedule() {
++        val tasks = ArrayDeque<Runnable>(); var attempts = 0; var close = false
++        lateinit var scheduler: ProxyRestoreScheduler
++        scheduler = ProxyRestoreScheduler({ task, delay -> assertEquals(30_000L, delay); tasks.add(task) }, {
++            attempts++; repeat(64) { scheduler.request(30_000L) }; if (close) scheduler.close(); 30_000L
++        })
++        scheduler.request(30_000L)
++        repeat(1000) { tasks.remove().run(); assertEquals(1, tasks.size) }
++        close = true; tasks.remove().run(); assertEquals(1001, attempts); assertTrue(tasks.isEmpty())
++        scheduler.request(30_000L); assertTrue(tasks.isEmpty())
++    }
++    @Test fun wantedCancellationStopsRealServiceUnknownCoreBootRetry() {
++        prefs.edit().putBoolean("proxyRootAutoStart", true).commit(); RecoveryStressBridgeShadow.core = "?"
++        invoke(service, "scheduleBootRestore", 350L); timer.fire(); drain()
++        assertEquals(1, RecoveryStressBridgeShadow.commands.size); assertEquals(1, timer.pending)
++        prefs.edit().putBoolean("proxyRootWanted", false).commit(); timer.fire(); drain()
++        assertEquals(1, RecoveryStressBridgeShadow.commands.size); assertEquals(0, timer.pending)
++    }
++
++    private class ManualWorker : AbstractExecutorService() {
++        val queue = ArrayDeque<Runnable>(); private var stopped = false
++        override fun execute(task: Runnable) { if (stopped) throw RejectedExecutionException(); queue.add(task) }
++        fun drain() { while (queue.isNotEmpty()) queue.remove().run() }
++        override fun shutdown() { stopped = true }
++        override fun shutdownNow(): MutableList<Runnable> { stopped = true; return mutableListOf() }
++        override fun isShutdown() = stopped
++        override fun isTerminated() = stopped
++        override fun awaitTermination(timeout: Long, unit: TimeUnit) = stopped
++    }
++    private class ManualTimer : ScheduledThreadPoolExecutor(1) {
++        private val tasks = ArrayDeque<Future>()
++        val pending get() = tasks.count { !it.cancelled }
++        override fun schedule(task: Runnable, delay: Long, unit: TimeUnit): ScheduledFuture<*> = Future(task).also { tasks.add(it) }
++        fun fire(includeCancelled: Boolean = false) {
++            val due = tasks.toList(); tasks.clear(); due.forEach { if (includeCancelled || !it.cancelled) it.task.run() }
++        }
++        private class Future(val task: Runnable) : ScheduledFuture<Any?> {
++            var cancelled = false
++            override fun cancel(mayInterruptIfRunning: Boolean): Boolean { cancelled = true; return true }
++            override fun isCancelled() = cancelled
++            override fun isDone() = cancelled
++            override fun get(): Any? = null
++            override fun get(timeout: Long, unit: TimeUnit): Any? = null
++            override fun getDelay(unit: TimeUnit) = 0L
++            override fun compareTo(other: Delayed) = 0
++        }
++    }
++}

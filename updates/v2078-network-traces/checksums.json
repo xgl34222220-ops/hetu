@@ -1,0 +1,10 @@
+{
+  "patch_sha256": "053077497c6e11be8cd7b35904101ce3b78de7ca3c5f61e6fa51c0c06a4fa6ab",
+  "base_effective_source": "V20.77 34ba4778e36e79ae916c5729e6b848c4218f868f / 37160754265: 292 units passed; duplicate native-frame API35/36 failure retained, rerun in V20.78",
+  "versionCode": 2078,
+  "versionName": "0.12.8-v20",
+  "rootRuntimeRevision": 151,
+  "rootAssetSha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+  "autostartSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
+  "native_changes": false
+}

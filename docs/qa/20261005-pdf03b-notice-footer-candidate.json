@@ -1,0 +1,132 @@
+{
+  "created_utc": "2026-10-05T17:47:34.217506+00:00",
+  "source_file": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt",
+  "baseline_application_commit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "baseline_entire_file_sha256": "0f520b3ff09a88b5b58f6bf857e5fb492f33ea2973418d4e679be440ce4b301e",
+  "modified_entire_file_sha256": "0d93da6d2bb352058eedd04f102e90730032b2c51bf3531e8c9d5becadfd978a",
+  "only_addition_literal": "#notice .dialog-footer{padding:3px 13px}",
+  "only_addition_bytes": 41,
+  "insertion_after_reference_status_and_before_tabs": true,
+  "entire_file_reverse_one_exact_line_equals_ca60825": true,
+  "reverted_entire_file_sha256": "0f520b3ff09a88b5b58f6bf857e5fb492f33ea2973418d4e679be440ce4b301e",
+  "entire_markup_outside_style_unchanged": true,
+  "entire_script_blocks_unchanged": true,
+  "JS_script_sha256": "bbd8dfe7759f96debe4594062a36893b01b69adc3e798c810c41934b1245b789",
+  "CSS_after_removing_one_line_equals_baseline": true,
+  "generic_dialog_footer_exact_5px_13px_unchanged": true,
+  "CSS_specificity_proof": {
+    "added_selector": "#notice .dialog-footer",
+    "added_specificity": [
+      1,
+      1,
+      0
+    ],
+    "later_shared_selector": ".dialog-footer",
+    "shared_specificity": [
+      0,
+      1,
+      0
+    ],
+    "cascade_result": "Higher ID specificity keeps notice padding3px13px although shared5px13px rule occurs later. Other dialog footer remains5px13px.",
+    "actual_markup_footer_selector_matches": [
+      {
+        "tag": "div",
+        "parent_dialog_id": "node-dialog",
+        "notice_selector_matches": false
+      },
+      {
+        "tag": "div",
+        "parent_dialog_id": "notice",
+        "notice_selector_matches": true
+      }
+    ],
+    "properties_changed_only_on_notice": [
+      "padding-top:5px->3px",
+      "padding-bottom:5px->3px"
+    ],
+    "horizontal_padding_unchanged": "13px"
+  },
+  "historical_actual_measurement": {
+    "report": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03b-ca60825-visual-review.json",
+    "report_sha256": "694eb7c5daf10dce4cf0a0b8e3bbc9c670ef9645ef2a37c3a4fa3380c9a132f7",
+    "report_remains_unchanged": true,
+    "application_commit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "run_id": 37346239863,
+    "actual_03B44_capture_path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-044-native-switch-failure.png",
+    "actual_03B44_capture_sha256": "dc1708fa08d193a416f773cbb51aa1d8fe7f444fdb8045a441f212d539671749",
+    "measurement": {
+      "page": 44,
+      "method": "Only-white notice minRGB thresholds225/230/235/240; all4bboxes stable. Divider sampled referencex90y520/currentx84y429",
+      "reference_bbox": [
+        85,
+        441,
+        341,
+        564
+      ],
+      "reference_size_raw": [
+        256,
+        123
+      ],
+      "reference_size_normalized394": [
+        237.3270588235294,
+        114.02823529411764
+      ],
+      "current_bbox": [
+        78,
+        355,
+        316,
+        474
+      ],
+      "current_size": [
+        238,
+        119
+      ],
+      "size_difference_current_minus_reference": [
+        0.6729411764706015,
+        4.971764705882364
+      ],
+      "reference_top_to_divider_raw": 79,
+      "reference_top_to_divider_normalized394": 73.23764705882353,
+      "current_top_to_divider": 74,
+      "reference_footer_height_raw": 44,
+      "reference_footer_height_normalized394": 40.790588235294116,
+      "current_footer_height": 45,
+      "footer_excess": 4.209411764705884,
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt:117 .dialog-footer padding5px13px; buttonpadding8px10px,line-height18px;1pxborder",
+      "high_confidence_source_defect": true,
+      "classification": "Existing narrow bounded notice-footer height residual; not newly introduced by ca60825",
+      "candidate_UI_only_change": "Only #notice .dialog-footer padding-top3px/padding-bottom3px (horizontal13unchanged) gives footer41px,total115px. Do not change generic node-dialog, notice body/title, listeners orcontroller rejection handling.",
+      "candidate_expected_notice_height": 115,
+      "candidate_expected_difference_to_reference": 0.9717647058823644,
+      "source_changed_by_this_reviewer": false,
+      "candidate_status": "Reported to parent; not implemented or validated by this review."
+    }
+  },
+  "bounded_geometry_calculation": {
+    "old_vertical_padding_each": 5,
+    "new_vertical_padding_each": 3,
+    "unchanged_button_line_height": 18,
+    "unchanged_button_vertical_padding_each": 8,
+    "unchanged_separator_border": 1,
+    "old_footer_height": 45,
+    "predicted_new_footer_height": 41,
+    "height_delta": -4,
+    "historical_actual_notice_height": 119,
+    "predicted_new_notice_height": 115,
+    "actual_reference_normalized_height": 114.02823529411764,
+    "predicted_height_minus_reference": 0.9717647058823644,
+    "node_dialog_height_change": 0,
+    "notice_body_title_flow_height_change": 0
+  },
+  "retained_behavior_proof": [
+    "Full file reverse equals ca60825, so allhandlers/controllerauth/APIcalls/rejectioncatch/selectedstate/markup/text unchanged.",
+    "Genericfooter keeps5px13px and matchesnode-dialog; onlynotice footermatchesnewIDselector."
+  ],
+  "verification_limits": [
+    "Source/CSS-selector/fullfile-reversal proof completed; predicted4pxdelta is deterministic box-height calculation.",
+    "New build/native screenshot not run by this reviewer; root owns next narrowbatch CI and fresh screenshot verification.",
+    "Historicalca60825report remains original48evidence and is not relabeled as new screenshot.",
+    "Literalpixel1:1 still false; noGoogle/device/account/authhealth claim."
+  ],
+  "source_edit_scope": "Only ProxyLocalWebUiActivity.kt single CSS line; no other production/source/tests/scope/patch/inputs/CI changes by reviewer."
+}

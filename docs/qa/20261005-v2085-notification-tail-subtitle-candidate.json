@@ -1,0 +1,58 @@
+{
+  "parentApplication": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "candidateOwnBuildAndCaptures": "not executed yet",
+  "literal130PagePixelParityAccepted": false,
+  "changedInputs": 40,
+  "frozenInputs": 332,
+  "totalInputs": 372,
+  "patchSha256": "bae75d18e86669e1eec6b33cec8db5bc1abf36c64d4263a846e05caef0643651",
+  "exactReconstructionAll372Inputs": true,
+  "fullSharedDefaultsGuard": true,
+  "fullNativeSettingsCallbackGuard": true,
+  "fullSettingsPickerTestGuard": true,
+  "fullWebuiAuthBehaviorGuard": true,
+  "boundedRootDiagnosticOnlyGuard": true,
+  "manifestDependenciesSigningCoreAndHomePanelFrozen": true,
+  "productionSourceUnchangedExcept": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt"
+  ],
+  "runtimePresentationOnly": "Own273 measured page25/26 per-index menu typography/layout and localAdblock subtitle12sp; shared defaults and all callbacks preserved",
+  "testChangesSinceParent": [],
+  "historicalLayers": [
+    {
+      "path": "updates/v2082-new-ui/inputs.json",
+      "sha256": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2082-new-ui/integration.patch",
+      "sha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/inputs.json",
+      "sha256": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/ui.patch",
+      "sha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/inputs.json",
+      "sha256": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/runtime.patch",
+      "sha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "byteEqualHistoricalBase": true
+    }
+  ],
+  "proofStatus": "Historical local proof before tools intake; same four source candidates preserved. New final-geometry layer own acceptance required.",
+  "supersedingLayer": "updates/v2085-pdf-final-geometry"
+}

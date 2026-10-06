@@ -33,29 +33,29 @@ import java.util.TreeSet
 
 class ProxyRuntimeCoreSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { HetuTheme { RuntimeCoreSettingsPage { finish() } } }
+        super.onCreate(savedInstanceState)
+        hxHost { vm -> RuntimeCoreScreen(vm, onBack = { finish() }, onOpenCores = { startActivity(Intent(this, ProxyCoreActivity::class.java)) }) }
     }
 }
 
 class ProxySharedNetworkSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { HetuTheme { SharedNetworkSettingsPage { finish() } } }
+        super.onCreate(savedInstanceState)
+        hxHost { vm -> SharedNetworkScreen(vm) { finish() } }
     }
 }
 
 class ProxyCnIpSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { HetuTheme { CnIpSettingsPage { finish() } } }
+        super.onCreate(savedInstanceState)
+        hxHost { vm -> CnIpScreen(vm) { finish() } }
     }
 }
 
 class ProxyBypassRulesActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState); enableEdgeToEdge()
-        setContent { HetuTheme { BypassRulesPage { finish() } } }
+        super.onCreate(savedInstanceState)
+        hxHost { vm -> BypassRulesScreen(vm) { finish() } }
     }
 }
 
@@ -69,7 +69,7 @@ private fun RuntimeCoreSettingsPage(onBack: () -> Unit) {
         item { FocusedNotice("修改运行核心后，下次启动或重启代理生效。这里仅负责核心选择；下载、更新和维护在“内核管理”中完成。") }
         item {
             FocusedGroup {
-                FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF12806F), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
+                FocusedChoiceRow(Icons.Rounded.Memory, Color(0xFF2A62E8), "Mihomo", "标准 Mihomo 运行核心", profile.core == ProxyRuntimeProfile.Core.MIHOMO) {
                     prefs.edit().putString("proxyBaseCore", "mihomo").apply(); revision++
                 }
                 FocusedDivider()
@@ -458,7 +458,7 @@ private fun FocusedSettingsScaffold(title: String, subtitle: String, onBack: () 
 private fun FocusedChoiceRow(icon: ImageVector, accent: Color, title: String, subtitle: String, selected: Boolean, onClick: () -> Unit) {
     Row(Modifier.fillMaxWidth().clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
         FocusedIcon(icon, accent); Spacer(Modifier.width(10.dp)); Column(Modifier.weight(1f)) { Text(title, fontSize = 14.sp, fontWeight = FontWeight.Bold); Text(subtitle, color = MaterialTheme.colorScheme.onSurfaceVariant, fontSize = 11.sp, lineHeight = 15.sp) }
-        if (selected) Surface(color = Color(0xFFDDF1EC), shape = CircleShape) { Icon(Icons.Rounded.Check, null, tint = Color(0xFF12806F), modifier = Modifier.padding(6.dp).size(16.dp)) } else Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f))
+        if (selected) Surface(color = Color(0xFFE3EAFD), shape = CircleShape) { Icon(Icons.Rounded.Check, null, tint = Color(0xFF2A62E8), modifier = Modifier.padding(6.dp).size(16.dp)) } else Icon(Icons.Rounded.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = .52f))
     }
 }
 

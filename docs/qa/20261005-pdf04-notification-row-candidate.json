@@ -1,0 +1,512 @@
+{
+  "schema": 1,
+  "createdAtUtc": "2026-10-05T17:52:18.072256+00:00",
+  "baselineApplicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "baselineRunId": 37346239863,
+  "baselineUiArtifactId": 11360907944,
+  "status": "Source candidate only; source stopped; root owns generated layers/CI/new-render verification.",
+  "sourcePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+  "baselineBytes": 60873,
+  "baselineSha256": "e1d24a5cb07d1e69e5cd3a848fc30fe13e520dace4b71ce31f022cbdea696506",
+  "candidateBytes": 60917,
+  "candidateSha256": "1dd75cec90790c89cdc4f69e8376835de297a3cca94b3333c3aca0a07b98a288",
+  "exactForwardThreeReplacementsEqualCurrent": true,
+  "wholeFileReverseSha256": "e1d24a5cb07d1e69e5cd3a848fc30fe13e520dace4b71ce31f022cbdea696506",
+  "wholeFileReverseByteEqualCa60825": true,
+  "allowedChanges": [
+    {
+      "before": "subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)",
+      "after": "subtitleFontSizeSp = 13f, rowMinHeight = 71.dp)",
+      "exactOccurrenceCount": 1
+    },
+    {
+      "before": "SettingsNavRow(\"刷新频率\", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = \"$refresh 秒\", dropdown = true) { picker = \"refresh\" to -1 }",
+      "after": "SettingsNavRow(\"刷新频率\", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = \"$refresh 秒\", dropdown = true, rowMinHeight = 63.dp) { picker = \"refresh\" to -1 }",
+      "exactOccurrenceCount": 1
+    },
+    {
+      "before": "SettingsNavRow(\"点击通知打开\", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true) {",
+      "after": "SettingsNavRow(\"点击通知打开\", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true, rowMinHeight = 60.dp) {",
+      "exactOccurrenceCount": 1
+    }
+  ],
+  "protectedPreferencesPermissionHandlersSave": [
+    {
+      "name": "preferences_initial_state_options_permission_save",
+      "bytes": 4309,
+      "baselineSha256": "96deedeb13d370dd58d138615851e10f8f40632603784a5b9d8dd6ff80681f1b",
+      "candidateSha256": "96deedeb13d370dd58d138615851e10f8f40632603784a5b9d8dd6ff80681f1b",
+      "exactBytesEqual": true
+    },
+    {
+      "name": "permission_switch_guard_handler",
+      "bytes": 600,
+      "baselineSha256": "8fdfa1582a65c9be87aa65ad44500453cd50f4d39d57e0e9ecddaf149e411e3d",
+      "candidateSha256": "8fdfa1582a65c9be87aa65ad44500453cd50f4d39d57e0e9ecddaf149e411e3d",
+      "exactBytesEqual": true
+    },
+    {
+      "name": "template_action_pickers_handlers",
+      "bytes": 3480,
+      "baselineSha256": "ec780213be9cbfd4cbb0f0fa70e98b3c52b5f0e6e430a55df795926e18c07b01",
+      "candidateSha256": "ec780213be9cbfd4cbb0f0fa70e98b3c52b5f0e6e430a55df795926e18c07b01",
+      "exactBytesEqual": true
+    },
+    {
+      "name": "refresh_picker_callback",
+      "bytes": 28,
+      "baselineSha256": "a76689f94650fc317c3ad92ceeca1c50263050fa8c5357c9a07c150ec0cb6064",
+      "candidateSha256": "a76689f94650fc317c3ad92ceeca1c50263050fa8c5357c9a07c150ec0cb6064",
+      "exactBytesEqual": true
+    },
+    {
+      "name": "target_picker_callback",
+      "bytes": 48,
+      "baselineSha256": "a3e4af19b1da246b480f772befc6e470ac73cfd206201418030f3b5aa74b0b4e",
+      "candidateSha256": "a3e4af19b1da246b480f772befc6e470ac73cfd206201418030f3b5aa74b0b4e",
+      "exactBytesEqual": true
+    }
+  ],
+  "allOtherFileBytesPreservedViaWholeFileReverse": true,
+  "sharedSettingsHelpersDefaultsUnchanged": true,
+  "homePanelSourceUnchangedByThisCandidate": true,
+  "measurementSnapshotPath": "/tmp/hetu_pdf04_ca60825_notification_rows_measurement.json",
+  "measurementSnapshotBytes": 9217,
+  "measurementSnapshotSha256": "ab689550f4fd2b84a3521a131eef71fd6b5cb85326d5e0bad2151daa7a171cfe",
+  "measurementSnapshotUtf8": "{\n  \"schema\": 1,\n  \"createdAtUtc\": \"2026-10-05T17:45:54.961325+00:00\",\n  \"reviewer\": \"/root/settings_parity_audit\",\n  \"applicationCommit\": \"ca60825b4edaecc07fc6c4485c264eec8d37cbe6\",\n  \"runId\": 37346239863,\n  \"artifactId\": 11360907944,\n  \"page\": \"04/11\",\n  \"actualNewFullSizeOpenEvidence\": [\n    \"Original425x950 rendered PDF page\",\n    \"xref32 original850x1850 embedded JPEG\",\n    \"ca60825 actual393x852 screenshot\"\n  ],\n  \"referenceEmbeddedPath\": \"/tmp/hetu-pdf04-page11-embedded.jpeg\",\n  \"referenceEmbeddedSha256\": \"30813607c34567e5c3b15878b14c17eb504a1a788d4b173ca3e2f543dd2b3c30\",\n  \"referenceXref\": 32,\n  \"currentPath\": \"/workspace/scratch/3788973cf567/tmp/ui85-ca60825/04-011-notification.png\",\n  \"currentSha256\": \"3659a311c8ec2a6a13540af4d8852c83e4000584312ae60776abfa690c891145\",\n  \"scale\": {\n    \"referenceWidth\": 850,\n    \"currentWidth\": 393,\n    \"referenceToCurrentWidthScale\": 0.4623529411764706\n  },\n  \"cardBoundaries\": {\n    \"referenceAAInclusiveFirstLastRows\": [\n      255,\n      696\n    ],\n    \"referenceHalfOpenY\": [\n      255,\n      697\n    ],\n    \"referenceUncertaintyEmbeddedPx\": 1,\n    \"referenceNormalizedHeight\": 204.35999999999999,\n    \"currentHalfOpenY\": [\n      52,\n      270\n    ],\n    \"currentHeight\": 218\n  },\n  \"dividerCenters\": {\n    \"referenceDarkestRows\": [\n      418,\n      556\n    ],\n    \"referenceAACoverageRows\": [\n      [\n        417,\n        419\n      ],\n      [\n        556,\n        557\n      ]\n    ],\n    \"referenceDarkestRGBAtCenterX425\": [\n      [\n        233,\n        231,\n        252\n      ],\n      [\n        231,\n        232,\n        252\n      ]\n    ],\n    \"currentDarkestRows\": [\n      128,\n      197\n    ],\n    \"currentRGBAtCenterX196\": [\n      [\n        239,\n        240,\n        248\n      ],\n      [\n        239,\n        240,\n        248\n      ]\n    ]\n  },\n  \"edgeAndDividerIntervals\": {\n    \"referenceEmbedded\": [\n      163,\n      138,\n      141\n    ],\n    \"referenceWidthNormalized\": [\n      75.3635294117647,\n      63.80470588235294,\n      65.19176470588235\n    ],\n    \"current\": [\n      76,\n      69,\n      73\n    ],\n    \"currentMinusReference\": [\n      0.6364705882352979,\n      5.195294117647059,\n      7.808235294117651\n    ]\n  },\n  \"textMeasurements\": {\n    \"reference\": {\n      \"row1title\": {\n        \"crop\": [\n          163,\n          289,\n          630,\n          348\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          169,\n          302,\n          388,\n          337\n        ],\n        \"inkWidthHeight\": [\n          220,\n          36\n        ],\n        \"inkWidthHeightNormalized\": [\n          101.717647,\n          16.644706\n        ],\n        \"bboxCenterY\": 319.5,\n        \"bboxCenterRelativeCardTopNormalized\": 29.821765,\n        \"inkCentroidY\": 320.208344,\n        \"inkPixels\": 4027\n      },\n      \"row1subtitle\": {\n        \"crop\": [\n          163,\n          344,\n          650,\n          390\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          170,\n          351,\n          633,\n          378\n        ],\n        \"inkWidthHeight\": [\n          464,\n          28\n        ],\n        \"inkWidthHeightNormalized\": [\n          214.531765,\n          12.945882\n        ],\n        \"bboxCenterY\": 364.5,\n        \"bboxCenterRelativeCardTopNormalized\": 50.627647,\n        \"inkCentroidY\": 364.528086,\n        \"inkPixels\": 5145\n      },\n      \"row2title\": {\n        \"crop\": [\n          162,\n          458,\n          480,\n          516\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          169,\n          468,\n          315,\n          502\n        ],\n        \"inkWidthHeight\": [\n          147,\n          35\n        ],\n        \"inkWidthHeightNormalized\": [\n          67.965882,\n          16.182353\n        ],\n        \"bboxCenterY\": 485.0,\n        \"bboxCenterRelativeCardTopNormalized\": 106.341176,\n        \"inkCentroidY\": 484.509427,\n        \"inkPixels\": 2917\n      },\n      \"row3title\": {\n        \"crop\": [\n          162,\n          592,\n          570,\n          650\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          169,\n          605,\n          390,\n          640\n        ],\n        \"inkWidthHeight\": [\n          222,\n          36\n        ],\n        \"inkWidthHeightNormalized\": [\n          102.642353,\n          16.644706\n        ],\n        \"bboxCenterY\": 622.5,\n        \"bboxCenterRelativeCardTopNormalized\": 169.914706,\n        \"inkCentroidY\": 622.780604,\n        \"inkPixels\": 3774\n      }\n    },\n    \"current\": {\n      \"row1title\": {\n        \"crop\": [\n          77,\n          66,\n          290,\n          98\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          81,\n          74,\n          189,\n          91\n        ],\n        \"inkWidthHeight\": [\n          109,\n          18\n        ],\n        \"inkWidthHeightNormalized\": [\n          109,\n          18\n        ],\n        \"bboxCenterY\": 82.5,\n        \"bboxCenterRelativeCardTopNormalized\": 30.5,\n        \"inkCentroidY\": 82.832653,\n        \"inkPixels\": 735\n      },\n      \"row1subtitle\": {\n        \"crop\": [\n          77,\n          98,\n          302,\n          124\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          81,\n          101,\n          294,\n          113\n        ],\n        \"inkWidthHeight\": [\n          214,\n          13\n        ],\n        \"inkWidthHeightNormalized\": [\n          214,\n          13\n        ],\n        \"bboxCenterY\": 107.0,\n        \"bboxCenterRelativeCardTopNormalized\": 55.0,\n        \"inkCentroidY\": 106.994019,\n        \"inkPixels\": 836\n      },\n      \"row2title\": {\n        \"crop\": [\n          77,\n          145,\n          254,\n          181\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          81,\n          154,\n          152,\n          171\n        ],\n        \"inkWidthHeight\": [\n          72,\n          18\n        ],\n        \"inkWidthHeightNormalized\": [\n          72,\n          18\n        ],\n        \"bboxCenterY\": 162.5,\n        \"bboxCenterRelativeCardTopNormalized\": 110.5,\n        \"inkCentroidY\": 162.084192,\n        \"inkPixels\": 582\n      },\n      \"row3title\": {\n        \"crop\": [\n          77,\n          213,\n          273,\n          253\n        ],\n        \"threshold\": \"maxRGB<160\",\n        \"bboxInclusive\": [\n          81,\n          223,\n          189,\n          240\n        ],\n        \"inkWidthHeight\": [\n          109,\n          18\n        ],\n        \"inkWidthHeightNormalized\": [\n          109,\n          18\n        ],\n        \"bboxCenterY\": 231.5,\n        \"bboxCenterRelativeCardTopNormalized\": 179.5,\n        \"inkCentroidY\": 231.423313,\n        \"inkPixels\": 652\n      }\n    }\n  },\n  \"sourceCurrentFixedGeometry\": {\n    \"source\": \"android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt\",\n    \"callers\": {\n      \"masterRow\": \"1116-1117\",\n      \"refreshRow\": \"1119\",\n      \"targetRow\": \"1121\"\n    },\n    \"masterRowMinDp\": 72,\n    \"refreshTargetDefaultMinDp\": 68,\n    \"SettingsGroupTopBottomPaddingDp\": 4,\n    \"SettingsDividerDp\": 0.5,\n    \"actualDividerHeightAtCurrentMdpiPx\": 1,\n    \"SettingsRowTitleSizeLineHeightSp\": [\n      18,\n      24\n    ],\n    \"masterSubtitleSizeLineHeightSp\": [\n      13,\n      18\n    ]\n  },\n  \"narrowCandidateNotImplemented\": {\n    \"onlyCallerOverrides\": {\n      \"masterRowMinHeightDp\": 71,\n      \"refreshRowMinHeightDp\": 63,\n      \"targetRowMinHeightDp\": 60\n    },\n    \"preserveCallbacksAndDefaults\": true,\n    \"expectedIntervalsPx\": [\n      75,\n      64,\n      65\n    ],\n    \"expectedCardHeightPx\": 204,\n    \"referenceNormalizedCardHeightPx\": 204.35999999999999,\n    \"expectedMinusReferencePx\": -0.3599999999999852,\n    \"derivation\": \"Independent edge-to-divider75.365 minus top4 gives master71.365; divider-to-divider63.805 minus actual1px divider gives refresh62.805; divider-to-bottom65.192 minus actual1px divider and bottom4 gives target60.192. Nearest integer minima71/63/60, not even division of total excess.\",\n    \"expectedTitleCenterRelativeCardTopPx\": [\n      30,\n      107,\n      169.5\n    ],\n    \"expectedTitleCenterMinusReferencePx\": [\n      0.1782350000000008,\n      0.6588239999999956,\n      -0.41470599999999536\n    ],\n    \"expectedSubtitleCenterRelativeTopPx\": 54.5,\n    \"expectedSubtitleCenterMinusReferencePx\": 3.872352999999997,\n    \"freshRendered\": false,\n    \"newCommitOrCIStarted\": false\n  },\n  \"masterTitleSubtitleGap\": {\n    \"referenceEmbeddedPx\": 45,\n    \"referenceWidthNormalizedPx\": 20.805882352941175,\n    \"currentPx\": 24.5,\n    \"candidateRowMinDoesNotChangeThisGap\": true,\n    \"sourceTitleLine24SubtitleLine18Remain\": true,\n    \"pending\": \"Row-minimum correction does not remove ~3.69px interline gap difference. Separate local text-line candidate requires rendering; no globalfont/line-height changes inferred.\"\n  },\n  \"limitations\": [\n    \"JPEG AA edge uncertainty±1embeddedpx≈0.46normalizedpx; centers from isolated glyphbbox, not assumed Text layout boxes.\",\n    \"Three rowminima not rendered/compiled/accepted in new commit; wholepagepixel1:1 not claimed.\",\n    \"Current OFFpermission fixture changes switchcolor but not rowminima/fixed cardbounds.\",\n    \"Existing finalca report unchanged as saved before follow-up measurement.\",\n    \"No source/test/CI mutation.\"\n  ]\n}\n",
+  "measurementSnapshot": {
+    "schema": 1,
+    "createdAtUtc": "2026-10-05T17:45:54.961325+00:00",
+    "reviewer": "/root/settings_parity_audit",
+    "applicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "runId": 37346239863,
+    "artifactId": 11360907944,
+    "page": "04/11",
+    "actualNewFullSizeOpenEvidence": [
+      "Original425x950 rendered PDF page",
+      "xref32 original850x1850 embedded JPEG",
+      "ca60825 actual393x852 screenshot"
+    ],
+    "referenceEmbeddedPath": "/tmp/hetu-pdf04-page11-embedded.jpeg",
+    "referenceEmbeddedSha256": "30813607c34567e5c3b15878b14c17eb504a1a788d4b173ca3e2f543dd2b3c30",
+    "referenceXref": 32,
+    "currentPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/04-011-notification.png",
+    "currentSha256": "3659a311c8ec2a6a13540af4d8852c83e4000584312ae60776abfa690c891145",
+    "scale": {
+      "referenceWidth": 850,
+      "currentWidth": 393,
+      "referenceToCurrentWidthScale": 0.4623529411764706
+    },
+    "cardBoundaries": {
+      "referenceAAInclusiveFirstLastRows": [
+        255,
+        696
+      ],
+      "referenceHalfOpenY": [
+        255,
+        697
+      ],
+      "referenceUncertaintyEmbeddedPx": 1,
+      "referenceNormalizedHeight": 204.35999999999999,
+      "currentHalfOpenY": [
+        52,
+        270
+      ],
+      "currentHeight": 218
+    },
+    "dividerCenters": {
+      "referenceDarkestRows": [
+        418,
+        556
+      ],
+      "referenceAACoverageRows": [
+        [
+          417,
+          419
+        ],
+        [
+          556,
+          557
+        ]
+      ],
+      "referenceDarkestRGBAtCenterX425": [
+        [
+          233,
+          231,
+          252
+        ],
+        [
+          231,
+          232,
+          252
+        ]
+      ],
+      "currentDarkestRows": [
+        128,
+        197
+      ],
+      "currentRGBAtCenterX196": [
+        [
+          239,
+          240,
+          248
+        ],
+        [
+          239,
+          240,
+          248
+        ]
+      ]
+    },
+    "edgeAndDividerIntervals": {
+      "referenceEmbedded": [
+        163,
+        138,
+        141
+      ],
+      "referenceWidthNormalized": [
+        75.3635294117647,
+        63.80470588235294,
+        65.19176470588235
+      ],
+      "current": [
+        76,
+        69,
+        73
+      ],
+      "currentMinusReference": [
+        0.6364705882352979,
+        5.195294117647059,
+        7.808235294117651
+      ]
+    },
+    "textMeasurements": {
+      "reference": {
+        "row1title": {
+          "crop": [
+            163,
+            289,
+            630,
+            348
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            169,
+            302,
+            388,
+            337
+          ],
+          "inkWidthHeight": [
+            220,
+            36
+          ],
+          "inkWidthHeightNormalized": [
+            101.717647,
+            16.644706
+          ],
+          "bboxCenterY": 319.5,
+          "bboxCenterRelativeCardTopNormalized": 29.821765,
+          "inkCentroidY": 320.208344,
+          "inkPixels": 4027
+        },
+        "row1subtitle": {
+          "crop": [
+            163,
+            344,
+            650,
+            390
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            170,
+            351,
+            633,
+            378
+          ],
+          "inkWidthHeight": [
+            464,
+            28
+          ],
+          "inkWidthHeightNormalized": [
+            214.531765,
+            12.945882
+          ],
+          "bboxCenterY": 364.5,
+          "bboxCenterRelativeCardTopNormalized": 50.627647,
+          "inkCentroidY": 364.528086,
+          "inkPixels": 5145
+        },
+        "row2title": {
+          "crop": [
+            162,
+            458,
+            480,
+            516
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            169,
+            468,
+            315,
+            502
+          ],
+          "inkWidthHeight": [
+            147,
+            35
+          ],
+          "inkWidthHeightNormalized": [
+            67.965882,
+            16.182353
+          ],
+          "bboxCenterY": 485.0,
+          "bboxCenterRelativeCardTopNormalized": 106.341176,
+          "inkCentroidY": 484.509427,
+          "inkPixels": 2917
+        },
+        "row3title": {
+          "crop": [
+            162,
+            592,
+            570,
+            650
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            169,
+            605,
+            390,
+            640
+          ],
+          "inkWidthHeight": [
+            222,
+            36
+          ],
+          "inkWidthHeightNormalized": [
+            102.642353,
+            16.644706
+          ],
+          "bboxCenterY": 622.5,
+          "bboxCenterRelativeCardTopNormalized": 169.914706,
+          "inkCentroidY": 622.780604,
+          "inkPixels": 3774
+        }
+      },
+      "current": {
+        "row1title": {
+          "crop": [
+            77,
+            66,
+            290,
+            98
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            81,
+            74,
+            189,
+            91
+          ],
+          "inkWidthHeight": [
+            109,
+            18
+          ],
+          "inkWidthHeightNormalized": [
+            109,
+            18
+          ],
+          "bboxCenterY": 82.5,
+          "bboxCenterRelativeCardTopNormalized": 30.5,
+          "inkCentroidY": 82.832653,
+          "inkPixels": 735
+        },
+        "row1subtitle": {
+          "crop": [
+            77,
+            98,
+            302,
+            124
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            81,
+            101,
+            294,
+            113
+          ],
+          "inkWidthHeight": [
+            214,
+            13
+          ],
+          "inkWidthHeightNormalized": [
+            214,
+            13
+          ],
+          "bboxCenterY": 107.0,
+          "bboxCenterRelativeCardTopNormalized": 55.0,
+          "inkCentroidY": 106.994019,
+          "inkPixels": 836
+        },
+        "row2title": {
+          "crop": [
+            77,
+            145,
+            254,
+            181
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            81,
+            154,
+            152,
+            171
+          ],
+          "inkWidthHeight": [
+            72,
+            18
+          ],
+          "inkWidthHeightNormalized": [
+            72,
+            18
+          ],
+          "bboxCenterY": 162.5,
+          "bboxCenterRelativeCardTopNormalized": 110.5,
+          "inkCentroidY": 162.084192,
+          "inkPixels": 582
+        },
+        "row3title": {
+          "crop": [
+            77,
+            213,
+            273,
+            253
+          ],
+          "threshold": "maxRGB<160",
+          "bboxInclusive": [
+            81,
+            223,
+            189,
+            240
+          ],
+          "inkWidthHeight": [
+            109,
+            18
+          ],
+          "inkWidthHeightNormalized": [
+            109,
+            18
+          ],
+          "bboxCenterY": 231.5,
+          "bboxCenterRelativeCardTopNormalized": 179.5,
+          "inkCentroidY": 231.423313,
+          "inkPixels": 652
+        }
+      }
+    },
+    "sourceCurrentFixedGeometry": {
+      "source": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "callers": {
+        "masterRow": "1116-1117",
+        "refreshRow": "1119",
+        "targetRow": "1121"
+      },
+      "masterRowMinDp": 72,
+      "refreshTargetDefaultMinDp": 68,
+      "SettingsGroupTopBottomPaddingDp": 4,
+      "SettingsDividerDp": 0.5,
+      "actualDividerHeightAtCurrentMdpiPx": 1,
+      "SettingsRowTitleSizeLineHeightSp": [
+        18,
+        24
+      ],
+      "masterSubtitleSizeLineHeightSp": [
+        13,
+        18
+      ]
+    },
+    "narrowCandidateNotImplemented": {
+      "onlyCallerOverrides": {
+        "masterRowMinHeightDp": 71,
+        "refreshRowMinHeightDp": 63,
+        "targetRowMinHeightDp": 60
+      },
+      "preserveCallbacksAndDefaults": true,
+      "expectedIntervalsPx": [
+        75,
+        64,
+        65
+      ],
+      "expectedCardHeightPx": 204,
+      "referenceNormalizedCardHeightPx": 204.35999999999999,
+      "expectedMinusReferencePx": -0.3599999999999852,
+      "derivation": "Independent edge-to-divider75.365 minus top4 gives master71.365; divider-to-divider63.805 minus actual1px divider gives refresh62.805; divider-to-bottom65.192 minus actual1px divider and bottom4 gives target60.192. Nearest integer minima71/63/60, not even division of total excess.",
+      "expectedTitleCenterRelativeCardTopPx": [
+        30,
+        107,
+        169.5
+      ],
+      "expectedTitleCenterMinusReferencePx": [
+        0.1782350000000008,
+        0.6588239999999956,
+        -0.41470599999999536
+      ],
+      "expectedSubtitleCenterRelativeTopPx": 54.5,
+      "expectedSubtitleCenterMinusReferencePx": 3.872352999999997,
+      "freshRendered": false,
+      "newCommitOrCIStarted": false
+    },
+    "masterTitleSubtitleGap": {
+      "referenceEmbeddedPx": 45,
+      "referenceWidthNormalizedPx": 20.805882352941175,
+      "currentPx": 24.5,
+      "candidateRowMinDoesNotChangeThisGap": true,
+      "sourceTitleLine24SubtitleLine18Remain": true,
+      "pending": "Row-minimum correction does not remove ~3.69px interline gap difference. Separate local text-line candidate requires rendering; no globalfont/line-height changes inferred."
+    },
+    "limitations": [
+      "JPEG AA edge uncertainty±1embeddedpx≈0.46normalizedpx; centers from isolated glyphbbox, not assumed Text layout boxes.",
+      "Three rowminima not rendered/compiled/accepted in new commit; wholepagepixel1:1 not claimed.",
+      "Current OFFpermission fixture changes switchcolor but not rowminima/fixed cardbounds.",
+      "Existing finalca report unchanged as saved before follow-up measurement.",
+      "No source/test/CI mutation."
+    ]
+  },
+  "expectedRendering": {
+    "cardHeightPx": 204,
+    "referenceNormalizedPx": 204.36,
+    "titleCenterResidualApproxPx": [
+      0.176,
+      0.659,
+      -0.415
+    ],
+    "masterSubtitleResidualApproxPx": 3.867,
+    "subtitleResidualCauseNotUniquelyMapped": true,
+    "integerRasterPredictionUncertaintyPx": 0.5
+  },
+  "newCommit": null,
+  "newCiRun": null,
+  "freshCompilationExecuted": false,
+  "freshRenderingExecuted": false,
+  "freshInstalledAcceptanceExecuted": false,
+  "baselineCa479AndInstalledHistoryNotRelabeledNewResult": true,
+  "pixel1to1Certified": false,
+  "sourceStopped": true,
+  "unifiedSourceDiff": [
+    "--- ca60825/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt\n",
+    "+++ candidate/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt\n",
+    "@@ -1114,11 +1114,11 @@\n",
+    "                             enabled = on\n",
+    "                         }\n",
+    "                     }, subtitle = \"常驻显示运行状态、网速与快捷控制\", icon = Icons.Rounded.Router, iconTint = c.textMuted,\n",
+    "-                        subtitleFontSizeSp = 13f, rowMinHeight = 72.dp)\n",
+    "+                        subtitleFontSizeSp = 13f, rowMinHeight = 71.dp)\n",
+    "                     SettingsDivider()\n",
+    "-                    SettingsNavRow(\"刷新频率\", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = \"$refresh 秒\", dropdown = true) { picker = \"refresh\" to -1 }\n",
+    "+                    SettingsNavRow(\"刷新频率\", icon = Icons.Rounded.Refresh, iconTint = c.textMuted, value = \"$refresh 秒\", dropdown = true, rowMinHeight = 63.dp) { picker = \"refresh\" to -1 }\n",
+    "                     SettingsDivider()\n",
+    "-                    SettingsNavRow(\"点击通知打开\", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true) {\n",
+    "+                    SettingsNavRow(\"点击通知打开\", icon = Icons.Rounded.Inventory2, iconTint = c.textMuted, value = targetOptions.firstOrNull { it.first == target }?.second ?: target, dropdown = true, rowMinHeight = 60.dp) {\n",
+    "                         picker = \"target\" to -1\n",
+    "                     }\n",
+    "                 }\n"
+  ]
+}

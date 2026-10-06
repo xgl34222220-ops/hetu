@@ -1,0 +1,1239 @@
+{
+  "schemaVersion": 1,
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "observationAtUtc": "2026-10-05T19:46:16.219Z",
+  "latestFollowupReadAtUtc": "2026-10-05T19:51:00.448Z",
+  "status": "HISTORICAL_ATTEMPT_FAILURES_PRESERVED_CURRENT_EC_ATTEMPT_2_QUEUED",
+  "scope": "Read-only original tools ZIP intake CI observation; no source, Google evidence, old installation archive, APK, run creation, rerun or cancellation performed by this task.",
+  "baselineSourceCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "expectedFreshIntakeCounts": {
+    "baselineOriginalTests": 422,
+    "pdfAndDiagnosticBaselineTests": 479,
+    "addedIntakeTests": 8,
+    "expectedTotalTests": 487,
+    "expectedXmlClasses": 51,
+    "acceptedFreshXmlClasses": null,
+    "acceptedFreshTestTotal": null
+  },
+  "historicalAttempts": [
+    {
+      "run": {
+        "id": 37363055933,
+        "name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "head_sha": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3",
+        "path": ".github/workflows/ui-v76-build.yml",
+        "display_title": "Integrate uploaded tools modules with cancellable VPN consent and iso…",
+        "run_number": 40,
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure",
+        "workflow_id": 374587740,
+        "check_suite_id": 101203505116,
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363055933",
+        "created_at": "2026-10-05T19:23:29Z",
+        "updated_at": "2026-10-05T19:38:32Z",
+        "run_attempt": 1,
+        "run_started_at": "2026-10-05T19:23:29Z",
+        "previous_attempt_url": null
+      },
+      "jobs": [
+        {
+          "id": 111941958077,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "failure",
+          "run_id": 37363055933,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Regenerate and verify integrated effective source",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Verify presentation patch cannot alter runtime or dependency inputs",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Verify PDF layer preserves frozen UI and diagnostic boundaries",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Verify uploaded tools intake source and additive test boundaries",
+              "status": "completed",
+              "conclusion": "failure",
+              "number": 7
+            },
+            {
+              "name": "Verify independent authentication source and test-evidence boundaries",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 8
+            },
+            {
+              "name": "Regress actual tool viewport gesture bounds",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 9
+            },
+            {
+              "name": "Regress isolated controller authentication installation fixtures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 10
+            },
+            {
+              "name": "Regress observed nested WebView document topology without weakening surface guards",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 11
+            },
+            {
+              "name": "Verify built-in WebUI behavior with controlled API fixtures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 12
+            },
+            {
+              "name": "Render built-in WebUI with isolated browser fixtures",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 13
+            },
+            {
+              "name": "Run actions/setup-java@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 14
+            },
+            {
+              "name": "Reproduce cache eviction on old production exporter and verify new exporter",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 15
+            },
+            {
+              "name": "Restore signing identity",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 16
+            },
+            {
+              "name": "Verify signing identity",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 17
+            },
+            {
+              "name": "Prepare Android SDK",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 18
+            },
+            {
+              "name": "Run gradle/actions/setup-gradle@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 19
+            },
+            {
+              "name": "Export effective V20.85 source",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 20
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 21
+            },
+            {
+              "name": "Record resolved MaterialKolor ABI dependencies",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 22
+            },
+            {
+              "name": "Build APK",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 23
+            },
+            {
+              "name": "Verify APK embeds the tested runtime",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 24
+            },
+            {
+              "name": "Verify packaged MaterialKolor constructors",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 25
+            },
+            {
+              "name": "Verify packaged launcher and concept icon bytes",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 26
+            },
+            {
+              "name": "Runtime unit tests",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 27
+            },
+            {
+              "name": "Android lint compatibility gate",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 28
+            },
+            {
+              "name": "Consolidate native and browser state evidence",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 29
+            },
+            {
+              "name": "Upload concept UI verification evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 30
+            },
+            {
+              "name": "Verify APK",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 31
+            },
+            {
+              "name": "Run actions/upload-artifact@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 32
+            },
+            {
+              "name": "Upload APK transport manifest",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 33
+            },
+            {
+              "name": "Upload APK transport part 00",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 34
+            },
+            {
+              "name": "Upload APK transport part 01",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 35
+            },
+            {
+              "name": "Upload APK transport part 02",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 36
+            },
+            {
+              "name": "Upload APK transport part 03",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 37
+            },
+            {
+              "name": "Upload APK transport part 04",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 38
+            },
+            {
+              "name": "Upload APK transport part 05",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 39
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "status": "completed",
+              "conclusion": "skipped",
+              "number": 77
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 78
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 79
+            }
+          ]
+        },
+        {
+          "id": 111941958184,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "run_id": 37363055933,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111942440427,
+          "name": "Installed APK on Android API ${{ matrix.api }}",
+          "status": "completed",
+          "conclusion": "skipped",
+          "run_id": 37363055933,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 11366698760,
+          "name": "Hetu-V20.85-UI-verification",
+          "size_in_bytes": 71756,
+          "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11366698760",
+          "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11366698760/zip",
+          "expired": false,
+          "created_at": "2026-10-05T19:24:50Z",
+          "expires_at": "2027-01-03T19:23:29Z",
+          "updated_at": "2026-10-05T19:24:50Z",
+          "digest": "sha256:6b67393ba5d5323ab3fda3256245d334048ca49af280334158b542a0ee867b61",
+          "workflow_run": {
+            "id": 37363055933,
+            "repository_id": 1367821114,
+            "head_repository_id": 1367821114,
+            "head_branch": "test/v20.76-new-ui",
+            "head_sha": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3"
+          }
+        }
+      ],
+      "buildVerdict": "FAILURE_IN_SOURCE_SAFETY_GATE_BEFORE_APPLICATION_BUILD",
+      "originalApplicationInstallation": "SKIPPED",
+      "originalApplicationNavigation59": "NOT_EXECUTED",
+      "originalApplicationAuthentication5": "NOT_EXECUTED",
+      "originalApplicationController401To200": "NOT_EXECUTED",
+      "originalApplicationApkManifest": "NOT_GENERATED_OR_NOT_EVIDENCED",
+      "currentGooglePlayRootCause": "NOT_ESTABLISHED",
+      "currentDeviceFix": "NOT_VERIFIED"
+    },
+    {
+      "run": {
+        "id": 37363630612,
+        "name": "Hetu V20.85 PDF tools and settings continuation",
+        "head_branch": "test/v20.76-new-ui",
+        "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+        "path": ".github/workflows/ui-v76-build.yml",
+        "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+        "run_number": 41,
+        "event": "push",
+        "status": "completed",
+        "conclusion": "failure",
+        "workflow_id": 374587740,
+        "check_suite_id": 101205159122,
+        "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+        "created_at": "2026-10-05T19:28:35Z",
+        "updated_at": "2026-10-05T19:43:39Z",
+        "run_attempt": 1,
+        "run_started_at": "2026-10-05T19:28:35Z",
+        "previous_attempt_url": null
+      },
+      "jobs": [
+        {
+          "id": 111943700570,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "run_id": 37363630612,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111943700704,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "completed",
+          "conclusion": "success",
+          "run_id": 37363630612,
+          "logs_url": null,
+          "steps": [
+            {
+              "name": "Set up job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 1
+            },
+            {
+              "name": "Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 2
+            },
+            {
+              "name": "Run actions/setup-node@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 3
+            },
+            {
+              "name": "Run actions/setup-java@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 4
+            },
+            {
+              "name": "Download pinned historical V20.74 APK",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 5
+            },
+            {
+              "name": "Prepare official AOSP emulator",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 6
+            },
+            {
+              "name": "Run installed APK navigation and native WebView smoke",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 7
+            },
+            {
+              "name": "Upload Android smoke evidence",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 8
+            },
+            {
+              "name": "Post Run actions/setup-java@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 14
+            },
+            {
+              "name": "Post Run actions/setup-node@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 15
+            },
+            {
+              "name": "Post Run actions/checkout@v4",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 16
+            },
+            {
+              "name": "Complete job",
+              "status": "completed",
+              "conclusion": "success",
+              "number": 17
+            }
+          ]
+        },
+        {
+          "id": 111948722354,
+          "name": "Installed APK on Android API ${{ matrix.api }}",
+          "status": "completed",
+          "conclusion": "skipped",
+          "run_id": 37363630612,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": [
+        {
+          "id": 11367773120,
+          "name": "Hetu-V20.74-palette-crash-baseline-Android-36",
+          "size_in_bytes": 683500,
+          "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11367773120",
+          "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11367773120/zip",
+          "expired": false,
+          "created_at": "2026-10-05T19:31:56Z",
+          "expires_at": "2027-01-03T19:28:35Z",
+          "updated_at": "2026-10-05T19:31:56Z",
+          "digest": "sha256:5ae10587e52a831669ed3140769a6b0370ee32bf679b5441900790668b583cde",
+          "workflow_run": {
+            "id": 37363630612,
+            "repository_id": 1367821114,
+            "head_repository_id": 1367821114,
+            "head_branch": "test/v20.76-new-ui",
+            "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623"
+          }
+        }
+      ],
+      "buildVerdict": "CANCELLED_WITH_NULL_STEPS_AND_UNAVAILABLE_LOGS",
+      "originalApplicationInstallation": "SKIPPED",
+      "originalApplicationNavigation59": "NOT_EXECUTED",
+      "originalApplicationAuthentication5": "NOT_EXECUTED",
+      "originalApplicationController401To200": "NOT_EXECUTED",
+      "originalApplicationApkManifest": "NOT_GENERATED_OR_NOT_EVIDENCED",
+      "currentGooglePlayRootCause": "NOT_ESTABLISHED",
+      "currentDeviceFix": "NOT_VERIFIED"
+    }
+  ],
+  "firstAttemptFailure": {
+    "sourceCommit": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3",
+    "runId": 37363055933,
+    "buildJobId": 111941958077,
+    "failedStep": "Verify uploaded tools intake source and additive test boundaries",
+    "timestampUtc": "2026-10-05T19:24:49.0642855Z",
+    "result": "FAILED (errors=2)",
+    "exitCode": 1,
+    "suite": "ToolsIntakeScopeTest",
+    "caseTotal": 18,
+    "errors": 2,
+    "errorCases": [
+      "test_current_generator_reproduces_available_inputs_and_reports_missing_payloads",
+      "test_generator_cannot_treat_missing_source_as_external_payload"
+    ],
+    "exactFailedCommand": [
+      "git",
+      "rev-parse",
+      "2730954591393c1b81f747cef72adb8940c5a82c:android-app"
+    ],
+    "subprocessExitCode": 128,
+    "errorLocation": ".github/scripts/generate_tools_intake_source_layer.py:40",
+    "confirmedMechanism": "The pinned baseline tree lookup failed during two source-generator safety tests in the shallow CI checkout. Application compile, 487 runtime tests, lint and installation steps were skipped.",
+    "laterWorkflowChange": "ec211b9ad81748dee30fec43f0a25849559e4623 adds git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c immediately before the intake guard. Its execution success is not established by attempt 1.",
+    "earlyUiArtifact": {
+      "artifactId": 11366698760,
+      "sizeInBytes": 71756,
+      "zipSha256": "6b67393ba5d5323ab3fda3256245d334048ca49af280334158b542a0ee867b61",
+      "filesUploadedAccordingToLog": 17,
+      "downloadedByThisTask": false,
+      "scope": "Always-uploaded early verification evidence only; no compiled UI264, new XML487, APK or installation success claimed."
+    }
+  },
+  "cancellationEvidence": {
+    "jobs": [
+      {
+        "runId": 37363055933,
+        "jobId": 111941958184,
+        "conclusion": "cancelled",
+        "steps": null,
+        "logsReadAvailable": false
+      },
+      {
+        "runId": 37363630612,
+        "attempt": 1,
+        "jobId": 111943700570,
+        "conclusion": "cancelled",
+        "steps": null,
+        "logsReadAvailable": false
+      }
+    ],
+    "actor": "NOT_ESTABLISHED",
+    "reason": "NOT_ESTABLISHED",
+    "runActorDoesNotIdentifyCancellationActor": true,
+    "pinnedWorkflowConcurrency": {
+      "group": "hetu-v2085-${{ github.ref }}-${{ github.sha }}",
+      "cancelInProgress": false,
+      "workflows": [
+        {
+          "source": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3",
+          "sha256": "317943296be6d797f503c8b2e4669eccbeccda73131d4b3d2d34e66f794dc93f"
+        },
+        {
+          "source": "ec211b9ad81748dee30fec43f0a25849559e4623",
+          "sha256": "76810afc98f5b5bf02d6b8576eacbbd37b5ec25b556b458a6e933f4f7e2e31ad"
+        }
+      ]
+    },
+    "unknownCauseNotAttributedToConcurrency": true,
+    "unavailableLogsOriginalResponses": [
+      {
+        "jobId": 111941958184,
+        "apiResponse": {
+          "error": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:bb8508bb-101e-004a-3f02-55347e000000\nTime:2026-10-05T19:47:55.4829874Z</Message></Error>",
+          "error_code": "NOT_FOUND",
+          "error_data": {
+            "error_str": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:bb8508bb-101e-004a-3f02-55347e000000\nTime:2026-10-05T19:47:55.4829874Z</Message></Error>"
+          }
+        },
+        "readAvailable": false
+      },
+      {
+        "jobId": 111943700570,
+        "apiResponse": {
+          "error": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:54a185ff-301e-0085-1802-559c34000000\nTime:2026-10-05T19:47:55.5683879Z</Message></Error>",
+          "error_code": "NOT_FOUND",
+          "error_data": {
+            "error_str": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:54a185ff-301e-0085-1802-559c34000000\nTime:2026-10-05T19:47:55.5683879Z</Message></Error>"
+          }
+        },
+        "readAvailable": false
+      }
+    ],
+    "unavailableCheckRunEvidence": [
+      {
+        "runId": 37363055933,
+        "value": {
+          "error": "HTTPError: 400: GitHub Fetch URL is not an allowed public GitHub repository or search endpoint. (Response: None)",
+          "error_code": "INVALID_ARGUMENT"
+        }
+      },
+      {
+        "runId": 37363630612,
+        "value": {
+          "error": "HTTPError: 400: GitHub Fetch URL is not an allowed public GitHub repository or search endpoint. (Response: None)",
+          "error_code": "INVALID_ARGUMENT"
+        }
+      }
+    ]
+  },
+  "logs": [
+    {
+      "jobId": 111941958077,
+      "localPath": "/tmp/hetu-ci-tools-intake-observed/job-111941958077-complete.log",
+      "characters": 40016,
+      "completeRawLog": "﻿2026-10-05T19:23:39.1480735Z Current runner version: '2.337.0'\n2026-10-05T19:23:39.1508279Z ##[group]Runner Image Provisioner\n2026-10-05T19:23:39.1509145Z Hosted Compute Agent\n2026-10-05T19:23:39.1509875Z Version: 20260901.588\n2026-10-05T19:23:39.1510517Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b\n2026-10-05T19:23:39.1511701Z Build Date: 2026-09-01T19:56:44Z\n2026-10-05T19:23:39.1512440Z Worker ID: {64f0f466-a3c2-4abf-98e7-0ecc18a5a3aa}\n2026-10-05T19:23:39.1513164Z Azure Region: westcentralus\n2026-10-05T19:23:39.1513900Z ##[endgroup]\n2026-10-05T19:23:39.1515448Z ##[group]Operating System\n2026-10-05T19:23:39.1516150Z Ubuntu\n2026-10-05T19:23:39.1516694Z 24.04.5\n2026-10-05T19:23:39.1517213Z LTS\n2026-10-05T19:23:39.1517824Z ##[endgroup]\n2026-10-05T19:23:39.1518383Z ##[group]Runner Image\n2026-10-05T19:23:39.1519040Z Image: ubuntu-24.04\n2026-10-05T19:23:39.1519681Z Version: 20260927.320.1\n2026-10-05T19:23:39.1520995Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md\n2026-10-05T19:23:39.1522989Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320\n2026-10-05T19:23:39.1524002Z ##[endgroup]\n2026-10-05T19:23:39.1525268Z ##[group]GITHUB_TOKEN Permissions\n2026-10-05T19:23:39.1527602Z Actions: read\n2026-10-05T19:23:39.1528255Z Contents: read\n2026-10-05T19:23:39.1528819Z Metadata: read\n2026-10-05T19:23:39.1529505Z ##[endgroup]\n2026-10-05T19:23:39.1532457Z Secret source: Actions\n2026-10-05T19:23:39.1534209Z Cache mode: write\n2026-10-05T19:23:39.1535854Z Prepare workflow directory\n2026-10-05T19:23:39.2001556Z Prepare all required actions\n2026-10-05T19:23:39.2050310Z Getting action download info\n2026-10-05T19:23:39.5758828Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)\n2026-10-05T19:23:39.7114355Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)\n2026-10-05T19:23:39.9394038Z Download action repository 'actions/setup-java@v4' (SHA:cf277c60eb25467037889841efdb72551f06f6c3)\n2026-10-05T19:23:40.8979953Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)\n2026-10-05T19:23:41.0393246Z Download action repository 'gradle/actions@v4' (SHA:ed408507eac070d1f99cc633dbcf757c94c7933a)\n2026-10-05T19:23:42.6504829Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)\n2026-10-05T19:23:42.9788085Z Complete job name: build\n2026-10-05T19:23:43.0620049Z ##[group]Run actions/checkout@v4\n2026-10-05T19:23:43.0620690Z with:\n2026-10-05T19:23:43.0620943Z   repository: xgl34222220-ops/hetu\n2026-10-05T19:23:43.0623780Z   token: ***\n2026-10-05T19:23:43.0624009Z   ssh-strict: true\n2026-10-05T19:23:43.0624231Z   ssh-user: git\n2026-10-05T19:23:43.0624462Z   persist-credentials: true\n2026-10-05T19:23:43.0624710Z   clean: true\n2026-10-05T19:23:43.0624934Z   sparse-checkout-cone-mode: true\n2026-10-05T19:23:43.0625220Z   fetch-depth: 1\n2026-10-05T19:23:43.0625439Z   fetch-tags: false\n2026-10-05T19:23:43.0625696Z   show-progress: true\n2026-10-05T19:23:43.0625914Z   lfs: false\n2026-10-05T19:23:43.0626114Z   submodules: false\n2026-10-05T19:23:43.0626339Z   set-safe-directory: true\n2026-10-05T19:23:43.0626599Z   allow-unsafe-pr-checkout: false\n2026-10-05T19:23:43.0627106Z env:\n2026-10-05T19:23:43.0627409Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:23:43.0627769Z ##[endgroup]\n2026-10-05T19:23:43.1655020Z Syncing repository: xgl34222220-ops/hetu\n2026-10-05T19:23:43.1656587Z ##[group]Getting Git version info\n2026-10-05T19:23:43.1656987Z Working directory is '/home/runner/work/hetu/hetu'\n2026-10-05T19:23:43.1658134Z [command]/usr/bin/git version\n2026-10-05T19:23:43.1826179Z git version 2.55.0\n2026-10-05T19:23:43.1884400Z ##[endgroup]\n2026-10-05T19:23:43.1910570Z Temporarily overriding HOME='/home/runner/work/_temp/456ba40b-122b-4a23-b4b8-06a1297fadd3' before making global git config changes\n2026-10-05T19:23:43.1912844Z Adding repository directory to the temporary git global config as a safe directory\n2026-10-05T19:23:43.1917229Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hetu/hetu\n2026-10-05T19:23:43.1985965Z Deleting the contents of '/home/runner/work/hetu/hetu'\n2026-10-05T19:23:43.1994037Z ##[group]Initializing the repository\n2026-10-05T19:23:43.2000345Z [command]/usr/bin/git init /home/runner/work/hetu/hetu\n2026-10-05T19:23:43.2139954Z hint: Using 'master' as the name for the initial branch. This default branch name\n2026-10-05T19:23:43.2141497Z hint: will change to \"main\" in Git 3.0. To configure the initial branch name\n2026-10-05T19:23:43.2143024Z hint: to use in all of your new repositories, which will suppress this warning,\n2026-10-05T19:23:43.2144109Z hint: call:\n2026-10-05T19:23:43.2144786Z hint:\n2026-10-05T19:23:43.2145511Z hint: \tgit config --global init.defaultBranch <name>\n2026-10-05T19:23:43.2146256Z hint:\n2026-10-05T19:23:43.2146953Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\n2026-10-05T19:23:43.2148211Z hint: 'development'. The just-created branch can be renamed via this command:\n2026-10-05T19:23:43.2149378Z hint:\n2026-10-05T19:23:43.2150104Z hint: \tgit branch -m <name>\n2026-10-05T19:23:43.2150906Z hint:\n2026-10-05T19:23:43.2152054Z hint: Disable this message with \"git config set advice.defaultBranchName false\"\n2026-10-05T19:23:43.2153513Z Initialized empty Git repository in /home/runner/work/hetu/hetu/.git/\n2026-10-05T19:23:43.2166155Z [command]/usr/bin/git remote add origin https://github.com/xgl34222220-ops/hetu\n2026-10-05T19:23:43.2257229Z ##[endgroup]\n2026-10-05T19:23:43.2258521Z ##[group]Disabling automatic garbage collection\n2026-10-05T19:23:43.2259670Z [command]/usr/bin/git config --local gc.auto 0\n2026-10-05T19:23:43.2300032Z ##[endgroup]\n2026-10-05T19:23:43.2301029Z ##[group]Setting up auth\n2026-10-05T19:23:43.2315669Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-05T19:23:43.2362619Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-05T19:23:43.2799911Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-05T19:23:43.2838387Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-05T19:23:43.3074903Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-05T19:23:43.3114893Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-05T19:23:43.3349111Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***\n2026-10-05T19:23:43.3393298Z ##[endgroup]\n2026-10-05T19:23:43.3394017Z ##[group]Fetching the repository\n2026-10-05T19:23:43.3404082Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +23dd77d9597911bf102a9ea6fbc16b260f21c1b3:refs/remotes/origin/test/v20.76-new-ui\n2026-10-05T19:23:45.1422923Z From https://github.com/xgl34222220-ops/hetu\n2026-10-05T19:23:45.1423700Z  * [new ref]         23dd77d9597911bf102a9ea6fbc16b260f21c1b3 -> origin/test/v20.76-new-ui\n2026-10-05T19:23:45.1430218Z ##[endgroup]\n2026-10-05T19:23:45.1431001Z ##[group]Determining the checkout info\n2026-10-05T19:23:45.1432112Z ##[endgroup]\n2026-10-05T19:23:45.1437085Z [command]/usr/bin/git sparse-checkout disable\n2026-10-05T19:23:45.1492742Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig\n2026-10-05T19:23:45.1534103Z ##[group]Checking out the ref\n2026-10-05T19:23:45.1552913Z [command]/usr/bin/git checkout --progress --force -B test/v20.76-new-ui refs/remotes/origin/test/v20.76-new-ui\n2026-10-05T19:23:45.2859140Z Switched to a new branch 'test/v20.76-new-ui'\n2026-10-05T19:23:45.2864219Z branch 'test/v20.76-new-ui' set up to track 'origin/test/v20.76-new-ui'.\n2026-10-05T19:23:45.2875408Z ##[endgroup]\n2026-10-05T19:23:45.2924323Z [command]/usr/bin/git log -1 --format=%H\n2026-10-05T19:23:45.2953558Z 23dd77d9597911bf102a9ea6fbc16b260f21c1b3\n2026-10-05T19:23:45.3220101Z ##[group]Run actions/setup-node@v4\n2026-10-05T19:23:45.3220453Z with:\n2026-10-05T19:23:45.3220656Z   node-version: 24\n2026-10-05T19:23:45.3220877Z   always-auth: false\n2026-10-05T19:23:45.3221103Z   check-latest: false\n2026-10-05T19:23:45.3223979Z   token: ***\n2026-10-05T19:23:45.3224201Z env:\n2026-10-05T19:23:45.3224486Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:23:45.3224843Z ##[endgroup]\n2026-10-05T19:23:45.4940037Z Found in cache @ /opt/hostedtoolcache/node/24.21.0/x64\n2026-10-05T19:23:45.4947267Z (node:2385) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:23:45.4948788Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:23:45.4951191Z ##[group]Environment details\n2026-10-05T19:23:49.7560490Z node: v24.21.0\n2026-10-05T19:23:49.7561040Z npm: 11.19.0\n2026-10-05T19:23:49.7562820Z yarn: 1.22.22\n2026-10-05T19:23:49.7563950Z ##[endgroup]\n2026-10-05T19:23:49.7708536Z ##[group]Run set -euo pipefail\n2026-10-05T19:23:49.7708943Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:23:49.7709270Z \u001b[36;1mmkdir -p \"$RUNNER_TEMP/hetu-v2081-source\"\u001b[0m\n2026-10-05T19:23:49.7709944Z \u001b[36;1mgh run download 37171744564 --repo \"$GITHUB_REPOSITORY\" --name Hetu-V20.81-effective-source --dir \"$RUNNER_TEMP/hetu-v2081-source\"\u001b[0m\n2026-10-05T19:23:49.7710713Z \u001b[36;1mARCHIVE=\"$RUNNER_TEMP/hetu-v2081-source/Hetu-V20.81-effective-source.tar.gz\"\u001b[0m\n2026-10-05T19:23:49.7711699Z \u001b[36;1m# Only ignored native binaries are restored; all effective source is checked in.\u001b[0m\n2026-10-05T19:23:49.7712195Z \u001b[36;1mpython3 - \"$ARCHIVE\" <<'PYINNER'\u001b[0m\n2026-10-05T19:23:49.7712622Z \u001b[36;1mimport hashlib,sys,tarfile\u001b[0m\n2026-10-05T19:23:49.7712931Z \u001b[36;1mfrom pathlib import Path\u001b[0m\n2026-10-05T19:23:49.7713332Z \u001b[36;1mp=Path(sys.argv[1])\u001b[0m\n2026-10-05T19:23:49.7713972Z \u001b[36;1massert hashlib.sha256(p.read_bytes()).hexdigest()=='6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730'\u001b[0m\n2026-10-05T19:23:49.7714564Z \u001b[36;1mwith tarfile.open(p) as z:\u001b[0m\n2026-10-05T19:23:49.7714844Z \u001b[36;1m for m in z.getmembers():\u001b[0m\n2026-10-05T19:23:49.7715717Z \u001b[36;1m  if m.isfile() and (m.name.startswith('android-app/app/src/main/jniLibs/') or m.name.startswith('android-app/app/src/main/assets/mihomo-root/') or m.name=='android-app/app/src/main/assets/mihomo-revision.txt'):\u001b[0m\n2026-10-05T19:23:49.7716799Z \u001b[36;1m   q=Path(m.name);q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(z.extractfile(m).read())\u001b[0m\n2026-10-05T19:23:49.7717280Z \u001b[36;1mPYINNER\u001b[0m\n2026-10-05T19:23:49.7717611Z \u001b[36;1mpython3 .github/scripts/prepare_new_ui_source.py \"$ARCHIVE\"\u001b[0m\n2026-10-05T19:23:49.7718674Z \u001b[36;1mpython3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b --autostart-sha256 3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9\u001b[0m\n2026-10-05T19:23:49.7719735Z \u001b[36;1msh -n android-app/app/src/main/assets/hetu-root.sh\u001b[0m\n2026-10-05T19:23:49.7720155Z \u001b[36;1msh -n android-app/app/src/main/assets/hetu-autostart.sh\u001b[0m\n2026-10-05T19:23:49.7720674Z \u001b[36;1mpython3 tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt\u001b[0m\n2026-10-05T19:23:49.7721668Z \u001b[36;1mpython3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt\u001b[0m\n2026-10-05T19:23:49.7722350Z \u001b[36;1mpython3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt\u001b[0m\n2026-10-05T19:23:49.7723258Z \u001b[36;1mpython3 tools/qa/test_network_recovery_stress.py --before out/verification/v2078-network-service.java --output out/verification/network-recovery-stress.json\u001b[0m\n2026-10-05T19:23:49.7724416Z \u001b[36;1mpython3 tools/qa/test_network_journal_stress.py --before out/verification/v2079-network-journal.java --output out/verification/network-journal-stress.json\u001b[0m\n2026-10-05T19:23:49.7725753Z \u001b[36;1mpython3 tools/qa/test_network_journal_symbols.py --before out/verification/v2080-network-journal.java --output out/verification/network-journal-symbols.json\u001b[0m\n2026-10-05T19:23:49.8066888Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:23:49.8067227Z env:\n2026-10-05T19:23:49.8067568Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:23:49.8071016Z   GH_TOKEN: ***\n2026-10-05T19:23:49.8071490Z ##[endgroup]\n2026-10-05T19:24:09.6178130Z {\"baseCommit\": \"37e963d488a38900263e33cb8b2047f487bd6dcf\", \"baseRun\": 37171744564, \"archiveSha256\": \"6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730\", \"integrationPatchSha256\": \"3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002\", \"baselineFiles\": 307, \"changedOrAddedFiles\": 31, \"checkoutMatchesGeneratedSource\": true, \"historicPatchesAppliedToCheckout\": false, \"presentationLayer\": {\"baseCommit\": \"aa599a53856fb26b4d256ba345a496b2a178b3b8\", \"baseRun\": 37211142058, \"patchSha256\": \"a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514\", \"changedOrAddedFiles\": 68, \"protectedRuntimeUnchanged\": true}, \"controllerAuthenticationLayer\": {\"baseCommit\": \"a93a756d8578cf3afa60ee090405535ad097e49e\", \"baseRun\": 37240041766, \"baseAndroidAppTree\": \"2c698fb681f647e4c3a1d0050bf806a9f4cc5de2\", \"patchSha256\": \"327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee\", \"changedOrAddedFiles\": 17, \"runtimePayloadsUnchanged\": true, \"dependenciesUnchanged\": true, \"manifestAndPermissionsUnchanged\": true, \"unchangedOutsideAuthScope\": true, \"baselineUnitTests\": 392, \"expectedUnitTests\": 422, \"newTestCounts\": {\"ToastFeedbackTest\": 6, \"ControllerAuthenticationTest\": 11, \"LegacyControllerCredentialTest\": 3, \"ControllerReadStateTest\": 6, \"PanelControllerErrorTest\": 4}}, \"pdfReferenceLayer\": {\"patchSha256\": \"09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66\", \"frozenInputs\": 332, \"homeAndPanelUnchanged\": true, \"runtimePayloadsUnchanged\": true, \"manifestDependenciesAndSigningUnchanged\": true, \"expectedUnitTests\": 479}, \"toolsIntakeLayer\": {\"baseCommit\": \"2730954591393c1b81f747cef72adb8940c5a82c\", \"baseAndroidAppTree\": \"930994157562814a8e22aeeb1873d8eeb0a51f64\", \"patchSha256\": \"108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b\", \"changedOrAddedFiles\": 5, \"frozenInputs\": 374, \"homeAndPanelUnchanged\": true, \"runtimePayloadsUnchanged\": true, \"manifestDependenciesAndSigningUnchanged\": true, \"baselineUnitTests\": 479, \"expectedUnitTests\": 487, \"newTestCounts\": {\"tools.ToolsDnsConsentIntakeTest\": 5, \"tools.ToolsDiagIntakeTest\": 3}}}\n2026-10-05T19:24:09.8642603Z Snapshot verified: 21 unchanged runtime payloads + tested shell + 1 added boot script\n2026-10-05T19:24:10.5545735Z test_core_birth_change_during_validation_refuses_publication (__main__.RootHealth.test_core_birth_change_during_validation_refuses_publication) ... ok\n2026-10-05T19:24:11.0994304Z test_core_identity_failure_is_degraded_despite_reachable_listener_fixture (__main__.RootHealth.test_core_identity_failure_is_degraded_despite_reachable_listener_fixture) ... ok\n2026-10-05T19:24:11.3119171Z test_corrupt_legacy_snapshot_is_never_accepted (__main__.RootHealth.test_corrupt_legacy_snapshot_is_never_accepted) ... ok\n2026-10-05T19:24:12.0839318Z test_failed_metadata_publish_restores_original_manifest (__main__.RootHealth.test_failed_metadata_publish_restores_original_manifest) ... ok\n2026-10-05T19:24:13.6060143Z test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules (__main__.RootHealth.test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules) ... ok\n2026-10-05T19:24:14.7791089Z test_missing_listener_stays_degraded_and_is_not_hidden (__main__.RootHealth.test_missing_listener_stays_degraded_and_is_not_hidden) ... ok\n2026-10-05T19:24:14.9750318Z test_missing_manifest_is_not_reconstructed_from_reachable_sockets (__main__.RootHealth.test_missing_manifest_is_not_reconstructed_from_reachable_sockets) ... ok\n2026-10-05T19:24:16.7192817Z test_missing_owned_chain_and_duplicate_hook_are_repaired (__main__.RootHealth.test_missing_owned_chain_and_duplicate_hook_are_repaired) ... ok\n2026-10-05T19:24:18.4465974Z test_missing_route_and_policy_rule_are_detected_and_repaired (__main__.RootHealth.test_missing_route_and_policy_rule_are_detected_and_repaired) ... ok\n2026-10-05T19:24:19.4676387Z test_other_owner_at_priority_does_not_get_overwritten (__main__.RootHealth.test_other_owner_at_priority_does_not_get_overwritten) ... ok\n2026-10-05T19:24:19.6865641Z test_other_session_difference_is_not_a_known_tail_migration (__main__.RootHealth.test_other_session_difference_is_not_a_known_tail_migration) ... ok\n2026-10-05T19:24:19.8694981Z test_pid_tampering_still_invalidates_manifest (__main__.RootHealth.test_pid_tampering_still_invalidates_manifest) ... ok\n2026-10-05T19:24:20.4294463Z test_previous_ordering_reproduces_reported_metadata_fault (__main__.RootHealth.test_previous_ordering_reproduces_reported_metadata_fault) ... ok\n2026-10-05T19:24:20.6056493Z test_production_entry_refuses_an_unauthorized_root_identity (__main__.RootHealth.test_production_entry_refuses_an_unauthorized_root_identity) ... ok\n2026-10-05T19:24:20.9563654Z test_real_start_google_disabled_has_complete_healthy_baseline (__main__.RootHealth.test_real_start_google_disabled_has_complete_healthy_baseline) ... ok\n2026-10-05T19:24:21.3117957Z test_real_start_google_enabled_keeps_baseline_and_runs_cleanup (__main__.RootHealth.test_real_start_google_enabled_keeps_baseline_and_runs_cleanup) ... ok\n2026-10-05T19:24:22.0732845Z test_reused_shell_pid_cannot_overwrite_an_older_repair_backup (__main__.RootHealth.test_reused_shell_pid_cannot_overwrite_an_older_repair_backup) ... ok\n2026-10-05T19:24:22.2583991Z test_session_tampering_still_invalidates_manifest (__main__.RootHealth.test_session_tampering_still_invalidates_manifest) ... ok\n2026-10-05T19:24:22.4411716Z test_snapshot_tampering_still_invalidates_checksum (__main__.RootHealth.test_snapshot_tampering_still_invalidates_checksum) ... ok\n2026-10-05T19:24:22.6107133Z test_transaction_in_progress_is_unknown_and_read_only (__main__.RootHealth.test_transaction_in_progress_is_unknown_and_read_only) ... ok\n2026-10-05T19:24:23.1138764Z test_unknown_table_read_does_not_mutate_network (__main__.RootHealth.test_unknown_table_read_does_not_mutate_network) ... ok\n2026-10-05T19:24:23.6719549Z test_upgrade_with_missing_dns_listener_cannot_become_healthy (__main__.RootHealth.test_upgrade_with_missing_dns_listener_cannot_become_healthy) ... ok\n2026-10-05T19:24:24.2296711Z test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining (__main__.RootHealth.test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining) ... ok\n2026-10-05T19:24:24.7412987Z test_upgrade_with_unknown_read_refuses_metadata_and_network_changes (__main__.RootHealth.test_upgrade_with_unknown_read_refuses_metadata_and_network_changes) ... ok\n2026-10-05T19:24:25.9034910Z test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair (__main__.RootHealth.test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair) ... ok\n2026-10-05T19:24:26.8860628Z test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted (__main__.RootHealth.test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted) ... ok\n2026-10-05T19:24:26.8862086Z \n2026-10-05T19:24:26.8862532Z ----------------------------------------------------------------------\n2026-10-05T19:24:26.8863143Z Ran 26 tests in 16.894s\n2026-10-05T19:24:26.8863488Z \n2026-10-05T19:24:26.8863836Z OK\n2026-10-05T19:24:27.8123070Z test_both_families_google_reject_and_drop_removed_by_exact_spec (__main__.GoogleFirewall.test_both_families_google_reject_and_drop_removed_by_exact_spec) ... ok\n2026-10-05T19:24:27.8206656Z test_changed_core_pid_never_changes_firewall (__main__.GoogleFirewall.test_changed_core_pid_never_changes_firewall) ... ok\n2026-10-05T19:24:27.9167120Z test_current_uid_resolution_includes_work_profile_and_exact_package_names (__main__.GoogleFirewall.test_current_uid_resolution_includes_work_profile_and_exact_package_names) ... ok\n2026-10-05T19:24:27.9239900Z test_disabled_session_never_enters_maintenance (__main__.GoogleFirewall.test_disabled_session_never_enters_maintenance) ... ok\n2026-10-05T19:24:28.2856305Z test_failed_exact_delete_is_reported_without_flush_fallback (__main__.GoogleFirewall.test_failed_exact_delete_is_reported_without_flush_fallback) ... ok\n2026-10-05T19:24:28.2950477Z test_failed_transaction_lock_never_changes_firewall (__main__.GoogleFirewall.test_failed_transaction_lock_never_changes_firewall) ... ok\n2026-10-05T19:24:28.6575133Z test_globbing_state_and_wildcard_interface_are_preserved (__main__.GoogleFirewall.test_globbing_state_and_wildcard_interface_are_preserved) ... ok\n2026-10-05T19:24:29.0343967Z test_healthy_hetu_rules_still_check_oem_google_rules (__main__.GoogleFirewall.test_healthy_hetu_rules_still_check_oem_google_rules) ... ok\n2026-10-05T19:24:29.1302436Z test_no_google_packages_no_firewall_operation (__main__.GoogleFirewall.test_no_google_packages_no_firewall_operation) ... ok\n2026-10-05T19:24:29.2863731Z test_older_oem_package_tool_fallback (__main__.GoogleFirewall.test_older_oem_package_tool_fallback) ... ok\n2026-10-05T19:24:29.9834210Z test_repeated_cleanup_is_idempotent (__main__.GoogleFirewall.test_repeated_cleanup_is_idempotent) ... ok\n2026-10-05T19:24:30.7360178Z test_sixty_second_rate_limit_and_oem_rule_reinsertion (__main__.GoogleFirewall.test_sixty_second_rate_limit_and_oem_rule_reinsertion) ... ok\n2026-10-05T19:24:30.7520578Z test_start_protocol_accepts_legacy_and_supported_google_flag (__main__.GoogleFirewall.test_start_protocol_accepts_legacy_and_supported_google_flag) ... ok\n2026-10-05T19:24:30.7653363Z test_start_protocol_rejects_invalid_flag_and_other_unsupported_controls (__main__.GoogleFirewall.test_start_protocol_rejects_invalid_flag_and_other_unsupported_controls) ... ok\n2026-10-05T19:24:31.1337050Z test_uid_is_resolved_again_after_package_reinstall (__main__.GoogleFirewall.test_uid_is_resolved_again_after_package_reinstall) ... ok\n2026-10-05T19:24:31.4994732Z test_unavailable_ipv6_is_nonfatal (__main__.GoogleFirewall.test_unavailable_ipv6_is_nonfatal) ... ok\n2026-10-05T19:24:31.8732434Z test_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved (__main__.GoogleFirewall.test_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved) ... ok\n2026-10-05T19:24:31.8733608Z \n2026-10-05T19:24:31.8734015Z ----------------------------------------------------------------------\n2026-10-05T19:24:31.8734615Z Ran 17 tests in 4.928s\n2026-10-05T19:24:31.8734847Z \n2026-10-05T19:24:31.8734985Z OK\n2026-10-05T19:24:31.9420369Z test_active_duplicate_worker_cannot_remove_its_lock (__main__.BootWorker.test_active_duplicate_worker_cannot_remove_its_lock) ... ok\n2026-10-05T19:24:31.9692044Z test_app_launch_denial_does_not_undo_native_start (__main__.BootWorker.test_app_launch_denial_does_not_undo_native_start) ... ok\n2026-10-05T19:24:32.9237998Z test_delayed_system_and_network_still_restore_once (__main__.BootWorker.test_delayed_system_and_network_still_restore_once) ... ok\n2026-10-05T19:24:32.9477118Z test_disable_during_wait_cancels (__main__.BootWorker.test_disable_during_wait_cancels) ... ok\n2026-10-05T19:24:32.9518537Z test_disabled_never_starts (__main__.BootWorker.test_disabled_never_starts) ... ok\n2026-10-05T19:24:32.9682666Z test_existing_core_is_adopted_without_restart (__main__.BootWorker.test_existing_core_is_adopted_without_restart) ... ok\n2026-10-05T19:24:33.0257566Z test_failed_start_retries_then_succeeds (__main__.BootWorker.test_failed_start_retries_then_succeeds) ... ok\n2026-10-05T19:24:33.0450766Z test_missing_plan_reports_failure (__main__.BootWorker.test_missing_plan_reports_failure) ... ok\n2026-10-05T19:24:34.2806506Z test_network_wait_has_a_bound (__main__.BootWorker.test_network_wait_has_a_bound) ... ok\n2026-10-05T19:24:34.3077069Z test_previous_boot_stop_does_not_block_new_boot (__main__.BootWorker.test_previous_boot_stop_does_not_block_new_boot) ... ok\n2026-10-05T19:24:34.3387768Z test_stale_previous_boot_lock_does_not_block_restore (__main__.BootWorker.test_stale_previous_boot_lock_does_not_block_restore) ... ok\n2026-10-05T19:24:34.3737108Z test_stop_during_network_wait_cancels_this_boot (__main__.BootWorker.test_stop_during_network_wait_cancels_this_boot) ... ok\n2026-10-05T19:24:34.3854809Z test_native_guard_does_not_restart_a_winning_manual_start (__main__.NativeStartGuard.test_native_guard_does_not_restart_a_winning_manual_start) ... ok\n2026-10-05T19:24:34.3969843Z test_native_guard_rechecks_disabled_setting (__main__.NativeStartGuard.test_native_guard_rechecks_disabled_setting) ... ok\n2026-10-05T19:24:34.4093483Z test_native_guard_rechecks_explicit_stop_after_lock (__main__.NativeStartGuard.test_native_guard_rechecks_explicit_stop_after_lock) ... ok\n2026-10-05T19:24:34.4206445Z test_native_guard_rejects_wrong_boot (__main__.NativeStartGuard.test_native_guard_rejects_wrong_boot) ... ok\n2026-10-05T19:24:34.4317615Z test_normal_manual_start_is_not_subject_to_boot_guard (__main__.NativeStartGuard.test_normal_manual_start_is_not_subject_to_boot_guard) ... ok\n2026-10-05T19:24:34.4318694Z \n2026-10-05T19:24:34.4319115Z ----------------------------------------------------------------------\n2026-10-05T19:24:34.4319764Z Ran 17 tests in 2.500s\n2026-10-05T19:24:34.4320014Z \n2026-10-05T19:24:34.4320332Z OK\n2026-10-05T19:24:40.8906819Z {\"after\": {\"cycles\": 512, \"maxQueuedRecoveries\": 1, \"drainedAttempts\": 1, \"latestExecuted\": 1, \"cancelledWantedExecuted\": 0, \"eventDuringAttemptPreserved\": true, \"cancelledTimersRetained\": 0, \"sourceSha256\": \"30d5420d27203151c7c27b5e192a54d0c5c9de31b3a91ce7ed9bec16851a8e5e\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}, \"before\": {\"cycles\": 512, \"maxQueuedRecoveries\": 512, \"drainedAttempts\": 512, \"latestExecuted\": 1, \"cancelledWantedExecuted\": 0, \"eventDuringAttemptPreserved\": true, \"cancelledTimersRetained\": 4096, \"sourceSha256\": \"b50773343de46622658e65b48a3e00a96863d74033f561fd6bdab304402ae1cd\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n2026-10-05T19:24:45.7507203Z {\"after\": {\"attempts\": 3000, \"storageLimitBytes\": 8192, \"storedBytes\": 8016, \"dropped\": 2952, \"fullStatusVisible\": true, \"sensitiveStoredMetadataCopied\": false, \"oversizedHealthEventBytes\": 217, \"viewTruncationVisible\": true, \"sourceSha256\": \"7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}, \"before\": {\"attempts\": 3000, \"storageLimitBytes\": 8192, \"storedBytes\": 501000, \"dropped\": 0, \"fullStatusVisible\": false, \"sensitiveStoredMetadataCopied\": true, \"oversizedHealthEventBytes\": 200190, \"viewTruncationVisible\": false, \"sourceSha256\": \"8c8fcf2f77897e079c3ca2cd395fe2b3a0b3cf4fdce16931f3d7bc87e961cf9c\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n2026-10-05T19:24:48.5124544Z {\"after\": {\"captured\": [\"example.Worker.toDynamicScheme-Iv8Zu3U:41\", \"example.Worker.<init>:41\", \"example.Worker.<clinit>:41\"], \"copied\": [\"example.Worker.toDynamicScheme-Iv8Zu3U:41\", \"example.Worker.<init>:41\", \"example.Worker.<clinit>:41\"], \"hostileSymbolsRejected\": 5, \"privateMessageOrFileCopied\": false, \"sourceSha256\": \"7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}, \"before\": {\"captured\": [\"redacted-frame\", \"redacted-frame\", \"redacted-frame\"], \"copied\": [\"redacted-frame\", \"redacted-frame\", \"redacted-frame\"], \"hostileSymbolsRejected\": 5, \"privateMessageOrFileCopied\": false, \"sourceSha256\": \"83980b0576665cbcc8d0583758f4d911c3356aed7db8bf37e6ff0d2df2d87b51\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n2026-10-05T19:24:48.5228933Z ##[group]Run set -euo pipefail\n2026-10-05T19:24:48.5229300Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:24:48.5229817Z \u001b[36;1mpython3 .github/scripts/test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt\u001b[0m\n2026-10-05T19:24:48.5292763Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:24:48.5293035Z env:\n2026-10-05T19:24:48.5293330Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:24:48.5293700Z ##[endgroup]\n2026-10-05T19:24:48.5822851Z test_current_ui_packages_and_named_bridges_are_allowed (__main__.PresentationScope.test_current_ui_packages_and_named_bridges_are_allowed) ... ok\n2026-10-05T19:24:48.5825044Z test_only_expected_version_change_is_allowed_in_build_inputs (__main__.PresentationScope.test_only_expected_version_change_is_allowed_in_build_inputs) ... ok\n2026-10-05T19:24:48.5833824Z test_path_traversal_is_rejected_even_with_allowed_ui_prefix (__main__.PresentationScope.test_path_traversal_is_rejected_even_with_allowed_ui_prefix) ... ok\n2026-10-05T19:24:48.5835670Z test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch (__main__.PresentationScope.test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch) ... ok\n2026-10-05T19:24:48.5837320Z test_unlisted_root_package_bridge_is_rejected (__main__.PresentationScope.test_unlisted_root_package_bridge_is_rejected) ... ok\n2026-10-05T19:24:48.5838030Z \n2026-10-05T19:24:48.5838346Z ----------------------------------------------------------------------\n2026-10-05T19:24:48.5838847Z Ran 5 tests in 0.001s\n2026-10-05T19:24:48.5839034Z \n2026-10-05T19:24:48.5839144Z OK\n2026-10-05T19:24:48.5930402Z ##[group]Run python3 .github/scripts/test_pdf85_source_scope.py\n2026-10-05T19:24:48.5930893Z \u001b[36;1mpython3 .github/scripts/test_pdf85_source_scope.py\u001b[0m\n2026-10-05T19:24:48.5994072Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:24:48.5994351Z env:\n2026-10-05T19:24:48.5994653Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:24:48.5995031Z ##[endgroup]\n2026-10-05T19:24:48.6571560Z ......\n2026-10-05T19:24:48.6587334Z ----------------------------------------------------------------------\n2026-10-05T19:24:48.6587992Z Ran 6 tests in 0.003s\n2026-10-05T19:24:48.6588218Z \n2026-10-05T19:24:48.6588354Z OK\n2026-10-05T19:24:48.6684800Z ##[group]Run set -euo pipefail\n2026-10-05T19:24:48.6685150Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:24:48.6685506Z \u001b[36;1mpython3 .github/scripts/test_tools_intake_source_scope.py\u001b[0m\n2026-10-05T19:24:48.6685968Z \u001b[36;1mpython3 .github/scripts/test_tools_intake_test_results.py\u001b[0m\n2026-10-05T19:24:48.6748314Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:24:48.6748585Z env:\n2026-10-05T19:24:48.6748873Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:24:48.6749231Z ##[endgroup]\n2026-10-05T19:24:49.0451726Z .E....E...........\n2026-10-05T19:24:49.0452505Z ======================================================================\n2026-10-05T19:24:49.0454375Z ERROR: test_current_generator_reproduces_available_inputs_and_reports_missing_payloads (__main__.ToolsIntakeScopeTest.test_current_generator_reproduces_available_inputs_and_reports_missing_payloads)\n2026-10-05T19:24:49.0456021Z ----------------------------------------------------------------------\n2026-10-05T19:24:49.0456819Z Traceback (most recent call last):\n2026-10-05T19:24:49.0458252Z   File \"/home/runner/work/hetu/hetu/.github/scripts/test_tools_intake_source_scope.py\", line 226, in test_current_generator_reproduces_available_inputs_and_reports_missing_payloads\n2026-10-05T19:24:49.0459588Z     report = generate(ROOT, directory)\n2026-10-05T19:24:49.0460077Z              ^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-10-05T19:24:49.0460984Z   File \"/home/runner/work/hetu/hetu/.github/scripts/generate_tools_intake_source_layer.py\", line 40, in generate\n2026-10-05T19:24:49.0462506Z     assert git('rev-parse', BASE_COMMIT + ':android-app', cwd=root).decode().strip() == BASE_ANDROID_APP_TREE\n2026-10-05T19:24:49.0463371Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-10-05T19:24:49.0464287Z   File \"/home/runner/work/hetu/hetu/.github/scripts/generate_tools_intake_source_layer.py\", line 30, in git\n2026-10-05T19:24:49.0465254Z     return subprocess.run(['git', *args], cwd=cwd, check=True,\n2026-10-05T19:24:49.0465909Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-10-05T19:24:49.0466508Z   File \"/usr/lib/python3.12/subprocess.py\", line 571, in run\n2026-10-05T19:24:49.0467148Z     raise CalledProcessError(retcode, process.args,\n2026-10-05T19:24:49.0468869Z subprocess.CalledProcessError: Command '['git', 'rev-parse', '2730954591393c1b81f747cef72adb8940c5a82c:android-app']' returned non-zero exit status 128.\n2026-10-05T19:24:49.0469816Z \n2026-10-05T19:24:49.0470119Z ======================================================================\n2026-10-05T19:24:49.0471812Z ERROR: test_generator_cannot_treat_missing_source_as_external_payload (__main__.ToolsIntakeScopeTest.test_generator_cannot_treat_missing_source_as_external_payload)\n2026-10-05T19:24:49.0473202Z ----------------------------------------------------------------------\n2026-10-05T19:24:49.0473812Z Traceback (most recent call last):\n2026-10-05T19:24:49.0475087Z   File \"/home/runner/work/hetu/hetu/.github/scripts/test_tools_intake_source_scope.py\", line 244, in test_generator_cannot_treat_missing_source_as_external_payload\n2026-10-05T19:24:49.0476232Z     generate(ROOT, directory)\n2026-10-05T19:24:49.0477112Z   File \"/home/runner/work/hetu/hetu/.github/scripts/generate_tools_intake_source_layer.py\", line 40, in generate\n2026-10-05T19:24:49.0478399Z     assert git('rev-parse', BASE_COMMIT + ':android-app', cwd=root).decode().strip() == BASE_ANDROID_APP_TREE\n2026-10-05T19:24:49.0479274Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-10-05T19:24:49.0480195Z   File \"/home/runner/work/hetu/hetu/.github/scripts/generate_tools_intake_source_layer.py\", line 30, in git\n2026-10-05T19:24:49.0481192Z     return subprocess.run(['git', *args], cwd=cwd, check=True,\n2026-10-05T19:24:49.0482036Z            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n2026-10-05T19:24:49.0482673Z   File \"/usr/lib/python3.12/subprocess.py\", line 571, in run\n2026-10-05T19:24:49.0483346Z     raise CalledProcessError(retcode, process.args,\n2026-10-05T19:24:49.0485090Z subprocess.CalledProcessError: Command '['git', 'rev-parse', '2730954591393c1b81f747cef72adb8940c5a82c:android-app']' returned non-zero exit status 128.\n2026-10-05T19:24:49.0486076Z \n2026-10-05T19:24:49.0486456Z ----------------------------------------------------------------------\n2026-10-05T19:24:49.0487043Z Ran 18 tests in 0.169s\n2026-10-05T19:24:49.0487274Z \n2026-10-05T19:24:49.0487434Z FAILED (errors=2)\n2026-10-05T19:24:49.0642855Z ##[error]Process completed with exit code 1.\n2026-10-05T19:24:49.0802966Z ##[group]Run actions/upload-artifact@v4\n2026-10-05T19:24:49.0803296Z with:\n2026-10-05T19:24:49.0803517Z   if-no-files-found: warn\n2026-10-05T19:24:49.0803789Z   name: Hetu-V20.85-UI-verification\n2026-10-05T19:24:49.0805677Z   path: android-app/app/build/test-results/testDebugUnitTest/\nandroid-app/app/build/reports/tests/testDebugUnitTest/\nandroid-app/app/build/reports/lint-results-debug.*\nandroid-app/app/build/outputs/pdf85/\nandroid-app/app/build/outputs/ui83/\nandroid-app/app/build/outputs/concept59/\nandroid-app/app/build/outputs/concept-state-coverage/\nandroid-app/app/build/outputs/concept-remaining-coverage/\nout/verification/\ndocs/qa/concept-173-current.json\ndocs/qa/concept-173-current.md\n\n2026-10-05T19:24:49.0807556Z   compression-level: 6\n2026-10-05T19:24:49.0807815Z   overwrite: false\n2026-10-05T19:24:49.0808057Z   include-hidden-files: false\n2026-10-05T19:24:49.0808311Z env:\n2026-10-05T19:24:49.0808595Z   HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks\n2026-10-05T19:24:49.0809007Z ##[endgroup]\n2026-10-05T19:24:49.2538976Z (node:13619) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:24:49.2539889Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:24:49.2686500Z Multiple search paths detected. Calculating the least common ancestor of all paths\n2026-10-05T19:24:49.2690941Z The least common ancestor is /home/runner/work/hetu/hetu. This will be the root directory of the artifact\n2026-10-05T19:24:49.2692089Z With the provided path, there will be 17 files uploaded\n2026-10-05T19:24:49.2696669Z Artifact name is valid!\n2026-10-05T19:24:49.2697361Z Root directory input is valid!\n2026-10-05T19:24:49.6050322Z Beginning upload of artifact content to blob storage\n2026-10-05T19:24:49.6545265Z (node:13619) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n2026-10-05T19:24:49.9146063Z Uploaded bytes 71756\n2026-10-05T19:24:49.9698531Z Finished uploading artifact content to blob storage!\n2026-10-05T19:24:49.9699604Z SHA256 digest of uploaded artifact zip is 6b67393ba5d5323ab3fda3256245d334048ca49af280334158b542a0ee867b61\n2026-10-05T19:24:49.9701180Z Finalizing artifact upload\n2026-10-05T19:24:50.2289113Z Artifact Hetu-V20.85-UI-verification.zip successfully finalized. Artifact ID 11366698760\n2026-10-05T19:24:50.2291547Z Artifact Hetu-V20.85-UI-verification has been successfully uploaded! Final size is 71756 bytes. Artifact ID is 11366698760\n2026-10-05T19:24:50.2299128Z Artifact download URL: https://github.com/xgl34222220-ops/hetu/actions/runs/37363055933/artifacts/11366698760\n2026-10-05T19:24:50.2534586Z Post job cleanup.\n2026-10-05T19:24:50.3446390Z [command]/usr/bin/git version\n2026-10-05T19:24:50.3493271Z git version 2.55.0\n2026-10-05T19:24:50.3536030Z Temporarily overriding HOME='/home/runner/work/_temp/96498952-b66e-4661-b8bc-396439829676' before making global git config changes\n2026-10-05T19:24:50.3538077Z Adding repository directory to the temporary git global config as a safe directory\n2026-10-05T19:24:50.3542800Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hetu/hetu\n2026-10-05T19:24:50.3587467Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-05T19:24:50.3626876Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-05T19:24:50.3901052Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-05T19:24:50.3934293Z http.https://github.com/.extraheader\n2026-10-05T19:24:50.3947695Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n2026-10-05T19:24:50.3988615Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-05T19:24:50.4277161Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-05T19:24:50.4320182Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-05T19:24:50.4754125Z Cleaning up orphan processes\n2026-10-05T19:24:50.5037455Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n",
+      "scope": "23dd current source-gate failure log.",
+      "bytes": 40018,
+      "sha256": "770c23d1e08cd853149825d53ef24c0ead04c4ab0f1abde55be6cdd2123c56c7"
+    },
+    {
+      "jobId": 111943700704,
+      "localPath": "/tmp/hetu-ci-tools-intake-observed/job-111943700704-complete.log",
+      "characters": 43641,
+      "completeRawLog": "﻿2026-10-05T19:29:06.9438560Z Current runner version: '2.337.0'\n2026-10-05T19:29:06.9464003Z ##[group]Runner Image Provisioner\n2026-10-05T19:29:06.9465051Z Hosted Compute Agent\n2026-10-05T19:29:06.9465666Z Version: 20260901.588\n2026-10-05T19:29:06.9466372Z Commit: f88ec8081b781fac6c440065ac7ff9e710ce3d0b\n2026-10-05T19:29:06.9467151Z Build Date: 2026-09-01T19:56:44Z\n2026-10-05T19:29:06.9467851Z Worker ID: {005b68b9-115d-4995-a4c6-fb5b795545d8}\n2026-10-05T19:29:06.9468712Z Azure Region: westus2\n2026-10-05T19:29:06.9469304Z ##[endgroup]\n2026-10-05T19:29:06.9471497Z ##[group]Operating System\n2026-10-05T19:29:06.9472217Z Ubuntu\n2026-10-05T19:29:06.9472759Z 24.04.5\n2026-10-05T19:29:06.9473376Z LTS\n2026-10-05T19:29:06.9473902Z ##[endgroup]\n2026-10-05T19:29:06.9474815Z ##[group]Runner Image\n2026-10-05T19:29:06.9475538Z Image: ubuntu-24.04\n2026-10-05T19:29:06.9476158Z Version: 20260927.320.1\n2026-10-05T19:29:06.9477512Z Included Software: https://github.com/actions/runner-images/blob/ubuntu24/20260927.320/images/ubuntu/Ubuntu2404-Readme.md\n2026-10-05T19:29:06.9479094Z Image Release: https://github.com/actions/runner-images/releases/tag/ubuntu24%2F20260927.320\n2026-10-05T19:29:06.9480199Z ##[endgroup]\n2026-10-05T19:29:06.9481575Z ##[group]GITHUB_TOKEN Permissions\n2026-10-05T19:29:06.9483811Z Actions: read\n2026-10-05T19:29:06.9484451Z Contents: read\n2026-10-05T19:29:06.9485119Z Metadata: read\n2026-10-05T19:29:06.9485699Z ##[endgroup]\n2026-10-05T19:29:06.9487758Z Secret source: Actions\n2026-10-05T19:29:06.9488850Z Cache mode: write\n2026-10-05T19:29:06.9489539Z Prepare workflow directory\n2026-10-05T19:29:06.9828268Z Prepare all required actions\n2026-10-05T19:29:06.9899117Z Getting action download info\n2026-10-05T19:29:07.3958126Z Download action repository 'actions/checkout@v4' (SHA:11d5960a326750d5838078e36cf38b85af677262)\n2026-10-05T19:29:07.5135727Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)\n2026-10-05T19:29:07.6453719Z Download action repository 'actions/setup-java@v4' (SHA:cf277c60eb25467037889841efdb72551f06f6c3)\n2026-10-05T19:29:07.9765313Z Download action repository 'actions/upload-artifact@v4' (SHA:ea165f8d65b6e75b540449e92b4886f43607fa02)\n2026-10-05T19:29:08.2333826Z Complete job name: Reproduce V20.74 custom palette crash on API 36 (36)\n2026-10-05T19:29:08.3102511Z ##[group]Run actions/checkout@v4\n2026-10-05T19:29:08.3103395Z with:\n2026-10-05T19:29:08.3103854Z   repository: xgl34222220-ops/hetu\n2026-10-05T19:29:08.3107622Z   token: ***\n2026-10-05T19:29:08.3108050Z   ssh-strict: true\n2026-10-05T19:29:08.3108485Z   ssh-user: git\n2026-10-05T19:29:08.3108929Z   persist-credentials: true\n2026-10-05T19:29:08.3109415Z   clean: true\n2026-10-05T19:29:08.3109852Z   sparse-checkout-cone-mode: true\n2026-10-05T19:29:08.3110562Z   fetch-depth: 1\n2026-10-05T19:29:08.3111130Z   fetch-tags: false\n2026-10-05T19:29:08.3111760Z   show-progress: true\n2026-10-05T19:29:08.3112211Z   lfs: false\n2026-10-05T19:29:08.3112631Z   submodules: false\n2026-10-05T19:29:08.3113081Z   set-safe-directory: true\n2026-10-05T19:29:08.3113615Z   allow-unsafe-pr-checkout: false\n2026-10-05T19:29:08.3114422Z ##[endgroup]\n2026-10-05T19:29:08.4147119Z Syncing repository: xgl34222220-ops/hetu\n2026-10-05T19:29:08.4149675Z ##[group]Getting Git version info\n2026-10-05T19:29:08.4151119Z Working directory is '/home/runner/work/hetu/hetu'\n2026-10-05T19:29:08.4152381Z [command]/usr/bin/git version\n2026-10-05T19:29:08.4217721Z git version 2.55.0\n2026-10-05T19:29:08.4243574Z ##[endgroup]\n2026-10-05T19:29:08.4259788Z Temporarily overriding HOME='/home/runner/work/_temp/4ac360d7-98d1-4296-aaa5-c7cb4a94c715' before making global git config changes\n2026-10-05T19:29:08.4262860Z Adding repository directory to the temporary git global config as a safe directory\n2026-10-05T19:29:08.4266269Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hetu/hetu\n2026-10-05T19:29:08.4318145Z Deleting the contents of '/home/runner/work/hetu/hetu'\n2026-10-05T19:29:08.4323218Z ##[group]Initializing the repository\n2026-10-05T19:29:08.4329042Z [command]/usr/bin/git init /home/runner/work/hetu/hetu\n2026-10-05T19:29:08.4442999Z hint: Using 'master' as the name for the initial branch. This default branch name\n2026-10-05T19:29:08.4444918Z hint: will change to \"main\" in Git 3.0. To configure the initial branch name\n2026-10-05T19:29:08.4446893Z hint: to use in all of your new repositories, which will suppress this warning,\n2026-10-05T19:29:08.4448339Z hint: call:\n2026-10-05T19:29:08.4449009Z hint:\n2026-10-05T19:29:08.4449912Z hint: \tgit config --global init.defaultBranch <name>\n2026-10-05T19:29:08.4451256Z hint:\n2026-10-05T19:29:08.4452002Z hint: Names commonly chosen instead of 'master' are 'main', 'trunk' and\n2026-10-05T19:29:08.4453107Z hint: 'development'. The just-created branch can be renamed via this command:\n2026-10-05T19:29:08.4453992Z hint:\n2026-10-05T19:29:08.4454491Z hint: \tgit branch -m <name>\n2026-10-05T19:29:08.4455015Z hint:\n2026-10-05T19:29:08.4455674Z hint: Disable this message with \"git config set advice.defaultBranchName false\"\n2026-10-05T19:29:08.4457288Z Initialized empty Git repository in /home/runner/work/hetu/hetu/.git/\n2026-10-05T19:29:08.4460100Z [command]/usr/bin/git remote add origin https://github.com/xgl34222220-ops/hetu\n2026-10-05T19:29:08.4509398Z ##[endgroup]\n2026-10-05T19:29:08.4510999Z ##[group]Disabling automatic garbage collection\n2026-10-05T19:29:08.4512982Z [command]/usr/bin/git config --local gc.auto 0\n2026-10-05T19:29:08.4546304Z ##[endgroup]\n2026-10-05T19:29:08.4547441Z ##[group]Setting up auth\n2026-10-05T19:29:08.4553719Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-05T19:29:08.4587461Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-05T19:29:08.4971824Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-05T19:29:08.5012140Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-05T19:29:08.5238817Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-05T19:29:08.5275622Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-05T19:29:08.5499422Z [command]/usr/bin/git config --local http.https://github.com/.extraheader AUTHORIZATION: basic ***\n2026-10-05T19:29:08.5540849Z ##[endgroup]\n2026-10-05T19:29:08.5541918Z ##[group]Fetching the repository\n2026-10-05T19:29:08.5551199Z [command]/usr/bin/git -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +ec211b9ad81748dee30fec43f0a25849559e4623:refs/remotes/origin/test/v20.76-new-ui\n2026-10-05T19:29:09.9647220Z From https://github.com/xgl34222220-ops/hetu\n2026-10-05T19:29:09.9648776Z  * [new ref]         ec211b9ad81748dee30fec43f0a25849559e4623 -> origin/test/v20.76-new-ui\n2026-10-05T19:29:09.9655397Z ##[endgroup]\n2026-10-05T19:29:09.9656540Z ##[group]Determining the checkout info\n2026-10-05T19:29:09.9658916Z ##[endgroup]\n2026-10-05T19:29:09.9665737Z [command]/usr/bin/git sparse-checkout disable\n2026-10-05T19:29:09.9718537Z [command]/usr/bin/git config --local --unset-all extensions.worktreeConfig\n2026-10-05T19:29:09.9756337Z ##[group]Checking out the ref\n2026-10-05T19:29:09.9757161Z [command]/usr/bin/git checkout --progress --force -B test/v20.76-new-ui refs/remotes/origin/test/v20.76-new-ui\n2026-10-05T19:29:10.1053598Z Switched to a new branch 'test/v20.76-new-ui'\n2026-10-05T19:29:10.1066527Z branch 'test/v20.76-new-ui' set up to track 'origin/test/v20.76-new-ui'.\n2026-10-05T19:29:10.1071527Z ##[endgroup]\n2026-10-05T19:29:10.1158674Z [command]/usr/bin/git log -1 --format=%H\n2026-10-05T19:29:10.1159675Z ec211b9ad81748dee30fec43f0a25849559e4623\n2026-10-05T19:29:10.1436183Z ##[group]Run actions/setup-node@v4\n2026-10-05T19:29:10.1436745Z with:\n2026-10-05T19:29:10.1437000Z   node-version: 24\n2026-10-05T19:29:10.1437265Z   always-auth: false\n2026-10-05T19:29:10.1437537Z   check-latest: false\n2026-10-05T19:29:10.1440704Z   token: ***\n2026-10-05T19:29:10.1440999Z ##[endgroup]\n2026-10-05T19:29:10.3125361Z Found in cache @ /opt/hostedtoolcache/node/24.21.0/x64\n2026-10-05T19:29:10.3130066Z (node:2333) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:29:10.3131424Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:29:10.3133117Z ##[group]Environment details\n2026-10-05T19:29:12.7058681Z node: v24.21.0\n2026-10-05T19:29:12.7059178Z npm: 11.19.0\n2026-10-05T19:29:12.7059583Z yarn: 1.22.22\n2026-10-05T19:29:12.7061227Z ##[endgroup]\n2026-10-05T19:29:12.7258451Z ##[group]Run actions/setup-java@v4\n2026-10-05T19:29:12.7258780Z with:\n2026-10-05T19:29:12.7258979Z   distribution: temurin\n2026-10-05T19:29:12.7259205Z   java-version: 21\n2026-10-05T19:29:12.7259440Z   java-package: jdk\n2026-10-05T19:29:12.7259656Z   check-latest: false\n2026-10-05T19:29:12.7259868Z   server-id: github\n2026-10-05T19:29:12.7260084Z   server-username: GITHUB_ACTOR\n2026-10-05T19:29:12.7260652Z   server-password: GITHUB_TOKEN\n2026-10-05T19:29:12.7260941Z   overwrite-settings: true\n2026-10-05T19:29:12.7261186Z   job-status: success\n2026-10-05T19:29:12.7264025Z   token: ***\n2026-10-05T19:29:12.7264230Z ##[endgroup]\n2026-10-05T19:29:12.8934099Z ##[warning]setup-java v4 is deprecated and will no longer receive updates. Please migrate to actions/setup-java@v5.\n2026-10-05T19:29:12.8941999Z ##[group]Installed distributions\n2026-10-05T19:29:12.9068680Z Resolved Java 21.0.12+1 from tool-cache\n2026-10-05T19:29:12.9069519Z Setting Java 21.0.12+1 as the default\n2026-10-05T19:29:12.9075773Z (node:2365) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:29:12.9077141Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:29:12.9078810Z Creating toolchains.xml for JDK version 21 from temurin\n2026-10-05T19:29:12.9154503Z Writing to /home/runner/.m2/toolchains.xml\n2026-10-05T19:29:12.9155189Z \n2026-10-05T19:29:12.9155553Z Java configuration:\n2026-10-05T19:29:12.9156265Z   Distribution: temurin\n2026-10-05T19:29:12.9156958Z   Version: 21.0.12+1\n2026-10-05T19:29:12.9158116Z   Path: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:12.9159002Z \n2026-10-05T19:29:12.9161525Z ##[endgroup]\n2026-10-05T19:29:12.9166105Z Creating settings.xml with server-id: github\n2026-10-05T19:29:12.9198160Z Writing to /home/runner/.m2/settings.xml\n2026-10-05T19:29:12.9371192Z ##[group]Run set -euo pipefail\n2026-10-05T19:29:12.9371625Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:29:12.9371959Z \u001b[36;1mmkdir -p candidate out/verification\u001b[0m\n2026-10-05T19:29:12.9372546Z \u001b[36;1mgh run download 37122739246 --repo \"$GITHUB_REPOSITORY\" --name Hetu-APK --dir candidate\u001b[0m\n2026-10-05T19:29:12.9373542Z \u001b[36;1mprintf '%s\\n' 'ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f  candidate/Hetu-0.12.4-v20.apk' | sha256sum -c -\u001b[0m\n2026-10-05T19:29:12.9374835Z \u001b[36;1mpython3 .github/scripts/verify_materialkolor_abi.py candidate/Hetu-0.12.4-v20.apk --expect-incompatible --output out/android-smoke/v2074-materialkolor-abi.json\u001b[0m\n2026-10-05T19:29:12.9721720Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:29:12.9722243Z env:\n2026-10-05T19:29:12.9722818Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:12.9723766Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:12.9729251Z   GH_TOKEN: ***\n2026-10-05T19:29:12.9729624Z ##[endgroup]\n2026-10-05T19:29:25.8793015Z candidate/Hetu-0.12.4-v20.apk: OK\n2026-10-05T19:29:27.1352239Z MaterialKolor ABI: 596 constructors, 12 missing; expected-incompatible=True\n2026-10-05T19:29:27.1519974Z ##[group]Run set -euo pipefail\n2026-10-05T19:29:27.1520599Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:29:27.1521171Z \u001b[36;1mmkdir -p out/android-smoke\u001b[0m\n2026-10-05T19:29:27.1521545Z \u001b[36;1mexport ANDROID_AVD_HOME=\"$RUNNER_TEMP/hetu-avd\"\u001b[0m\n2026-10-05T19:29:27.1521923Z \u001b[36;1mmkdir -p \"$ANDROID_AVD_HOME\"\u001b[0m\n2026-10-05T19:29:27.1522319Z \u001b[36;1mecho \"ANDROID_AVD_HOME=$ANDROID_AVD_HOME\" >> \"$GITHUB_ENV\"\u001b[0m\n2026-10-05T19:29:27.1522834Z \u001b[36;1mSDKMANAGER=\"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager\"\u001b[0m\n2026-10-05T19:29:27.1523383Z \u001b[36;1mAVDMANAGER=\"$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager\"\u001b[0m\n2026-10-05T19:29:27.1524198Z \u001b[36;1m\"$SDKMANAGER\" 'platform-tools' 'emulator' 'system-images;android-36;default;x86_64' 2>&1 | tee out/android-smoke/sdk-prepare.log\u001b[0m\n2026-10-05T19:29:27.1524978Z \u001b[36;1m\"$AVDMANAGER\" list device --compact | grep -qx 'pixel_2'\u001b[0m\n2026-10-05T19:29:27.1526084Z \u001b[36;1mecho no | \"$AVDMANAGER\" create avd --force --device pixel_2 --name hetu-smoke --path \"$ANDROID_AVD_HOME/hetu-smoke.avd\" --package 'system-images;android-36;default;x86_64' 2>&1 | tee out/android-smoke/avd-prepare.log\u001b[0m\n2026-10-05T19:29:27.1527141Z \u001b[36;1mtest -f \"$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini\"\u001b[0m\n2026-10-05T19:29:27.1527722Z \u001b[36;1mcp \"$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini\" out/android-smoke/owned-avd-config-sdk.ini\u001b[0m\n2026-10-05T19:29:27.1529071Z \u001b[36;1mpython3 -c 'import sys; sys.path.insert(0,\".github/scripts\"); from run_hetu_emulator import prepare_owned_avd_identity; from pathlib import Path; import os; prepare_owned_avd_identity(Path(os.environ[\"ANDROID_AVD_HOME\"])/\"hetu-smoke.avd/config.ini\")'\u001b[0m\n2026-10-05T19:29:27.1530577Z \u001b[36;1mcp \"$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini\" out/android-smoke/owned-avd-config-before-boot.ini\u001b[0m\n2026-10-05T19:29:27.1531428Z \u001b[36;1msed -i '/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d' \"$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini\"\u001b[0m\n2026-10-05T19:29:27.1532110Z \u001b[36;1mcat >> \"$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini\" <<'EOF'\u001b[0m\n2026-10-05T19:29:27.1532487Z \u001b[36;1mhw.lcd.width=393\u001b[0m\n2026-10-05T19:29:27.1532738Z \u001b[36;1mhw.lcd.height=852\u001b[0m\n2026-10-05T19:29:27.1532991Z \u001b[36;1mhw.lcd.density=160\u001b[0m\n2026-10-05T19:29:27.1533246Z \u001b[36;1mhw.ramSize=2048\u001b[0m\n2026-10-05T19:29:27.1533479Z \u001b[36;1mEOF\u001b[0m\n2026-10-05T19:29:27.1599067Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:29:27.1599342Z env:\n2026-10-05T19:29:27.1599684Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:27.1600268Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:27.1600998Z ##[endgroup]\n2026-10-05T19:29:30.2476460Z Loading package information...                                                  \n2026-10-05T19:29:30.3247628Z Loading local repository...                                                     \n2026-10-05T19:29:30.3250461Z [                                       ] 3% Loading local repository...        \n2026-10-05T19:29:31.7575799Z [                                       ] 3% Fetch remote repository...         \n2026-10-05T19:29:32.2391603Z [=                                      ] 3% Fetch remote repository...         \n2026-10-05T19:29:32.2975265Z [=                                      ] 4% Fetch remote repository...         \n2026-10-05T19:29:32.4284897Z [=                                      ] 5% Fetch remote repository...         \n2026-10-05T19:29:32.4725618Z [==                                     ] 5% Fetch remote repository...         \n2026-10-05T19:29:32.5293932Z [==                                     ] 6% Fetch remote repository...         \n2026-10-05T19:29:32.6305520Z [==                                     ] 7% Fetch remote repository...         \n2026-10-05T19:29:32.6331460Z [==                                     ] 7% Computing updates...               \n2026-10-05T19:29:32.6443449Z [===                                    ] 8% Computing updates...               \n2026-10-05T19:29:32.6601826Z [===                                    ] 10% Computing updates...              \n2026-10-05T19:29:32.6953337Z [===                                    ] 10% Installing Android Emulator       \n2026-10-05T19:29:33.2239800Z [===                                    ] 10% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.4058128Z [====                                   ] 10% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.5542664Z [====                                   ] 11% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.6695104Z [====                                   ] 12% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.7853327Z [=====                                  ] 13% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.8797028Z [=====                                  ] 14% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.9282049Z [=====                                  ] 15% Downloading emulator-linux_x64-164\n2026-10-05T19:29:33.9734298Z [======                                 ] 15% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.0993188Z [======                                 ] 16% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.2279152Z [======                                 ] 17% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.3420047Z [=======                                ] 18% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.4931785Z [=======                                ] 19% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.5428824Z [=======                                ] 20% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.6115234Z [========                               ] 20% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.6676220Z [========                               ] 21% Downloading emulator-linux_x64-164\n2026-10-05T19:29:34.7483860Z [========                               ] 21% Unzipping...                      \n2026-10-05T19:29:34.7486587Z [========                               ] 21% Unzipping... emulator/            \n2026-10-05T19:29:34.7487570Z [========                               ] 21% Unzipping... emulator/resources/  \n2026-10-05T19:29:34.7933601Z [========                               ] 21% Unzipping... emulator/qsn         \n2026-10-05T19:29:34.8675045Z [========                               ] 21% Unzipping... emulator/emulator    \n2026-10-05T19:29:34.8924615Z [========                               ] 21% Unzipping... emulator/netsimd     \n2026-10-05T19:29:34.9959187Z [========                               ] 22% Unzipping... emulator/netsimd     \n2026-10-05T19:29:34.9961391Z [========                               ] 22% Unzipping... emulator/bin64/      \n2026-10-05T19:29:34.9962629Z [========                               ] 22% Unzipping... emulator/qemu/       \n2026-10-05T19:29:34.9976777Z [========                               ] 22% Unzipping... emulator/NOTICE.txt  \n2026-10-05T19:29:35.0157217Z [========                               ] 22% Unzipping... emulator/crashpad_han\n2026-10-05T19:29:35.0165710Z [========                               ] 22% Unzipping... emulator/source.prope\n2026-10-05T19:29:35.0819965Z [========                               ] 22% Unzipping... emulator/nimble_bridg\n2026-10-05T19:29:35.0823216Z [========                               ] 22% Unzipping... emulator/LICENSE     \n2026-10-05T19:29:35.0824265Z [========                               ] 22% Unzipping... emulator/lib/        \n2026-10-05T19:29:35.0909197Z [========                               ] 22% Unzipping... emulator/qemu-img    \n2026-10-05T19:29:35.0911451Z [========                               ] 22% Unzipping... emulator/include/    \n2026-10-05T19:29:35.0916405Z [========                               ] 22% Unzipping... emulator/NOTICE.csv  \n2026-10-05T19:29:35.0917660Z [========                               ] 22% Unzipping... emulator/lib64/      \n2026-10-05T19:29:35.1081711Z [========                               ] 22% Unzipping... emulator/emulator-che\n2026-10-05T19:29:35.1276804Z [========                               ] 22% Unzipping... emulator/crashreport \n2026-10-05T19:29:35.1281001Z [========                               ] 22% Unzipping... emulator/mksdcard    \n2026-10-05T19:29:35.1461764Z [========                               ] 22% Unzipping... emulator/resources/To\n2026-10-05T19:29:35.1527912Z [========                               ] 22% Unzipping... emulator/resources/de\n2026-10-05T19:29:35.1531334Z [========                               ] 22% Unzipping... emulator/resources/To\n2026-10-05T19:29:35.1545710Z [========                               ] 22% Unzipping... emulator/resources/de\n2026-10-05T19:29:35.1679590Z [========                               ] 22% Unzipping... emulator/resources/To\n2026-10-05T19:29:35.1681353Z [========                               ] 22% Unzipping... emulator/resources/ma\n2026-10-05T19:29:35.1708195Z [========                               ] 22% Unzipping... emulator/resources/de\n2026-10-05T19:29:35.1709748Z [========                               ] 22% Unzipping... emulator/resources/sk\n2026-10-05T19:29:35.1752725Z [========                               ] 22% Unzipping... emulator/resources/de\n2026-10-05T19:29:35.1761807Z [========                               ] 22% Unzipping... emulator/resources/ma\n2026-10-05T19:29:35.1770799Z [========                               ] 22% Unzipping... emulator/resources/po\n2026-10-05T19:29:35.1837381Z [========                               ] 22% Unzipping... emulator/resources/ma\n2026-10-05T19:29:35.1844434Z [=========                              ] 23% Unzipping... emulator/resources/ma\n2026-10-05T19:29:35.1921845Z [=========                              ] 23% Unzipping... emulator/resources/sk\n2026-10-05T19:29:35.1939182Z [=========                              ] 23% Unzipping... emulator/resources/ma\n2026-10-05T19:29:35.1976434Z [=========                              ] 23% Unzipping... emulator/bin64/e2fsck\n2026-10-05T19:29:35.2013870Z [=========                              ] 23% Unzipping... emulator/bin64/fsck.e\n2026-10-05T19:29:35.2037537Z [=========                              ] 23% Unzipping... emulator/bin64/tune2f\n2026-10-05T19:29:35.2054489Z [=========                              ] 23% Unzipping... emulator/bin64/resize\n2026-10-05T19:29:35.2080264Z [=========                              ] 23% Unzipping... emulator/bin64/mkfs.e\n2026-10-05T19:29:35.5824070Z [=========                              ] 23% Unzipping... emulator/qemu/linux-x\n2026-10-05T19:29:35.9332205Z [=========                              ] 24% Unzipping... emulator/qemu/linux-x\n2026-10-05T19:29:36.1066742Z [=========                              ] 25% Unzipping... emulator/qemu/linux-x\n2026-10-05T19:29:36.2961539Z [==========                             ] 25% Unzipping... emulator/qemu/linux-x\n2026-10-05T19:29:36.2962540Z [==========                             ] 25% Unzipping... emulator/lib/emulator\n2026-10-05T19:29:36.2963424Z [==========                             ] 25% Unzipping... emulator/lib/rtc_serv\n2026-10-05T19:29:36.2964490Z [==========                             ] 25% Unzipping... emulator/lib/advanced\n2026-10-05T19:29:36.2965562Z [==========                             ] 25% Unzipping... emulator/lib/cmake/  \n2026-10-05T19:29:36.2966597Z [==========                             ] 25% Unzipping... emulator/lib/emulator\n2026-10-05T19:29:36.2967603Z [==========                             ] 25% Unzipping... emulator/lib/control_\n2026-10-05T19:29:36.2968541Z [==========                             ] 25% Unzipping... emulator/lib/emulated\n2026-10-05T19:29:36.2969473Z [==========                             ] 25% Unzipping... emulator/lib/rtc_serv\n2026-10-05T19:29:36.2971648Z [==========                             ] 25% Unzipping... emulator/lib/emu-orig\n2026-10-05T19:29:36.2976281Z [==========                             ] 25% Unzipping... emulator/lib/hardware\n2026-10-05T19:29:36.2977237Z [==========                             ] 25% Unzipping... emulator/lib/pkgconfi\n2026-10-05T19:29:36.2978157Z [==========                             ] 25% Unzipping... emulator/lib/pc-bios/\n2026-10-05T19:29:36.2979280Z [==========                             ] 25% Unzipping... emulator/lib/snapshot\n2026-10-05T19:29:36.2980646Z [==========                             ] 25% Unzipping... emulator/lib/adb_serv\n2026-10-05T19:29:36.2985203Z [==========                             ] 25% Unzipping... emulator/lib/hostapd.\n2026-10-05T19:29:36.2987506Z [==========                             ] 25% Unzipping... emulator/lib/grpc_end\n2026-10-05T19:29:36.3004244Z [==========                             ] 25% Unzipping... emulator/lib/ca-bundl\n2026-10-05T19:29:36.3012138Z [==========                             ] 25% Unzipping... emulator/lib/ui_contr\n2026-10-05T19:29:36.3013457Z [==========                             ] 25% Unzipping... emulator/lib/snapshot\n2026-10-05T19:29:36.3015961Z [==========                             ] 25% Unzipping... emulator/lib/ice_conf\n2026-10-05T19:29:36.3161809Z [==========                             ] 25% Unzipping... emulator/lib/libflatb\n2026-10-05T19:29:36.3374443Z [==========                             ] 26% Unzipping... emulator/lib/libflatb\n2026-10-05T19:29:36.3380841Z [==========                             ] 26% Unzipping... emulator/lib/emulator\n2026-10-05T19:29:36.3384096Z [==========                             ] 26% Unzipping... emulator/lib/waterfal\n2026-10-05T19:29:36.3387098Z [==========                             ] 26% Unzipping... emulator/lib/emulated\n2026-10-05T19:29:36.3408871Z [==========                             ] 26% Unzipping... emulator/lib/cmake/fl\n2026-10-05T19:29:36.3411057Z [==========                             ] 26% Unzipping... emulator/lib/pkgconfi\n2026-10-05T19:29:36.3597733Z [==========                             ] 26% Unzipping... emulator/lib/pc-bios/\n2026-10-05T19:29:36.3684456Z [==========                             ] 26% Unzipping... emulator/include/flat\n2026-10-05T19:29:36.3754259Z [==========                             ] 26% Unzipping... emulator/lib64/libgli\n2026-10-05T19:29:36.3876607Z [==========                             ] 26% Unzipping... emulator/lib64/libpro\n2026-10-05T19:29:36.3878483Z [==========                             ] 26% Unzipping... emulator/lib64/qt/   \n2026-10-05T19:29:36.4278743Z [==========                             ] 26% Unzipping... emulator/lib64/liband\n2026-10-05T19:29:36.4981397Z [==========                             ] 26% Unzipping... emulator/lib64/libgfx\n2026-10-05T19:29:36.4983018Z [==========                             ] 26% Unzipping... emulator/lib64/gles_l\n2026-10-05T19:29:36.4989929Z [==========                             ] 26% Unzipping... emulator/lib64/liband\n2026-10-05T19:29:36.5001546Z [==========                             ] 26% Unzipping... emulator/lib64/vulkan\n2026-10-05T19:29:36.5002642Z [==========                             ] 26% Unzipping... emulator/lib64/gles_s\n2026-10-05T19:29:36.5003705Z [==========                             ] 26% Unzipping... emulator/lib64/libemu\n2026-10-05T19:29:36.5118203Z [==========                             ] 26% Unzipping... emulator/lib64/libpro\n2026-10-05T19:29:36.6678893Z [==========                             ] 26% Unzipping... emulator/lib64/liband\n2026-10-05T19:29:36.6697700Z [==========                             ] 26% Unzipping... emulator/lib64/libtcm\n2026-10-05T19:29:36.6700482Z [==========                             ] 26% Unzipping... emulator/lib64/libima\n2026-10-05T19:29:36.6765027Z [==========                             ] 26% Unzipping... emulator/lib64/libc++\n2026-10-05T19:29:36.7046456Z [==========                             ] 26% Unzipping... emulator/lib64/liband\n2026-10-05T19:29:36.7092020Z [==========                             ] 26% Unzipping... emulator/lib64/libabs\n2026-10-05T19:29:36.7093015Z [==========                             ] 26% Unzipping... emulator/lib64/gles_a\n2026-10-05T19:29:36.7164319Z [==========                             ] 26% Unzipping... emulator/lib64/libsha\n2026-10-05T19:29:36.7231340Z [==========                             ] 26% Unzipping... emulator/lib64/libc++\n2026-10-05T19:29:36.7242088Z [==========                             ] 26% Unzipping... emulator/lib64/qt/res\n2026-10-05T19:29:36.7243211Z [==========                             ] 26% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:36.7244518Z [==========                             ] 26% Unzipping... emulator/lib64/qt/tra\n2026-10-05T19:29:36.7245514Z [==========                             ] 26% Unzipping... emulator/lib64/qt/plu\n2026-10-05T19:29:36.7266190Z [==========                             ] 26% Unzipping... emulator/lib64/qt/res\n2026-10-05T19:29:36.7967009Z [==========                             ] 27% Unzipping... emulator/lib64/qt/res\n2026-10-05T19:29:36.9072217Z [==========                             ] 27% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:37.3060918Z [===========                            ] 28% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:37.7159452Z [===========                            ] 29% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:37.9135135Z [===========                            ] 30% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:37.9961589Z [============                           ] 30% Unzipping... emulator/lib64/qt/lib\n2026-10-05T19:29:38.1065895Z [============                           ] 30% Unzipping... emulator/lib64/qt/tra\n2026-10-05T19:29:38.1190991Z [============                           ] 30% Unzipping... emulator/lib64/qt/plu\n2026-10-05T19:29:38.1407755Z [============                           ] 30% Unzipping... emulator/lib64/gles_l\n2026-10-05T19:29:38.2044232Z [============                           ] 31% Unzipping... emulator/lib64/gles_l\n2026-10-05T19:29:38.5636261Z [============                           ] 31% Unzipping... emulator/lib64/vulkan\n2026-10-05T19:29:38.8926762Z [============                           ] 32% Unzipping... emulator/lib64/vulkan\n2026-10-05T19:29:38.9609722Z [============                           ] 32% Unzipping... emulator/lib64/gles_s\n2026-10-05T19:29:39.0188400Z [============                           ] 32% Unzipping... emulator/lib64/gles_a\n2026-10-05T19:29:39.0833456Z [=============                          ] 33% Unzipping... emulator/lib64/gles_a\n2026-10-05T19:29:39.4853069Z [=====================                  ] 55% Unzipping... emulator/lib64/gles_a\n2026-10-05T19:29:39.5097762Z [=====================                  ] 55% Installing Intel x86_64 Atom Syste\n2026-10-05T19:29:39.5588228Z [=====================                  ] 55% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:39.6832978Z [======================                 ] 55% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:39.9216495Z [======================                 ] 56% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:40.1643065Z [======================                 ] 57% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:40.4273854Z [=======================                ] 58% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:40.6551552Z [=======================                ] 59% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:40.7696298Z [=======================                ] 60% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:40.8667410Z [========================               ] 60% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:41.1178521Z [========================               ] 61% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:41.3313580Z [========================               ] 62% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:41.5770271Z [=========================              ] 63% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:41.8254371Z [=========================              ] 64% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:41.9342233Z [=========================              ] 65% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:42.0758863Z [==========================             ] 65% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:42.2199081Z [==========================             ] 66% Downloading x86_64-36_r02.zip... e\n2026-10-05T19:29:42.2213584Z [==========================             ] 66% Unzipping... emulator/lib64/gles_a\n2026-10-05T19:29:42.2352926Z [==========================             ] 66% Unzipping... x86_64/NOTICE.txt    \n2026-10-05T19:29:42.2354896Z [==========================             ] 66% Unzipping... x86_64/VerifiedBootPa\n2026-10-05T19:29:42.2357370Z [==========================             ] 66% Unzipping... x86_64/advancedFeatur\n2026-10-05T19:29:42.2359554Z [==========================             ] 66% Unzipping... x86_64/build.prop    \n2026-10-05T19:29:42.2362408Z [==========================             ] 66% Unzipping... x86_64/data/empty_dat\n2026-10-05T19:29:42.2366383Z [==========================             ] 66% Unzipping... x86_64/data/local.pro\n2026-10-05T19:29:42.2370162Z [==========================             ] 66% Unzipping... x86_64/data/misc/Gold\n2026-10-05T19:29:42.2377234Z [==========================             ] 66% Unzipping... x86_64/data/misc/emul\n2026-10-05T19:29:42.2389484Z [==========================             ] 66% Unzipping... x86_64/data/misc/mode\n2026-10-05T19:29:42.2959430Z [==========================             ] 66% Unzipping... x86_64/encryptionkey.\n2026-10-05T19:29:42.4123479Z [==========================             ] 66% Unzipping... x86_64/kernel-ranchu \n2026-10-05T19:29:42.4125992Z [==========================             ] 66% Unzipping... x86_64/kernel_cmdline\n2026-10-05T19:29:42.4136025Z [==========================             ] 66% Unzipping... x86_64/ramdisk.img   \n2026-10-05T19:29:42.4260181Z [==========================             ] 67% Unzipping... x86_64/ramdisk.img   \n2026-10-05T19:29:42.4262344Z [==========================             ] 67% Unzipping... x86_64/source.propert\n2026-10-05T19:29:43.0366826Z [==========================             ] 67% Unzipping... x86_64/system.img    \n2026-10-05T19:29:43.7923336Z [===========================            ] 68% Unzipping... x86_64/system.img    \n2026-10-05T19:29:44.6500194Z [===========================            ] 69% Unzipping... x86_64/system.img    \n2026-10-05T19:29:45.0638296Z [===========================            ] 70% Unzipping... x86_64/system.img    \n2026-10-05T19:29:45.4131085Z [============================           ] 70% Unzipping... x86_64/system.img    \n2026-10-05T19:29:46.2271648Z [============================           ] 71% Unzipping... x86_64/system.img    \n2026-10-05T19:29:46.9402996Z [============================           ] 72% Unzipping... x86_64/system.img    \n2026-10-05T19:29:47.6834023Z [=============================          ] 73% Unzipping... x86_64/system.img    \n2026-10-05T19:29:48.6901620Z [=============================          ] 74% Unzipping... x86_64/system.img    \n2026-10-05T19:29:49.0577634Z [=============================          ] 75% Unzipping... x86_64/system.img    \n2026-10-05T19:29:49.4504518Z [==============================         ] 75% Unzipping... x86_64/system.img    \n2026-10-05T19:29:50.0623838Z [==============================         ] 76% Unzipping... x86_64/system.img    \n2026-10-05T19:29:52.6358520Z [==============================         ] 77% Unzipping... x86_64/system.img    \n2026-10-05T19:29:53.0789454Z [==============================         ] 77% Unzipping... x86_64/vendor.img    \n2026-10-05T19:29:53.2150938Z [==============================         ] 78% Unzipping... x86_64/vendor.img    \n2026-10-05T19:29:53.2151899Z [=======================================] 100% Unzipping... x86_64/vendor.img   \n2026-10-05T19:29:53.2226750Z \n2026-10-05T19:29:55.2919418Z Loading local repository...                                                     \n2026-10-05T19:29:55.2921385Z [=========                              ] 25% Loading local repository...       \n2026-10-05T19:29:55.2922572Z [=========                              ] 25% Fetch remote repository...        \n2026-10-05T19:29:55.2923792Z [=======================================] 100% Fetch remote repository...       \n2026-10-05T19:29:55.3508577Z Auto-selecting single ABI x86_64\n2026-10-05T19:29:55.7702089Z ##[group]Run set -euo pipefail\n2026-10-05T19:29:55.7702434Z \u001b[36;1mset -euo pipefail\u001b[0m\n2026-10-05T19:29:55.7702742Z \u001b[36;1mmkdir -p out/android-smoke\u001b[0m\n2026-10-05T19:29:55.7703205Z \u001b[36;1mexport PATH=\"$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH\"\u001b[0m\n2026-10-05T19:29:55.7703909Z \u001b[36;1mtest -x \"$ANDROID_HOME/platform-tools/adb\"\u001b[0m\n2026-10-05T19:29:55.7704456Z \u001b[36;1m\"$ANDROID_HOME/platform-tools/adb\" version | tee out/android-smoke/adb-version.txt\u001b[0m\n2026-10-05T19:29:55.7705123Z \u001b[36;1m# Uses only this runner's existing KVM or sudo access. No device permission,\u001b[0m\n2026-10-05T19:29:55.7705751Z \u001b[36;1m# group, ACL or SELinux changes; owned supervisor verifies process cleanup.\u001b[0m\n2026-10-05T19:29:55.7706269Z \u001b[36;1mpython3 .github/scripts/run_hetu_emulator.py\u001b[0m\n2026-10-05T19:29:55.7769728Z shell: /usr/bin/bash -e {0}\n2026-10-05T19:29:55.7770043Z env:\n2026-10-05T19:29:55.7770672Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:55.7771387Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:29:55.7771959Z   ANDROID_AVD_HOME: /home/runner/work/_temp/hetu-avd\n2026-10-05T19:29:55.7772362Z   HETU_EXPECTED_VERSION: 2074\n2026-10-05T19:29:55.7772686Z   HETU_EXPECT_PALETTE_CRASH: 1\n2026-10-05T19:29:55.7772985Z ##[endgroup]\n2026-10-05T19:29:55.8003124Z Android Debug Bridge version 1.0.41\n2026-10-05T19:29:55.8003893Z Version 37.0.1-15733141\n2026-10-05T19:29:55.8004677Z Installed as /usr/local/lib/android/sdk/platform-tools/adb\n2026-10-05T19:29:55.8005919Z Running on Linux 6.17.0-1022-azure (x86_64)\n2026-10-05T19:29:55.8543660Z * daemon not running; starting now at tcp:5037\n2026-10-05T19:29:55.9221298Z * daemon started successfully\n2026-10-05T19:31:54.4697512Z ##[group]Run actions/upload-artifact@v4\n2026-10-05T19:31:54.4697861Z with:\n2026-10-05T19:31:54.4698176Z   name: Hetu-V20.74-palette-crash-baseline-Android-36\n2026-10-05T19:31:54.4698575Z   path: out/android-smoke/\n2026-10-05T19:31:54.4698862Z   if-no-files-found: warn\n2026-10-05T19:31:54.4699140Z   compression-level: 6\n2026-10-05T19:31:54.4699392Z   overwrite: false\n2026-10-05T19:31:54.4699647Z   include-hidden-files: false\n2026-10-05T19:31:54.4699938Z env:\n2026-10-05T19:31:54.4700283Z   JAVA_HOME: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:31:54.4701075Z   JAVA_HOME_21_X64: /opt/hostedtoolcache/Java_Temurin-Hotspot_jdk/21.0.12-1/x64\n2026-10-05T19:31:54.4701596Z   ANDROID_AVD_HOME: /home/runner/work/_temp/hetu-avd\n2026-10-05T19:31:54.4701951Z ##[endgroup]\n2026-10-05T19:31:54.6355165Z (node:3029) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:31:54.6357576Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:31:54.6483444Z With the provided path, there will be 26 files uploaded\n2026-10-05T19:31:54.6484492Z Artifact name is valid!\n2026-10-05T19:31:54.6485046Z Root directory input is valid!\n2026-10-05T19:31:55.0278753Z Beginning upload of artifact content to blob storage\n2026-10-05T19:31:55.1051443Z (node:3029) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.\n2026-10-05T19:31:55.7587397Z Uploaded bytes 683500\n2026-10-05T19:31:55.8389622Z Finished uploading artifact content to blob storage!\n2026-10-05T19:31:55.8392152Z SHA256 digest of uploaded artifact zip is 5ae10587e52a831669ed3140769a6b0370ee32bf679b5441900790668b583cde\n2026-10-05T19:31:55.8393661Z Finalizing artifact upload\n2026-10-05T19:31:56.1062566Z Artifact Hetu-V20.74-palette-crash-baseline-Android-36.zip successfully finalized. Artifact ID 11367773120\n2026-10-05T19:31:56.1066669Z Artifact Hetu-V20.74-palette-crash-baseline-Android-36 has been successfully uploaded! Final size is 683500 bytes. Artifact ID is 11367773120\n2026-10-05T19:31:56.1073735Z Artifact download URL: https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612/artifacts/11367773120\n2026-10-05T19:31:56.1265631Z Post job cleanup.\n2026-10-05T19:31:56.2623557Z (node:3042) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:31:56.2625303Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:31:56.2819126Z Post job cleanup.\n2026-10-05T19:31:56.4203213Z (node:3051) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.\n2026-10-05T19:31:56.4204811Z (Use `node --trace-deprecation ...` to show where the warning was created)\n2026-10-05T19:31:56.4417983Z Post job cleanup.\n2026-10-05T19:31:56.5337243Z [command]/usr/bin/git version\n2026-10-05T19:31:56.5384773Z git version 2.55.0\n2026-10-05T19:31:56.5427360Z Temporarily overriding HOME='/home/runner/work/_temp/79eee0ee-732a-4b00-89a9-2f9ad48fa7e7' before making global git config changes\n2026-10-05T19:31:56.5429542Z Adding repository directory to the temporary git global config as a safe directory\n2026-10-05T19:31:56.5432286Z [command]/usr/bin/git config --global --add safe.directory /home/runner/work/hetu/hetu\n2026-10-05T19:31:56.5469847Z [command]/usr/bin/git config --local --name-only --get-regexp core\\.sshCommand\n2026-10-05T19:31:56.5508250Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'core\\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\"\n2026-10-05T19:31:56.5759952Z [command]/usr/bin/git config --local --name-only --get-regexp http\\.https\\:\\/\\/github\\.com\\/\\.extraheader\n2026-10-05T19:31:56.5794925Z http.https://github.com/.extraheader\n2026-10-05T19:31:56.5832021Z [command]/usr/bin/git config --local --unset-all http.https://github.com/.extraheader\n2026-10-05T19:31:56.5861724Z [command]/usr/bin/git submodule foreach --recursive sh -c \"git config --local --name-only --get-regexp 'http\\.https\\:\\/\\/github\\.com\\/\\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\"\n2026-10-05T19:31:56.6222551Z [command]/usr/bin/git config --local --name-only --get-regexp ^includeIf\\.gitdir:\n2026-10-05T19:31:56.6261502Z [command]/usr/bin/git submodule foreach --recursive git config --local --show-origin --name-only --get-regexp remote.origin.url\n2026-10-05T19:31:56.6706188Z Cleaning up orphan processes\n2026-10-05T19:31:56.7035432Z Terminate orphan process: pid (2594) (adb)\n2026-10-05T19:31:56.7078467Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/checkout@v4, actions/setup-java@v4, actions/setup-node@v4, actions/upload-artifact@v4. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/\n",
+      "scope": "Historical V20.74 baseline only; does not validate ec211 new application.",
+      "bytes": 43643,
+      "sha256": "a1f35a88c3165649c6c1f9d62656db402aa6c4e237d12b12d59ecdc1f68c022c"
+    }
+  ],
+  "attempt1ExplicitRecheck": {
+    "readAtUtc": "2026-10-05T19:51:27.757Z",
+    "run": {
+      "id": 37363630612,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+      "run_number": 41,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101205159122,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+      "created_at": "2026-10-05T19:28:35Z",
+      "updated_at": "2026-10-05T19:43:39Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T19:28:35Z",
+      "previous_attempt_url": null
+    }
+  },
+  "currentObservedAttempt": {
+    "readAtUtc": "2026-10-05T19:51:00.448Z",
+    "run": {
+      "id": 37363630612,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+      "run_number": 41,
+      "event": "push",
+      "status": "queued",
+      "conclusion": null,
+      "workflow_id": 374587740,
+      "check_suite_id": 101205159122,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+      "created_at": "2026-10-05T19:28:35Z",
+      "updated_at": "2026-10-05T19:46:19Z",
+      "run_attempt": 2,
+      "run_started_at": "2026-10-05T19:46:18Z",
+      "previous_attempt_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/attempts/1"
+    },
+    "jobs": [
+      {
+        "id": 111949659738,
+        "name": "build",
+        "status": "queued",
+        "conclusion": null,
+        "run_id": 37363630612,
+        "logs_url": null,
+        "steps": null
+      },
+      {
+        "id": 111949661928,
+        "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 37363630612,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Download pinned historical V20.74 APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          }
+        ]
+      }
+    ],
+    "followupIsSameRun": true,
+    "newRunCreatedByThisTask": false,
+    "rerunTriggeredByThisTask": false,
+    "acceptedAsNewApplicationPass": false,
+    "oldPaletteBaselineSuccessDoesNotValidateNewApplication": true
+  },
+  "activeBranchQueries": [
+    {
+      "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs?branch=test%2Fv20.76-new-ui&status=in_progress&per_page=100",
+      "readAtUtc": "2026-10-05T19:50:45.524Z",
+      "totalCount": 0,
+      "runs": [],
+      "error": null
+    },
+    {
+      "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs?branch=test%2Fv20.76-new-ui&status=queued&per_page=100",
+      "readAtUtc": "2026-10-05T19:50:45.524Z",
+      "totalCount": 1,
+      "runs": [
+        {
+          "id": 37363630612,
+          "name": "Hetu V20.85 PDF tools and settings continuation",
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+          "path": ".github/workflows/ui-v76-build.yml",
+          "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+          "run_number": 41,
+          "event": "push",
+          "status": "queued",
+          "conclusion": null,
+          "workflow_id": 374587740,
+          "check_suite_id": 101205159122,
+          "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+          "created_at": "2026-10-05T19:28:35Z",
+          "updated_at": "2026-10-05T19:46:19Z",
+          "run_attempt": 2,
+          "run_started_at": "2026-10-05T19:46:18Z",
+          "previous_attempt_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/attempts/1"
+        }
+      ],
+      "error": null
+    },
+    {
+      "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs?branch=test%2Fv20.76-new-ui&status=waiting&per_page=100",
+      "readAtUtc": "2026-10-05T19:50:45.524Z",
+      "totalCount": 0,
+      "runs": [],
+      "error": null
+    }
+  ],
+  "latestBranchRunsObserved": [
+    {
+      "id": 37363630612,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Fetch pinned tools intake baseline for shallow CI checkout",
+      "run_number": 41,
+      "event": "push",
+      "status": "queued",
+      "conclusion": null,
+      "workflow_id": 374587740,
+      "check_suite_id": 101205159122,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363630612",
+      "created_at": "2026-10-05T19:28:35Z",
+      "updated_at": "2026-10-05T19:46:19Z",
+      "run_attempt": 2,
+      "run_started_at": "2026-10-05T19:46:18Z",
+      "previous_attempt_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/runs/37363630612/attempts/1"
+    },
+    {
+      "id": 37363055933,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "23dd77d9597911bf102a9ea6fbc16b260f21c1b3",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Integrate uploaded tools modules with cancellable VPN consent and iso…",
+      "run_number": 40,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101203505116,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37363055933",
+      "created_at": "2026-10-05T19:23:29Z",
+      "updated_at": "2026-10-05T19:38:32Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T19:23:29Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37360879852,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Match PDF scroll header, capsule and notification menu geometry; pres…",
+      "run_number": 39,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101197332490,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37360879852",
+      "created_at": "2026-10-05T19:05:35Z",
+      "updated_at": "2026-10-05T19:33:56Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T19:05:35Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37353575277,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "01b66345f645aa168d56400ccc89313d3932f3f8",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Align final measured PDF tool and notification geometry; preserve ful…",
+      "run_number": 38,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101176566332,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37353575277",
+      "created_at": "2026-10-05T18:07:29Z",
+      "updated_at": "2026-10-05T18:34:36Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T18:07:29Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37346239863,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Fix PDF A21 name error gap using fresh capture measurements; preserve…",
+      "run_number": 37,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101155818653,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37346239863",
+      "created_at": "2026-10-05T17:08:54Z",
+      "updated_at": "2026-10-05T17:36:08Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T17:08:54Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37342421613,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "fix(ui): match PDF name-error spacing and retain menu acceptance asse…",
+      "run_number": 36,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101145152213,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37342421613",
+      "created_at": "2026-10-05T16:38:46Z",
+      "updated_at": "2026-10-05T17:05:59Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T16:38:46Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37338269235,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "fix(ui): refine measured PDF tool geometry and settings dialogs; reta…",
+      "run_number": 35,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101133632285,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37338269235",
+      "created_at": "2026-10-05T16:06:51Z",
+      "updated_at": "2026-10-05T16:15:41Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T16:06:51Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37330392252,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "9399121212b68a5f6422170e00835095218c2f8e",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "fix(ui): align PDF tool and native settings details; preserve strict …",
+      "run_number": 34,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101111602676,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37330392252",
+      "created_at": "2026-10-05T15:08:38Z",
+      "updated_at": "2026-10-05T15:36:52Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T15:08:38Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37322190390,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "fix(v20.85): match PDF typography and secondary tool entry points",
+      "run_number": 33,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101088310002,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37322190390",
+      "created_at": "2026-10-05T14:07:40Z",
+      "updated_at": "2026-10-05T14:36:11Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T14:07:40Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37317099530,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "270f559424f3ef6e3503d2431ea24f81d295d3d7",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "fix(v20.85): match supplied Apps menus and adblock state geometry",
+      "run_number": 32,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101073854037,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37317099530",
+      "created_at": "2026-10-05T13:28:43Z",
+      "updated_at": "2026-10-05T13:56:02Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T13:28:43Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37312432198,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "20c308da02e4920f6581c5210af291ff6fb63dab",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Match final PDF states: measured notification rows, rename validation…",
+      "run_number": 31,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101060875121,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37312432198",
+      "created_at": "2026-10-05T12:51:21Z",
+      "updated_at": "2026-10-05T13:15:25Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T12:51:21Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37307367305,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "93988af07d8f052e928a8db166daaeaeb053ef67",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Correct PDF error-state alignment, subscription actions and original …",
+      "run_number": 30,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101046856231,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37307367305",
+      "created_at": "2026-10-05T12:07:28Z",
+      "updated_at": "2026-10-05T12:35:21Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T12:07:28Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37306185320,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "2bb0dd980f981c5a75454900d66f5c37310cbf30",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Align remaining PDF editor/settings sheets and tool WebUI status plac…",
+      "run_number": 29,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101043524084,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37306185320",
+      "created_at": "2026-10-05T11:56:34Z",
+      "updated_at": "2026-10-05T12:24:12Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T11:56:34Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37305122492,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "77164bc42c2ecc800105a48e36598ad8fbbcda36",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Restore remaining supplied PDF tool/settings details and Sub-Store br…",
+      "run_number": 28,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101040635737,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37305122492",
+      "created_at": "2026-10-05T11:46:41Z",
+      "updated_at": "2026-10-05T12:13:20Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T11:46:41Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37300578403,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "cebeb089faec7ba39b5d73eb5e44389556d1371d",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Finish reviewed tool state details: import glyphs, menu variants and …",
+      "run_number": 27,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101028351036,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37300578403",
+      "created_at": "2026-10-05T11:04:23Z",
+      "updated_at": "2026-10-05T11:27:12Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T11:04:23Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37299514792,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "3a78d564eab28c19ca780fc9119c8da6f45fd218",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Align retained header parity test with reviewed PDF spacing; keep all…",
+      "run_number": 26,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "success",
+      "workflow_id": 374587740,
+      "check_suite_id": 101025454371,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37299514792",
+      "created_at": "2026-10-05T10:54:17Z",
+      "updated_at": "2026-10-05T11:21:20Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T10:54:17Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37298866646,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "b12f5e6bb7ddd07898932ccc3c7a263c37f8dbf4",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Wait for enabled native retry under401 before recovery transition; re…",
+      "run_number": 25,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101023675950,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37298866646",
+      "created_at": "2026-10-05T10:48:00Z",
+      "updated_at": "2026-10-05T10:57:04Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T10:48:00Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37298079055,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "a89b328700d11f781e86f1f54cd7e26ca8ee86f4",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Match reference hub typography and spacing; preserve every CI run wit…",
+      "run_number": 24,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101021517217,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37298079055",
+      "created_at": "2026-10-05T10:40:31Z",
+      "updated_at": "2026-10-05T10:49:58Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T10:40:31Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37296512354,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "1cbaf7f40561708ac36e1c2a5b29e52789cbb5d9",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "Refine PDF tool dialogs, menus and settings reference surfaces after …",
+      "run_number": 23,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101017269871,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37296512354",
+      "created_at": "2026-10-05T10:25:43Z",
+      "updated_at": "2026-10-05T10:51:50Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T10:25:43Z",
+      "previous_attempt_url": null
+    },
+    {
+      "id": 37293354486,
+      "name": "Hetu V20.85 PDF tools and settings continuation",
+      "head_branch": "test/v20.76-new-ui",
+      "head_sha": "770f3fa8e252958e9cb05fb0e6a4b6d7aa40edb6",
+      "path": ".github/workflows/ui-v76-build.yml",
+      "display_title": "ui: use opt-in reference canvas for tools and settings while freezing…",
+      "run_number": 22,
+      "event": "push",
+      "status": "completed",
+      "conclusion": "failure",
+      "workflow_id": 374587740,
+      "check_suite_id": 101008722588,
+      "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37293354486",
+      "created_at": "2026-10-05T09:56:46Z",
+      "updated_at": "2026-10-05T10:44:21Z",
+      "run_attempt": 1,
+      "run_started_at": "2026-10-05T09:56:46Z",
+      "previous_attempt_url": null
+    }
+  ],
+  "branchTaskConclusion": "No newer run ID than 37363630612 was visible in the latest 20 same-branch runs. Original run 37363630612 has a real attempt 2 queued since 19:46:18Z; it must continue and must not be reported as a completed failure or accepted success.",
+  "limits": {
+    "noApplication487XmlAccepted": true,
+    "noApplicationApkAccepted": true,
+    "noCurrentApplicationInstallationAccepted": true,
+    "noGoogleAccountAuthenticationValidated": true,
+    "noUserDeviceActions": [],
+    "googleEvidenceFileModified": false,
+    "old273ReportsModified": false,
+    "rootMutationCountForNewApplication": null,
+    "cleanupForNewApplication": null
+  }
+}

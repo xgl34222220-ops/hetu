@@ -1,0 +1,40 @@
+{
+  "applicationCommit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "workflowRunId": 37322190390,
+  "uiArtifactId": 11351635003,
+  "referencePage44": {
+    "path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-44.png",
+    "sha256": "273d10d66f277a2a7b439e7f407403be9154bf5810077582658c73c4ef1aa913",
+    "actuallyOpenedFullSize": true,
+    "firstVisibleCompleteCard": "拦截强度 with 轻量/均衡/加强 and note"
+  },
+  "currentPage45": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-045-current.png",
+    "sha256": "eb4ba00823f505361d9f854fe552f5be156137fc398e2f0742cc26e587b22894",
+    "actuallyOpenedFullSize": true,
+    "levelCardTopYpx": 765,
+    "toolbarBottomYpx": 78
+  },
+  "currentPage44": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-7cf/03A-044-current.png",
+    "sha256": "149ece5db4f8f879b9d9f0f2e48303c88cd15016b4a9f3ebe7261acab3d59142",
+    "actuallyOpenedFullSize": true,
+    "visibleLevelCardBottomYpx": 124,
+    "reason": "initial RulesScroll100000 clamps to page bottom and hides LevelCard title/segmented options"
+  },
+  "captureDensity": "ToolsPdf85Test qualifier zh-rCN-w393dp-h852dp-mdpi, 1dp=1px",
+  "candidate": {
+    "page44InitialScrollPx": 687,
+    "derivation": "765-78=687 aligns full LevelCard as first body card below native toolbar",
+    "page47InitialScrollUnchanged": 100000,
+    "page48InitialScrollUnchanged": 100000,
+    "productionScrollAndCallbacksUnchanged": true,
+    "rendered": false
+  },
+  "sourceProof": "Reversing page44 comment+one integer restores wholefile byte-for-byte to7cf; pages47/48 and 49test count unchanged.",
+  "limits": [
+    "This fixes the reference capture state, not a missing production feature.",
+    "Reference/native toolbar, OS bars and lower row typography still differ; candidate full pixel parity is not asserted.",
+    "New candidate must be built/captured on its own commit; old7cf CI cannot validate it."
+  ]
+}

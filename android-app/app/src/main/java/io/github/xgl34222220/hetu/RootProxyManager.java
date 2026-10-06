@@ -22,11 +22,13 @@ final class RootProxyManager {
     private static final String CONFIG=ROOT+"/run/state/startup-config";
     private static final String CORE_TOKEN=ROOT+"/run/state/core.token";
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
+    private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
     private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
+    private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
     static long observationTicket(){return CONTROL_LOCK.observe();}
     static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
     private final Context context;
@@ -56,10 +58,11 @@ final class RootProxyManager {
         final ProxyConfigLibrary.Entry source;
         final RootProxyPolicy policy;
         final ProxyAdblockRules.Snapshot adblock;
+        final RootFakeIpRanges fakeIps;
         final String startup,settingsSignature;
         final int tproxyPort,redirectPort,controllerPort;
-        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,String y,int tp,int rp,int cp,String signature){
-            profile=p;source=s;this.policy=policy;this.adblock=adblock;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
+        Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
+            profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
         }
     }
 
@@ -325,17 +328,28 @@ final class RootProxyManager {
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
-        writeStartupCopy(generated.yaml);
-        return new Prepared(profile,selected,policy,adblock,generated.yaml,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
+        RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
+        // Private comments carry an already validated routing projection into start/boot.
+        // Keep the established startup argument protocol and the user's source untouched.
+        String startup=fakeIps.privateStartup(generated.yaml);
+        writeStartupCopy(startup);
+        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
     }
 
-    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
+    private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
         return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
+                +"|dnsForward="+bit(prefs.getBoolean("proxyMihomoDnsForward",true))
+                +"|dnsTcp="+bit(prefs.getBoolean("proxyDnsHijackTcp",true))+"|dnsUdp="+bit(prefs.getBoolean("proxyDnsHijackUdp",true))
+                +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
+                +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
+                +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
                 +"|sharedMacs="+policy.sharedBypassMacs
-                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges;
+                +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges
+                +"|fake4="+fakeIps.ipv4+"|fake6="+fakeIps.ipv6
+                +"|lan4="+fakeIps.ipv4BypassCidrs+"|lan6="+fakeIps.ipv6BypassCidrs;
     }
 
     private void installHotReloadFiles(Prepared p)throws Exception{
@@ -374,7 +388,7 @@ final class RootProxyManager {
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
             int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
             Prepared p=prepare(profile,port);
-            String nextFingerprint=topologyFingerprint(profile,p.policy);
+            String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
             String liveFingerprint=prefs.getString("proxyRootTopologyFingerprint","");
             if(liveFingerprint!=null&&!liveFingerprint.isEmpty()&&!liveFingerprint.equals(nextFingerprint))
                 throw new IOException("运行模式、应用范围、DNS、IPv6、TCP/UDP 或绕过策略已变化，请使用「重启」应用这些网络层设置");
@@ -405,7 +419,8 @@ final class RootProxyManager {
                     .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                     .remove("proxyAdblockLastError")
                     .apply();
-            return "运行配置已热重载";
+            String bootWarning=refreshAutostart(p,autostartArgs(p));
+            return "运行配置已热重载"+(bootWarning.isEmpty()?"":"；"+bootWarning);
         }finally{
             CONTROL_LOCK.unlock();
         }
@@ -429,8 +444,8 @@ final class RootProxyManager {
         return hex(digest.digest());
     }
 
-    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy){
-        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy);
+    private String capabilityFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
+        return "caps-v2|"+ProxyRuntimeSettings.RUNTIME_REVISION+"|"+Build.FINGERPRINT+"|"+topologyFingerprint(profile,policy,fakeIps);
     }
 
     JSONObject preflight(Prepared p)throws Exception{
@@ -439,9 +454,10 @@ final class RootProxyManager {
         try{
         installRuntimeFiles(p,false);
         RootProxyPolicy policy=p.policy;
+        String preflightDns=prefs.getBoolean("proxyMihomoDnsForward",true)?p.profile.dnsHijack.id:"off";
         return runJson("preflight",
                 p.profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),p.profile.ipv6.id,
-                bit(p.profile.tcp),bit(p.profile.udp),p.profile.dnsHijack.id,bit(p.profile.quicBlocked),
+                bit(p.profile.tcp),bit(p.profile.udp),preflightDns,bit(p.profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,policy.directGidRanges,policy.sharedBypassMacs);
         }finally{CONTROL_LOCK.unlock();}
@@ -483,10 +499,15 @@ final class RootProxyManager {
         }finally{CONTROL_LOCK.unlock();}
     }
     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
+        return startIfWanted(profile,()->true);
+    }
+    JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
         if(!CONTROL_LOCK.tryLock())return new JSONObject().put("ok",true).put("cancelled",true).put("reason","control-busy");
         try{
             if(!prefs.getBoolean("proxyRootWanted",false))
                 return new JSONObject().put("ok",true).put("running",false).put("cancelled",true);
+            if(!currentNetwork.getAsBoolean())
+                return new JSONObject().put("ok",true).put("running",false).put("cancelled",true).put("reason","network-changed");
             return startInternal(profile,null,false);
         }finally{CONTROL_LOCK.unlock();}
     }
@@ -499,14 +520,31 @@ final class RootProxyManager {
         try{
             trace.next("runtimeProbe");
             RootStartupProbe.Result initial=probeStartupRuntime();
+            if(initial.process==ProxyContinuity.ProcessState.DEAD){
+                // Clear stale health only on confirmed absence, never on a probe
+                // timeout, and do not revoke the user's boot recovery intent.
+                prefs.edit().putBoolean("proxyRootRuntimeRunning",false)
+                        .putString("proxyNetworkIntegrity","stopped")
+                        .putString("proxyNetworkFault","not-running")
+                        .putString("proxyPolicyEgressState","unverified")
+                        .remove("proxyRootBootRestoreSuccessAt").apply();
+            }
             boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                     prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
             if(existingRunning&&!replaceRunning){
                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
                 ensureContinuityService(true);
                 trace.outcome="alreadyRunning";
-                return new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
-                        .put("message","Root 代理已在运行，已忽略重复启动请求");
+                int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
+                String liveMessage="Root 代理已在运行，已忽略重复启动请求";
+                if(appliedRevision>0&&appliedRevision<ProxyRuntimeSettings.RUNTIME_REVISION)
+                    liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
+                JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
+                        .put("message",liveMessage);
+                if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartInstalled",false)){
+                    try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
+                }
+                return unchanged;
             }
             if(replaceRunning) {
                 // Preserve the user's intent before any new preparation. The shell start transaction
@@ -577,7 +615,7 @@ final class RootProxyManager {
 
         trace.next("legacyCleanup");
         if(!prefs.getBoolean("hetuLegacyRetired",false))quiesceLegacyRuntime(progress);
-        String capabilityKey=capabilityFingerprint(profile,policy);
+        String capabilityKey=capabilityFingerprint(profile,policy,p.fakeIps);
         boolean capabilityKnown=capabilityKey.equals(prefs.getString("proxyRootCapabilityFingerprint",""));
         stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
@@ -603,12 +641,22 @@ final class RootProxyManager {
                 .apply();
         }
         trace.next("coreAndNetwork");
+        String runtimeDns=prefs.getBoolean("proxyMihomoDnsForward",true)?profile.dnsHijack.id:"off";
+        String dnsTcp=bit(prefs.getBoolean("proxyDnsHijackTcp",true));
+        String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
+        String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
+        String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
+        String mem=prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"";
+        String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
+        String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
         JSONObject result;
-        try{result=runJsonWithTimeout(125000L,"start",
+        String[] bootArgs=new String[]{
                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
-                bit(profile.tcp),bit(profile.udp),profile.dnsHijack.id,bit(profile.quicBlocked),
+                bit(profile.tcp),bit(profile.udp),runtimeDns,bit(profile.quicBlocked),
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
-                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs);
+                policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
+                dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
+        try{result=runJsonWithTimeout(125000L,prependStart(bootArgs));
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
 
@@ -666,6 +714,8 @@ final class RootProxyManager {
                 .put("controllerPort",p.controllerPort)
                 .put("adblockRevision",p.adblock==null?"":p.adblock.revision)
                 .put("bypassCidrs",policy.cidrs)
+                .put("fakeIpV4",p.fakeIps.ipv4)
+                .put("fakeIpV6",p.fakeIps.ipv6)
                 .put("bypassInterfaces",policy.interfaces);
         if(!warning.isEmpty())result.put("warning",warning);
         synchronized(ProxyAdblockSession.LOCK){
@@ -677,7 +727,7 @@ final class RootProxyManager {
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
                 .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                 .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
-                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy))
+                .putString("proxyRootTopologyFingerprint",topologyFingerprint(profile,policy,p.fakeIps))
                 // A completed network transaction consumes its captured request.
                 // Runtime fallbacks (for example adblock-chain degradation) are reported through
                 // their own effective/error fields; they must not create an endless "restart again"
@@ -694,6 +744,8 @@ final class RootProxyManager {
                 .remove("proxyRootBootError")
                 .apply();
         }
+        String bootWarning=refreshAutostart(p,bootArgs);
+        if(!bootWarning.isEmpty())result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+bootWarning);
         ensureContinuityService(true);
         trace.outcome="ready";
         return result;
@@ -706,6 +758,84 @@ final class RootProxyManager {
                         .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
             }finally{CONTROL_LOCK.unlock();}
         }
+    }
+
+    private static String[] prependStart(String[] args){
+        String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
+    }
+
+    private String[] autostartArgs(Prepared p){
+        ProxyRuntimeProfile profile=p.profile;RootProxyPolicy policy=p.policy;
+        return new String[]{BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
+                bit(profile.tcp),bit(profile.udp),prefs.getBoolean("proxyMihomoDnsForward",true)?profile.dnsHijack.id:"off",bit(profile.quicBlocked),
+                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),policy.appScope,policy.uidRanges,
+                bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
+                bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
+                bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
+                prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"",
+                prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"",bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
+    }
+
+    private void installAutostart(Prepared p,String[] args)throws Exception{
+        File stage=new File(context.getCacheDir(),"hetu-autostart");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法准备开机脚本");
+        File script=new File(stage,"hetu-root.sh");copyScriptAsset(script);
+        RootAutostart.install(context,new File(CONFIG),args,script);
+    }
+
+    private String refreshAutostart(Prepared p,String[] args){
+        if(!prefs.getBoolean("proxyRootAutoStart",false))return "";
+        try{
+            installAutostart(p,args);
+            prefs.edit().putBoolean("proxyRootAutoStartInstalled",true).remove("proxyRootAutoStartError").apply();
+            return "";
+        }catch(Exception error){
+            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
+            prefs.edit().putBoolean("proxyRootAutoStartInstalled",false).putString("proxyRootAutoStartError",detail).apply();
+            return "开机脚本未更新："+detail;
+        }
+    }
+
+    boolean adoptBootRuntime()throws Exception{
+        RootBridge.requireWorkerThread();CONTROL_LOCK.lock();
+        try{
+            if(!prefs.getBoolean("proxyRootAutoStart",false)||!RootAutostart.confirmedRunningThisBoot(context))return false;
+            if(probeStartupRuntime().process!=ProxyContinuity.ProcessState.ALIVE)return false;
+            prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true)
+                    .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis()).remove("proxyRootBootError").apply();
+            return true;
+        }finally{CONTROL_LOCK.unlock();}
+    }
+
+    String setAutoStart(boolean enabled)throws Exception{
+        RootBridge.requireWorkerThread();CONTROL_LOCK.lock();
+        try{
+            if(enabled){
+                if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
+                ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+                ProxyRuntimeProfile.Core bootCore=profile.core;
+                if(bootCore==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(bootCore))bootCore=ProxyRuntimeProfile.Core.MIHOMO;
+                if(!runtimeCoreCurrent(expectedCoreToken(bootCore)))
+                    throw new IOException("请先成功启动一次所选核心，再开启开机自启");
+                Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
+                // Copy the last successfully deployed config. Enabling must not change a
+                // live proxy or claim unvalidated settings are boot-ready.
+                RootBridge.Result available=RootBridge.rootShell(context,"test -x "+RootBridge.quote(SCRIPT)+" && test -s "+RootBridge.quote(CONFIG),4000L);
+                if(!available.ok())throw new IOException("请先成功启动一次代理，再开启开机自启");
+                if(!p.settingsSignature.equals(prefs.getString("proxyRootAppliedSettings","")))
+                    throw new IOException("代理设置已变化，请先启动或重启应用设置，再开启开机自启");
+                // A failed restart may have replaced CONFIG without publishing a
+                // successful settings snapshot. Validate the actual deployed bytes.
+                validateRuntimeConfig();
+                installAutostart(p,autostartArgs(p));
+            }else RootAutostart.remove(context);
+            if(!prefs.edit().putBoolean("proxyRootAutoStart",enabled).putBoolean("proxyRootAutoStartInstalled",enabled)
+                    .remove("proxyRootAutoStartError").commit())throw new IOException("开机自启状态保存失败，请重试");
+            return enabled?"开机脚本已安装，重启后自动启动代理":"开机自启已关闭";
+        }catch(Exception error){
+            prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
+            throw error;
+        }finally{CONTROL_LOCK.unlock();}
     }
 
     JSONObject stop()throws Exception{return stop(null);}
@@ -767,12 +897,55 @@ final class RootProxyManager {
     }
 
     JSONObject networkHealth()throws Exception{
-        // Old deployed scripts intentionally require one explicit restart after upgrade.
-        return runJsonWithTimeout(8000L,"network-health");
+        return runHealthChecker("network-health");
+    }
+
+    JSONObject repairSessionRecord()throws Exception{
+        RootBridge.requireWorkerThread();
+        CONTROL_LOCK.lock();
+        try{
+            if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限；运行记录未改动");
+            JSONObject result=runHealthChecker("repair-session");
+            JSONObject checked=networkHealth();
+            prefs.edit().putString("proxyNetworkIntegrity",checked.optString("networkIntegrity","unknown"))
+                    .putString("proxyNetworkFault",checked.optString("networkFault",""))
+                    .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).apply();
+            if(!checked.optBoolean("dataPlaneHealthy",false))result.put("message",result.optString("message")
+                    +"；网络核验仍未通过："+checked.optString("networkFault","unknown"));
+            return result;
+        }finally{CONTROL_LOCK.unlock();}
+    }
+
+    private JSONObject runHealthChecker(String action)throws Exception{
+        RootBridge.requireWorkerThread();
+        HEALTH_CHECKER_LOCK.lock();
+        try{
+            // Update only the inspector, never the running controller/core or boot
+            // entry. Merely opening a diagnostic does not migrate a session.
+            File stage=new File(context.getNoBackupFilesDir(),"hetu-health-stage");
+            if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建健康检查目录");
+            File checker=new File(stage,"hetu-health-checker.sh");
+            copyScriptAsset(checker);
+            String digest=RuntimeCompatibility14.sha256(checker);
+            String temporary=HEALTH_CHECKER+".new";
+            String command="set -e; test -s "+RootBridge.quote(ROOT+"/run/session.state")
+                    +"; if [ \"$(sha256sum "+RootBridge.quote(HEALTH_CHECKER)+" 2>/dev/null | cut -d ' ' -f 1)\" != "+RootBridge.quote(digest)+" ]; then"
+                    +" cp "+RootBridge.quote(checker.getAbsolutePath())+" "+RootBridge.quote(temporary)
+                    +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
+                    +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
+                    +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
+            RootBridge.Result reply=RootBridge.rootShell(context,command,"repair-session".equals(action)?20000L:10000L);
+            return RootCommandReply.read(reply.code,reply.output);
+        }finally{HEALTH_CHECKER_LOCK.unlock();}
     }
 
     JSONObject status()throws Exception{
         JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
+        if(state.optBoolean("running",false)){
+            JSONObject health=networkHealth();
+            for(String key:new String[]{"networkIntegrity","networkFault","sessionManifestState","baselineRepairAvailable","dataPlaneHealthy"})
+                state.put(key,health.get(key));
+        }
         int livePort=liveControllerPort(state);
         if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
             prefs.edit().putInt("proxyControllerPort",livePort).apply();
@@ -795,9 +968,17 @@ final class RootProxyManager {
     String diagnostics(){
         RootBridge.requireWorkerThread();
         DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
+        report.section("上次应用闪退（本地记录）",AppCrashReport.read(context),16384);
+        report.section("网络事件记录（本地，可独立于 Root 读取）",new ProxyNetworkJournal(context).report(prefs),65536);
         StringBuilder events=new StringBuilder("time=").append(new Date())
                 .append("\napp=").append(BuildConfig.VERSION_NAME)
                 .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
+        try{
+            RootBridge.Result boot=RootBridge.rootShell(context,"ls -l "+RootBridge.quote(RootAutostart.ENTRY)+" 2>/dev/null; cat "
+                    +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
+                    +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
+            report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
+        }catch(Exception ignored){}
         Map<String,?> values=prefs.getAll();
         for(String key:new String[]{"proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyRootWanted",
                 "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
@@ -809,7 +990,10 @@ final class RootProxyManager {
                 "proxySelectorDisconnectOnSelect","proxyLastSelectionAt","proxyLastSelectionGroup",
                 "proxyLastSelectionClosed","proxyLastSelectionCloseFailed",
                 "proxyAdblockHotReloadAt","proxyAdblockLastHitAt","proxyRootEgressProbeLastError",
-                "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt"}){
+                "proxyNetworkIntegrity","proxyNetworkFault","proxyNetworkCheckedAt","proxyPolicyEgressState","proxyPolicyEgressCheckedAt",
+                "proxyNetworkEpoch","proxyPhysicalNetworkState","proxyLastNetworkCallback","proxyLastNetworkCallbackAt",
+                "proxyNetworkHealthTraceId","proxyNetworkHealthReadError","proxyPolicyEgressTraceId",
+                "proxyNetworkRepairExit","proxyNetworkRepairTraceId","proxyNetworkJournalError","proxyNetworkJournalDropped","proxyNetworkSessionId"}){
             if(values.containsKey(key))events.append('\n').append(key).append('=').append(values.get(key));
         }
         report.section("版本与最近运行事件",events.toString(),6000);
@@ -852,13 +1036,23 @@ final class RootProxyManager {
             report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
             RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
             report.section("网络原位修复记录",repairs.output,5000);
+            RootBridge.Result sessionRepairs=RootBridge.rootShell(context,"tail -n 20 "+RootBridge.quote(ROOT+"/run/session-repair.log")+" 2>/dev/null; true",3000L);
+            report.section("运行记录兼容修复",sessionRepairs.output,3000);
+            RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
+                    +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
+            report.section("Google 服务防火墙修复",google.output,5000);
         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
         try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
             org.json.JSONArray connections=new MihomoControllerClient(context).connections().optJSONArray("connections");
             StringBuilder matched=new StringBuilder("WeChat UID=").append(wechatUid).append('\n');
-            int count=0,otherCount=0;
+            int count=0,otherCount=0,googleCount=0;
+            java.util.Set<Integer> googleUids=new java.util.HashSet<>();
+            for(String pkg:new String[]{"com.google.android.gms","com.google.android.gsf","com.android.vending"}) {
+                try { googleUids.add(context.getPackageManager().getApplicationInfo(pkg,0).uid); } catch(Exception ignored) {}
+            }
+            StringBuilder googleConnections=new StringBuilder(GoogleConnectionEvidence.LIMITATION).append('\n');
             StringBuilder other=new StringBuilder();
             for(int i=0;connections!=null&&i<connections.length();i++){
                 JSONObject connection=connections.optJSONObject(i);
@@ -870,10 +1064,11 @@ final class RootProxyManager {
                         ||destination.contains("telegram")||destination.contains("twitter")||destination.equals("x.com")
                         ||destination.endsWith(".x.com")||process.contains("telegram")||process.contains("twitter")||process.contains("chrome");
                 boolean wechat=DiagnosticReport.isWechat(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),wechatUid);
-                // Busy browsers must not consume the quota before WeChat is inspected.
-                if(wechat ? count>=25 : !affected||otherCount>=10)continue;
-                StringBuilder destinationText=wechat?matched:other;
-                int number=wechat?++count:++otherCount;
+                boolean googleConnection=GoogleConnectionEvidence.matches(metadata.optString("process"),metadata.optString("host"),metadata.optInt("uid",-1),googleUids);
+                // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
+                if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
+                StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
+                int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                         .append(" uid=").append(metadata.optInt("uid",-1))
                         .append(" host=").append(metadata.optString("host"))
@@ -886,6 +1081,8 @@ final class RootProxyManager {
             }
             if(count==0)matched.append("当前未识别到微信连接；这不代表微信未联网，可能走应用绕过、OEM推送或已断连。\n");
             report.section("微信连接（仅元数据）",matched.toString(),6000);
+            if(googleCount==0)googleConnections.append("当前没有可识别的 Google/GMS/Play 连接；可能被应用绕过、已经断连或缺少核心进程元数据，认证状态仍未验证。\n");
+            report.section("Google/GMS/Play 连接（认证状态未验证）",googleConnections.toString(),6000);
             if(otherCount>0)report.section("其他应用连接（仅元数据）",other.toString(),2500);
         }catch(Exception e){report.section("微信当前连接","Controller 读取失败："+e.getMessage(),1000);}
         try{
@@ -1123,13 +1320,17 @@ final class RootProxyManager {
                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
-                    .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp))
-                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
+                    .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
             if(adblockAllow!=null){
                 cmd.append("; cp ").append(RootBridge.quote(adblockAllow.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
-                        .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
+                        .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
+                        .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
             }
+            cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
+                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
+                    .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
+                    .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(dst));
             cmd.append("; printf %s ").append(RootBridge.quote(p.adblock.revision)).append(" > ").append(RootBridge.quote(revisionFile))
                     .append("; chmod 600 ").append(RootBridge.quote(revisionFile)).append("; chown 0:0 ").append(RootBridge.quote(revisionFile))
                     .append("; fi");

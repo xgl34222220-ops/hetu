@@ -99,7 +99,7 @@ private fun overviewRouteAccent(name: String, primary: Color): Color {
         name.equals("DIRECT", true) -> Color(0xFF10B981)
         name.startsWith("REJECT", true) -> Color(0xFFF43F5E)
         "fallback" in lower || "故障" in name -> Color(0xFFF59E0B)
-        "google" in lower || "github" in lower || "youtube" in lower -> Color(0xFF12806F)
+        "google" in lower || "github" in lower || "youtube" in lower -> Color(0xFF2A62E8)
         "ai" in lower || "openai" in lower -> Color(0xFF10A37F)
         else -> primary
     }

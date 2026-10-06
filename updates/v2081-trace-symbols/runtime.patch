@@ -1,0 +1,117 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 07e153f..5ac9f7e 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2080
+-        versionName = "0.12.10-v20"
++        versionCode = 2081
++        versionName = "0.12.11-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java
+index 4f8028d..8cd95da 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java
+@@ -6,6 +6,7 @@ import android.os.SystemClock;
+ import java.io.*;
+ import java.nio.charset.StandardCharsets;
+ import java.util.*;
++import java.util.regex.Pattern;
+ import org.json.*;
+ 
+ /** App-private, append-only diagnostic metadata. No exception messages or network addresses. */
+@@ -22,6 +23,11 @@ final class ProxyNetworkJournal {
+     private static final int RECENT_LIMIT=64, READ_BYTES=128*1024, VIEW_BYTES=48*1024, MAX_EVENT_BYTES=8192;
+     static final long STORAGE_BYTES=2*1024*1024;
+     private static final int STATUS_RESERVE=16;
++    private static final String CLASS_NAME="[a-zA-Z_$][a-zA-Z0-9_$]*(?:\\.[a-zA-Z_$][a-zA-Z0-9_$]*)*";
++    private static final String METHOD_NAME="(?:<init>|<clinit>|[a-zA-Z_$][a-zA-Z0-9_$-]{0,159})";
++    private static final Pattern CLASS_SYMBOL=Pattern.compile(CLASS_NAME);
++    private static final Pattern METHOD_SYMBOL=Pattern.compile(METHOD_NAME);
++    private static final Pattern FRAME_LINE=Pattern.compile("-?[0-9]{1,10}");
+     private final File directory;
+     private final int chunkBytes;
+     private final long storageBytes;
+@@ -67,7 +73,7 @@ final class ProxyNetworkJournal {
+                 JSONArray frames=new JSONArray();
+                 StackTraceElement[] trace=cause.getStackTrace();
+                 for(int i=0;i<Math.min(trace.length,3);i++){
+-                    String cls=symbol(trace[i].getClassName()),method=symbol(trace[i].getMethodName());
++                    String cls=symbol(trace[i].getClassName()),method=methodSymbol(trace[i].getMethodName());
+                     frames.put(cls.equals("redacted-symbol")||method.equals("redacted-symbol")?"redacted-frame":cls+"."+method+":"+trace[i].getLineNumber());
+                 }
+                 if(trace.length>3)entry.put("framesTruncated",true);
+@@ -81,7 +87,15 @@ final class ProxyNetworkJournal {
+         }catch(JSONException impossible){throw new IllegalStateException(impossible);}
+     }
+ 
+-    private static String symbol(String text){return text!=null&&text.matches("[a-zA-Z_$][a-zA-Z0-9_$.]{0,159}")?text:"redacted-symbol";}
++    private static String symbol(String text){return text!=null&&text.length()<=160&&CLASS_SYMBOL.matcher(text).matches()?text:"redacted-symbol";}
++    private static String methodSymbol(String text){return text!=null&&text.length()<=160&&METHOD_SYMBOL.matcher(text).matches()?text:"redacted-symbol";}
++    private static boolean frameSymbol(String frame){
++        if(frame.length()>340)return false;
++        int colon=frame.lastIndexOf(':'),dot=frame.lastIndexOf('.',colon);
++        return dot>0&&colon>dot+1&&!symbol(frame.substring(0,dot)).equals("redacted-symbol")
++                &&!methodSymbol(frame.substring(dot+1,colon)).equals("redacted-symbol")
++                &&FRAME_LINE.matcher(frame.substring(colon+1)).matches();
++    }
+     private static String faultCode(String code){
+         boolean known=code!=null&&code.length()<=96&&code.matches("session-manifest-missing|health-read-failed|service-recreated|not-running|transaction-in-progress|core-(identity(-read)?|exited)|watchdog-(missing|exited|identity(-read)?)|routing-journal|native-device|socket-read|ipv[46]-(policy-rule|local-route|rule-read|route-read)|listener-[0-9]{1,5}-(tcp|udp)|[46]-(nat|mangle|filter)-(read|hook|HETU_(DNSOUT|DNSPRE|KFWD|KOUT|MOUT|MPRE|NOUT|NPRE|QUICFWD|QUICOUT|V6FWD|V6OUT|WRFWD|WROUT))");
+         return known?code:"unclassified-fault";
+@@ -179,7 +193,7 @@ final class ProxyNetworkJournal {
+                 JSONArray frames=cause.optJSONArray("frames"),locations=new JSONArray();
+                 if(frames!=null)for(int k=0;k<Math.min(3,frames.length());k++){
+                     String frame=frames.optString(k);
+-                    boolean valid=frame.length()<=340&&frame.matches("[a-zA-Z_$][a-zA-Z0-9_$.]{0,320}:-?[0-9]{1,10}");
++                    boolean valid=frameSymbol(frame);
+                     locations.put(valid?frame:"redacted-frame");if(!valid)safe.put("metadataRedacted",true);
+                 }
+                 item.put("frames",locations);
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt
+index fa22a74..631f810 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt
+@@ -163,4 +163,38 @@ class JournalReliabilityTest {
+         try { j.append(huge); fail("oversized direct event accepted") } catch (_: IOException) {}
+         assertEquals(before, snapshot(dir))
+     }
++    @Test fun kotlinMangledLocationsFromReportedCrashRemainTraceableThroughCaptureAndCopy() {
++        val error = NoSuchMethodError("SYNTHETIC message is private")
++        val input = arrayOf(StackTraceElement("com.materialkolor.ktx.DynamicSchemeKt", "toDynamicScheme-Iv8Zu3U", "private-file", 41),
++            StackTraceElement("com.materialkolor.ktx.DynamicSchemeKt", "DynamicScheme-9lyMwEc", "private-file", 135),
++            StackTraceElement("com.materialkolor.DynamicColorSchemeKt", "dynamicColorScheme-mm0v_cE", "private-file", 111))
++        error.stackTrace = input; val e = event(error); val j = ProxyNetworkJournal(temporary.newFolder(), 4096); j.append(e)
++        val frames = records(j.recent()).single().getJSONArray("causes").getJSONObject(0).getJSONArray("frames")
++        input.forEachIndexed { i, f -> assertEquals("${f.className}.${f.methodName}:${f.lineNumber}", frames.getString(i)) }
++        assertTrue(j.recent().contains(e.id)); assertFalse(j.recent().contains("private-file")); assertFalse(j.recent().contains("SYNTHETIC"))
++    }
++    @Test fun constructorAndClassInitializerLocationsSurviveCaptureAndLegacyRead() {
++        val error = IllegalStateException("ignored"); error.stackTrace = arrayOf(
++            StackTraceElement("example.Worker", "<init>", "ignored", 12), StackTraceElement("example.Worker", "<clinit>", "ignored", -2))
++        val dir = temporary.newFolder(); val e = event(error); file(dir).writeText(e.line + "\n")
++        val frames = records(ProxyNetworkJournal(dir, 4096).recent()).single().getJSONArray("causes").getJSONObject(0).getJSONArray("frames")
++        assertEquals("example.Worker.<init>:12", frames.getString(0)); assertEquals("example.Worker.<clinit>:-2", frames.getString(1))
++    }
++    @Test fun expandingLegalMethodFormsStillRejectsPoisonedOrOverlongSymbols() {
++        val methods = listOf("<init>https://TOPSECRET@private.invalid", "invoke-token=TOPSECRET", "invoke-TOPSECRET@private.invalid", "get\nTOPSECRET", "m".repeat(161))
++        methods.forEach { method ->
++            val error = IOException("private"); error.stackTrace = arrayOf(StackTraceElement("example.Worker", method, "ignored", 42))
++            val e = event(error); val dir = temporary.newFolder(); val poisoned = JSONObject(e.line)
++            poisoned.getJSONArray("causes").getJSONObject(0).getJSONArray("frames").put(0, "example.Worker.$method:42")
++            file(dir).writeText(poisoned.toString() + "\n"); val j = ProxyNetworkJournal(dir, 4096)
++            assertTrue(e.line.contains("redacted-frame")); assertTrue(j.recent().contains("redacted-frame"))
++            assertFalse(j.recent().contains("TOPSECRET")); assertFalse(j.recent().contains("private.invalid"))
++        }
++    }
++    @Test fun mangledMethodSuffixMatchingConfiguredSecretIsStillRedacted() {
++        val error = IOException("ignored"); error.stackTrace = arrayOf(StackTraceElement("example.Worker", "measure-Iv8Zu3U", "ignored", 42))
++        val e = event(error); val j = ProxyNetworkJournal(temporary.newFolder(), 4096, 8192L, "Iv8Zu3U"); j.append(e)
++        val recent = j.recent(); assertTrue(recent.contains("example.Worker.measure-[redacted]:42")); assertFalse(recent.contains("Iv8Zu3U"))
++        assertTrue(recent.contains(e.id))
++    }
+ }

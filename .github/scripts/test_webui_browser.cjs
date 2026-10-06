@@ -1,0 +1,70 @@
+const {chromium}=require('playwright');const fs=require('fs');const path=require('node:path');const assert=require('node:assert/strict');
+const sourcePath=process.argv[2] || 'android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt';
+const outputDir=process.argv[3] || 'out/verification/webui-browser';
+fs.mkdirSync(outputDir,{recursive:true});
+(async()=>{
+ const source=fs.readFileSync(sourcePath,'utf8');
+ const html=source.split('val WEB_UI = """')[1].split('""".trimIndent()')[0].replaceAll('__PORT__','9090').replace('__SECRET_JSON__','"test-only-secret"');
+ const browser=await chromium.launch({headless:true});
+ const context=await browser.newContext({viewport:{width:393,height:789},deviceScaleFactor:1,serviceWorkers:'block',colorScheme:'light'});
+ let failGet=false,failPut=false,ignorePut=false,putCount=0,requests=[];
+ const group='Test <Group>',node='Node <B>';
+ const data={version:{version:'v-test'},proxies:{proxies:{[group]:{type:'Selector',now:'Node A',all:['Node A',node]}}},connections:{uploadTotal:1024,downloadTotal:1048576,connections:[{metadata:{host:'host.test'},chains:[group,'Node A'],upload:2048,download:4096}]}};
+ await context.route('**/*',async route=>{
+  const req=route.request(),url=new URL(req.url());assert.equal(url.origin,'http://127.0.0.1:9090','No live or external requests allowed');if(url.pathname==='/favicon.ico')return route.fulfill({status:204,body:''});requests.push({path:url.pathname,method:req.method(),authorization:req.headers().authorization});
+  if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html});
+  if(req.method()==='PUT'){
+   putCount++;assert(url.pathname.startsWith('/proxies/'));const target=decodeURIComponent(url.pathname.slice('/proxies/'.length));assert(Object.hasOwn(data.proxies.proxies,target));assert.equal(req.headers().authorization,'Bearer test-only-secret');
+   if(failPut)return route.fulfill({status:503,body:''});
+   if(!ignorePut)data.proxies.proxies[target].now=req.postDataJSON().name;
+   return route.fulfill({status:204,body:''});
+  }
+  if(failGet)return route.fulfill({status:503,body:''});
+  const body=data[url.pathname.slice(1)];if(body)return route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
+  throw new Error('Unexpected request '+req.url());
+ });
+ const page=await context.newPage(),errors=[];page.on('pageerror',error=>errors.push(error.message));
+ const results=[];const pass=name=>results.push({name,result:'passed'});
+ await page.goto('http://127.0.0.1:9090/');await page.getByText('Mihomo v-test',{exact:true}).waitFor();
+ assert.equal(await page.locator('.metric').count(),4);assert.match(await page.locator('#content').innerText(),/↑ 1 KB · ↓ 1 MB/);pass('Overview displays four actual-response metrics and formatted counters');
+ await page.screenshot({path:path.join(outputDir,'webui-overview.png')});
+ await page.getByRole('button',{name:'策略组',exact:true}).click();await page.getByText(group,{exact:true}).waitFor();
+ assert.equal(await page.locator('script').count(),1);assert.equal(await page.locator('.group').count(),1);await page.screenshot({path:path.join(outputDir,'webui-groups.png')});pass('Groups and labels are escaped and retain actual count/type/current node');
+ await page.locator('.node-picker').click();await page.locator('#node-dialog[open]').waitFor();
+ await page.screenshot({path:path.join(outputDir,'webui-node-dialog.png')});
+ await page.getByRole('button',{name:'取消',exact:true}).click();assert.equal(putCount,0);assert.equal(await page.locator('#node-dialog[open]').count(),0);pass('Cancel dismisses node dialog without mutation');
+ failPut=true;await page.locator('.node-picker').click();await page.getByRole('radio',{name:node,exact:true}).click();await page.getByText('切换失败：HTTP 503',{exact:true}).waitFor();
+ assert.equal(await page.locator('.pill').innerText(),'Node A');await page.screenshot({path:path.join(outputDir,'webui-switch-failure.png')});
+ await page.getByRole('button',{name:'确定',exact:true}).click();pass('Rejected PUT shows the 503 notice and retains previous selection');
+ failPut=false;await page.locator('.node-picker').click();await page.getByRole('radio',{name:node,exact:true}).click();await page.waitForFunction(()=>document.querySelector('.pill').textContent==='Node <B>');
+ assert.equal(data.proxies.proxies[group].now,node);assert.equal(await page.locator('#notice[open]').count(),0);pass('Successful authenticated PUT is followed by controller reread before current-node update');
+ ignorePut=true;await page.locator('.node-picker').click();await page.getByRole('radio',{name:'Node A',exact:true}).click();await page.getByText('切换失败：控制器尚未确认所选节点',{exact:true}).waitFor();
+ assert.equal(await page.locator('.pill').innerText(),node);await page.getByRole('button',{name:'确定',exact:true}).click();ignorePut=false;pass('Unconfirmed 204 response cannot falsely change the selected node');
+ await page.getByRole('button',{name:'连接',exact:true}).click();await page.getByText('host.test',{exact:true}).waitFor();
+ assert.equal(await page.locator('.up').innerText(),'↑2 KB');assert.equal(await page.locator('.down').innerText(),'↓4 KB');await page.screenshot({path:path.join(outputDir,'webui-connections.png')});pass('Connections show host, chain, separate upload and download from response');
+ failGet=true;await page.evaluate(()=>refresh());await page.getByText('控制器未连接：HTTP 503',{exact:false}).waitFor();assert.equal(await page.locator('.connection').count(),0);
+ await page.getByRole('button',{name:'概览',exact:true}).click();await page.screenshot({path:path.join(outputDir,'webui-disconnected.png')});assert.equal(await page.locator('.metric').count(),0);assert.equal(await page.locator('#status-label').innerText(),'未连接');pass('Failed controller refresh and tab switch cannot display fake zero metrics or stale connected status');
+ failGet=false;await page.getByRole('button',{name:'重试',exact:true}).click();await page.getByText('Mihomo v-test',{exact:true}).waitFor();pass('Retry restores connected metrics from successful response');
+ assert.deepEqual(errors,[]);assert(requests.filter(r=>r.path!=='/').every(r=>r.authorization==='Bearer test-only-secret'));pass('No JavaScript errors and bearer authentication retained on every API request');
+ assert(!/https?:\/\//.test(html.split('<script>')[1]));pass('Built-in dashboard script has no external request endpoint');
+ // Separate reference-shaped fixtures: they never enter production assets or contact a controller.
+ const refNodes=['香港 01','香港 02','日本 01','日本 02','新加坡 01','台湾 01'];
+ data.version.version='v1.19.0';data.proxies.proxies={};
+ ['节点选择','手动选择','故障转移','AI 稳定','香港节点','日本节点','台湾节点','新加坡节点','其他节点','流媒体','自动选择','备用选择'].forEach((name,index)=>{
+  data.proxies.proxies[name]={type:index===1?'Selector':index>=2?'Fallback':'URLTest',now:refNodes[index%refNodes.length],all:refNodes};
+ });
+ data.connections={uploadTotal:624*1024,downloadTotal:165*1024*1024,connections:Array.from({length:18},(_,i)=>({metadata:{host:['api.example.com','download.example.com','203.0.113.20','updates.example.com','192.0.2.53'][i%5]},chains:['节点选择',refNodes[i%6]],upload:(i+1)*1024,download:(i+1)*1024*1024}))};
+ await page.evaluate(async()=>{current='overview';await refresh()});await page.getByText('Mihomo v1.19.0',{exact:true}).waitFor();
+ await page.screenshot({path:path.join(outputDir,'reference-03B-040-overview.png')});
+ await page.getByRole('button',{name:'策略组',exact:true}).click();await page.locator('.group').first().waitFor();
+ await page.screenshot({path:path.join(outputDir,'reference-03B-041-groups.png')});
+ await page.getByRole('button',{name:'连接',exact:true}).click();await page.locator('.connection').first().waitFor();
+ await page.screenshot({path:path.join(outputDir,'reference-03B-042-connections.png')});
+ await page.getByRole('button',{name:'策略组',exact:true}).click();await page.locator('.node-picker').first().click();
+ await page.locator('#node-dialog[open]').waitFor();await page.screenshot({path:path.join(outputDir,'reference-03B-043-node-dialog.png')});
+ failPut=true;await page.getByRole('radio',{name:'香港 02',exact:true}).click();await page.getByText('切换失败：HTTP 503',{exact:true}).waitFor();
+ await page.screenshot({path:path.join(outputDir,'reference-03B-044-switch-failure.png')});
+ pass('Five reference-shaped browser content states rendered from explicit isolated fixtures');
+ const output={results,passed:results.length,putCount,requestCount:requests.length,browser:'Chromium',viewport:'393 x 789 CSS pixels; HTML content only, no OS bars',fixtureOnly:true,referenceImages:['reference-03B-040-overview.png','reference-03B-041-groups.png','reference-03B-042-connections.png','reference-03B-043-node-dialog.png','reference-03B-044-switch-failure.png'],limitations:'Controlled browser/API fixtures, not Android WebView or a running Mihomo core; populated counts/names are test data, not exact reference data.'};
+ fs.writeFileSync(path.join(outputDir,'results.json'),JSON.stringify(output,null,2));console.log(JSON.stringify(output,null,2));await browser.close();
+})().catch(e=>{console.error(e);process.exit(1)});

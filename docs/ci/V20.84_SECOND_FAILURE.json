@@ -1,0 +1,60 @@
+{
+  "schema": 1,
+  "version": "V20.84",
+  "candidateCommit": "934bc32def48ac333f59e1d5b86b1c81d226ea1e",
+  "ciRun": 37244396784,
+  "attempt": 1,
+  "conclusion": "failure",
+  "buildJob": 111559292413,
+  "units": {
+    "xmlFiles": 47,
+    "tests": 422,
+    "failures": 3,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failures": [
+    {
+      "suite": "io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "test": "unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot",
+      "message": "java.lang.AssertionError",
+      "stack": "java.lang.AssertionError\n\tat org.junit.Assert.fail(Assert.java:87)\n\tat org.junit.Assert.assertTrue(Assert.java:42)\n\tat org.junit.Assert.assertTrue(Assert.java:53)\n\tat io.github.xgl34222220.hetu.ControllerReadStateTest$unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot$1.invokeSuspend(ControllerReadStateTest.kt:119)\n\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n\tat kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)\n\tat kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)\n\tat kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)\n\tat kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:22)\n\tat kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:20)\n\tat kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)\n\tat io.github.xgl34222220.hetu.ControllerReadStateTest.unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot(ControllerReadStateTest.kt:106)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:524)\n\tat org.robolectric.internal.SandboxTestRunner.executeInSandbox(SandboxTestRunner.java:494)\n\tat org.robolectric.internal.SandboxTestRunner.access$900(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$7.evaluate(SandboxTestRunner.java:442)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.robolectric.internal.SandboxTestRunner.access$600(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$6.evaluate(SandboxTestRunner.java:333)\n\tat org.robolectric.internal.SandboxTestRunner$3.evaluate(SandboxTestRunner.java:233)\n\tat org.robolectric.internal.SandboxTestRunner$5.lambda$evaluate$0(SandboxTestRunner.java:317)\n\tat org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:101)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n"
+    },
+    {
+      "suite": "io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "test": "cancellationDuringControllerReadPropagatesWithoutPublishingState",
+      "message": "java.lang.AssertionError",
+      "stack": "java.lang.AssertionError\n\tat org.junit.Assert.fail(Assert.java:87)\n\tat org.junit.Assert.assertTrue(Assert.java:42)\n\tat org.junit.Assert.assertTrue(Assert.java:53)\n\tat io.github.xgl34222220.hetu.ControllerReadStateTest$cancellationDuringControllerReadPropagatesWithoutPublishingState$1.invokeSuspend(ControllerReadStateTest.kt:219)\n\tat kotlin.coroutines.jvm.internal.BaseContinuationImpl.resumeWith(ContinuationImpl.kt:34)\n\tat kotlinx.coroutines.DispatchedTask.run(DispatchedTask.kt:100)\n\tat kotlinx.coroutines.EventLoopImplBase.processNextEvent(EventLoop.common.kt:256)\n\tat kotlinx.coroutines.BlockingCoroutine.joinBlocking(Builders.kt:54)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlockingImpl(Builders.kt:30)\n\tat kotlinx.coroutines.BuildersKt.runBlockingImpl(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__Builders_concurrentKt.runBlockingK(Builders.concurrent.kt:172)\n\tat kotlinx.coroutines.BuildersKt.runBlockingK(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking(Builders.kt:22)\n\tat kotlinx.coroutines.BuildersKt.runBlocking(Unknown Source)\n\tat kotlinx.coroutines.BuildersKt__BuildersKt.runBlocking$default(Builders.kt:20)\n\tat kotlinx.coroutines.BuildersKt.runBlocking$default(Unknown Source)\n\tat io.github.xgl34222220.hetu.ControllerReadStateTest.cancellationDuringControllerReadPropagatesWithoutPublishingState(ControllerReadStateTest.kt:205)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:524)\n\tat org.robolectric.internal.SandboxTestRunner.executeInSandbox(SandboxTestRunner.java:494)\n\tat org.robolectric.internal.SandboxTestRunner.access$900(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$7.evaluate(SandboxTestRunner.java:442)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.robolectric.internal.SandboxTestRunner.access$600(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$6.evaluate(SandboxTestRunner.java:333)\n\tat org.robolectric.internal.SandboxTestRunner$3.evaluate(SandboxTestRunner.java:233)\n\tat org.robolectric.internal.SandboxTestRunner$5.lambda$evaluate$0(SandboxTestRunner.java:317)\n\tat org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:101)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n"
+    },
+    {
+      "suite": "io.github.xgl34222220.hetu.PanelActionSafetyTest",
+      "test": "stopDuringHistorySuspensionCannotPersistOldRunningSnapshot",
+      "message": "java.lang.AssertionError: History record suspended",
+      "stack": "java.lang.AssertionError: History record suspended\n\tat org.junit.Assert.fail(Assert.java:89)\n\tat org.junit.Assert.assertTrue(Assert.java:42)\n\tat io.github.xgl34222220.hetu.PanelActionSafetyTest.eventually(PanelActionSafetyTest.kt:126)\n\tat io.github.xgl34222220.hetu.PanelActionSafetyTest.stopDuringHistorySuspensionCannotPersistOldRunningSnapshot(PanelActionSafetyTest.kt:455)\n\tat java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103)\n\tat java.base/java.lang.reflect.Method.invoke(Method.java:580)\n\tat org.junit.runners.model.FrameworkMethod$1.runReflectiveCall(FrameworkMethod.java:59)\n\tat org.junit.internal.runners.model.ReflectiveCallable.run(ReflectiveCallable.java:12)\n\tat org.junit.runners.model.FrameworkMethod.invokeExplosively(FrameworkMethod.java:56)\n\tat org.junit.internal.runners.statements.InvokeMethod.evaluate(InvokeMethod.java:17)\n\tat org.junit.internal.runners.statements.RunBefores.evaluate(RunBefores.java:26)\n\tat org.junit.internal.runners.statements.RunAfters.evaluate(RunAfters.java:27)\n\tat org.junit.runners.ParentRunner$3.evaluate(ParentRunner.java:306)\n\tat org.robolectric.RobolectricTestRunner$HelperTestRunner$1.evaluate(RobolectricTestRunner.java:524)\n\tat org.robolectric.internal.SandboxTestRunner.executeInSandbox(SandboxTestRunner.java:494)\n\tat org.robolectric.internal.SandboxTestRunner.access$900(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$7.evaluate(SandboxTestRunner.java:442)\n\tat org.junit.runners.BlockJUnit4ClassRunner$1.evaluate(BlockJUnit4ClassRunner.java:100)\n\tat org.junit.runners.ParentRunner.runLeaf(ParentRunner.java:366)\n\tat org.junit.runners.BlockJUnit4ClassRunner.runChild(BlockJUnit4ClassRunner.java:103)\n\tat org.robolectric.internal.SandboxTestRunner.access$600(SandboxTestRunner.java:67)\n\tat org.robolectric.internal.SandboxTestRunner$6.evaluate(SandboxTestRunner.java:333)\n\tat org.robolectric.internal.SandboxTestRunner$3.evaluate(SandboxTestRunner.java:233)\n\tat org.robolectric.internal.SandboxTestRunner$5.lambda$evaluate$0(SandboxTestRunner.java:317)\n\tat org.robolectric.internal.bytecode.Sandbox.lambda$runOnMainThread$0(Sandbox.java:101)\n\tat java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor.runWorker(ThreadPoolExecutor.java:1144)\n\tat java.base/java.util.concurrent.ThreadPoolExecutor$Worker.run(ThreadPoolExecutor.java:642)\n\tat java.base/java.lang.Thread.run(Thread.java:1583)\n"
+    }
+  ],
+  "productionApkCompilation": "success",
+  "runtimePayloadAbiAndIconGates": "success",
+  "lintExecuted": false,
+  "apkSignerGateExecuted": false,
+  "api35Installation": "skipped",
+  "api36Installation": "skipped",
+  "historicalCrashJob": {
+    "id": 111559292579,
+    "conclusion": "success"
+  },
+  "verificationArtifact": {
+    "id": 11318881293,
+    "bytes": 12142928,
+    "zipSha256": "ce0fd2c20c0d8b5afa2b6feec90be53aa4bd1517f505c7e9c91e7f8054a952a9"
+  },
+  "corrections": [
+    "Explicitly reset the test-only HistoryAudit sample list before each method; retain no-history-on401 assertions.",
+    "Wait until the fixture dispatcher enters the blocked real controller read, cancel, and assert no state published plus CancellationException completion.",
+    "Make original test-only HistoryRecord pause/pending volatile for cross-thread visibility; preserve original predicates and add only failure-state/request-path diagnostics. This is a fixture synchronization hypothesis, not a proven production-state defect."
+  ],
+  "originalActionSafetyAssertionsPreserved": true,
+  "productionInputsUnchangedByThisCorrection": true,
+  "failureEvidenceRetained": true,
+  "phoneCredentialRecoveryClaimed": false
+}

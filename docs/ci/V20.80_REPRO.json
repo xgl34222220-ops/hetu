@@ -1,0 +1,28 @@
+{
+  "after": {
+    "attempts": 3000,
+    "storageLimitBytes": 8192,
+    "storedBytes": 8112,
+    "dropped": 2952,
+    "fullStatusVisible": true,
+    "sensitiveStoredMetadataCopied": false,
+    "oversizedHealthEventBytes": 219,
+    "viewTruncationVisible": true,
+    "sourceSha256": "83980b0576665cbcc8d0583758f4d911c3356aed7db8bf37e6ff0d2df2d87b51",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  },
+  "before": {
+    "attempts": 3000,
+    "storageLimitBytes": 8192,
+    "storedBytes": 507000,
+    "dropped": 0,
+    "fullStatusVisible": false,
+    "sensitiveStoredMetadataCopied": true,
+    "oversizedHealthEventBytes": 200192,
+    "viewTruncationVisible": false,
+    "sourceSha256": "8c8fcf2f77897e079c3ca2cd395fe2b3a0b3cf4fdce16931f3d7bc87e961cf9c",
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false
+  }
+}

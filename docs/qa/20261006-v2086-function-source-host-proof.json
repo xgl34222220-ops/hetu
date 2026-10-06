@@ -1,0 +1,491 @@
+{
+  "schema": 1,
+  "scope": "local source reconstruction and host fixtures only",
+  "createdUtc": "2026-10-05T21:30:18.456732+00:00",
+  "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+  "baseAndroidAppTree": "c5f2c1a9e070fe4c6e1940b5d6729ccc4810fdaa",
+  "versionCode": 2086,
+  "versionName": "0.12.16-v20-fix",
+  "patchSha256": "2a394afc8381d8390d34e0c29c150a5850d11299fb28b3bc41ba3c70135f6b62",
+  "inputsSha256": "c1318f0e829e473851a81fa471799bf2ac2ac88a732c87a153038ef636b41252",
+  "changedOrAddedFiles": {
+    "android-app/app/build.gradle.kts": "ec2160fec32c7de63290b8750fc170a35db2e303388866a463cc5cdc93bf64b5",
+    "android-app/app/src/main/assets/hetu-root.sh": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "b6e579759a02e68cb1408d5117911d375f77a9550634e9c4399d5d7a86a9ea8a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "08a6e7cc13d9cbe7dc3abe56400ad8a30487088a6a059058baf151789cfd0f45",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "b8a08a67c15b723b8bd67cb443931f9aad2a675a00f64af692596414dfd70440",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java": "9e4a1302e87ef51d91f76ebbcddf514aeed477549b159c1e841eee5135001dd6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "5cc5f89b6de5a7d1b5aca2fa970457916b5fc521c808dd7a05342b23217e68b2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "73b437aa72e5b79ba720dc8b4f995590aaf13080b6985b13053144f65e8e3133",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "04c5aeb43281ee8cbf2a75d35f154e2b5550a495eef14b0134a46ec8d4b00a25",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "9cdc0ada46ab36d708141e96e3cd2c35ec6c98eb39f3df81013173b9963aab8d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java": "5f7955eaee7c46899b5401d4ceae103dfab6640c30a10eba73418621648294e6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "a2bab35172eba9d98299b5160f3e6c5c7bb70e6a67e8dd1d2781ea4b7ea97809",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "5f0aa06577d14a80a2225680aeda1aee17e73d7b6efa1b1e7bf39c120b6a02f6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java": "52969bec08c3bbb2daeaaad9bbc306974878cfe23e14c852c224be1bc40b27fa",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java": "992722b4531ca1ebab5d54f339eccf66d05402a2a16ff16a0af7a3b14a22499b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "2977c5a6f8e2e3cab2db1c4b2f41ddd9d5b500252bd4b558b71f77af978b3402"
+  },
+  "frozenInputs": 370,
+  "requiredEffectiveInputs": 386,
+  "locallyVerifiedInputs": 382,
+  "locallyMissingUnchangedPayloadFiles": {
+    "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+    "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+    "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+    "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
+  },
+  "completeEffectiveSourceVerified": false,
+  "full386InputRebuildRequiredInCI": true,
+  "originalAndroidTestCasesPreserved": 487,
+  "originalTestXmlFilesPreserved": 51,
+  "newAndroidTestsExpected": 55,
+  "expectedAndroidUnitTests": 542,
+  "expectedAndroidTestXmlFiles": 56,
+  "newAndroidTestPlan": {
+    "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt",
+      "tests": 4
+    },
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+      "tests": 10
+    },
+    "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",
+      "tests": 12
+    },
+    "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
+      "tests": 13
+    },
+    "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+      "tests": 16
+    }
+  },
+  "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+  "runtimePayloadCountRequiredInCI": 23,
+  "androidUnitTestsExecuted": false,
+  "apkBuilt": false,
+  "lintExecuted": false,
+  "apkRuntimePayloadsVerified": false,
+  "deviceValidationExecuted": false,
+  "googleAccountAuthenticationValidated": false,
+  "checks": [
+    {
+      "name": "function_scope",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_source_scope.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.137,
+      "unittestCounts": [
+        11
+      ],
+      "logSha256": "14ab6dd82dc527d0ca3b03e32bae77e725b83bf73ed38854074906159012c296",
+      "output": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.086s\n\nOK\n"
+    },
+    {
+      "name": "function_results",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_test_results.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.156,
+      "unittestCounts": [
+        5
+      ],
+      "logSha256": "2ac3d3a59044238aedfa9953328bdc4aa82ab4003d939fa8621c26bda967731f",
+      "output": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.101s\n\nOK\n"
+    },
+    {
+      "name": "function_workflow",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_workflow.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.047,
+      "unittestCounts": [
+        4
+      ],
+      "logSha256": "56e03afda220e7ba78bbcecf9a2e53a0149cfc3e311fa10bbd01b25e8e5ba671",
+      "output": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.003s\n\nOK\n"
+    },
+    {
+      "name": "original_five_source_gates",
+      "command": [
+        "python",
+        ".github/scripts/run_functionfix_baseline_hosts.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.382,
+      "unittestCounts": [
+        5,
+        6,
+        18,
+        8,
+        10
+      ],
+      "logSha256": "e703efe181031f4dc14038425d1429335a495cc31fdf9fda090d0e5faf160d64",
+      "output": "{\"baselineInputs\": 379, \"locallyVerifiedBaselineInputs\": 375, \"missingUnchangedPayloadFiles\": [\"android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo\", \"android-app/app/src/main/assets/mihomo-root/x86_64/mihomo\", \"android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so\", \"android-app/app/src/main/jniLibs/x86_64/libhetu_core.so\"], \"exactFunctionPatchReversed\": true, \"currentCheckoutUnmodified\": true}\ntest_current_ui_packages_and_named_bridges_are_allowed (__main__.PresentationScope.test_current_ui_packages_and_named_bridges_are_allowed) ... ok\ntest_only_expected_version_change_is_allowed_in_build_inputs (__main__.PresentationScope.test_only_expected_version_change_is_allowed_in_build_inputs) ... ok\ntest_path_traversal_is_rejected_even_with_allowed_ui_prefix (__main__.PresentationScope.test_path_traversal_is_rejected_even_with_allowed_ui_prefix) ... ok\ntest_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch (__main__.PresentationScope.test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch) ... ok\ntest_unlisted_root_package_bridge_is_rejected (__main__.PresentationScope.test_unlisted_root_package_bridge_is_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nOK\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.003s\n\nOK\n..................\n----------------------------------------------------------------------\nRan 18 tests in 1.206s\n\nOK\n........\n----------------------------------------------------------------------\nRan 8 tests in 0.016s\n\nOK\ntest_exact_authentication_production_files_are_allowed (__main__.AuthenticationScope.test_exact_authentication_production_files_are_allowed) ... ok\ntest_existing_ui_boundary_still_rejects_authentication_runtime (__main__.AuthenticationScope.test_existing_ui_boundary_still_rejects_authentication_runtime) ... ok\ntest_history_fixture_can_only_add_cross_thread_visibility_and_audit (__main__.AuthenticationScope.test_history_fixture_can_only_add_cross_thread_visibility_and_audit) ... ok\ntest_manifest_requires_fixed_provenance_and_preserves_the_baseline (__main__.AuthenticationScope.test_manifest_requires_fixed_provenance_and_preserves_the_baseline) ... ok\ntest_old_action_safety_assertion_can_only_gain_failure_details (__main__.AuthenticationScope.test_old_action_safety_assertion_can_only_gain_failure_details) ... ok\ntest_only_the_named_authentication_tests_are_allowed (__main__.AuthenticationScope.test_only_the_named_authentication_tests_are_allowed) ... ok\ntest_only_the_new_version_can_change_in_build_inputs (__main__.AuthenticationScope.test_only_the_new_version_can_change_in_build_inputs) ... ok\ntest_path_traversal_is_rejected (__main__.AuthenticationScope.test_path_traversal_is_rejected) ... ok\ntest_runtime_assets_manager_manifest_and_dependencies_stay_protected (__main__.AuthenticationScope.test_runtime_assets_manager_manifest_and_dependencies_stay_protected) ... ok\ntest_unrelated_presentation_sources_are_not_authorized (__main__.AuthenticationScope.test_unrelated_presentation_sources_are_not_authorized) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "name": "intake_evidence",
+      "command": [
+        "python",
+        ".github/scripts/test_tools_intake_test_results.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.13,
+      "unittestCounts": [
+        5
+      ],
+      "logSha256": "8ef079b682444e8f7da7dd10296d4c52972a359c6fb98513ec2584e9610cca24",
+      "output": "test_all_original_and_intake_suites_are_required (__main__.ToolsIntakeEvidence.test_all_original_and_intake_suites_are_required) ... ok\ntest_duplicate_intake_suite_is_rejected (__main__.ToolsIntakeEvidence.test_duplicate_intake_suite_is_rejected) ... ok\ntest_failures_errors_and_skips_in_each_new_suite_are_rejected (__main__.ToolsIntakeEvidence.test_failures_errors_and_skips_in_each_new_suite_are_rejected) ... ok\ntest_missing_suite_cannot_be_replaced_with_more_tests_in_another (__main__.ToolsIntakeEvidence.test_missing_suite_cannot_be_replaced_with_more_tests_in_another) ... ok\ntest_new_tests_cannot_replace_existing_tests (__main__.ToolsIntakeEvidence.test_new_tests_cannot_replace_existing_tests) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.072s\n\nOK\n"
+    },
+    {
+      "name": "auth_evidence",
+      "command": [
+        "python",
+        ".github/scripts/test_auth_test_results.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.076,
+      "unittestCounts": [
+        6
+      ],
+      "logSha256": "61405d9dc935103332f2c7c1d5d40ba47657775eacdbd1e8f0458f26b84f0715",
+      "output": "test_baseline_xml_inventory_cannot_be_reduced (__main__.AuthenticationEvidence.test_baseline_xml_inventory_cannot_be_reduced) ... ok\ntest_exact_baseline_and_all_authentication_suites_pass (__main__.AuthenticationEvidence.test_exact_baseline_and_all_authentication_suites_pass) ... ok\ntest_failures_errors_and_skips_are_rejected_in_both_buckets (__main__.AuthenticationEvidence.test_failures_errors_and_skips_are_rejected_in_both_buckets) ... ok\ntest_incorrect_declared_total_is_rejected (__main__.AuthenticationEvidence.test_incorrect_declared_total_is_rejected) ... ok\ntest_missing_authentication_suite_is_rejected (__main__.AuthenticationEvidence.test_missing_authentication_suite_is_rejected) ... ok\ntest_same_total_cannot_substitute_new_tests_for_old_tests (__main__.AuthenticationEvidence.test_same_total_cannot_substitute_new_tests_for_old_tests) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.032s\n\nOK\n"
+    },
+    {
+      "name": "native_scroll",
+      "command": [
+        "python",
+        ".github/scripts/test_native_scroll_bounds.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.146,
+      "unittestCounts": [
+        13
+      ],
+      "logSha256": "62202e610e6c5ed7ea5172bc76cd1b7d4171740df692e5f5ae76611c8674d555",
+      "output": "test_another_application_cannot_receive_the_swipe (__main__.NativeScrollBounds.test_another_application_cannot_receive_the_swipe) ... ok\ntest_invalid_empty_negative_and_disabled_viewports_are_rejected (__main__.NativeScrollBounds.test_invalid_empty_negative_and_disabled_viewports_are_rejected) ... ok\ntest_missing_target_on_a_fitted_page_fails_without_a_blind_swipe_or_tap (__main__.NativeScrollBounds.test_missing_target_on_a_fitted_page_fails_without_a_blind_swipe_or_tap) ... ok\ntest_observed_dock_clearance_keeps_the_physical_swipe_inside_the_viewport (__main__.NativeScrollBounds.test_observed_dock_clearance_keeps_the_physical_swipe_inside_the_viewport) ... ok\ntest_observed_settings_dock_clips_the_full_and_navigation_inset_viewports (__main__.NativeScrollBounds.test_observed_settings_dock_clips_the_full_and_navigation_inset_viewports) ... ok\ntest_reverse_swipe_stays_inside_an_offset_viewport (__main__.NativeScrollBounds.test_reverse_swipe_stays_inside_an_offset_viewport) ... ok\ntest_smoke_scrolls_about_above_the_actual_dock_before_physically_tapping (__main__.NativeScrollBounds.test_smoke_scrolls_about_above_the_actual_dock_before_physically_tapping) ... ok\ntest_target_edges_follow_the_actual_viewport_and_reverse_at_the_header (__main__.NativeScrollBounds.test_target_edges_follow_the_actual_viewport_and_reverse_at_the_header) ... ok\ntest_tools_clearance_and_child_pages_without_a_dock_keep_their_bounds (__main__.NativeScrollBounds.test_tools_clearance_and_child_pages_without_a_dock_keep_their_bounds) ... ok\ntest_two_independent_scrollviews_are_rejected (__main__.NativeScrollBounds.test_two_independent_scrollviews_are_rejected) ... ok\ntest_two_native_dock_groups_are_rejected (__main__.NativeScrollBounds.test_two_native_dock_groups_are_rejected) ... ok\ntest_unmoving_target_under_the_dock_exhausts_seven_attempts_without_tapping_home (__main__.NativeScrollBounds.test_unmoving_target_under_the_dock_exhausts_seven_attempts_without_tapping_home) ... ok\ntest_visible_target_on_a_fitted_page_receives_the_original_physical_tap (__main__.NativeScrollBounds.test_visible_target_on_a_fitted_page_receives_the_original_physical_tap) ... ok\n\n----------------------------------------------------------------------\nRan 13 tests in 0.078s\n\nOK\n"
+    },
+    {
+      "name": "mock_controller",
+      "command": [
+        "python",
+        ".github/scripts/test_mock_webview_controller.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.114,
+      "unittestCounts": [
+        5
+      ],
+      "logSha256": "2ca6d3c31424f028c44acfae8916986449ac4ab041a9562ff8d036780c0b3936",
+      "output": ".....\n----------------------------------------------------------------------\nRan 5 tests in 2.025s\n\nOK\n"
+    },
+    {
+      "name": "panel_auth",
+      "command": [
+        "python",
+        ".github/scripts/test_panel_auth_smoke.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.34,
+      "unittestCounts": [
+        18
+      ],
+      "logSha256": "e748d56a5f23073bc234cc0f5a677dd556cea9253e943b2da9fd3591fa3bee20",
+      "output": "..................\n----------------------------------------------------------------------\nRan 18 tests in 0.268s\n\nOK\n"
+    },
+    {
+      "name": "native_webview",
+      "command": [
+        "python",
+        ".github/scripts/test_native_webview_bounds.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.039,
+      "unittestCounts": [
+        6
+      ],
+      "logSha256": "1e65a4a9ef51a1da3c84741d4e6951d3b82a09a6e9d97c26d391846dde175b9f",
+      "output": "test_empty_surface_cannot_receive_a_tap (__main__.NativeWebViewBounds.test_empty_surface_cannot_receive_a_tap) ... ok\ntest_negative_bounds_are_not_silently_converted_to_positive (__main__.NativeWebViewBounds.test_negative_bounds_are_not_silently_converted_to_positive) ... ok\ntest_observed_nested_document_is_not_a_second_native_container (__main__.NativeWebViewBounds.test_observed_nested_document_is_not_a_second_native_container) ... ok\ntest_other_application_surface_cannot_be_selected (__main__.NativeWebViewBounds.test_other_application_surface_cannot_be_selected) ... ok\ntest_single_native_container_keeps_original_bounds (__main__.NativeWebViewBounds.test_single_native_container_keeps_original_bounds) ... ok\ntest_two_independent_containers_are_still_rejected (__main__.NativeWebViewBounds.test_two_independent_containers_are_still_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 6 tests in 0.001s\n\nOK\n"
+    },
+    {
+      "name": "root_health",
+      "command": [
+        "python",
+        "tools/qa/test_root_health.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 13.448,
+      "unittestCounts": [
+        26
+      ],
+      "logSha256": "b724dab2495aa5521653f745d1ee3fa90a7dc2edb7e56aa8e2d0904e7914d04b",
+      "output": "test_core_birth_change_during_validation_refuses_publication (__main__.RootHealth.test_core_birth_change_during_validation_refuses_publication) ... ok\ntest_core_identity_failure_is_degraded_despite_reachable_listener_fixture (__main__.RootHealth.test_core_identity_failure_is_degraded_despite_reachable_listener_fixture) ... ok\ntest_corrupt_legacy_snapshot_is_never_accepted (__main__.RootHealth.test_corrupt_legacy_snapshot_is_never_accepted) ... ok\ntest_failed_metadata_publish_restores_original_manifest (__main__.RootHealth.test_failed_metadata_publish_restores_original_manifest) ... ok\ntest_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules (__main__.RootHealth.test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules) ... ok\ntest_missing_listener_stays_degraded_and_is_not_hidden (__main__.RootHealth.test_missing_listener_stays_degraded_and_is_not_hidden) ... ok\ntest_missing_manifest_is_not_reconstructed_from_reachable_sockets (__main__.RootHealth.test_missing_manifest_is_not_reconstructed_from_reachable_sockets) ... ok\ntest_missing_owned_chain_and_duplicate_hook_are_repaired (__main__.RootHealth.test_missing_owned_chain_and_duplicate_hook_are_repaired) ... ok\ntest_missing_route_and_policy_rule_are_detected_and_repaired (__main__.RootHealth.test_missing_route_and_policy_rule_are_detected_and_repaired) ... ok\ntest_other_owner_at_priority_does_not_get_overwritten (__main__.RootHealth.test_other_owner_at_priority_does_not_get_overwritten) ... ok\ntest_other_session_difference_is_not_a_known_tail_migration (__main__.RootHealth.test_other_session_difference_is_not_a_known_tail_migration) ... ok\ntest_pid_tampering_still_invalidates_manifest (__main__.RootHealth.test_pid_tampering_still_invalidates_manifest) ... ok\ntest_previous_ordering_reproduces_reported_metadata_fault (__main__.RootHealth.test_previous_ordering_reproduces_reported_metadata_fault) ... ok\ntest_production_entry_refuses_an_unauthorized_root_identity (__main__.RootHealth.test_production_entry_refuses_an_unauthorized_root_identity) ... ok\ntest_real_start_google_disabled_has_complete_healthy_baseline (__main__.RootHealth.test_real_start_google_disabled_has_complete_healthy_baseline) ... ok\ntest_real_start_google_enabled_keeps_baseline_and_runs_cleanup (__main__.RootHealth.test_real_start_google_enabled_keeps_baseline_and_runs_cleanup) ... ok\ntest_reused_shell_pid_cannot_overwrite_an_older_repair_backup (__main__.RootHealth.test_reused_shell_pid_cannot_overwrite_an_older_repair_backup) ... ok\ntest_session_tampering_still_invalidates_manifest (__main__.RootHealth.test_session_tampering_still_invalidates_manifest) ... ok\ntest_snapshot_tampering_still_invalidates_checksum (__main__.RootHealth.test_snapshot_tampering_still_invalidates_checksum) ... ok\ntest_transaction_in_progress_is_unknown_and_read_only (__main__.RootHealth.test_transaction_in_progress_is_unknown_and_read_only) ... ok\ntest_unknown_table_read_does_not_mutate_network (__main__.RootHealth.test_unknown_table_read_does_not_mutate_network) ... ok\ntest_upgrade_with_missing_dns_listener_cannot_become_healthy (__main__.RootHealth.test_upgrade_with_missing_dns_listener_cannot_become_healthy) ... ok\ntest_upgrade_with_missing_route_is_reported_and_refuses_rebaselining (__main__.RootHealth.test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining) ... ok\ntest_upgrade_with_unknown_read_refuses_metadata_and_network_changes (__main__.RootHealth.test_upgrade_with_unknown_read_refuses_metadata_and_network_changes) ... ok\ntest_watchdog_missing_is_degraded_and_does_not_trigger_network_repair (__main__.RootHealth.test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair) ... ok\ntest_watchdog_pid_for_an_unrelated_live_process_is_not_accepted (__main__.RootHealth.test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted) ... ok\n\n----------------------------------------------------------------------\nRan 26 tests in 13.395s\n\nOK\n"
+    },
+    {
+      "name": "root_autostart",
+      "command": [
+        "python",
+        "tools/qa/test_root_autostart.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.68,
+      "unittestCounts": [
+        17
+      ],
+      "logSha256": "2e8261d3de4f2b2bcbfb6a2ff0440cef2b77e0e5b4f2b59d0631cda66830459f",
+      "output": "test_active_duplicate_worker_cannot_remove_its_lock (__main__.BootWorker.test_active_duplicate_worker_cannot_remove_its_lock) ... ok\ntest_app_launch_denial_does_not_undo_native_start (__main__.BootWorker.test_app_launch_denial_does_not_undo_native_start) ... ok\ntest_delayed_system_and_network_still_restore_once (__main__.BootWorker.test_delayed_system_and_network_still_restore_once) ... ok\ntest_disable_during_wait_cancels (__main__.BootWorker.test_disable_during_wait_cancels) ... ok\ntest_disabled_never_starts (__main__.BootWorker.test_disabled_never_starts) ... ok\ntest_existing_core_is_adopted_without_restart (__main__.BootWorker.test_existing_core_is_adopted_without_restart) ... ok\ntest_failed_start_retries_then_succeeds (__main__.BootWorker.test_failed_start_retries_then_succeeds) ... ok\ntest_missing_plan_reports_failure (__main__.BootWorker.test_missing_plan_reports_failure) ... ok\ntest_network_wait_has_a_bound (__main__.BootWorker.test_network_wait_has_a_bound) ... ok\ntest_previous_boot_stop_does_not_block_new_boot (__main__.BootWorker.test_previous_boot_stop_does_not_block_new_boot) ... ok\ntest_stale_previous_boot_lock_does_not_block_restore (__main__.BootWorker.test_stale_previous_boot_lock_does_not_block_restore) ... ok\ntest_stop_during_network_wait_cancels_this_boot (__main__.BootWorker.test_stop_during_network_wait_cancels_this_boot) ... ok\ntest_native_guard_does_not_restart_a_winning_manual_start (__main__.NativeStartGuard.test_native_guard_does_not_restart_a_winning_manual_start) ... ok\ntest_native_guard_rechecks_disabled_setting (__main__.NativeStartGuard.test_native_guard_rechecks_disabled_setting) ... ok\ntest_native_guard_rechecks_explicit_stop_after_lock (__main__.NativeStartGuard.test_native_guard_rechecks_explicit_stop_after_lock) ... ok\ntest_native_guard_rejects_wrong_boot (__main__.NativeStartGuard.test_native_guard_rejects_wrong_boot) ... ok\ntest_normal_manual_start_is_not_subject_to_boot_guard (__main__.NativeStartGuard.test_normal_manual_start_is_not_subject_to_boot_guard) ... ok\n\n----------------------------------------------------------------------\nRan 17 tests in 2.634s\n\nOK\n"
+    },
+    {
+      "name": "google_firewall",
+      "command": [
+        "python",
+        "tools/qa/test_google_firewall.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 4.215,
+      "unittestCounts": [
+        17
+      ],
+      "logSha256": "6b944a674d4f876155b0b3c9a88945f0930c4969e44a95b2f70ab8dafcb25470",
+      "output": "test_both_families_google_reject_and_drop_removed_by_exact_spec (__main__.GoogleFirewall.test_both_families_google_reject_and_drop_removed_by_exact_spec) ... ok\ntest_changed_core_pid_never_changes_firewall (__main__.GoogleFirewall.test_changed_core_pid_never_changes_firewall) ... ok\ntest_current_uid_resolution_includes_work_profile_and_exact_package_names (__main__.GoogleFirewall.test_current_uid_resolution_includes_work_profile_and_exact_package_names) ... ok\ntest_disabled_session_never_enters_maintenance (__main__.GoogleFirewall.test_disabled_session_never_enters_maintenance) ... ok\ntest_failed_exact_delete_is_reported_without_flush_fallback (__main__.GoogleFirewall.test_failed_exact_delete_is_reported_without_flush_fallback) ... ok\ntest_failed_transaction_lock_never_changes_firewall (__main__.GoogleFirewall.test_failed_transaction_lock_never_changes_firewall) ... ok\ntest_globbing_state_and_wildcard_interface_are_preserved (__main__.GoogleFirewall.test_globbing_state_and_wildcard_interface_are_preserved) ... ok\ntest_healthy_hetu_rules_still_check_oem_google_rules (__main__.GoogleFirewall.test_healthy_hetu_rules_still_check_oem_google_rules) ... ok\ntest_no_google_packages_no_firewall_operation (__main__.GoogleFirewall.test_no_google_packages_no_firewall_operation) ... ok\ntest_older_oem_package_tool_fallback (__main__.GoogleFirewall.test_older_oem_package_tool_fallback) ... ok\ntest_repeated_cleanup_is_idempotent (__main__.GoogleFirewall.test_repeated_cleanup_is_idempotent) ... ok\ntest_sixty_second_rate_limit_and_oem_rule_reinsertion (__main__.GoogleFirewall.test_sixty_second_rate_limit_and_oem_rule_reinsertion) ... ok\ntest_start_protocol_accepts_legacy_and_supported_google_flag (__main__.GoogleFirewall.test_start_protocol_accepts_legacy_and_supported_google_flag) ... ok\ntest_start_protocol_rejects_invalid_flag_and_other_unsupported_controls (__main__.GoogleFirewall.test_start_protocol_rejects_invalid_flag_and_other_unsupported_controls) ... ok\ntest_uid_is_resolved_again_after_package_reinstall (__main__.GoogleFirewall.test_uid_is_resolved_again_after_package_reinstall) ... ok\ntest_unavailable_ipv6_is_nonfatal (__main__.GoogleFirewall.test_unavailable_ipv6_is_nonfatal) ... ok\ntest_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved (__main__.GoogleFirewall.test_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved) ... ok\n\n----------------------------------------------------------------------\nRan 17 tests in 4.170s\n\nOK\n"
+    },
+    {
+      "name": "fake_ip_private_routing",
+      "command": [
+        "python",
+        "tools/qa/test_fake_ip_private_routing.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.096,
+      "unittestCounts": [
+        16
+      ],
+      "logSha256": "63c0091ed9eca2319411a2d693e6bb01068574f8d87c0d7e6f623e32fb9e5228",
+      "output": "test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml (__main__.FakeIpPrivateRouting.test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml) ... ok\ntest_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain (__main__.FakeIpPrivateRouting.test_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain) ... ok\ntest_explicit_cidr_uid_gid_interface_mac_returns_keep_priority (__main__.FakeIpPrivateRouting.test_explicit_cidr_uid_gid_interface_mac_returns_keep_priority) ... ok\ntest_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain (__main__.FakeIpPrivateRouting.test_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain) ... ok\ntest_legacy_config_without_metadata_retains_original_private_returns (__main__.FakeIpPrivateRouting.test_legacy_config_without_metadata_retains_original_private_returns) ... ok\ntest_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block (__main__.FakeIpPrivateRouting.test_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block) ... ok\ntest_literal_cidr_validation_never_resolves_or_executes_metadata (__main__.FakeIpPrivateRouting.test_literal_cidr_validation_never_resolves_or_executes_metadata) ... ok\ntest_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls (__main__.FakeIpPrivateRouting.test_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls) ... ok\ntest_old_session_without_projection_remains_compatible (__main__.FakeIpPrivateRouting.test_old_session_without_projection_remains_compatible) ... ok\ntest_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect (__main__.FakeIpPrivateRouting.test_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect) ... ok\ntest_real_start_rejects_bad_policy_before_cleanup_or_core_launch (__main__.FakeIpPrivateRouting.test_real_start_rejects_bad_policy_before_cleanup_or_core_launch) ... ok\ntest_saved_policy_roundtrip_uses_immutable_health_checksum (__main__.FakeIpPrivateRouting.test_saved_policy_roundtrip_uses_immutable_health_checksum) ... ok\ntest_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses (__main__.FakeIpPrivateRouting.test_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses) ... ok\ntest_tampered_session_or_baseline_cannot_supply_watchdog_policy (__main__.FakeIpPrivateRouting.test_tampered_session_or_baseline_cannot_supply_watchdog_policy) ... ok\ntest_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect (__main__.FakeIpPrivateRouting.test_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect) ... ok\ntest_udp_quic_and_kill_guards_do_not_return_fake_destinations (__main__.FakeIpPrivateRouting.test_udp_quic_and_kill_guards_do_not_return_fake_destinations) ... ok\n\n----------------------------------------------------------------------\nRan 16 tests in 1.049s\n\nOK\n"
+    },
+    {
+      "name": "webview_js_syntax",
+      "command": [
+        "node",
+        "--check",
+        ".github/scripts/check_hetu_webview.cjs"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.053,
+      "unittestCounts": [],
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": ""
+    },
+    {
+      "name": "webui_concept",
+      "command": [
+        "node",
+        ".github/scripts/test_webui_concept.cjs"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.057,
+      "unittestCounts": [],
+      "logSha256": "a28e16de60020918309f3d8ef6bd467f526a0dae6c0f64009b72306029025ed4",
+      "output": "{\n  \"results\": [\n    {\n      \"name\": \"Overview generator renders four response-derived metrics and traffic\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Group names escape markup and use actual type/count/selection\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Dialog renderer escapes names, marks current radio, and cancellation sends no request\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Rejected PUT opens error notice and retains old selection; dismiss resets notice\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Successful authenticated PUT rereads controller and updates selected node\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Unconfirmed 204 cannot invent a successful selection\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Pending selection blocks repeated writes\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Connection generator preserves host/chain and separate directional counters\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Disconnected refresh and tab changes cannot fabricate zero metrics or stale connected state\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"A successful retry restores real cached data\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Missing and invalid traffic remain unknown while actual zero stays zero\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Every API call retains bearer secret and only existing loopback relative endpoints are used\",\n      \"result\": \"passed\"\n    },\n    {\n      \"name\": \"Background polling is paused when the document is hidden\",\n      \"result\": \"passed\"\n    }\n  ],\n  \"passed\": 13,\n  \"putCount\": 3,\n  \"requestCount\": 18,\n  \"fixtureOnly\": true,\n  \"testKind\": \"Isolated Node VM with minimal DOM and intercepted API fixture\",\n  \"limitations\": \"Logic/generator checks only. Chromium launch blocked by environment socket restriction; no rendered browser screenshots and no Android WebView/Mihomo device validation.\"\n}\n"
+    },
+    {
+      "name": "current_network_recovery",
+      "command": [
+        "python",
+        "tools/qa/test_network_recovery_stress.py",
+        "--output",
+        "/workspace/scratch/ffcd4c4ec4d2/functionfix-host-check/network-recovery-current.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.681,
+      "unittestCounts": [],
+      "logSha256": "d1f10fae27f406f272ea014901243be16c3a8bd14a07de34a38b90952b4f1edf",
+      "output": "{\"after\": {\"cycles\": 512, \"maxQueuedRecoveries\": 1, \"drainedAttempts\": 1, \"latestExecuted\": 1, \"cancelledWantedExecuted\": 0, \"eventDuringAttemptPreserved\": true, \"cancelledTimersRetained\": 0, \"sourceSha256\": \"30d5420d27203151c7c27b5e192a54d0c5c9de31b3a91ce7ed9bec16851a8e5e\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n"
+    },
+    {
+      "name": "current_network_journal",
+      "command": [
+        "python",
+        "tools/qa/test_network_journal_stress.py",
+        "--output",
+        "/workspace/scratch/ffcd4c4ec4d2/functionfix-host-check/network-journal-current.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.227,
+      "unittestCounts": [],
+      "logSha256": "069c58411a86da1c79b48964af7ebe2e28eba4052081e9870c831f801af1569a",
+      "output": "{\"after\": {\"attempts\": 3000, \"storageLimitBytes\": 8192, \"storedBytes\": 8160, \"dropped\": 2952, \"fullStatusVisible\": true, \"sensitiveStoredMetadataCopied\": false, \"oversizedHealthEventBytes\": 220, \"viewTruncationVisible\": true, \"sourceSha256\": \"7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n"
+    },
+    {
+      "name": "current_journal_symbols",
+      "command": [
+        "python",
+        "tools/qa/test_network_journal_symbols.py",
+        "--output",
+        "/workspace/scratch/ffcd4c4ec4d2/functionfix-host-check/network-journal-symbols-current.json"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 1.118,
+      "unittestCounts": [],
+      "logSha256": "2ba382b3a0e54e89028ad0eab03f2c76e01bb8c2ceef793d93f1b3a0ba5496d4",
+      "output": "{\"after\": {\"captured\": [\"example.Worker.toDynamicScheme-Iv8Zu3U:41\", \"example.Worker.<init>:41\", \"example.Worker.<clinit>:41\"], \"copied\": [\"example.Worker.toDynamicScheme-Iv8Zu3U:41\", \"example.Worker.<init>:41\", \"example.Worker.<clinit>:41\"], \"hostileSymbolsRejected\": 5, \"privateMessageOrFileCopied\": false, \"sourceSha256\": \"7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621\", \"fixtureOnly\": true, \"deviceOrNetworkAccess\": false}}\n"
+    },
+    {
+      "name": "git_diff_whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.008,
+      "unittestCounts": [],
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": ""
+    },
+    {
+      "name": "python_yaml_shell_syntax",
+      "command": [
+        "python",
+        "-c",
+        "from pathlib import Path\nimport py_compile, subprocess, yaml\nfiles=list(Path('.github/scripts').glob('*functionfix*.py'))+[Path('.github/scripts/prepare_new_ui_source.py')]\nfor path in files: py_compile.compile(str(path),doraise=True)\nworkflow=yaml.safe_load(Path('.github/workflows/ui-v76-build.yml').read_text())\nassert workflow['concurrency']['cancel-in-progress'] is False\ncount=0\nfor job in workflow['jobs'].values():\n for step in job.get('steps',[]):\n  if 'run' in step:\n   subprocess.run(['bash','-n'],input=step['run'],text=True,check=True)\n   count+=1\nfor name in ('hetu-root.sh','hetu-autostart.sh'):\n subprocess.run(['sh','-n','android-app/app/src/main/assets/'+name],check=True)\nprint('Python files:',len(files),'workflow bash snippets:',count,'root/autostart sh syntax: OK')\n"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.125,
+      "unittestCounts": [],
+      "logSha256": "ec80c488e356422e7dfa5b74a6892ed32cc98d396ab656c4688293a04de43b02",
+      "output": "Python files: 9 workflow bash snippets: 31 root/autostart sh syntax: OK\n"
+    },
+    {
+      "name": "final_git_diff_whitespace",
+      "command": [
+        "git",
+        "diff",
+        "--check"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.009,
+      "unittestCounts": [],
+      "logSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "output": ""
+    }
+  ],
+  "notExecutedLocally": [
+    "Full386 effective source reconstruction including four unchanged ignored native payloads; CI must restore real bytes and compare every file",
+    "Android Gradle build, 542 unit tests / 56 XML, lint, APK 23 payloads / ABI / signing, isolated API35/API36 installation and interaction",
+    "Historical network/filter before-after archived fixture comparisons; current-source network host fixtures are separate checks",
+    "Browser Playwright execution (CI provisioned dependency); local node syntax and pure concept fixture checked separately"
+  ],
+  "allExecutedHostCommandsPassed": true,
+  "supersededPassingChecks": [
+    {
+      "name": "function_scope",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_source_scope.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.141,
+      "unittestCounts": [
+        11
+      ],
+      "logSha256": "47d6ad1719dcc615c8a045e73a56c7b1e582b15b434fd3c18b49aa5e059921b7",
+      "output": "...........\n----------------------------------------------------------------------\nRan 11 tests in 0.085s\n\nOK\n"
+    },
+    {
+      "name": "function_results",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_test_results.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.145,
+      "unittestCounts": [
+        5
+      ],
+      "logSha256": "0128ed60920a973c6da15388f7c6d038d3293a04af11a1c77a8ce3cfc8328f5a",
+      "output": ".....\n----------------------------------------------------------------------\nRan 5 tests in 0.099s\n\nOK\n"
+    },
+    {
+      "name": "function_workflow",
+      "command": [
+        "python",
+        ".github/scripts/test_functionfix_workflow.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 0.045,
+      "unittestCounts": [
+        4
+      ],
+      "logSha256": "56e03afda220e7ba78bbcecf9a2e53a0149cfc3e311fa10bbd01b25e8e5ba671",
+      "output": "....\n----------------------------------------------------------------------\nRan 4 tests in 0.003s\n\nOK\n"
+    },
+    {
+      "name": "original_five_source_gates",
+      "command": [
+        "python",
+        ".github/scripts/run_functionfix_baseline_hosts.py"
+      ],
+      "exitCode": 0,
+      "durationSeconds": 2.222,
+      "unittestCounts": [
+        5,
+        6,
+        18,
+        8,
+        10
+      ],
+      "logSha256": "2c61b6c15e8404c4d714e5bbb788dd4ce9eba3ba8f0a82e540a45d000ad28d2a",
+      "output": "{\"baselineInputs\": 379, \"locallyVerifiedBaselineInputs\": 375, \"missingUnchangedPayloadFiles\": [\"android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo\", \"android-app/app/src/main/assets/mihomo-root/x86_64/mihomo\", \"android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so\", \"android-app/app/src/main/jniLibs/x86_64/libhetu_core.so\"], \"exactFunctionPatchReversed\": true, \"currentCheckoutUnmodified\": true}\ntest_current_ui_packages_and_named_bridges_are_allowed (__main__.PresentationScope.test_current_ui_packages_and_named_bridges_are_allowed) ... ok\ntest_only_expected_version_change_is_allowed_in_build_inputs (__main__.PresentationScope.test_only_expected_version_change_is_allowed_in_build_inputs) ... ok\ntest_path_traversal_is_rejected_even_with_allowed_ui_prefix (__main__.PresentationScope.test_path_traversal_is_rejected_even_with_allowed_ui_prefix) ... ok\ntest_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch (__main__.PresentationScope.test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch) ... ok\ntest_unlisted_root_package_bridge_is_rejected (__main__.PresentationScope.test_unlisted_root_package_bridge_is_rejected) ... ok\n\n----------------------------------------------------------------------\nRan 5 tests in 0.000s\n\nOK\n......\n----------------------------------------------------------------------\nRan 6 tests in 0.003s\n\nOK\n..................\n----------------------------------------------------------------------\nRan 18 tests in 1.148s\n\nOK\n........\n----------------------------------------------------------------------\nRan 8 tests in 0.014s\n\nOK\ntest_exact_authentication_production_files_are_allowed (__main__.AuthenticationScope.test_exact_authentication_production_files_are_allowed) ... ok\ntest_existing_ui_boundary_still_rejects_authentication_runtime (__main__.AuthenticationScope.test_existing_ui_boundary_still_rejects_authentication_runtime) ... ok\ntest_history_fixture_can_only_add_cross_thread_visibility_and_audit (__main__.AuthenticationScope.test_history_fixture_can_only_add_cross_thread_visibility_and_audit) ... ok\ntest_manifest_requires_fixed_provenance_and_preserves_the_baseline (__main__.AuthenticationScope.test_manifest_requires_fixed_provenance_and_preserves_the_baseline) ... ok\ntest_old_action_safety_assertion_can_only_gain_failure_details (__main__.AuthenticationScope.test_old_action_safety_assertion_can_only_gain_failure_details) ... ok\ntest_only_the_named_authentication_tests_are_allowed (__main__.AuthenticationScope.test_only_the_named_authentication_tests_are_allowed) ... ok\ntest_only_the_new_version_can_change_in_build_inputs (__main__.AuthenticationScope.test_only_the_new_version_can_change_in_build_inputs) ... ok\ntest_path_traversal_is_rejected (__main__.AuthenticationScope.test_path_traversal_is_rejected) ... ok\ntest_runtime_assets_manager_manifest_and_dependencies_stay_protected (__main__.AuthenticationScope.test_runtime_assets_manager_manifest_and_dependencies_stay_protected) ... ok\ntest_unrelated_presentation_sources_are_not_authorized (__main__.AuthenticationScope.test_unrelated_presentation_sources_are_not_authorized) ... ok\n\n----------------------------------------------------------------------\nRan 10 tests in 0.001s\n\nOK\n"
+    }
+  ],
+  "sourceReconstruction": {
+    "command": [
+      "python",
+      ".github/scripts/generate_functionfix_source_layer.py",
+      "--output",
+      "/tmp/hetu-function-final-proof-fzhtpup7"
+    ],
+    "exitCode": 0,
+    "result": {
+      "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+      "changedOrAddedFiles": 16,
+      "frozenInputs": 370,
+      "requiredEffectiveInputs": 386,
+      "locallyVerifiedInputs": 382,
+      "locallyMissingUnchangedPayloadFiles": [
+        "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo",
+        "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo",
+        "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so",
+        "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"
+      ],
+      "completeEffectiveSourceVerified": false,
+      "expectedUnitTests": 542,
+      "expectedTestXmlFiles": 56,
+      "patchSha256": "2a394afc8381d8390d34e0c29c150a5850d11299fb28b3bc41ba3c70135f6b62",
+      "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+      "output": "/tmp/hetu-function-final-proof-fzhtpup7"
+    },
+    "finalManifestAndPatchReproducedByteForByte": true
+  },
+  "hostUnittestCasesPassed": 196,
+  "newHostUnittestCasesPassed": 20,
+  "originalSourceGateCounts": [
+    5,
+    6,
+    18,
+    8,
+    10
+  ],
+  "historicalRuntimeBeforeAfterComparisonsRunLocally": false
+}

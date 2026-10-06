@@ -1,0 +1,1061 @@
+{
+  "parentApplication": "9399121212b68a5f6422170e00835095218c2f8e",
+  "candidateOwnBuildAndCaptures": "not executed yet",
+  "literal130PagePixelParityAccepted": false,
+  "changedInputs": 39,
+  "frozenInputs": 333,
+  "totalInputs": 372,
+  "patchSha256": "e831886e53552a4181f1d2e11441ee5cb0b867813e120741ad460babb9555160",
+  "exactReconstructionAll372Inputs": true,
+  "fullSharedDefaultsGuard": true,
+  "fullNativeSettingsCallbackGuard": true,
+  "fullWebuiAuthBehaviorGuard": true,
+  "boundedRootDiagnosticOnlyGuard": true,
+  "manifestDependenciesSigningCoreAndHomePanelFrozen": true,
+  "historicalLayers": [
+    {
+      "path": "updates/v2082-new-ui/inputs.json",
+      "sha256": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2082-new-ui/integration.patch",
+      "sha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/inputs.json",
+      "sha256": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2083-ui-polish/ui.patch",
+      "sha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/inputs.json",
+      "sha256": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+      "byteEqualHistoricalBase": true
+    },
+    {
+      "path": "updates/v2084-controller-auth/runtime.patch",
+      "sha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "byteEqualHistoricalBase": true
+    }
+  ],
+  "hostTests": {
+    "pdf85SourceScope": 6,
+    "authTestResultParser": 6,
+    "panelAuthSmokeHarness": 18,
+    "total": 30,
+    "failures": 0
+  },
+  "boundedToolSourceProofs": [
+    {
+      "sha256": "cc870e80c486f32ca745082e75c64e1c0c174de5599fbcac033237bb9ebecd16",
+      "evidence": {
+        "applicationBaseCommit": "9399121212b68a5f6422170e00835095218c2f8e",
+        "candidateNotCompiledOrCaptured": true,
+        "files": [
+          {
+            "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt",
+            "baseSha256": "3f2ed449676c09b83dd78b22b7592822ef2452421df03b661796264a5cf982e7",
+            "candidateSha256": "5aa26917857d95c7d6fccd530f1b56fbcde2cc91798337eb32ac0cd04073dddc",
+            "explicitPresentationReverseEqualsWholeBaseline": true
+          },
+          {
+            "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt",
+            "baseSha256": "42ef0e8242b1ffdef0c787d384857e3e8494ace330c85c555425c05a0d9bf319",
+            "candidateSha256": "8bb72974b9a084a2ccb7fe8bf6e08a4519dea4cfab5f23fa300f2422afd402db",
+            "explicitPresentationReverseEqualsWholeBaseline": true
+          },
+          {
+            "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+            "baseSha256": "4a1bc9588d99a6b360dd7c38fa62a93a115b33f19fc8799c444b3c6c19ceeb54",
+            "candidateSha256": "d46342ad474475caf826e9eb742e46e3971e3449f942d0255d7206786aacb5b2",
+            "explicitPresentationReverseEqualsWholeBaseline": true,
+            "businessFieldReferenceCountsUnchanged": true,
+            "protectedPredicatesCallbacksPresentVerbatim": true,
+            "statusChainRecentPrefixWholeBytesUnchanged": true,
+            "frame44InitialScroll687StillMatchesPrefix": true
+          },
+          {
+            "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+            "baseSha256": "edb1e963a523cc1f81b1ae4b883c598eb0b630e6ed2eb6100584973b48686030",
+            "candidateSha256": "db63a5968aaf03c3cd19ed47cf186e74797216f77cd511252e6040c6638e07ce",
+            "explicitPresentationReverseEqualsWholeBaseline": true
+          }
+        ],
+        "sourceMeasurements": {
+          "yamlSameKeys": [
+            {
+              "key": "mixed-port:",
+              "refBBox": [
+                75,
+                316,
+                163,
+                330
+              ],
+              "nativeBBox": [
+                69,
+                227,
+                154,
+                240
+              ],
+              "refWidthDp": 81.37411764705882,
+              "nativeWidthDp": 85,
+              "candidateSpacing": -0.36258823529411754
+            },
+            {
+              "key": "allow-lan:",
+              "refBBox": [
+                76,
+                334,
+                155,
+                345
+              ],
+              "nativeBBox": [
+                70,
+                244,
+                146,
+                254
+              ],
+              "refWidthDp": 73.05176470588235,
+              "nativeWidthDp": 76,
+              "candidateSpacing": -0.32758169934640574
+            },
+            {
+              "key": "mode:",
+              "refBBox": [
+                75,
+                353,
+                113,
+                364
+              ],
+              "nativeBBox": [
+                69,
+                261,
+                106,
+                271
+              ],
+              "refWidthDp": 35.138823529411766,
+              "nativeWidthDp": 37,
+              "candidateSpacing": -0.4652941176470584
+            },
+            {
+              "key": "log-level:",
+              "refBBox": [
+                76,
+                372,
+                155,
+                384
+              ],
+              "nativeBBox": [
+                71,
+                278,
+                146,
+                291
+              ],
+              "refWidthDp": 73.05176470588235,
+              "nativeWidthDp": 75,
+              "candidateSpacing": -0.2164705882352946
+            },
+            {
+              "key": "ipv6:",
+              "refBBox": [
+                76,
+                390,
+                113,
+                402
+              ],
+              "nativeBBox": [
+                71,
+                295,
+                106,
+                308
+              ],
+              "refWidthDp": 34.21411764705882,
+              "nativeWidthDp": 35,
+              "candidateSpacing": -0.19647058823529484
+            },
+            {
+              "key": "dns:",
+              "refBBox": [
+                76,
+                428,
+                105,
+                438
+              ],
+              "nativeBBox": [
+                70,
+                329,
+                98,
+                339
+              ],
+              "refWidthDp": 26.816470588235294,
+              "nativeWidthDp": 28,
+              "candidateSpacing": -0.39450980392156865
+            },
+            {
+              "key": "enable:",
+              "refBBox": [
+                93,
+                446,
+                147,
+                456
+              ],
+              "nativeBBox": [
+                86,
+                346,
+                138,
+                356
+              ],
+              "refWidthDp": 49.93411764705883,
+              "nativeWidthDp": 52,
+              "candidateSpacing": -0.34431372549019557
+            },
+            {
+              "key": "enhanced-mode:",
+              "refBBox": [
+                93,
+                465,
+                205,
+                474
+              ],
+              "nativeBBox": [
+                86,
+                363,
+                194,
+                373
+              ],
+              "refWidthDp": 103.56705882352941,
+              "nativeWidthDp": 108,
+              "candidateSpacing": -0.3409954751131225
+            },
+            {
+              "key": "nameserver:",
+              "refBBox": [
+                93,
+                486,
+                180,
+                492
+              ],
+              "nativeBBox": [
+                86,
+                383,
+                170,
+                390
+              ],
+              "refWidthDp": 80.44941176470589,
+              "nativeWidthDp": 84,
+              "candidateSpacing": -0.3550588235294114
+            }
+          ],
+          "yamlCandidateSpacingSp": -0.35,
+          "yamlLeastSquaresSp": -0.32893962848297226,
+          "Adblock44NativeHeightsBefore": [
+            153,
+            246,
+            100,
+            100
+          ],
+          "Adblock44ReferenceHeightsDp": [
+            135.0070588235294,
+            239.49882352941177,
+            90.62117647058824,
+            91.54588235294118
+          ],
+          "Adblock44CandidateHeightsExpectedDp": [
+            134,
+            240,
+            90,
+            90,
+            144
+          ],
+          "CNAMECandidateBottomExpectedDp": 832,
+          "segmentActualRefPixelColors": [
+            [
+              242,
+              242,
+              252
+            ],
+            [
+              241,
+              241,
+              251
+            ]
+          ],
+          "segmentLightLocalCandidateRgb": [
+            241,
+            241,
+            251
+          ],
+          "chipRefInkWidthDp": 74.90117647058824,
+          "chipNativeMonoInkWidthDp": 86,
+          "chipCandidate": "onlydomain14/21DefaultSemi",
+          "domain49CandidateSpacingSp": 0.8
+        },
+        "glyphProvenance": {
+          "pdfPath": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+          "pdfSha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+          "PDFPage": 44,
+          "embeddedJpegXref": 91,
+          "embeddedJpegSha256": "55df2610b74c14c2df003df37825a55dbf7b651e3ad8cc8b275a4243cfa12da6",
+          "sourcePixels": [
+            850,
+            1850
+          ],
+          "cropPixels": [
+            60,
+            699,
+            116,
+            755
+          ],
+          "foregroundBBoxPixels": [
+            69,
+            706,
+            107,
+            751
+          ],
+          "foregroundPixels": 738,
+          "threshold": "max(R,G,B)<128",
+          "viewport": 56,
+          "contourMethod": "marching-squares 0.5;no simplification",
+          "contours": 5,
+          "vertices": 424,
+          "differentPixelsAtSourceCenters": 0,
+          "binaryIoU": 1.0,
+          "callerSizeDp": 26,
+          "comparisonPreview": "/workspace/scratch/3788973cf567/tmp/pdf03a44-document-comparison.png",
+          "limits": "Binary threshold contour is exact at source centers; JPEG/antialias not represented as filled background. Preview is standalone vector contour render, not new app screenshot."
+        },
+        "limits": [
+          "Rendered939912 measurements support candidates but do not validate candidates.",
+          "No edits to Pdf85Frames2 needed: entireStatus/Chain/Recentprefix unchanged, old687 remainsLevel top765 minusbar78.",
+          "Header/row text wraps may grow with realdata/fontscale; nullable minimums preserve overflow/scroll and hit targets.",
+          "No sharedHome/panel helper or globalicon/default modified."
+        ],
+        "source_edits_stopped": true
+      }
+    },
+    {
+      "sha256": "1808acaecc6cf4c3d44c730ed10b6f4ce47c6907b4263999bc3fbf1f393cc459",
+      "evidence": {
+        "kind": "unbuilt next subscription/row source candidate",
+        "baseline_application": "9399121212b68a5f6422170e00835095218c2f8e",
+        "baseline_actual_review": "/tmp/hetu_03a_939912_subscription_review.json",
+        "baseline_geometry": {
+          "editable_fill_normalized393": "Fresh48 versus PDF42.536–43.461",
+          "readonly_value_ink_height_normalized393": "Fresh17 versus PDF21.268",
+          "readonly_explanation_line_count": "Fresh2 versus PDF1"
+        },
+        "source_inspection_before_edit": {
+          "body": "ToolsTypography.body16sp/23sp",
+          "editable_min_height": "compact42dp else48dp",
+          "editable_vertical_padding": "10dp",
+          "read_only_value": "17sp/24sp SemiBold",
+          "hint": "14sp/19sp",
+          "row_height": "compact56dp else64dp",
+          "note": "These are the actual939912 fallbacks; preserved despite parent shorthand mentioning12/17 elsewhere.",
+          "row_vertical_padding": "top8dp bottom8dp, exact defaults retained"
+        },
+        "changes": {
+          "field_optins": "Nullable readOnlyValueStyle/hintStyle/inputMinHeight/inputVerticalPadding appended after existing errorAfterHint; defaultnull",
+          "edit_name_only": "22sp/28sp SemiBold value;12sp/17sp hint; read-only structure retained",
+          "editable_subscription_name_and_url_only": "min43dp; vertical9.5dp; body16sp/23sp unchanged",
+          "row_optin": "Nullable minHeight:Dp?=null and verticalPadding:Dp?=null immediately before trailing. heightIn falls back to exact compact56/normal64 expression; top/bottom padding falls back to8dp each. No row callers edited by this task.",
+          "retained": "Add errorAfterHint=adding; Add URL invalid footer7dp else28dp; hints/errors/labels/keyboard/callbacks/loading/enabled/clear actions retained"
+        },
+        "files": [
+          {
+            "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+            "baseline_sha256": "f1bfa9f0d4d59aefd6d0c752b3ca8dff3de1cf8bf1048b370eefd6f2487d71a7",
+            "candidate_sha256": "943e9f9e761f046df5687bfe0393c58c6dece298d3d85cbd2edc79650eafc541",
+            "whole_file_after_inverse_equals_939912": true,
+            "inverse_transform_match_counts": [
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              1,
+              2
+            ],
+            "callback_and_semantic_byte_proof": [
+              {
+                "index": 0,
+                "byte_length": 472,
+                "sha256": "26433cb4e49f1067217b52668c860dc0601a1fbaab3170c01ce5e003ce9c1c0e",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "                value = value, onValueChange = onValueChange,\n                modifier = Modifier.fillMaxWidth(), singleLine = true,\n                textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium,\n                    fontFamily = if (monospace && keyboardType != KeyboardType.Uri) FontFamily.Monospace else FontFamily.Default),\n                keyboardOptions = KeyboardOptions(keyboardType = keyboardType), cursorBrush = SolidColor(c.accent),",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 1,
+                "byte_length": 396,
+                "sha256": "15b44b1a9a1212714d39cd49739434fedbb208ccf3bb2c89ddb0aa1acaa25d55",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "                            if (clearable && value.isNotEmpty()) Box(Modifier.size(20.dp).clip(CircleShape)\n                                .background(c.t3.copy(alpha = .14f)).clickable(role = Role.Button, onClickLabel = ht(\"清除输入\")) { onValueChange(\"\") },\n                                contentAlignment = Alignment.Center) { Icon(HomeIcons.X, null, Modifier.size(12.dp), tint = c.t3) }",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 2,
+                "byte_length": 362,
+                "sha256": "7d71106294f7a9b2e9a768a54546c16b3918e1c6c5e889fc54a49fc9df741a09",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "        if (error != null) {\n            Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {\n                Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)\n                Text(error, color = c.bad, style = HomeType.caption)\n            }\n        }",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 3,
+                "byte_length": 220,
+                "sha256": "6540f2186309714995586eae351b701eb791e6dbfb02cdc7abeb7b4ed1653d9d",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "    val interactive = if (onClick == null) base else base.hxPressScale(source, .985f).clickable(enabled = enabled, interactionSource = source, indication = null, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }",
+                "rechecked_after_row_vertical_padding_addition": true
+              }
+            ]
+          },
+          {
+            "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+            "baseline_sha256": "c1d410ce4a44a48cf08003e7fe8ed27bd71ca0abaf2e1bf0680ffce28f8b8f03",
+            "candidate_sha256": "4d47d609d629b52d56399f001a64b51ba1e0c251d4d3437552eeda227bbeb438",
+            "whole_file_after_inverse_equals_939912": true,
+            "inverse_transform_match_counts": [
+              1,
+              1,
+              1,
+              1,
+              1
+            ],
+            "callback_and_semantic_byte_proof": [
+              {
+                "index": 0,
+                "byte_length": 118,
+                "sha256": "3c64a612f9c18bb392f3be3e82c232e7f33029492f4f78b98e8bd031c160f15d",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "    onNameChange: (String) -> Unit,\n    onUrlChange: (String) -> Unit,\n    onSave: () -> Unit,\n    onBack: () -> Unit,",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 1,
+                "byte_length": 108,
+                "sha256": "8c9e9b1b1bba0668af6641937f345f7b46c144cdc20f2e3ba1c0588f6aa176f2",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "ToolsField(\"订阅名称\", form.name, onNameChange, placeholder = \"例如 主订阅\", error = form.nameError",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 2,
+                "byte_length": 137,
+                "sha256": "d46489782a067c30ef9be63a9931c1125540eae13e799a89eae72579b6a7ec9c",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "ToolsField(\"订阅名称\", form.name, {}, readOnly = true, hint = \"名称用于策略组引用，可在 YAML 编辑器中统一修改。\"",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 3,
+                "byte_length": 305,
+                "sha256": "9c6efab2ef13a669ee7aca630f1b9ab7644e02ed846c5516b7a68a6178b4c846",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "                    \"订阅链接\", form.url, onUrlChange,\n                    placeholder = \"https://\", monospace = true, keyboardType = KeyboardType.Uri,\n                    error = form.urlError, hint = \"保存到当前配置，运行时会尝试应用。\",\n                    errorAfterHint = adding,",
+                "rechecked_after_row_vertical_padding_addition": true
+              },
+              {
+                "index": 4,
+                "byte_length": 430,
+                "sha256": "f7486ecaa7ebc081b37534657f0e429d936edba45e98f08cb64c501ca264b0af",
+                "identical_literal_present_in_base_and_candidate": true,
+                "literal": "                Column(Modifier.padding(top = if (adding && form.urlError != null) 7.dp else 28.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {\n                    HomeButton(\"保存\", onSave, Modifier.fillMaxWidth(), kind = HomeButtonKind.Primary, icon = HomeIcons.Save, loading = form.saving)\n                    HomeButton(\"取消\", onBack, Modifier.fillMaxWidth(), kind = HomeButtonKind.Ghost, enabled = !form.saving)",
+                "rechecked_after_row_vertical_padding_addition": true
+              }
+            ]
+          }
+        ],
+        "verification": {
+          "git_diff_check": "passed",
+          "independent_read_only_review": "No source issues found; no tracked ToolsRow call supplies prior trailing argument positionally; standard named and trailing lambda calls compatible",
+          "executed": "Exact whole-file inverse equality and protected byte snippets; no tests/build/CI/git actions",
+          "whole_file_inverse_after_row_padding_addition": "Both complete files reversed through every field/row/caller change byte-equal compiled939912; all protected callback/semantic literals rechecked"
+        },
+        "geometry_expectation_not_validation": {
+          "editable_default_scale": "23sp line plus2×9.5dp padding yields nominal42dp; min43dp should govern at default scale",
+          "readonly_name": "22sp/28sp enlarges name;12sp/17sp may let fixed Chinese explanation fit one line; must verify fresh pixels",
+          "row": "Parent-proposed off row minHeight51dp/verticalPadding5dp/subtitle12sp17sp has nominal24sp title+17sp subtitle+10dp vertical padding=51dp at default scale; height is minimum only. Caller opt-in belongs to parent; not changed here.",
+          "limits": [
+            "Candidate is not yet compiled or rendered;939912 screenshot/CI does not validate it.",
+            "heightIn is a minimum; font metrics/font scale can grow height.",
+            "22sp readonly value retains existing one-line ellipsis and may ellipsize long names sooner.",
+            "Fresh captures required for05/21/22/23/26 geometry and helper order/gaps; parent retains interaction/regression validation."
+          ]
+        },
+        "source_edits_stopped": true
+      }
+    },
+    {
+      "sha256": "799684569759f6ea2c60a08914d3cb4001d8bef33e2989fc417faa3de2b13db5",
+      "evidence": {
+        "schema_version": 1,
+        "created_utc": "2026-10-05T15:59:57.356983+00:00",
+        "scope": "Next bounded source candidate after939912: outline compact header, Cores busy spinner23dp, and nullable A44 button/segment reference presentation APIs",
+        "status": {
+          "source_candidate": "pending-own-build-and-render",
+          "new_candidate_render_verified": false,
+          "new_candidate_ci_or_tests_run_by_agent": false,
+          "compiled939912_capture_not_used_as_candidate_render": true,
+          "task_remains_open_for_parent_A44_opt_in_requirements": false,
+          "A44_requested_API_completed": true,
+          "task_remains_open_until_parent_release": false,
+          "source_edits_stopped": true,
+          "parent_requested_final_closure": true
+        },
+        "repo": {
+          "path": "/workspace/scratch/3788973cf567/hetu",
+          "branch": "test/v20.76-new-ui",
+          "baseline_compiled_application_commit": "9399121212b68a5f6422170e00835095218c2f8e",
+          "head_observed_at_report": "9399121212b68a5f6422170e00835095218c2f8e"
+        },
+        "reference_measurement_evidence": {
+          "path": "/tmp/hetu_03a_939912_outline_cores_review.json",
+          "sha256": "29baac2636b3a6ac454392d717c766baff627696004e89dc1e3dfb51b1227217",
+          "actual_compiled_capture_identity": {
+            "compiled_application_commit": "9399121212b68a5f6422170e00835095218c2f8e",
+            "run_id": 37330392252,
+            "artifact_id": 11353804803,
+            "identity_provider": "Parent/root supplied compiled run/artifact identity. Capture PNGs independently match local extracted artifact bytes.",
+            "root_verified_tests": {
+              "tests": 479,
+              "xml_files": 49,
+              "failures": 0,
+              "errors": 0,
+              "skipped": 0
+            },
+            "local_report_path": "/workspace/scratch/3788973cf567/tmp/ui85-939912-evidence/out/verification/pdf85-tests.json",
+            "local_report_sha256": "f4199d1832a52ca0c9b75f02680637d5c25cbd08b9b7e8d8bf070eef729f6d45",
+            "local_report_total_tests": 479,
+            "local_report_xml_files": 49,
+            "not_new_page_callback_acceptance": true
+          },
+          "outline_reference_fresh_comparison": {
+            "pill_fill_median_rgb_reference": [
+              248.0,
+              247.0,
+              253.0
+            ],
+            "pill_fill_median_rgb_fresh": [
+              248.0,
+              247.0,
+              253.0
+            ],
+            "pill_fill_channel_delta_fresh_minus_reference": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "gradient_top_channel_delta": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "gradient_bottom_channel_delta": [
+              0.0,
+              0.0,
+              0.0
+            ],
+            "reference_median_pill_height_width_normalized": 26.816470588235294,
+            "fresh_median_pill_height_px": 28.0,
+            "reference_median_pitch_width_normalized": 32.249117647058824,
+            "fresh_median_pitch_px": 32.0,
+            "reference_nested_indent_width_normalized": 27.278823529411763,
+            "fresh_nested_indent_px": 28,
+            "reference_first_label_glyph_width_width_normalized": 70.27764705882353,
+            "fresh_first_label_glyph_width_px": 68,
+            "reference_sheet_top_width_normalized": 397.1611764705882,
+            "fresh_sheet_top_y": 392,
+            "reference_first_pill_top_width_normalized": 455.88,
+            "fresh_first_pill_top_y": 478,
+            "first_pill_absolute_y_delta_width_normalized": 22.120000000000005,
+            "reference_sheet_to_first_pill_gap_width_normalized": 58.718823529411765,
+            "fresh_sheet_to_first_pill_gap_px": 86,
+            "sheet_to_first_pill_gap_delta_width_normalized": 27.281176470588235,
+            "reference_first_pill_left_width_normalized": 14.332941176470587,
+            "fresh_first_pill_left_x": 16
+          },
+          "busy_spinner_reference_visible_size_width_normalized": [
+            23.11764705882353,
+            23.11764705882353
+          ],
+          "busy_spinner939912_visible_size_px": [
+            18,
+            18
+          ]
+        },
+        "source_owner_files": [
+          "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+          "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+          "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt"
+        ],
+        "helper_source_locations": {
+          "ToolsSheetContent": "ToolsDesign.kt",
+          "ToolsButton": "ToolsDesign.kt",
+          "outline_call": "ToolsEditorScreen.kt / ToolsOutlineSheetContent",
+          "core_busy_call": "ToolsCoresScreen.kt / CoreCard",
+          "shared_HomeSpinner": "Unchanged; existing HomeSpinner only receives size opt-in through ToolsButton"
+        },
+        "implementation": {
+          "outline": {
+            "shared_api": "compactHeader:Boolean=false, before body trailing-lambda parameter",
+            "only_true_call_site": "ToolsOutlineSheetContent",
+            "default_handle_container_padding_top_bottom_dp": [
+              8,
+              4
+            ],
+            "opt_in_handle_container_padding_top_bottom_dp": [
+              0,
+              4
+            ],
+            "handle_size_dp": [
+              36,
+              4
+            ],
+            "handle_size_unchanged": true,
+            "default_header_row_top_bottom_padding_dp": [
+              8,
+              12
+            ],
+            "opt_in_header_row_top_bottom_padding_dp": [
+              0,
+              0
+            ],
+            "original_close_icon_button_call_retained": true,
+            "close_icon_button_layout_size_dp": 48,
+            "close_icon_button_source_function_unchanged": true,
+            "default_sheet_header_total_dp": 84,
+            "opt_in_sheet_header_total_dp": 56,
+            "header_reduction_dp": 28,
+            "outline_local_extra_bottom_padding_dp": 22,
+            "why_local_bottom_padding": "The modal is bottom anchored. Reducing header alone shifts only sheet top; adding22dp bottom spacing moves first pill approximately22dp upward while total sheet height decreases6dp.",
+            "titles_fields_subtitle_body_footer_text_unchanged": true,
+            "outline_rows_pills_fonts_colors_scroll_jump_unchanged": true
+          },
+          "core_busy_spinner": {
+            "shared_api": "spinnerSize:Dp=18.dp appended to ToolsButton parameters",
+            "default_size_dp": 18,
+            "only_explicit_opt_in_call_site": "CoreCard busy HomeButton",
+            "only_explicit_opt_in_size_dp": 23,
+            "baseline_call": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)",
+            "candidate_call": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true, spinnerSize = 23.dp)",
+            "original_busy_onclick_enabled_loading_prefix_byte_identical": true,
+            "all_current_colors_and_alpha_preserved": true,
+            "all_other_tool_button_defaults_and_calls_unchanged": true,
+            "shared_HomeSpinner_source_and_default_unchanged": true
+          },
+          "A44_button_reference_opt_in": {
+            "owned_shared_source": "ToolsDesign.kt / ToolsButton",
+            "nullable_parameters": {
+              "visualHeight": "Dp?=null",
+              "textStyle": "TextStyle?=null",
+              "horizontalPadding": "Dp?=null",
+              "visualCornerRadius": "Dp?=null"
+            },
+            "requested_parent_caller_values": {
+              "visualHeight_dp": 29,
+              "font_size_sp": 12,
+              "line_height_sp": 18,
+              "horizontal_padding_dp": 12,
+              "visualCornerRadius_dp": 7
+            },
+            "reference_measurements_supplied_by_parent": {
+              "button_width_width_normalized": 71.202,
+              "button_height_width_normalized": 28.665,
+              "old_native_width_height_px": [
+                96,
+                48
+              ],
+              "corner_radius_approx_dp": 7
+            },
+            "default_background_modifier_recipe_retained_byte_for_byte": ".clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)\n        .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)",
+            "opt_in_paint": "drawBehind centered rounded rectangle of visualHeight inside unchanged48dp-min Row, with optional visualCornerRadius. Reference7dp corner is not clipped again by the48dp Primary24dp shape. Generic Secondary opt-in retains.75dp border; absent corner override uses existing kind radius24dp/14dp clamped to painted bounds. Default null-height modifier remains the original clip/background/border recipe.",
+            "default_hpad_dp": 16,
+            "default_text_style": "ToolsTypography.button",
+            "unchanged_clickable_min_height_dp": 48,
+            "paint_does_not_shrink_clickable_area": true,
+            "kind_color_mapping_block_byte_identical": true,
+            "no_new_helper_or_duplicate_content": true,
+            "caller_file_parent_owned_and_not_edited_by_this_agent": "ToolsAdblockScreen.kt"
+          },
+          "A44_segment_reference_opt_in": {
+            "owned_shared_source": "ToolsDesign.kt / ToolsSegmented",
+            "nullable_parameters": {
+              "referenceVisualInset": "Dp?=null",
+              "referenceOuterPadding": "Dp?=null"
+            },
+            "requested_parent_caller_values": {
+              "referenceVisualInset_dp": 3.5,
+              "referenceOuterPadding_dp": 2
+            },
+            "reference_measurements_supplied_by_parent": {
+              "level_card_height_width_normalized": 135.007,
+              "old_native_level_card_height_px": 153,
+              "selected_fill_height_width_normalized": 36.988,
+              "old_native_selected_fill_height_px": 45
+            },
+            "default_outer_modifier_recipe_retained_byte_for_byte": "modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()",
+            "default_item_modifier_recipe_retained_byte_for_byte": "Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)\n                .background(if (selected == key) c.accentSoft else Color.Transparent)\n                .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }\n                .padding(vertical = 9.dp)",
+            "opt_in_recipe": "Each item keeps heightIn(min44) and Role.Tab selectable on its outer modifier; then3.5dp vertical inset, original segment clip/fill, then9-3.5=5.5dp inner vertical padding. Outer padding2 gives intended total48 at default text size.",
+            "selectable_min_height_dp": 44,
+            "reference_default_font_predicted_fill_height_dp": 37,
+            "reference_default_font_predicted_outer_height_dp": 48,
+            "select_callback_source_fragment": ".selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }",
+            "baseline_select_callback_occurrences": 1,
+            "candidate_select_callback_occurrences": 2,
+            "callback_occurrences_explanation": "The original complete default modifier recipe and the new opt-in modifier recipe each retain the exact callback expression. An if/else chooses exactly one modifier recipe per item; options iteration and item content each remain single. No second active selectable is added to a tab.",
+            "reference_inset_clamped_range_dp": [
+              0,
+              9
+            ],
+            "shared_item_content_remains_single": true,
+            "caller_file_parent_owned_and_not_edited_by_this_agent": "ToolsAdblockScreen.kt"
+          }
+        },
+        "static_geometry_prediction_not_render_evidence": {
+          "assumptions": "The11-item393×852 default-font fixture preserves its measured32px rows, bottom anchoring, and navigation inset. These calculations are not rendered candidate results.",
+          "baseline_actual_sheet_top_y": 392,
+          "baseline_actual_first_pill_top_y": 478,
+          "candidate_predicted_sheet_top_y": 398,
+          "candidate_predicted_first_pill_top_y": 456,
+          "reference_sheet_top_width_normalized": 397.1611764705882,
+          "reference_first_pill_top_width_normalized": 455.88,
+          "baseline_actual_sheet_to_first_pill_gap_px": 86,
+          "candidate_predicted_sheet_to_first_pill_gap_px": 58,
+          "reference_sheet_to_first_pill_gap_width_normalized": 58.718823529411765,
+          "new_spinner_target_dp": 23,
+          "reference_spinner_visible_extent_width_normalized": [
+            23.11764705882353,
+            23.11764705882353
+          ]
+        },
+        "preservation_checks": {
+          "callback_predicate_role_text_fragments": {
+            "outline_jump_role_haptic_callback": {
+              "text": ".clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onJump(item) }",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "outline_close_argument": {
+              "text": "onClose = onClose",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "busy_empty_onclick_and_predicates": {
+              "text": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "core_primary_callback": {
+              "text": "action.label, { onPrimary(action) }, Modifier.weight(1f),",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "core_import_callback_and_predicate": {
+              "text": "HomeButton(\"导入\", onImport, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = enabled && !busy)",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "shared_button_enabled_predicate": {
+              "text": ".clickable(enabled = enabled && !loading, interactionSource = source, indication = null,",
+              "baseline_count": 2,
+              "candidate_count": 2,
+              "byte_identical_expression_preserved": true
+            },
+            "shared_button_role_haptic_callback": {
+              "text": "role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }",
+              "baseline_count": 2,
+              "candidate_count": 2,
+              "byte_identical_expression_preserved": true
+            },
+            "shared_disabled_alpha": {
+              "text": ".alpha(if (enabled) 1f else .45f)",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "shared_close_original48dp_call": {
+              "text": "onClose != null -> ToolsIconButton(HomeIcons.X, \"关闭\", onClose)",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            },
+            "shared_title_text_style": {
+              "text": "Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)",
+              "baseline_count": 1,
+              "candidate_count": 1,
+              "byte_identical_expression_preserved": true
+            }
+          },
+          "ToolsIconButton_entire_function_byte_identical": true,
+          "ToolsIconButton_baseline_function_sha256": "17719f57563533f5e443ae9ae53e8ecbc94b23d3cd6b06ddf68fb61456f777cf",
+          "ToolsIconButton_candidate_function_sha256": "17719f57563533f5e443ae9ae53e8ecbc94b23d3cd6b06ddf68fb61456f777cf",
+          "default_sheet_layout_values_preserved": true,
+          "default_spinner_size18dp_preserved": true,
+          "ToolsButton_default_background_modifier_recipe_byte_identical": true,
+          "ToolsSegmented_default_outer_and_item_modifier_recipes_byte_identical": true,
+          "button_kind_fill_foreground_mapping_byte_identical": true,
+          "nullable_button_defaults": {
+            "visualHeight": null,
+            "textStyle": null,
+            "horizontalPadding": null,
+            "visualCornerRadius": null
+          },
+          "nullable_segment_defaults": {
+            "referenceVisualInset": null,
+            "referenceOuterPadding": null
+          },
+          "default_button_text_style_fallback": "textStyle ?: ToolsTypography.button",
+          "default_button_hpad_fallback": "horizontalPadding ?: 16.dp",
+          "all_three_whole_file_reversals_passed": true
+        },
+        "file_source_reverse_proofs": [
+          {
+            "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+            "baseline_commit": "9399121212b68a5f6422170e00835095218c2f8e",
+            "baseline_sha256": "0580af44ae6a6a4b86eacddfd46f61040027ea752b9495a8589e85860ef5bd77",
+            "candidate_sha256": "e61d1e59f8936409edf54971c2fa1034add4fef1f50df1c7ccca9e47e7ac2e2a",
+            "reversed_candidate_sha256": "0580af44ae6a6a4b86eacddfd46f61040027ea752b9495a8589e85860ef5bd77",
+            "whole_file_reversed_to_baseline_byte_for_byte": true,
+            "reverse_recipe": [
+              {
+                "candidate_unique_text": "HomeSheetContent(title = \"语法大纲\", modifier = modifier.then(sheetBackground).padding(bottom = 22.dp), onClose = onClose, compactHeader = true) {",
+                "baseline_replacement_text": "HomeSheetContent(title = \"语法大纲\", modifier = modifier.then(sheetBackground), onClose = onClose) {",
+                "candidate_occurrences": 1
+              }
+            ],
+            "source_diff": "diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt\nindex eeb5172..7c182f5 100644\n--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt\n+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt\n@@ -196,7 +196,7 @@ internal fun ToolsOutlineSheetContent(items: List<ToolsOutlineItem>, onJump: (To\n     val sheetBackground = if (c.dark) Modifier.background(c.surface) else Modifier.background(\n         Brush.verticalGradient(listOf(Color(0xFFF3F3FD), Color(0xFFEFF1FE))),\n     )\n-    HomeSheetContent(title = \"语法大纲\", modifier = modifier.then(sheetBackground), onClose = onClose) {\n+    HomeSheetContent(title = \"语法大纲\", modifier = modifier.then(sheetBackground).padding(bottom = 22.dp), onClose = onClose, compactHeader = true) {\n         if (items.isEmpty()) {\n             Text(ht(\"没有可识别的顶层字段。\"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)\n         } else {\n"
+          },
+          {
+            "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+            "baseline_commit": "9399121212b68a5f6422170e00835095218c2f8e",
+            "baseline_sha256": "66b8209da7d6e0bac83e8e8ed097832495803159e59ff361cd75ccf26a12d6a4",
+            "candidate_sha256": "d63a4ac64dea68128edfc61c97a28ef13c1bd46e83756a0691b46f97888d6b97",
+            "reversed_candidate_sha256": "66b8209da7d6e0bac83e8e8ed097832495803159e59ff361cd75ccf26a12d6a4",
+            "whole_file_reversed_to_baseline_byte_for_byte": true,
+            "reverse_recipe": [
+              {
+                "candidate_unique_text": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true, spinnerSize = 23.dp)",
+                "baseline_replacement_text": "HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)",
+                "candidate_occurrences": 1
+              }
+            ],
+            "source_diff": "diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\nindex 559e865..d8e467e 100644\n--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\n+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt\n@@ -132,7 +132,7 @@ private fun CoreCard(core: ToolsCore, busy: Boolean, enabled: Boolean, progress:\n             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                 when {\n                     busy -> CompositionLocalProvider(LocalHomeColors provides processingColors) {\n-                        HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true)\n+                        HomeButton(\"处理中\", {}, Modifier.weight(1f), enabled = false, loading = true, spinnerSize = 23.dp)\n                     }\n                     action != null -> CompositionLocalProvider(LocalHomeColors provides if (action == ToolsCoreAction.Download) softButtonColors else c) {\n                         HomeButton(\n"
+          },
+          {
+            "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+            "baseline_commit": "9399121212b68a5f6422170e00835095218c2f8e",
+            "baseline_sha256": "a4b8756f3026cf6dbb941f85e4b5fc27ded1102bcbf6b4ef23fa0264ce206c6f",
+            "candidate_sha256": "3d286031438b5b6e404127d84ec4d9a18e96a0a45401cba517a1c6045dcedffc",
+            "reversed_candidate_sha256": "a4b8756f3026cf6dbb941f85e4b5fc27ded1102bcbf6b4ef23fa0264ce206c6f",
+            "whole_file_reversed_to_baseline_byte_for_byte": true,
+            "reverse_recipe": [
+              {
+                "function_start_marker": "@Composable\ninternal fun ToolsButton(",
+                "next_function_marker": "@Composable\ninternal fun ToolsTopBar(",
+                "candidate_function_sha256": "7c1091788b0287f4cdf82896c3e3bc0e6702ba43b1f7199e1f50a11518b320eb",
+                "baseline_function_sha256": "b3d11ac078be5d01652ab661da0fa4784192301245580a456958ea710880cf73",
+                "baseline_function_source": "@Composable\ninternal fun ToolsButton(\n    text: String,\n    onClick: () -> Unit,\n    modifier: Modifier = Modifier,\n    kind: HomeButtonKind = HomeButtonKind.Secondary,\n    icon: ImageVector? = null,\n    enabled: Boolean = true,\n    loading: Boolean = false,\n    neutral: Boolean = false,\n) {\n    val c = LocalHomeColors.current\n    val haptics = LocalHomeHaptics.current\n    val source = remember { MutableInteractionSource() }\n    val (fill, foreground) = when (kind) {\n        HomeButtonKind.Primary -> c.accent to c.onAccent\n        HomeButtonKind.Secondary -> c.surface to c.t1\n        HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent\n        HomeButtonKind.Ghost -> Color.Transparent to c.accent\n    }\n    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)\n        .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)\n        .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)\n        .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,\n            role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }\n        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,\n        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {\n        if (loading) HomeSpinner(size = 18.dp, color = foreground)\n        else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)\n        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)\n    }\n}\n\n",
+                "candidate_occurrences": 1
+              },
+              {
+                "function_start_marker": "@Composable\ninternal fun ToolsSheetContent(",
+                "next_function_marker": "@Composable\ninternal fun <T> ToolsSegmented(",
+                "candidate_function_sha256": "22c02f14648ba08fc5142d33f39318d2a03123344666b7911e4866f62ec3a190",
+                "baseline_function_sha256": "baae8e82ba4de01874b15501bc00c0aca5fcd0200a5eeee3720a6dbb6af29120",
+                "baseline_function_source": "@Composable\ninternal fun ToolsSheetContent(\n    title: String,\n    modifier: Modifier = Modifier,\n    subtitle: String? = null,\n    onClose: (() -> Unit)? = null,\n    trailing: (@Composable RowScope.() -> Unit)? = null,\n    footer: (@Composable RowScope.() -> Unit)? = null,\n    body: @Composable ColumnScope.() -> Unit,\n) {\n    val c = LocalHomeColors.current\n    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {\n        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {\n            Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))\n        }\n        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {\n            Column(Modifier.weight(1f)) {\n                Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)\n                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)\n            }\n            when {\n                trailing != null -> trailing()\n                onClose != null -> ToolsIconButton(HomeIcons.X, \"关闭\", onClose)\n            }\n        }\n        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = if (footer == null) 24.dp else 16.dp), content = body)\n        if (footer != null) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),\n            horizontalArrangement = Arrangement.spacedBy(8.dp), content = footer)\n    }\n}\n\n",
+                "candidate_occurrences": 1
+              },
+              {
+                "function_start_marker": "@Composable\ninternal fun <T> ToolsSegmented(",
+                "next_function_marker": null,
+                "candidate_function_sha256": "e6bc690dcfad2a264a85abb5e4be7d3bdd895f2e960d48ad12ab53b9657f0efc",
+                "baseline_function_sha256": "be0e719cfa0aedaeb01049e70a9644928832470bf23278bcd3526f2db70cfe9a",
+                "baseline_function_source": "@Composable\ninternal fun <T> ToolsSegmented(\n    options: List<Pair<T, String>>,\n    selected: T,\n    onSelect: (T) -> Unit,\n    modifier: Modifier = Modifier,\n    enabled: Boolean = true,\n    icons: Map<T, ImageVector> = emptyMap(),\n) {\n    val c = LocalHomeColors.current\n    val haptics = LocalHomeHaptics.current\n    Row(modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()) {\n        options.forEach { (key, label) ->\n            Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)\n                .background(if (selected == key) c.accentSoft else Color.Transparent)\n                .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }\n                .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {\n                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                    icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }\n                    Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)\n                }\n            }\n        }\n    }\n}\n",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.draw.drawBehind",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.geometry.CornerRadius",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.geometry.Offset",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.geometry.Size",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.graphics.drawscope.Stroke",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              },
+              {
+                "candidate_added_import": "import androidx.compose.ui.unit.Dp",
+                "reverse_action": "remove",
+                "candidate_occurrences": 1
+              }
+            ],
+            "source_diff": "diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt\nindex fbcb8fd..b0328ff 100644\n--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt\n+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt\n@@ -18,7 +18,12 @@ import androidx.compose.ui.Alignment\n import androidx.compose.ui.Modifier\n import androidx.compose.ui.draw.clip\n import androidx.compose.ui.draw.alpha\n+import androidx.compose.ui.draw.drawBehind\n+import androidx.compose.ui.geometry.CornerRadius\n+import androidx.compose.ui.geometry.Offset\n+import androidx.compose.ui.geometry.Size\n import androidx.compose.ui.graphics.Color\n+import androidx.compose.ui.graphics.drawscope.Stroke\n import androidx.compose.ui.graphics.vector.ImageVector\n import androidx.compose.ui.semantics.Role\n import androidx.compose.ui.semantics.contentDescription\n@@ -29,6 +34,7 @@ import androidx.compose.ui.text.TextStyle\n import androidx.compose.ui.text.font.FontFamily\n import androidx.compose.ui.text.font.FontWeight\n import androidx.compose.ui.text.style.TextOverflow\n+import androidx.compose.ui.unit.Dp\n import androidx.compose.ui.unit.dp\n import androidx.compose.ui.unit.sp\n import io.github.xgl34222220.hetu.HomeContinuousShape\n@@ -175,6 +181,11 @@ internal fun ToolsButton(\n     enabled: Boolean = true,\n     loading: Boolean = false,\n     neutral: Boolean = false,\n+    spinnerSize: Dp = 18.dp,\n+    visualHeight: Dp? = null,\n+    textStyle: TextStyle? = null,\n+    horizontalPadding: Dp? = null,\n+    visualCornerRadius: Dp? = null,\n ) {\n     val c = LocalHomeColors.current\n     val haptics = LocalHomeHaptics.current\n@@ -185,16 +196,32 @@ internal fun ToolsButton(\n         HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent\n         HomeButtonKind.Ghost -> Color.Transparent to c.accent\n     }\n-    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)\n+    val backgroundModifier = if (visualHeight == null) Modifier\n         .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)\n         .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)\n+    else Modifier\n+        .drawBehind {\n+            val height = visualHeight.toPx().coerceIn(0f, size.height)\n+            val top = (size.height - height) / 2f\n+            val radius = minOf((visualCornerRadius ?: if (kind == HomeButtonKind.Primary) 24.dp else 14.dp).toPx(), height / 2f, size.width / 2f)\n+            drawRoundRect(fill, Offset(0f, top), Size(size.width, height), CornerRadius(radius, radius))\n+            if (kind == HomeButtonKind.Secondary) {\n+                val stroke = .75.dp.toPx()\n+                val borderRadius = (radius - stroke / 2f).coerceAtLeast(0f)\n+                drawRoundRect(c.line2, Offset(stroke / 2f, top + stroke / 2f),\n+                    Size((size.width - stroke).coerceAtLeast(0f), (height - stroke).coerceAtLeast(0f)),\n+                    CornerRadius(borderRadius, borderRadius), style = Stroke(stroke))\n+            }\n+        }\n+    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)\n+        .then(backgroundModifier)\n         .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,\n             role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }\n-        .padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,\n+        .padding(horizontal = horizontalPadding ?: 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,\n         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {\n-        if (loading) HomeSpinner(size = 18.dp, color = foreground)\n+        if (loading) HomeSpinner(size = spinnerSize, color = foreground)\n         else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)\n-        Text(ht(text), color = foreground, style = ToolsTypography.button, maxLines = 1)\n+        Text(ht(text), color = foreground, style = textStyle ?: ToolsTypography.button, maxLines = 1)\n     }\n }\n \n@@ -231,14 +258,16 @@ internal fun ToolsSheetContent(\n     onClose: (() -> Unit)? = null,\n     trailing: (@Composable RowScope.() -> Unit)? = null,\n     footer: (@Composable RowScope.() -> Unit)? = null,\n+    compactHeader: Boolean = false,\n     body: @Composable ColumnScope.() -> Unit,\n ) {\n     val c = LocalHomeColors.current\n     Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {\n-        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {\n+        Box(Modifier.fillMaxWidth().padding(top = if (compactHeader) 0.dp else 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {\n             Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))\n         }\n-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {\n+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp,\n+            top = if (compactHeader) 0.dp else 8.dp, bottom = if (compactHeader) 0.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {\n             Column(Modifier.weight(1f)) {\n                 Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)\n                 if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)\n@@ -262,15 +291,30 @@ internal fun <T> ToolsSegmented(\n     modifier: Modifier = Modifier,\n     enabled: Boolean = true,\n     icons: Map<T, ImageVector> = emptyMap(),\n+    referenceVisualInset: Dp? = null,\n+    referenceOuterPadding: Dp? = null,\n ) {\n     val c = LocalHomeColors.current\n     val haptics = LocalHomeHaptics.current\n-    Row(modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()) {\n+    val outerModifier = if (referenceOuterPadding == null)\n+        modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()\n+    else modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(referenceOuterPadding).selectableGroup()\n+    Row(outerModifier) {\n         options.forEach { (key, label) ->\n-            Box(Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)\n+            val itemModifier = if (referenceVisualInset == null) Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)\n                 .background(if (selected == key) c.accentSoft else Color.Transparent)\n                 .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }\n-                .padding(vertical = 9.dp), contentAlignment = Alignment.Center) {\n+                .padding(vertical = 9.dp)\n+            else {\n+                val inset = referenceVisualInset.coerceIn(0.dp, 9.dp)\n+                Modifier.weight(1f).heightIn(min = 44.dp)\n+                    .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }\n+                    .padding(vertical = inset)\n+                    .clip(ToolsDesignDims.segmentShape)\n+                    .background(if (selected == key) c.accentSoft else Color.Transparent)\n+                    .padding(vertical = 9.dp - inset)\n+            }\n+            Box(itemModifier, contentAlignment = Alignment.Center) {\n                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {\n                     icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }\n                     Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)\n"
+          }
+        ],
+        "selected_file_diff_check": {
+          "command": "git diff --check -- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+          "exit_code": 0,
+          "stdout": "",
+          "stderr": ""
+        },
+        "limits": [
+          "This candidate has not been compiled or rendered. The previous939912 screenshots verify only the prior candidate.",
+          "Compact header alters the handle container top padding only for outline and changes its handle/title relative geometry; all intended positions require fresh visual verification.",
+          "Width normalization from the original850px raster is an estimate rather than authoritative device-dp calibration.",
+          "No complete page pixel1:1 or page callback/IO acceptance is claimed.",
+          "A44 reference card/button dimensions were supplied by the parent measurement task; this agent did not independently reopen A44 images in this source-edit task. Nullable API values and source recipes are verified; rendered sizes remain pending fresh build/capture."
+        ],
+        "boundaries": {
+          "sources_edited_only": [
+            "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+            "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+            "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt"
+          ],
+          "other_sources_tests_docs_patches_CI_git_not_modified_by_agent": true,
+          "only_temporary_report_written": "/tmp/hetu_03a_outline_cores_next_candidate.json",
+          "source_edits_stopped": true
+        }
+      }
+    }
+  ],
+  "referenceOnlyAdditionalChanges": {
+    "compactWarning": "18dp layout cell; filled23dp painted warning glyph centered; defaultfalse unchanged",
+    "licenseGutter": "10.5dp only referenceDocument; default16dp/legal text/internal14dp padding/scroll/height unchanged",
+    "legacyModeGlyph": "wrongMode warning precedence and no protecting halo; effective history/network/callbacks unchanged; separate whole-source reverse proof preserved"
+  },
+  "allNineToolSourcesStopped": true,
+  "boundedSettingsSourceProof": {
+    "sha256": "8516b6e4e37060b3f7dc59d449284738d1020f590f02fa5abe6e5e5240c88bd6",
+    "evidence": {
+      "schema": 1,
+      "createdAtUtc": "2026-10-05T16:04:02.147071+00:00",
+      "applicationBaseline": "9399121212b68a5f6422170e00835095218c2f8e",
+      "sourceStopped": true,
+      "compiled": false,
+      "rendered": false,
+      "newCIRequired": true,
+      "purpose": "Byte-exact whole-file inverse of only authorized UI candidate transforms; all callbacks/I/O/guards/default paths preserved.",
+      "files": [
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+          "baselineSha256": "3061d1b044f16a8ee6ca3984256652228d7f38022ef26180178a90e22e5f43e6",
+          "candidateSha256": "b4f80535be520071219bb97873bd8a2fa4f2ea0c4d5aceea211c166051e6cdfd",
+          "baselineBytes": 26974,
+          "candidateBytes": 26974,
+          "reversedSha256": "3061d1b044f16a8ee6ca3984256652228d7f38022ef26180178a90e22e5f43e6",
+          "wholeFileVirtualReverseEqualsBaseline": true,
+          "allOtherBytesIncludingCallbacksGuardsExactlyPreserved": true,
+          "inverseTransforms": [
+            {
+              "candidateExactText": "settingsSubtitle(subtitle,12.5f)",
+              "baselineExactText": "settingsSubtitle(subtitle,11.5f)",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "showChoice(modeValue,labels,descriptions,enabled,selected,214,index->",
+              "baselineExactText": "showChoice(modeValue,labels,descriptions,enabled,selected,184,index->",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "showChoice(ipv6Value,labels,descriptions,new boolean[]{true,true,true,true},profile().ipv6.ordinal(),214,index->",
+              "baselineExactText": "showChoice(ipv6Value,labels,descriptions,new boolean[]{true,true,true,true},profile().ipv6.ordinal(),184,index->",
+              "occurrencesRequiredAndObserved": 1
+            }
+          ]
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+          "baselineSha256": "584fbc3f7b652f4cf3b0c2a8a5e1373603de2859dcaf4a7184b9d5a21b84c485",
+          "candidateSha256": "e9e62ef46c0cea41f14df623d417c141e2dfed2891d120f92969cf6cd9d67349",
+          "baselineBytes": 5726,
+          "candidateBytes": 5726,
+          "reversedSha256": "584fbc3f7b652f4cf3b0c2a8a5e1373603de2859dcaf4a7184b9d5a21b84c485",
+          "wholeFileVirtualReverseEqualsBaseline": true,
+          "allOtherBytesIncludingCallbacksGuardsExactlyPreserved": true,
+          "inverseTransforms": [
+            {
+              "candidateExactText": "fontSize = 12.sp, lineHeight = 19.sp, letterSpacing = 1.sp,",
+              "baselineExactText": "fontSize = 12.sp, lineHeight = 19.sp, letterSpacing = 0.sp,",
+              "occurrencesRequiredAndObserved": 1
+            }
+          ]
+        },
+        {
+          "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt",
+          "baselineSha256": "2050e971cbddfb746ad3e50698123ac687b25b3db5b2a294566ca949c18e6eec",
+          "candidateSha256": "903e14ef0286b4a18c415e06d2d2e655edc17572195428484412c9f3d9272372",
+          "baselineBytes": 14460,
+          "candidateBytes": 14781,
+          "reversedSha256": "2050e971cbddfb746ad3e50698123ac687b25b3db5b2a294566ca949c18e6eec",
+          "wholeFileVirtualReverseEqualsBaseline": true,
+          "allOtherBytesIncludingCallbacksGuardsExactlyPreserved": true,
+          "inverseTransforms": [
+            {
+              "candidateExactText": "    referenceMirrorNormalSpacing: Boolean = false,\n",
+              "baselineExactText": "",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "modifier = Modifier.fillMaxWidth().padding(top = if (referenceMirrorNormalSpacing) 14.dp else 8.dp,\n                    bottom = if (referenceMirrorNormalSpacing) 16.dp else 20.dp))",
+              "baselineExactText": "modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp))",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "Spacer(Modifier.height(if (referenceMirrorNormalSpacing) 22.dp else 18.dp))",
+              "baselineExactText": "Spacer(Modifier.height(18.dp))",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "            if (referenceMirrorNormalSpacing) Spacer(Modifier.height(6.dp))\n",
+              "baselineExactText": "",
+              "occurrencesRequiredAndObserved": 1
+            },
+            {
+              "candidateExactText": "titleLineHeightSp = if (error) 24f else null, referenceMirrorNormalSpacing = !error)",
+              "baselineExactText": "titleLineHeightSp = if (error) 24f else null)",
+              "occurrencesRequiredAndObserved": 1
+            }
+          ]
+        }
+      ],
+      "scopedGitDiffCheckPassed": true,
+      "scopedGitDiffCheckPaths": [
+        "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+        "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+        "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt",
+        "AGENTS.md",
+        "docs/V20.85_PDF_CONTINUATION.md"
+      ]
+    }
+  }
+}

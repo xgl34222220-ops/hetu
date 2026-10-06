@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Reverse only the fully SHA-verified function layer in a disposable prior view."""
+import argparse
+import json
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+
+from functionfix_source_scope import ROOT, previous_files, validate_layer, validate_source_transforms, digest
+from tools_intake_source_scope import EXTERNAL_PAYLOAD_FILES, compilation_inputs, validate_checkout_matches_generated
+
+SOURCE_GATES = ('test_ui_source_scope.py', 'test_pdf85_source_scope.py',
+                'test_tools_intake_source_scope.py', 'test_pdf85_final_source_scope.py',
+                'test_auth_source_scope.py')
+BASE_OBJECTS = ('2730954591393c1b81f747cef72adb8940c5a82c',
+                'ec211b9ad81748dee30fec43f0a25849559e4623')
+
+
+def predecessor_view(root, destination):
+    root, destination = Path(root), Path(destination)
+    previous = previous_files(root)
+    layer_path = root / 'updates/v2086-functionfix/inputs.json'
+    layer = json.loads(layer_path.read_text())
+    validate_layer(layer, previous, root)
+    patch = layer_path.with_name('runtime.patch')
+    assert digest(patch) == layer['patchSha256']
+    missing = previous.keys() - compilation_inputs(root)
+    assert missing <= EXTERNAL_PAYLOAD_FILES
+    final = {**previous, **layer['changedOrAddedFiles']}
+    # Every available current byte must match the recorded final map before
+    # copying/reversing; this never hides unknown production changes.
+    available_final = {name: sha for name, sha in final.items() if name not in missing}
+    for name, sha in available_final.items():
+        assert digest(root / name) == sha, 'Current function input differs from recorded layer: ' + name
+    assert compilation_inputs(root) == set(available_final)
+    shutil.copytree(root / 'android-app', destination / 'android-app',
+                    ignore=shutil.ignore_patterns('build', '.gradle', 'local.properties'))
+    shutil.copytree(root / '.github/scripts', destination / '.github/scripts', ignore=shutil.ignore_patterns('__pycache__'))
+    shutil.copytree(root / 'updates', destination / 'updates')
+    shutil.copyfile(root / 'UI92_RUNTIME146_INPUTS.json', destination / 'UI92_RUNTIME146_INPUTS.json')
+    subprocess.run(['git', 'init', '-q'], cwd=destination, check=True)
+    for commit in BASE_OBJECTS:
+        subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1', str(root), commit], cwd=destination, check=True)
+    subprocess.run(['git', 'apply', '--check', '-R', str(patch)], cwd=destination, check=True)
+    subprocess.run(['git', 'apply', '-R', str(patch)], cwd=destination, check=True)
+    validate_source_transforms(destination, root)
+    validate_checkout_matches_generated(destination, destination, {name: sha for name, sha in previous.items() if name not in missing})
+    return {'baselineInputs': len(previous), 'locallyVerifiedBaselineInputs': len(previous) - len(missing),
+            'missingUnchangedPayloadFiles': sorted(missing), 'exactFunctionPatchReversed': True,
+            'currentCheckoutUnmodified': True}
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--gate', choices=SOURCE_GATES, action='append')
+    args = parser.parse_args()
+    with tempfile.TemporaryDirectory(prefix='hetu-function-baseline-host-') as directory:
+        view = Path(directory)
+        report = predecessor_view(ROOT, view)
+        for gate in args.gate or SOURCE_GATES:
+            subprocess.run(['python3', str(view / '.github/scripts' / gate)], cwd=view, check=True)
+        print(json.dumps(report))

@@ -1,0 +1,327 @@
+{
+  "appCommit": "77164bc42c2ecc800105a48e36598ad8fbbcda36",
+  "run": 37305122492,
+  "conclusion": "success",
+  "buildJob": 111746825884,
+  "apkSha256": "21cf3b7e20acab050e7faebc4c833f586ddd32eb37d7c3aaf1dd44515cba81de",
+  "apkBytes": 134761485,
+  "uiArtifact": 11343393222,
+  "unit": {
+    "tests": 479,
+    "xmlFiles": 49,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "apis": {
+    "35": {
+      "job": 111751477079,
+      "artifact": 11344725850,
+      "result": "success",
+      "passed": 64,
+      "legacyChecksPassed": 59,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "auth": {
+        "result": "PASS",
+        "fixtureOnly": true,
+        "syntheticCachedRuntimeHint": true,
+        "rootMutationActions": 0,
+        "controllerHost": "127.0.0.1",
+        "target": {
+          "avd": "hetu-smoke",
+          "apiLevel": 35,
+          "ownedSession": "bae5af0a691345d0812ab04ad7e9223b",
+          "runnerPid": 2569,
+          "launcherPid": 2583,
+          "launcherStartTicks": 15774,
+          "supervisorPid": 2585,
+          "emulatorPids": [
+            2586
+          ],
+          "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+          "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+          "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+          "serial": "emulator-5554",
+          "nonRootShell": true,
+          "consoleAvdReply": []
+        },
+        "rootHealthEvidence": false,
+        "toast401Claimed": false,
+        "limitations": "Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.",
+        "originalPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+        "continuityServiceObserved": false,
+        "retryWhile401": {
+          "timeMonotonic": 869.616864829,
+          "bounds": [
+            115,
+            355,
+            177,
+            403
+          ],
+          "input": "native adb tap"
+        },
+        "retryReadyBeforeFixture200": {
+          "observedAtMonotonic": 874.395890227,
+          "enabled": true,
+          "source": "fresh native XML while fixture remained401"
+        },
+        "fixture200AtMonotonic": 874.395891378,
+        "retryAfterFixture200": {
+          "timeMonotonic": 874.395936627,
+          "bounds": [
+            115,
+            355,
+            177,
+            403
+          ],
+          "input": "native adb tap"
+        },
+        "actualBearerAuthorizationVerified": true,
+        "observedNativeCounts": {
+          "策略": 12,
+          "规则": 3,
+          "当前连接": 18
+        },
+        "first200AtMonotonic": 874.439613639,
+        "recoveryObservation": "retry input preceded successful reads; foreground poll also remained active",
+        "exclusiveRetryRecoveryClaimed": false,
+        "restoredPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+        "originalPreferencesRestored": true,
+        "adbReverseRestored": true,
+        "newChecks": [
+          {
+            "name": "panel-controller-401-first-read",
+            "result": "passed",
+            "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+          },
+          {
+            "name": "panel-controller-401-api-settings",
+            "result": "passed",
+            "evidence": "actual NativeCompose ApiSheet opened by native tap"
+          },
+          {
+            "name": "panel-controller-401-retry",
+            "result": "passed",
+            "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+          },
+          {
+            "name": "panel-controller-200-recovered",
+            "result": "passed",
+            "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+          },
+          {
+            "name": "panel-controller-fixture-cleanup",
+            "result": "passed",
+            "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+          }
+        ]
+      },
+      "preflight": {
+        "avd": "hetu-smoke",
+        "apiLevel": 35,
+        "ownedSession": "bae5af0a691345d0812ab04ad7e9223b",
+        "runnerPid": 2569,
+        "launcherPid": 2583,
+        "launcherStartTicks": 15774,
+        "supervisorPid": 2585,
+        "emulatorPids": [
+          2586
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      },
+      "emulatorCleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2586,
+        "returncode": 0
+      },
+      "runnerLifecycle": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      }
+    },
+    "36": {
+      "job": 111751477260,
+      "artifact": 11344930138,
+      "result": "success",
+      "passed": 64,
+      "legacyChecksPassed": 59,
+      "paletteCasesPassed": 21,
+      "rootMutationActions": 0,
+      "auth": {
+        "result": "PASS",
+        "fixtureOnly": true,
+        "syntheticCachedRuntimeHint": true,
+        "rootMutationActions": 0,
+        "controllerHost": "127.0.0.1",
+        "target": {
+          "avd": "hetu-smoke",
+          "apiLevel": 36,
+          "ownedSession": "7e5f1b55aec944cba2018749cb06eb04",
+          "runnerPid": 2344,
+          "launcherPid": 2358,
+          "launcherStartTicks": 14369,
+          "supervisorPid": 2360,
+          "emulatorPids": [
+            2361
+          ],
+          "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+          "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+          "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+          "serial": "emulator-5554",
+          "nonRootShell": true,
+          "consoleAvdReply": []
+        },
+        "rootHealthEvidence": false,
+        "toast401Claimed": false,
+        "limitations": "Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.",
+        "originalPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+        "continuityServiceObserved": false,
+        "retryWhile401": {
+          "timeMonotonic": 828.848737249,
+          "bounds": [
+            115,
+            355,
+            177,
+            403
+          ],
+          "input": "native adb tap"
+        },
+        "retryReadyBeforeFixture200": {
+          "observedAtMonotonic": 833.594235899,
+          "enabled": true,
+          "source": "fresh native XML while fixture remained401"
+        },
+        "fixture200AtMonotonic": 833.59423687,
+        "retryAfterFixture200": {
+          "timeMonotonic": 833.594273734,
+          "bounds": [
+            115,
+            355,
+            177,
+            403
+          ],
+          "input": "native adb tap"
+        },
+        "actualBearerAuthorizationVerified": true,
+        "observedNativeCounts": {
+          "策略": 12,
+          "规则": 3,
+          "当前连接": 18
+        },
+        "first200AtMonotonic": 833.601855522,
+        "recoveryObservation": "retry input preceded successful reads; foreground poll also remained active",
+        "exclusiveRetryRecoveryClaimed": false,
+        "restoredPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+        "originalPreferencesRestored": true,
+        "adbReverseRestored": true,
+        "newChecks": [
+          {
+            "name": "panel-controller-401-first-read",
+            "result": "passed",
+            "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+          },
+          {
+            "name": "panel-controller-401-api-settings",
+            "result": "passed",
+            "evidence": "actual NativeCompose ApiSheet opened by native tap"
+          },
+          {
+            "name": "panel-controller-401-retry",
+            "result": "passed",
+            "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+          },
+          {
+            "name": "panel-controller-200-recovered",
+            "result": "passed",
+            "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+          },
+          {
+            "name": "panel-controller-fixture-cleanup",
+            "result": "passed",
+            "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+          }
+        ]
+      },
+      "preflight": {
+        "avd": "hetu-smoke",
+        "apiLevel": 36,
+        "ownedSession": "7e5f1b55aec944cba2018749cb06eb04",
+        "runnerPid": 2344,
+        "launcherPid": 2358,
+        "launcherStartTicks": 14369,
+        "supervisorPid": 2360,
+        "emulatorPids": [
+          2361
+        ],
+        "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+        "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+        "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+        "serial": "emulator-5554",
+        "nonRootShell": true,
+        "consoleAvdReply": []
+      },
+      "emulatorCleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2361,
+        "returncode": 0
+      },
+      "runnerLifecycle": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      }
+    }
+  },
+  "limitations": "Independent earlier candidate, later PDF mistakes corrected in939. Loopback Mihomo controller, not real Google authentication."
+}

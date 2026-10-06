@@ -1,0 +1,3533 @@
+{
+  "schemaVersion": 5,
+  "createdUtc": "2026-10-05T17:30:35.225145+00:00",
+  "applicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "workflowRunId": 37346239863,
+  "uiArtifactId": 11360907944,
+  "uiZipSize": 14683807,
+  "uiZipSha256": "96649400c1e8b4793d6d22e68810be32a6cf0e0d7272eb89e57a515cedc5d071",
+  "artifactDigestScope": "Parent uniquely downloaded and verified the ZIP. This agent independently verified all49 new capture hashes, all49 flat/raw exact bytes, and all49 unit XML totals.",
+  "referencePDF": {
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03A-工具上册-离线版(1).pdf",
+    "sha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+    "pages": 49
+  },
+  "scope": "Only final fresh03A49 capture hash comparison against26a and actual full-size03A21 measurement. No source, fixture, tests or CI mutations.",
+  "source_edits_stopped": true,
+  "reviewSummary": {
+    "actualNewCaptureHashesChecked": 49,
+    "flatRawExactByteMatches": 49,
+    "unchangedPagesExactlyEqual26a": 48,
+    "changedPages": [
+      21
+    ],
+    "newA21ActuallyOpenedFullSize": true,
+    "all49NewImagesReopened": false,
+    "visualInheritanceMethod": "48 pages inherit visual findings solely by verified exact bytes from26a; its unchanged page evidence explicitly points to the actual49-pair936 review. No name-only or memory-based inference.",
+    "pixelParityPassed": false,
+    "strict1to1OverallStatus": "FAIL",
+    "visualImplementationOverallStatus": "PARTIAL",
+    "A21SpecificNewTargetStatus": "PASS_WITH_RASTER_TOLERANCE: actual164/7/28 with absolute errors below0.4 normalized pixels; full-page literal parity remains PARTIAL",
+    "highConfidenceNewMissingControlRegression": false
+  },
+  "validationContext": {
+    "independentFreshArtifactXml": {
+      "suites": 49,
+      "tests": 479,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "failureCases": [],
+      "pdf85": {
+        "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.tools.ToolsPdf85Test.xml",
+        "name": "io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+        "tests": 49,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "allSuiteResults": [
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AdblockSnifferTest.xml",
+          "name": "io.github.xgl34222220.hetu.AdblockSnifferTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AppCrashReportTest.xml",
+          "name": "io.github.xgl34222220.hetu.AppCrashReportTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationConceptParity57Test.xml",
+          "name": "io.github.xgl34222220.hetu.AutomationConceptParity57Test",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest.xml",
+          "name": "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationToolsConceptParityTest.xml",
+          "name": "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.BootStartup60Test.xml",
+          "name": "io.github.xgl34222220.hetu.BootStartup60Test",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptParity57Test.xml",
+          "name": "io.github.xgl34222220.hetu.ConceptParity57Test",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptRemainingCoverageTest.xml",
+          "name": "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptStateCoverageTest.xml",
+          "name": "io.github.xgl34222220.hetu.ConceptStateCoverageTest",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerAuthenticationTest.xml",
+          "name": "io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerReadStateTest.xml",
+          "name": "io.github.xgl34222220.hetu.ControllerReadStateTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CoreManagerConcept57Test.xml",
+          "name": "io.github.xgl34222220.hetu.CoreManagerConcept57Test",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest.xml",
+          "name": "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.DocumentPickerSafetyTest.xml",
+          "name": "io.github.xgl34222220.hetu.DocumentPickerSafetyTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+          "name": "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.JournalReliabilityTest.xml",
+          "name": "io.github.xgl34222220.hetu.JournalReliabilityTest",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LargeTitleParity59Test.xml",
+          "name": "io.github.xgl34222220.hetu.LargeTitleParity59Test",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LegacyControllerCredentialTest.xml",
+          "name": "io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.MainLanguageBindingTest.xml",
+          "name": "io.github.xgl34222220.hetu.MainLanguageBindingTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NativeConceptScreenshotTest.xml",
+          "name": "io.github.xgl34222220.hetu.NativeConceptScreenshotTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkDiagnosticsTest.xml",
+          "name": "io.github.xgl34222220.hetu.NetworkDiagnosticsTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkRecoveryStressTest.xml",
+          "name": "io.github.xgl34222220.hetu.NetworkRecoveryStressTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewHomePanelInteractionTest.xml",
+          "name": "io.github.xgl34222220.hetu.NewHomePanelInteractionTest",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiIntegrationTest.xml",
+          "name": "io.github.xgl34222220.hetu.NewUiIntegrationTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiShell83Test.xml",
+          "name": "io.github.xgl34222220.hetu.NewUiShell83Test",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelActionSafetyTest.xml",
+          "name": "io.github.xgl34222220.hetu.PanelActionSafetyTest",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelConceptModelTest.xml",
+          "name": "io.github.xgl34222220.hetu.PanelConceptModelTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelControllerErrorTest.xml",
+          "name": "io.github.xgl34222220.hetu.PanelControllerErrorTest",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelLayoutDefaultsTest.xml",
+          "name": "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelModel11Test.xml",
+          "name": "io.github.xgl34222220.hetu.PanelModel11Test",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyAdblockExportTest.xml",
+          "name": "io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyLatencyRegressionTest.xml",
+          "name": "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyNetworkJournalTest.xml",
+          "name": "io.github.xgl34222220.hetu.ProxyNetworkJournalTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyScriptSafetyTest.xml",
+          "name": "io.github.xgl34222220.hetu.ProxyScriptSafetyTest",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootAutostartTest.xml",
+          "name": "io.github.xgl34222220.hetu.RootAutostartTest",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootHealthUpgradeTest.xml",
+          "name": "io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootNetworkRecoveryTest.xml",
+          "name": "io.github.xgl34222220.hetu.RootNetworkRecoveryTest",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.Runtime146ContractTest.xml",
+          "name": "io.github.xgl34222220.hetu.Runtime146ContractTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeStartup15Test.xml",
+          "name": "io.github.xgl34222220.hetu.RuntimeStartup15Test",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeYaml15Test.xml",
+          "name": "io.github.xgl34222220.hetu.RuntimeYaml15Test",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsBackupParity57Test.xml",
+          "name": "io.github.xgl34222220.hetu.SettingsBackupParity57Test",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsConceptParityTest.xml",
+          "name": "io.github.xgl34222220.hetu.SettingsConceptParityTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsPickerParity58Test.xml",
+          "name": "io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToastFeedbackTest.xml",
+          "name": "io.github.xgl34222220.hetu.ToastFeedbackTest",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToolsConceptParityTest.xml",
+          "name": "io.github.xgl34222220.hetu.ToolsConceptParityTest",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83EditorHistoryTest.xml",
+          "name": "io.github.xgl34222220.hetu.UI83EditorHistoryTest",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83ToolsTest.xml",
+          "name": "io.github.xgl34222220.hetu.UI83ToolsTest",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.WanDetails61Test.xml",
+          "name": "io.github.xgl34222220.hetu.WanDetails61Test",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.tools.ToolsPdf85Test.xml",
+          "name": "io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "whole479Status": "PASS: 479 tests /0 failures /0 errors /0 skips independently read",
+    "ToolsPdf85Status": "PASS: 49 tests /0 failures /0 errors /0 skips independently read",
+    "XMLReportPath": "/tmp/hetu_ca60825_xml_tests_readonly_review.json",
+    "XMLReportSha256": "575ba8b1161b51e1139ccc7a87f71a7c2e2ff72df9e4fa253bd20ff5bf114e3c",
+    "productionBuild": "Fresh compiled capture and XML evidence present; final build/lint/signature status owned by parent acceptance evidence",
+    "API35InstallationAndSmoke": "NOT_CONFIRMED_BY_THIS_REVIEW",
+    "API36InstallationAndSmoke": "NOT_CONFIRMED_BY_THIS_REVIEW",
+    "API59NavigationAcceptance": "NOT_CONFIRMED_BY_THIS_REVIEW",
+    "API5AuthenticationAcceptance": "NOT_CONFIRMED_BY_THIS_REVIEW",
+    "native401to200": "NOT_CONFIRMED_BY_THIS_REVIEW",
+    "older936Failed479EvidenceRetained": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+    "oldNativeSuccessNotReused": true,
+    "reviewerStartedOrCancelledCI": false,
+    "reviewerRanTests": false
+  },
+  "measurementMethod": {
+    "sizeNormalization": "425px reference lengths ×393/425;850px embedded JPEG lengths ×393/850",
+    "coordinateLimits": "原PDF含文档25px标题和OEM系统栏；跨图绝对Y不得直接相减，shape尺寸/内部gap单独测。",
+    "inkSegmentation": "RGB mask on actual PNG/JPEG; glyph antialias/hinting andJPEG affect ink endpoints; multi-key repeated measurements justify spacing candidate."
+  },
+  "A21ActualMeasurements": {
+    "reference": {
+      "actual_view_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-21.png",
+      "sha256": "b56ef0c7bcac5ba178eadb69e3b61a8c81475d0a736f622d55cd4be10d7dbe24",
+      "size": [
+        425,
+        950
+      ],
+      "ROIs": {
+        "error": [
+          30,
+          245,
+          145,
+          270
+        ],
+        "text": [
+          55,
+          245,
+          145,
+          270
+        ],
+        "icon": [
+          30,
+          245,
+          52,
+          270
+        ],
+        "URLlabel": [
+          28,
+          286,
+          180,
+          315
+        ]
+      },
+      "error_ink_bbox": [
+        33,
+        247,
+        136,
+        263
+      ],
+      "error_text_ink_bbox": [
+        58,
+        249,
+        136,
+        260
+      ],
+      "error_icon_ink_bbox": [
+        33,
+        247,
+        49,
+        263
+      ],
+      "URL_label_ink_bbox": [
+        32,
+        293,
+        93,
+        307
+      ],
+      "name_fill_y_inclusive": [
+        194,
+        239
+      ],
+      "URL_fill_y_inclusive": [
+        321,
+        366
+      ],
+      "name_fill_native_height": 46,
+      "URL_fill_native_height": 46,
+      "card_top_native": 144,
+      "native_URL_cardTop_origin": 177,
+      "normalized393_URL_cardTop_origin": 163.672941,
+      "native_input_fill_last_to_error_first_ink": 8,
+      "normalized393_input_fill_last_to_error_first_ink": 7.397647,
+      "native_error_last_ink_to_URLlabel_first_ink": 30,
+      "normalized393_error_last_ink_to_URLlabel_first_ink": 27.741176,
+      "text": {
+        "native_height": 12,
+        "native_width": 79,
+        "normalized393_height": 11.096471,
+        "normalized393_width": 73.051765,
+        "native_input_fill_last_to_first_ink": 10,
+        "normalized393_input_fill_last_to_first_ink": 9.247059,
+        "native_last_ink_to_URLlabel_first_ink": 33,
+        "normalized393_last_ink_to_URLlabel_first_ink": 30.515294
+      },
+      "icon": {
+        "native_height": 17,
+        "native_width": 17,
+        "normalized393_height": 15.72,
+        "normalized393_width": 15.72,
+        "native_input_fill_last_to_first_ink": 8,
+        "normalized393_input_fill_last_to_first_ink": 7.397647,
+        "native_last_ink_to_URLlabel_first_ink": 30,
+        "normalized393_last_ink_to_URLlabel_first_ink": 27.741176
+      }
+    },
+    "previous26a": {
+      "actual_view_path": "/workspace/scratch/3788973cf567/tmp/ui85-26a0906/03A-021-current.png",
+      "sha256": "db87b1d42a92f426252fce899680570d78afea43cbba033750962839e65149d7",
+      "size": [
+        393,
+        852
+      ],
+      "ROIs": {
+        "error": [
+          30,
+          160,
+          145,
+          190
+        ],
+        "text": [
+          48,
+          160,
+          145,
+          190
+        ],
+        "icon": [
+          30,
+          160,
+          47,
+          190
+        ],
+        "URLlabel": [
+          28,
+          193,
+          180,
+          235
+        ]
+      },
+      "error_ink_bbox": [
+        32,
+        165,
+        121,
+        176
+      ],
+      "error_text_ink_bbox": [
+        50,
+        165,
+        121,
+        176
+      ],
+      "error_icon_ink_bbox": [
+        32,
+        166,
+        43,
+        176
+      ],
+      "URL_label_ink_bbox": [
+        31,
+        204,
+        93,
+        219
+      ],
+      "name_fill_y_inclusive": [
+        112,
+        155
+      ],
+      "URL_fill_y_inclusive": [
+        231,
+        273
+      ],
+      "name_fill_native_height": 44,
+      "URL_fill_native_height": 43,
+      "card_top_native": 64,
+      "native_URL_cardTop_origin": 167,
+      "normalized393_URL_cardTop_origin": 167.0,
+      "native_input_fill_last_to_error_first_ink": 10,
+      "normalized393_input_fill_last_to_error_first_ink": 10.0,
+      "native_error_last_ink_to_URLlabel_first_ink": 28,
+      "normalized393_error_last_ink_to_URLlabel_first_ink": 28.0,
+      "text": {
+        "native_height": 12,
+        "native_width": 72,
+        "normalized393_height": 12.0,
+        "normalized393_width": 72.0,
+        "native_input_fill_last_to_first_ink": 10,
+        "normalized393_input_fill_last_to_first_ink": 10.0,
+        "native_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+      },
+      "icon": {
+        "native_height": 11,
+        "native_width": 12,
+        "normalized393_height": 11.0,
+        "normalized393_width": 12.0,
+        "native_input_fill_last_to_first_ink": 11,
+        "normalized393_input_fill_last_to_first_ink": 11.0,
+        "native_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+      }
+    },
+    "freshCa60825": {
+      "actual_view_path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-021-current.png",
+      "sha256": "f4538045e0789d53d4173515618523cdee937799e9c270222d0dbb9dad910f1b",
+      "size": [
+        393,
+        852
+      ],
+      "ROIs": {
+        "error": [
+          30,
+          160,
+          145,
+          190
+        ],
+        "text": [
+          48,
+          160,
+          145,
+          190
+        ],
+        "icon": [
+          30,
+          160,
+          47,
+          190
+        ],
+        "URLlabel": [
+          28,
+          193,
+          180,
+          235
+        ]
+      },
+      "error_ink_bbox": [
+        32,
+        162,
+        121,
+        173
+      ],
+      "error_text_ink_bbox": [
+        50,
+        162,
+        121,
+        173
+      ],
+      "error_icon_ink_bbox": [
+        32,
+        163,
+        43,
+        173
+      ],
+      "URL_label_ink_bbox": [
+        31,
+        201,
+        93,
+        216
+      ],
+      "name_fill_y_inclusive": [
+        112,
+        155
+      ],
+      "URL_fill_y_inclusive": [
+        228,
+        270
+      ],
+      "name_fill_native_height": 44,
+      "URL_fill_native_height": 43,
+      "card_top_native": 64,
+      "native_URL_cardTop_origin": 164,
+      "normalized393_URL_cardTop_origin": 164.0,
+      "native_input_fill_last_to_error_first_ink": 7,
+      "normalized393_input_fill_last_to_error_first_ink": 7.0,
+      "native_error_last_ink_to_URLlabel_first_ink": 28,
+      "normalized393_error_last_ink_to_URLlabel_first_ink": 28.0,
+      "text": {
+        "native_height": 12,
+        "native_width": 72,
+        "normalized393_height": 12.0,
+        "normalized393_width": 72.0,
+        "native_input_fill_last_to_first_ink": 7,
+        "normalized393_input_fill_last_to_first_ink": 7.0,
+        "native_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+      },
+      "icon": {
+        "native_height": 11,
+        "native_width": 12,
+        "normalized393_height": 11.0,
+        "normalized393_width": 12.0,
+        "native_input_fill_last_to_first_ink": 8,
+        "normalized393_input_fill_last_to_first_ink": 8.0,
+        "native_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+      }
+    },
+    "targetActualChecks": {
+      "URL_origin164": {
+        "status": "PASS",
+        "actual": 164,
+        "reference_normalized": 163.672941,
+        "fresh_minus_reference": 0.327059
+      },
+      "input_to_error_ink7": {
+        "status": "PASS",
+        "actual": 7,
+        "reference_normalized": 7.397647,
+        "fresh_minus_reference": -0.397647
+      },
+      "error_to_URLlabel_ink28": {
+        "status": "PASS",
+        "actual": 28,
+        "reference_normalized": 27.741176,
+        "fresh_minus_reference": 0.258824
+      }
+    },
+    "beforeAfterActual": {
+      "URLorigin_previous26a_to_fresh": [
+        167,
+        164
+      ],
+      "error_inputgap_previous26a_to_fresh": [
+        10,
+        7
+      ],
+      "error_aftergap_previous26a_to_fresh": [
+        28,
+        28
+      ],
+      "text_size_unchanged": [
+        12,
+        72
+      ],
+      "icon_ink_size_unchanged": [
+        11,
+        12
+      ],
+      "actual_relative_compression_from26a": 3,
+      "historical936_origin_from_prior_actualreview": 176,
+      "total_compression_from_historical936": 12,
+      "normal_origin148_from_prior_actualreview": "Inheritedanchor only; normal05notnewlyvisuallyreviewed here",
+      "error_increment_over_normal": 16
+    },
+    "RowTextReconstruction": {
+      "actualRowheight": 18,
+      "declared_errorTextStyle": "12sp/14sp,letterSpacing0.4sp",
+      "icon_declared_size": "13dp unchanged",
+      "previous26a_Row_y_interval": [
+        162,
+        180
+      ],
+      "fresh_Row_and_Text_y_interval": [
+        159,
+        177
+      ],
+      "fresh_input_y_interval": [
+        112,
+        156
+      ],
+      "fresh_error_before_Spacer_y_interval": [
+        156,
+        159
+      ],
+      "fresh_after_Spacer_y_interval": [
+        177,
+        196
+      ],
+      "fresh_URLlabel_y_interval": [
+        196,
+        220
+      ],
+      "fresh_label_to_input_Spacer_y_interval": [
+        220,
+        228
+      ],
+      "fresh_URLinput_y_interval": [
+        228,
+        271
+      ],
+      "basis": "Measured44pxnamefill and43pxURLfill; compiled3dpbeforegap/19dpaftergap/8dplabel-inputgap plusunchanged24pxlabelbox constrain18pxRow. Newincrement18+3+19−24=16. Nooffset/negativepadding."
+    },
+    "coordinateAndThresholdMethod": {
+      "normalization": "Distances×393/image_width; nativeink/fillbboxesinclusive; layoutintervalsend-exclusive. Reference425×950 versusapp393×852. No OSbaralignment.",
+      "ink_masks": "ErrorR>200,G<130,B<150; URLlabelmaxRGB<195,minRGB>10,channelspread<60 withinstatedROI",
+      "field_fill": "R<244 and B-R>5 atblankx360reference/x335app withinstatedROI",
+      "uncertainty": "About1 nativepixel thresholdedge sensitivity. Textink is distinctfromlinebox."
+    },
+    "sourceSnapshot": [
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "compiled_sha256": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+        "workspace_equals_compiled": true,
+        "wholefile_equal_previous26a": true
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+        "compiled_sha256": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+        "workspace_equals_compiled": true,
+        "only_source_change_vs26a": "Caller6dp→3dp; exactwholefileinverseequals26a",
+        "callbacks_defaults_style_aftergap_unchanged": true
+      }
+    ],
+    "sourceLayoutConclusion": "Actual row height18px is retained. The compiled caller before spacing6→3 shifts error and downstream URL3px up, confirming URL164/input-to-error7/aftergap28. These are fresh measured values. Font/glyph literal differences remain explicitly unresolved."
+  },
+  "unchangedVisualEvidenceInherited": {
+    "baselineApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+    "baselineReviewPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+    "baselineReviewSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+    "sameBytesPages": 48,
+    "priorActualReadOrigin": {
+      "baselineApplicationCommit": "936ffac87a81ef056e3c006987667e9d56baf5bc",
+      "baselineReviewPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+      "baselineReviewSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+      "baselineReportHadActual49Read": true,
+      "substantiveRemainingIssuesInherited": [
+        "A44selected39pxvsref36.988",
+        "A44DomainChip84pxwidthvsref74.901",
+        "A44cardheights137/243vsref135.007/239.496",
+        "Referencefont/glyph/frame/carddifferences remain;originalstrict1to1 false"
+      ]
+    },
+    "substantiveRemainingIssuesInherited": [
+      "A44selected39pxvsref36.988",
+      "A44DomainChip84pxwidthvsref74.901",
+      "A44cardheights137/243vsref135.007/239.496",
+      "Referencefont/glyph/frame/carddifferences remain;originalstrict1to1 false"
+    ]
+  },
+  "pageHashes": [
+    {
+      "page": 1,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-001-current.png",
+      "sha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+      "previous26asha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-001-current.png"
+    },
+    {
+      "page": 2,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-002-current.png",
+      "sha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+      "previous26asha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-002-current.png"
+    },
+    {
+      "page": 3,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-003-current.png",
+      "sha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+      "previous26asha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-003-current.png"
+    },
+    {
+      "page": 4,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-004-current.png",
+      "sha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+      "previous26asha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-004-current.png"
+    },
+    {
+      "page": 5,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-005-current.png",
+      "sha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+      "previous26asha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-005-current.png"
+    },
+    {
+      "page": 6,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-006-current.png",
+      "sha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+      "previous26asha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-006-current.png"
+    },
+    {
+      "page": 7,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-007-current.png",
+      "sha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+      "previous26asha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-007-current.png"
+    },
+    {
+      "page": 8,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-008-current.png",
+      "sha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+      "previous26asha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-008-current.png"
+    },
+    {
+      "page": 9,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-009-current.png",
+      "sha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+      "previous26asha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-009-current.png"
+    },
+    {
+      "page": 10,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-010-current.png",
+      "sha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+      "previous26asha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-010-current.png"
+    },
+    {
+      "page": 11,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-011-current.png",
+      "sha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+      "previous26asha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-011-current.png"
+    },
+    {
+      "page": 12,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-012-current.png",
+      "sha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+      "previous26asha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-012-current.png"
+    },
+    {
+      "page": 13,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-013-current.png",
+      "sha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+      "previous26asha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-013-current.png"
+    },
+    {
+      "page": 14,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-014-current.png",
+      "sha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+      "previous26asha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-014-current.png"
+    },
+    {
+      "page": 15,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-015-current.png",
+      "sha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+      "previous26asha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-015-current.png"
+    },
+    {
+      "page": 16,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-016-current.png",
+      "sha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+      "previous26asha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-016-current.png"
+    },
+    {
+      "page": 17,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-017-current.png",
+      "sha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+      "previous26asha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-017-current.png"
+    },
+    {
+      "page": 18,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-018-current.png",
+      "sha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+      "previous26asha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-018-current.png"
+    },
+    {
+      "page": 19,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-019-current.png",
+      "sha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+      "previous26asha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-019-current.png"
+    },
+    {
+      "page": 20,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-020-current.png",
+      "sha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+      "previous26asha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-020-current.png"
+    },
+    {
+      "page": 21,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-021-current.png",
+      "sha256": "f4538045e0789d53d4173515618523cdee937799e9c270222d0dbb9dad910f1b",
+      "previous26asha256": "db87b1d42a92f426252fce899680570d78afea43cbba033750962839e65149d7",
+      "exactBytesEqual26a": false,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-021-current.png"
+    },
+    {
+      "page": 22,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-022-current.png",
+      "sha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+      "previous26asha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-022-current.png"
+    },
+    {
+      "page": 23,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-023-current.png",
+      "sha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+      "previous26asha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-023-current.png"
+    },
+    {
+      "page": 24,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-024-current.png",
+      "sha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+      "previous26asha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-024-current.png"
+    },
+    {
+      "page": 25,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-025-current.png",
+      "sha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+      "previous26asha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-025-current.png"
+    },
+    {
+      "page": 26,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-026-current.png",
+      "sha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+      "previous26asha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-026-current.png"
+    },
+    {
+      "page": 27,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-027-current.png",
+      "sha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+      "previous26asha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-027-current.png"
+    },
+    {
+      "page": 28,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-028-current.png",
+      "sha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+      "previous26asha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-028-current.png"
+    },
+    {
+      "page": 29,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-029-current.png",
+      "sha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+      "previous26asha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-029-current.png"
+    },
+    {
+      "page": 30,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-030-current.png",
+      "sha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+      "previous26asha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-030-current.png"
+    },
+    {
+      "page": 31,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-031-current.png",
+      "sha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+      "previous26asha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-031-current.png"
+    },
+    {
+      "page": 32,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-032-current.png",
+      "sha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+      "previous26asha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-032-current.png"
+    },
+    {
+      "page": 33,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-033-current.png",
+      "sha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+      "previous26asha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-033-current.png"
+    },
+    {
+      "page": 34,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-034-current.png",
+      "sha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+      "previous26asha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-034-current.png"
+    },
+    {
+      "page": 35,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-035-current.png",
+      "sha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+      "previous26asha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-035-current.png"
+    },
+    {
+      "page": 36,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-036-current.png",
+      "sha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+      "previous26asha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-036-current.png"
+    },
+    {
+      "page": 37,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-037-current.png",
+      "sha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+      "previous26asha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-037-current.png"
+    },
+    {
+      "page": 38,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-038-current.png",
+      "sha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+      "previous26asha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-038-current.png"
+    },
+    {
+      "page": 39,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-039-current.png",
+      "sha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+      "previous26asha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-039-current.png"
+    },
+    {
+      "page": 40,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-040-current.png",
+      "sha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+      "previous26asha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-040-current.png"
+    },
+    {
+      "page": 41,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-041-current.png",
+      "sha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+      "previous26asha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-041-current.png"
+    },
+    {
+      "page": 42,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-042-current.png",
+      "sha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+      "previous26asha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-042-current.png"
+    },
+    {
+      "page": 43,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-043-current.png",
+      "sha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+      "previous26asha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-043-current.png"
+    },
+    {
+      "page": 44,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-044-current.png",
+      "sha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+      "previous26asha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-044-current.png"
+    },
+    {
+      "page": 45,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-045-current.png",
+      "sha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+      "previous26asha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-045-current.png"
+    },
+    {
+      "page": 46,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-046-current.png",
+      "sha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+      "previous26asha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-046-current.png"
+    },
+    {
+      "page": 47,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-047-current.png",
+      "sha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+      "previous26asha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-047-current.png"
+    },
+    {
+      "page": 48,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-048-current.png",
+      "sha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+      "previous26asha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-048-current.png"
+    },
+    {
+      "page": 49,
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-049-current.png",
+      "sha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+      "previous26asha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+      "exactBytesEqual26a": true,
+      "flatMatchesRaw": true,
+      "rawPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-049-current.png"
+    }
+  ],
+  "pages": [
+    {
+      "page": 1,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-01.png",
+      "referenceSha256": "dfaba404577d2ee746786be6cba501d33b2c48eeac411b1a0c42f82971d1a692",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-001-current.png",
+      "captureSha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-001-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "ca46bf486f9f4cb058cf9b10a57c8acd48d9fdfbe010fc4801f7a3a20468f2de",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-01.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 2,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-02.png",
+      "referenceSha256": "ed78391a22474b453c60c3e298e6f414e957d29fbb853ac50e2302b1e1c79425",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-002-current.png",
+      "captureSha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-002-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "7fc5dcd5fc0a7b724899830c2064bf99750cb614241d53cbb0dba4e4c3573259",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-02.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 3,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-03.png",
+      "referenceSha256": "02b51b156376baec0f7001a651509ced7c4574b46697b9699a89728583e55eb5",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-003-current.png",
+      "captureSha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-003-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "35e26dcfe67718b184e15ae1db2809d8707bab2f979901d6d4b18f874d9922d2",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-03.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 4,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-04.png",
+      "referenceSha256": "4496878c255c4682e70a340eb2d366e8e9f474491d25c9ff89010c556b64f08e",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-004-current.png",
+      "captureSha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-004-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "56889a3ce9c5a759f399f7d42c2d45bb6d4bae959baf10cce4344aca97c18bbe",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-04.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 5,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-05.png",
+      "referenceSha256": "b8fb4542aebe6536da8a7d7362283b1ba06575edb81a5b9424bb0e1f9d4ba7de",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-005-current.png",
+      "captureSha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-005-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Add URL实际填色43px，name44px；URLcardTop offset148≈ref147.953，label/error/footer callbacks状态保留。"
+      ],
+      "findingIds": [
+        "P05_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "450841d92105328bf0e89785936f66cbbecf0672c8172dd60849c04444a0edaa",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-05.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 6,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-06.png",
+      "referenceSha256": "bfbf91e0a6b0ab23c1b90e79bdcb77055c9027df4d9d903585d2cffced4e3a3f",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-006-current.png",
+      "captureSha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-006-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "95977e5b53ae5395ff5d92aa437875b28cbe84d073c61fd3cb7c8ce43f7a553e",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-06.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 7,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-07.png",
+      "referenceSha256": "362113df42e6278d4abd8e5022f263c210bc7ba3fe5d4b04ff0073f1952ddf42",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-007-current.png",
+      "captureSha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-007-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "b4fed1cedf63e04efaf81f980ece3e43e97ed077563b1cf1700669974450bc44",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-07.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 8,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-08.png",
+      "referenceSha256": "df11c7a66a78153a76632d268878519ba0703183bac37bf51237a8b8637912d7",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-008-current.png",
+      "captureSha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-008-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "5e42202c41fe9aa5fa4fe46ab1b64f9ac7fd16fe1e38c7784862d7e21739a401",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-08.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 9,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-09.png",
+      "referenceSha256": "376a1ff61cdfd6c2ce100f639bebbed12154127a073fc8a57ba769accbe369b4",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-009-current.png",
+      "captureSha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-009-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "cce4471fd6d109c913a1929c1941de8cb9c8bcc779417a07c3ecd3e7f50905bf",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-09.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 10,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-10.png",
+      "referenceSha256": "f7fbdcd64c9bf616c0f67aa71b343eb50e5afbb3a960632a5c101b2e35e8d58e",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-010-current.png",
+      "captureSha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-010-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "0f13579db49bbf93c8e6fcf46d0935b47407cacde661a29ff2c0e30b0b39ddd5",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-10.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 11,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-11.png",
+      "referenceSha256": "75bb67ed465e7794285cdab630609f9170102f37e5955a48310b033209b38099",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-011-current.png",
+      "captureSha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-011-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "25dc6b30730d26441ace084a3d3220cc3b535fac5ef03a6d5ebfc1cc017b239f",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-11.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 12,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-12.png",
+      "referenceSha256": "a04d5e6a2286154d0d615c9cf5ed5b9cf2cb2c02b827f27294c8814b41c2317c",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-012-current.png",
+      "captureSha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-012-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "2c694bb38e482f66bfb59d0850ae247d0e36417eca04077482d36bce79d82597",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-12.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 13,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-13.png",
+      "referenceSha256": "8dc64411d28c465950231967532af1e51d370360fc9149ee1b1773ab4461cc40",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-013-current.png",
+      "captureSha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-013-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "sheet实际y398、首pill456、gap58；旧939为392/478/86，原JPEG归一397.161/455.88/58.719；11pill视觉28/pitch32/indent28保留。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "202b224f2c2fea6edd227949a457003c9070669923e4c2a3b38cea412d001800",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-13.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 14,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-14.png",
+      "referenceSha256": "b7267c4768779f9c138dceac4bc32e42e6dffcb611174bd3b33b184128268d22",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-014-current.png",
+      "captureSha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-014-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "新共用YAML字距实际出现在underlay；保存冲突提示和按钮仍可见。Sheet按钮形状/字体等整页未像素全过。"
+      ],
+      "findingIds": [
+        "P14_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "c912d33820f2a358bccf9677d17981a5587d2543cb52484f224dd6c3607c31f6",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-14.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 15,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-15.png",
+      "referenceSha256": "99cbb810971778a245e7a9a1c39f68f7d8f50ecacc2750140ebe980c91eb33a7",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-015-current.png",
+      "captureSha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-015-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "新YAML字距实际出现在error editor，error行高亮与验证文字仍在；源fixture28行与原27行属于样本内容差，单独记录。"
+      ],
+      "findingIds": [
+        "P15_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "afa76103efe0dedbd2bc74e1ac532b250b85af670925be0d8781d401fafa5d13",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-15.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 16,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-16.png",
+      "referenceSha256": "748e3c52a80ed5f528c421a92fafe8a8c09d57b22e4b9e78c632b051c1e4f9a8",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-016-current.png",
+      "captureSha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-016-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "失败图标与939capture SHA相同，实际44×54墨迹保持；没有以旧文件替代此次artifact图片。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "66052dd55a45d8f88dfa5fefca8e564189756199c8ceaa14a06e7e00e0f41a62",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-16.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 17,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-17.png",
+      "referenceSha256": "da4169463e828d2029a3edfe030ad12bf810bcccb93f33b4a0c6b1b3c30e2818",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-017-current.png",
+      "captureSha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-017-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "外部修改sheet与draft/reload两动作仍可见；新YAML字距在underlay呈现，整页不宣称像素精确。"
+      ],
+      "findingIds": [
+        "P17_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "4b480d061052e53bf2495604a92e45d6553252b22d31b87c5784a27338ef38de",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-17.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 18,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-18.png",
+      "referenceSha256": "b5d9f872a8ffb18518e5c67d0921737ad05e7cd094c0ab5163d7bfbf9f249ca9",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-018-current.png",
+      "captureSha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-018-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "重新读取confirm和underlay新YAML字距可见，动作标签/危险按钮未删除；整体PARTIAL。"
+      ],
+      "findingIds": [
+        "P18_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "910363fc5083481309c87ab00c9b84806faa36342fd03227971b5e18c259106b",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-18.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 19,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-19.png",
+      "referenceSha256": "c00358c0ea134bf7c8faa49fbfdf581460b353195727a5c2916e4b4425e19409",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-019-current.png",
+      "captureSha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-019-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "放弃修改confirm状态保留，新字距underlay实际可见；dialog字体与原稿并非全等。"
+      ],
+      "findingIds": [
+        "P19_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "cd4e588582de5510f93c0f17ad3168b204743e5720d6f56c8df322110d68d759",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-19.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 20,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-20.png",
+      "referenceSha256": "65f927f0c8b16d934ce9f4f8d7d15b6e073bcd3088cf00d552c497478f9911d3",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-020-current.png",
+      "captureSha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-020-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "ee15056760432d465fbcbc87db42c32035539f73d776d299ad78905b66770071",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-20.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 21,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-21.png",
+      "referenceSha256": "b56ef0c7bcac5ba178eadb69e3b61a8c81475d0a736f622d55cd4be10d7dbe24",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-021-current.png",
+      "captureSha256": "f4538045e0789d53d4173515618523cdee937799e9c270222d0dbb9dad910f1b",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-021-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "db87b1d42a92f426252fce899680570d78afea43cbba033750962839e65149d7",
+      "exactBytesEqual26a": false,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": true,
+      "pairedVisualOpenedInThisCaReview": true,
+      "pairPath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-03A-review/A21-reference-26a-ca.png",
+      "viewMethod": "Actual full-size reference / 26a / ca60825 three-image comparison opened with detail original, without rescaling. Child independently opened all three original images.",
+      "localizedTargetGeometryStatus": "PASS_WITH_RASTER_TOLERANCE",
+      "observations": [
+        "Fresh URL input top228 minus card top64 gives164px; previous26a167 and reference normalized163.672941.",
+        "Fresh name fill last155 to error first162 gives7px; previous26a10 and reference normalized7.397647.",
+        "Fresh error last173 to URL label first201 gives28px; previous26a28 and reference normalized27.741176.",
+        "All three claimed values were measured in this fresh capture; they are not retained predictions.",
+        "Error text remains72px wide by12px high. Error icon ink remains12px wide by11px high against reference normalized15.72px square, so literal full-page parity remains PARTIAL.",
+        "The observed18px error row and real3dp before /19dp after spacing preserve flow layout. No offset or negative-padding capture workaround was used."
+      ],
+      "findingIds": [
+        "P21_LIMITED_GEOMETRY_CONFIRMED",
+        "P21_GLYPH_TEXT_LITERAL_PARITY_REMAINS_PARTIAL"
+      ]
+    },
+    {
+      "page": 22,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-22.png",
+      "referenceSha256": "4e49d19bbcdc8473469217043d7c4989a1a773a5282f5e274aa20fc6339484e3",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-022-current.png",
+      "captureSha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-022-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Add hint在error前正确；URLfill43px、offset148≈ref147.953；error至Save仍33px≈ref32.365，局部目标通过但未整页1:1。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "cc037b6d3a5e055048a921cbbc7aed136c25e899142fcbc9202d471e6cea52f4",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-22.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 23,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-23.png",
+      "referenceSha256": "d4bd2ddd5daea09181e723e80edfbf696d5f6ea4a0c6f6a2fc347436c506a188",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-023-current.png",
+      "captureSha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-023-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Edit只读名称22px×64vs原约21.268×65.656；hint单行12px，URL43px；error在hint前正确，URLoffset163 vs原166.447仍偏。"
+      ],
+      "findingIds": [
+        "P23_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "12440a422f5e70d749beb3c94ccffb3f6a803472af2f29ccde1b1b023a68347c",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-23.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 24,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-24.png",
+      "referenceSha256": "8ef5068d46aed997505e3bca213e5e4ea2e742a2b2ab6b5b5f422b28e3dce167",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-024-current.png",
+      "captureSha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-024-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "d8cb92ac01576c0fa612f7751d764dbcbf9a82ec4c3116526c96f653aa5db553",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-24.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 25,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-25.png",
+      "referenceSha256": "a23e0acbc9d54db0fcaffffe15696d4eb64106ac0bcc48b7f4fbe19037a2fbbf",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-025-current.png",
+      "captureSha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-025-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "字距-.35已渲染：mixed-port宽82（旧85，原81.374）；9同文key横宽误差全部减小，8项<=1dp，一项1.052；17px行距vs原16.645。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "d9b85882de7e1eae63a20bad6de833e5dfbd53b15958d6f31bedeb21060416d4",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-25.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 26,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-26.png",
+      "referenceSha256": "e7e50084adfbf07e7bf3fa026113f2d82bc91bf18d432fac9c975289896f1b87",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-026-current.png",
+      "captureSha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-026-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Edit只读name22/hint单行12已渲染；URL43px，offset163vsref167.372，布局更接近但仍PARTIAL。"
+      ],
+      "findingIds": [
+        "P26_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "ddae74cb6f6beac35239b8d94854abd936ed2749a360f852cd667c88b8b623dc",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-26.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 27,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-27.png",
+      "referenceSha256": "3a2400c285e2bc80a881cb70f9a7732aa16cab4af29c491e4886ce7d1013d088",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-027-current.png",
+      "captureSha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-027-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "01e2dce2589a7543e15ba1e700b609ac96db84dcbc5c25bf892e104d990a2d1e",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-27.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 28,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-28.png",
+      "referenceSha256": "3afe91c4e2a47551dc25debf5aba88897c719131826821ed7c653ae3479aee13",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-028-current.png",
+      "captureSha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-028-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "284386731cbcaa10797035866a839bbefe62930d56a7c896d20eea5b5758f820",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-28.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 29,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-29.png",
+      "referenceSha256": "94ecbb218212c591a87fb944c30e7ee49c789dd8dc51681e7742452c136cc802",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-029-current.png",
+      "captureSha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-029-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "6a4f3ab80a435814f07e4fa608bf1bfe9b378cbe71529c966a4dfc31bd4cbcb0",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-29.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 30,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-30.png",
+      "referenceSha256": "e98bcf7545a48c56d12c14183d8a40730e084f4a57c19e1a8052630bfbc8e61b",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-030-current.png",
+      "captureSha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-030-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "d99d3cac5fb016c8b7e8d006d15177d0ccf1375b47c889aea78f3f187f5213bc",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-30.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 31,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-31.png",
+      "referenceSha256": "24487a055161653e115e12ab381497ca656dbf813e6c7022ec897631f8731639",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-031-current.png",
+      "captureSha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-031-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "3c5196b15c045df653acf23b28828cc91eb103b94849a46d2a4c61ebfa4465c4",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-31.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 32,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-32.png",
+      "referenceSha256": "6e5d72d317ac6887b39ee3e590e8adfbea8dff544a0a5f5d4d51027adc67b12a",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-032-current.png",
+      "captureSha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-032-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "f0fbeba9b3ee89270e83d23714dfd69ba800ae6170ace7f7fc54d5a7a4f62b5c",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-32.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 33,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-33.png",
+      "referenceSha256": "b32247ed09f32b1c71e79cae5dc9f0403ac2f8b36baf650d6b53586e89cfc34c",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-033-current.png",
+      "captureSha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-033-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "86ef55f6593abe03c44eedcddc82cc25678076385b3ece86fda137bad10e6ce7",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-33.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 34,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-34.png",
+      "referenceSha256": "da432eb12a9301449a1e804dfd01604dbc1a73c93a4868bc539bfcb31c21ac68",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-034-current.png",
+      "captureSha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-034-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "capture SHA与939完全相同，来自此次artifact且hash复核；Core实心glyph和SoftRGB238/240/252保持。"
+      ],
+      "findingIds": [
+        "P34_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "486aa02f183fac8ef55eb6f47a7bf210439878d11fc1c0a87cc517e301113b50",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-34.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 35,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-35.png",
+      "referenceSha256": "1b1fffbb80e86691b102c3ec66bbc0808b05a9aa142ec79f4943883bd1547f95",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-035-current.png",
+      "captureSha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-035-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "实际busy spinner23×23（旧18×18，原23.118归一），busy200/202/214、disabled234/237/246、label187/189/202保持；925变像素仅spinner/居中busy文本区域。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "5ba125a61dd9db3c38aef38fa51f303af281b43292eb4232ed00c8132012f750",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-35.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 36,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-36.png",
+      "referenceSha256": "6560b4ed317517d63443a741779386a81cb5923f206459ea4d19648e0ac3d833",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-036-current.png",
+      "captureSha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-036-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "333a8349aa731c556e2592304b15ef862af5c9be905b7cbd520e5760e3030b88",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-36.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 37,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-37.png",
+      "referenceSha256": "dbc832ed81ffb902be65c4648bb2966727cff45a25d828b46ac850113cfdc4c0",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-037-current.png",
+      "captureSha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-037-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "c7825bc641df792149c877ef2d82edb6e0dcc468aa6d3bc4359a1c4d15ca71a8",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-37.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 38,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-38.png",
+      "referenceSha256": "7c15bc9174b31fefb14716d86b9c8a69ad1887d6e2f81a17dda852896c16b402",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-038-current.png",
+      "captureSha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-038-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "3abff1b7cc6ba7fb31b3f0d4a7a72637e67ee06befa2ca440ceeb1c0d4d901eb",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-38.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 39,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-39.png",
+      "referenceSha256": "3439840794529c545b2b7c3dd67ab3d31703cf3053eca292b97483d27d781ed8",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-039-current.png",
+      "captureSha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-039-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "8c468971a4c29f495b0d7e0ca407e4ad5992036d442d6694f71cd0284fd38d91",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-39.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 40,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-40.png",
+      "referenceSha256": "5a6cf38a09c9867b971ec71cc405d6ba728c8cccebd44658b115ba42ef84a714",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-040-current.png",
+      "captureSha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-040-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "8d933d7ab111c69a950b18c49d3e51fe8264b30d437de79533bcc684dd3aa848",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-40.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 41,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-41.png",
+      "referenceSha256": "92769e856304a45a4dcb01a6c354e0851d8bdf96ee628fb20242003b5c030e15",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-041-current.png",
+      "captureSha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-041-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "共享YAML字距影响readonly code实际capture改变；sheet高度仍既有参考约60%，不从underlay位置臆断68%。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "9318703d1aac52069b888033d9fd5639cd4e170a3a5338e5e4518808d20ff98e",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-41.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 42,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-42.png",
+      "referenceSha256": "ce589d63b90b16d4c068b9ef588b431f92d40e252bea4458f977b9dcd813666e",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-042-current.png",
+      "captureSha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-042-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "71234dce3dbe0fa55854bfb132ee7a1963963160018a69352f483f5b12bea010",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-42.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 43,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-43.png",
+      "referenceSha256": "ea71488b22c8c0bc74db1421c939ba35883f220b4adbb6d88dc02d9dbd1fa907",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-043-current.png",
+      "captureSha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-043-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "网络诊断readonly report字距同源变化实际出现；输出内容完整/复制入口保留，图片阅读不是交互验收。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "ca38b7e7160727e694d0e0381c17bbc28356447901c6a71c502d4bb8b2ac2bc6",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-43.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 44,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-44.png",
+      "referenceSha256": "273d10d66f277a2a7b439e7f407403be9154bf5810077582658c73c4ef1aa913",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-044-current.png",
+      "captureSha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-044-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "新Level137/Sources243/Domain90/90/Off152px，旧153/246/100/100；CNAME title801..819、caption826..838、switch完整同屏，原687未移动。",
+        "新规则源无折角document18×21墨迹，原embedded crop归一17.57×20.81，保留负空间与动态tint。Update72×28 strong-fill vs原约70.28×28.665；selectedfill110×39 vs原108.18×36.988仍有差。",
+        "DomainChip已比例Semi字体，墨迹84×13 vs旧mono86×14，原归一74.901×12.946；仍宽约9.1dp，不能将家族修正视作宽度1:1。"
+      ],
+      "findingIds": [
+        "P44_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "76703d85342bc9a2a1d2651f10804ccaf984298ea3b2fa0b34c3cdb2501e497a",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-44.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 45,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-45.png",
+      "referenceSha256": "fcdf25f6a4d99a43820d4f449b9147faa1cd242999cfa49bcfc09eed50f898d1",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-045-current.png",
+      "captureSha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-045-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Status/Chain/Recent原prefix source不动；新Level card geometry在屏底呈现，顶部填充shield/circle与业务状态保持；card边界字距等未整页像素精确。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "4ebc2b1067912cb12438923568f0f7f6ebd501471fd034838c394ee224544977",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-45.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 46,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-46.png",
+      "referenceSha256": "dcb67e600d708ba34184e6bdddb185bb0a3b1005a708dfd42cdb55b0c4dfe2fa",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-046-current.png",
+      "captureSha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-046-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "已实际打开本轮原图/936capture pair；本批未发现新增缺失控件，但原有字体、glyph/边框、卡尺寸、菜单样式等差异仍未认定像素1:1。OS状态栏/clock/nav、fixture数据差异另列，不用于掩盖已明确source呈现差。"
+      ],
+      "findingIds": [],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "edb484418d3ac9b24e21b8d350c7414093658f7bff909f169121a7e40406c2e0",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-46.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 47,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-47.png",
+      "referenceSha256": "3852fc4707ac2a67f756d37525397cac9d68a251d6c001eb6ee0e387998dc925",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-047-current.png",
+      "captureSha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-047-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "Rule页累计卡高压缩后对话框underlay真实改变；47原maxscroll未改，Level部分露出不同于44精准定位，field/actions存在。"
+      ],
+      "findingIds": [
+        "P47_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "7d9b4318671431c5635f31dc4db05e178039d7925510042347b8e1ee4939f2f0",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-47.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 48,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-48.png",
+      "referenceSha256": "475cbe529e53c72fef00b7edc8b9d10845ecf64b70b778a5941dced0bf76b4b6",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-048-current.png",
+      "captureSha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-048-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "同样实际underlay变化且fixture原值保留，domain入参/添加与取消入口存在；不以滚动隐藏44末控件。"
+      ],
+      "findingIds": [
+        "P48_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "10f53cd8361b1ed23ba3bbf6e505aa720411fbf436423b71d6673b0b7eb76973",
+          "previousActualReadMethod": "fresh pair assembled at native pixel size in actually opened four-pair grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-48.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    },
+    {
+      "page": 49,
+      "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-49.png",
+      "referenceSha256": "6881de78a7a7dfe8e336b05735dcbb916904ae7bcac427341549324e620b1cc5",
+      "capturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-049-current.png",
+      "captureSha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+      "rawArtifactCapturePath": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/outputs/pdf85/03A-049-current.png",
+      "flatMatchesRawArtifactByteForByte": true,
+      "previous26aCaptureSha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+      "exactBytesEqual26a": true,
+      "pixelParityPassed": false,
+      "strict1to1Status": "NOT_PASS",
+      "newCaCaptureReopened": false,
+      "pairedVisualOpenedInThisCaReview": false,
+      "viewMethod": "New capture SHA and flat/raw bytes independently checked. This page was not reopened in this final review; visual findings inherit only by exact byte equality to26a, whose page evidence inherits exact bytes from the actually opened936 capture.",
+      "observations": [
+        "+.8sp domain字距实图strong-ink119px（旧108，原strong归一118.362；weak mask新120vs原119.285），宽度误差现<=1px；familyDefault/c.t2保留。整dialog/underlay并未pixel全过。"
+      ],
+      "findingIds": [
+        "P49_LOCAL_PRESENTATION_REMAINS"
+      ],
+      "inheritedVisualReview": {
+        "immediateReportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-26a0906-visual-review.json",
+        "immediateReportSha256": "60876a8835f1ca720597d30a19b2b97450b1108cdf9ef1cc5fa8d8d9ea125b2b",
+        "immediateApplicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+        "sameCaptureSha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+        "immediateCaptureReopened": false,
+        "actualReadingOrigin": {
+          "reportPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-936ffac-visual-review.json",
+          "reportSha256": "bcd8e7eff21994a326fa23b2b627bc445fd31a5344a6a625d9306eabddc51ddc",
+          "previousCaptureSha256": "d8e8261d9b0e16e5b5c9a4fd56b94cc31aaa3e99a57bfad41388daaf679ae52f",
+          "previousActualReadMethod": "individual full-size pair plus grouped review",
+          "previousPairPath": "/workspace/scratch/3788973cf567/tmp/ui85-936ffac-03A-review/page-49.jpg"
+        },
+        "actual936PairOpened": true
+      }
+    }
+  ],
+  "limits": [
+    "479 unit tests and49 tool screenshot tests passing do not establish all130 PDF pages as pixel1:1 or full functional acceptance.",
+    "48 pages were not newly reopened; their visual review inherits only after all48 fresh byte identities were proven. Only A21 was actually reopened at full size in this final review.",
+    "A21 scoped origin and error-gap targets are confirmed within0.4px of normalized reference, while text/icon literal differences remain. No claim of whole-page or whole-book exact parity.",
+    "Native API35/36 final installation/navigation/authentication results were not verified in this subtask. Do not substitute an older successful run or controller401→200 for fresh native success or Google account authentication.",
+    "No new source edit, fixture change, test execution, CI start/cancel, phone/account operation or real-device fix claim by this reviewer."
+  ],
+  "A21ChildActualReview": {
+    "review": "Actual full-size03A21 reference/previous26a/freshca60825 read-onlyQA",
+    "compiled_application_commit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "previous_application_commit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+    "actions_run": "37346239863",
+    "artifact_id": "11360907944",
+    "archive_size_supplied_by_parent": 14683807,
+    "archive_sha256_supplied_by_parent": "96649400c1e8b4793d6d22e68810be32a6cf0e0d7272eb89e57a515cedc5d071",
+    "archive_identity_scope": "Parent supplied archiveidentity; individualPNG/XMLSHA independentlycomputed",
+    "scope": "Only three requestedA21 images, compiledtwo-source snapshot and requestedunitXML totals",
+    "actual_view_detail": "original",
+    "actual_view_count": 3,
+    "source_edits_stopped": true,
+    "target_geometry_status": "PASS",
+    "literal_PDF_parity_status": "PARTIAL",
+    "captures": {
+      "reference": {
+        "actual_view_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-21.png",
+        "sha256": "b56ef0c7bcac5ba178eadb69e3b61a8c81475d0a736f622d55cd4be10d7dbe24",
+        "size": [
+          425,
+          950
+        ],
+        "ROIs": {
+          "error": [
+            30,
+            245,
+            145,
+            270
+          ],
+          "text": [
+            55,
+            245,
+            145,
+            270
+          ],
+          "icon": [
+            30,
+            245,
+            52,
+            270
+          ],
+          "URLlabel": [
+            28,
+            286,
+            180,
+            315
+          ]
+        },
+        "error_ink_bbox": [
+          33,
+          247,
+          136,
+          263
+        ],
+        "error_text_ink_bbox": [
+          58,
+          249,
+          136,
+          260
+        ],
+        "error_icon_ink_bbox": [
+          33,
+          247,
+          49,
+          263
+        ],
+        "URL_label_ink_bbox": [
+          32,
+          293,
+          93,
+          307
+        ],
+        "name_fill_y_inclusive": [
+          194,
+          239
+        ],
+        "URL_fill_y_inclusive": [
+          321,
+          366
+        ],
+        "name_fill_native_height": 46,
+        "URL_fill_native_height": 46,
+        "card_top_native": 144,
+        "native_URL_cardTop_origin": 177,
+        "normalized393_URL_cardTop_origin": 163.672941,
+        "native_input_fill_last_to_error_first_ink": 8,
+        "normalized393_input_fill_last_to_error_first_ink": 7.397647,
+        "native_error_last_ink_to_URLlabel_first_ink": 30,
+        "normalized393_error_last_ink_to_URLlabel_first_ink": 27.741176,
+        "text": {
+          "native_height": 12,
+          "native_width": 79,
+          "normalized393_height": 11.096471,
+          "normalized393_width": 73.051765,
+          "native_input_fill_last_to_first_ink": 10,
+          "normalized393_input_fill_last_to_first_ink": 9.247059,
+          "native_last_ink_to_URLlabel_first_ink": 33,
+          "normalized393_last_ink_to_URLlabel_first_ink": 30.515294
+        },
+        "icon": {
+          "native_height": 17,
+          "native_width": 17,
+          "normalized393_height": 15.72,
+          "normalized393_width": 15.72,
+          "native_input_fill_last_to_first_ink": 8,
+          "normalized393_input_fill_last_to_first_ink": 7.397647,
+          "native_last_ink_to_URLlabel_first_ink": 30,
+          "normalized393_last_ink_to_URLlabel_first_ink": 27.741176
+        }
+      },
+      "previous26a": {
+        "actual_view_path": "/workspace/scratch/3788973cf567/tmp/ui85-26a0906/03A-021-current.png",
+        "sha256": "db87b1d42a92f426252fce899680570d78afea43cbba033750962839e65149d7",
+        "size": [
+          393,
+          852
+        ],
+        "ROIs": {
+          "error": [
+            30,
+            160,
+            145,
+            190
+          ],
+          "text": [
+            48,
+            160,
+            145,
+            190
+          ],
+          "icon": [
+            30,
+            160,
+            47,
+            190
+          ],
+          "URLlabel": [
+            28,
+            193,
+            180,
+            235
+          ]
+        },
+        "error_ink_bbox": [
+          32,
+          165,
+          121,
+          176
+        ],
+        "error_text_ink_bbox": [
+          50,
+          165,
+          121,
+          176
+        ],
+        "error_icon_ink_bbox": [
+          32,
+          166,
+          43,
+          176
+        ],
+        "URL_label_ink_bbox": [
+          31,
+          204,
+          93,
+          219
+        ],
+        "name_fill_y_inclusive": [
+          112,
+          155
+        ],
+        "URL_fill_y_inclusive": [
+          231,
+          273
+        ],
+        "name_fill_native_height": 44,
+        "URL_fill_native_height": 43,
+        "card_top_native": 64,
+        "native_URL_cardTop_origin": 167,
+        "normalized393_URL_cardTop_origin": 167.0,
+        "native_input_fill_last_to_error_first_ink": 10,
+        "normalized393_input_fill_last_to_error_first_ink": 10.0,
+        "native_error_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_error_last_ink_to_URLlabel_first_ink": 28.0,
+        "text": {
+          "native_height": 12,
+          "native_width": 72,
+          "normalized393_height": 12.0,
+          "normalized393_width": 72.0,
+          "native_input_fill_last_to_first_ink": 10,
+          "normalized393_input_fill_last_to_first_ink": 10.0,
+          "native_last_ink_to_URLlabel_first_ink": 28,
+          "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+        },
+        "icon": {
+          "native_height": 11,
+          "native_width": 12,
+          "normalized393_height": 11.0,
+          "normalized393_width": 12.0,
+          "native_input_fill_last_to_first_ink": 11,
+          "normalized393_input_fill_last_to_first_ink": 11.0,
+          "native_last_ink_to_URLlabel_first_ink": 28,
+          "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+        }
+      },
+      "freshca": {
+        "actual_view_path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825/03A-021-current.png",
+        "sha256": "f4538045e0789d53d4173515618523cdee937799e9c270222d0dbb9dad910f1b",
+        "size": [
+          393,
+          852
+        ],
+        "ROIs": {
+          "error": [
+            30,
+            160,
+            145,
+            190
+          ],
+          "text": [
+            48,
+            160,
+            145,
+            190
+          ],
+          "icon": [
+            30,
+            160,
+            47,
+            190
+          ],
+          "URLlabel": [
+            28,
+            193,
+            180,
+            235
+          ]
+        },
+        "error_ink_bbox": [
+          32,
+          162,
+          121,
+          173
+        ],
+        "error_text_ink_bbox": [
+          50,
+          162,
+          121,
+          173
+        ],
+        "error_icon_ink_bbox": [
+          32,
+          163,
+          43,
+          173
+        ],
+        "URL_label_ink_bbox": [
+          31,
+          201,
+          93,
+          216
+        ],
+        "name_fill_y_inclusive": [
+          112,
+          155
+        ],
+        "URL_fill_y_inclusive": [
+          228,
+          270
+        ],
+        "name_fill_native_height": 44,
+        "URL_fill_native_height": 43,
+        "card_top_native": 64,
+        "native_URL_cardTop_origin": 164,
+        "normalized393_URL_cardTop_origin": 164.0,
+        "native_input_fill_last_to_error_first_ink": 7,
+        "normalized393_input_fill_last_to_error_first_ink": 7.0,
+        "native_error_last_ink_to_URLlabel_first_ink": 28,
+        "normalized393_error_last_ink_to_URLlabel_first_ink": 28.0,
+        "text": {
+          "native_height": 12,
+          "native_width": 72,
+          "normalized393_height": 12.0,
+          "normalized393_width": 72.0,
+          "native_input_fill_last_to_first_ink": 7,
+          "normalized393_input_fill_last_to_first_ink": 7.0,
+          "native_last_ink_to_URLlabel_first_ink": 28,
+          "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+        },
+        "icon": {
+          "native_height": 11,
+          "native_width": 12,
+          "normalized393_height": 11.0,
+          "normalized393_width": 12.0,
+          "native_input_fill_last_to_first_ink": 8,
+          "normalized393_input_fill_last_to_first_ink": 8.0,
+          "native_last_ink_to_URLlabel_first_ink": 28,
+          "normalized393_last_ink_to_URLlabel_first_ink": 28.0
+        }
+      }
+    },
+    "source_snapshot": [
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "compiled_sha256": "1809ddbfc25a5905815fb5e7205c04942e2fae62a17a17b93185ba7d723020b6",
+        "workspace_equals_compiled": true,
+        "wholefile_equal_previous26a": true
+      },
+      {
+        "path": "/workspace/scratch/3788973cf567/hetu/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+        "compiled_sha256": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+        "workspace_equals_compiled": true,
+        "only_source_change_vs26a": "Caller6dp→3dp; exactwholefileinverseequals26a",
+        "callbacks_defaults_style_aftergap_unchanged": true
+      }
+    ],
+    "coordinate_method": {
+      "normalization": "Distances×393/image_width; nativeink/fillbboxesinclusive; layoutintervalsend-exclusive. Reference425×950 versusapp393×852. No OSbaralignment.",
+      "ink_masks": "ErrorR>200,G<130,B<150; URLlabelmaxRGB<195,minRGB>10,channelspread<60 withinstatedROI",
+      "field_fill": "R<244 and B-R>5 atblankx360reference/x335app withinstatedROI",
+      "uncertainty": "About1 nativepixel thresholdedge sensitivity. Textink is distinctfromlinebox."
+    },
+    "limits": [
+      "Only requestedA21 visualscope wasreviewed.",
+      "ExactreferenceText/Rowlineboxes unavailable frombitmap; captured18pxRow andyintervals are source-constrainedreconstruction,not exportedsemantics.",
+      "ScopedtargetPASS doesnot imply literalwholepageparity; referenceiconink/fontweight/renderingstilldiffers.",
+      "No source/fixture/CI changes, tests, callbackexecution,installationorreal-devicevalidationperformedbyreviewer.",
+      "FinalnativeAPI35/36 resultsnotnotified/verified; nofinalworkflowPASSclaim."
+    ],
+    "target_actual_checks": {
+      "URL_origin164": {
+        "status": "PASS",
+        "actual": 164,
+        "reference_normalized": 163.672941,
+        "fresh_minus_reference": 0.327059
+      },
+      "input_to_error_ink7": {
+        "status": "PASS",
+        "actual": 7,
+        "reference_normalized": 7.397647,
+        "fresh_minus_reference": -0.397647
+      },
+      "error_to_URLlabel_ink28": {
+        "status": "PASS",
+        "actual": 28,
+        "reference_normalized": 27.741176,
+        "fresh_minus_reference": 0.258824
+      }
+    },
+    "before_after_actual": {
+      "URLorigin_previous26a_to_fresh": [
+        167,
+        164
+      ],
+      "error_inputgap_previous26a_to_fresh": [
+        10,
+        7
+      ],
+      "error_aftergap_previous26a_to_fresh": [
+        28,
+        28
+      ],
+      "text_size_unchanged": [
+        12,
+        72
+      ],
+      "icon_ink_size_unchanged": [
+        11,
+        12
+      ],
+      "actual_relative_compression_from26a": 3,
+      "historical936_origin_from_prior_actualreview": 176,
+      "total_compression_from_historical936": 12,
+      "normal_origin148_from_prior_actualreview": "Inheritedanchor only; normal05notnewlyvisuallyreviewed here",
+      "error_increment_over_normal": 16
+    },
+    "Row_Text_reconstruction": {
+      "actualRowheight": 18,
+      "declared_errorTextStyle": "12sp/14sp,letterSpacing0.4sp",
+      "icon_declared_size": "13dp unchanged",
+      "previous26a_Row_y_interval": [
+        162,
+        180
+      ],
+      "fresh_Row_and_Text_y_interval": [
+        159,
+        177
+      ],
+      "fresh_input_y_interval": [
+        112,
+        156
+      ],
+      "fresh_error_before_Spacer_y_interval": [
+        156,
+        159
+      ],
+      "fresh_after_Spacer_y_interval": [
+        177,
+        196
+      ],
+      "fresh_URLlabel_y_interval": [
+        196,
+        220
+      ],
+      "fresh_label_to_input_Spacer_y_interval": [
+        220,
+        228
+      ],
+      "fresh_URLinput_y_interval": [
+        228,
+        271
+      ],
+      "basis": "Measured44pxnamefill and43pxURLfill; compiled3dpbeforegap/19dpaftergap/8dplabel-inputgap plusunchanged24pxlabelbox constrain18pxRow. Newincrement18+3+19−24=16. Nooffset/negativepadding."
+    },
+    "validation_context": {
+      "unit_XML_status": "PASS",
+      "independently_read_XML_count": 49,
+      "actual_totals": {
+        "tests": 479,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "selected_suites": [
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsPickerParity58Test.xml",
+          "sha256": "e679ec6fb6686d7b2698ac35d198f46c1b82c92af61180126550bd59f7b1dfad",
+          "name": "io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+          "counts": {
+            "tests": 2,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.tools.ToolsPdf85Test.xml",
+          "sha256": "17a938f0308b69b1c78f18370056fb05c0c31601950e51aee7de24dccd4612fd",
+          "name": "io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+          "counts": {
+            "tests": 49,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        }
+      ],
+      "API35_final": "NOT_CONFIRMED",
+      "API36_final": "NOT_CONFIRMED",
+      "final_workflow_result": "NOT_CLAIMED",
+      "reviewer_ran_tests_or_CI": false
+    }
+  },
+  "A21ChildActualReviewSha256": "0275630cfc5c0c545003e954721c2998be1858215262e55951b4a5be969f0952",
+  "actualOpenedComparison": {
+    "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-03A-review/A21-reference-26a-ca.png",
+    "sha256": "4c8ebf89f97756ec2488f308ca5533ba470d27bd715aa6334a74db1e021b8d24",
+    "method": "view_image(detail=original), native425 reference and393 native captures side by side without rescaling",
+    "newCaSourceOnlyChange": "Compiled ToolsComponents exactly equals26a; ToolsSubscription caller errorSpacing6→3 is the sole difference and reversing it exactly equals26a. Other callbacks and defaults remain byte unchanged."
+  }
+}

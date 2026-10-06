@@ -1,0 +1,2809 @@
+{
+  "schema": 1,
+  "reference_pages": 173,
+  "current_named_captures": 82,
+  "extra_user_approved_core_captures": [
+    {
+      "id": "core-mihomo-variant-picker",
+      "image": "android-app/app/build/outputs/concept-state-coverage/core-mihomo-variant-picker.png",
+      "metadata": "android-app/app/build/outputs/concept-state-coverage/core-mihomo-variant-picker.json",
+      "sha256": "29151633c00cdc5953a8b4394504ca6b5ea79b0b601d33e040899e5cf869d83e",
+      "captured_at_utc": "2026-10-02T09:02:01.881861795Z",
+      "image_size": [
+        393,
+        852
+      ],
+      "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+    },
+    {
+      "id": "core-three-cards-smart-selected",
+      "image": "android-app/app/build/outputs/concept-state-coverage/core-three-cards-smart-selected.png",
+      "metadata": "android-app/app/build/outputs/concept-state-coverage/core-three-cards-smart-selected.json",
+      "sha256": "85f74e51a9ee53c554f54c7e8af0476789a9a775fff08ec3a7ca8a6df4fb6ceb",
+      "captured_at_utc": "2026-10-02T09:02:01.919161459Z",
+      "image_size": [
+        393,
+        852
+      ],
+      "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+    }
+  ],
+  "status_counts": {
+    "current_native_capture_and_interaction": 79,
+    "earlier_offline_capture_only": 13,
+    "native_capture_pending": 81
+  },
+  "test_result": {
+    "tests": "19",
+    "failures": "0",
+    "errors": "0",
+    "skipped": "0",
+    "timestamp": "2026-10-02T09:01:51.220Z",
+    "time": "17.132"
+  },
+  "test_source_sha256": "f61c386c73ef5106267d50ccfd9a7bed8576524c174d2049887bae74b551ab2e",
+  "boundaries": [
+    "System font retained; no font asset substituted.",
+    "No production state fixtures, bitmap overlays, mock UI redraw or fake live data.",
+    "No Root start/stop/reload, core download/install, real controller/backend, notification service or network-match service action.",
+    "MockWebServer serves isolated loopback GET fixtures for adjacent panel reads; API drafts cancelled.",
+    "Native window rasters composed with actual WindowManager gravity/dim attributes; status/navigation chrome, OS shadows, keyboard and GPU blur are not simulated.",
+    "Passed interaction tests and captured pages are not pixel-exact acceptance or device/runtime validation."
+  ],
+  "pages": [
+    {
+      "reference": "01/001",
+      "title": "首页 · 首页-参考版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/001.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-001-running.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-001-running.json",
+          "sha256": "36289dcd46f9d62296d4aa48c983014e83676da450582aaa039cb54c507311b2",
+          "captured_at_utc": "2026-10-02T09:02:08.047624868Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Synthetic running fixture; no device/Root data. Direct latency values are unknown."
+    },
+    {
+      "reference": "01/002",
+      "title": "首页 · 首页-运行控制展开",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/002.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-002-controls-expanded.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-002-controls-expanded.json",
+          "sha256": "0cded4716ec19e1fdc08a5005c73c22044234fe417e2bbc6a097d9aff29fd08d",
+          "captured_at_utc": "2026-10-02T09:02:08.107195446Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/003",
+      "title": "首页 · 首页-未运行",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/003.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/home-offline.png",
+          "sha256": "61ee61d99f679d440df41426f6439db5334863f601032879d2c7d4714992c90e"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "01/004",
+      "title": "首页 · 首页-待重启与LAN",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/004.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-004-pending-lan.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-004-pending-lan.json",
+          "sha256": "533b3729df932aaaf976fd52900ab9b37a7daaf005ab3250a7f93fcd41cfdaf9",
+          "captured_at_utc": "2026-10-02T09:02:08.178898071Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Pending preference is created by actual ProxyRuntimeSettings.markDirty, then LAN toggled. No restart action."
+    },
+    {
+      "reference": "01/005",
+      "title": "首页 · 首页-网速数据来源",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/005.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-005-speed-source.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-005-speed-source.json",
+          "sha256": "0bbd3f617d120c994e5957f10b1d6191899b24926e449002e47bb87f8fbbff41",
+          "captured_at_utc": "2026-10-02T09:02:08.238809075Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/006",
+      "title": "首页 · 首页-正在启动-校正版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/006.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-006-starting.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-006-starting.json",
+          "sha256": "86d80416e9c2f9561711248bf7744faaf2873d750fcd06348c6b055e1a9097ef",
+          "captured_at_utc": "2026-10-02T09:02:06.813080520Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/007",
+      "title": "首页 · 首页-启动失败-校正版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/007.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-007-failed.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-007-failed.json",
+          "sha256": "24b8e60f1bbde7875b285749d4d8843265daeb67d39ca9b907563cfd70693873",
+          "captured_at_utc": "2026-10-02T09:02:06.885927961Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/008",
+      "title": "首页 · 首页-正在重启-校正版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/008.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-008-restarting.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-008-restarting.json",
+          "sha256": "1f6c87ca87fb8e1e220551b97226afbb7e2b89e477bdf4a8472baf0a00acea7c",
+          "captured_at_utc": "2026-10-02T09:02:08.334978732Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/009",
+      "title": "首页 · 公网IP详情-公网",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/009.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/ip-public.png",
+          "sha256": "77a4ee3b776f45914d49856e4aed75d3fb19009e9e8bca9b36c88de1c8c0582d"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "01/010",
+      "title": "首页 · 公网IP详情-局域网",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/010.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/ip-lan.png",
+          "sha256": "45983c5a6fe29c7e0ae56f354f24b4a8db1e6cb4b42805746dcfbef0688ff555"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "01/011",
+      "title": "首页 · 本机直测目标-已保存",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/011.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-011-direct-targets-saved.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-011-direct-targets-saved.json",
+          "sha256": "a11a3490a1406989545408f13c837ff957b5830aab4182f46334f68c9861bef9",
+          "captured_at_utc": "2026-10-02T09:02:01.627604795Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/012",
+      "title": "首页 · 本机直测目标-校验错误-统一版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/012.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/01-012-direct-targets-invalid.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/01-012-direct-targets-invalid.json",
+          "sha256": "097428df6576bd88b9cb989de8db6ca679458859615757d2299fb2fb9af94b58",
+          "captured_at_utc": "2026-10-02T09:02:01.577944720Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "01/013",
+      "title": "首页 · 资源占用-运行与缺测",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/013.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/resources-gaps.png",
+          "sha256": "299e1fa45fe67d83dfb59a77ba1fba813defd7c8961b61490112e19ef8bf3be3"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "01/014",
+      "title": "首页 · 资源占用-等待采样-统一版",
+      "reference_pdf": "河图概念图-01-首页-离线版 (1)(1).pdf",
+      "reference_image": "render/01/014.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/resources-waiting.png",
+          "sha256": "6fdad449cbbdcd0ff2da4699232876f57cd3eda2e67061349dbdf6700ff61d9a"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "02/001",
+      "title": "面板 · 紧凑策略组-参考版",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/001.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-001-strategies.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-001-strategies.json",
+          "sha256": "c6c7e3a48acb0bc37adfa90029b38b125ae101e6f18595c59a77fee6cd16c0c0",
+          "captured_at_utc": "2026-10-02T09:02:00.029773599Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Configured-image URLs omitted in test fixture; normal production fallback glyphs render. Exact configured brand icons are not validated."
+    },
+    {
+      "reference": "02/002",
+      "title": "面板 · 策略展开-参考版",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/002.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-002-expanded.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-002-expanded.json",
+          "sha256": "09ece61175efcaebad6369879f68219629c7d1a3d6adb34294c846e833720006",
+          "captured_at_utc": "2026-10-02T09:02:00.164292905Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Eight deterministic test nodes; node selection or real delay probes are not executed."
+    },
+    {
+      "reference": "02/003",
+      "title": "面板 · 面板概览-顶部",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/003.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-003-overview.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-003-overview.json",
+          "sha256": "65605fc08980558f6e76e7de383c44fe59bf8382a6b4ab410fbd2102c2b1e77c",
+          "captured_at_utc": "2026-10-02T09:02:03.888847296Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/004",
+      "title": "面板 · 面板概览-收起顶栏",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/004.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-004-overview-scrolled.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-004-overview-scrolled.json",
+          "sha256": "96ce9d1be98b046bb43432a5a9685edebff33e0a8df34d52a15bc5b31ec28242",
+          "captured_at_utc": "2026-10-02T09:02:04.078066930Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Physical native vertical swipe exercises header collapse; only two synthetic ranked apps, not reference five."
+    },
+    {
+      "reference": "02/005",
+      "title": "面板 · 面板订阅",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/005.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-005-providers.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-005-providers.json",
+          "sha256": "ab875a315505ddf461b1304b00fb123a24f9f1c06c527ec969c3842c0367ac20",
+          "captured_at_utc": "2026-10-02T09:02:05.515087122Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "One loopback provider fixture; reference has three providers. Remaining-percent rendering is exercised."
+    },
+    {
+      "reference": "02/006",
+      "title": "面板 · 面板连接",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/006.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-006-connections.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-006-connections.json",
+          "sha256": "29db64e99b228c71054e3fa0ced9b1a4adf8402b9807a0473ed5848d9e5120de",
+          "captured_at_utc": "2026-10-02T09:02:07.035460946Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/007",
+      "title": "面板 · 面板规则",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/007.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-007-rules.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-007-rules.json",
+          "sha256": "bdbc2ab2d5635cffe15b8d4c50137b3f30c8fa58bc76ef3860201b91b6a690b4",
+          "captured_at_utc": "2026-10-02T09:02:05.712623376Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/008",
+      "title": "面板 · 面板规则集",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/008.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-008-rulesets.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-008-rulesets.json",
+          "sha256": "74bca355031d6f645f2e061c78b980f708f7e750e2ce73f5870f2e7b9e11bb0f",
+          "captured_at_utc": "2026-10-02T09:02:05.784297824Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/009",
+      "title": "面板 · 面板日志",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/009.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Live log state requires a controlled log-source fixture; no native capture in this pass."
+    },
+    {
+      "reference": "02/010",
+      "title": "面板 · 策略-筛选浮层",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/010.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-010-filter.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-010-filter.json",
+          "sha256": "357d0d98545eec1389f56fe7aef2c005a0335576a36f6daa0c60a00b66240582",
+          "captured_at_utc": "2026-10-02T09:01:58.217045023Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/011",
+      "title": "面板 · 策略-排序与布局",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/011.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-011-layout.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-011-layout.json",
+          "sha256": "73709ec8b182f574bf20c4dee353786bc4acad5ae1c41a3dd0f6b45515f65ef7",
+          "captured_at_utc": "2026-10-02T09:01:58.748479072Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/012",
+      "title": "面板 · 策略-测速与API",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/012.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-012-api-expanded.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-012-api-expanded.json",
+          "sha256": "7ac5f858afe4e95b3ad22cfdd858f5850a82b63566b6957722111463423d0163",
+          "captured_at_utc": "2026-10-02T09:01:59.374574550Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "All three toggles expanded in actual API sheet; controller port is the isolated test server port. Cancel does not persist edits."
+    },
+    {
+      "reference": "02/013",
+      "title": "面板 · 策略-节点信息",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/013.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-013-node-info.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-013-node-info.json",
+          "sha256": "08d54e24a0b052069bd75586dc480f71b0319502380ddb48e47bfa8a2bd34297",
+          "captured_at_utc": "2026-10-02T09:02:00.359446928Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/014",
+      "title": "面板 · 连接-详情浮层",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/014.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-014-connection-detail.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-014-connection-detail.json",
+          "sha256": "148747e8db3d411a125226922c689460738a9412a5cb0dc580de21e04f804017",
+          "captured_at_utc": "2026-10-02T09:02:07.218582460Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Scoped visible close button exercised and verified. App icon unavailable in synthetic fixture."
+    },
+    {
+      "reference": "02/015",
+      "title": "面板 · 连接-断开全部确认",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/015.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-015-disconnect-confirm.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-015-disconnect-confirm.json",
+          "sha256": "a4bbd5ef6fde958279ba37267ee0dbc2301a021e69675e6bf171953b854b7390",
+          "captured_at_utc": "2026-10-02T09:02:07.340353650Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/016",
+      "title": "面板 · 概览-显示数量",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/016.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-016-rank-count.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-016-rank-count.json",
+          "sha256": "ff23708cd80c23d9743f4a2ec6094b8786f826d1df6cc36220fc142dd5884e64",
+          "captured_at_utc": "2026-10-02T09:02:04.140894256Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/017",
+      "title": "面板 · 连接-排序",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/017.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-017-connection-sort.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-017-connection-sort.json",
+          "sha256": "539c393ef448255eb99a99d81c0adb9f781372cd7bec8f89cd7d5f95dc0330fb",
+          "captured_at_utc": "2026-10-02T09:02:07.093649273Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/018",
+      "title": "面板 · 连接-显示菜单",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/018.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-018-connection-display.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-018-connection-display.json",
+          "sha256": "7d1d1f9264ea684574241a7ee304a1a1e1cad84bf42836693afaaedaeadba92f",
+          "captured_at_utc": "2026-10-02T09:02:07.289209691Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/019",
+      "title": "面板 · 策略-搜索结果",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/019.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-019-search.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-019-search.json",
+          "sha256": "af75be3ac4bc8014e6c418d68f2408337231b79ddbf87ebb6ecbd262c1b8ee1f",
+          "captured_at_utc": "2026-10-02T09:02:00.646717434Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/020",
+      "title": "面板 · 概览-排行方式",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/020.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-020-rank-order.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-020-rank-order.json",
+          "sha256": "c8206fb33ee35083b6fdf9da3552820917c7021373c22cedf040ed23baf785c2",
+          "captured_at_utc": "2026-10-02T09:02:03.962337949Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/021",
+      "title": "面板 · 连接-筛选",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/021.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-021-connection-filter.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-021-connection-filter.json",
+          "sha256": "c7981193474bf3c7f8c6a8cfbfc93fd26d5d103a934ad9202ebd94eaa2b541b2",
+          "captured_at_utc": "2026-10-02T09:02:07.151573511Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/022",
+      "title": "面板 · 订阅-搜索与更新状态",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/022.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-022-provider-updating.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-022-provider-updating.json",
+          "sha256": "ed2f080df078607f6a8c2b597b0fa9f6156ec93de34f087f0d342556c3a89870",
+          "captured_at_utc": "2026-10-02T09:02:05.586178541Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        },
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-022-provider-failed.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-022-provider-failed.json",
+          "sha256": "986ef10dd3c1b4c1724e227dc1d825962011db511d65f995c6679bf1aa7b8415",
+          "captured_at_utc": "2026-10-02T09:02:05.614721695Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/023",
+      "title": "面板 · 规则-搜索无结果",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/023.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-023-rules-empty.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-023-rules-empty.json",
+          "sha256": "eeeb4ef6b3dfbc0adaaefda387d1d75fe6b34e25f749b2a93a5060c56fc78043",
+          "captured_at_utc": "2026-10-02T09:02:05.977256355Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/024",
+      "title": "面板 · 连接-搜索与应用展开",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/024.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-024-grouped-search.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-024-grouped-search.json",
+          "sha256": "861b66933942eb4f89eea47f79d5ad129215c3aea4e81aafa01d14c1af32d77e",
+          "captured_at_utc": "2026-10-02T09:02:07.440289154Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "One expanded synthetic app connection group; no real controller close request."
+    },
+    {
+      "reference": "02/025",
+      "title": "面板 · 规则集-搜索与更新",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/025.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-025-ruleset-statuses.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-025-ruleset-statuses.json",
+          "sha256": "34f39280e0a0f6e7db05cd94ca509c8ad194e5f6b651afaa92668ec629c231e4",
+          "captured_at_utc": "2026-10-02T09:02:05.870386084Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/026",
+      "title": "面板 · 日志-搜索与展开",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/026.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Live log state requires a controlled log-source fixture; no native capture in this pass."
+    },
+    {
+      "reference": "02/027",
+      "title": "面板 · 策略-测速与API默认",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/027.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-027-api-default.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-027-api-default.json",
+          "sha256": "b8e727845c285e31a53911156ee7387a29ccf8984ddd9cca9bfaf1dd95ae6000",
+          "captured_at_utc": "2026-10-02T09:01:59.198930528Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/028",
+      "title": "面板 · 策略-测速中与超时",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/028.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/02-028-node-statuses.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/02-028-node-statuses.json",
+          "sha256": "882f4174b8854d3aecf94804091ce83bc9db5dcd512b90a24f6b56c2fbe26cb5",
+          "captured_at_utc": "2026-10-02T09:02:00.243245Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "02/029",
+      "title": "面板 · 面板-代理未运行",
+      "reference_pdf": "河图概念图-02-面板-离线版 (1).pdf",
+      "reference_image": "render/02/029.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/panel-stopped.png",
+          "sha256": "47d3381aa895be4594b7ae80b4549f4aa5d8bc4bb535ef61be6d22893059ddf1"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/001",
+      "title": "工具上册 · 工具-展开",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/001.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/tools-offline.png",
+          "sha256": "8e2f42180de33f0ddeabf447f7f0a80c2775f0feb16899e50fad54bdb1344e8c"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/002",
+      "title": "工具上册 · 工具-折叠",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/002.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Exact native reference state has not been captured in this pass."
+    },
+    {
+      "reference": "03A/003",
+      "title": "工具上册 · 工具-搜索",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/003.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-003-tools-search.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-003-tools-search.json",
+          "sha256": "2b7e04e4f9d33ba1cce46e481c8b0cdf807efad2e55f3e640e0658646028283b",
+          "captured_at_utc": "2026-10-02T09:02:04.799240617Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/004",
+      "title": "工具上册 · 配置与订阅-列表",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/004.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/configs.png",
+          "sha256": "527cbae693ab4d2fa3b9486d4c8c673a04af0815f3a7312d6844f9d314023ab9"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/005",
+      "title": "工具上册 · 添加订阅",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/005.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-005-add-subscription-empty.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-005-add-subscription-empty.json",
+          "sha256": "9c48011695e0a7d15a2922920ebbeb76583d45f675649b20b1ea3e551939f1ee",
+          "captured_at_utc": "2026-10-02T09:02:05.232172333Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Empty initial subscription form captured; reference shows populated values. Required-field and bad-URL states captured separately."
+    },
+    {
+      "reference": "03A/006",
+      "title": "工具上册 · 配置菜单-当前配置",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/006.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/007",
+      "title": "工具上册 · 配置菜单-其他配置",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/007.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/008",
+      "title": "工具上册 · 配置菜单-内置模板",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/008.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/009",
+      "title": "工具上册 · 配置-重命名",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/009.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/010",
+      "title": "工具上册 · 配置-删除确认",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/010.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/011",
+      "title": "工具上册 · 订阅-删除确认",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/011.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/012",
+      "title": "工具上册 · 配置表单-放弃填写",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/012.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-012-discard-import.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-012-discard-import.json",
+          "sha256": "7b8a74b4f1966a6eb826b28f887bd8b14e29dc7e0e8b80a730553ecb2ce49f52",
+          "captured_at_utc": "2026-10-02T09:02:05.089833210Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/013",
+      "title": "工具上册 · 配置编辑-语法大纲",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/013.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/014",
+      "title": "工具上册 · 配置编辑-选择变更冲突",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/014.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/015",
+      "title": "工具上册 · 配置编辑-校验失败",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/015.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/016",
+      "title": "工具上册 · 配置编辑-读取失败",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/016.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/017",
+      "title": "工具上册 · 配置编辑-文件外部修改",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/017.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/018",
+      "title": "工具上册 · 配置编辑-放弃并重新读取",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/018.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/019",
+      "title": "工具上册 · 配置编辑-放弃修改",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/019.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Configuration menu/editor/conflict states remain unrendered; require isolated local file/selection fixtures."
+    },
+    {
+      "reference": "03A/020",
+      "title": "工具上册 · 配置导入-链接错误",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/020.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-020-import-link-invalid.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-020-import-link-invalid.json",
+          "sha256": "e50f361df760bb14854921af06134dfe8ccac698ea060295d06370faed5f9053",
+          "captured_at_utc": "2026-10-02T09:02:05.032331970Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/021",
+      "title": "工具上册 · 添加订阅-名称为空",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/021.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-021-subscription-empty-name.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-021-subscription-empty-name.json",
+          "sha256": "7bf90902a0fe6a7f6aad54ea02e8e5e744708b5069ffc86d1b2018e54a916276",
+          "captured_at_utc": "2026-10-02T09:02:05.263994478Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/022",
+      "title": "工具上册 · 添加订阅-链接错误",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/022.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-022-subscription-invalid-url.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-022-subscription-invalid-url.json",
+          "sha256": "ec2270c6f16c5644460643d21ab4046c3b2fcbcbc2546bd9d857c2b046a47ee8",
+          "captured_at_utc": "2026-10-02T09:02:05.293638764Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/023",
+      "title": "工具上册 · 编辑订阅-链接错误",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/023.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Existing-subscription edit fixture remains unrendered."
+    },
+    {
+      "reference": "03A/024",
+      "title": "工具上册 · 配置导入-链接",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/024.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-024-import-link.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-024-import-link.json",
+          "sha256": "e4d8add7bbe22f1b284c9459c01064c303ce6fb8aa6e9d7a543a8185e50f883a",
+          "captured_at_utc": "2026-10-02T09:02:05.002443413Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/025",
+      "title": "工具上册 · 配置编辑-YAML",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/025.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Exact native reference state has not been captured in this pass."
+    },
+    {
+      "reference": "03A/026",
+      "title": "工具上册 · 订阅-编辑",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/026.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Existing-subscription edit fixture remains unrendered."
+    },
+    {
+      "reference": "03A/027",
+      "title": "工具上册 · 配置导入-文件",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/027.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-027-import-file-empty.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-027-import-file-empty.json",
+          "sha256": "c2ea3ff82926b038ec7400ee9fd0df838fc163e8c4ac5be17ce1466296dd295b",
+          "captured_at_utc": "2026-10-02T09:02:04.940755486Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Empty file-picker state only. A selected document/result URI and system picker are not exercised."
+    },
+    {
+      "reference": "03A/028",
+      "title": "工具上册 · 应用管理-黑名单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/028.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/029",
+      "title": "工具上册 · 应用-排序菜单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/029.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/030",
+      "title": "工具上册 · 应用-更多菜单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/030.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/031",
+      "title": "工具上册 · 应用管理-白名单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/031.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/032",
+      "title": "工具上册 · 应用管理-核心模式",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/032.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/033",
+      "title": "工具上册 · 应用管理-搜索",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/033.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Application-manager list/mode/menu/search fixtures remain unrendered."
+    },
+    {
+      "reference": "03A/034",
+      "title": "工具上册 · 核心管理",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/034.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-034-core-three-cards.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-034-core-three-cards.json",
+          "sha256": "4b88f9be988ad35e3b238214181300eab2f6ef4c0e090724061e4ae38670657d",
+          "captured_at_utc": "2026-10-02T09:02:01.798891223Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Three primary core cards and variant picker follow the later user-approved design adjustment. No download/import/remove operation."
+    },
+    {
+      "reference": "03A/035",
+      "title": "工具上册 · 核心管理-下载中",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/035.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Download-in-progress state not triggered; no external download was authorized in this QA pass."
+    },
+    {
+      "reference": "03A/036",
+      "title": "工具上册 · 绕过规则",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/036.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-036-bypass-rules.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-036-bypass-rules.json",
+          "sha256": "138736a85ff4e7aae8b0eb4c3e36c38c15611a9818070bcf24f1a171ef675b40",
+          "captured_at_utc": "2026-10-02T09:02:01.304353996Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/037",
+      "title": "工具上册 · 绕过规则-放弃修改",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/037.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03A-037-bypass-discard.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03A-037-bypass-discard.json",
+          "sha256": "18fb06678de94a93e5774417da3f46565e76dbfcfd3540f78de5111e37581658",
+          "captured_at_utc": "2026-10-02T09:02:01.365513255Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03A/038",
+      "title": "工具上册 · 共享网络",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/038.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/shared-network.png",
+          "sha256": "42f6d5d78dbfe0d8d97dcd3d7d85ac56a42851afe3c68472d2772e08cd7125c2"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/039",
+      "title": "工具上册 · CNIP设置",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/039.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/cnip.png",
+          "sha256": "b69abdd6730429c8c7110555503efd48b0f1132b881473abdf2ae4188c435007"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/040",
+      "title": "工具上册 · 诊断与维护",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/040.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/diagnostics.png",
+          "sha256": "f94303d618ee92663c0a61bbbaf90311ae01e82091d849dbf056a1c8ec4bc0d7"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03A/041",
+      "title": "工具上册 · 诊断-启动配置浮层",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/041.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/042",
+      "title": "工具上册 · 诊断-恢复网络确认",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/042.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/043",
+      "title": "工具上册 · 诊断-消息与网络",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/043.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/044",
+      "title": "工具上册 · 广告过滤-规则",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/044.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/045",
+      "title": "工具上册 · 广告过滤-状态",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/045.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/046",
+      "title": "工具上册 · 广告过滤-说明",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/046.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/047",
+      "title": "工具上册 · 广告过滤-添加白名单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/047.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/048",
+      "title": "工具上册 · 广告过滤-添加黑名单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/048.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03A/049",
+      "title": "工具上册 · 广告过滤-加入白名单",
+      "reference_pdf": "河图概念图-03A-工具上册-离线版 (1).pdf",
+      "reference_image": "render/03A/049.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03B/001",
+      "title": "工具下册 · 广告过滤-全局模式警告",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/001.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Diagnostic/adblock overlay or runtime state remains unrendered; no Root/backend action triggered."
+    },
+    {
+      "reference": "03B/002",
+      "title": "工具下册 · 日志文件",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/002.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/003",
+      "title": "工具下册 · 日志-选择文件",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/003.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/004",
+      "title": "工具下册 · 日志-清空确认",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/004.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/005",
+      "title": "工具下册 · 日志-搜索展开",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/005.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/006",
+      "title": "工具下册 · 脚本",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/006.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/007",
+      "title": "工具下册 · 脚本-更多菜单",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/007.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/008",
+      "title": "工具下册 · 脚本-启动前Hook",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/008.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/009",
+      "title": "工具下册 · 脚本-停止后Hook",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/009.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/010",
+      "title": "工具下册 · 脚本-删除确认",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/010.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/011",
+      "title": "工具下册 · 脚本-环境",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/011.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/012",
+      "title": "工具下册 · 文件编辑",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/012.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/013",
+      "title": "工具下册 · 文件管理-列表",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/013.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/014",
+      "title": "工具下册 · 文件管理-子目录搜索",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/014.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/015",
+      "title": "工具下册 · 文件管理-更多菜单",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/015.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/016",
+      "title": "工具下册 · 文件管理-文件操作",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/016.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/017",
+      "title": "工具下册 · 文件管理-文件夹操作",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/017.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/018",
+      "title": "工具下册 · 文件管理-新建文件",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/018.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/019",
+      "title": "工具下册 · 文件管理-新建文件夹",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/019.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/020",
+      "title": "工具下册 · 文件管理-下载表单",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/020.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/021",
+      "title": "工具下册 · 文件管理-下载地址校验",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/021.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/022",
+      "title": "工具下册 · 文件管理-重命名",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/022.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/023",
+      "title": "工具下册 · 文件管理-删除文件确认",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/023.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/024",
+      "title": "工具下册 · 文件管理-删除文件夹确认",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/024.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/025",
+      "title": "工具下册 · 文件管理-名称未改校验",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/025.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/026",
+      "title": "工具下册 · 文件编辑-更多菜单",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/026.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/027",
+      "title": "工具下册 · 文件编辑-跳转行",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/027.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/028",
+      "title": "工具下册 · 文件编辑-放弃修改",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/028.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/029",
+      "title": "工具下册 · 文件编辑-搜索",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/029.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Root-backed log/script/file-manager/editor state remains unrendered; real Root operations intentionally excluded."
+    },
+    {
+      "reference": "03B/030",
+      "title": "工具下册 · 网络匹配",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/030.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-030-network-match.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-030-network-match.json",
+          "sha256": "29fa7bef477f488ba717d7dd2837a2a72e9f958c46a182837554e16f8463ff83",
+          "captured_at_utc": "2026-10-02T09:02:02.775691793Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Automation deliberately OFF; no foreground service, Wi-Fi permission, or real network action launched."
+    },
+    {
+      "reference": "03B/031",
+      "title": "工具下册 · 网络匹配-匹配动作",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/031.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-031-match-action.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-031-match-action.json",
+          "sha256": "d0cad071f0ad6727d53db13bbc9b6fd35afb2189d7b0cd5d6154bd1c2373861e",
+          "captured_at_utc": "2026-10-02T09:02:02.844493759Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Choice rendered and selected while automation is OFF. Menu visual style still differs from reference (title/radios/scrim)."
+    },
+    {
+      "reference": "03B/032",
+      "title": "工具下册 · 网络匹配-失配动作",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/032.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-032-unmatch-action.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-032-unmatch-action.json",
+          "sha256": "40cfb0c242fc5e8e75bdde121b7cf2e9fdbff46ad2568e1334006b9061214602",
+          "captured_at_utc": "2026-10-02T09:02:02.956523156Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Choice rendered and selected while automation is OFF. Menu visual style still differs from reference (title/radios/scrim)."
+    },
+    {
+      "reference": "03B/033",
+      "title": "工具下册 · Web面板管理",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/033.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-033-web-panels.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-033-web-panels.json",
+          "sha256": "623b1f2d04415e9efb1b1f9239ee3045a78ddc74bd3dabd6e88508d9f5781feb",
+          "captured_at_utc": "2026-10-02T09:02:07.566387819Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03B/034",
+      "title": "工具下册 · Web面板-添加",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/034.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-034-add-web-panel.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-034-add-web-panel.json",
+          "sha256": "8129a6dea95d77eac30ecba60bd06ebbc7ef3341fdc16d0afacbca2649a0d54a",
+          "captured_at_utc": "2026-10-02T09:02:07.634967393Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03B/035",
+      "title": "工具下册 · Web面板-编辑",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/035.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-035-edit-web-panel.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-035-edit-web-panel.json",
+          "sha256": "ba7097885b9337febb0f3060df9e76a0c59e8f0e0c6364a865fc995a3bf278f2",
+          "captured_at_utc": "2026-10-02T09:02:07.712456190Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03B/036",
+      "title": "工具下册 · Web面板-删除确认",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/036.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-036-delete-web-panel.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-036-delete-web-panel.json",
+          "sha256": "4c351826e8498603ec628b6616441fb4e40f7458aee8aa52785ff3dc11b455af",
+          "captured_at_utc": "2026-10-02T09:02:07.794397933Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03B/037",
+      "title": "工具下册 · Web面板-本地模式",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/037.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/03B-037-local-mode.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/03B-037-local-mode.json",
+          "sha256": "548e3cb2984f920ef20b0164389d96e49f76851385b391e94969bc2a7b243307",
+          "captured_at_utc": "2026-10-02T09:02:07.863496140Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "03B/038",
+      "title": "工具下册 · 自定义Web面板-容器边界",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/038.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/039",
+      "title": "工具下册 · SubStore面板-容器边界",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/039.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/040",
+      "title": "工具下册 · 内置WebUI-概览",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/040.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/041",
+      "title": "工具下册 · 内置WebUI-策略组",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/041.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/042",
+      "title": "工具下册 · 内置WebUI-连接",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/042.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/043",
+      "title": "工具下册 · 内置WebUI-节点选择",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/043.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/044",
+      "title": "工具下册 · 内置WebUI-切换失败",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/044.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Real Android WebView container/embedded WebUI visual state remains unrendered. Separate JavaScript model tests are not native screenshots."
+    },
+    {
+      "reference": "03B/045",
+      "title": "工具下册 · SubStore管理",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/045.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/sub-store.png",
+          "sha256": "2252126515119155889d48697704afa702335b35f912aca517aac9f6816a20b7"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "03B/046",
+      "title": "工具下册 · SubStore-检测中",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/046.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Sub-Store probe state remains unrendered; no real backend probe made."
+    },
+    {
+      "reference": "03B/047",
+      "title": "工具下册 · SubStore-已连接",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/047.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Sub-Store probe state remains unrendered; no real backend probe made."
+    },
+    {
+      "reference": "03B/048",
+      "title": "工具下册 · SubStore-后端未启动",
+      "reference_pdf": "河图概念图-03B-工具下册-离线版 (1).pdf",
+      "reference_image": "render/03B/048.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Sub-Store probe state remains unrendered; no real backend probe made."
+    },
+    {
+      "reference": "04/001",
+      "title": "设置 · 设置-首页展开",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/001.png",
+      "pixel_exact_pass": false,
+      "status": "earlier_offline_capture_only",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept57/settings-offline.png",
+          "sha256": "a5dc463446e89b421a35ce8f1bacd1174ce252e71d2b12d69285488fc841b172"
+        }
+      ],
+      "caveat": "Earlier empty/offline fixture only; not an exact populated concept state or a fresh full-flow verification."
+    },
+    {
+      "reference": "04/002",
+      "title": "设置 · 设置-首页收起",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/002.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Exact native reference state has not been captured in this pass."
+    },
+    {
+      "reference": "04/003",
+      "title": "设置 · 设置-基础代理配置",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/003.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Native basic-proxy activity and its dropdowns remain unrendered in this controlled suite."
+    },
+    {
+      "reference": "04/004",
+      "title": "设置 · 设置-高级代理配置",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/004.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-004-advanced-settings.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-004-advanced-settings.json",
+          "sha256": "05f4757a23d9c429c745c38e689acaa82c3de3988756a24e143b186343737e48",
+          "captured_at_utc": "2026-10-02T09:02:00.877401652Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Actual ProxyAdvancedSettingsActivity created under Robolectric, not a replica composable."
+    },
+    {
+      "reference": "04/005",
+      "title": "设置 · 设置-高级资源限制",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/005.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-005-resource-limits.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-005-resource-limits.json",
+          "sha256": "9c3407da8f8ffb930cecfad7e2357e4d8354c25138192e4af257f5b20c3f64fa",
+          "captured_at_utc": "2026-10-02T09:02:01.055115969Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Resource controls shown with real default disabled values; reference has them enabled. No resource/runtime changes performed."
+    },
+    {
+      "reference": "04/006",
+      "title": "设置 · 设置-开机启动与下载",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/006.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-006-startup-download.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-006-startup-download.json",
+          "sha256": "2ae5b3a4f8a8e6236e1a7663a18da247b23a05626d2e957502e72788aa1ff8b9",
+          "captured_at_utc": "2026-10-02T09:02:03.352003445Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/007",
+      "title": "设置 · 设置-默认面板",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/007.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-007-default-panel.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-007-default-panel.json",
+          "sha256": "ad3e21ff353523f4d862c24b18b866d21d5baec6072a07ad29e2a27d1176a1d1",
+          "captured_at_utc": "2026-10-02T09:02:03.185523878Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/008",
+      "title": "设置 · 设置-主题外观",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/008.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-008-theme.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-008-theme.json",
+          "sha256": "c1e4624c9f0dfd19bc48a21911b5c32a3ed0e25dae0c8f6565fac43d754be5a7",
+          "captured_at_utc": "2026-10-02T09:02:04.289468989Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/009",
+      "title": "设置 · 设置-主题玻璃与动画",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/009.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-009-theme-motion.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-009-theme-motion.json",
+          "sha256": "4010694e232ffaa16b01009f281425fbebd158f0570f0c82d49f9d007b3616f1",
+          "captured_at_utc": "2026-10-02T09:02:04.423480150Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/010",
+      "title": "设置 · 设置-备份与恢复",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/010.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-010-backup.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-010-backup.json",
+          "sha256": "6d3dfbae090575225266a08291f10bfbf86f160eac514090d7d038ae2046e7d4",
+          "captured_at_utc": "2026-10-02T09:02:03.606613420Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/011",
+      "title": "设置 · 设置-通知详细设置",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/011.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-011-notification.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-011-notification.json",
+          "sha256": "1327ee86fe9d71885bc20aa74441f786b8766dc0b2257b4cd926a831043ce88d",
+          "captured_at_utc": "2026-10-02T09:02:02.055209570Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Default notification OFF fixture. Menu choices remain drafts and Back discards them; Save/service/permission flow not run."
+    },
+    {
+      "reference": "04/012",
+      "title": "设置 · 设置-通知快捷按钮",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/012.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-012-notification-actions.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-012-notification-actions.json",
+          "sha256": "ee642504d5f6f2797d2b48cb4df5c866ebbd6ea9efd9d40c26fc81004818ee98",
+          "captured_at_utc": "2026-10-02T09:02:02.389259366Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/013",
+      "title": "设置 · 设置-关于",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/013.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-013-about.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-013-about.json",
+          "sha256": "85dd6248fe5500e337de9ea1c4ccb67dea403f4b4257cd39b78bd1182331c4fc",
+          "captured_at_utc": "2026-10-02T09:02:06.117172531Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/014",
+      "title": "设置 · 设置-启动配置",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/014.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Startup-config screen requires controlled Root/read fixture; not rendered here."
+    },
+    {
+      "reference": "04/015",
+      "title": "设置 · 设置-核心选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/015.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Native basic-proxy activity and its dropdowns remain unrendered in this controlled suite."
+    },
+    {
+      "reference": "04/016",
+      "title": "设置 · 设置-运行模式选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/016.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Native basic-proxy activity and its dropdowns remain unrendered in this controlled suite."
+    },
+    {
+      "reference": "04/017",
+      "title": "设置 · 设置-IPv6选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/017.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Native basic-proxy activity and its dropdowns remain unrendered in this controlled suite."
+    },
+    {
+      "reference": "04/018",
+      "title": "设置 · 设置-默认面板选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/018.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-018-default-panel-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-018-default-panel-menu.json",
+          "sha256": "07f03038f101ff67bcd29d2d0f6bbb82261f7cc34a7ef1fabd53ef6371c4fd68",
+          "captured_at_utc": "2026-10-02T09:02:03.243002515Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/019",
+      "title": "设置 · 设置-语言选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/019.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-019-language-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-019-language-menu.json",
+          "sha256": "09074a9b8f334de897d7d573ba03a7ff982728ee2911e2f1c05734cd90d61a87",
+          "captured_at_utc": "2026-10-02T09:02:04.358784863Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/020",
+      "title": "设置 · 设置-顶栏模糊选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/020.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-020-top-blur-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-020-top-blur-menu.json",
+          "sha256": "b1f094d1c13ca091398cdbfd4b474dddc42a10f2f08af9e194f542e14fa0f7da",
+          "captured_at_utc": "2026-10-02T09:02:04.495021687Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/021",
+      "title": "设置 · 设置-界面缩放选择",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/021.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-021-scale-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-021-scale-menu.json",
+          "sha256": "c0998640b2d00631fbf6f61b4fcf134c194defe1196e37c9608c9aea5214f24b",
+          "captured_at_utc": "2026-10-02T09:02:04.585698275Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/022",
+      "title": "设置 · 设置-通知刷新频率",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/022.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-022-refresh-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-022-refresh-menu.json",
+          "sha256": "2d0507874d5201ae51b9b7ba94752ce0578afab6bb67e706218396c6d3df6924",
+          "captured_at_utc": "2026-10-02T09:02:02.156979434Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/023",
+      "title": "设置 · 设置-通知点击目标",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/023.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-023-target-menu.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-023-target-menu.json",
+          "sha256": "74a4756511779895c16b51c6f278aac5b38c5075dc83996c3fa2e18ca5dd925c",
+          "captured_at_utc": "2026-10-02T09:02:02.322507770Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/024",
+      "title": "设置 · 设置-通知按钮1动作",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/024.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-024-action-one.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-024-action-one.json",
+          "sha256": "20b90d30f5cc5fe3b6137a74160c08e2fe0465999dd20a2dd83bd7f89e723c32",
+          "captured_at_utc": "2026-10-02T09:02:02.453071002Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/025",
+      "title": "设置 · 设置-通知按钮2动作",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/025.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-025-action-two.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-025-action-two.json",
+          "sha256": "ce09a1e3cf4e7e8f5338f4751a70382330b65bcc2b36bef69e436dfe2990af47",
+          "captured_at_utc": "2026-10-02T09:02:02.523919593Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/026",
+      "title": "设置 · 设置-通知按钮3动作",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/026.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-026-action-three.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-026-action-three.json",
+          "sha256": "db15a4d2aa9347096741272505b57a7562ba6613d4ab0a101404d90c3b569d50",
+          "captured_at_utc": "2026-10-02T09:02:02.599397949Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/027",
+      "title": "设置 · 设置-DNS劫持策略",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/027.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-027-dns-dialog.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-027-dns-dialog.json",
+          "sha256": "c4bf62123871f285e3decc6283262a6b87860713d6f328c7c800ae6dcea0cadc",
+          "captured_at_utc": "2026-10-02T09:02:00.998901254Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Actual advanced-settings DNS dialog. Native dialog width is renderer/theme dependent; real-device geometry remains unverified."
+    },
+    {
+      "reference": "04/028",
+      "title": "设置 · 设置-恢复备份确认",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/028.png",
+      "pixel_exact_pass": false,
+      "status": "native_capture_pending",
+      "evidence": [],
+      "caveat": "Backup restore confirmation overlay not rendered; separate actual restore model tests cover collision preservation."
+    },
+    {
+      "reference": "04/029",
+      "title": "设置 · 设置-加速地址编辑",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/029.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-029-mirror-dialog.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-029-mirror-dialog.json",
+          "sha256": "6b3d6b21c3cafa60a87e7e3c51f0ef46d4086922957ebdb2adde782d10bd1a8b",
+          "captured_at_utc": "2026-10-02T09:02:03.424245314Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/030",
+      "title": "设置 · 设置-加速地址校验",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/030.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-030-mirror-invalid.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-030-mirror-invalid.json",
+          "sha256": "facca8edf3ace56bbb1fab2b31400dcfe0ae6d0c14dc84fced77c44e66c5294c",
+          "captured_at_utc": "2026-10-02T09:02:03.464833747Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Controlled production UI state captured; data/content and system chrome differ from the reference. Pixel-exact parity is not asserted."
+    },
+    {
+      "reference": "04/031",
+      "title": "设置 · 设置-Mihomo许可",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/031.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-031-mihomo-license.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-031-mihomo-license.json",
+          "sha256": "6f93d7c1e68ada302cf47856755b7eacc1467a4fe540ff83ff12808aea6aa547",
+          "captured_at_utc": "2026-10-02T09:02:06.364249877Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Actual bundled license, with visible horizontal clipping from generic HxTextSheet; reference wrapping differs."
+    },
+    {
+      "reference": "04/032",
+      "title": "设置 · 设置-AdGuard许可",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/032.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-032-adguard-license.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-032-adguard-license.json",
+          "sha256": "f601dd309a2df26024c6525e58996d9cf58a06475fc53c8d12c46d2335219225",
+          "captured_at_utc": "2026-10-02T09:02:06.527575981Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Actual bundled license, with visible horizontal clipping from generic HxTextSheet; reference wrapping differs."
+    },
+    {
+      "reference": "04/033",
+      "title": "设置 · 设置-Lucide许可",
+      "reference_pdf": "河图概念图-04-设置-离线版(1).pdf",
+      "reference_image": "render/04/033.png",
+      "pixel_exact_pass": false,
+      "status": "current_native_capture_and_interaction",
+      "evidence": [
+        {
+          "image": "android-app/app/build/outputs/concept-state-coverage/04-033-lucide-license.png",
+          "metadata": "android-app/app/build/outputs/concept-state-coverage/04-033-lucide-license.json",
+          "sha256": "6ceaa68f7a44dcd1dfbeae820564b6e4b1717f2ca1cb0edeca084c287db70afe",
+          "captured_at_utc": "2026-10-02T09:02:06.629462314Z",
+          "image_size": [
+            393,
+            852
+          ],
+          "capture_method": "native_window_rasters_with_window_manager_gravity_and_dim_composition"
+        }
+      ],
+      "caveat": "Actual bundled ISC and attribution content; not replaced with short reference sample. Horizontal wrapping differs."
+    }
+  ]
+}

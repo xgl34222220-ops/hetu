@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.Semaphore;
 
-/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
+/** Authenticated Mihomo API client; each request keeps its selected endpoint and credentials together. */
 final class MihomoControllerClient {
     private static final int LIMIT=6*1024*1024;
     static final String IPV6_DELAY_URL="https://[2606:4700:4700::1111]/cdn-cgi/trace";
@@ -29,9 +29,14 @@ final class MihomoControllerClient {
     }
     static final class ControllerHttpException extends IOException {
         final int statusCode;
-        ControllerHttpException(int statusCode, String detail) {
-            super("Mihomo 控制接口返回 "+statusCode+(detail.isEmpty()?"":"："+compact(detail)));
+        final boolean customApi;
+        ControllerHttpException(int statusCode, String detail, boolean customApi) {
+            super(statusCode==401
+                    ? (customApi ? "自定义 Mihomo 控制接口鉴权失败（401），请核对所填 API 地址、端口与 Secret"
+                                 : "本机 Mihomo 控制接口鉴权失败（401），应用凭据与当前运行核心不一致")
+                    : "Mihomo 控制接口返回 "+statusCode+(detail.isEmpty()?"":"："+compact(detail)));
             this.statusCode=statusCode;
+            this.customApi=customApi;
         }
     }
     private final Context context;
@@ -41,31 +46,36 @@ final class MihomoControllerClient {
         return context.getSharedPreferences("hetu",0);
     }
 
-    private boolean customApi(){
-        return prefs().getBoolean("proxyCustomApiEnabled",false);
-    }
+    private static final class ControllerEndpoint {
+        final boolean customApi;
+        final String host;
+        final int port;
+        final String secret;
 
-    private String host()throws IOException{
-        if(!customApi())return "127.0.0.1";
-        String value=prefs().getString("proxyCustomApiHost","127.0.0.1");
-        value=value==null?"":value.trim();
-        if(value.isEmpty()||value.length()>253||!value.matches("[A-Za-z0-9.-]+"))
-            throw new IOException("自定义 Clash API 地址无效");
-        return value;
-    }
+        ControllerEndpoint(Map<String,?> snapshot)throws IOException {
+            // SharedPreferences.getAll() takes one atomic copy. Never reread the mode
+            // while choosing fields: a concurrent Save must not move a local secret
+            // onto a custom endpoint, or a custom secret onto the local controller.
+            customApi=Boolean.TRUE.equals(snapshot.get("proxyCustomApiEnabled"));
+            host=customApi?string(snapshot,"proxyCustomApiHost","127.0.0.1").trim():"127.0.0.1";
+            if(customApi&&(host.isEmpty()||host.length()>253||!host.matches("[A-Za-z0-9.-]+")))
+                throw new IOException("自定义 Clash API 地址无效");
+            int fallback=customApi?9090:MihomoStartupConfig.CONTROLLER_PORT;
+            Object rawPort=snapshot.get(customApi?"proxyCustomApiPort":"proxyControllerPort");
+            if(rawPort!=null&&!(rawPort instanceof Integer))throw new IOException("Clash API 端口设置类型无效");
+            int requested=rawPort==null?fallback:(Integer)rawPort;
+            port=requested>=1024&&requested<=65535?requested:fallback;
+            secret=string(snapshot,customApi?"proxyCustomApiSecret":"proxyControllerSecret","");
+            if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
+            if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
+        }
 
-    private String secret()throws IOException{
-        String key=customApi()?"proxyCustomApiSecret":"proxyControllerSecret";
-        String value=prefs().getString(key,"");
-        value=value==null?"":value;
-        if(value.indexOf('\r')>=0||value.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
-        if(!customApi()&&value.isEmpty())throw new IOException("策略控制接口尚未初始化");
-        return value;
-    }
-
-    private int port(){
-        int key=customApi()?prefs().getInt("proxyCustomApiPort",9090):prefs().getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
-        return key>=1024&&key<=65535?key:(customApi()?9090:MihomoStartupConfig.CONTROLLER_PORT);
+        private static String string(Map<String,?> values,String key,String fallback)throws IOException {
+            Object value=values.get(key);
+            if(value==null)return fallback;
+            if(!(value instanceof String))throw new IOException("Clash API 设置类型无效");
+            return (String)value;
+        }
     }
 
     private String customDelayUrl(){
@@ -201,10 +211,13 @@ final class MihomoControllerClient {
                 String status=URLEncoder.encode(expectedRange,"UTF-8");
                 return request(
                     "GET",
-                    "/group/"+Uri.encode(group)+"/delay?timeout=10000&url="+test+"&expected="+status,
+                    "/group/"+Uri.encode(group)+"/delay?timeout=5000&url="+test+"&expected="+status,
                     null,
-                    15000
+                    7000
                 );
+            }catch(ControllerHttpException e){
+                if(e.statusCode==401)throw e;
+                last=e;
             }catch(Exception e){last=e;}
         }
         if(last!=null)throw last;
@@ -214,7 +227,8 @@ final class MihomoControllerClient {
     void closeAll()throws Exception{request("DELETE","/connections",null);}
     boolean waitReady(long timeoutMs){
         long end=android.os.SystemClock.elapsedRealtime()+timeoutMs;
-        do{try{version();return true;}catch(Exception ignored){}android.os.SystemClock.sleep(120);}while(android.os.SystemClock.elapsedRealtime()<end);
+        do{try{version();return true;}catch(ControllerHttpException error){if(error.statusCode==401)return false;}
+            catch(Exception ignored){}android.os.SystemClock.sleep(120);}while(android.os.SystemClock.elapsedRealtime()<end);
         return false;
     }
 
@@ -224,23 +238,23 @@ final class MihomoControllerClient {
 
     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
-        int port=port();
-        String host=host();
-        String secret=secret();
+        ControllerEndpoint endpoint=new ControllerEndpoint(prefs().getAll());
         Socket socket=new Socket();
         try{
-            socket.connect(new InetSocketAddress(InetAddress.getByName(host),port),2200);
+            socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host),endpoint.port),2200);
             socket.setSoTimeout(socketTimeoutMs);
             OutputStream raw=socket.getOutputStream();
             StringBuilder head=new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-                .append("Host: ").append(host).append(':').append(port).append("\r\n");
-            if(!secret.isEmpty())head.append("Authorization: Bearer ").append(secret).append("\r\n");
+                .append("Host: ").append(endpoint.host).append(':').append(endpoint.port).append("\r\n");
+            if(!endpoint.secret.isEmpty())head.append("Authorization: Bearer ").append(endpoint.secret).append("\r\n");
             head.append("Accept: application/json\r\n")
                 .append("Connection: close\r\n");
             if(payload.length>0)head.append("Content-Type: application/json; charset=utf-8\r\nContent-Length: ").append(payload.length).append("\r\n");
             head.append("\r\n");
-            raw.write(head.toString().getBytes(StandardCharsets.US_ASCII));
+            // Go's HTTP parser retains header value bytes. Preserve a configured UTF-8
+            // secret exactly instead of silently replacing every non-ASCII character.
+            raw.write(head.toString().getBytes(StandardCharsets.UTF_8));
             if(payload.length>0)raw.write(payload);
             raw.flush();
 
@@ -250,6 +264,8 @@ final class MihomoControllerClient {
             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
             HashMap<String,String> headers=new HashMap<>();String line;
             while((line=readLine(in))!=null&&!line.isEmpty()){int colon=line.indexOf(':');if(colon>0)headers.put(line.substring(0,colon).trim().toLowerCase(Locale.ROOT),line.substring(colon+1).trim());}
+            // Do not echo an authentication server's body: it may contain credentials.
+            if(code==401)throw new ControllerHttpException(code,"",endpoint.customApi);
             byte[] bytes;
             String transfer=headers.get("transfer-encoding");
             if(transfer!=null&&transfer.toLowerCase(Locale.ROOT).contains("chunked"))bytes=readChunked(in);
@@ -258,7 +274,7 @@ final class MihomoControllerClient {
                 if(len<0||len>LIMIT)throw new IOException("控制接口响应过大");bytes=readFixed(in,len);
             }else bytes=readToEnd(in);
             String text=new String(bytes,StandardCharsets.UTF_8);
-            if(code<200||code>=300)throw new ControllerHttpException(code,text.trim());
+            if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
             return text.trim().isEmpty()?new JSONObject():new JSONObject(text);
         }finally{try{socket.close();}catch(Exception ignored){}}
     }

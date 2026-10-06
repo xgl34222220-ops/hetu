@@ -1,0 +1,87 @@
+{
+  "sourcePdf": "河图概念图-03A-工具上册-离线版(1).pdf",
+  "sourcePdfSha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+  "referenceCoordinates": "Approximate full-page PDF coordinates visually measured on actual 425x950 PNG; page header is included. Native geometry normalized by 393/425.",
+  "toolbarEndSpacerDp": 4,
+  "toolbarActionWidthDp": 32,
+  "toolbarActionHeightDp": 48,
+  "pointerHeightDp": 7,
+  "cardTop": "Actual boundsInWindow anchor.top + density-scaled existing 44dp; pointer extends 7dp above card.",
+  "menus": [
+    {
+      "page": 29,
+      "jpegXref": 61,
+      "jpegSha256": "82ce26f95e1752eda1282953c6b727374764e5701cba80d0d3594ca2727fdfab",
+      "sourceResolution": [
+        850,
+        1850
+      ],
+      "referencePngSha256": "94ecbb218212c591a87fb944c30e7ee49c789dd8dc51681e7742452c136cc802",
+      "approximateCardPdfBounds": [
+        262,
+        129,
+        403,
+        298
+      ],
+      "approximateWidth393dp": 130.3835294117647,
+      "approximateRightInset393dp": 20.343529411764706,
+      "approximateLabelCentersPdfY": [
+        154,
+        189.25,
+        224.25,
+        272.5
+      ],
+      "labelCenterGaps393dp": [
+        32.595882352941175,
+        32.36470588235294,
+        44.61705882352941
+      ],
+      "implementedMinCardWidthDp": 130,
+      "implementedRightInsetDp": 20,
+      "implementedMinRowHeightDp": 33,
+      "implementedFontSizeSp": 14,
+      "implementedLineHeightSp": 20,
+      "scrimAlphaMeasuredByRoot": 0.43
+    },
+    {
+      "page": 30,
+      "jpegXref": 63,
+      "jpegSha256": "262c1856afa3f8ad66da4642e48f99e6d7ab6447d3a27605f8ed0762bab881bb",
+      "sourceResolution": [
+        850,
+        1850
+      ],
+      "referencePngSha256": "e98bcf7545a48c56d12c14183d8a40730e084f4a57c19e1a8052630bfbc8e61b",
+      "approximateCardPdfBounds": [
+        285,
+        125,
+        414,
+        295
+      ],
+      "approximateWidth393dp": 119.2870588235294,
+      "approximateRightInset393dp": 10.171764705882353,
+      "approximateLabelCentersPdfY": [
+        149.25,
+        189,
+        229.5,
+        269.5
+      ],
+      "labelCenterGaps393dp": [
+        36.75705882352941,
+        37.45058823529412,
+        36.98823529411764
+      ],
+      "implementedMinCardWidthDp": 120,
+      "implementedRightInsetDp": 10,
+      "implementedMinRowHeightDp": 37,
+      "implementedFontSizeSp": 14,
+      "implementedLineHeightSp": 20,
+      "scrimAlphaMeasuredByRoot": 0.45
+    }
+  ],
+  "limitations": [
+    "Await new native screenshot/compile evidence for this source batch.",
+    "Minimum card width may expand for checked six-character text, localization, or accessibility font size.",
+    "Prior 20c screenshots do not evidence these new menu or status-circle changes."
+  ]
+}

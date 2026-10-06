@@ -1,0 +1,55 @@
+{
+  "applicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "runId": 37360879852,
+  "apkName": "Hetu-V20.85-Test-2730954.apk",
+  "apkBytes": 134827739,
+  "apkSha256": "82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c",
+  "partCount": 6,
+  "allSixArtifactAndPartHashesVerified": true,
+  "fullApkHashVerified": true,
+  "installedAcceptance": "PASS; own 2730954 /37360879852 independent 53 evidence checks, dualAPI64/21 and479/49XML",
+  "transportManifestArtifactId": 11367756192,
+  "transportParts": [
+    {
+      "index": 0,
+      "artifactId": 11367666536,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:2cae0bbdb84b22b325bb5b42ac72909250980e526c9c602968efeb008e9a0e93"
+    },
+    {
+      "index": 1,
+      "artifactId": 11367860929,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:9600be3d0f0cd66207f5d19517546e7e6b0cae7a4460f0001f2cb293c2b7d4b3"
+    },
+    {
+      "index": 2,
+      "artifactId": 11367641302,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:51cc2ee188bee0f3295bea30fdb88c582fe3ab9d270b6d71f5b3cb0ff6051cac"
+    },
+    {
+      "index": 3,
+      "artifactId": 11367361869,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:385475a78ef2b25f31315c079e5a3b88ef07d60e21e4908e7227ffe0f1d3f65c"
+    },
+    {
+      "index": 4,
+      "artifactId": 11366434215,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:b44886dfa699437ad8958dbca2afcccc83a8dbcd59764b7b592f7ee310b82ebe"
+    },
+    {
+      "index": 5,
+      "artifactId": 11367860955,
+      "artifactBytes": 8998753,
+      "artifactDigest": "sha256:171eb96320c797bf0fcaf7b0ae40382b6638676e52e8871ca4a49fefd3c79fc4"
+    }
+  ],
+  "installedEvidenceFile": "docs/qa/20261005-v2085-2730954-installation-success.json",
+  "installedEvidenceSha256": "c4819f0f2601e622ef32d5f03110aa3effaa6640dc5416564c805ffe6665f578",
+  "deliveredFinal": false,
+  "saved": false,
+  "successor": "Four measured presentation changes after tools-intake ec211; own successor acceptance pending"
+}

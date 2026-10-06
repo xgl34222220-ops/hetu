@@ -1,0 +1,42 @@
+{
+  "applicationParent": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+  "parentRun": 37342421613,
+  "parentUnitTests": {
+    "tests": 479,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "parentInstallAcceptance": "still running; not cancelled",
+  "sourcePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+  "beforeSha256": "99231fe32edc94048b015c1de7b322b059c2f559b25aca6a6f71eebb010bbc0b",
+  "afterSha256": "f7dd443ccd5c002c16e70ebe1f49ea12545689785b97d6094b3d34d822a9114f",
+  "wholeFileReverseEqualsParent": true,
+  "onlyChange": {
+    "before": "errorSpacing = if (form.nameError != null) 6.dp else null)",
+    "after": "errorSpacing = if (form.nameError != null) 3.dp else null)"
+  },
+  "actualFreshParentGeometry": {
+    "urlRelativeCardTop": 167,
+    "referenceUrlRelativeCardTop": 163.6729411764706,
+    "inputToErrorInk": 10,
+    "referenceInputToErrorInk": 7.397647058823529,
+    "errorToUrlLabelInk": 28,
+    "referenceErrorToUrlLabelInk": 27.741176470588236,
+    "actualErrorRow": 18
+  },
+  "predictionNotVerification": {
+    "urlRelativeCardTop": 164,
+    "inputToErrorInk": 7,
+    "errorToUrlLabelInk": 28
+  },
+  "newOwnBuildAndCaptures": "not executed",
+  "changedInputs": 40,
+  "frozenInputs": 332,
+  "totalInputs": 372,
+  "exactRebuildAll372": true,
+  "allFiveBoundaryGuards": true,
+  "patchSha256": "7d60109b050d8e5b2e8bfa304ee1954893b61d41b7aadaa9ca90c5aee4cf76c3",
+  "defaultNullAndAllCallbacksExact": true,
+  "literal130PagePixelParityAccepted": false
+}

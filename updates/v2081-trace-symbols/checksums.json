@@ -1,0 +1,9 @@
+{
+  "base": "V20.80 / 52ad5701; verified full CI37169862397",
+  "patchSha256": "4aa197b037dec26a268ebb57ec5893283b64fd0ece45d3ccc9567f24d0786115",
+  "versionCode": 2081,
+  "versionName": "0.12.11-v20",
+  "rootRevision": 151,
+  "plannedSelectedUnitTests": 348,
+  "userDeviceAccessed": false
+}

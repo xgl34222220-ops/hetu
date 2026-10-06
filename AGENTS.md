@@ -1,3 +1,251 @@
+## 本轮功能收口：c7096ea 新545/56与双API安装均通过，APK已保存
+
+截至2026-10-05T22:51:44.426776+00:00，原test/v20.76-new-ui受测应用c7096ea25cf1e150a1297859f8ec53d137327c47 /run37381538358 attempt1整体completed/success，自己的build/历史对照/API35/API36四jobs全success。实际56XML545项零失败/错误/跳过，原487身份逐一保留、新58执行；386完整CI输入/16变化/370冻结、六历史层原SHA、23载荷（原22项清单保留，除Root脚本外21项及自启字节保持）、687ABI零缺失、lint0 Error/Fatal/299Warn7Hint及固定签名通过。本地382及未本地重哈希94MB源归档边界不冒称完整。完整交付180检查PASS、UI170另核非相加；真实MCP run/head/job和10实际ZIP摘要另绑，不以离线调用参数自证producer。
+
+两API各64=59+auth5、21palette、Root mutation0、401→enabledretrybefore200→200、Bearer六路径实200、偏好/端口/KVM/PID/session隔离清理通过；前台poll存在，不能独占归因按钮，不能当Google验证。真实六part APK134858259 bytes/SHA91001c677ca1974c9c8833acc183cf7f7e278ff13da5d6ad4ebd867b443ca835已核验并保存交付。覆盖安装后用户点一次代理「重启」部署revision152。未操作手机/帐号/清数据/no hook/未合并main或正式发布；真实Google唯一根因与真机修复仍未验证，不保证未知缺陷全部不存在。详情docs/FUNCTION_FIX_20261006.md及c7096ea四份独立/producer QA证据。7b8/3b68原失败、其他PDF任务全部证据/成功、原功能/设计/权限/签名/历史层继续保留。下文待验状态是此前历史。
+
+## 最终功能候选：整波返回前身份检查，目标545/56
+
+已确认成功PUT时批量快结果/慢阻塞的迟到map会被VM接纳，measureSnapshot及非Selector groupDelay返回前各补现有identity guard；原稳定身份partial成功继续保留。追加1真实HTTP测试覆盖global/group两条路径，Probe原12完整保留共13，新增58/原487总545、56XML。此前544/a980报告对应该追加前候选，保留历史事实但不代替新源验收；等待新层/67host与自己的新CI。其余所有前述授权及保留边界保持，不扩大review、不取消旧CI。
+
+## 当前续验：3b68真实542/1失败，缓存mutation epoch与夹具显式重置
+
+原test/v20.76-new-ui恢复到20315ad；Android与3b68相同，保留原PDF任务所有文档与成功/失败记录，不操作其CI。本功能run37377929368@3b68 attempt1真实56XML542项，1failure/0error/0skip；原487和新展开4/探测10/订阅12/fake13通过，VM15/16通过。唯一ordinaryPoll失败为自定义shadow静态PID88跨测试残留；仅测试@Before显式RootStatus.reset/Sites.reset及前后77断言，保留原16测试/所有原busy/结果断言，生产VM不改。完整日志/原XML/套件摘要归档docs/qa/20261006-v2086-3b68da9-*。lint/当前安装尚未执行，不称Root0。
+
+另确认实际group testNode路径成功选择及订阅刷新后短缓存未失效：成功PUT立即推进AtomicLong mutation epoch，失败PUT保留有效缓存，旧缓存/迟到结果由现有身份守卫拒绝。Probe原10保留加2真实HTTP回归，共12；下一候选57新增、544总项/56XML，386完整输入（本地382缺原4native）。须重建当前独立层/67host证明、提交原分支并用自己的新CI完整验收；原196主机报告仅属7b8输入，丢失临时epoch报告不能冒充本次实物核验。
+
+用户功能修复授权及原设计/功能/权限/签名/22原载荷/自启/六层保持，必要revision152已在原精确版本契约内。覆盖安装后用户点击一次代理「重启」应用新Root脚本；不强停现有核心、不操作手机或帐号、不清数据/no hook/不合并main或正式发布。真实Google认证根因与真机修复仍未验证，AOSP及HTTP延迟不能替代。详见docs/FUNCTION_FIX_20261006.md。
+
+## 当前续验：7b8de49 首轮测试编译失败，仅修两处夹具类型
+
+功能生产源已编译/23载荷/687ABI通过，但原新run37376676669的Runtime unit tests在新增PanelExpansionAnchorTest的DpRect height/width类型误用处编译失败；0实际XML，Android单测、lint、当前双API未执行，不记542或Root0成功。原failure与历史对照success分别保留，未取消CI。根任务只修两处边界计算的尺寸类型（使用.value边差），原断言/阈值/4测试/542目标/56XML及全部生产文件不变；新层patch5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f，20新host+47原source再次通过，本地382缺4、CI完整386仍必须重建。详见docs/qa/20261006-v2086-anchor-fixture-compilation-candidate.json；196原host证明属于7b8首轮字节不改写。继续原branch新提交独立验收，不拿首轮或旧274/ec成功替代。
+
+截至2026-10-05T21:45Z，再读远端已到3b68da93082e43263e2cfae8011c05fa7fdcff14；既有功能任务已修两个测试夹具类型并保留7b8失败，新run37377929368正在执行。本任务保留其追加源/层/失败文档，不重复修改、不取消或重跑其CI。当前新版功能测试结果待其自己的新run完成；274的487/53PASS仅属于274。
+
+## 分支协调：274 CI 已通过且 PDF 差异已记录，后续功能候选由既有任务独立续验
+
+截至2026-10-05T21:43:51Z，远端原分支已由既有功能任务从1d184b5追加7b8de498dc3c4cd7d044bdbee0e7efe2233d7953；本任务ff保留该实现，不重复改其源码、不取消或重跑其CI。37376676669@7b8 attempt1的build已完成APK编译，但compileDebugUnitTestKotlin在PanelExpansionAnchorTest.kt:101/151发生Int/Dp类型/receiver不符，542/56XML尚未执行通过，lint/新包交付/双API安装未执行通过。原日志和全部job状态见docs/qa/20261005-function-owner-7b8-failure-observation.json；由原功能任务继续修编译及自己新验收，不用274的487/53PASS替代。
+
+下述274 PDF收口是受测应用274aa0d /37366522056的历史版本证据。130 map/currentReviewCommit、home/panel freeze/source及Google/测试APK严格绑定274，不代表最新7b8运行路由或panel修复已经验收。保留新任务全部源/CI/层/文档与失败证据；本笔仅追加证据文档，不回退源、不扩大权限、不操作用户设备。
+
+## 当前接续：V20.86 用户授权功能修复（源已收口，尚未 Android 验收）
+
+用户提供河图下 Google Play 身份验证错误及 BoxProxy 下同账号正常的截图，明确要求修复功能缺陷和策略组展开大幅上跳。本轮授权允许修复实际 launcher 的策略交互、运行路由、测速请求归属及订阅编辑；旧纯呈现 freeze 对这些明确范围不再阻止修复。保留当前设计、原功能入口/显式节点定位、原工具接入、四处 PDF 收尾、六历史补丁层、权限、签名、22 原载荷与原自启脚本。不引入 hook、不操作用户手机/账号、不清数据、不合并 main 或正式发布。
+
+从1dbe40cc4e312c230524092dfe32a2c6cfb5f25d的 Android 树c5f2c1a9e070fe4c6e1940b5d6729ccc4810fdaa追加独立 updates/v2086-functionfix；文档 parent 继承远端最新1d184b5，保持另一任务的所有证据，原37366522056不取消、不由本任务重跑。版本2086/0.12.16-v20-fix、部署revision152。RuntimeSettings整文件只151→152，Runtime146ContractTest原6项只对应期望值变换，原487/51测试不删；新55项/五类精确追加，目标542/56XML、386输入（本地382缺4原native），自己的新CI逐XML和双API安装验收，不能用ec211b9或274成功替代。
+
+已确认策略展开无条件滚顶、fake-IP落私网默认RETURN、IPv6共享DNS漏MAC、首页网站探测绕过运行核心且错误HTTP被接受、批次测速异常丢成功结果、共享测速/订阅迟到结果覆盖与busy归属、跨API短缓存、添加无BaseProvider锚点及删除块状use/共享锚点编辑缺陷。本地22命令/196 Python回归及主机Java检查通过，详见本轮source-host-proof；继续实际编译、全量单测、lint、23载荷/ABI/签名及API35/36隔离安装。旧核心覆盖安装后须由用户点击一次代理「重启」应用新脚本，不能强制重启已有连接。
+
+截图未给出故障时配置、DNS、实际Play/GMS UID链路或认证响应，真实Google账号错误唯一根因及真机修复仍未验证；AOSP及延迟测试不证明Google登录修复。本地Java/shell回归与Android新CI分别报告。详见docs/FUNCTION_FIX_20261006.md。
+
+## 本轮收口：274aa0d 独立 CI 与 PDF 证据，真实 Google 问题仍未定位
+
+截至2026-10-05T21:42:22.463860+00:00，原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui；受测应用提交274aa0d2f80dad39884bd3d079a2e02c86a90abd / Actions37366522056整轮completed/success，严格53项本轮原始证据PASS。应用build/UI/APK与API35实际producer为attempt2，API36及历史对照为其后续补验；最新attempt的新job元数据ID不冒称重新执行过保留的成功build/API35。初轮和后续各次排队取消/日志404、单job及failed-jobs恢复请求全部保留；取消者/原因未证实，不归因源码/节点。没有取消CI，没有跳过门禁或删原测试。
+
+自己的51份原XML487项、0失败/错误/跳过，原422全部继续；原479加intake8。CI实际379有效输入逐SHA与生成源一致，最后4呈现修改/375冻结、旧五层10inputs/patch字节原样，100host守卫(61+39)、23载荷、687构造ABI零缺失、lint及固定签名通过。本地仍缺4个不入Git原载荷，不能称本地完整有效源。全部已适配工具接入功能/授权helper和新增8测试保留；ec owner自身attempt3成功仅作协调证据，不代替274验收。
+
+本轮API35/36各64=59导航+5控制器认证、21配色，Root mutation0；Bearer六路径真实HTTP200分别19/19条，401先读、重试入口在200前可用、原偏好/reverse/forward/KVM/launcher/emulator清理均通过。前台轮询存在，不把200独占归因于重试点击。新旧AVD身份、路径、PID/session、nonce及nonRoot安全门禁实际执行。历史对照使用固定旧2074/ea8569...APK，在本轮隔离AOSP36实际复现SchemeTonalSpot NoSuchMethodError，ABI596引用/12缺失与清理证据已归档；旧整包签名字节身份与本job未直接apksigner重读区别保留。新274签名已在自己的build直接核实。
+
+本次附件03A49/03B48/0433原PDF已实际读取、逐页入口清单保留。130当前捕获/原稿SHA全部复核，125受控组件/原生Activity图加5自己的API36安装WebView图；16对本次实际重开、114页按完整相同字节继承，另有自己的API35五native实开补充报告。新Adblock字幕实际193×11对原193.264×11.096；通知25/26的字14、body181/180、行距35/34、蓝色/视觉内缩已在新图实核，22–24无退化、9目标7行及原回调/配置保留。首页panel43图42逐字节/RGBA同，另一全图实读仅端口47023→57531，source492→274无差；静态图不替代真机动效验收。
+
+130页严格字面像素1:1与全部130逐页回调/I-O仍未全部通过：A44量化标题/卡片gap微差、04/11字墨gap及字体/指针/阴影/OS/真实内容状态残差仍如实记载，未找到可唯一证明的新增窄源修法，原字体、自动定位、完整合法内容及真实数据继续保留。现有有效功能、核心、签名、权限、home/panel布局动效与无hook约束保持。
+
+197434.jpg为Google帐号认证错误+重试/Hot Air Balloon，非CAPTCHA。历史GMS不同链路/流量、HTTP200–499直测和本轮控制器401→200都不足定位GooglePlay帐号故障。缺当前故障时认证响应/DNS答案/实际UID分流代理链与正常代理同刻对照；真实根因未建立、真机修复未验证。AOSP无GMS/用户帐号，不操作用户手机、退出帐号、清数据或改网络安全设置。未合并main、正式发布或部署；V20.83 a93交付及全部原失败记录保留。
+
+最终测试APK134833109字节/SHA256 b58438e74239312a7cbd32c8675827ee2e3e7b256b59dfb879b06891171b29e3，六artifact ZIP、六part及整包实际双人核实；只作为原测试分支产物。详情见docs/qa/20261005-v2085-274aa0d-installation-success.json、三份274逐页报告、PDF map、home/panel freeze、Google evidence及APK delivery记录。
+
+## 当前检查点：274aa0d 构建/API35 已通过，单 job 续验中
+
+应用源274aa0d2f80dad39884bd3d079a2e02c86a90abd / Actions37366522056 固定，文档检查点不改应用/CI/层。attempt2自己的实际build111958672585成功：51份原XML487项、0失败/错误/跳过，原422继续；379有效输入重建一致（4呈现修改/375冻结）、100项host守卫、23载荷、687构造ABI零缺失、lint与固定签名通过。本地仍缺4个不入Git原载荷，不称本地完整有效源；CI恢复/379与本地375明确分别记录。
+
+自己的API35 producer111967310512/API artifact11369762515已实读：64=59导航+5控制器认证、21配色、Root mutation0、Bearer六路径19条200、401→重试入口可用→200，prefs/reverse/forward/KVM/进程清理全部通过。控制器认证不等于Google帐号认证，前台轮询存在，不把200独占归因于按钮点击。Root独立51XML与API35摘要、完整build独立证据已归档。
+
+attempt1排队两job取消及attempt2旧对照/API36排队取消均原始保存；无取消者/原因实证，不归因源码/节点，不编造Root0。20:52:53UTC root只重跑API36原job111967310459，实见attempt3新111972733304 queued。新attempt保留的build/API35 job元数据ID虽变化，步骤/原执行时间完全相同；真实产物producer仍attempt2。没有重跑成功build/API35，没有改门禁/测试，旧对照须在API36完成后单job续验；整体53仍未通过。
+
+自己的264图SHA4638a43376eaff943e6af0531e3ff7ebe4de2c574a13e1907938e420d31819a9，03A49（3新实开/46字节继承）、04/33（22–26新实开，31字节同273/2变）报告已停止，B43组件（3新端口对照/40继承）已审，B40–44明确等待本轮API36，未借旧native。新字幕实测193×11对原193.264×11.096；25/26菜单body181/180、行距35/34、选中填充34/31实际已渲染。首页panel43图42全RGBA同，另一仅全图读到端口47023→57531，source492→274无差。量化未唯一源微差/字体/OEM/真实内容与全部130回调仍未全部验收，不冒称字面130页1:1。
+
+同范围工具接入ec211b9 /37363630612由其owner续到attempt3四jobs全部success，只读核对归档，全部适配/8新增测试保留；不拿该产物验证274。真实GooglePlay故障原因仍未定位/真机修复未验证；当前故障日志/认证响应/DNS/实际UID链路及正常代理同刻对照未取得。无hook、不操作用户手机/帐号/网络安全设置、不扩权、不合并main/发布部署。V20.83 a93交付及原失败记录全部保留。
+
+## 当前验收状态：274aa0d 首轮未启动与同提交续跑
+
+应用274aa0d2f80dad39884bd3d079a2e02c86a90abd /run37366522056于19:55:28UTC排队，attempt1在20:10观测为completed/failure；build111952930609与旧对照111952930932均cancelled且steps=null，无产物，安装skipped。不是已知源码编译失败，取消者/原因无证据。14次原状态快照及两job日志404BlobNotFound完整原响应已保存docs/qa/20261005-v2085-274aa0d-acceptance-failure.json，SHA2c80bf0e4eed6015fd286506ad2718e548f3d4e4b01fc035819e4c860fabe54f。所有487单测/51XML、新264图、双API64/21/401→200、安全门禁与cleanup均未执行或无证据，不使用273旧成功补齐，也不写伪Root0。
+
+用户已明确授权必要重跑；root在先归档/核实原run终态及精确SHA之后只调用一次rerun_failed_workflow_run_jobs，20:12:14UTC sameSHA/run attempt2 queued。原CI保留、无取消操作、未新建重复workflow，源/门禁/测试不改；本次只有文档证据checkpoint，不触发新CI。当前源候选仍274，自己的新动态验收待执行；本地61host与完整四源变换通过仅证明源码边界。Google真机帐号认证故障仍未定位/修复未验证；缺当前故障日志及正常代理同刻对照，不操作手机或帐号。旧成功/失败和V20.83 a93交付全部保留。
+
+## 当前接续：2730954独立验收归档与工具接入后的四处PDF收尾
+
+原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui，2730954591393c1b81f747cef72adb8940c5a82c / Actions37360879852于2026-10-05 19:33:56UTC整体success。自己的49XML479/0失败错误跳过，原422保留；双API各64=59导航+5控制器认证、21配色、Root mutation0、Bearer六路径各19条200、原偏好/端口/KVM/进程清理均通过，严格53项原始证据PASS。真实273APK134827739字节/SHA82918483cc08d0b3a7c281f4ac8b62568bf313d29ae7d48adbeed3191f13646c，非最终交付。130页原PDF与当前捕获逐SHA核验，18对新实际重开、112页字节相同继承；首页panel43张42张全同，剩一张仅隔离夹具端口47023→33407且完整图已打开。静态图不等于动效或全部130回调验收，字面像素1:1仍未全部通过。
+
+真实远端另一任务已接入工具包23dd77d及浅clone修正ec211b9ad81748dee30fec43f0a25849559e4623。原分支ff接续，全部两adapter/授权helper/新增8测试保留，不重复实现；当前ec的原CI attempt2由另一次续跑排队，不能把attempt1的cancelled直接归因取消者。我们没有取消CI或重复重跑原提交，失败/取消与新attempt状态分别记录。03B九源、home/panel、核心、签名/权限和旧四层源均与273无重叠。
+
+最后四源候选仅Adblock caller副标题12sp（全局14/19/Medium默认仍原样）、通知25字14/约35行距/主题强调色选中文字、26字14/约34行距/选中底色垂直视觉内缩1.5dp且触摸框不变；24仍16/40，22/23caller与9目标7行可视滚动、所有onPick/onDismiss/配置不改。四源完整变换均对ec精确，添加updates/v2085-pdf-final-geometry于intake之后，旧五层10份inputs/patch字节冻结；379有效输入，4呈现修改/375冻结，4个不入Git载荷仍须CI恢复实验，本地375源重建通过，不称本地完整有效源。487/51XML目标=原479+intake8，不删原测试；旧intake scope18与evidence5、PDF6、authEvidence6、panelAuth18及新完整呈现守卫8合计61项host通过。候选自己的Android编译、487、最新图及双API安装尚未执行，不能挪用273验收。历史AVD/936等失败和V20.83 a93交付保留，不改安全门禁。
+
+Google截图为帐号认证错误，非CAPTCHA；旧不同GMS链路/流量及控制器401→200不足定位Play帐号故障。缺当前故障时DNS答案、实际UID/分流/代理链和认证HTTP/TLS，以及正常代理同刻对照；真实根因未建立/真机修复未验证。AOSP无GMS及用户帐号，不操作手机、退出帐号、清数据或改网络安全设置。未合并main、发布或部署，无hook。详见docs/V20.85_PDF_CONTINUATION.md及逐页/原始验收证据。
+
+## 当前接续：2026-10-06 工具源码包接入
+
+用户明确要求接入 hetu-tools-part1-v20.48.zip 与 hetu-tools-part2-v20.48.zip；继续原 test/v20.76-new-ui，从2730954591393c1b81f747cef72adb8940c5a82c核对。27份上传Kotlin均有已适配实现，实际主入口app/PanelToolsScreens.ToolsScreen已连HetuToolsV2；不要直接覆盖回旧包而丢失当前PDF、CIDR、名单及运行链修复。本批只补仍存在的VPN授权意图与诊断迟到结果缺口，保留既有UI。独立追加updates/v2085-tools-intake；历史四层patch/inputs不改，首页/panel、设置呈现、核心、Root/service、签名、Manifest/权限和依赖冻结。
+
+本轮新增ToolsDnsConsentIntakeTest5项实际adapter授权回归与ToolsDiagIntakeTest3项实际Host交互回归，全部原479继续，总目标487/51XML。候选自己的Android编译、全量单测/lint/签名与双API安装必须依本轮新CI读取，不挪用273或01b结果。原运行中的37360879852不取消；当前候选源码收口并准备独立新验收，尚未通过。详见docs/TOOLS_INTAKE_20261006.md和逐文件provenance。无hook、不操作用户手机、不扩大权限、不合并main、不正式发布。
+
+## 当前接续：01b6634 独立完整验收与胶囊、通知菜单收尾
+
+应用01b66345f645aa168d56400ccc89313d3932f3f8 / Actions37353575277于2026-10-05 18:34:36UTC completed/success。build111910202022、历史V20.74对照111910202241、API35安装111916367156与API36安装111916367367均success。实际49原XML479项、0失败/错误/跳过，原422全部继续执行；23固定载荷、687 ABI零缺失、lint与固定签名通过。自己的53项严格原始证据检查全部PASS，docs/qa/20261005-v2085-01b6634-installation-success.json；不是使用ca或更早结果验证本轮。
+
+API35/36各64=59导航+5控制器认证、21配色、Root mutation0，HTTP401首读/重试后Bearer六路径真实200各24/23条，原preferences、reverse/forward、KVM与runner进程清理均通过。重试按钮先于200已启用，前台轮询仍存在，不把恢复独占归因为点击。自有AOSP镜像身份、路径、PID/session归属安全门禁保持。原安装失败和936失败、V20.83 a93交付记录均保留，没有取消CI。
+
+本轮01b6634真实APK134823359字节，SHA256 78785c46c716093b7b1d1f78808dc62529cbe723bab33ceaff95bb18cec2c11e；六artifact、各part与整包均实际核验，是中间测试产物，尚未作为本轮最终交付。264新PNG和自己的5张API36原生WebView实际核对；130页原PDF与新捕获SHA已逐项验证，三份逐页报告区分新重开17对及113页精确字节继承。首页/panel43张42张全同，另一张只现有隔离夹具随机端口47023→41305，源码与动效路径冻结，静态图不等于真机动效验收。
+
+新图仍发现03A44选中块沿用13dp连续角而原PDF为半高胶囊，以及04/22、23、24菜单行距分别约43/35/40px对当前47px。后续只修改A44局部shape、scroll==0保留45/49副标题且滚动后44/47/48折叠，以及通知三caller的宽度、行距、字号和选中块留白；保留默认路径、9项目标/7行可视滚动、全部配置和回调。HxMenus整文件、home/panel、manifest/权限、核心、签名、历史层不改；同一v2085层保持40修改/332冻结/372精确重建。候选必须自己的新提交、479单测、新图与双API安装，01成功不验证候选。未唯一确定的纵向锚点/字体细微差异不凭印象调整，130页字面像素与全部回调验收仍未全部通过。
+
+Google截图是帐号认证错误，非CAPTCHA。旧GMS连接的不同分流/链路和流量不足以定位；隔离401→200仅证明Mihomo控制器认证。当前故障时Play/GMS认证响应、DNS答案/实际UID链路及正常代理同刻对照未取得，真实根因尚未建立，真机修复未验证。AOSP没有GMS/用户帐号，禁止操作用户手机、退出帐号、清数据或改设备网络安全设置；不合并主分支、发布或部署。详见docs/V20.85_PDF_CONTINUATION.md、当前逐页清单与Google证据JSON。
+
+## 当前接续：ca60825完整验收与四项实测呈现收尾
+
+原仓库xgl34222220-ops/hetu、原test/v20.76-new-ui，当前应用ca60825b4edaecc07fc6c4485c264eec8d37cbe6 / Actions37346239863于2026-10-05 17:36:08UTC completed/success。本轮49原XML479/0失败/0错误/0跳过，原422继续执行；API35/36各59导航+5控制器认证、21配色、Root mutation0、Bearer六路径各19次200以及原偏好、端口、KVM和进程清理通过。53项原始证据校验全部PASS，docs/qa/20261005-v2085-ca60825-installation-success.json；26a完整成功与936原始失败分别保留，不挪用旧结果。
+
+ca测试APK134819453字节/SHA256 f5d1382e55438aaf2f09524c34d59c2d84a730338de6881f04633780a8f13ef7已实物重组核验并作为进行中测试包提供，未宣称全部130页字面像素1:1或Google Play认证已修复。125当前组件/原生组件图及5当前API36 WebView图已关联实际49+48+33页原PDF；逐页报告分别明确实际重开与哈希相同继承。首页/panel43图42张字节和像素全同，另一张只有现有隔离夹具随机端口，布局及动效源码路径冻结。
+
+下一批只收尾原PDF实测的03A21错误glyph、03A44拦截等级卡、03B44提示footer及04/11通知行高，要求各整文件逆转回ca且默认、回调、触摸与认证行为不变。它们须自己的提交、新479单测、新图及双API验收；ca成功不验证后续代码。原同层40修改/332冻结/372重建与五项整文件边界门禁保持，不修改manifest/核心/签名/权限/home/panel或no-hook约束，不取消任何CI。
+
+Google截图是帐号身份验证错误，非CAPTCHA；已有DNS/分流与不同链路流量不足以定位故障，控制器401→200只证明隔离Mihomo认证。缺故障当时既有Play/GMS响应与DNS/连接UID记录，以及正常代理同刻链路对照，真机根因与修复均未证实。不要操作手机、退出帐号、清数据、改变设备网络安全设置；不合并主分支或正式发布。见docs/V20.85_PDF_CONTINUATION.md及当前原始证据。
+
+## 当前接续：26a0906 新单测通过与A21最后3dp留白候选
+
+26a0906ed9765c04de1316cdcf99cd0460d9d276 /37342421613已真实完成build/lint/固定签名、23载荷和687ABI零缺失；实际新49XML479/0失败/0错误/0跳过，原SettingsPicker58两测试含宽度case执行通过。新UI11359219809/264PNG、ZIP SHA a3039879cdcdd67370b6afb5ff5152597a45af7407b9af7be8fa7b1081228fa3；API35/36仍在本轮原生导航/WebView验收，未取消，不将其未完成结果称为通过。936原失败与939旧成功均保留。
+
+新A21实读发现errorRow实际18px（非预计15），URL相对cardTop167对原163.673，input→error墨迹10对7.398，而error→URLlabel28已接近27.741。最后候选仅Add nameError非空caller的errorSpacing6→3dp；字体12/14/.4、后gap19、其余null/default24及所有回调逐字保持，整文件逆转等26a。预测URL164、前墨迹7、后28，必须以自己的新提交和新图核实。40修改/332冻结/372重建与五项边界门禁通过，证据docs/qa/20261005-v2085-A21-final-gap-candidate.json。GooglePlay根因仍未定位/真机修复未验证；不要把控制器401→200或旧包当新Google成功。
+
+## 936ffac 原始失败证据与菜单宽度期望续验
+
+应用936ffac87a81ef056e3c006987667e9d56baf5bc / Actions37338269235已经真实编译并产出264新组件图、23载荷与687配色ABI零缺失，但原49XML为479项/478通过/1失败/0错误/0跳过；SettingsPickerParity58Test.rootSettingsChoiceWidthsStayCompact在第11行仍硬编码Mode184，下一行IPv6也仍184，与实际附PDF04新原生214相冲。实际新图Mode214对原图归一213.60、IPv6214对212.68；Core174对173.85且能力禁用门禁保留。不能把这轮记为通过；lint、最终APK签名/运输manifest、API35/36安装59+5+21及401→200均未执行。原完整日志与49原XML已归档docs/qa/20261005-v2085-936ffac-acceptance-failure.json，不覆盖先前成功/失败。
+
+续验候选将现有测试两处184期望更新214，原Core174、全部@Test及其余断言精确保留；新增整文件期望变换门禁及拒绝删测试/改Core/改dim的负例。40修改/332冻结仍总计372；新增白名单仅原设置测试源，不扩大运行层、权限、核心、依赖或签名。全部479仍必须执行，不能降低原422基线或跳过失败类。已有生产UI源不以这次断言修正伪称已安装通过。当前30项host检查通过、372输入精确重建；自己的后续提交与全量CI待执行。首页/panel继续冻结，GooglePlay根因未定位/真机修复未验证，控制器认证与Google帐号认证独立报告。
+
+同一续验另包含实际新图发现的03A21名称错误状态局部留白：新URL栏比原稿归一多下移12.33dp；input→error墨迹13对7.398、error→URLlabel32对27.741、error文字82×14对73.052×11.096。只在Add名称error非空时传nullable errorStyle12/14/.4sp与errorSpacing6，名称→URL真实Spacer19（其它24）、URL→footer始终24；两源ToolsComponents/Subscription的默认null8dp、完整error文字/icon13、validator与键盘/clear/save/cancel回调保留，没有offset/负padding。两份独立整文件逆转均等936ffac，源已停止，证据归档docs/qa/20261005-v2085-settings-width-expectation-candidate.json。候选自己的编译与新图仍未执行；936原FAIL与图页剩余差不改写为通过。
+
+## 939912 已完成的独立验收与其后窄修正
+
+真实仓库 xgl34222220-ops/hetu / test/v20.76-new-ui 延续原实现，无重复分支或取消CI。最新已完整验证的应用提交为9399121212b68a5f6422170e00835095218c2f8e，Actions37330392252截至2026-10-05 15:36:52UTC为completed/success，构建、历史崩溃守护、API35安装、API36安装四job均success。实际49XML/479项零失败、错误、跳过；原422基线、新Google分类8和工具状态49继续执行。23载荷、687ABI零缺失、lint与固定签名通过。APK134804906字节，SHA256 e23997fa0af6f78e310983a05a9514b21749067090585caa9ad8d65c9cf9b0fb；本轮独立证据docs/qa/20261005-v2085-939912-installation-success.json的53项严格证据检查全部PASS，不替代7cf、270及以前成功/失败记录。
+
+API35/36各64=原59+认证5、21配色、Root mutation0。实际loopback控制器401→200、启用重试按钮先于fixture200、有效Bearer六路径通过，实际200请求各25/19条；原配置、adb reverse、runner/KVM和独立AVD资源恢复/清理均通过。foreground轮询仍存在，不能声称仅重试恢复。此验收证明AOSP隔离环境中的控制器认证与原生呈现，不证明Google Play帐号认证、真机Root/开机/网络或用户设备修复。
+
+939912新图再次按本次PDF03A49、03B48、0433逐页检查，设置33原图xref/嵌入图/渲染SHA与33新图全部实读。原生基本页实际入口RootTproxyActivity，不能挪用Compose修改结论；自启关闭与通知状态说明新图已单行，Mirror正常46px/错误约70px、错误标题19/24和非pill按钮已渲染。仍有客观几何/字距差异，像素1:1与130页完整功能验收没有全部通过。当前未提交、未编译的窄候选包括Mode/IPv6菜单214dp（Core174保留）、原生唯一自动覆写说明12.5/600（其余14/600保留）、Startup12/19仅tracking1.sp、Mirror仅正常状态标题top14/bottom16/按钮前22/后6，总高预计+12px，error/Restore/default逐字保留；许可仅referenceDocument正文外gutter10.5dp、完整GPL/ISC/Feather法律文与原最大高度不改；compact warning仅已开启referenceCompact的Bad/Warn绘制23dp实心Error图标，其余18dp，固定18dp占位和现有间距/行为保留。工具其他窄候选仍须其本批新提交、构建与新图证明，不能引用939912的479项提前标通过。
+
+本轮源修改已收口（source stopped），设置三源候选逐字反转等于939912，回调/配置/门禁不变，git diff --check通过；由根任务统一生成层、提交原测试分支并运行新验收。首页/panel布局、动效、核心、签名、权限与no-hook约束继续冻结。Google真实根因仍未知，缺故障当时Play/GMS认证HTTP/TLS、DNS答案及另一代理同刻分流/链路证据；不操作手机、退出帐号、清数据或改变网络安全设置。历史AVD、按钮禁用及断言失败证据与V20.83 a93交付保持。细节见docs/V20.85_PDF_CONTINUATION.md及本轮三份939912逐页复核JSON。
+
+工具上册本批三组证明已归档docs/qa/20261005-v2085-next-detail-candidate.json，九份呈现源source stopped；这不是新构建或新视觉验收通过。许可referenceDocument唯一留白分支的守卫已本地通过，根任务统一汇总设置及工具后续候选证据。
+
+## 此前接续：V20.85 7cf 实际PDF130页与认证证据
+
+原仓库 xgl34222220-ops/hetu / test/v20.76-new-ui，从492a9c继续；没有重复实现或取消CI。最新完整验证应用7cfdf426400026c06a997f09d3b7eb4defad852b /run37322190390四job success，14:36:11UTC完成；479/49XML零失败错误跳过，API35/36各64=59+5、21palette、Root0、loopback401→200/Bearer六路径和隔离资源清理通过。APK134797638 bytes/SHA6c076ff75c285cefcd0e0520923e9a8351bfb77257513d524e2cfbd21852f171。证据docs/qa/20261005-v2085-7cf-installation-success.json；270与此前失败和成功记录保留。
+
+本条追加候选按7cf130页实际审图修正YAML13/17及行号栏、Outline32dp/28dp/比例字体、添加订阅错误hint顺序和条件footer、核心busy灰底白字、独立DNS单行说明及白名单比例字体；设置真实原生基本页14/600和自动覆写11.5/600、Mirror正常/错误各自尺寸、Startup12/19、通知和自启关闭单行；文件父目录glyph及正常下载框34/7。设置04/04与05资源图标原稿冲突按详细05统一并记录差异。共享表单新增空值opt-in，原生基本页整文件白名单守卫保留所有Root/配置回调；首页/panel默认路径精确冻结。候选尚待自己的新CI，不能挪用7cf结果。追加v2085同层39修改、333冻结，422原基线和479总数保留；核心/权限/签名与历史补丁冻结。
+
+PDF03A49、03B48、0433均实际读并130当前截图有入口映射；字面像素1:1和130完整功能验收未全部通过。197434实际为Google帐号认证错误而非CAPTCHA；用户明确Google Play商店打不开，其他代理正常。实际重新读取197152仅显示Mihomo控制器401，与Play认证不同。历史GMS两条分流链、独立DNS重定向与河图自身UID直测已证据对照，但缺当前故障时DNS/认证HTTP/TLS及另一代理同刻链路，Google根因未知/真机修复未验证。新增25条Google元数据配额及8分类用例，只改证据保留、不改DNS/链路/权限；AOSP控制器认证不是Google账号验收。
+
+AVD/按钮禁用/旧间距断言失败证据和V20.83 a93交付记录全部保留。用户已授权本测试分支代码/UI/tests/CI/docs提交与隔离验收；不操作手机/帐号/网络安全设置、不合并main、不发布部署、无hook。详细过程见docs/V20.85_PDF_CONTINUATION.md；入口/captureSHA见docs/qa/20261005-tools-settings-pdf-map.json。
+
+## 当前续接：V20.84 控制接口鉴权与面板缺测状态（构建通过，安装续验待核）
+
+继续 `test/v20.76-new-ui`，以已实际编译的 `a93a756d8578cf3afa60ee090405535ad097e49e` 为底座；其完整 Actions `37240041766` 现四 job 均 success，保留下面交付时记录的原状态。本轮 versionCode 2084 / `0.12.14-v20-auth`，独立追加 `updates/v2084-controller-auth/runtime.patch`，原 V20.82/83 清单及补丁字节不变。
+
+截图实际为 401 Unauthorized，不能仅凭截图确定手机 API 来源或活动密钥。修复请求偏好快照、防止旧迁移覆盖本机密钥、实际请求模式鉴权提示、失败读取数据保留、原生面板重试/API 设置与错误图标；不猜测或自动替换当前密钥，不重启用户核心。新增 5 类 30 项单测，须实际核验原 392/42 XML 与新增 30/5 XML，合计 422。保留原安装 59 项及 21 配色，每 API 新增 5 项原生 401→200 隔离夹具；仅模拟运行提示，不注入健康 Root 状态。实际构建及 API35/36 安装未验证前不得描述为通过。
+
+首轮 `7536b695` / Actions `37243939715`：应用编译与载荷/ABI/图标通过；新增 ToastFeedbackTest 显式导入 `assertExists` 编译失败，单测未执行，lint 与本轮 API35/36 安装 skipped。已仅移除错误导入并保留实际渲染断言，独立补丁重新生成；原失败证据保留于 `docs/ci/V20.84_FIRST_FAILURE.json`，修正后的完整重跑尚未验证。
+
+第二轮 `934bc32` / Actions `37244396784`：实际 47 XML / 422 tests / 3 failures / 0 errors/skipped，lint/最终 APK signer 与双 API 安装 skipped。保留 `docs/ci/V20.84_SECOND_FAILURE.json`。新测试显式清空静态历史夹具并等待实际读取闸门后验证取消；旧 HistoryRecord 的 pause/pending 增加 volatile，原安全断言仅增加失败详情。原 392 与新增 30 数量不变；第三轮仍须完整验证，字段可见性不是已确认的生产根因。
+
+第三轮 `6666bd8c` / Actions `37269048184`：实际 422/1 failure/0 error/skipped，新 30 全过；仅原 stop/history latch 失败，诊断显示 panelReady=true/readFailed=false/historyPaused=true，volatile 未解决。证据保留 `docs/ci/V20.84_THIRD_FAILURE.json`。两套 Shadow 针对同一个 Kotlin history 单例存在夹具绑定冲突疑点；第四轮统一复用原可暂停 HistoryRecord，仅补只读采样审计并显式核对实际绑定，不改生产历史保护或原断言，仍待完整重跑。
+
+第四轮实际编译 `121e0ab99904e7ea862b1dcb350a59169aeab0cd` / Actions `37270231154`：build `111635473569` 与旧崩溃复现 `111635473860` success；47 XML / 422 tests（原 392 +新增 30）/ 0 failures/errors/skipped，lint 0 Error/Fatal、298 Warning/7 Hint，23 载荷、687 ABI 引用零缺失与固定签名通过。整体仍为 failure：API35 `111638870907`、API36 `111638870864` 在新增夹具目标检查因 console AVD 名称返回空而拒绝，尚未执行新增鉴权 5 项；两 artifact 无 results.json，不推算原 59/21 或新 64 通过。保留 `docs/ci/V20.84_FOURTH_FAILURE.json`。
+
+仅修测试监督进程与目标识别，不改 Android 编译输入：固定 APK `Hetu-0.12.14-v20-auth.apk`，134727773 bytes，SHA256 `33d60ce01b63f40c6b6ccd8c63c5dd1ea38b85d4d25e37c32f48130c4207ff50`；其 Android 源码树 `2954ad5c83131050acd3ffd52eb63d8689a8de33`。待严格固定原 build/job、源码树、产物 ZIP 摘要、实际 422 XML、载荷/ABI/证书的双 API 安装续测，原 59 +新增 5 项与 21 配色全部保留。续测提交不作为重新编译提交，原第四轮 full-run failure 不改写为 success。
+
+首次固定 APK 安装续测 `c4e58f7fe2dfcb7ecef717641c6c883e64682f32` / Actions `37273953593` 仍失败：API35 `111646751627`、API36 `111646751764` 各实际 72 项 host 全过，但新复用守卫误设 manifest ZIP 只有 manifest.json，实际固定 ZIP 还有 apk-metadata.txt / apk-signature.txt，故在模拟器启动与安装前拒绝。保留 `docs/ci/V20.84_FIRST_INSTALLATION_FAILURE.json`，安装通过计数保持未执行；仅修正精确三成员结构与身份文本校验，新增回归后守卫 19 项通过，固定 ZIP 摘要与真实 aapt/apksigner 检查不放宽。原编译及 APK 不变，第二次安装续测仍待真实验收。
+
+原 23 载荷、Root runtime 151、核心/native/service.d、签名、Manifest/权限与依赖不变。无 hook、不操作用户设备/网络/安全设置、不永久删除数据、不合并主分支或正式发布。手机实际鉴权恢复、K80/OEM/KernelSU、真机 Root 与长期网络仍未验证。详细范围见 `docs/V20.84_CONTROLLER_AUTH.md`。
+
+## 上次交付：V20.83 工具、设置与首页面板交互（构建及独立安装验收通过）
+
+继续原 `test/v20.76-new-ui`；实际编译提交 `a93a756d8578cf3afa60ee090405535ad097e49e`。首页/面板沿用已有 UI，仅补实际下拉刷新、动效、配置图标读取与节点展开尺寸；完成工具、配置、日志、诊断与设置页面，保留真实功能回调及编辑器返回状态。有效运行源码仍以 V20.81 `37e963d4` 为基底，UI 基底 `aa599a53`；生成源码与 checkout 一致，68 项 UI 输入补丁 SHA256 `a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514`，受保护运行源码不变。
+
+Actions `37240041766` 的 build `111546766975` 与旧 V20.74/API36 闪退复现 job `111546767044` 均 success；实际 42 XML / 392 tests / 0 failures/errors/skipped，lint 0 Error/Fatal、298 Warning，13 项实际滚动边界 host 回归、687 ABI 构造引用零缺失、23 载荷与固定签名通过。该 full run 的重复安装 job 在记录时仍运行，不能称其全量 success。独立固定 APK 安装续测 `37240041754` 已整体 success：API35 `111546766773`、API36 `111546766922` 各 59 项检查（各 21 配色）通过，原诊断/存储/历史/拒绝 Root/原生 WebView/HTTP503 断言保留，5 个原生 WebView 状态各不相同，Root mutation 0。续测严格固定原构建、源码树、两类 job、artifact ZIP 摘要及 APK；原应用编译 `7d082aca` 的相同 APK 又由当前 a93 原 workflow 独立重建并重跑 392 项，不把续测本身描述成重新编译。完整证据见 `docs/ci/V20.83_RESULT.json`。
+
+交付 `Hetu-0.12.13-v20-ui.apk`：134721428 bytes，SHA256 `24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57`；versionCode 2083，Root runtime 151，证书 SHA256 `701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad`。分块与完整 APK、23 项载荷逐项回读通过，14 张已审阅截图在后续构建中字节一致。全部六轮失败及修复记录保留于 `docs/ci/V20.83_*_FAILURE.json`，不覆盖失败结论。本记录之后的提交仅为文档，不作为已编译提交。
+
+原核心/native/service.d、Root、签名、Manifest/权限及依赖边界保持；无 hook，不合并主分支或正式发布，不操作用户设备/安全网络设置、不永久删除数据。截图清单不等于像素一比一验收；安装仅 AOSP 隔离夹具，K80/OEM/KernelSU、真机 Root 自启、长期 Google/微信网络、GPU 模糊与帧率仍未验证。
+
+## 此前续接：V20.81 合法栈位置（全量CI已核实通过）
+
+沿原test/v20.75-theme-compat，应用37e963d4 / Actions37171744564 attempt1四job全部success；实际348单测0fail/error/skipped，JournalReliability21执行，6host+60shell、过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各56（各21配色），Root mutation0。符号夹具旧捕获/复制三处redacted，新保留Kotlin短横线及init/clinit，5类恶意符号仍拒绝；安装报告位置/UUID/脱敏/满额旧段保留通过。实际下载APK133353242 bytes，SHA2561319ef860d4aedcfcb4e57f029df0a45e285d67ad7dcd3415a7d8c0cb1dbe425，23载荷逐项回读匹配。详见docs/ci/V20.81_RESULT.json、docs/V20.81_TRACE_SYMBOLS.md。
+
+保留ed326756/37163668343及V20.79、V20.80首轮失败和最终证据；不把旧262/旧Android15-16当本轮结果。Root151、核心/service.d、原UI方向、固定签名、Manifest/权限保持，无hook、不操作用户设备/安全网络设置、不永久删除用户数据、不合并主分支或正式发布部署。真机KernelSU/OEM、长期Google微信、长期IPv6/TUN/eBPF仍未验证；服务/状态重建仅隔离夹具通过，真实强杀/掉电后日志完整性及异步计数持久化未测。间歇断网未确认解决。
+
+## 当前续接：V20.80 日志限额与脱敏（全量CI已核实通过）
+
+原应用b49c6d18，测试导入修正52ad5701，Actions37169862397四jobsuccess；首轮37169355897测试编译失败、单测未执行/安装skipped证据保留。实际344单测0fail/error/skipped、6host+60shell、过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各56（各21配色），Root mutation0。CI3000写入旧501000→新8016≤8192预算/2952拒绝；故障200190→217字节，脱敏/截断/最新UUID/复制实际函数/超限旧段校验保留均通过。见docs/ci/V20.80_RESULT.json及docs/V20.80_JOURNAL_BOUNDS.md。
+
+内容总限额2MiB满额暂停，所有旧段保留；生成ID不等于落盘，缺口可见。Root151/core/service.d/签名/Manifest/原UI方向/权限保持；无hook、不操作用户设备/安全网络设置、不永久删除用户数据、不合并主分支或正式发布部署。真机KernelSU、Google/微信长期断连、长期IPv6/TUN/eBPF未验证，间歇断网未确认。下一批为已复现的Kotlin/JVM合法符号被误过滤，须独立完整CI，不能拿本轮结果替代。
+
+## 当前续接：V20.79 恢复背压（全量 CI 已核实通过）
+
+原分支 `test/v20.75-theme-compat`，应用 `82be531f`，Actions `37166956898` 四个job success。实际324单测无失败/错误/跳过，6host+60shell、生产过滤ENOENT、lint0error、687ABI/23载荷/固定签名通过；API35/36各52安装检查（各21配色），Root mutation0。积压夹具旧512→新1、取消计时器旧4096→新0，服务重建与迟到结果门禁13项通过。保留ed326756/37163668343上一轮及全部失败证据。详见docs/ci/V20.79_RESULT.json与docs/V20.79_RECOVERY_BACKPRESSURE.md。
+
+Root151/core/service.d/签名/Manifest/原UI方向不变。未知core在wanted+autoStart开启时继续有界间隔等待，最多一个重试；既已进入Root事务不强制取消。用户设备、KernelSU/OEM、长期Google微信/IPv6/TUN/eBPF未验证，不能宣称间歇断网解决。日志存储边界与脱敏为下一批；禁止永久删除历史、扩权、合并主分支或正式发布部署。
+
+## 当前续接：V20.78 网络诊断（全量 CI 已核实通过）
+
+最终应用提交 `47609a6925eb411def74ea6781eaa77b88a6b7da`，定位脚本/CI 修正提交 `95b6e171f0f078a0477d200cdb4c391629b62234`，Actions `37163668343` 四个 job 全部 success。本轮实际 XML 311 tests / 0 failures/errors/skipped；6 项 host、60 项 shell、生产过滤 ENOENT 前后验证通过；lint 零 error（278 条 warning 保留），687 个配色构造引用零缺失，23 项运行载荷与固定签名通过。API35/36 各 52 项安装检查通过，各含 21 种配色组合的实际脚本页交互。五种 WebView 画面各自不同，去除状态/导航栏后仍不同；已人工核对连接列表与节点弹窗。Root mutation 为 0。APK 133347510 bytes，SHA256 `33c48db99d98c19b8e91bb44c5441e8c32250e083dc459d97c2403f19c697966`。完整证据见 `docs/ci/V20.78_RESULT.json` 和 `docs/V20.78_NETWORK_TRACES.md`。
+
+V20.77 与 V20.78 首轮失败记录保留；最终 V20.78 重跑覆盖两批应用改动，不将旧失败运行改为成功。API36 日志另含 shell UID2000 的 uiautomator 进程3960错误，应用进程2375与之不同；不把日志描述为“所有进程无异常”。调用方 blocked 回调只反映河图 UID，不能据此判断 GMS 或整台手机被禁网。真机间歇断网、KernelSU/OEM切网/开机及长期 IPv6/TUN/eBPF 未验收。继续原分支与 UI/核心/签名约束，无 hook、不扩权、不操作用户设备、不合并主分支或正式发布部署。
+
+### 首轮与重跑历史（不覆盖失败证据）
+
+V20.78 首轮 47609a69 / 37162276140：实际311单测、60 shell、lint/ABI/23载荷/签名均通过，但两API安装因脚本把同一WebView的嵌套无障碍文档计为第二个容器而失败。已据实际失败树保留无文本拓扑fixture，增加6项host回归，本地全部通过；只选择唯一顶层容器，独立双容器仍拒绝。应用代码不变，测试/CI修正后全量重跑；最终安装结果仍须核实，不能标为已通过。
+
+仍使用 `test/v20.75-theme-compat`，从 V20.76 成功有效源码接续，不重放 UI 迁移，不开重复分支/实现。V20.77 应用 6a94d872 首轮测试夹具隐藏 API 编译失败；34ba4778 修正后实际 292 单测、lint、载荷/签名/ABI 通过，Actions 37160754265 的 API35/36 均在原生 WebView 截图重复门禁失败，不能称完整通过。所有证据保留在 docs/V20.77_NETWORK_RECOVERY.md。
+
+V20.78 在相同补丁链追加 `updates/v2078-network-traces/runtime.patch`；2078 / 0.12.8-v20，Root 151、原 native/core/service.d、固定证书不变。先修安装测试同步（CDP 只读定位 + 实际 AOSP 原生点击 + 原生 UI 快照后截图），保留五截图唯一性和原门禁。新增网络事件 noBackup 追加分段、错误 UUID/网络代次/原因类型、每固定出口目标结果及 stale-result、独立无 Root 报告入口；旧分段不自动删除。写盘/队列失败报告缺口，不能改变健康或 wanted。完整 CI 预计311选中单测、60 shell、全部原载荷/ABI/lint/签名与API35/36各52安装检查，结果须待当轮核实，旧76/75结果不计为本轮通过。
+
+参考源码、文档和许可证已核对，见 docs/V20.78_NETWORK_TRACES.md；只借鉴设计，沿用原 UI，不引入 hook 或新安全敏感权限。Google 可达独立于 session baseline、规则、DNS 与守护完整性。用户手机间歇断网仍未确认；禁止操作用户设备/网络/安全设置、扩大 Root/KVM/SELinux 权限、合并主分支、正式发布部署或永久删除用户数据。继续现有失败优先，缺相应真机的项继续明确列为未验证。
+
+## 当前测试交付：V20.76 安全运行记录修复与过滤导出
+
+继续 `test/v20.75-theme-compat` 的已交付 V20.75（分支原 HEAD 069a7ed），不创建重复分支，不合并主分支，不发布或部署。追加 `updates/v2076-session-filter/runtime.patch`，versionCode 2076 / 0.12.6-v20，Root runtime 151；21 个原 native/core 与 service.d 载荷、固定签名保持。最新用户禁止操作手机或修改其网络、安全设置，测试仅限已有授权的隔离 shell/JVM/AOSP 环境。
+
+旧 r149 session 仅多出末尾 GOOGLE_FIREWALL_CLEAN 行时，现有不可变 baseline checksum、PID、规则、路由、监听与守护身份全部核对后，允许用户在工具中显式修复运行记录。保留原始 baseline；不重建缺失/损坏 baseline，不将现网快照登记为健康，不强制重启核心，不自动把已应用 runtime 149 改为 151。新版独立检查器用于旧部署的诊断，读检查不得使 ProxyControlEpoch 的观察票据失效。任何观察不完整均失败关闭，Google 可达独立报告。
+
+过滤导出迁至 noBackup 稳定目录；按不可变 generation 成对发布、hash 校验、保留旧交接文件。实际旧/new 导出器的缓存清理故障注入、真实 Android 导出、第二 provider 写入失败、共享主题重建与 Monet 切换回归均纳入本轮 CI。最终应用提交 a48ece29289a34b1812c67fa0f82e0252362efc3，Actions 37157127775 全部 success；278 项单测、lint、687 个配色构造引用零缺失、23 项载荷与固定签名验证通过。API35/36 各 50 项安装检查通过，各含 21 种配色与修复入口/拒绝授权报告。旧2074/API36闪退本轮再次精确复现。不引用旧 262/旧 Android 15/16 作为本轮通过。APK SHA256 d3c481f34a08134107ab9c7f9b5ae397164f446988ea41428420f7faa17726d0；未做真机 Root 重启、长期切网或间歇断网验收。详见 docs/V20.76_SESSION_FILTER.md。禁止访问用户设备、扩大 KVM/Root/SELinux 等权限；本轮不得永久删除用户数据。
+
+## 当前交付：V20.75 自定义配色兼容修复
+
+从已交付 V20.74 源码继续，追加 `updates/v2075-theme-compat/runtime.patch`，不重放历史 UI 迁移。versionCode 2075，versionName 0.12.5-v20；Root runtime 保持 150，原核心/native 载荷、Root 脚本与 service.d 自启保持已验证 V20.74 字节与固定签名。
+
+用户最新真机诊断：当前 App 2074，但已部署 Root 149；`upgrade-required/session-manifest-missing` 仍来自旧运行基线，须显式重启代理部署 150，不能隐藏警告、无条件重新快照现网或自动强制重启。Google 服务已有双向流量，清理 checked=6/removed=0/failed=0，不声称已确认 Google 防火墙断网。
+
+历史 2072 的 `ProxyScriptsActivity` 闪退记录为 `NoSuchMethodError` / MaterialKolor DynamicScheme。已检查 2074 实际 APK DEX：MaterialKolor 2.0.0 引用的 Scheme 构造方法在实际 MCU 5.0.1 中不存在。MiuiX 0.9.4 引入 MCU 5.0.1，主题依赖也统一严格锁到 5.0.1，保留全部 8 种配色、系统 Monet、强调色与原配色算法。默认蓝色/TonalSpot 分支不会进入有缺陷代码，之前默认配色 smoke 因此漏报。按 `.github/workflows/hetu-build.yml` 构建，补真实共享主题回归、APK 构造方法存在性校验、API35/36 自定义配色实际脚本页交互和 2074/Android16 旧包预期闪退复现。结果须以最终 Actions 与 artifact 为准；AOSP 仍不等于用户手机 Root 重启验收。
+
+应用提交 494ef31c70a29e7f18a67ad617493c11bea133ba，Actions 37132069914 attempt 2 全部 success，262 项单测与 lint 通过，API35/36 各 45 项实际安装检查通过（各 18 项自定义配色脚本页），APK ABI 构造方法缺失 0，23 项 runtime 打包 hash 通过。APK SHA-256 27f34ad301f42f0828a9c9b5110d04c8de18dfee22d0489cec14174799c2dc49，固定签名 701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad。首轮列表等待 1 项失败及原提交不改断言重跑通过记录保留在 docs/V20.75_THEME_COMPAT.md，失败原因未确定。旧2074/API36闪退已精确复现；不声称真机Root重启或Google间歇问题全部验收。
+
+## 当前交付：V20.74 开机运行健康基线修复
+
+沿用已交付 V20.73 底座与固定签名，追加 `updates/v2074-boot-health/runtime.patch`，构建用 `.github/workflows/hetu-build.yml`。versionCode 2074，versionName 0.12.4-v20，Root runtime 150。全部界面与功能、21 个原始 native/core 载荷、service.d 自启实现保持。
+
+确认并复现启动顺序错误：`health_record` 复制 session 后才追加 `GOOGLE_FIREWALL_CLEAN`，导致完整性快照始终不匹配、状态返回 `upgrade-required/session-manifest-missing`，并跳过仅处理 degraded 的自动修复。先完成 session 再保存快照；写入失败停止启动。不能用核心 PID 或远程测速结果替代健康检查，不能清空系统防火墙。Google 超时本身不等于已确认 OEM 防火墙拦截。
+
+应用提交 `ae544982c501c61af2d8687169194bb604b9eb31`，Actions `37122739246` 全部 success。本地/CI 实际 shell 11 项健康/修复、17 项开机、17 项 Google 清理夹具通过；259 项 Android 单测、lint、23 项 runtime 打包 hash、固定签名验证通过。API35/36 各 27 项实际安装交互通过，无闪退/ANR。APK SHA-256 `ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f`。首轮错误测试预期的失败与完整重建结果保留在 `docs/V20.74_BOOT_HEALTH.md`。
+
+覆盖安装后须显式重启一次代理更新 Root 脚本和基线；版本号不自动强制重启已有核心。AOSP 安装与 shell 夹具不等于用户手机 Root 重启验收，Google 超时的真机根因仍未确认。
+
+## 当前交付：V20.73 脚本与开机自启修复
+
+以已验证 V20.71 有效源码、V20.72 补丁及 `updates/v2073-scripts-boot/runtime.patch` 为底座，使用 `.github/workflows/hetu-build.yml`；不重放历史 UI 覆盖。应用提交 `1321b2d6fddf8abae82c9bf98483ba58c33748d4`，versionCode 2073，versionName 0.12.3-v20，Root runtime 149。用户本轮要求修复运行问题，Root 开机脚本与运行层修复见 `docs/V20.73_SCRIPTS_BOOT.md`，不沿用下文历史“后端未改”作为本版描述。
+
+保留全部界面/功能，21 个原始 native/core 载荷不变。沿用固定签名 SHA-256 `701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad`；缓存/证书缺失失败关闭。开机自启须实际安装 Root service.d 脚本并校验成功部署配置才保存为开启。脚本文件列表保留真实文件名；导入后台限量读取，错误结果明确显示诊断。Google 防火墙回归保留。
+
+259 个 Android 单测和 lint 通过；Android 15/16 各 27 个实际安装交互检查通过，最终 CI 37118971993 attempt 2 成功；Root 重启只验证受控夹具，没有用户手机/Magisk/KernelSU/APatch 真机验收。用户所述脚本点击闪退未在旧包 AOSP 上复现，不声称设备根因已经确认。APK 与安装测试身份、后续交付证据见本版文档。
+
 ## 当前交付：V20 整体重构（以此为准）
 
 用户要求“按你的审美完全重构，包括功能”。V20 用单一 `HetuActivity` + `app/` 下的新 Compose 界面取代全部旧 UI；用户明确要求**不删除任何功能**：旧 UI 文件、功能页、测试、脚本、工作流全部保留，旧页面只换配色并由新设置页进入；下文 UI10–UI15 的首页/面板布局约束对新主界面不再适用。后端（Root、Mihomo、规则、DNS VPN、服务）未改，除：`MihomoStartupConfig` 在广告过滤开启且源配置无 sniffer 时注入嗅探。构建用 `.github/workflows/hetu-build.yml`。详情 `CHANGELOG-V20.md`。
@@ -98,3 +346,7 @@
 - 不引入Vue空回调、console.log、setTimeout假启停/测速、硬编码IP/节点/CPU/流量/ISP。未知值继续未知。
 - 分开报告迁移脚本、实际应用提交、编译、测试、发布和真机结果。用户要求回复不放图片/图片链接，交付真实APK、源码、报告和文字即可。
 - 旧test.92自动写回已停用，不重写Git历史。之前批量清理旧分支/标签/产物被安全检查拦截、未完成，本轮未执行历史清理，不授权绕过。
+
+本轮恢复后实物源独立重建完成：patch8c8281ce4248610259696b03d1d224ee8b2b6bb677227fe552a225723958687a，inputs5acab6aa5b44ba2bb62cd17b1d884412a1a75f7e18183f0c55a0b3735d7c3164；20新增与47原源码host全部通过，层逐字节复现。报告 docs/qa/20261006-v2086-select-epoch-reset-source-host-proof.json SHA256 a980694b26c1fb954917b0bc5ce16ca3f605820e897b8972a283113f100f14b5。此时Android544/56、lint和当前双API仍待新提交自己的CI。
+
+最终batch候选67host已全部通过且层逐字节复现：patch ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a、inputs 796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22；545/56，local382/required386。独立报告 docs/qa/20261006-v2086-batch-epoch-source-host-proof.json SHA49f1cc67cf4deb944141f4735f98c37c4cbc5d4a3012118f187a1e0c704aad27。此时新Android验收仍未执行。

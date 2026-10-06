@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "b7fe25d77195a45e63bc74a4aa327bc61cd509f4",
+  "ciRun": 37233387401,
+  "attempt": 1,
+  "conclusion": "failure",
+  "failedJob": 111527592262,
+  "failedStep": "Runtime unit tests",
+  "failedTask": "compileDebugUnitTestKotlin",
+  "compilerError": "NewHomePanelInteractionTest.kt:230: DpRect does not expose width in the resolved Compose test API.",
+  "correction": "Use first.right - first.left with the original >= 300.dp assertion and unchanged test count. Await the actual asynchronously loaded configuration action before taking its screenshot.",
+  "passedBeforeFailure": [
+    "All source, protected-input and early fixture gates",
+    "Production assembleDebug",
+    "23 packaged runtime entries match tested source and pinned originals",
+    "687 MaterialKolor constructor references, 0 missing",
+    "Packaged launcher and concept icon byte verification",
+    "Fixed signing keystore fingerprint"
+  ],
+  "unitTestsExecuted": 0,
+  "notExecuted": [
+    "392 selected Android unit tests",
+    "Android lint",
+    "Final APK certificate, version and checksum gate",
+    "Candidate APK API 35 and API 36 installation checks"
+  ],
+  "historicalCrashReproduction": {"job": 111527592520, "conclusion": "success"},
+  "uiVerificationArtifact": 11315335002,
+  "effectiveSourceArtifact": 11314712348,
+  "boundaries": [
+    "The failed run remains failed. Production compilation is not full acceptance.",
+    "No assertion threshold or protected runtime input changed. A fresh complete CI run is required."
+  ]
+}

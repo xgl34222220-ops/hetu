@@ -1,0 +1,2633 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2061
+-        versionName = "0.11.1-v20"
++        versionCode = 2062
++        versionName = "0.11.2-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+@@ -463,6 +463,7 @@
+     actionKey?.let { key ->
+         HxChoiceSheet(
+             title = if (key == "networkMatchAction") "匹配成功动作" else "失配动作",
++            referenceRadios = true,
+             choices = listOf(HxChoice("none", "不操作"), HxChoice("start", "启动 Root 代理"), HxChoice("stop", "停止 Root 代理")),
+             selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
+             onPick = { value ->
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt
+@@ -28,6 +28,10 @@
+     val city: String = "—",
+     val isp: String = "—",
+     val asn: String = "—",
++    val organization: String = "—",
++    val ipType: String = "—",
++    val timezone: String = "—",
++    val coordinates: String = "—",
+ )
+ 
+ internal data class ProxyRuntimeSnapshot(
+@@ -51,6 +55,10 @@
+     val wanState: String = "idle",
+     val wanCheckedAt: Long = 0L,
+     val wanError: String = "",
++    val wanOrganization: String = "—",
++    val wanIpType: String = "—",
++    val wanTimezone: String = "—",
++    val wanCoordinates: String = "—",
+ )
+ 
+ /** Lightweight runtime inspector used by the proxy dashboard. */
+@@ -132,6 +140,10 @@
+             wanCity = wan.city,
+             wanIsp = wan.isp,
+             wanAsn = wan.asn,
++            wanOrganization = wan.organization,
++            wanIpType = wan.ipType,
++            wanTimezone = wan.timezone,
++            wanCoordinates = wan.coordinates,
+             cpuAffinity = json?.optString("cpuAffinity", "—")?.ifBlank { "—" } ?: "—",
+             currentCpu = json?.optInt("currentCpu", -1) ?: -1,
+             wanState = lookup.state,
+@@ -281,7 +293,7 @@
+             val port = probeEgressPort
+             if (port !in 1024..65535) error("Mihomo egress probe is not ready")
+             val proxy = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
+-            val connection = (URL("https://ipwho.is/?fields=success,ip,country_code,country,region,city,connection").openConnection(proxy) as HttpURLConnection).apply {
++            val connection = (URL("https://ipwho.is/?fields=success,ip,type,country_code,country,region,city,connection,timezone,latitude,longitude").openConnection(proxy) as HttpURLConnection).apply {
+                 connectTimeout = 3_000
+                 readTimeout = 3_000
+                 requestMethod = "GET"
+@@ -303,20 +315,7 @@
+                     }
+                     text.toString()
+                 }
+-                val json = JSONObject(body)
+-                if (!json.optBoolean("success", false)) error("WAN lookup failed")
+-                val address = json.optString("ip", "").trim()
+-                if (address.isBlank()) error("WAN response has no address")
+-                val carrier = json.optJSONObject("connection")
+-                return WanRuntimeInfo(
+-                    address = address,
+-                    countryCode = json.optString("country_code", ""),
+-                    country = json.optString("country", "—").ifBlank { "—" },
+-                    region = json.optString("region", "—").ifBlank { "—" },
+-                    city = json.optString("city", "—").ifBlank { "—" },
+-                    isp = carrier?.optString("isp", "—")?.ifBlank { "—" } ?: "—",
+-                    asn = carrier?.optString("asn", "—")?.ifBlank { "—" } ?: "—",
+-                )
++                return parseWanRuntimeInfo(body)
+             } finally {
+                 connection.disconnect()
+             }
+@@ -324,3 +323,26 @@
+     }
+ 
+ }
++
++/** The existing provider's optional fields stay unknown unless actually supplied.
++ * Schema: https://ipwhois.io/documentation (same endpoint, egress and request limits).
++ */
++internal fun parseWanRuntimeInfo(body: String): WanRuntimeInfo {
++    val json = JSONObject(body)
++    require(json.optBoolean("success", false)) { "WAN lookup failed" }
++    fun text(obj: JSONObject?, key: String): String = obj?.optString(key, "")?.trim()
++        ?.takeUnless { it.isEmpty() || it == "null" || it == "—" } ?: "—"
++    val address = text(json, "ip")
++    require(address != "—") { "WAN response has no address" }
++    val connection = json.optJSONObject("connection")
++    val asn = text(connection, "asn").let { if (it.all(Char::isDigit)) "AS$it" else it }
++    val latitude = json.optDouble("latitude", Double.NaN)
++    val longitude = json.optDouble("longitude", Double.NaN)
++    val coordinates = if (latitude.isFinite() && longitude.isFinite() && latitude in -90.0..90.0 && longitude in -180.0..180.0)
++        String.format(java.util.Locale.US, "%.4f, %.4f", latitude, longitude) else "—"
++    return WanRuntimeInfo(address = address, countryCode = text(json, "country_code").takeUnless { it == "—" }.orEmpty(),
++        country = text(json, "country"), region = text(json, "region"), city = text(json, "city"),
++        isp = text(connection, "isp"), asn = asn, organization = text(connection, "org"),
++        ipType = text(json, "type").takeIf { it == "IPv4" || it == "IPv6" } ?: "—",
++        timezone = text(json.optJSONObject("timezone"), "id"), coordinates = coordinates)
++}
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java
+@@ -165,7 +165,7 @@
+             WindowManager wm=(WindowManager)getSystemService(WINDOW_SERVICE);
+             WindowManager.LayoutParams lp=(WindowManager.LayoutParams)container.getLayoutParams();
+             lp.flags|=WindowManager.LayoutParams.FLAG_DIM_BEHIND;
+-            lp.dimAmount=.26f;
++            lp.dimAmount=0f;
+             wm.updateViewLayout(container,lp);
+         }catch(Exception ignored){}
+     }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt
+@@ -213,6 +213,7 @@
+                 }
+             }
+         }
++        Spacer(Modifier.height(16.dp))
+         if (failure || working) HetuTaskFeedback(message, failure, working, Modifier.padding(horizontal = 12.dp))
+         revision
+         if (search) YamlWorkbenchSearch(editor, matches) { search = false }
+@@ -222,7 +223,12 @@
+                 CodeEditor(viewContext).apply {
+                     setEditorLanguage(if (path.endsWith(".yaml", true) || path.endsWith(".yml", true)) HetuYamlLanguage() else HetuCodeLanguage(File(path).extension))
+                     setText(model.draft ?: model.content!!.text)
+-                    typefaceText = Typeface.DEFAULT; setTextSize(12.5f); setLineNumberEnabled(true)
++                    typefaceText = Typeface.MONOSPACE; setTextSize(14f); setLineNumberEnabled(true)
++                    setLineSpacingMultiplier(1.4f)
++                    setLineNumberMarginLeft(18f * resources.displayMetrics.density)
++                    setDividerMargin(8f * resources.displayMetrics.density, 14f * resources.displayMetrics.density)
++                    setDividerWidth(0f)
++                    setPadding(0, (10f * resources.displayMetrics.density).toInt(), 0, 0)
+                     setWordwrap(wrap); setTabWidth(2); setHighlightCurrentLine(true)
+                     colorScheme = editorColors
+                     subscribeAlways<ContentChangeEvent> {
+@@ -269,13 +275,17 @@
+             }
+         }
+     }
+-    if (discard || jump) ModalBottomSheet(onDismissRequest = { discard = false; jump = false }, containerColor = Color.Transparent) {
+-        Column(Modifier.fillMaxWidth().liquidSheetMaterial().navigationBarsPadding().imePadding().padding(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
++    if (discard || jump) HxSheet(onDismiss = { discard = false; jump = false }) {
++        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+             Text(if (discard) "放弃未保存修改？" else "跳转到行", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+             if (discard) Text("当前修改尚未保存。", color = t.textSecondary)
+-            else LiquidGlassTextField(jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) }, "行号", Modifier.fillMaxWidth(), supportingText = "共 ${editor?.text?.lineCount ?: 1} 行")
++            else Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
++                Text("行号", color = t.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 4.dp))
++                LiquidGlassTextField(jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) }, "", Modifier.fillMaxWidth(), supportingText = "共 ${editor?.text?.lineCount ?: 1} 行")
++            }
+             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+-                TextButton(onClick = { discard = false; jump = false }, modifier = Modifier.weight(1f)) { Text("继续编辑") }
++                Button(onClick = { discard = false; jump = false }, modifier = Modifier.weight(1f),
++                    shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Hx.colors.surfaceMuted, contentColor = Hx.colors.accent)) { Text("继续编辑") }
+                 Button(onClick = {
+                     if (discard) { model.draft = null; discard = false; onBack() }
+                     else { editor?.let { it.setSelection((jumpLine.toIntOrNull() ?: 1).coerceIn(1, it.text.lineCount) - 1, 0); it.ensureSelectionVisible() }; jump = false }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+@@ -91,6 +91,7 @@
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.viewinterop.AndroidView
+ import androidx.lifecycle.ViewModelProvider
+ import io.github.rosemoe.sora.event.ContentChangeEvent
+@@ -201,6 +202,7 @@
+     HxPage(
+         title = "配置与订阅",
+         largeTitle = false,
++        compactTitleFontSizeSp = 20f,
+         subtitle = "管理源配置与当前配置中的订阅链接。",
+         onBack = { nav.pop() },
+         actions = {
+@@ -211,7 +213,7 @@
+         item(key = "configs") {
+             HxSection {
+                 HxGroup {
+-                    HxRow("配置管理", icon = Icons.Rounded.FolderOpen)
++                    HxRow("配置管理", icon = Icons.Rounded.FolderOpen, referenceRow = true)
+                     if (loading && configs.isEmpty()) {
+                         Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
+                     }
+@@ -230,10 +232,10 @@
+                                 ).padding(start = 14.dp, end = 2.dp),
+                             verticalAlignment = Alignment.CenterVertically,
+                         ) {
+-                            Icon(Icons.Rounded.Description, null, tint = c.text, modifier = Modifier.size(24.dp))
++                            Icon(settingsLineIcon(Icons.Rounded.Description), null, tint = c.text, modifier = Modifier.size(24.dp))
+                             Spacer(Modifier.width(16.dp))
+                             Column(Modifier.weight(1f).padding(vertical = 9.dp)) {
+-                                Text(config.name, style = MaterialTheme.typography.bodyLarge,
++                                Text(config.name, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
+                                     fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text,
+                                     maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                 Text(when {
+@@ -253,7 +255,7 @@
+                         .padding(horizontal = 20.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
+                         Icon(Icons.Rounded.Edit, null, tint = c.accent, modifier = Modifier.size(24.dp))
+                         Spacer(Modifier.width(20.dp))
+-                        Text("编辑当前 YAML", style = MaterialTheme.typography.bodyLarge,
++                        Text("编辑当前 YAML", style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
+                             fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.accent)
+                     }
+                 }
+@@ -262,7 +264,7 @@
+         item(key = "subs") {
+             HxSection {
+                 HxGroup {
+-                    HxRow("订阅管理", subtitle = "当前配置的 proxy-providers。", icon = Icons.Rounded.Link) {
++                    HxRow("订阅管理", subtitle = "当前配置的 proxy-providers。", icon = Icons.Rounded.Link, referenceRow = true) {
+                         IconButton(onClick = { editSub = null; form = "subscription" }, enabled = !busy) {
+                             Icon(Icons.Rounded.Add, "添加订阅", tint = c.text)
+                         }
+@@ -272,7 +274,7 @@
+                     }
+                     subscriptions.forEach { sub ->
+                         HxRow(sub.name,
+-                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface),
++                            referenceRow = true,                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface),
+                             subtitle = if (sub.placeholder) "尚未填写订阅链接" else maskUrl(sub.url),
+                             icon = Icons.Rounded.Link,
+                             onClick = { editSub = sub; form = "subscription" },
+@@ -293,6 +295,8 @@
+     menuFor?.let { config ->
+         HxActionMenu(
+             title = config.name,
++            referenceFileMenu = true,
++            anchorEndInset = 2.dp,
+             actions = buildList {
+                 if (!config.selected) add(HxMenuAction("设为当前配置", Icons.Rounded.CheckCircle) {
+                     menuFor = null
+@@ -309,7 +313,7 @@
+     }
+     renameFor?.let { config ->
+         HxFormDialog(
+-            title = "重命名配置", fields = listOf(HxField("名称", config.name)),
++            title = "重命名配置", configFooter = true, fields = listOf(HxField("名称", config.name)),
+             validate = { values ->
+                 val name = values[0]
+                 when {
+@@ -841,7 +845,11 @@
+                                 setEditable(true)
+                                 setSoftKeyboardEnabled(true)
+                                 typefaceText = Typeface.MONOSPACE
+-                                setTextSize(13f)
++                                setTextSize(14f)
++                                setLineSpacingMultiplier(1.4f)
++                                setLineNumberMarginLeft(18f * resources.displayMetrics.density)
++                                setDividerMargin(8f * resources.displayMetrics.density, 14f * resources.displayMetrics.density)
++                                setDividerWidth(0f)
+                                 setLineNumberEnabled(true)
+                                 setWordwrap(false)
+                                 setTabWidth(2)
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt
+@@ -270,7 +270,7 @@
+     }
+     if (detail != null) {
+         run {
+-            HxSheet(onDismiss = { detailId = null }, title = detail.host, showClose = true) {
++            HxSheet(onDismiss = { detailId = null }, title = detail.host, showClose = true, containerColor = androidx.compose.ui.graphics.lerp(Hx.colors.canvas, Hx.colors.surface, .45f)) {
+                 val close = LocalHxSheetClose.current
+                 Column(Modifier.padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                     HxGroup {
+@@ -400,7 +400,7 @@
+     Column(Modifier.fillMaxWidth().background(c.surface).clickable(onClick = onClick)
+         .padding(horizontal = 12.dp, vertical = 9.dp)) {
+         Row(verticalAlignment = Alignment.CenterVertically) {
+-            Text(item.host, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold,
++            Text(item.host, fontSize = 18.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold,
+                 color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+             val time = panelConnectionTime(item.startedAt)
+             if (time.isNotBlank()) {
+@@ -410,7 +410,7 @@
+         }
+         val metadata = (item.network.split(" · ") + item.inbound + item.addressType)
+             .map(String::trim).filter(String::isNotBlank).distinctBy { it.lowercase() }.joinToString(" · ")
+-        if (metadata.isNotBlank()) Text(metadata, fontSize = 9.5.sp, lineHeight = 13.sp,
++        if (metadata.isNotBlank()) Text(metadata, fontSize = 11.sp, lineHeight = 14.sp,
+             color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         Spacer(Modifier.height(7.dp))
+         Row(verticalAlignment = Alignment.CenterVertically) {
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -288,6 +288,10 @@
+         wanCity = prefs.getString("proxyUiLastWanCity", "—") ?: "—",
+         wanIsp = prefs.getString("proxyUiLastWanIsp", "—") ?: "—",
+         wanAsn = prefs.getString("proxyUiLastWanAsn", "—") ?: "—",
++        wanOrganization = prefs.getString("proxyUiLastWanOrganization", "—") ?: "—",
++        wanIpType = prefs.getString("proxyUiLastWanIpType", "—") ?: "—",
++        wanTimezone = prefs.getString("proxyUiLastWanTimezone", "—") ?: "—",
++        wanCoordinates = prefs.getString("proxyUiLastWanCoordinates", "—") ?: "—",
+         cpuAffinity = prefs.getString("proxyUiLastCpuAffinity", "—") ?: "—",
+         currentCpu = prefs.getInt("proxyUiLastCurrentCpu", -1),
+         wanState = "stale",
+@@ -408,6 +412,10 @@
+             .putString("proxyUiLastWanCity", sampled.wanCity)
+             .putString("proxyUiLastWanIsp", sampled.wanIsp)
+             .putString("proxyUiLastWanAsn", sampled.wanAsn)
++            .putString("proxyUiLastWanOrganization", sampled.wanOrganization)
++            .putString("proxyUiLastWanIpType", sampled.wanIpType)
++            .putString("proxyUiLastWanTimezone", sampled.wanTimezone)
++            .putString("proxyUiLastWanCoordinates", sampled.wanCoordinates)
+             .putString("proxyUiLastCpuAffinity", sampled.cpuAffinity)
+             .putInt("proxyUiLastCurrentCpu", sampled.currentCpu)
+             .apply()
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeDetailsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeDetailsScreen.kt
+@@ -36,9 +36,9 @@
+         "IP 地址" to present(rt.wanAddress),
+         "地理位置" to listOf(rt.wanCountry, rt.wanRegion).filter { it.isNotBlank() && it != "—" }.distinct().joinToString(" · ").ifBlank { "未知" },
+         "网络运营商" to present(rt.wanIsp), "ASN" to present(rt.wanAsn), "城市" to present(rt.wanCity),
+-        "组织" to "未知", "IP 类型" to "未知", "时区" to "未知", "经纬度" to "未知",
++        "组织" to present(rt.wanOrganization), "IP 类型" to present(rt.wanIpType), "时区" to present(rt.wanTimezone), "经纬度" to present(rt.wanCoordinates),
+     )
+-    HxPage(title = "公网 IP 详情", onBack = onBack, largeTitle = false,
++    HxPage(title = "公网 IP 详情", onBack = onBack, largeTitle = false, compactTitleFontSizeSp = 20f,
+         actions = { HxBarAction(Icons.Rounded.Sync, "刷新 IP 信息", vm::pullRefresh, busy = vm.refreshing) }) {
+         item { HxSection { HxSegmented(listOf("wan" to "公网 IP", "lan" to "局域网 IP"), tab, { tab = it }, selectionColor = Hx.colors.accent, selectedTextColor = Hx.colors.onAccent) } }
+         item {
+@@ -49,7 +49,7 @@
+                         Row(Modifier.fillMaxWidth().heightIn(min = 52.dp).padding(start = 16.dp, end = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                             Text(label, color = Hx.colors.textMuted, fontSize = 14.sp, modifier = Modifier.width(105.dp))
+                             Text(value, color = Hx.colors.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+-                            if (tab == "lan" || index < 2) HxBarAction(Icons.Rounded.ContentCopy, "复制$label", { hxCopy(context, label, value) })
++                            if (tab == "lan" || index < 5) HxBarAction(Icons.Rounded.ContentCopy, "复制$label", { hxCopy(context, label, value) })
+                         }
+                     }
+                 }
+@@ -74,16 +74,16 @@
+         "启动配置" to vm.state.config,
+         "活动连接" to if (running && vm.state.panelReady) vm.state.connections.size.toString() else "—",
+     )
+-    HxPage(title = "资源占用", onBack = onBack, largeTitle = false) {
++    HxPage(title = "资源占用", onBack = onBack, largeTitle = false, compactTitleFontSizeSp = 20f) {
+         item { ResourceChartCard("CPU", latest?.cpuPercent?.let { String.format(Locale.US, "%.1f%%", it) } ?: "—", samples.map { it.cpuPercent }, Hx.colors.accent) }
+         item { ResourceChartCard("内存", latest?.memoryBytes?.let(HxFormat::bytes) ?: "—", samples.map { it.memoryBytes?.toFloat() }, Hx.colors.good) }
+         item {
+             HxSection {
+                 HxGroup {
+                     rows.forEach { (label, value) ->
+-                        Row(Modifier.fillMaxWidth().heightIn(min = 40.dp).padding(horizontal = 16.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+-                            Text(label, color = Hx.colors.textMuted, fontSize = 14.sp, modifier = Modifier.weight(1f))
+-                            Text(value, color = Hx.colors.text, fontSize = 15.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
++                        Row(Modifier.fillMaxWidth().heightIn(min = 42.dp).padding(horizontal = 16.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
++                            Text(label, color = Hx.colors.textMuted, fontSize = 16.sp, modifier = Modifier.weight(1f))
++                            Text(value, color = Hx.colors.text, fontSize = 16.sp, fontWeight = FontWeight.Medium, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
+                         }
+                     }
+                 }
+@@ -102,7 +102,7 @@
+                 Text("本次查看", color = muted, fontSize = 11.sp)
+             }
+             Text(value, color = if (value == "—") Hx.colors.text else Hx.colors.accent, fontSize = 32.sp, fontWeight = FontWeight.SemiBold)
+-            Box(Modifier.fillMaxWidth().height(108.dp), contentAlignment = Alignment.Center) {
++            Box(Modifier.fillMaxWidth().height(76.dp), contentAlignment = Alignment.Center) {
+                 if (samples.none { it != null }) Text("等待连接进行采样", color = muted, fontSize = 12.sp)
+                 else Canvas(Modifier.fillMaxSize().padding(vertical = 10.dp)) {
+                     val max = samples.filterNotNull().maxOrNull()?.coerceAtLeast(1f) ?: 1f
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+@@ -50,6 +50,7 @@
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.layout.widthIn
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+@@ -83,6 +84,9 @@
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.semantics.stateDescription
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.graphics.Brush
+@@ -480,7 +484,10 @@
+     val targets = ProxyLatencyTargets.load(vm.prefs)
+     HxSection {
+         Bento(
+-            "本机直测",
++            "延迟",
++            modifier = Modifier.semantics {
++                contentDescription = "本机直测。测量直连请求，未指定代理节点；结果不代表其他应用的代理路径"
++            },
+             trailing = {
+                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+                     HomeHeaderIcon(
+@@ -497,8 +504,6 @@
+                 }
+             },
+         ) {
+-            Text("测量直连请求，未指定代理节点\n结果不代表其他应用的代理路径", style = MaterialTheme.typography.labelSmall, color = c.textMuted)
+-            Spacer(Modifier.height(6.dp))
+             Row(Modifier.fillMaxWidth()) {
+                 targets.forEachIndexed { index, target ->
+                     if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(0.5.dp).height(30.dp).background(c.line))
+@@ -614,22 +619,28 @@
+             }
+         }
+         Spacer(Modifier.height(8.dp))
+-        AnimatedContent(
+-            targetState = address ?: "—",
+-            transitionSpec = {
+-                (fadeIn(tween(HxMotion.Medium)) + slideInVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { it / 3 })
+-                    .togetherWith(fadeOut(tween(HxMotion.Short)) + slideOutVertically(tween(HxMotion.Short)) { -it / 3 })
+-            },
+-            label = "wanLanIp",
+-        ) { ip ->
+-            Text(
+-                ip,
+-                style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
+-                fontWeight = FontWeight.SemiBold,
+-                color = c.text,
+-                maxLines = 1,
+-                overflow = TextOverflow.Ellipsis,
+-            )
++        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
++            Text("IP", style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.SemiBold, color = c.textMuted)
++            Spacer(Modifier.width(10.dp))
++            AnimatedContent(
++                targetState = address ?: "—",
++                transitionSpec = {
++                    (fadeIn(tween(HxMotion.Medium)) + slideInVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { it / 3 })
++                        .togetherWith(fadeOut(tween(HxMotion.Short)) + slideOutVertically(tween(HxMotion.Short)) { -it / 3 })
++                },
++                label = "wanLanIp",
++                modifier = Modifier.weight(1f),
++                contentAlignment = Alignment.CenterEnd,
++            ) { ip ->
++                Text(
++                    ip,
++                    style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
++                    fontWeight = FontWeight.SemiBold,
++                    color = c.text,
++                    maxLines = 1,
++                    overflow = TextOverflow.Ellipsis,
++                )
++            }
+         }
+         Spacer(Modifier.height(8.dp))
+         AnimatedContent(
+@@ -1022,11 +1033,42 @@
+                     )
+                 }
+                 if (group != null && vm.state.running) {
+-                    HxDelayPill(delay, testing) { vm.testGroup(group) }
++                    HomeNodeDelay(delay, testing) { vm.testGroup(group) }
+                     Spacer(Modifier.width(4.dp))
+                 }
+                 HxChevron()
+             }
++        }
++    }
++}
++
++@Composable
++private fun HomeNodeDelay(delay: Long?, testing: Boolean, onClick: () -> Unit) {
++    val source = remember { MutableInteractionSource() }
++    val haptics = rememberHetuHaptics()
++    Box(
++        Modifier
++            .hxPressScale(source, .94f)
++            .widthIn(min = 66.dp)
++            .height(38.dp)
++            .semantics { if (testing) stateDescription = "测速中" }
++            .clickable(interactionSource = source, indication = null, enabled = !testing, onClickLabel = "测试当前节点延迟") {
++                haptics.perform(HetuHaptic.Tick)
++                onClick()
++            }
++            .padding(horizontal = 6.dp),
++        contentAlignment = Alignment.Center,
++    ) {
++        if (testing) {
++            HxSpinningSync(spinning = true, tint = Hx.colors.textMuted, size = 20.dp)
++        } else {
++            Text(
++                HxFormat.delay(delay) + if ((delay ?: 0L) > 0L) " ms" else "",
++                style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 24.sp).merge(HxNumberStyle),
++                fontWeight = FontWeight.SemiBold,
++                color = HxFormat.delayColor(delay),
++                maxLines = 1,
++            )
+         }
+     }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -35,8 +35,14 @@
+ import androidx.compose.animation.shrinkVertically
+ import androidx.compose.foundation.BorderStroke
+ import androidx.compose.foundation.LocalIndication
++import androidx.compose.foundation.selection.selectable
+ import androidx.compose.foundation.selection.toggleable
+ import androidx.compose.ui.semantics.Role
++import androidx.compose.foundation.gestures.detectTapGestures
++import androidx.compose.ui.input.pointer.pointerInput
++import androidx.compose.ui.platform.LocalConfiguration
++import androidx.compose.ui.platform.LocalView
++import androidx.compose.ui.window.DialogWindowProvider
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.border
+ import androidx.compose.foundation.clickable
+@@ -55,6 +61,7 @@
+ import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.WindowInsets
+ import androidx.compose.foundation.layout.asPaddingValues
++import androidx.compose.foundation.layout.fillMaxHeight
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.height
+@@ -166,6 +173,7 @@
+     largeTitleStartPadding: Dp = Hx.gutter,
+     largeTitleTopPadding: Dp = 0.dp,
+     largeTitleFontSizeSp: Float? = null,
++    compactTitleFontSizeSp: Float = 18f,
+     largeTitleBottomPadding: Dp = 10.dp,
+     canvasColor: Color? = null,
+     referenceLabel: String? = null,
+@@ -265,7 +273,7 @@
+                                 maxLines = 1,
+                             )
+                         }
+-                        if (!collapsed) {
++                        if (!collapsed && onBack == null) {
+                             Row(verticalAlignment = Alignment.CenterVertically, content = actions)
+                         }
+                     }
+@@ -344,7 +352,7 @@
+                             scaleX = s
+                             scaleY = s
+                         },
+-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, fontWeight = FontWeight.SemiBold),
++                    style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = FontWeight.SemiBold),
+                     color = c.text,
+                     maxLines = 1,
+                     overflow = TextOverflow.Ellipsis,
+@@ -355,7 +363,7 @@
+                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
+                     }
+                 }
+-                if (!largeTitle || collapsed) {
++                if (!largeTitle || collapsed || onBack != null) {
+                     Row(
+                         modifier = Modifier.align(Alignment.CenterEnd),
+                         verticalAlignment = Alignment.CenterVertically,
+@@ -591,6 +599,9 @@
+     iconTint: Color = Hx.colors.accent,
+     enabled: Boolean = true,
+     danger: Boolean = false,
++    referenceRow: Boolean = false,
++    referenceTextSizeSp: Float = 16f,
++    minimumHeight: Dp = 50.dp,
+     onClick: (() -> Unit)? = null,
+     onLongClick: (() -> Unit)? = null,
+     trailing: @Composable (RowScope.() -> Unit)? = null,
+@@ -608,26 +619,27 @@
+                     onLongClick = onLongClick?.let { long -> { haptics.perform(HetuHaptic.LongPress); long() } },
+                 ) else Modifier,
+             )
+-            .heightIn(min = 50.dp)
+-            .padding(horizontal = 14.dp, vertical = 8.dp)
++            .heightIn(min = minimumHeight)
++            .padding(horizontal = if (referenceRow) (if (referenceTextSizeSp >= 18f) 21.dp else 18.dp) else 14.dp, vertical = 8.dp)
+             .graphicsLayer { alpha = contentAlpha },
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+         if (icon != null) {
+-            HxIconBadge(icon, if (danger) c.bad else iconTint)
+-            Spacer(Modifier.width(9.dp))
++            if (referenceRow) Icon(settingsLineIcon(icon), null, tint = if (danger) c.bad else c.text, modifier = Modifier.size(24.dp))
++            else HxIconBadge(icon, if (danger) c.bad else iconTint)
++            Spacer(Modifier.width(if (referenceRow) (if (referenceTextSizeSp >= 18f) 24.dp else 16.dp) else 9.dp))
+         }
+         Column(Modifier.weight(1f)) {
+             Text(
+                 title,
+-                style = MaterialTheme.typography.bodyLarge,
+-                fontWeight = FontWeight.Medium,
++                style = if (referenceRow) MaterialTheme.typography.bodyLarge.copy(fontSize = referenceTextSizeSp.sp, lineHeight = (referenceTextSizeSp + 5f).sp) else MaterialTheme.typography.bodyLarge,
++                fontWeight = if (referenceRow) FontWeight.SemiBold else FontWeight.Medium,
+                 color = if (danger) c.bad else c.text,
+                 maxLines = 2,
+                 overflow = TextOverflow.Ellipsis,
+             )
+             if (!subtitle.isNullOrBlank()) {
+-                Text(subtitle, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
++                Text(subtitle, style = if (referenceRow) MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp) else MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
+             }
+         }
+         if (trailing != null) {
+@@ -999,6 +1011,7 @@
+     onDismiss: () -> Unit,
+     title: String? = null,
+     showClose: Boolean = false,
++    containerColor: Color = Hx.colors.surface,
+     content: @Composable ColumnScope.() -> Unit,
+ ) {
+     val c = Hx.colors
+@@ -1020,7 +1033,7 @@
+     ModalBottomSheet(
+         onDismissRequest = onDismiss,
+         sheetState = sheetState,
+-        containerColor = c.surface,
++        containerColor = containerColor,
+         contentColor = c.text,
+         scrimColor = Color.Black.copy(alpha = if (c.dark) .52f else .32f),
+         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+@@ -1058,29 +1071,29 @@
+ 
+ /** Monospace text viewer (logs, diagnostics, generated config). */
+ @Composable
+-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null) {
++internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false) {
+     val context = LocalContext.current
+     val c = Hx.colors
+     HxSheet(onDismiss = onDismiss) {
+         Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+-            Text(title, style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
++            Text(title, style = if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
+             if (onRefresh != null) TextButton(onClick = onRefresh) { Text("刷新") }
+             IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, "复制", tint = c.textMuted) }
+         }
+         Box(
+             Modifier
+                 .fillMaxWidth()
+-                .heightIn(max = 520.dp)
++                .heightIn(max = if (wrapLines) (LocalConfiguration.current.screenHeightDp * .49f).dp else 520.dp)
+                 .padding(horizontal = 16.dp)
+                 .clip(Hx.rowShape)
+                 .background(c.surfaceMuted)
+                 .verticalScroll(rememberScrollState())
+-                .horizontalScroll(rememberScrollState())
++                .then(if (wrapLines) Modifier else Modifier.horizontalScroll(rememberScrollState()))
+                 .padding(14.dp),
+         ) {
+             Text(
+                 text.ifBlank { "（空）" },
+-                fontFamily = FontFamily.Monospace,
++                fontFamily = if (wrapLines) FontFamily.Default else FontFamily.Monospace,
+                 fontSize = 11.5.sp,
+                 lineHeight = 16.sp,
+                 color = c.text,
+@@ -1088,6 +1101,8 @@
+         }
+     }
+ }
++
++internal enum class HxChoicePresentation { Standard, Settings, Language, Scale, Notification }
+ 
+ internal data class HxChoice(val id: String, val label: String, val description: String? = null, val enabled: Boolean = true)
+ 
+@@ -1100,25 +1115,57 @@
+     onDismiss: () -> Unit,
+     footer: String? = null,
+     dimBehind: Boolean = true,
++    referenceRadios: Boolean = false,
++    presentation: HxChoicePresentation = HxChoicePresentation.Standard,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+     // Opened from a row: show a dropdown right next to it (the row stays visible).
+     val anchor = remember { HxAnchor.take() }
+     if (anchor != null) {
+-        HxAnchoredMenu(anchor, onDismiss, dimBehind = dimBehind, minWidth = if (dimBehind) 152.dp else 128.dp) { close ->
+-            choices.forEach { choice ->
++        val referenceSettings = presentation != HxChoicePresentation.Standard
++        val menuWidth = when (presentation) {
++            HxChoicePresentation.Settings -> 116.dp
++            HxChoicePresentation.Language -> 130.dp
++            HxChoicePresentation.Scale -> 154.dp
++            HxChoicePresentation.Notification -> 148.dp
++            else -> if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
++        }
++        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidth) { close ->
++            if (referenceRadios) {
++                Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
++                    textAlign = TextAlign.Center, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = c.text)
++                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
++                    choices.forEach { choice ->
++                        val active = choice.id == selected
++                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
++                            .background(if (active) c.accentSoft else if (c.dark) c.surfaceMuted else Color.White)
++                            .selectable(selected = active, enabled = choice.enabled, role = Role.RadioButton) { haptics.perform(HetuHaptic.Tick); close { onPick(choice.id) } }
++                            .padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
++                            Box(Modifier.size(20.dp).clip(CircleShape)
++                                .background(if (active) c.accent else Color.Transparent)
++                                .then(if (active) Modifier else Modifier.border(1.5.dp, c.textFaint, CircleShape)), contentAlignment = Alignment.Center) {
++                                if (active) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
++                            }
++                            Spacer(Modifier.width(14.dp))
++                            Text(choice.label, color = if (active) c.accent else c.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
++                        }
++                    }
++                }
++            } else choices.forEachIndexed { index, choice ->
+                 HxMenuItem(
+                     choice.label,
+                     onClick = { close { onPick(choice.id) } },
+                     description = choice.description,
+                     selected = choice.id == selected,
+-                    selectedTextColor = if (dimBehind) c.accent else c.text,
++                    selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
+                     enabled = choice.enabled,
++                    choicePresentation = presentation,
+                 )
++                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
+             }
+             if (!footer.isNullOrBlank()) {
+-                Text(footer, style = MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
++                Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+             }
+         }
+         return
+@@ -1195,6 +1242,8 @@
+     fields: List<HxField>,
+     confirmLabel: String = "保存",
+     message: String? = null,
++    configFooter: Boolean = false,
++    messageBelowFields: Boolean = false,
+     validate: (List<String>) -> String? = { null },
+     onConfirm: (List<String>) -> Unit,
+     onDismiss: () -> Unit,
+@@ -1212,49 +1261,69 @@
+             for (x in listOf(12f, -9f, 6f, -3f, 0f)) shake.animateTo(x, tween(48))
+         }
+     }
+-    AlertDialog(
+-        onDismissRequest = onDismiss,
+-        containerColor = c.surface,
+-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+-        text = {
+-            Column(
+-                Modifier.graphicsLayer { translationX = shake.value * density },
+-                verticalArrangement = Arrangement.spacedBy(10.dp),
+-            ) {
+-                if (!message.isNullOrBlank()) Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
++    val submit: () -> Unit = {
++        val result = values.map { it.value.trim() }
++        val problem = validate(result)
++        if (problem != null) { error = problem; shakeTick++ }
++        else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
++    }
++    HxReferenceDialog(onDismiss, widthFraction = if (configFooter) .74f else .76f, contentPadding = 0.dp) {
++        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
++            Column(Modifier.padding(horizontal = if (configFooter) 20.dp else 22.dp, vertical = if (configFooter) 20.dp else 18.dp)
++                .graphicsLayer { translationX = shake.value * density }) {
++                Text(title, fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold, color = c.text,
++                    textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
++                Spacer(Modifier.height(if (configFooter) 18.dp else 14.dp))
++                if (!message.isNullOrBlank() && !messageBelowFields) {
++                    Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
++                    Spacer(Modifier.height(12.dp))
++                }
+                 fields.forEachIndexed { index, field ->
+-                    HxTextField(
++                    if (index > 0) Spacer(Modifier.height(12.dp))
++                    Text(field.label, color = c.textMuted, fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.Medium)
++                    Spacer(Modifier.height(6.dp))
++                    androidx.compose.foundation.text.BasicTextField(
+                         value = values[index].value,
+                         onValueChange = { values[index].value = it; error = null },
+-                        label = { Text(field.label) },
+-                        placeholder = { if (field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint) },
+                         singleLine = field.singleLine,
+                         maxLines = if (field.singleLine) 1 else 6,
+                         keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
+-                        modifier = Modifier.fillMaxWidth(),
+-                        shape = Hx.rowShape,
++                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = 15.sp, lineHeight = 20.sp),
++                        cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
++                        modifier = Modifier.fillMaxWidth().heightIn(min = if (configFooter) 42.dp else 38.dp).clip(RoundedCornerShape(10.dp))
++                            .background(c.surfaceMuted).border(.7.dp, if (error != null) c.bad else c.line, RoundedCornerShape(10.dp))
++                            .padding(horizontal = 12.dp, vertical = if (configFooter) 10.dp else 9.dp),
++                        decorationBox = { input -> Box {
++                            if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
++                            input()
++                        } },
+                     )
+                 }
++                if (!message.isNullOrBlank() && messageBelowFields) {
++                    Spacer(Modifier.height(6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
++                }
+                 AnimatedVisibility(error != null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
+-                    Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall)
++                    Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
+                 }
+-            }
+-        },
+-        confirmButton = {
+-            HxDialogButtons(confirmLabel, c.accent, onDismiss = onDismiss) {
+-                val result = values.map { it.value.trim() }
+-                val problem = validate(result)
+-                if (problem != null) {
+-                    error = problem
+-                    shakeTick++
+-                } else {
+-                    haptics.perform(HetuHaptic.Confirm)
+-                    onConfirm(result)
++                if (!configFooter) {
++                    Spacer(Modifier.height(14.dp))
++                    HxDialogButtons(confirmLabel, c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = submit)
+                 }
+             }
+-        },
+-        shape = RoundedCornerShape(28.dp),
+-    )
++            if (configFooter) {
++                HorizontalDivider(thickness = .5.dp, color = c.line)
++                Row(Modifier.fillMaxWidth().height(58.dp)) {
++                    Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
++                        Text("取消", color = c.textMuted, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
++                    }
++                    Box(Modifier.width(.5.dp).fillMaxHeight().background(c.line))
++                    Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = submit), contentAlignment = Alignment.Center) {
++                        Text(confirmLabel, color = c.accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
++                    }
++                }
++            }
++        }
++    }
+ }
+ 
+ @Composable
+@@ -1267,16 +1336,31 @@
+     onDismiss: () -> Unit,
+ ) {
+     val c = Hx.colors
+-    AlertDialog(
+-        onDismissRequest = onDismiss,
+-        containerColor = c.surface,
+-        title = { Text(title, style = MaterialTheme.typography.titleLarge) },
+-        text = { Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted) },
+-        confirmButton = {
+-            HxDialogButtons(confirmLabel, if (danger) c.bad else c.accent, onDismiss = onDismiss, onConfirm = onConfirm)
+-        },
+-        shape = RoundedCornerShape(28.dp),
+-    )
++    HxReferenceDialog(onDismiss = onDismiss, widthFraction = .75f) {
++        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
++            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
++        Spacer(Modifier.height(12.dp))
++        Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted,
++            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
++        Spacer(Modifier.height(18.dp))
++        HxDialogButtons(confirmLabel, if (danger) Color(0xFFFF3564) else c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = onConfirm)
++    }
++}
++
++@Composable
++internal fun HxReferenceDialog(onDismiss: () -> Unit, widthFraction: Float = .84f, contentPadding: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) {
++    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss,
++        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
++        val view = LocalView.current
++        SideEffect { (view.parent as? DialogWindowProvider)?.window?.setDimAmount(.5f) }
++        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
++            // Dismissal is a sibling behind the card, never a clickable ancestor of
++            // its heading/inputs (which would make accessibility activation dismiss).
++            Box(Modifier.matchParentSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss))
++            Column(Modifier.fillMaxWidth(widthFraction).clip(RoundedCornerShape(22.dp)).background(Hx.colors.surface)
++                .pointerInput(Unit) { detectTapGestures(onTap = {}) }.padding(contentPadding), content = content)
++        }
++    }
+ }
+ 
+ /** Primary filled button in the app's pill shape. */
+@@ -1401,7 +1485,7 @@
+ 
+ /** Dialog footer: two equal pills — a quiet cancel and a solid confirm. */
+ @Composable
+-private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, onDismiss: () -> Unit, onConfirm: () -> Unit) {
++private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, referenceCorners: Boolean = false, onDismiss: () -> Unit, onConfirm: () -> Unit) {
+     val c = Hx.colors
+     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+         val cancelSource = remember { MutableInteractionSource() }
+@@ -1410,7 +1494,7 @@
+                 .weight(1f)
+                 .hxPressScale(cancelSource, .96f)
+                 .height(46.dp)
+-                .clip(Hx.pillShape)
++                .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
+                 .background(c.surfaceMuted)
+                 .clickable(interactionSource = cancelSource, indication = LocalIndication.current, onClick = onDismiss),
+             contentAlignment = Alignment.Center,
+@@ -1423,7 +1507,7 @@
+                 .weight(1f)
+                 .hxPressScale(okSource, .96f)
+                 .height(46.dp)
+-                .clip(Hx.pillShape)
++                .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
+                 .background(confirmColor)
+                 .clickable(interactionSource = okSource, indication = LocalIndication.current, onClick = onConfirm),
+             contentAlignment = Alignment.Center,
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
+@@ -31,6 +31,8 @@
+ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.rounded.Check
++import androidx.compose.material.icons.rounded.CheckCircle
++import androidx.compose.material3.HorizontalDivider
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.MaterialTheme
+ import androidx.compose.material3.Text
+@@ -61,6 +63,7 @@
+ import androidx.compose.ui.unit.LayoutDirection
+ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
+ import androidx.compose.ui.window.Popup
+ import androidx.compose.ui.window.PopupPositionProvider
+ import androidx.compose.ui.window.PopupProperties
+@@ -128,6 +131,7 @@
+     onDismiss: () -> Unit,
+     dimBehind: Boolean = true,
+     minWidth: Dp = 152.dp,
++    anchorEndInset: Dp = 14.dp,
+     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+ ) {
+     val c = Hx.colors
+@@ -169,7 +173,7 @@
+                         maxHeight = (constraints.maxHeight - safeTop - safeBottom).roundToInt().coerceAtLeast(0)))
+                     val maxW = constraints.maxWidth.toFloat()
+                     val maxH = constraints.maxHeight.toFloat()
+-                    val x = (anchor.right - margin - placeable.width).coerceIn(margin, (maxW - margin - placeable.width).coerceAtLeast(margin))
++                    val x = (anchor.right - with(density) { anchorEndInset.toPx() } - placeable.width).coerceIn(margin, (maxW - margin - placeable.width).coerceAtLeast(margin))
+                     val below = anchor.bottom + with(density) { 4.dp.toPx() }
+                     val opensUp = below + placeable.height > maxH - with(density) { 36.dp.toPx() }
+                     val y = (if (opensUp) anchor.top - placeable.height - with(density) { 4.dp.toPx() } else below)
+@@ -216,6 +220,8 @@
+     danger: Boolean = false,
+     icon: ImageVector? = null,
+     selectedTextColor: Color = Hx.colors.accent,
++    compact: Boolean = false,
++    choicePresentation: HxChoicePresentation = HxChoicePresentation.Standard,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+@@ -226,8 +232,15 @@
+                 haptics.perform(HetuHaptic.Tick)
+                 onClick()
+             }
+-            .background(Color.Transparent)
+-            .padding(horizontal = 14.dp, vertical = if (description.isNullOrBlank()) 13.dp else 10.dp)
++            .background(if (choicePresentation == HxChoicePresentation.Notification && selected) c.surfaceMuted else Color.Transparent)
++            .padding(horizontal = 14.dp, vertical = when {
++                compact -> 6.dp
++                choicePresentation == HxChoicePresentation.Scale -> 8.dp
++                choicePresentation == HxChoicePresentation.Language -> 9.dp
++                choicePresentation != HxChoicePresentation.Standard -> 11.dp
++                description.isNullOrBlank() -> 13.dp
++                else -> 10.dp
++            })
+             .graphicsLayer { alpha = if (enabled) 1f else .4f },
+         verticalAlignment = Alignment.CenterVertically,
+     ) {
+@@ -238,7 +251,11 @@
+         Column(Modifier.weight(1f)) {
+             Text(
+                 label,
+-                style = MaterialTheme.typography.bodyLarge,
++                style = when (choicePresentation) {
++                    HxChoicePresentation.Standard -> MaterialTheme.typography.bodyLarge
++                    HxChoicePresentation.Scale -> MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp, lineHeight = 19.sp)
++                    else -> MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 20.sp)
++                },
+                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                 color = when {
+                     danger -> c.bad
+@@ -252,7 +269,7 @@
+         }
+         if (selected) {
+             Spacer(Modifier.width(12.dp))
+-            Icon(Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(19.dp))
++            Icon(if (choicePresentation == HxChoicePresentation.Language) Icons.Rounded.CheckCircle else Icons.Rounded.Check, null, tint = c.accent, modifier = Modifier.size(19.dp))
+         }
+     }
+ }
+@@ -269,12 +286,17 @@
+  * known, otherwise a bottom sheet with the same actions.
+  */
+ @Composable
+-internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit) {
++internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit, referenceFileMenu: Boolean = false, anchorEndInset: Dp = 14.dp) {
+     val anchor = remember { HxAnchor.take() }
+     if (anchor != null) {
+-        HxAnchoredMenu(anchor, onDismiss) { close ->
++        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceFileMenu, anchorEndInset = anchorEndInset) { close ->
++            if (referenceFileMenu) {
++                Text(title, color = Hx.colors.textMuted, style = MaterialTheme.typography.labelMedium,
++                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp))
++                HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = Hx.colors.line)
++            }
+             actions.forEach { action ->
+-                HxMenuItem(action.label, onClick = { close(action.onClick) }, danger = action.danger, icon = action.icon)
++                HxMenuItem(action.label, onClick = { close(action.onClick) }, danger = action.danger, icon = action.icon, compact = referenceFileMenu)
+             }
+         }
+     } else {
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
+@@ -280,7 +280,7 @@
+                 verticalAlignment = Alignment.CenterVertically,
+                 horizontalArrangement = Arrangement.spacedBy(6.dp),
+             ) {
+-                Text(title, style = MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(title, style = if (panelReferenceStyle) MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleMedium, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+             if (panelReferenceStyle) {
+                 Row(Modifier.align(Alignment.CenterStart), verticalAlignment = Alignment.CenterVertically) {
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
+@@ -67,7 +67,7 @@
+     text = Color(0xFF171A24),
+     textMuted = Color(0xFF5F6473),
+     textFaint = Color(0xFF989DAB),
+-    accent = Color(0xFF2E70E2),
++    accent = Color(0xFF0A62E8),
+     accentSoft = Color(0xFFDCE5FF),
+     onAccent = Color(0xFFFFFFFF),
+     good = Color(0xFF16A34A),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -491,7 +491,7 @@
+             ) {
+                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                     Image(
+-                        painterResource(R.drawable.ic_hetu_official),
++                        painterResource(R.drawable.ic_hetu_concept),
+                         null,
+                         Modifier
+                             .size(108.dp)
+@@ -534,5 +534,5 @@
+         }
+     }
+ 
+-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }) }
++    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true) }
+ }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+@@ -834,7 +834,7 @@
+     var draft by remember { mutableStateOf(PanelApiDraft11.read(vm.prefs)) }
+     var error by remember { mutableStateOf<String?>(null) }
+ 
+-    HxSheet(onDismiss = onDismiss) {
++    HxSheet(onDismiss = onDismiss, containerColor = c.canvas) {
+         Column(
+             Modifier.fillMaxWidth().padding(horizontal = 14.dp),
+             verticalArrangement = Arrangement.spacedBy(10.dp),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+@@ -180,10 +180,7 @@
+     onConfirm: () -> Unit,
+     content: @Composable ColumnScope.() -> Unit,
+ ) {
+-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss,
+-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
+-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
+-        Column(Modifier.fillMaxWidth(.84f).clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface).padding(18.dp)) {
++    HxReferenceDialog(onDismiss = onDismiss) {
+             Text(title, color = Hx.colors.text, fontSize = 24.sp, lineHeight = 30.sp,
+                 fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 20.dp))
+@@ -193,15 +190,15 @@
+                 SettingsDialogButton("取消", false, onDismiss, Modifier.weight(1f))
+                 SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f))
+             }
+-        }
+-        }
+     }
+ }
+ 
+ @Composable
+ private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier) {
+     Box(modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(16.dp))
+-        .background(if (primary) Hx.colors.accent else Hx.colors.accentSoft)
++        .background(if (primary) {
++            if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
++        } else Hx.colors.accentSoft)
+         .clickable(onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
+         Text(label, color = if (primary) Hx.colors.onAccent else Hx.colors.textMuted,
+             fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt
+@@ -40,7 +40,7 @@
+     "CloudSync" -> SettingsReferenceIcons.CloudUp
+     "Restore" -> SettingsReferenceIcons.CloudDown
+     "Notifications" -> SettingsReferenceIcons.Bell
+-    "LinkOff" -> SettingsReferenceIcons.Link
++    "Link", "LinkOff" -> SettingsReferenceIcons.Link
+     "Sync", "Refresh" -> SettingsReferenceIcons.Refresh
+     "BlurOn" -> SettingsReferenceIcons.Droplet
+     "SwapHoriz" -> SettingsReferenceIcons.Move
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -407,6 +407,7 @@
+ 
+     when (choice) {
+         "language" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Language,
+             title = "语言",
+             choices = listOf(
+                 HxChoice("system", "跟随系统"),
+@@ -429,6 +430,7 @@
+         )
+ 
+         "defaultPanel" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "默认面板页面",
+             choices = listOf(
+                 HxChoice("overview", "概览"),
+@@ -607,6 +609,7 @@
+ 
+     when (choice) {
+         "core" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "核心选择",
+             choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
+                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
+@@ -617,6 +620,7 @@
+             onDismiss = { choice = null },
+         )
+         "mode" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "运行模式",
+             choices = ProxyRuntimeProfile.Mode.values()
+                 .filter { ProxyRuntimeProfile.capability(profile.core, it).available }
+@@ -626,6 +630,7 @@
+             onDismiss = { choice = null },
+         )
+         "ipv6" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "IPv6",
+             choices = listOf(
+                 HxChoice("enable", "启用", "IPv6 流量同样进入代理"),
+@@ -665,7 +670,7 @@
+         HxCard(onClick = onClick, padding = PaddingValues(horizontal = 16.dp, vertical = 14.dp)) {
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 Image(
+-                    painterResource(R.drawable.ic_hetu_official),
++                    painterResource(R.drawable.ic_hetu_concept),
+                     null,
+                     Modifier.size(48.dp).clip(RoundedCornerShape(14.dp)),
+                 )
+@@ -694,7 +699,7 @@
+ private fun HxAccentSwatches(vm: HetuViewModel) {
+     val c = Hx.colors
+     val swatches = listOf(
+-        "#2A62E8" to Color(0xFF005CFF), "#42CAA3" to Color(0xFF42CAA3),
++        "#2A62E8" to Color(0xFF0A62E8), "#42CAA3" to Color(0xFF42CAA3),
+         "#36B9F3" to Color(0xFF36B9F3), "#6654FF" to Color(0xFF6654FF),
+         "#9B5CFC" to Color(0xFF9B5CFC), "#F766AC" to Color(0xFFF766AC),
+         "#FF5557" to Color(0xFFFF5557), "#FFAA06" to Color(0xFFFFAA06),
+@@ -798,9 +803,9 @@
+                                         .clip(RoundedCornerShape(12.dp))
+                                         .then(
+                                             if (selected) Modifier.border(1.5.dp, c.accent, RoundedCornerShape(12.dp))
+-                                            else Modifier.border(1.dp, c.line, RoundedCornerShape(12.dp))
++                                            else Modifier
+                                         )
+-                                        .background(if (selected) c.accentSoft else Color.Transparent)
++                                        .background(if (selected) c.accentSoft else c.surfaceMuted.copy(alpha = .42f))
+                                         .clickable {
+                                             vm.setAppearanceMode(value)
+                                             vm.bumpSettings()
+@@ -873,6 +878,7 @@
+ 
+     when (choice) {
+         "language" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Language,
+             title = "语言",
+             choices = listOf(
+                 HxChoice("system", "跟随系统"),
+@@ -891,6 +897,7 @@
+             onDismiss = { choice = null },
+         )
+         "appearance" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "主题模式",
+             choices = listOf(HxChoice("system", "跟随系统"), HxChoice("light", "浅色"), HxChoice("dark", "深色")),
+             selected = vm.appearance,
+@@ -898,6 +905,7 @@
+             onDismiss = { choice = null },
+         )
+         "topBlur" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Settings,
+             title = "顶栏模糊样式",
+             choices = listOf(
+                 HxChoice("progressive", "渐进式模糊", "顶部更浓，向内容区域逐渐消散"),
+@@ -908,6 +916,7 @@
+             onDismiss = { choice = null },
+         )
+         "scale" -> HxChoiceSheet(
++            presentation = HxChoicePresentation.Scale,
+             title = "界面缩放",
+             choices = listOf(.8f, .9f, 1f, 1.1f, 1.2f).map { HxChoice(it.toString(), "${(it * 100).toInt()}%") },
+             selected = uiScale.toString(),
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -27,6 +27,7 @@
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.layout.widthIn
+ import androidx.compose.foundation.text.KeyboardOptions
+ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.material.icons.Icons
+@@ -626,6 +627,9 @@
+     HxPage(
+         title = "文件管理",
+         largeTitle = true,
++        largeTitleFontSizeSp = 34f,
++        largeTitleStartPadding = 20.dp,
++        largeTitleTopPadding = 6.dp,
+         onBack = onBack,
+         refreshing = loading && entries.isNotEmpty(),
+         onRefresh = { refresh++ },
+@@ -667,12 +671,13 @@
+                 breadcrumb.forEachIndexed { index, (label, target) ->
+                     val active = index == breadcrumb.lastIndex
+                     Box(
+-                        Modifier.clip(RoundedCornerShape(8.dp))
++                        Modifier.clip(Hx.pillShape)
+                             .background(if (active) c.accentSoft else c.surfaceMuted)
+                             .clickable(enabled = !active) { onOpen(target) }
+-                            .padding(horizontal = 9.dp, vertical = 5.dp),
++                            .widthIn(min = if (index == 0) 68.dp else 0.dp).padding(horizontal = 12.dp, vertical = 5.dp),
++                        contentAlignment = Alignment.Center,
+                     ) {
+-                        Text(label, style = MaterialTheme.typography.labelMedium,
++                        Text(label, style = MaterialTheme.typography.labelMedium.copy(fontSize = 16.sp, lineHeight = 20.sp),
+                             color = if (active) c.accent else c.textMuted,
+                             fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium)
+                     }
+@@ -701,8 +706,8 @@
+             item(key = "hint") {
+                 Text(
+                     "${visibleEntries.count { it.directory }} 个文件夹 · ${visibleEntries.count { !it.directory }} 个文件 · 长按更多操作",
+-                    style = MaterialTheme.typography.labelMedium,
+-                    color = c.textFaint,
++                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 16.sp, lineHeight = 21.sp),
++                    color = c.textMuted,
+                     modifier = Modifier.padding(start = Hx.gutter + 4.dp, bottom = 8.dp),
+                 )
+             }
+@@ -712,12 +717,12 @@
+             if (path != root || folders.isNotEmpty()) item(key = "folders") {
+                 HxSection {
+                     HxGroup {
+-                        if (path != root) HxRow("..", icon = Icons.Rounded.Folder, onClick = {
++                        if (path != root) HxRow("..", icon = Icons.Rounded.Folder, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 68.dp, onClick = {
+                             val parent = File(path).parentFile?.path.orEmpty()
+                             onOpen(parent.takeIf { it == root || it.startsWith("$root/") } ?: root)
+                         }) { HxChevron() }
+                         folders.forEach { entry ->
+-                            HxRow(entry.name, icon = Icons.Rounded.Folder,
++                            HxRow(entry.name, icon = Icons.Rounded.Folder, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 68.dp,
+                                 onClick = { haptics.perform(HetuHaptic.Tap); onOpen(entry.path) },
+                                 onLongClick = { menuFor = entry }) { HxChevron() }
+                         }
+@@ -728,7 +733,7 @@
+                 HxSection {
+                     HxGroup {
+                         files.forEach { entry ->
+-                            HxRow(entry.name,
++                            HxRow(entry.name, referenceRow = true, referenceTextSizeSp = 18f, minimumHeight = 74.dp,
+                                 subtitle = listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
+                                     .filter { it.isNotBlank() }.joinToString(" · "),
+                                 icon = Icons.Rounded.Description,
+@@ -748,6 +753,7 @@
+     menuFor?.let { entry ->
+         HxActionMenu(
+             title = entry.name,
++            referenceFileMenu = true,
+             actions = buildList {
+                 if (entry.directory) add(HxMenuAction("打开", Icons.Rounded.FolderOpen) { menuFor = null; onOpen(entry.path) })
+                 else add(HxMenuAction("编辑", Icons.Rounded.Edit) { menuFor = null; openFile(entry) })
+@@ -802,6 +808,7 @@
+     renameFor?.let { entry ->
+         HxFormDialog(
+             title = "重命名",
++            message = "原文件：${entry.name}", messageBelowFields = true,
+             fields = listOf(HxField("新名称", entry.name)),
+             confirmLabel = "重命名",
+             validate = { v ->
+@@ -1084,6 +1091,7 @@
+     picker?.let { (kind, index) ->
+         when (kind) {
+             "refresh" -> HxChoiceSheet(
++                presentation = HxChoicePresentation.Notification,
+                 title = "刷新频率",
+                 choices = refreshOptions.map { HxChoice(it.toString(), "$it 秒") },
+                 selected = refresh.toString(),
+@@ -1091,6 +1099,7 @@
+                 onDismiss = { picker = null },
+             )
+             "target" -> HxChoiceSheet(
++                presentation = HxChoicePresentation.Notification,
+                 title = "点击通知打开",
+                 choices = targetOptions.map { HxChoice(it.first, it.second) },
+                 selected = target,
+@@ -1098,6 +1107,7 @@
+                 onDismiss = { picker = null },
+             )
+             else -> HxChoiceSheet(
++                presentation = HxChoicePresentation.Notification,
+                 title = "快捷按钮 ${index + 1}",
+                 choices = actionOptions.map { HxChoice(it.first, it.second) },
+                 selected = actions.getOrNull(index),
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
+@@ -53,7 +53,8 @@
+         rule.onAllNodesWithText("等待连接进行采样").assertCountEquals(2)
+         screenshot("resources-waiting")
+         rule.onNodeWithContentDescription("返回").performClick()
+-        rule.onNodeWithText("本机直测").assertExists()
++        rule.onNodeWithText("延迟").assertExists()
++        rule.onNodeWithContentDescription("本机直测。测量直连请求，未指定代理节点；结果不代表其他应用的代理路径").assertExists()
+         screenshot("home-offline")
+     }
+     @Test fun resourceChartsRetainMissingSampleGaps() {
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -0,0 +1,595 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import android.widget.TextView
++import android.widget.PopupWindow
++import io.github.rosemoe.sora.widget.CodeEditor
++import org.robolectric.annotation.Implements
++import org.robolectric.annotation.Implementation
++import org.robolectric.annotation.Resetter
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.os.Looper
++import android.view.View
++import android.view.MotionEvent
++import android.view.Gravity
++import android.view.WindowManager
++import android.os.SystemClock
++import android.view.ViewGroup
++import android.view.inspector.WindowInspector
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.*
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.semantics.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.text.AnnotatedString
++import androidx.test.core.app.ApplicationProvider
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.*
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++import java.time.Duration
++
++/**
++ * Actual production components and semantics actions with isolated test-only data.
++ * No onForeground(), Root start/stop, download, real controller or external request.
++ * A loopback MockWebServer handles incidental adjacent-pager provider reads.
++ * Native Android windows are drawn at their real screen positions. OS status/nav
++ * chrome, hardware blur, keyboard and OS window-manager shadows are not emulated.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class, shadows = [RemainingRootBridgeShadow::class, RemainingRootManagerShadow::class])
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class ConceptRemainingCoverageTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private val output = File("build/outputs/concept-remaining-coverage")
++
++    @Before fun prepare() {
++        RemainingRootBridgeShadow.reset()
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    require(request.method == "GET") { "Coverage must never mutate a controller: ${request.method} ${request.path}" }
++                    return MockResponse().setBody(when (request.requestUrl?.encodedPath) {
++                        "/providers/proxies" -> """{"providers":{"测试订阅":{"vehicleType":"HTTP","updatedAt":"2026-10-02T00:00:00Z","proxies":["香港 01","香港 02"],"subscriptionInfo":{"Upload":0,"Download":21474836480,"Total":107374182400,"Expire":1798761600}}}}"""
++                        "/proxies" -> "{\"proxies\":{}}"
++                        else -> "{}"
++                    })
++                }
++            }
++            start()
++        }
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putString("appearance", "light").putBoolean("hetuDynamicColor", false)
++            .putBoolean("hetuLegacyAppDataMigrated", true).putBoolean("enableBlur", false).putBoolean("predictiveBackAnimation", false)
++            .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).putString("proxyCustomApiSecret", "")
++            .putInt("proxySelectorGroupColumns", 2).putInt("proxySelectorNodeColumns", 2)
++            .putString("proxySelectorDensity", "compact").commit()
++        vm = HetuViewModel(app)
++        rule.mainClock.autoAdvance = false
++        output.mkdirs()
++    }
++    @After fun finish() {
++        rule.runOnUiThread { rule.activity.setContent {} }
++        frame()
++        vm.onBackground()
++        server.shutdown()
++        assertEquals("Unexpected Root calls were blocked", emptyList<String>(), RemainingRootBridgeShadow.unexpected.toList())
++    }
++    private fun frame() {
++        repeat(4) {
++            rule.mainClock.advanceTimeBy(200)
++            rule.runOnUiThread { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }
++        }
++    }
++    private fun show(content: @Composable () -> Unit) {
++        rule.runOnUiThread { rule.activity.setContent {
++            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav()) {
++                Box(Modifier.fillMaxSize()) { content() }
++            } }
++        } }
++        frame()
++    }
++    @Suppress("UNCHECKED_CAST")
++    private fun fixture(name: String, value: Any?) {
++        val field = HetuViewModel::class.java.getDeclaredField(name + "\$delegate").apply { isAccessible = true }
++        (field.get(vm) as MutableState<Any?>).value = value
++    }
++    @Suppress("UNCHECKED_CAST")
++    private fun windows(): List<View> {
++        if (android.os.Build.VERSION.SDK_INT >= 29) return WindowInspector.getGlobalWindowViews()
++        val type = Class.forName("android.view.WindowManagerGlobal")
++        val instance = type.getMethod("getInstance").invoke(null)
++        return type.getDeclaredField("mViews").apply { isAccessible = true }.get(instance) as List<View>
++    }
++    private fun nativeNodes(): List<SemanticsNode> {
++        val result = mutableListOf<SemanticsNode>()
++        fun visitNode(n: SemanticsNode) { result += n; n.children.forEach(::visitNode) }
++        fun visitView(v: View) {
++            v.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }?.let {
++                visitNode((it.invoke(v) as SemanticsOwner).rootSemanticsNode)
++            }
++            if (v is ViewGroup) (0 until v.childCount).forEach { visitView(v.getChildAt(it)) }
++        }
++        windows().asReversed().forEach(::visitView)
++        return result
++    }
++    private fun labels(n: SemanticsNode): List<String> =
++        n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
++            n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
++    private fun exists(label: String): Boolean = nativeNodes().any { label in labels(it) }
++    private fun expectEventually(label: String) {
++        val until = System.nanoTime() + 5_000_000_000L
++        while (System.nanoTime() < until) {
++            var present = false
++            rule.runOnUiThread { present = exists(label) }
++            if (present) return
++            Thread.sleep(20)
++            frame()
++        }
++        expect(label)
++    }
++    private fun expect(label: String) = rule.runOnUiThread { assertTrue("Missing $label; present: " + nativeNodes().flatMap(::labels), exists(label)) }
++    private fun click(label: String, index: Int = 0) {
++        rule.runOnUiThread {
++            val matches = nativeNodes().filter { label in labels(it) }
++            val nodes = matches.mapNotNull { start ->
++                generateSequence(start) { it.parent }.firstOrNull { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            }.distinctBy { it.id }
++            assertTrue("No clickable $label; present: " + nativeNodes().flatMap(::labels), nodes.size > index)
++            assertTrue(nodes[index].config[SemanticsActions.OnClick].action!!.invoke())
++        }
++        frame()
++    }
++    /** Dispatch real touch events so pointerInput-owned anchors are exercised too. */
++    private fun touch(label: String, index: Int = 0) {
++        rule.runOnUiThread {
++            val matches = nativeNodes().filter { label in labels(it) }.mapNotNull { start ->
++                generateSequence(start) { it.parent }.firstOrNull { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            }.distinctBy { it.id }
++            val target = matches[index]
++            fun contains(view: View): Boolean {
++                val getter = view.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }
++                fun find(n: SemanticsNode): Boolean = n.id == target.id || n.children.any(::find)
++                if (getter != null && find((getter.invoke(view) as SemanticsOwner).rootSemanticsNode)) return true
++                return view is ViewGroup && (0 until view.childCount).any { contains(view.getChildAt(it)) }
++            }
++            val window = windows().last { contains(it) }
++            val at = target.boundsInWindow.center
++            val time = SystemClock.uptimeMillis()
++            val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, at.x, at.y, 0)
++            assertTrue("Touch down was not delivered to $label", window.dispatchTouchEvent(down)); down.recycle()
++            val up = MotionEvent.obtain(time, time + 80, MotionEvent.ACTION_UP, at.x, at.y, 0)
++            window.dispatchTouchEvent(up); up.recycle()
++        }
++        frame()
++    }
++    private fun longClick(label: String) {
++        rule.runOnUiThread {
++            val n = nativeNodes().filter { label in labels(it) }.asSequence().flatMap { generateSequence(it) { n -> n.parent } }
++                .first { it.config.getOrNull(SemanticsActions.OnLongClick)?.action != null }
++            // A real down/cancel supplies the production pointer-owned anchor, then
++            // the accessibility long-click action opens the same item menu safely.
++            val at = n.boundsInWindow.center
++            val window = rule.activity.window.decorView
++            val time = SystemClock.uptimeMillis()
++            val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, at.x, at.y, 0)
++            window.dispatchTouchEvent(down); down.recycle()
++            val cancel = MotionEvent.obtain(time, time + 10, MotionEvent.ACTION_CANCEL, at.x, at.y, 0)
++            window.dispatchTouchEvent(cancel); cancel.recycle()
++            assertTrue(n.config[SemanticsActions.OnLongClick].action!!.invoke())
++        }
++        frame()
++    }
++    private fun replace(index: Int, value: String) {
++        rule.runOnUiThread {
++            val fields = nativeNodes().filter { it.config.getOrNull(SemanticsActions.SetText)?.action != null }
++            assertTrue("Expected field $index; found ${fields.size}", fields.size > index)
++            assertTrue(fields[index].config[SemanticsActions.SetText].action!!.invoke(AnnotatedString(value)))
++        }
++        frame()
++    }
++    private fun swipeUp() {
++        rule.runOnUiThread {
++            val view = rule.activity.window.decorView
++            val t = SystemClock.uptimeMillis()
++            fun send(action: Int, x: Float, y: Float, elapsed: Long) {
++                val e = MotionEvent.obtain(t, t + elapsed, action, x, y, 0)
++                view.dispatchTouchEvent(e); e.recycle()
++            }
++            send(MotionEvent.ACTION_DOWN, 195f, 740f, 0)
++            for (i in 1..20) send(MotionEvent.ACTION_MOVE, 195f, 740f - i * 25f, i * 30L)
++            send(MotionEvent.ACTION_UP, 195f, 240f, 630)
++        }
++        frame()
++    }
++    private fun scroll(pixels: Float) {
++        rule.runOnUiThread {
++            val node = nativeNodes().first { it.config.getOrNull(SemanticsActions.ScrollBy)?.action != null && it.boundsInWindow.width > 0 && it.boundsInWindow.center.x in 0f..393f }
++            node.config[SemanticsActions.ScrollBy].action!!.invoke(0f, pixels)
++        }
++        frame()
++    }
++    private fun dismissSheet() {
++        rule.runOnUiThread {
++            val node = nativeNodes().lastOrNull { it.config.getOrNull(SemanticsActions.Dismiss)?.action != null }
++            if (node != null) assertTrue(node.config[SemanticsActions.Dismiss].action!!.invoke())
++            else {
++                val window = windows().last()
++                val time = SystemClock.uptimeMillis()
++                val down = MotionEvent.obtain(time,time,MotionEvent.ACTION_DOWN,3f,800f,0)
++                window.dispatchTouchEvent(down); down.recycle()
++                val up = MotionEvent.obtain(time,time+80,MotionEvent.ACTION_UP,3f,800f,0)
++                window.dispatchTouchEvent(up); up.recycle()
++            }
++        }
++        frame()
++    }
++    private fun toggle(index: Int) {
++        rule.runOnUiThread {
++            val controls = nativeNodes().filter { it.config.getOrNull(SemanticsProperties.ToggleableState) != null && it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            assertTrue(controls[index].config[SemanticsActions.OnClick].action!!.invoke())
++        }
++        frame()
++    }
++    private fun expectDock(visible: Boolean) = rule.runOnUiThread {
++        assertEquals("Root dock visibility", visible, nativeNodes().any { it.config.getOrNull(SemanticsProperties.TestTag) == "hetu-dock" })
++    }
++    private fun back() { rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }; frame() }
++    private fun capture(id: String) {
++        frame()
++        rule.runOnUiThread {
++            val base = rule.activity.window.decorView
++            assertTrue(base.width > 0 && base.height > 0)
++            val bitmap = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(bitmap)
++            val windows = windows().filter { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }
++            val metadata = JSONArray()
++            windows.forEach { view ->
++                val xy = IntArray(2); view.getLocationOnScreen(xy)
++                val params = view.layoutParams as? WindowManager.LayoutParams
++                // Robolectric lays a separate dialog decor at (0,0); apply the real
++                // WM gravity/dim attributes to compose its native raster with the app.
++                if (view !== base && params != null) {
++                    val placed = android.graphics.Rect()
++                    Gravity.apply(params.gravity, view.width, view.height, android.graphics.Rect(0, 0, base.width, base.height), params.x, params.y, placed)
++                    xy[0] = placed.left; xy[1] = placed.top
++                    if ((params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0)
++                        canvas.drawColor(android.graphics.Color.argb((params.dimAmount * 255).toInt(), 0, 0, 0))
++                }
++                canvas.save(); canvas.translate(xy[0].toFloat(), xy[1].toFloat()); view.draw(canvas); canvas.restore()
++                metadata.put(JSONObject().put("class", view.javaClass.name).put("x", xy[0]).put("y", xy[1]).put("width", view.width).put("height", view.height)
++                    .put("gravity", params?.gravity).put("dimAmount", params?.dimAmount))
++            }
++            File(output, "$id.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
++            bitmap.recycle()
++            File(output, "$id.json").writeText(JSONObject().put("id", id).put("capturedAtUtc", java.time.Instant.now().toString()).put("testOnlySyntheticData", true).put("apiLevel", android.os.Build.VERSION.SDK_INT).put("interceptedRootCommands", JSONArray(RemainingRootBridgeShadow.commands.toList()))
++                .put("windowBounds", metadata).put("text", JSONArray(nativeNodes().flatMap(::labels).distinct())).toString(2))
++        }
++    }
++    private val yaml = """
++        mixed-port: 7890
++        allow-lan: true
++        mode: rule
++        log-level: info
++        external-controller: 127.0.0.1:9090
++        dns:
++          enable: true
++          enhanced-mode: fake-ip
++        proxy-providers:
++          机场订阅:
++            type: http
++            url: 'https://example.com/subscription'
++            interval: 86400
++        proxy-groups:
++          - name: 节点选择
++            type: select
++            use: [机场订阅]
++        rules:
++          - MATCH,节点选择
++    """.trimIndent()
++    private fun configFiles(): ProxyConfigLibrary {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        val library = ProxyConfigLibrary(app)
++        library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "备用配置.yaml", yaml.byteInputStream())
++        library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "日常使用.yaml", yaml.byteInputStream())
++        vm.prefs.edit().putString("proxyBaseCore", "mihomo").commit()
++        val actual = kotlinx.coroutines.runBlocking { vm.controller.configLibrary().map { it.name } }
++        assertTrue("Controller must see the isolated config fixture: $actual", actual.containsAll(listOf("备用配置.yaml", "日常使用.yaml")))
++        return library
++    }
++    private fun editor(): CodeEditor {
++        fun visit(view: View): CodeEditor? {
++            if (view is CodeEditor) return view
++            if (view is ViewGroup) for (i in 0 until view.childCount) visit(view.getChildAt(i))?.let { return it }
++            return null
++        }
++        return windows().mapNotNull(::visit).first()
++    }
++    private fun changeEditor(text: String) { rule.runOnUiThread { editor().setText(text) }; frame() }
++    private fun nativeClick(label: String) {
++        rule.runOnUiThread {
++            fun visit(v: View): View? {
++                if ((v as? TextView)?.text?.toString() == label || v.contentDescription?.toString() == label) return v
++                if (v is ViewGroup) for (i in 0 until v.childCount) visit(v.getChildAt(i))?.let { return it }
++                return null
++            }
++            val v = windows().asReversed().mapNotNull(::visit).first()
++            val target = generateSequence(v) { it.parent as? View }.first { it.isClickable }
++            assertTrue(target.performClick())
++        }; frame()
++    }
++    private fun dismissPopup() {
++        rule.runOnUiThread { Shadows.shadowOf(ApplicationProvider.getApplicationContext<Application>()).latestPopupWindow?.dismiss() }; frame()
++    }
++    @Test fun shadowFailsClosedWithoutRunningShell() {
++        try { RootBridge.rootShell(rule.activity, "UNEXPECTED_SENTINEL", 1000); fail("Must fail closed") }
++        catch (_: SecurityException) { }
++        assertEquals(listOf("UNEXPECTED_SENTINEL"), RemainingRootBridgeShadow.unexpected.toList())
++        RemainingRootBridgeShadow.unexpected.clear()
++    }
++    @Test fun configMenusAndCancelledDestructiveDialogs() {
++        val library = configFiles()
++        show { ConfigsScreen(vm) }; expectEventually("日常使用.yaml")
++        longClick("日常使用.yaml"); expect("重命名"); capture("03A-006-current-config-menu"); dismissSheet()
++        longClick("备用配置.yaml"); capture("03A-007-other-config-menu"); dismissSheet()
++        longClick(ProxyConfigLibrary.BUNDLED_NAME); capture("03A-008-bundled-config-menu"); dismissSheet()
++        longClick("日常使用.yaml"); click("重命名"); capture("03A-009-rename-config"); click("取消")
++        longClick("日常使用.yaml"); click("删除配置"); expect("删除配置？"); capture("03A-010-delete-config"); click("取消")
++        scroll(360f); click("删除订阅"); capture("03A-011-delete-subscription"); click("取消")
++        assertEquals("日常使用.yaml", library.selected(ProxyRuntimeProfile.Core.MIHOMO)!!.name)
++        assertEquals(1, library.subscriptions(library.selected(ProxyRuntimeProfile.Core.MIHOMO)).size)
++    }
++    @Config(qualifiers = "zh-rCN-w320dp-h852dp-mdpi")
++    @Test fun narrowConfigLongNameKeepsMenuAndCancelReachable() {
++        val library = configFiles()
++        val name = "出差备用机场配置用于检查较长标题的布局.yaml"
++        library.importConfig(ProxyRuntimeProfile.Core.MIHOMO, name, yaml.byteInputStream())
++        show { ConfigsScreen(vm) }; expectEventually(name)
++        capture("extra-configs-narrow-long-name")
++        longClick(name); expect("导出配置"); expect("重命名")
++        capture("extra-configs-narrow-long-name-menu")
++        click("重命名"); expect("重命名配置"); click("取消")
++        assertEquals(name, library.selected(ProxyRuntimeProfile.Core.MIHOMO)!!.name)
++    }
++    @Test fun existingSubscriptionInvalidDraftAndCancel() {
++        configFiles(); show { ConfigsScreen(vm) }; expectEventually("日常使用.yaml"); scroll(360f)
++        click("机场订阅"); expect("编辑订阅"); capture("03A-026-edit-subscription")
++        replace(0, "not-a-url"); click("保存"); expect("请输入有效的 http/https 链接"); capture("03A-023-edit-subscription-invalid")
++        click("返回"); click("放弃"); expect("配置与订阅")
++    }
++    @Test fun yamlEditorOutlineAndDraftDiscard() {
++        configFiles(); show { ConfigEditorScreen(vm) {} }; expectEventually("日常使用.yaml")
++        capture("03A-025-yaml-editor"); click("语法大纲"); capture("03A-013-yaml-outline"); dismissSheet()
++        changeEditor(yaml + "\n# 未保存的本地草稿\n")
++        click("返回"); expect("放弃修改？"); capture("03A-019-yaml-discard"); click("取消")
++        assertTrue(editor().text.toString().contains("未保存"))
++    }
++    @Test fun yamlSelectionConflictPreservesDraft() {
++        val library = configFiles(); show { ConfigEditorScreen(vm) {} }; expectEventually("日常使用.yaml")
++        changeEditor(yaml + "\n# 草稿\n")
++        library.select(ProxyRuntimeProfile.Core.MIHOMO, "备用配置.yaml")
++        click("保存"); expectEventually("保存遇到冲突"); capture("03A-014-yaml-selection-conflict")
++        click("重新读取"); expect("放弃草稿并重新读取？"); capture("03A-018-yaml-reload-confirm"); click("取消")
++        assertTrue(editor().text.toString().contains("# 草稿"))
++    }
++    @Test fun yamlExternalFileConflictPreservesDraft() {
++        val library = configFiles(); show { ConfigEditorScreen(vm) {} }; expectEventually("日常使用.yaml")
++        changeEditor(yaml + "\n# 草稿\n")
++        library.write(library.selected(ProxyRuntimeProfile.Core.MIHOMO), yaml + "\n# 外部修改\n")
++        click("保存"); expectEventually("文件已在其他位置修改"); capture("03A-017-yaml-external-conflict")
++        click("保留草稿"); assertTrue(editor().text.toString().contains("# 草稿"))
++    }
++    @Test fun yamlReadAndValidationFailures() {
++        val library = configFiles()
++        library.selected(ProxyRuntimeProfile.Core.MIHOMO)!!.file.writeBytes(byteArrayOf(0xC3.toByte(),0x28))
++        show { ConfigEditorScreen(vm) {} }; expectEventually("配置读取失败"); capture("03A-016-yaml-read-error")
++        library.write(library.selected(ProxyRuntimeProfile.Core.MIHOMO), yaml)
++        click("重新读取"); expectEventually("日常使用.yaml")
++        changeEditor("dns: [invalid\n")
++        click("校验"); expectEventually("配置无效：测试夹具：第 1 行 YAML 语法错误")
++        capture("03A-015-yaml-validation-error")
++    }
++    @Config(sdk = [28]) @Test fun runtimeEditorNativeViewMenusJumpSearchAndDiscard() {
++        val model = RuntimeEditorModel().apply { content = RuntimeFileContent(yaml, RuntimeFilesRepository.digest(yaml.toByteArray()), true, "UTF-8") }
++        show { RuntimeFileEditorScreen("/data/adb/hetu/config.yaml", model) {} }
++        expect("config.yaml"); capture("03B-012-runtime-editor")
++        touch("更多"); expect("跳转到行"); capture("03B-026-runtime-editor-menu")
++        click("跳转到行"); capture("03B-027-runtime-editor-jump"); click("继续编辑")
++        touch("更多"); click("搜索"); capture("03B-029-runtime-editor-search")
++        back(); changeEditor(yaml + "\n# runtime draft\n"); click("返回"); capture("03B-028-runtime-editor-discard"); click("继续编辑")
++    }
++    @Test fun fileManagerMenusFormsValidationAndCancellations() {
++        show { FileManagerScreen(vm) {} }; expectEventually("config.yaml")
++        rule.runOnUiThread {
++            val heading = nativeNodes().filter { "文件管理" in labels(it) }.maxBy { it.boundsInWindow.height }
++            val search = nativeNodes().first { "搜索" in labels(it) }
++            assertTrue("Child-page actions stay in the toolbar above the large title", search.boundsInWindow.center.y < heading.boundsInWindow.top)
++        }
++        capture("03B-013-files-list")
++        touch("更多"); capture("03B-015-files-more"); click("新建文件"); capture("03B-018-files-new-file"); click("取消")
++        touch("更多"); click("新建文件夹"); capture("03B-019-files-new-folder"); click("取消")
++        touch("更多"); click("下载"); replace(0,"https://example.com/config.yaml"); capture("03B-020-files-download")
++        replace(0,"file:///tmp/config.yaml"); click("下载"); expect("请填写 HTTPS 下载地址"); capture("03B-021-files-download-invalid"); click("取消")
++        longClick("config.yaml"); capture("03B-016-file-menu"); click("重命名"); capture("03B-022-files-rename")
++        click("重命名"); expect("名称没有变化"); capture("03B-025-files-name-unchanged"); click("取消")
++        longClick("config.yaml"); click("删除"); capture("03B-023-file-delete"); click("取消")
++        longClick("backup"); capture("03B-017-folder-menu"); click("删除"); capture("03B-024-folder-delete"); click("取消")
++        click("backup"); expectEventually("backup.yaml"); replace(0,"backup"); capture("03B-014-files-subfolder-search")
++    }
++    @Config(sdk = [28]) @Test fun realScriptsActivityReadFixturesAndCancelledDialogs() {
++        show {}
++        val controller = Robolectric.buildActivity(ProxyScriptsActivity::class.java).setup()
++        try {
++            expectEventually("network-check.sh"); capture("03B-006-scripts")
++            click("更多"); capture("03B-007-scripts-menu"); click("脚本环境"); capture("03B-011-script-environment"); dismissSheet()
++            click("服务启动前"); expectEventually("脚本内容"); capture("03B-008-pre-start-hook"); dismissSheet()
++            click("服务停止后"); expectEventually("脚本内容"); capture("03B-009-post-stop-hook"); dismissSheet()
++            click("删除"); capture("03B-010-script-delete"); dismissSheet()
++        } finally { controller.pause().stop().destroy(); frame() }
++    }
++    @Test fun logFilesSelectionSearchAndCancelledClear() {
++        show { HxLogFilesScreen(vm) {} }; expectEventually("INFO"); capture("03B-002-log-files")
++        touch("选择日志"); capture("03B-003-log-file-picker"); click("core.log")
++        click("清空当前日志"); capture("03B-004-log-clear"); click("取消")
++        click("搜索"); replace(0,"example.com"); click("[TCP] 192.168.1.12:52000 --> example.com:443 match MATCH using 节点选择[香港 01]")
++        capture("03B-005-log-search-expanded")
++    }
++    @Test fun startupConfigReadAndRecoveryCancel() {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        RootProxyManager(app).startupFile().apply { parentFile!!.mkdirs(); writeText(yaml) }
++        show { SettingsStartupConfigScreen {} }; expectEventually(yaml); capture("04-014-startup-config")
++        configFiles(); show { DiagnosticsScreen(vm) {} }; click("启动配置"); expectEventually("复制"); capture("03A-041-diagnostic-startup"); dismissSheet()
++        click("恢复网络"); capture("03A-042-diagnostic-recovery"); click("取消")
++        click("消息与网络诊断"); expectEventually("受控诊断快照：无实际 Root 或网络操作"); capture("03A-043-diagnostic-network"); dismissSheet()
++    }
++    @Test fun basicProxyActualNativeActivityAndMenus() {
++        configFiles(); show {}
++        val controller = Robolectric.buildActivity(RootTproxyActivity::class.java).setup()
++        try {
++            frame(); capture("04-003-basic-proxy")
++            nativeClick("代理核心"); capture("04-015-core-choice"); dismissPopup()
++            nativeClick("运行模式"); capture("04-016-run-mode-choice"); dismissPopup()
++            nativeClick("IPv6"); capture("04-017-ipv6-choice"); dismissPopup()
++        } finally { controller.pause().stop().destroy(); frame() }
++    }
++    @Test fun toolsAndSettingsCollapsedHeaders() {
++        vm.tab=HxTab.Tools; show { HetuRoot(vm) }; swipeUp(); capture("03A-002-tools-collapsed")
++        rule.runOnUiThread { vm.tab=HxTab.Settings }; frame(); swipeUp(); capture("04-002-settings-collapsed")
++    }
++    @Test fun appListModesSortMenuAndSearch() {
++        val apps = listOf("微信" to "com.example.chat", "浏览器" to "com.example.browser", "应用商店" to "com.example.store", "地图" to "com.example.maps", "音乐" to "com.example.music", "设置" to "com.example.settings")
++            .mapIndexed { i, pair -> io.github.xgl34222220.hetu.ui.AppItem(pair.first, pair.second, i == 5, uid = 10001 + i) }
++        vm.filters.javaClass.getDeclaredField("appCache").apply { isAccessible = true }.set(vm.filters, apps)
++        vm.prefs.edit().putString("proxyAppScope", "blacklist").putStringSet("proxyAppPackages", setOf("com.example.chat")).commit()
++        show { AppListScreen(vm) }; expectEventually("微信"); capture("03A-028-app-blacklist")
++        touch("排序"); capture("03A-029-app-sort"); click("按 UID")
++        touch("更多"); capture("03A-030-app-more"); click("隐藏系统应用")
++        click("白名单"); capture("03A-031-app-whitelist"); assertEquals("whitelist", vm.prefs.getString("proxyAppScope", ""))
++        click("核心"); capture("03A-032-app-core-mode")
++        click("黑名单"); click("搜索"); replace(0,"微信"); capture("03A-033-app-search")
++    }
++    @Test fun panelLogReadSearchAndExpand() {
++        fixture("state", vm.state.copy(running=true, panelReady=true)); vm.openPanel("logs"); show { HetuRoot(vm) }
++        expectEventually("INFO"); capture("02-009-panel-logs")
++        click("搜索"); replace(0,"example.com")
++        click("[TCP] 192.168.1.12:52000 --> example.com:443 match MATCH using 节点选择[香港 01]")
++        capture("02-026-panel-log-search-expanded")
++    }
++    @Test fun adblockRulesHelpAndDomainDrafts() {
++        vm.prefs.edit().putStringSet("user_allow", setOf("example.com", "example.org")).putStringSet("user_block", setOf("ads.example.net")).commit()
++        show { AdblockScreen(vm) }; expectEventually("AdGuard DNS Filter")
++        click("说明"); capture("03A-046-adblock-help"); dismissSheet()
++        scroll(680f); capture("03A-044-adblock-rules")
++        repeat(4) { if (!exists("白名单（永不拦截）")) scroll(350f) }
++        click("添加", 0); replace(0,"example.com"); capture("03A-047-adblock-add-allow"); click("取消")
++        click("添加", 1); replace(0,"ads.example.net"); capture("03A-048-adblock-add-block"); click("取消")
++        assertEquals(setOf("example.com", "example.org"), vm.prefs.getStringSet("user_allow", emptySet()))
++    }
++    @Test fun adblockRuntimeSnapshotWhitelistCancelAndGlobalWarning() {
++        fixture("state", vm.state.copy(running=true, trafficMode="rule"))
++        vm.prefs.edit().putBoolean("proxyAdblockLastEffective", true).putLong("proxyAdblockSessionHits", 124L).commit()
++        show { AdblockScreen(vm) }; expectEventually("保护中"); expectEventually("ads.example.net"); capture("03A-045-adblock-status")
++        click("ads.example.net"); capture("03A-049-adblock-whitelist-confirm"); click("取消")
++        rule.runOnUiThread { fixture("state", vm.state.copy(trafficMode="global")) }; frame()
++        expect("当前为全局模式"); capture("03B-001-adblock-global-warning")
++    }
++    @Test fun subStoreControlledProbeStates() {
++        val release = java.util.concurrent.CountDownLatch(1)
++        var success = true
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                require(request.method == "GET" && request.requestUrl?.encodedPath == "/api/utils/env")
++                release.await(5, java.util.concurrent.TimeUnit.SECONDS)
++                return if (success) MockResponse().setBody("""{"data":{"backend":"Sub-Store","version":"2.20.0-fixture"}}""") else MockResponse().setResponseCode(503)
++            }
++        }
++        vm.prefs.edit().putString("subStoreBackendUrl", server.url("/").toString()).commit()
++        show { ProxySubStoreScreen {} }; click("检测"); expect("检测中"); capture("03B-046-substore-checking")
++        release.countDown(); expectEventually("Sub-Store 已连接 · Sub-Store · 2.20.0-fixture"); capture("03B-047-substore-connected")
++        success = false; click("检测"); expectEventually("后端不可用（HTTP 503）"); capture("03B-048-substore-unavailable")
++    }
++    @Test fun realWebViewNativeContainerBoundaries() {
++        show {}
++        val intent = android.content.Intent(ApplicationProvider.getApplicationContext<Application>(), ProxyWebPanelViewerActivity::class.java)
++            .putExtra("panel_name", "示例面板").putExtra("panel_url", "https://example.com")
++        val custom = Robolectric.buildActivity(ProxyWebPanelViewerActivity::class.java, intent).setup()
++        try { frame(); expect("正在加载外部面板…"); capture("03B-038-custom-web-container") }
++        finally { custom.pause().stop().destroy(); frame() }
++        val subStore = Robolectric.buildActivity(ProxySubStoreWebActivity::class.java).setup()
++        try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
++        finally { subStore.pause().stop().destroy(); frame() }
++    }
++    @Test fun restoreFileResultRequiresConfirmationAndCancelPreservesSettings() {
++        show { SettingsScreen(vm, androidx.compose.ui.unit.Dp(0f), "backup") {} }
++        click("选择文件")
++        rule.runOnUiThread {
++            val request = Shadows.shadowOf(rule.activity).nextStartedActivityForResult
++            assertNotNull(request)
++            rule.activity.activityResultRegistry.dispatchResult(request.requestCode, android.app.Activity.RESULT_OK,
++                android.content.Intent().setData(android.net.Uri.parse("content://qa.fixture/backup.json")))
++        }; frame()
++        expect("恢复备份？"); capture("04-028-restore-confirm"); click("取消")
++        assertEquals("light", vm.prefs.getString("appearance", ""))
++    }
++    @Config(shadows = [RemainingCoreDownloadShadow::class])
++    @Test fun coreDownloadProgressIsOnlyAnInMemoryCallbackFixture() {
++        show { CoresScreen(vm) {} }; expectEventually("Xray")
++        click("下载", 0); expectEventually("下载 Mihomo · 42%")
++        capture("03A-035-core-download-progress")
++        assertEquals(1, RemainingCoreDownloadShadow.calls)
++        rule.runOnUiThread { RemainingCoreDownloadShadow.cancelFixture() }; frame()
++        assertTrue(RemainingRootBridgeShadow.commands.isEmpty())
++    }
++}
++
++/** Test-only interception. No command here reaches a process, socket, device, or Root. */
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class RemainingRootBridgeShadow {
++    companion object {
++        val unexpected = java.util.Collections.synchronizedList(mutableListOf<String>())
++        val commands = java.util.Collections.synchronizedList(mutableListOf<String>())
++        @JvmStatic @Resetter fun reset() { unexpected.clear(); commands.clear() }
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeoutMs: Long): RootBridge.Result {
++            commands += command
++            val response = when {
++                command.startsWith("set -e; p=\$(readlink -f '") && command.contains("; for f in") && command.contains("stat -c %Y") ->
++                    if (command.contains("readlink -f '/data/adb/hetu/backup'")) "F\tbackup.yaml\t4200\t1790899200\nF\told.yaml\t2800\t1790899200\n"
++                    else "D\tbackup\t4096\t1790899200\nD\tbin\t4096\t1790899200\nD\trun\t4096\t1790899200\nD\tscripts\t4096\t1790899200\nF\tconfig.yaml\t12183\t1790899200\nF\trules.txt\t4088\t1790899200\n"
++                command == "mkdir -p '/data/adb/hetu/scripts' /data/adb/hetu/run && chmod 700 '/data/adb/hetu/scripts'" -> ""
++                command == "if [ -f '/data/adb/hetu/scripts/pre-start.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/pre-start.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho ready\n"
++                command == "if [ -f '/data/adb/hetu/scripts/post-stop.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/post-stop.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho stopped\n"
++                command.startsWith("for f in '/data/adb/hetu/scripts'/*.sh;") && command.endsWith("done") -> "network-check.sh\t1480\n"
++                command == "find '/data/adb/hetu' -maxdepth 2 -type f -name '*.log' -print 2>/dev/null | head -n 200" -> "/data/adb/hetu/run/core.log\n/data/adb/hetu/run/scripts.log\n"
++                command == "tail -n 1600 '/data/adb/hetu/run/core.log' 2>/dev/null" -> "time=\"2026-10-02T09:00:01Z\" level=info msg=\"[TCP] 192.168.1.12:52000 --> example.com:443 match MATCH using 节点选择[香港 01]\"\ntime=\"2026-10-02T09:00:02Z\" level=warning msg=\"DNS timeout\"\n"
++                command == "tail -n 1600 '/data/adb/hetu/run/scripts.log' 2>/dev/null" -> "time=\"2026-10-02T09:00:03Z\" level=info msg=\"Hook fixture read only\"\n"
++                command.startsWith("echo '--- controller-port ---'; echo ") && command.endsWith("cat /data/adb/hetu/run/last-crash 2>/dev/null || true") -> "time=\"2026-10-02T09:00:01Z\" level=info msg=\"[TCP] 192.168.1.12:52000 --> example.com:443 match MATCH using 节点选择[香港 01]\"\ntime=\"2026-10-02T09:00:02Z\" level=warning msg=\"DNS timeout\"\n"
++                command == "if [ -r /data/adb/hetu/run/core.log ]; then tail -c 1048576 /data/adb/hetu/run/core.log 2>/dev/null | grep -Ei 'hetu-adblock|RuleSet/hetu-adblock' | tail -n 4000; else exit 2; fi" -> "[TCP] 127.0.0.1:4321 --> ads.example.net:443 match RuleSet/hetu-adblock using REJECT\n"
++                command == "pm list users" -> "Users:\n UserInfo{0:Owner:13} running\n"
++                else -> null
++            }
++            if(response == null) { unexpected += command; throw SecurityException("Unexpected Root command blocked by QA fixture: $command") }
++            return RootBridge.Result(0, response)
++        }
++    }
++}
++
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
+@@ -0,0 +1,543 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import android.os.Looper
++import android.view.View
++import android.view.MotionEvent
++import android.view.Gravity
++import android.view.WindowManager
++import android.os.SystemClock
++import android.view.ViewGroup
++import android.view.inspector.WindowInspector
++import androidx.activity.ComponentActivity
++import androidx.activity.compose.setContent
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.runtime.*
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.semantics.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.text.AnnotatedString
++import androidx.test.core.app.ApplicationProvider
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.*
++import org.junit.runner.RunWith
++import org.robolectric.Robolectric
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++import java.io.File
++import java.time.Duration
++
++/**
++ * Actual production components and semantics actions with isolated test-only data.
++ * No onForeground(), Root start/stop, download, real controller or external request.
++ * A loopback MockWebServer handles incidental adjacent-pager provider reads.
++ * Native Android windows are drawn at their real screen positions. OS status/nav
++ * chrome, hardware blur, keyboard and OS window-manager shadows are not emulated.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class ConceptStateCoverageTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private val output = File("build/outputs/concept-state-coverage")
++
++    @Before fun prepare() {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    require(request.method == "GET") { "Coverage must never mutate a controller: ${request.method} ${request.path}" }
++                    return MockResponse().setBody(when (request.requestUrl?.encodedPath) {
++                        "/providers/proxies" -> """{"providers":{"测试订阅":{"vehicleType":"HTTP","updatedAt":"2026-10-02T00:00:00Z","proxies":["香港 01","香港 02"],"subscriptionInfo":{"Upload":0,"Download":21474836480,"Total":107374182400,"Expire":1798761600}}}}"""
++                        "/proxies" -> "{\"proxies\":{}}"
++                        else -> "{}"
++                    })
++                }
++            }
++            start()
++        }
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putString("appearance", "light").putBoolean("hetuDynamicColor", false)
++            .putBoolean("enableBlur", false).putBoolean("predictiveBackAnimation", false)
++            .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).putString("proxyCustomApiSecret", "")
++            .putInt("proxySelectorGroupColumns", 2).putInt("proxySelectorNodeColumns", 2)
++            .putString("proxySelectorDensity", "compact").commit()
++        vm = HetuViewModel(app)
++        rule.mainClock.autoAdvance = false
++        output.mkdirs()
++    }
++    @After fun finish() {
++        rule.runOnUiThread { rule.activity.setContent {} }
++        frame()
++        vm.onBackground()
++        server.shutdown()
++    }
++    private fun frame() {
++        repeat(4) {
++            rule.mainClock.advanceTimeBy(200)
++            rule.runOnUiThread { Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(100)) }
++        }
++    }
++    private fun show(content: @Composable () -> Unit) {
++        rule.runOnUiThread { rule.activity.setContent {
++            HetuAppTheme("light", false) { CompositionLocalProvider(LocalNav provides HxNav()) {
++                Box(Modifier.fillMaxSize()) { content() }
++            } }
++        } }
++        frame()
++    }
++    @Suppress("UNCHECKED_CAST")
++    private fun fixture(name: String, value: Any?) {
++        val field = HetuViewModel::class.java.getDeclaredField(name + "\$delegate").apply { isAccessible = true }
++        (field.get(vm) as MutableState<Any?>).value = value
++    }
++    private fun nativeNodes(): List<SemanticsNode> {
++        val result = mutableListOf<SemanticsNode>()
++        fun visitNode(n: SemanticsNode) { result += n; n.children.forEach(::visitNode) }
++        fun visitView(v: View) {
++            v.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }?.let {
++                visitNode((it.invoke(v) as SemanticsOwner).rootSemanticsNode)
++            }
++            if (v is ViewGroup) (0 until v.childCount).forEach { visitView(v.getChildAt(it)) }
++        }
++        WindowInspector.getGlobalWindowViews().asReversed().forEach(::visitView)
++        return result
++    }
++    private fun labels(n: SemanticsNode): List<String> =
++        n.config.getOrNull(SemanticsProperties.Text).orEmpty().map { it.text } +
++            n.config.getOrNull(SemanticsProperties.ContentDescription).orEmpty()
++    private fun exists(label: String): Boolean = nativeNodes().any { label in labels(it) }
++    private fun expectEventually(label: String) {
++        val until = System.nanoTime() + 5_000_000_000L
++        while (System.nanoTime() < until) {
++            var present = false
++            rule.runOnUiThread { present = exists(label) }
++            if (present) return
++            Thread.sleep(20)
++            frame()
++        }
++        expect(label)
++    }
++    private fun expect(label: String) = rule.runOnUiThread { assertTrue("Missing $label; present: " + nativeNodes().flatMap(::labels), exists(label)) }
++    private fun click(label: String, index: Int = 0) {
++        rule.runOnUiThread {
++            val matches = nativeNodes().filter { label in labels(it) }
++            val nodes = matches.mapNotNull { start ->
++                generateSequence(start) { it.parent }.firstOrNull { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            }.distinctBy { it.id }
++            assertTrue("No clickable $label; present: " + nativeNodes().flatMap(::labels), nodes.size > index)
++            assertTrue(nodes[index].config[SemanticsActions.OnClick].action!!.invoke())
++        }
++        frame()
++    }
++    /** Dispatch real touch events so pointerInput-owned anchors are exercised too. */
++    private fun touch(label: String, index: Int = 0) {
++        rule.runOnUiThread {
++            val matches = nativeNodes().filter { label in labels(it) }.mapNotNull { start ->
++                generateSequence(start) { it.parent }.firstOrNull { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            }.distinctBy { it.id }
++            val target = matches[index]
++            fun contains(view: View): Boolean {
++                val getter = view.javaClass.methods.firstOrNull { it.name == "getSemanticsOwner" }
++                fun find(n: SemanticsNode): Boolean = n.id == target.id || n.children.any(::find)
++                if (getter != null && find((getter.invoke(view) as SemanticsOwner).rootSemanticsNode)) return true
++                return view is ViewGroup && (0 until view.childCount).any { contains(view.getChildAt(it)) }
++            }
++            val window = WindowInspector.getGlobalWindowViews().last { contains(it) }
++            val at = target.boundsInWindow.center
++            val time = SystemClock.uptimeMillis()
++            val down = MotionEvent.obtain(time, time, MotionEvent.ACTION_DOWN, at.x, at.y, 0)
++            assertTrue("Touch down was not delivered to $label", window.dispatchTouchEvent(down)); down.recycle()
++            val up = MotionEvent.obtain(time, time + 80, MotionEvent.ACTION_UP, at.x, at.y, 0)
++            window.dispatchTouchEvent(up); up.recycle()
++        }
++        frame()
++    }
++    private fun longClick(label: String) {
++        rule.runOnUiThread {
++            val n = nativeNodes().filter { label in labels(it) }.asSequence().flatMap { generateSequence(it) { n -> n.parent } }
++                .first { it.config.getOrNull(SemanticsActions.OnLongClick)?.action != null }
++            assertTrue(n.config[SemanticsActions.OnLongClick].action!!.invoke())
++        }
++        frame()
++    }
++    private fun replace(index: Int, value: String) {
++        rule.runOnUiThread {
++            val fields = nativeNodes().filter { it.config.getOrNull(SemanticsActions.SetText)?.action != null }
++            assertTrue("Expected field $index; found ${fields.size}", fields.size > index)
++            assertTrue(fields[index].config[SemanticsActions.SetText].action!!.invoke(AnnotatedString(value)))
++        }
++        frame()
++    }
++    private fun swipeUp() {
++        rule.runOnUiThread {
++            val view = rule.activity.window.decorView
++            val t = SystemClock.uptimeMillis()
++            fun send(action: Int, x: Float, y: Float, elapsed: Long) {
++                val e = MotionEvent.obtain(t, t + elapsed, action, x, y, 0)
++                view.dispatchTouchEvent(e); e.recycle()
++            }
++            send(MotionEvent.ACTION_DOWN, 195f, 740f, 0)
++            for (i in 1..20) send(MotionEvent.ACTION_MOVE, 195f, 740f - i * 25f, i * 30L)
++            send(MotionEvent.ACTION_UP, 195f, 240f, 630)
++        }
++        frame()
++    }
++    private fun scroll(pixels: Float) {
++        rule.runOnUiThread {
++            val node = nativeNodes().first { it.config.getOrNull(SemanticsActions.ScrollBy)?.action != null && it.boundsInWindow.width > 0 && it.boundsInWindow.center.x in 0f..393f }
++            node.config[SemanticsActions.ScrollBy].action!!.invoke(0f, pixels)
++        }
++        frame()
++    }
++    private fun dismissSheet() {
++        rule.runOnUiThread {
++            val action = nativeNodes().last { it.config.getOrNull(SemanticsActions.Dismiss)?.action != null }.config[SemanticsActions.Dismiss]
++            assertTrue(action.action!!.invoke())
++        }
++        frame()
++    }
++    private fun toggle(index: Int) {
++        rule.runOnUiThread {
++            val controls = nativeNodes().filter { it.config.getOrNull(SemanticsProperties.ToggleableState) != null && it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            assertTrue(controls[index].config[SemanticsActions.OnClick].action!!.invoke())
++        }
++        frame()
++    }
++    private fun expectDock(visible: Boolean) = rule.runOnUiThread {
++        assertEquals("Root dock visibility", visible, nativeNodes().any { it.config.getOrNull(SemanticsProperties.TestTag) == "hetu-dock" })
++    }
++    private fun back() { rule.runOnUiThread { rule.activity.onBackPressedDispatcher.onBackPressed() }; frame() }
++    private fun capture(id: String) {
++        frame()
++        rule.runOnUiThread {
++            val base = rule.activity.window.decorView
++            assertTrue(base.width > 0 && base.height > 0)
++            val bitmap = Bitmap.createBitmap(base.width, base.height, Bitmap.Config.ARGB_8888)
++            val canvas = Canvas(bitmap)
++            val windows = WindowInspector.getGlobalWindowViews().filter { it.visibility == View.VISIBLE && it.width > 0 && it.height > 0 }
++            val metadata = JSONArray()
++            windows.forEach { view ->
++                val xy = IntArray(2); view.getLocationOnScreen(xy)
++                val params = view.layoutParams as? WindowManager.LayoutParams
++                // Robolectric lays a separate dialog decor at (0,0); apply the real
++                // WM gravity/dim attributes to compose its native raster with the app.
++                if (view !== base && params != null) {
++                    val placed = android.graphics.Rect()
++                    Gravity.apply(params.gravity, view.width, view.height, android.graphics.Rect(0, 0, base.width, base.height), params.x, params.y, placed)
++                    xy[0] = placed.left; xy[1] = placed.top
++                    if ((params.flags and WindowManager.LayoutParams.FLAG_DIM_BEHIND) != 0)
++                        canvas.drawColor(android.graphics.Color.argb((params.dimAmount * 255).toInt(), 0, 0, 0))
++                }
++                canvas.save(); canvas.translate(xy[0].toFloat(), xy[1].toFloat()); view.draw(canvas); canvas.restore()
++                metadata.put(JSONObject().put("class", view.javaClass.name).put("x", xy[0]).put("y", xy[1]).put("width", view.width).put("height", view.height)
++                    .put("gravity", params?.gravity).put("dimAmount", params?.dimAmount))
++            }
++            File(output, "$id.png").outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
++            bitmap.recycle()
++            File(output, "$id.json").writeText(JSONObject().put("id", id).put("capturedAtUtc", java.time.Instant.now().toString()).put("testOnlySyntheticData", true)
++                .put("windowBounds", metadata).put("text", JSONArray(nativeNodes().flatMap(::labels).distinct())).toString(2))
++        }
++    }
++    private fun runningFixture() {
++        val nodes = listOf(
++            ProxyNodeUi("香港 01", "VLESS", true, 28, "测试订阅"), ProxyNodeUi("香港 02", "VLESS", true, 31, "测试订阅"),
++            ProxyNodeUi("日本 01", "VLESS", true, 42, "测试订阅"), ProxyNodeUi("日本 02", "VLESS", true, -1, "测试订阅"),
++            ProxyNodeUi("新加坡 01", "VLESS", true, 36, "测试订阅"), ProxyNodeUi("台湾 01", "VLESS", true, 46, "测试订阅"),
++            ProxyNodeUi("韩国 01", "VLESS", false, null, "测试订阅"), ProxyNodeUi("美国 01", "VLESS", true, 128, "测试订阅"))
++        val groups = listOf("节点选择", "手动选择", "故障转移", "香港节点", "台湾节点", "日本节点", "新加坡节点", "韩国节点")
++            .map { ProxyGroupUi(it, if (it == "手动选择") "Selector" else "URLTest", nodes.first().name, nodes) }
++        fixture("state", vm.state.copy(running = true, panelReady = true, config = "测试配置.yaml", trafficMode = "rule",
++            groups = groups, corePid = 1842, memoryBytes = 82L * 1024 * 1024, downloadTotal = 20L * 1024 * 1024 * 1024))
++        fixture("runtime", ProxyRuntimeSnapshot(running = true, pid = 1842, elapsedSeconds = 1920, rssBytes = 82L * 1024 * 1024,
++            lanAddress = "192.168.1.12", lanInterface = "wlan0", wanAddress = "203.0.113.24", wanCountryCode = "HK",
++            wanCountry = "香港", wanCity = "香港", wanIsp = "Test Network", wanAsn = "AS64500",
++            wanOrganization = "Fixture Org", wanIpType = "IPv4", wanTimezone = "Asia/Hong_Kong", wanCoordinates = "22.3193, 114.1694", cpuAffinity = "0-7", currentCpu = 2, wanState = "ready"))
++        fixture("providers", listOf(DashboardProviderUi("测试订阅", "HTTP", "https://example.com/204", "", "2026-10-02T00:00:00Z", 0,
++            20L*1024*1024*1024, 100L*1024*1024*1024, 1798761600, nodes.map { it.name }.toSet(), true)))
++        fixture("coreVersion", "Mihomo test-fixture")
++        vm.delays.putAll(nodes.mapNotNull { node -> node.lastDelay?.let { node.name to it } }.toMap())
++        vm.resourceSamples.add(HomeResourceSample(2f, 82L*1024*1024))
++    }
++
++    @Test fun homeStoppedState() {
++        show { HetuRoot(vm) }; expect("未运行"); capture("01-003-stopped")
++    }
++    @Test fun homeWanAndLanDetailsKeepRealFixtureValues() {
++        runningFixture()
++        show { HomePublicIpScreen(vm) {} }; expect("203.0.113.24"); expect("Fixture Org"); capture("01-009-public-ip-details")
++        click("复制网络运营商")
++        val clipboard = rule.activity.getSystemService(android.content.ClipboardManager::class.java)
++        assertEquals("Test Network", clipboard.primaryClip!!.getItemAt(0).text.toString())
++        click("复制ASN"); assertEquals("AS64500", clipboard.primaryClip!!.getItemAt(0).text.toString())
++        click("局域网 IP"); expect("192.168.1.12"); expect("wlan0"); capture("01-010-lan-ip-details")
++    }
++    @Test fun resourceChartsKeepMissingSamplesAsGaps() {
++        runningFixture()
++        vm.resourceSamples.clear()
++        vm.resourceSamples.addAll(List(60) { index ->
++            HomeResourceSample(if (index in 28..31) null else (2.0 + kotlin.math.sin(index*.8)*.25 + kotlin.math.sin(index*.33)*.4).toFloat(),
++                ((82.0 + kotlin.math.sin(index*.55)*2) * 1024 * 1024).toLong())
++        }.dropLast(1) + HomeResourceSample(2f, 82L*1024*1024))
++        show { HomeResourcesScreen(vm) {} }; expect("断开处为缺测"); capture("01-013-resource-gaps")
++    }
++    @Test fun resourceChartsWaitingStateDoesNotInventZero() {
++        vm.resourceSamples.clear()
++        show { HomeResourcesScreen(vm) {} }; expect("等待连接进行采样"); capture("01-014-resource-waiting")
++    }
++    @Test fun homeLifecycleAndSourceSelection() {
++        runningFixture()
++        show { HetuRoot(vm) }
++        expect("运行中"); capture("01-001-running")
++        click("运行中"); expect("规则"); capture("01-002-controls-expanded")
++        rule.runOnUiThread { ProxyRuntimeSettings.markDirty(vm.prefs, "proxyBaseMode"); vm.bumpSettings() }; frame()
++        expect("设置已修改，重启后生效"); click("运行中")
++        click("WAN"); capture("01-004-pending-lan")
++        click("网速"); expect("网速数据来源"); capture("01-005-speed-source")
++        click("本地模式")
++        assertEquals("local", vm.prefs.getString("homeSpeedSource", ""))
++        rule.runOnUiThread { fixture("operation", HxRunOp.Restart); fixture("operationText", "请稍候…") }; frame()
++        expect("正在重启"); capture("01-008-restarting")
++    }
++    @Test fun homeStartAndFailure() {
++        fixture("operation", HxRunOp.Start); fixture("operationText", "请稍候…")
++        show { HetuRoot(vm) }
++        expect("正在启动"); capture("01-006-starting")
++        rule.runOnUiThread { fixture("operation", null); vm.startupError = "测试夹具：配置加载失败\n第 18 行：缩进无效" }; frame()
++        expect("启动失败"); capture("01-007-failed")
++    }
++    @Test fun strategyExpansionSearchAndNodeInfo() {
++        runningFixture(); vm.openPanel("proxies")
++        show { HetuRoot(vm) }
++        expect("节点选择"); capture("02-001-strategies")
++        click("节点选择"); expect("香港 02"); capture("02-002-expanded")
++        rule.runOnUiThread { vm.testingNodes["香港 02"] = true; vm.testingNodes["台湾 01"] = true }; frame()
++        capture("02-028-node-statuses")
++        longClick("香港 02"); expect("节点信息"); capture("02-013-node-info")
++        click("关闭")
++        click("搜索"); replace(0, "香港"); capture("02-019-search")
++    }
++    @Test fun strategyFilterAndApiDraft() {
++        runningFixture(); vm.openPanel("proxies")
++        show { HetuRoot(vm) }
++        touch("筛选"); expect("显示隐藏策略"); capture("02-010-filter")
++        click("显示隐藏策略")
++        assertTrue(vm.prefs.getBoolean("proxySelectorShowHidden", false))
++        assertFalse("Atlas requires filter to close after choosing", exists("显示隐藏策略"))
++        click("排序与布局"); expect("测速与 API"); capture("02-011-layout")
++        click("测速与 API"); expect("测速地址")
++        toggle(2); capture("02-027-api-default")
++        toggle(0); toggle(1); toggle(2); replace(0, "https://example.com/generate_204")
++        capture("02-012-api-expanded")
++        click("取消")
++        assertTrue(vm.prefs.getBoolean("proxyCustomApiEnabled", false))
++    }
++    @Test fun settingsNestedPagesAndMirrorValidation() {
++        vm.tab = HxTab.Settings
++        show { HetuRoot(vm) }
++        expectDock(true)
++        click("默认面板"); expectDock(false); expect("默认面板页面"); capture("04-007-default-panel")
++        touch("默认面板页面"); capture("04-018-default-panel-menu")
++        click("策略"); assertEquals("proxies", vm.prefs.getString("defaultPanelSection", ""))
++        click("返回"); expectDock(true); click("开机启动与下载"); expectDock(false); capture("04-006-startup-download")
++        click("加速地址"); capture("04-029-mirror-dialog")
++        replace(0, "mirror.example"); click("保存"); expect("请填写 http/https 地址"); capture("04-030-mirror-invalid")
++        assertEquals("", vm.prefs.getString("downloadMirrorPrefix", ""))
++        click("取消"); click("返回"); expectDock(true); click("备份与恢复"); expectDock(false); capture("04-010-backup")
++        back(); expectDock(true)
++    }
++    @Test fun themeMenusAndScroll() {
++        show { HxThemeLabScreen(vm) {} }
++        capture("04-008-theme")
++        touch("语言"); capture("04-019-language-menu"); click("简体中文")
++        assertEquals("zh-CN", vm.prefs.getString("appLanguage", ""))
++        scroll(630f); capture("04-009-theme-motion")
++        touch("顶栏模糊样式"); capture("04-020-top-blur-menu"); click("高斯模糊")
++        assertEquals("gaussian", vm.prefs.getString("topBarBlurStyle", ""))
++        touch("界面缩放"); capture("04-021-scale-menu"); click("100%")
++    }
++    @Test fun notificationMenusAreDraftsAndBackDiscards() {
++        var left = false
++        show { NotificationSettingsScreen(vm) { left = true } }
++        capture("04-011-notification")
++        touch("刷新频率"); capture("04-022-refresh-menu"); click("5 秒")
++        assertEquals(3, vm.prefs.getInt(ProxyStatusNotificationService.PREF_REFRESH_SECONDS, 3))
++        touch("点击通知打开"); capture("04-023-target-menu"); click("工具")
++        assertEquals("Home", vm.prefs.getString(ProxyStatusNotificationService.PREF_CLICK_TARGET, "Home"))
++        scroll(580f); capture("04-012-notification-actions")
++        touch("动作", 0); capture("04-024-action-one"); click("重载")
++        touch("动作", 1); capture("04-025-action-two"); click("重启")
++        touch("动作", 2); capture("04-026-action-three"); click("停止")
++        click("返回"); assertTrue(left)
++        assertEquals(3, vm.prefs.getInt(ProxyStatusNotificationService.PREF_REFRESH_SECONDS, 3))
++    }
++    @Test fun toolsSearchAndConfigImportValidation() {
++        vm.tab = HxTab.Tools
++        show { HetuRoot(vm) }
++        click("搜索"); replace(0, "网络"); capture("03A-003-tools-search")
++        click("关闭搜索")
++        click("配置管理"); expect("配置与订阅")
++        click("导入配置"); capture("03A-027-import-file-empty")
++        click("从链接导入"); replace(0, "https://example.com/config.yaml"); replace(1, "测试配置.yaml")
++        capture("03A-024-import-link")
++        replace(0, "example.com/config.yaml"); click("导入配置"); expect("请输入有效的 http/https 链接")
++        capture("03A-020-import-link-invalid")
++        click("返回"); expect("放弃填写？"); capture("03A-012-discard-import")
++        click("放弃"); expect("配置与订阅")
++    }
++    @Test fun subscriptionFormRequiredFieldsAndDiscard() {
++        show { ConfigsScreen(vm) }
++        click("添加订阅"); capture("03A-005-add-subscription-empty")
++        replace(1, "https://example.com/subscription"); click("保存"); expect("名称不能为空"); capture("03A-021-subscription-empty-name")
++        replace(0, "测试订阅"); replace(1, "example.com/subscription"); click("保存")
++        expect("请输入有效的 http/https 链接"); capture("03A-022-subscription-invalid-url")
++        click("返回"); expect("放弃填写？"); click("取消"); expect("添加订阅")
++        click("返回"); click("放弃"); expect("配置与订阅")
++    }
++    private fun panelDataFixture() {
++        runningFixture()
++        fixture("state", vm.state.copy(connections = listOf(
++            ProxyConnectionUi("qa-1", "api.example.com", "DOMAIN-SUFFIX", "example.com", "节点选择 → 香港 01", 128000, 4096000,
++                network = "TCP", inbound = "TProxy", appName = "测试应用", packageName = "com.example.qa", startedAt = "2026-10-02T08:00:00Z", addressType = "IPv4"),
++            ProxyConnectionUi("qa-2", "direct.example.org", "GEOIP", "CN", "DIRECT", 32000, 256000, network = "UDP", inbound = "TProxy",
++                appName = "另一测试应用", packageName = "org.example.qa", startedAt = "2026-10-02T08:01:00Z", addressType = "IPv4"))))
++        fixture("rules", listOf(ProxyRuleUi(0, "DOMAIN-SUFFIX", "example.com", "节点选择"), ProxyRuleUi(1, "GEOIP", "CN", "DIRECT"),
++            ProxyRuleUi(2, "MATCH", "", "节点选择")))
++        fixture("ruleSets", listOf(DashboardRuleSetUi("测试域名规则", "domain", "yaml", "HTTP", 12345, "2026-10-02 08:00"),
++            DashboardRuleSetUi("测试直连规则", "ipcidr", "mrs", "HTTP", 54321, "2026-10-02 08:00")))
++    }
++    @Test fun panelConnectionsMenusDetailsAndCancel() {
++        panelDataFixture(); vm.openPanel("conn")
++        show { HetuRoot(vm) }
++        expect("api.example.com"); capture("02-006-connections")
++        touch("连接排序"); capture("02-017-connection-sort"); click("主机")
++        touch("连接筛选"); capture("02-021-connection-filter"); click("代理")
++        click("api.example.com"); expect("断开此连接"); expect("关闭详情"); capture("02-014-connection-detail"); click("关闭详情")
++        touch("连接显示"); capture("02-018-connection-display"); click("断开全部连接")
++        expect("断开全部连接？"); capture("02-015-disconnect-confirm"); click("取消")
++        assertEquals(2, vm.state.connections.size)
++        click("搜索"); replace(0, "example"); click("按应用"); click("测试应用"); capture("02-024-grouped-search")
++    }
++    @Test fun panelRulesProvidersAndTaskStatuses() {
++        panelDataFixture(); vm.openPanel("providers")
++        show { HetuRoot(vm) }
++        expect("测试订阅"); capture("02-005-providers")
++        rule.runOnUiThread { vm.providerTasks["测试订阅"] = HxTask(running = true) }; frame()
++        click("搜索"); replace(0, "测试"); capture("02-022-provider-updating")
++        rule.runOnUiThread { vm.providerTasks["测试订阅"] = HxTask(ok = false, message = "受控测试错误") }; frame()
++        capture("02-022-provider-failed")
++        // Change only the view destination and local fixtures, never invoke update/retry.
++        rule.runOnUiThread { vm.openPanel("rules") }; frame()
++        expect("DOMAIN-SUFFIX"); capture("02-007-rules")
++        rule.runOnUiThread { vm.openPanel("sets") }; frame()
++        expect("测试域名规则"); capture("02-008-rulesets")
++        rule.runOnUiThread {
++            vm.ruleSetTasks["测试域名规则"] = HxTask(running = true)
++            vm.ruleSetTasks["测试直连规则"] = HxTask(ok = false, message = "受控测试错误")
++        }; frame(); click("搜索"); replace(0, "测试"); capture("02-025-ruleset-statuses")
++        rule.runOnUiThread { vm.openPanel("rules") }; frame()
++        click("搜索"); replace(0, "no-match-fixture"); expect("没有匹配的规则"); capture("02-023-rules-empty")
++    }
++    @Test fun panelOverviewRankingMenus() {
++        panelDataFixture(); vm.openPanel("overview")
++        vm.rateHistory.addAll(listOf(1000, 6000, 2500, 8000, 5500, 9000).map(Int::toLong))
++        vm.upHistory.addAll(listOf(600, 1500, 1200, 2400, 1800, 3000).map(Int::toLong))
++        show { HetuRoot(vm) }
++        capture("02-003-overview")
++        touch("排行方式"); capture("02-020-rank-order"); click("按总流量")
++        assertEquals("traffic", vm.prefs.getString("panelOverviewRankSort", ""))
++        swipeUp(); capture("02-004-overview-scrolled")
++        touch("显示数量"); capture("02-016-rank-count"); click("10")
++        assertEquals(10, vm.prefs.getInt("panelOverviewRankCount", 0))
++    }
++    @Test fun directTargetsRejectDuplicateAndSaveValidDraft() {
++        var left = false
++        show { ProxyLatencyTargetsScreen { left = true } }
++        replace(0, "测试 A"); replace(1, "https://example.com/204")
++        replace(2, "测试 A"); replace(3, "https://example.net/204")
++        replace(4, "测试 C"); replace(5, "https://example.org/204")
++        click("保存"); expect("三个测速目标名称不能重复。"); capture("01-012-direct-targets-invalid")
++        assertNotEquals("测试 A", ProxyLatencyTargets.load(vm.prefs)[0].name)
++        replace(2, "测试 B"); click("保存"); expect("测速目标已保存；返回首页后立即生效。")
++        capture("01-011-direct-targets-saved")
++        assertFalse(left); assertEquals("测试 B", ProxyLatencyTargets.load(vm.prefs)[1].name)
++    }
++    @Test fun bypassDraftAndDiscard() {
++        vm.prefs.edit().putStringSet("proxyBypassCidrs", setOf("10.0.0.0/8"))
++            .putStringSet("proxyBypassInterfaces", setOf("dummy0")).commit()
++        var left = false
++        show { BypassRulesScreen(vm) { left = true } }
++        capture("03A-036-bypass-rules")
++        replace(0, "192.0.2.0/24"); click("返回"); expect("放弃修改？"); capture("03A-037-bypass-discard")
++        click("取消"); assertFalse(left)
++        click("返回"); click("放弃"); assertTrue(left)
++        assertEquals(setOf("10.0.0.0/8"), vm.prefs.getStringSet("proxyBypassCidrs", emptySet()))
++    }
++    @Test fun networkMatchMenusKeepAutomationDisabled() {
++        vm.prefs.edit().putBoolean("networkMatchEnabled", false).putString("networkMatchLastEnvironment", "Wi-Fi · Test Network").commit()
++        show { HxNetworkMatchScreen(vm) {} }
++        capture("03B-030-network-match")
++        touch("匹配成功"); capture("03B-031-match-action"); click("不操作")
++        assertEquals("none", vm.prefs.getString("networkMatchAction", ""))
++        touch("条件失配"); capture("03B-032-unmatch-action"); click("不操作")
++        assertFalse(vm.prefs.getBoolean("networkMatchEnabled", true))
++    }
++    @Test fun bundledLicenseSheets() {
++        show { AboutScreen(vm) }
++        capture("04-013-about")
++        scroll(250f)
++        click("Mihomo"); expectEventually("复制"); capture("04-031-mihomo-license"); dismissSheet()
++        click("AdGuard DNS Filter"); expectEventually("复制"); capture("04-032-adguard-license"); dismissSheet()
++        click("Lucide Icons"); expectEventually("复制"); capture("04-033-lucide-license"); dismissSheet()
++    }
++    @Test fun actualAdvancedSettingsActivityAndDnsDialog() {
++        show { }
++        val controller = Robolectric.buildActivity(ProxyAdvancedSettingsActivity::class.java).setup()
++        try {
++            frame(); expect("高级代理配置"); capture("04-004-advanced-settings")
++            touch("DNS 劫持策略"); expect("REDIRECT"); capture("04-027-dns-dialog")
++            click("取消"); scroll(560f); capture("04-005-resource-limits")
++        } finally { controller.pause().stop().destroy(); frame() }
++    }
++    @Test fun corePickerKeepsRuntimeSelectionAndThreeCards() {
++        val original = ProxyRuntimeProfile.load(vm.prefs).core
++        show { CoresScreen(vm) {} }
++        expect("Mihomo"); expect("Xray"); expect("sing-box")
++        capture("03A-034-core-three-cards")
++        touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
++        capture("core-mihomo-variant-picker")
++        click("Mihomo Smart")
++        assertEquals("mihomo-smart", vm.prefs.getString("coreManagerSlot.mihomo", ""))
++        assertEquals(original, ProxyRuntimeProfile.load(vm.prefs).core)
++        expect("Mihomo Smart"); expect("Xray"); expect("sing-box")
++        capture("core-three-cards-smart-selected")
++    }
++    @Test fun webPanelCreateEditCancelDeleteAndMode() {
++        val context = ApplicationProvider.getApplicationContext<Application>()
++        HetuWebPanels.save(context, listOf(HetuWebPanel("qa-only", "测试面板", "https://example.com/panel")))
++        show { ProxyWebPanelsScreen {} }
++        capture("03B-033-web-panels")
++        click("添加"); replace(0, "旅行面板"); replace(1, "https://example.org/panel"); capture("03B-034-add-web-panel")
++        click("关闭"); assertEquals(1, HetuWebPanels.list(context).size)
++        click("编辑 测试面板"); capture("03B-035-edit-web-panel"); replace(0, "已编辑测试面板"); click("保存")
++        assertEquals("已编辑测试面板", HetuWebPanels.list(context).single().name)
++        click("删除 已编辑测试面板"); capture("03B-036-delete-web-panel"); click("关闭")
++        assertEquals(1, HetuWebPanels.list(context).size)
++        click("本地面板模式"); capture("03B-037-local-mode"); click("河图内置面板")
++        assertEquals("builtin", vm.prefs.getString("proxyWebPanelLocalMode", ""))
++    }
++}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
+@@ -9,8 +9,8 @@
+         val tools = java.io.File("src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt").readText()
+         val settings = java.io.File("src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt").readText()
+         assertTrue(components.contains("largeTitleTopPadding: Dp = 0.dp"))
+-        assertTrue(components.contains("if (!collapsed)"))
+-        assertTrue(components.contains("if (!largeTitle || collapsed)"))
++        assertTrue(components.contains("if (!collapsed && onBack == null)"))
++        assertTrue(components.contains("if (!largeTitle || collapsed || onBack != null)"))
+         assertTrue(tools.contains("largeTitleTopPadding = 26.dp"))
+         assertTrue(settings.contains("largeTitleTopPadding = 26.dp"))
+     }
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -19,6 +19,9 @@
+ import androidx.compose.ui.test.performScrollTo
+ import androidx.compose.ui.test.performScrollToNode
+ import androidx.compose.ui.test.hasScrollToIndexAction
++import androidx.compose.ui.test.hasClickAction
++import androidx.compose.ui.test.hasAnyDescendant
++import androidx.compose.ui.test.hasAnySibling
+ import androidx.compose.ui.test.hasText
+ import androidx.test.core.app.ApplicationProvider
+ import java.io.File
+@@ -135,17 +138,19 @@
+     }
+ 
+     @Test fun notificationAction2Choice() = snapshotAfter("settings-notification-action2-choice", { NotificationSettingsScreen(vm) {} }) {
+-        rule.onAllNodesWithText("动作")[1].performScrollTo().performClick()
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("快捷按钮 2"))
++        rule.onNode(hasClickAction() and hasText("动作") and hasAnySibling(hasText("快捷按钮 2"))).performScrollTo().performClick()
+     }
+     @Test fun notificationAction3Choice() = snapshotAfter("settings-notification-action3-choice", { NotificationSettingsScreen(vm) {} }) {
+-        rule.onAllNodesWithText("动作")[2].performScrollTo().performClick()
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("快捷按钮 3"))
++        rule.onNode(hasClickAction() and hasText("动作") and hasAnySibling(hasText("快捷按钮 3"))).performScrollTo().performClick()
+     }
+     @Test fun mirrorAddressDialog() = snapshotAfter("settings-mirror-dialog", { SettingsScreen(vm, 0.dp, initialSubPage = "startupDownload") }) {
+-        rule.onNodeWithText("加速地址").performClick()
+-        rule.onNodeWithText("加速下载").assertExists()
++        rule.onNode(hasText("加速地址") and hasClickAction()).performScrollTo().performClick()
++        rule.onNode(hasText("加速下载") and !hasClickAction()).assertExists()
+     }
+     @Test fun mihomoLicenseSheet() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
+-        rule.onNodeWithText("Mihomo", useUnmergedTree = true).performScrollTo().performClick()
++        rule.onNode(hasText("Mihomo") and hasClickAction()).performScrollTo().performClick()
+     }
+     @Test fun adguardLicenseSheet() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
+         rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingCoreDownloadShadow.java
+@@ -0,0 +1,32 @@
++package io.github.xgl34222220.hetu;
++import java.util.Arrays;
++import java.util.List;
++import kotlin.Unit;
++import kotlin.coroutines.Continuation;
++import kotlin.jvm.functions.Function1;
++import org.robolectric.annotation.Implements;
++import org.robolectric.annotation.Implementation;
++import org.robolectric.annotation.Resetter;
++/** In-memory suspend boundary only: cannot resolve a URL, write a core, or reach a backend. */
++@Implements(value = ProxyCoreDownloadManager.class, isInAndroidSdk = false, callThroughByDefault = false)
++public class RemainingCoreDownloadShadow {
++    private static Continuation<? super ProxyCoreRemoteStatus> pending;
++    public static int calls;
++    @Resetter public static void reset() { pending=null; calls=0; }
++    @Implementation public Object statuses(boolean network, Continuation<? super List<ProxyCoreRemoteStatus>> done) {
++        if (network) throw new SecurityException("Network core status is forbidden in this fixture");
++        return Arrays.asList(
++            new ProxyCoreRemoteStatus("mihomo","Mihomo",true,false,"1.19.10","1.19.12",true,true,true,"fixture",""),
++            new ProxyCoreRemoteStatus("xray","Xray",false,false,"","25.9.11",false,true,false,"fixture",""),
++            new ProxyCoreRemoteStatus("sing-box","sing-box",false,false,"","1.12.4",false,true,false,"fixture", ""));
++    }
++    @Implementation public Object downloadOrUpdate(ProxyRuntimeProfile.Core core, Function1<? super String, Unit> progress, Continuation<? super ProxyCoreRemoteStatus> done) {
++        if (pending != null) throw new SecurityException("Duplicate fixture download");
++        calls++; pending=done; progress.invoke("下载 Mihomo · 42%");
++        return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED();
++    }
++    public static void cancelFixture() {
++        Continuation<? super ProxyCoreRemoteStatus> done=pending; pending=null;
++        if (done!=null) done.resumeWith(kotlin.ResultKt.createFailure(new java.util.concurrent.CancellationException("Controlled fixture ended")));
++    }
++}
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingRootManagerShadow.java
+@@ -0,0 +1,12 @@
++package io.github.xgl34222220.hetu;
++import org.robolectric.annotation.Implements;
++import org.robolectric.annotation.Implementation;
++/** Controlled test-only boundary for init/validation, no real Root or core executable. */
++@Implements(value = RootProxyManager.class, isInAndroidSdk = false)
++public class RemainingRootManagerShadow {
++    @Implementation public String diagnostics() { return "受控诊断快照：无实际 Root 或网络操作"; }
++    @Implementation public String ensureRuntimeBase(ProxyRuntimeProfile.Core core) { return "/data/adb/hetu"; }
++    @Implementation public void validateConfigText(String text) throws java.io.IOException {
++        throw new java.io.IOException("测试夹具：第 1 行 YAML 语法错误");
++    }
++}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsPickerParity58Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsPickerParity58Test.kt
+@@ -11,7 +11,7 @@
+         assertTrue(source.contains("enabled,selected,184,index"))
+         assertTrue(source.contains("ordinal(),184,index"))
+         assertTrue(source.contains("FLAG_DIM_BEHIND"))
+-        assertTrue(source.contains("lp.dimAmount=.26f"))
++        assertTrue(source.contains("lp.dimAmount=0f"))
+     }
+ 
+     @Test fun composeChoiceMenusDimThePageByDefault() {
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/WanDetails61Test.kt
+@@ -0,0 +1,32 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35])
++class WanDetails61Test {
++    @Test fun optionalMetadataUsesOnlyActualResponse() {
++        val info = parseWanRuntimeInfo("""{"success":true,"ip":"203.0.113.24","type":"IPv4","country":"测试地区","latitude":22.3193,"longitude":114.1694,"connection":{"asn":64500,"org":"Fixture Org","isp":"Fixture ISP"},"timezone":{"id":"Asia/Hong_Kong"}}""")
++        assertEquals("AS64500", info.asn); assertEquals("Fixture Org", info.organization)
++        assertEquals("IPv4", info.ipType); assertEquals("Asia/Hong_Kong", info.timezone)
++        assertEquals("22.3193, 114.1694", info.coordinates)
++    }
++    @Test fun missingFieldsRemainUnknownNotFakeCoordinates() {
++        val info = parseWanRuntimeInfo("""{"success":true,"ip":"203.0.113.24","connection":{"org":null}}""")
++        assertEquals("—", info.organization); assertEquals("—", info.ipType)
++        assertEquals("—", info.timezone); assertEquals("—", info.coordinates); assertEquals("—", info.asn)
++    }
++    @Test fun actualZeroCoordinatesAreValidAndOutOfRangeIsNot() {
++        assertEquals("0.0000, 0.0000", parseWanRuntimeInfo("""{"success":true,"ip":"203.0.113.24","latitude":0,"longitude":0}""").coordinates)
++        assertEquals("—", parseWanRuntimeInfo("""{"success":true,"ip":"203.0.113.24","latitude":91,"longitude":180}""").coordinates)
++    }
++    @Test fun failedOrAddresslessResponseIsRejected() {
++        for (body in listOf("""{"success":false,"ip":"203.0.113.24"}""", """{"success":true}""", """{"success":true,"ip":null}""")) {
++            assertTrue(runCatching { parseWanRuntimeInfo(body) }.isFailure)
++        }
++    }
++}

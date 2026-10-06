@@ -1,0 +1,51 @@
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+index da44d4a..dd2574c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt
+@@ -58,6 +58,7 @@ import androidx.compose.material.icons.rounded.ArrowDownward
+ import androidx.compose.material.icons.rounded.ArrowUpward
+ import androidx.compose.material.icons.rounded.Article
+ import androidx.compose.material.icons.rounded.Description
++import androidx.compose.material.icons.rounded.Dns
+ import androidx.compose.material.icons.rounded.PowerSettingsNew
+ import androidx.compose.material.icons.rounded.Public
+ import androidx.compose.material.icons.rounded.Refresh
+@@ -1022,7 +1023,7 @@ private fun HomeOutboundNode(vm: HetuViewModel, group: ProxyGroupUi?) {
+         HxCard(onClick = { vm.openPanel("proxies") }, padding = androidx.compose.foundation.layout.PaddingValues(horizontal = 15.dp, vertical = 12.dp)) {
+             Row(verticalAlignment = Alignment.CenterVertically) {
+                 Box(Modifier.size(38.dp), contentAlignment = Alignment.Center) {
+-                    Icon(Icons.Rounded.Router, null, tint = c.text, modifier = Modifier.size(24.dp))
++                    Icon(Icons.Rounded.Dns, null, tint = c.text, modifier = Modifier.size(24.dp))
+                 }
+                 Spacer(Modifier.width(10.dp))
+                 Column(Modifier.weight(1f)) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index 9508db5..88b93da 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -55,6 +55,7 @@ import androidx.compose.material.icons.rounded.HealthAndSafety
+ import androidx.compose.material.icons.rounded.Image
+ import androidx.compose.material.icons.rounded.Inventory2
+ import androidx.compose.material.icons.rounded.LibraryBooks
++import androidx.compose.material.icons.rounded.Layers
+ import androidx.compose.material.icons.rounded.OpenInBrowser
+ import androidx.compose.material.icons.rounded.OpenInNew
+ import androidx.compose.material.icons.rounded.Sync
+@@ -345,7 +346,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+                     MiuixSettingsArrow(
+                         title = "高级代理配置",
+                         summary = "性能、DNS 与资源限制",
+-                        icon = Icons.Rounded.AltRoute,
++                        icon = Icons.Rounded.Dns,
+                         onClick = { open(ProxyAdvancedSettingsActivity::class.java) },
+                     )
+                 }
+@@ -373,7 +374,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+                     MiuixSettingsArrow(
+                         title = "备份与恢复",
+                         summary = "导出与恢复应用设置",
+-                        icon = Icons.Rounded.CloudSync,
++                        icon = Icons.Rounded.Layers,
+                         onClick = { nav.push(HxRoute.BackupSettings) },
+                     )
+                     MiuixSettingsArrow(

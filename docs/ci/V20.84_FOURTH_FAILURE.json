@@ -1,0 +1,217 @@
+{
+  "schema": 1,
+  "version": "V20.84",
+  "candidateCommit": "121e0ab99904e7ea862b1dcb350a59169aeab0cd",
+  "compiledAndroidAppTree": "2954ad5c83131050acd3ffd52eb63d8689a8de33",
+  "ciRun": 37270231154,
+  "attempt": 1,
+  "conclusion": "failure",
+  "buildJob": {
+    "id": 111635473569,
+    "conclusion": "success"
+  },
+  "historicalCrashJob": {
+    "id": 111635473860,
+    "conclusion": "success"
+  },
+  "units": {
+    "tests": 422,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "xmlFiles": 47,
+    "baseline": {
+      "tests": 392,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "baselineXmlFiles": 42,
+    "authentication": {
+      "tests": 30,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0
+    },
+    "authenticationXmlFiles": 5,
+    "authenticationSuites": {
+      "ControllerAuthenticationTest": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "ControllerReadStateTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "LegacyControllerCredentialTest": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "PanelControllerErrorTest": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "ToastFeedbackTest": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    }
+  },
+  "lint": {
+    "Error": 0,
+    "Fatal": 0,
+    "Warning": 298,
+    "Hint": 7
+  },
+  "productionApkCompilation": "success",
+  "runtimePayloadsVerified": 23,
+  "abiConstructorReferences": 687,
+  "abiMissingConstructors": 0,
+  "apk": {
+    "name": "Hetu-0.12.14-v20-auth.apk",
+    "bytes": 134727773,
+    "sha256": "33d60ce01b63f40c6b6ccd8c63c5dd1ea38b85d4d25e37c32f48130c4207ff50",
+    "certificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+    "directV2CertificateVerified": true
+  },
+  "verificationArtifact": {
+    "id": 11328238664,
+    "name": "Hetu-V20.84-UI-verification",
+    "zipBytes": 12342195,
+    "zipSha256": "cd6c3c8c27f431b940d2edd3b3350c1224faf4fec1f2544b303df7b1ad0f0b2c",
+    "metadataSource": "artifact-metadata.json"
+  },
+  "sourceAuthenticationLayer": {
+    "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+    "baseRun": 37240041766,
+    "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+    "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+    "changedOrAddedFiles": 17,
+    "runtimePayloadsUnchanged": true,
+    "dependenciesUnchanged": true,
+    "manifestAndPermissionsUnchanged": true,
+    "unchangedOutsideAuthScope": true,
+    "baselineUnitTests": 392,
+    "expectedUnitTests": 422,
+    "newTestCounts": {
+      "ToastFeedbackTest": 6,
+      "ControllerAuthenticationTest": 11,
+      "LegacyControllerCredentialTest": 3,
+      "ControllerReadStateTest": 6,
+      "PanelControllerErrorTest": 4
+    }
+  },
+  "installationEvidence": {
+    "api35": {
+      "job": 111638870907,
+      "conclusion": "failure",
+      "failure": "AssertionError: ('Unexpected AVD', [])",
+      "failurePhase": "new panel authentication fixture target verification, before preference injection and before loopback adb reverse",
+      "failureLocation": {
+        "source": ".github/scripts/smoke_hetu_apk.py",
+        "function": "panel_fixture_target",
+        "line": 292,
+        "command": "adb emu avd name",
+        "observedOutputLines": []
+      },
+      "artifact": {
+        "id": 11329450256,
+        "name": "Hetu-V20.84-Android-35-smoke",
+        "bytes": 6865996,
+        "zipSha256": "b5a9fa2a079bbfa648aa03e42fb233cded83146f51bdd3b2d7229dd560da46c7",
+        "downloadDigestVerified": true
+      },
+      "actualResultsJsonPresent": false,
+      "legacyChecksPassed": null,
+      "paletteCasesPassed": null,
+      "passedChecks": null,
+      "newPanelAuthChecksExecuted": 0,
+      "newControllerAuthFixtureReportPresent": false,
+      "newNative401Or200CapturesPresent": false,
+      "syntheticPanelPreferencesInjected": false,
+      "syntheticHintPreferencePresentInFailureSnapshot": false,
+      "newPanelFixtureRootMutationActions": 0,
+      "preservedNativeWebViewEvidence": {
+        "captureStates": 5,
+        "uniqueContentFrameHashes": 5,
+        "actualFixturePutObserved": true,
+        "boundary": "These pre-guard artifacts exist; they do not establish overall installation success or a completed59/64-check result."
+      },
+      "runnerLifecycle": {
+        "result": "FAIL",
+        "smokeExit": 1,
+        "launcherReaped": true,
+        "emulatorReaped": true,
+        "kvmSecurityMetadataUnchanged": true
+      }
+    },
+    "api36": {
+      "job": 111638870864,
+      "conclusion": "failure",
+      "failure": "AssertionError: ('Unexpected AVD', [])",
+      "failurePhase": "new panel authentication fixture target verification, before preference injection and before loopback adb reverse",
+      "failureLocation": {
+        "source": ".github/scripts/smoke_hetu_apk.py",
+        "function": "panel_fixture_target",
+        "line": 292,
+        "command": "adb emu avd name",
+        "observedOutputLines": []
+      },
+      "artifact": {
+        "id": 11329046016,
+        "name": "Hetu-V20.84-Android-36-smoke",
+        "bytes": 8764275,
+        "zipSha256": "f57e10518230e109f70ad9f1f325fd11c1591d8a6d2dbf98a7cc4d56062d42cf",
+        "downloadDigestVerified": true
+      },
+      "actualResultsJsonPresent": false,
+      "legacyChecksPassed": null,
+      "paletteCasesPassed": null,
+      "passedChecks": null,
+      "newPanelAuthChecksExecuted": 0,
+      "newControllerAuthFixtureReportPresent": false,
+      "newNative401Or200CapturesPresent": false,
+      "syntheticPanelPreferencesInjected": false,
+      "syntheticHintPreferencePresentInFailureSnapshot": false,
+      "newPanelFixtureRootMutationActions": 0,
+      "preservedNativeWebViewEvidence": {
+        "captureStates": 5,
+        "uniqueContentFrameHashes": 5,
+        "actualFixturePutObserved": true,
+        "boundary": "These pre-guard artifacts exist; they do not establish overall installation success or a completed59/64-check result."
+      },
+      "runnerLifecycle": {
+        "result": "FAIL",
+        "smokeExit": 1,
+        "launcherReaped": true,
+        "emulatorReaped": true,
+        "kvmSecurityMetadataUnchanged": true
+      }
+    }
+  },
+  "causeBoundary": "Both installed APK jobs reached the new fixture guard and received an empty successful-return console-name output. adb already captures stdout and stderr together. Exact emulator console empty-output cause is not established; emulator versus smoke HOME/console-token context is only a hypothesis. This is not evidence of a production401 rendering failure.",
+  "correctionBoundary": "Correct test-only owned fresh-emulator identity verification while retaining exact AVD/serial/non-root/qemu/API constraints. Android compilation inputs remain frozen. Any guarded install continuation must pin this successful build,47 XML/422 tests, runtime/ABI/signature/artifact/APK digests and distinguish the future installation test commit from this compiled commit.",
+  "originalActionSafetyAssertionsPreserved": true,
+  "failedRunsRetained": [
+    37243939715,
+    37244396784,
+    37269048184,
+    37270231154
+  ],
+  "failureEvidenceRetained": true,
+  "newPanelAuthenticationAcceptance": false,
+  "combinedVerified": false,
+  "evidenceBoundary": "Fourth build/unit/lint/runtime/ABI/signature gates passed; both API35/36 installation jobs failed before synthetic preference injection. No results.json means actual total or legacy59/palette21 pass counts are not claimed. All5 new authentication installed checks were not executed.",
+  "recordedAtUtc": "2026-10-05T06:33:16.133351+00:00",
+  "productionInputsFrozenForPlannedFixtureCorrection": true
+}

@@ -1,13 +1,5 @@
 name: UI92 Runtime146 inline panel UI11
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/ui92-runtime146-panel11.yml'
-      - 'tools/apply_ui11_panel.py'
-      - 'tools/fix_ui11.py'
-      - 'android-app/app/src/main/java/io/github/xgl34222220/hetu/Panel*11.kt'
-      - 'android-app/app/src/test/java/io/github/xgl34222220/hetu/*11Test.kt'
   workflow_dispatch:
 permissions:
   contents: write

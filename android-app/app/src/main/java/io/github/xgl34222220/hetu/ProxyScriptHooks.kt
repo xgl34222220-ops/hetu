@@ -29,7 +29,27 @@ internal object ProxyScriptHooks {
         return name
     }
 
-    private fun managedPath(name: String): String = ROOT + "/" + managedName(name)
+    private fun storedName(name: String): String {
+        require(name.isNotEmpty() && name.length <= 255 && name.none { it == '/' || it == '\u0000' || it == '\n' || it == '\r' || it == '\t' }) { "脚本文件名无效" }
+        require(name != "." && name != ".." && name.endsWith(".sh", true)) { "脚本文件名无效" }
+        require(name != "pre-start.sh" && name != "post-stop.sh") { "不能覆盖河图固定 Hook" }
+        return name
+    }
+
+    private fun managedPath(name: String): String = ROOT + "/" + storedName(name)
+
+    internal fun parseManaged(output: String): List<ManagedScript> {
+        val found = linkedMapOf<String, ManagedScript>()
+        output.lineSequence().forEach { line ->
+            val parts = line.split('\t')
+            if (parts.size != 2) return@forEach
+            val name = runCatching { storedName(parts[0]) }.getOrNull() ?: return@forEach
+            val size = parts[1].trim().toLongOrNull()?.takeIf { it >= 0 } ?: return@forEach
+            // Keep actual filesystem identity. Import sanitization belongs only to new files.
+            found[name] = ManagedScript(name, ROOT + "/" + name, size)
+        }
+        return found.values.sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
+    }
 
     suspend fun ensure(context: Context) = withContext(Dispatchers.IO) {
         val result = RootBridge.rootShell(
@@ -93,12 +113,7 @@ internal object ProxyScriptHooks {
             "done"
         val result = RootBridge.rootShell(context.applicationContext, command, 6_000L)
         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "脚本列表读取失败" })
-        result.output.lineSequence().mapNotNull { line ->
-            val parts = line.split('\t')
-            if (parts.size < 2) return@mapNotNull null
-            val name = runCatching { managedName(parts[0]) }.getOrNull() ?: return@mapNotNull null
-            ManagedScript(name, ROOT + "/" + name, parts[1].toLongOrNull() ?: 0L)
-        }.sortedBy { it.name.lowercase() }.toList()
+        parseManaged(result.output)
     }
 
     suspend fun importManaged(context: Context, fileName: String, bytes: ByteArray): ManagedScript = withContext(Dispatchers.IO) {
@@ -127,13 +142,9 @@ internal object ProxyScriptHooks {
         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "脚本删除失败" })
     }
 
-    suspend fun runManaged(context: Context, name: String): String = withContext(Dispatchers.IO) {
+    internal fun managedCommand(name: String, mode: String, config: String): String {
         val path = managedPath(name)
-        ensure(context)
-        val prefs = context.applicationContext.getSharedPreferences("hetu", Context.MODE_PRIVATE)
-        val mode = prefs.getString("proxyUiLastMode", "").orEmpty()
-        val config = prefs.getString("proxyUiLastConfig", "").orEmpty()
-        val command = buildString {
+        return buildString {
             append("test -f ").append(q(path)).append(" || exit 44; ")
             append("export HETU_HOOK=manual; ")
             append("export HETU_MODE=").append(q(mode)).append("; ")
@@ -141,10 +152,19 @@ internal object ProxyScriptHooks {
             append("export HETU_BASE=/data/adb/hetu; ")
             append("export HETU_RUN_DIR=/data/adb/hetu/run; ")
             append("export HETU_SCRIPT_DIR=").append(q(ROOT)).append("; ")
-            append("{ printf '\\n'; date '+[%Y-%m-%d %H:%M:%S] manual=").append(name.replace("%", "")).append("'; ")
+            append("{ printf '\\n[%s] manual=%s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" ").append(q(name)).append("; ")
             append("if command -v timeout >/dev/null 2>&1; then timeout 12 sh ").append(q(path))
             append("; else sh ").append(q(path)).append("; fi; } >> ").append(q(LOG)).append(" 2>&1")
         }
+    }
+
+    suspend fun runManaged(context: Context, name: String): String = withContext(Dispatchers.IO) {
+        val path = managedPath(name)
+        ensure(context)
+        val prefs = context.applicationContext.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+        val mode = prefs.getString("proxyUiLastMode", "").orEmpty()
+        val config = prefs.getString("proxyUiLastConfig", "").orEmpty()
+        val command = managedCommand(name, mode, config)
         val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
         if (!result.ok()) {
             throw IllegalStateException(
@@ -177,10 +197,8 @@ internal object ProxyScriptHooks {
             append("export HETU_BASE=/data/adb/hetu; ")
             append("export HETU_RUN_DIR=/data/adb/hetu/run; ")
             append("export HETU_SCRIPT_DIR=").append(q(ROOT)).append("; ")
-            append("{ printf '\\n'; date '+[%Y-%m-%d %H:%M:%S] hook=")
-            append(stage.replace("%", "")).append(" mode=")
-            append(mode.replace("%", "")).append(" config=")
-            append(config.replace("%", "")).append("'; ")
+            append("{ printf '\\n[%s] hook=%s mode=%s config=%s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" ")
+            append(q(stage)).append(' ').append(q(mode)).append(' ').append(q(config)).append("; ")
             append("if command -v timeout >/dev/null 2>&1; then timeout 12 sh ")
             append(q(path)).append("; else sh ").append(q(path)).append("; fi; ")
             append("} >> ").append(q(LOG)).append(" 2>&1")

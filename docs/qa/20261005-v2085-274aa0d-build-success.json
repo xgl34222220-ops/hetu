@@ -1,0 +1,140 @@
+{
+  "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "producingAttempt": 2,
+  "buildJobId": 111958672585,
+  "fullJobLog": "/tmp/hetu-ci-latest-274aa0d/job-111958672585-complete.log",
+  "fullJobLogSha256": "d31fac1580c4fa8e031de762273cc664d873b7dde195fbb54821ce15e990b0af",
+  "sourceLayerReconstruction": {
+    "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+    "baseRun": 37171744564,
+    "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "baselineFiles": 307,
+    "changedOrAddedFiles": 31,
+    "checkoutMatchesGeneratedSource": true,
+    "historicPatchesAppliedToCheckout": false,
+    "presentationLayer": {
+      "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+      "baseRun": 37211142058,
+      "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "changedOrAddedFiles": 68,
+      "protectedRuntimeUnchanged": true
+    },
+    "controllerAuthenticationLayer": {
+      "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+      "baseRun": 37240041766,
+      "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+      "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "changedOrAddedFiles": 17,
+      "runtimePayloadsUnchanged": true,
+      "dependenciesUnchanged": true,
+      "manifestAndPermissionsUnchanged": true,
+      "unchangedOutsideAuthScope": true,
+      "baselineUnitTests": 392,
+      "expectedUnitTests": 422,
+      "newTestCounts": {
+        "ToastFeedbackTest": 6,
+        "ControllerAuthenticationTest": 11,
+        "LegacyControllerCredentialTest": 3,
+        "ControllerReadStateTest": 6,
+        "PanelControllerErrorTest": 4
+      }
+    },
+    "pdfReferenceLayer": {
+      "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+      "frozenInputs": 332,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "expectedUnitTests": 479
+    },
+    "toolsIntakeLayer": {
+      "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+      "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+      "changedOrAddedFiles": 5,
+      "frozenInputs": 374,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "baselineUnitTests": 479,
+      "expectedUnitTests": 487,
+      "newTestCounts": {
+        "tools.ToolsDnsConsentIntakeTest": 5,
+        "tools.ToolsDiagIntakeTest": 3
+      }
+    },
+    "finalPdfGeometryLayer": {
+      "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+      "changedOrAddedFiles": 4,
+      "frozenInputs": 375,
+      "expectedUnitTests": 487,
+      "exactWholeFilePresentationTransforms": true,
+      "priorLayersUnchanged": true
+    }
+  },
+  "effectiveSourceCount": 379,
+  "host61RawReview": [
+    {
+      "script": "test_pdf85_source_scope.py",
+      "tests": 6,
+      "passed": true
+    },
+    {
+      "script": "test_tools_intake_source_scope.py",
+      "tests": 18,
+      "passed": true
+    },
+    {
+      "script": "test_tools_intake_test_results.py",
+      "tests": 5,
+      "passed": true
+    },
+    {
+      "script": "test_pdf85_final_source_scope.py",
+      "tests": 8,
+      "passed": true
+    },
+    {
+      "script": "test_auth_test_results.py",
+      "tests": 6,
+      "passed": true
+    },
+    {
+      "script": "test_panel_auth_smoke.py",
+      "tests": 18,
+      "passed": true
+    }
+  ],
+  "otherHostGuardRawReview": [
+    {
+      "script": "test_ui_source_scope.py",
+      "tests": 5,
+      "passed": true
+    },
+    {
+      "script": "test_auth_source_scope.py",
+      "tests": 10,
+      "passed": true
+    },
+    {
+      "script": "test_native_scroll_bounds.py",
+      "tests": 13,
+      "passed": true
+    },
+    {
+      "script": "test_mock_webview_controller.py",
+      "tests": 5,
+      "passed": true
+    },
+    {
+      "script": "test_native_webview_bounds.py",
+      "tests": 6,
+      "passed": true
+    }
+  ],
+  "loggedUnitSummaryEqualsIndependentPinnedVerifier": true,
+  "unitProof": "/tmp/hetu-ci-latest-274aa0d/unit-verifiers-independent.json"
+}

@@ -1,0 +1,125 @@
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+index 8da1a5f..508b505 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -126,6 +126,10 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.draw.drawBehind
++import androidx.compose.ui.geometry.CornerRadius
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.graphicsLayer
+@@ -1161,6 +1165,8 @@ internal fun HxChoiceSheet(
+     menuRowPresentation: HxChoicePresentation? = null,
+     menuDividers: Boolean? = null,
+     menuSelectedHorizontalPadding: Dp? = null,
++    menuSelectedTextColor: Color? = null,
++    menuSelectedVerticalVisualInset: Dp? = null,
+ ) {
+     val c = Hx.colors
+     val haptics = rememberHetuHaptics()
+@@ -1177,7 +1183,8 @@ internal fun HxChoiceSheet(
+         }
+         val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&
+             (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||
+-                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)
++                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null ||
++                menuSelectedTextColor != null || menuSelectedVerticalVisualInset != null)
+         val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)
+         HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,
+             anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,
+@@ -1189,16 +1196,22 @@ internal fun HxChoiceSheet(
+                         onClick = { close { onPick(choice.id) } },
+                         description = choice.description,
+                         selected = choice.id == selected,
+-                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
++                        selectedTextColor = menuSelectedTextColor ?: if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
+                         enabled = choice.enabled,
+-                        choicePresentation = menuRowPresentation ?: presentation,
++                        choicePresentation = if (menuSelectedVerticalVisualInset != null && choice.id == selected) HxChoicePresentation.Settings else menuRowPresentation ?: presentation,
+                         compact = menuItemVerticalPadding != null,
+                         compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,
+                         minimumHeight = menuItemMinimumHeight ?: 0.dp,
+                         labelFontSizeSp = menuItemFontSizeSp,
+                     )
+                 }
+-                if (menuSelectedHorizontalPadding != null && choice.id == selected) {
++                if (menuSelectedVerticalVisualInset != null && choice.id == selected) {
++                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding ?: 0.dp).clip(Hx.pillShape).drawBehind {
++                        val inset = menuSelectedVerticalVisualInset.toPx().coerceIn(0f, size.height / 2f)
++                        val visualHeight = size.height - 2f * inset
++                        drawRoundRect(color = c.surfaceMuted, topLeft = Offset(0f, inset), size = Size(size.width, visualHeight), cornerRadius = CornerRadius(visualHeight / 2f))
++                    }) { item() }
++                } else if (menuSelectedHorizontalPadding != null && choice.id == selected) {
+                     Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }
+                 } else item()
+             }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index bd42cd8..dbe7665 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -1202,15 +1202,17 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             )
+             else -> HxChoiceSheet(
+                 presentation = HxChoicePresentation.Notification,
+-                menuWidthOverride = 141.dp,
+-                menuAnchorEndInset = 1.dp,
+-                menuItemFontSizeSp = 16f,
+-                menuItemMinimumHeight = 40.dp,
+-                menuItemVerticalPadding = 8.dp,
+-                menuContentTopPadding = 3.dp,
+-                menuContentBottomPadding = 9.dp,
+-                menuSelectedHorizontalPadding = 3.dp,
+-                menuDividers = false,
++                menuWidthOverride = if (index == 2) 143.dp else 141.dp,
++                menuAnchorEndInset = when (index) { 1 -> 0.dp; 2 -> 4.dp; else -> 1.dp },
++                menuItemFontSizeSp = if (index == 1 || index == 2) 14f else 16f,
++                menuItemMinimumHeight = if (index == 1 || index == 2) 34.dp else 40.dp,
++                menuItemVerticalPadding = when (index) { 1 -> 5.5.dp; 2 -> 5.dp; else -> 8.dp },
++                menuContentTopPadding = if (index == 2) 5.dp else 3.dp,
++                menuContentBottomPadding = when (index) { 1 -> 4.dp; 2 -> 5.dp; else -> 9.dp },
++                menuSelectedHorizontalPadding = if (index == 2) 6.dp else 3.dp,
++                menuDividers = index == 1,
++                menuSelectedTextColor = if (index == 1) c.accent else null,
++                menuSelectedVerticalVisualInset = if (index == 2) 1.5.dp else null,
+                 title = "快捷按钮 ${index + 1}",
+                 choices = actionOptions.map { HxChoice(it.first, it.second) },
+                 selected = actions.getOrNull(index),
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+index e6bf760..208b4f9 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+@@ -90,7 +90,7 @@ internal fun ToolsAdblockScreen(
+     val ready = state.load is ToolsLoad.Ready
+     val idle = ready && !state.busy
+     Column(modifier.fillMaxSize().background(c.bg)) {
+-        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null) {
++        HomeTopBar(title = "广告过滤", onBack = onBack, subtitle = if (scroll.value == 0) "在 Mihomo 内按域名拦截广告与追踪" else null, subtitleStyle = HomeType.barSubtitle.copy(fontSize = 12.sp)) {
+             HomeIconButton(ToolsFeatureIcons.CircleHelp, "说明", onHelp)
+             HomeIconButton(HomeIcons.RefreshCw, "重新检测", onRefresh, enabled = idle)
+         }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
+index 78b93dd..7b1d01e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt
+@@ -232,6 +232,7 @@ internal fun ToolsTopBar(
+     onBack: () -> Unit,
+     modifier: Modifier = Modifier,
+     subtitle: String? = null,
++    subtitleStyle: TextStyle? = null,
+     actions: @Composable RowScope.() -> Unit = {},
+ ) {
+     val c = LocalHomeColors.current
+@@ -244,7 +245,7 @@ internal fun ToolsTopBar(
+         }
+         Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+             Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = ToolsTypography.barSubtitle,
++            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,
+                 maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+     }

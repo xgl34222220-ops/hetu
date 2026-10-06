@@ -1,20 +1,19 @@
 package io.github.xgl34222220.hetu
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import java.io.File
 
 /** First regional-indicator pair in a group name, e.g. "🇭🇰 香港" -> "🇭🇰". */
 internal fun hxNameFlag(name: String): String? {
@@ -28,36 +27,41 @@ internal fun hxNameFlag(name: String): String? {
 }
 
 /**
- * Group avatar: the icon declared in the YAML (`icon:` url, cached on disk by
- * [ProxyGroupIconRepository]), otherwise a flag from the name, otherwise the initial.
+ * Policy avatar. Coil owns network / disk decoding and SVG support, while the flag/initial stays
+ * rendered underneath as an immediate zero-jank fallback. The old repository remains available
+ * to the runtime importer, but Compose no longer needs its own image loading coroutine per card.
  */
 @Composable
 internal fun HxGroupIcon(group: ProxyGroupUi, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val repository = remember(context) { ProxyGroupIconRepository.get(context) }
-    val url = group.iconUrl
-    val loaded by produceState<GroupIconLoad>(
-        initialValue = repository.peek(url)?.let { GroupIconLoad.Ready(it, true) } ?: GroupIconLoad.Loading,
-        url,
-        group.iconPath,
-    ) {
-        if (url.isBlank() && group.iconPath.isBlank()) {
-            value = GroupIconLoad.Failed
-            return@produceState
-        }
-        value = repository.load(url.ifBlank { "local:" + group.iconPath }, group.iconPath)
-    }
     val flag = remember(group.name) { hxNameFlag(group.name) }
-    Box(modifier, contentAlignment = Alignment.Center) {
-        val ready = loaded as? GroupIconLoad.Ready
+    val model: Any? = remember(group.iconUrl, group.iconPath) {
         when {
-            ready != null -> Image(ready.bitmap.asImageBitmap(), group.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-            flag != null -> Text(flag, fontSize = 18.sp)
-            else -> Text(
-                group.name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?",
-                style = MaterialTheme.typography.titleSmall,
-                color = Hx.colors.accent,
-            )
+            group.iconUrl.isNotBlank() -> group.iconUrl
+            group.iconPath.isNotBlank() -> File(group.iconPath)
+            else -> null
+        }
+    }
+    BoxWithConstraints(modifier, contentAlignment = Alignment.Center) {
+        val glyph = with(LocalDensity.current) { (maxWidth * .62f).toSp() }
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            if (flag != null) {
+                Text(flag, fontSize = glyph)
+            } else {
+                Text(
+                    group.name.firstOrNull { it.isLetterOrDigit() }?.uppercase() ?: "?",
+                    style = MaterialTheme.typography.titleSmall,
+                    fontSize = glyph * .8f,
+                    color = Hx.colors.accent,
+                )
+            }
+            if (model != null) {
+                AsyncImage(
+                    model = model,
+                    contentDescription = group.name,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Fit,
+                )
+            }
         }
     }
 }

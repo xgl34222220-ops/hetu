@@ -1,0 +1,32 @@
+{
+  "document": "03A",
+  "page": 34,
+  "pdfSha256": "72e7f13f6c65fb91f72790cb2bdbab0c9ff17279cc3c7c39033f9fe09df92312",
+  "xref": 71,
+  "embeddedJpegSha256": "5b602879affef59079734b2572f2acf1a84ef265e79fe2a691646a2a8316a282",
+  "embeddedDimensions": [
+    850,
+    1850
+  ],
+  "method": "max(R,G,B)<128; marching squares at0.5; no path simplification; EvenOdd fill",
+  "glyphs": [
+    "CoreMihomoPdf34",
+    "CoreXrayPdf34",
+    "CoreSingBoxPdf34"
+  ],
+  "sourcePixelCenterBinaryDifference": [
+    0,
+    0,
+    0
+  ],
+  "sourcePixelCenterBinaryIoU": [
+    1,
+    1,
+    1
+  ],
+  "viewport": [
+    86,
+    86
+  ],
+  "limitations": "Preserves measured binary silhouette, not JPEG antialias colors or certified native-pixel parity. Source supplied by user, no web design."
+}

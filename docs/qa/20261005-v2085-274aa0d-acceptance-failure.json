@@ -1,0 +1,606 @@
+{
+  "schemaVersion": 1,
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "result": "FAILURE_BEFORE_ACCEPTED_BUILD_OR_INSTALLATION",
+  "observedAtUtc": "2026-10-05T20:11:54.683Z",
+  "run": {
+    "id": 37366522056,
+    "name": "Hetu V20.85 PDF tools and settings continuation",
+    "head_branch": "test/v20.76-new-ui",
+    "head_sha": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+    "path": ".github/workflows/ui-v76-build.yml",
+    "display_title": "Finish measured PDF subtitle and notification menus after preserved t…",
+    "run_number": 42,
+    "event": "push",
+    "status": "completed",
+    "conclusion": "failure",
+    "workflow_id": 374587740,
+    "check_suite_id": 101213660181,
+    "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37366522056",
+    "created_at": "2026-10-05T19:55:28Z",
+    "updated_at": "2026-10-05T20:10:31Z",
+    "run_attempt": 1,
+    "run_started_at": "2026-10-05T19:55:28Z",
+    "previous_attempt_url": null
+  },
+  "jobs": [
+    {
+      "id": 111952930609,
+      "name": "build",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "run_id": 37366522056,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 111952930932,
+      "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+      "status": "completed",
+      "conclusion": "cancelled",
+      "run_id": 37366522056,
+      "logs_url": null,
+      "steps": null
+    },
+    {
+      "id": 111958069405,
+      "name": "Installed APK on Android API ${{ matrix.api }}",
+      "status": "completed",
+      "conclusion": "skipped",
+      "run_id": 37366522056,
+      "logs_url": null,
+      "steps": null
+    }
+  ],
+  "artifacts": [],
+  "workflowConcurrency": {
+    "group": "hetu-v2085-${{ github.ref }}-${{ github.sha }}",
+    "cancelInProgress": false,
+    "pinnedWorkflowSha256": "b792024d693b85917484eebf5732d545ea2e7e8e0b7f40f0ed64cc16fb06a296"
+  },
+  "cancellationEvidence": {
+    "buildJobId": 111952930609,
+    "oldPaletteJobId": 111952930932,
+    "conclusions": [
+      "cancelled",
+      "cancelled"
+    ],
+    "steps": null,
+    "actor": "NOT_ESTABLISHED",
+    "reason": "NOT_ESTABLISHED",
+    "runActorDoesNotIdentifyCancellationActor": true,
+    "originalJobLogResponses": [
+      {
+        "jobId": 111952930609,
+        "readAtUtc": "2026-10-05T20:11:15.157Z",
+        "response": {
+          "error": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:019e0b92-b01e-00fa-7b05-5575b7000000\nTime:2026-10-05T20:11:14.9380640Z</Message></Error>",
+          "error_code": "NOT_FOUND",
+          "error_data": {
+            "error_str": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:019e0b92-b01e-00fa-7b05-5575b7000000\nTime:2026-10-05T20:11:14.9380640Z</Message></Error>"
+          }
+        }
+      },
+      {
+        "jobId": 111952930932,
+        "readAtUtc": "2026-10-05T20:11:15.157Z",
+        "response": {
+          "error": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:191eab77-701e-0063-2205-550a0a000000\nTime:2026-10-05T20:11:15.1115860Z</Message></Error>",
+          "error_code": "NOT_FOUND",
+          "error_data": {
+            "error_str": "GitHub API error 404: ﻿<?xml version=\"1.0\" encoding=\"utf-8\"?><Error><Code>BlobNotFound</Code><Message>The specified blob does not exist.\nRequestId:191eab77-701e-0063-2205-550a0a000000\nTime:2026-10-05T20:11:15.1115860Z</Message></Error>"
+          }
+        }
+      }
+    ],
+    "logResponsesMeaning": "Both exact job-log reads returned 404 BlobNotFound. No compile error or source-gate failure is inferred from missing logs."
+  },
+  "expectedFreshTestIdentity": {
+    "baselineOriginalTests": 422,
+    "previousPdfDiagnosticTotal": 479,
+    "addedDnsConsentTests": 5,
+    "addedDiagnosticTests": 3,
+    "expectedTotal": 487,
+    "expectedXmlFiles": 51,
+    "acceptedFreshTestTotal": null,
+    "acceptedFreshXmlFiles": null
+  },
+  "strictEvidenceChecks": {
+    "required": 53,
+    "executed": null,
+    "passed": null,
+    "result": "NOT_EXECUTED"
+  },
+  "noArtifactDownloads": [],
+  "originalApplicationAcceptance": {
+    "sourceSafetyGates": "NOT_EVIDENCED",
+    "productionCompile": "NOT_EVIDENCED",
+    "runtime487Tests": "NOT_EXECUTED_OR_NOT_EVIDENCED",
+    "lint": "NOT_EXECUTED_OR_NOT_EVIDENCED",
+    "apkManifestAndByteVerification": "NOT_EXECUTED",
+    "fixedSignatureAnd23PayloadAnd687ABI": "NOT_EXECUTED_OR_NOT_EVIDENCED",
+    "api35Installation": "NOT_EXECUTED",
+    "api36Installation": "NOT_EXECUTED",
+    "navigation59Each": "NOT_EXECUTED",
+    "controllerAuthentication5Each": "NOT_EXECUTED",
+    "palette21Each": "NOT_EXECUTED",
+    "native10Screenshots": "NOT_EXECUTED",
+    "actualBearerSixPathsAnd401Ready200TimeChain": "NOT_EXECUTED",
+    "rootMutationActions": null,
+    "preferencesRestore": null,
+    "reverseRestore": null,
+    "forwardCleanup": null,
+    "launcherAndEmulatorCleanup": null,
+    "kvmRestore": null
+  },
+  "oldEvidenceNotUsedAsFresh": {
+    "previousSuccessfulSource": "2730954591393c1b81f747cef72adb8940c5a82c",
+    "previousSuccessfulRun": 37360879852,
+    "previousAcceptanceArchive": "docs/qa/20261005-v2085-2730954-installation-success.json",
+    "previousArtifactsNotRedownloaded": true,
+    "oldPaletteBaselineDoesNotValidateCurrentApplication": true
+  },
+  "googlePlayStore": {
+    "currentRootCause": "not-established",
+    "realDeviceFix": "not-verified",
+    "controllerFixtureProvesPlayAuthentication": false,
+    "noUserDeviceActions": []
+  },
+  "actionsByThisTask": {
+    "createdWorkflow": false,
+    "reranWorkflow": false,
+    "cancelledWorkflow": false,
+    "downloadedApkParts": false,
+    "modifiedSource": false,
+    "changedPermissions": false
+  },
+  "limitation": "Exact source 274aa0d run attempt1 changed from queued to completed/failure with both real jobs cancelled, null steps, no artifacts and a skipped installation placeholder. Cancellation actor/reason absent; no safety gate bypass and no new application success claimed.",
+  "pollTimeline": [
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T195727-976Z.json",
+      "sha256": "a4e19a7911a730bf91fa0d772a3aab030cf47f885198e7bbaccf8207615679d8",
+      "observedAtUtc": "2026-10-05T19:57:27.976Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T195829-502Z.json",
+      "sha256": "7cf072fc43b1ff6fe2f756aab086259b7e50d0cd9ad9ffa3545f123392e74680",
+      "observedAtUtc": "2026-10-05T19:58:29.502Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T195931-173Z.json",
+      "sha256": "4c36c05673db8a8aa186c47c452bbf404fd5099f6b8d5e1dfc72905b1c5e2476",
+      "observedAtUtc": "2026-10-05T19:59:31.173Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200032-604Z.json",
+      "sha256": "b2223217c6655229ea71ba22d7df3d157c04fdf967580a00fa7547477f75bebb",
+      "observedAtUtc": "2026-10-05T20:00:32.604Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200134-134Z.json",
+      "sha256": "13f14e66f03fb07f3b08c35605390eaabce3434b008370ed994c4c09fa923233",
+      "observedAtUtc": "2026-10-05T20:01:34.134Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200235-746Z.json",
+      "sha256": "c89642d0b8ce34ad44e23475ee696f45ee923a36e756ba58acff66e4ac6d09f4",
+      "observedAtUtc": "2026-10-05T20:02:35.746Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200337-322Z.json",
+      "sha256": "72797cc65a84447c5cc3c4ab0fbbcdb2d9c19e5bbced79b19d2389349d065038",
+      "observedAtUtc": "2026-10-05T20:03:37.322Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200438-762Z.json",
+      "sha256": "63ac6498e7d1422f5a503cc373642f33a7893b870d80d4aa318cf86ea12fed29",
+      "observedAtUtc": "2026-10-05T20:04:38.762Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200540-126Z.json",
+      "sha256": "eebffca345b57c4e010b39056a232c0df07fba64750839481731bc9a5a54869e",
+      "observedAtUtc": "2026-10-05T20:05:40.126Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200641-710Z.json",
+      "sha256": "801b2af917b3739fb1f40bd7bef02b6335c4f73e07b51bfa038cafdf39e443bc",
+      "observedAtUtc": "2026-10-05T20:06:41.710Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200743-234Z.json",
+      "sha256": "cabee67135c4da44ae0f2107310106a5d326730eba196aa4305fe114b2afdbd9",
+      "observedAtUtc": "2026-10-05T20:07:43.234Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200844-698Z.json",
+      "sha256": "fd55eae33fd9222b4efa3766fcdbe82f42aedf0fa1bb46c8215ecb69473c7ccc",
+      "observedAtUtc": "2026-10-05T20:08:44.698Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T200946-154Z.json",
+      "sha256": "083981bc00080fbbb79453612c90ccf9bf7cf6b5a80cc1b1e2d368aa11707228",
+      "observedAtUtc": "2026-10-05T20:09:46.154Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "queued",
+      "conclusion": null,
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "queued",
+          "conclusion": null,
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    },
+    {
+      "path": "/tmp/hetu-ci-latest-274aa0d/state-2026-10-05T201047-735Z.json",
+      "sha256": "17c503deaabf401ef368ab2620118249e2d7a9583421a99d130f9611955c60ce",
+      "observedAtUtc": "2026-10-05T20:10:47.735Z",
+      "runId": 37366522056,
+      "sourceCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+      "attempt": 1,
+      "status": "completed",
+      "conclusion": "failure",
+      "jobs": [
+        {
+          "id": 111952930609,
+          "name": "build",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111952930932,
+          "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+          "status": "completed",
+          "conclusion": "cancelled",
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        },
+        {
+          "id": 111958069405,
+          "name": "Installed APK on Android API ${{ matrix.api }}",
+          "status": "completed",
+          "conclusion": "skipped",
+          "run_id": 37366522056,
+          "logs_url": null,
+          "steps": null
+        }
+      ],
+      "artifacts": []
+    }
+  ]
+}

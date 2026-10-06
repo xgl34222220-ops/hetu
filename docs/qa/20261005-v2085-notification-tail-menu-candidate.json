@@ -1,0 +1,2398 @@
+{
+  "schema": 1,
+  "applicationBaseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "candidateState": "source stopped; uncommitted; not compiled/rendered/installed",
+  "freshRenderingPassed": false,
+  "newCandidateCiExecuted": false,
+  "exactTransforms": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "import androidx.compose.ui.draw.clip\n",
+      "after": "import androidx.compose.ui.draw.clip\nimport androidx.compose.ui.draw.drawBehind\nimport androidx.compose.ui.geometry.CornerRadius\nimport androidx.compose.ui.geometry.Offset\nimport androidx.compose.ui.geometry.Size\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "    menuSelectedHorizontalPadding: Dp? = null,\n) {\n",
+      "after": "    menuSelectedHorizontalPadding: Dp? = null,\n    menuSelectedTextColor: Color? = null,\n    menuSelectedVerticalVisualInset: Dp? = null,\n) {\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)\n",
+      "after": "                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null ||\n                menuSelectedTextColor != null || menuSelectedVerticalVisualInset != null)\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,\n",
+      "after": "                        selectedTextColor = menuSelectedTextColor ?: if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                        choicePresentation = menuRowPresentation ?: presentation,\n",
+      "after": "                        choicePresentation = if (menuSelectedVerticalVisualInset != null && choice.id == selected) HxChoicePresentation.Settings else menuRowPresentation ?: presentation,\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                if (menuSelectedHorizontalPadding != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }\n",
+      "after": "                if (menuSelectedVerticalVisualInset != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding ?: 0.dp).clip(Hx.pillShape).drawBehind {\n                        val inset = menuSelectedVerticalVisualInset.toPx().coerceIn(0f, size.height / 2f)\n                        val visualHeight = size.height - 2f * inset\n                        drawRoundRect(color = c.surfaceMuted, topLeft = Offset(0f, inset), size = Size(size.width, visualHeight), cornerRadius = CornerRadius(visualHeight / 2f))\n                    }) { item() }\n                } else if (menuSelectedHorizontalPadding != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "before": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = 141.dp,\n                menuAnchorEndInset = 1.dp,\n                menuItemFontSizeSp = 16f,\n                menuItemMinimumHeight = 40.dp,\n                menuItemVerticalPadding = 8.dp,\n                menuContentTopPadding = 3.dp,\n                menuContentBottomPadding = 9.dp,\n                menuSelectedHorizontalPadding = 3.dp,\n                menuDividers = false,\n",
+      "after": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = if (index == 2) 143.dp else 141.dp,\n                menuAnchorEndInset = when (index) { 1 -> 0.dp; 2 -> 4.dp; else -> 1.dp },\n                menuItemFontSizeSp = if (index == 1 || index == 2) 14f else 16f,\n                menuItemMinimumHeight = if (index == 1 || index == 2) 34.dp else 40.dp,\n                menuItemVerticalPadding = when (index) { 1 -> 5.5.dp; 2 -> 5.dp; else -> 8.dp },\n                menuContentTopPadding = if (index == 2) 5.dp else 3.dp,\n                menuContentBottomPadding = when (index) { 1 -> 4.dp; 2 -> 5.dp; else -> 9.dp },\n                menuSelectedHorizontalPadding = if (index == 2) 6.dp else 3.dp,\n                menuDividers = index == 1,\n                menuSelectedTextColor = if (index == 1) c.accent else null,\n                menuSelectedVerticalVisualInset = if (index == 2) 1.5.dp else null,\n",
+      "count": 1
+    }
+  ],
+  "fileProofs": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "baselineSha256": "c21df0e528e59d4cd28d7f139bab7ed96170a58ca9c4bc708f4379cfd29cc87d",
+      "candidateSha256": "d5f632359b2df4145f9da6ee3efb26b7f58bfb9bef5320eec71b8447ac39aeab",
+      "wholeFileReverseEqualsBase": true,
+      "allTransformForwardCountsAsserted": true,
+      "allTransformReverseCountsAsserted": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "baselineSha256": "3fd7434c34179546596fb7e737564fb4f0a4f2587bff0cbabd25df135dd15bf0",
+      "candidateSha256": "aa6b48f1e8b139772eb0ceb680053b8c535c6f5f61512dc4581d2dd0131770cb",
+      "wholeFileReverseEqualsBase": true,
+      "allTransformForwardCountsAsserted": true,
+      "allTransformReverseCountsAsserted": true
+    }
+  ],
+  "frozenHxMenus": {
+    "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt",
+    "sha256": "aa0a56fd3e199e4d5a4062f18b47d68d12e2afd5c7b7eb182df3804ba810fcb9",
+    "byteEqualToBase": true
+  },
+  "preservation": {
+    "oldDefaultSelectedBoxLiteralUnchanged": true,
+    "oldDefaultHxMenuItemArgumentBlocksPreserved": 2,
+    "defaultNullableParametersRetainOldPath": true,
+    "missingAnchorPathEntireSuffixUnchanged": true,
+    "notificationBeforePickerEntirePrefixUnchanged": true,
+    "refreshAndTargetEntireCallerBlocksUnchanged": true,
+    "actionChoicesSelectedOnPickOnDismissEntireSuffixUnchanged": true,
+    "index0ParameterValuesExactly2730954": true,
+    "selectedPredicatesCheckHapticEnabledOriginal": true,
+    "targetNineDataAndMaximumSevenViewportUnchanged": true,
+    "rowHeightLabelPositionClickableUnaffectedByVisualInset": true,
+    "visualInsetNoLayoutPadding": true,
+    "themeSurfaceMutedAndAccentUsedWithoutForcedPalette": true,
+    "noYOffset": true,
+    "homePanelDefaultPathsAndMotionUnchanged": true
+  },
+  "candidateParameters": {
+    "index0_PDF24": {
+      "widthDp": 141,
+      "endInsetDp": 1,
+      "fontSp": 16,
+      "minHeightDp": 40,
+      "vpadDp": 8,
+      "outerTopDp": 3,
+      "outerBottomDp": 9,
+      "dividers": false,
+      "selectedHorizontalPaddingDp": 3,
+      "selectedTextColor": null,
+      "selectedVerticalVisualInsetDp": null,
+      "unchanged2730954Values": true
+    },
+    "index1_PDF25": {
+      "widthDp": 141,
+      "endInsetDp": 0,
+      "fontSp": 14,
+      "minHeightDp": 34,
+      "vpadDp": 5.5,
+      "outerTopDp": 3,
+      "outerBottomDp": 4,
+      "dividers": true,
+      "selectedHorizontalPaddingDp": 3,
+      "selectedTextColor": "Hx.colors.accent",
+      "selectedVerticalVisualInsetDp": null,
+      "predictedItemHeightDp": 34,
+      "predictedDividerPixels": 1,
+      "predictedPitchPixels": 35,
+      "predictedBodyHeightPixels": 181,
+      "predictedSelectedFillHeightPixels": 34
+    },
+    "index2_PDF26": {
+      "widthDp": 143,
+      "endInsetDp": 4,
+      "fontSp": 14,
+      "minHeightDp": 34,
+      "vpadDp": 5,
+      "outerTopDp": 5,
+      "outerBottomDp": 5,
+      "dividers": false,
+      "selectedHorizontalPaddingDp": 6,
+      "selectedTextColor": null,
+      "selectedVerticalVisualInsetDp": 1.5,
+      "predictedItemHeightDp": 34,
+      "predictedPitchPixels": 34,
+      "predictedBodyHeightPixels": 180,
+      "predictedSelectedVisualFillHeightPixels": 31,
+      "clickableItemHeightPreservedDp": 34
+    }
+  },
+  "referenceActualMeasurementPath": "/tmp/hetu_pdf04_2730954_notification_menu_actual_measurement.json",
+  "referenceActualMeasurementSha256": "a6ea8ce5232b1b7d5a5a77b456f332ff4b902f9d8d577dc9058ae0d9c4b65ab4",
+  "referenceActualMeasurement": {
+    "schema": 1,
+    "createdAtUtc": "2026-10-05T19:30:55.839018+00:00",
+    "applicationCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+    "runId": 37360879852,
+    "measurementsByPage": {
+      "22": {
+        "page": 22,
+        "currentCapture": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/04-022-refresh-menu.png",
+        "currentSha256": "91aa54b60ae80048b2132ca1de98589deb916dd3f62e05ba43972ee6031caf03",
+        "currentDimensions": [
+          393,
+          852
+        ],
+        "referenceEmbeddedPath": "/tmp/hetu-pdf04-page22-embedded.jpeg",
+        "referenceSha256": "a26dd3a9ace190ec658ab692c281a92ca1e9c50f21545197b2f10794bfc22883",
+        "referenceDimensions": [
+          851,
+          1849
+        ],
+        "referenceWidthNormalization": 0.4618096357226792,
+        "coordinateSystem": "Original raw embedded JPEG coordinates;393/referenceWidth scaling. Rendered PDF25px caption excluded.",
+        "fullSizeOriginalRenderedAndFreshCurrentActuallyOpened": true,
+        "referenceLabelInk": [
+          {
+            "crop": [
+              529,
+              556,
+              715,
+              604
+            ],
+            "bboxInclusive": [
+              542,
+              565,
+              601,
+              595
+            ],
+            "width": 60,
+            "height": 31,
+            "centerY": 580.0,
+            "inkPixels": 671,
+            "maskThreshold": "maxRGB<160",
+            "label": "2 秒",
+            "centerYNormalized": 267.8495887191539,
+            "widthNormalized": 27.70857814336075,
+            "heightNormalized": 14.316098707403055
+          },
+          {
+            "crop": [
+              529,
+              649,
+              715,
+              697
+            ],
+            "bboxInclusive": [
+              542,
+              658,
+              601,
+              688
+            ],
+            "width": 60,
+            "height": 31,
+            "centerY": 673.0,
+            "inkPixels": 689,
+            "maskThreshold": "maxRGB<160",
+            "label": "3 秒",
+            "centerYNormalized": 310.7978848413631,
+            "widthNormalized": 27.70857814336075,
+            "heightNormalized": 14.316098707403055
+          },
+          {
+            "crop": [
+              529,
+              741,
+              715,
+              789
+            ],
+            "bboxInclusive": [
+              542,
+              751,
+              601,
+              781
+            ],
+            "width": 60,
+            "height": 31,
+            "centerY": 766.0,
+            "inkPixels": 678,
+            "maskThreshold": "maxRGB<160",
+            "label": "5 秒",
+            "centerYNormalized": 353.7461809635723,
+            "widthNormalized": 27.70857814336075,
+            "heightNormalized": 14.316098707403055
+          },
+          {
+            "crop": [
+              529,
+              834,
+              715,
+              882
+            ],
+            "bboxInclusive": [
+              542,
+              845,
+              617,
+              874
+            ],
+            "width": 76,
+            "height": 30,
+            "centerY": 859.5,
+            "inkPixels": 820,
+            "maskThreshold": "maxRGB<160",
+            "label": "10 秒",
+            "centerYNormalized": 396.92538190364274,
+            "widthNormalized": 35.09753231492362,
+            "heightNormalized": 13.854289071680375
+          },
+          {
+            "crop": [
+              529,
+              927,
+              715,
+              975
+            ],
+            "bboxInclusive": [
+              542,
+              938,
+              626,
+              968
+            ],
+            "width": 85,
+            "height": 31,
+            "centerY": 953.0,
+            "inkPixels": 968,
+            "maskThreshold": "maxRGB<160",
+            "label": "30 秒",
+            "centerYNormalized": 440.1045828437133,
+            "widthNormalized": 39.25381903642773,
+            "heightNormalized": 14.316098707403055
+          },
+          {
+            "crop": [
+              529,
+              1023,
+              715,
+              1071
+            ],
+            "bboxInclusive": [
+              542,
+              1032,
+              626,
+              1062
+            ],
+            "width": 85,
+            "height": 31,
+            "centerY": 1047.0,
+            "inkPixels": 974,
+            "maskThreshold": "maxRGB<160",
+            "label": "60 秒",
+            "centerYNormalized": 483.5146886016451,
+            "widthNormalized": 39.25381903642773,
+            "heightNormalized": 14.316098707403055
+          }
+        ],
+        "currentLabelInk": [
+          {
+            "crop": [
+              245,
+              215,
+              333,
+              230
+            ],
+            "bboxInclusive": [
+              246,
+              215,
+              273,
+              229
+            ],
+            "width": 28,
+            "height": 15,
+            "centerY": 222.0,
+            "inkPixels": 107,
+            "maskThreshold": "maxRGB<160",
+            "label": "2 秒"
+          },
+          {
+            "crop": [
+              245,
+              258,
+              333,
+              274
+            ],
+            "bboxInclusive": [
+              251,
+              258,
+              278,
+              273
+            ],
+            "width": 28,
+            "height": 16,
+            "centerY": 265.5,
+            "inkPixels": 144,
+            "maskThreshold": "maxRGB<160",
+            "label": "3 秒"
+          },
+          {
+            "crop": [
+              245,
+              301,
+              333,
+              316
+            ],
+            "bboxInclusive": [
+              246,
+              301,
+              273,
+              315
+            ],
+            "width": 28,
+            "height": 15,
+            "centerY": 308.0,
+            "inkPixels": 107,
+            "maskThreshold": "maxRGB<160",
+            "label": "5 秒"
+          },
+          {
+            "crop": [
+              245,
+              344,
+              333,
+              359
+            ],
+            "bboxInclusive": [
+              246,
+              344,
+              283,
+              358
+            ],
+            "width": 38,
+            "height": 15,
+            "centerY": 351.0,
+            "inkPixels": 146,
+            "maskThreshold": "maxRGB<160",
+            "label": "10 秒"
+          },
+          {
+            "crop": [
+              245,
+              387,
+              333,
+              402
+            ],
+            "bboxInclusive": [
+              246,
+              387,
+              283,
+              401
+            ],
+            "width": 38,
+            "height": 15,
+            "centerY": 394.0,
+            "inkPixels": 160,
+            "maskThreshold": "maxRGB<160",
+            "label": "30 秒"
+          },
+          {
+            "crop": [
+              245,
+              430,
+              333,
+              445
+            ],
+            "bboxInclusive": [
+              246,
+              430,
+              283,
+              444
+            ],
+            "width": 38,
+            "height": 15,
+            "centerY": 437.0,
+            "inkPixels": 161,
+            "maskThreshold": "maxRGB<160",
+            "label": "60 秒"
+          }
+        ],
+        "referenceLabelPitchesNormalized": [
+          42.94829612220917,
+          42.94829612220917,
+          43.17920094007047,
+          43.17920094007053,
+          43.41010575793183
+        ],
+        "currentLabelPitches": [
+          43.5,
+          42.5,
+          43.0,
+          43.0,
+          43.0
+        ],
+        "currentMinusReferenceLabelPitch": [
+          0.5517038777908283,
+          -0.4482961222091717,
+          -0.17920094007047283,
+          -0.17920094007052967,
+          -0.4101057579318308
+        ],
+        "referenceBodyApproxHalfOpen": [
+          501,
+          522,
+          822,
+          1105
+        ],
+        "referenceWhiteComponentBBox": [
+          501,
+          522,
+          821,
+          1104
+        ],
+        "referenceBodyBoundsNormalized": [
+          231.36662749706227,
+          241.06462984723854,
+          379.6075205640423,
+          510.2996474735605
+        ],
+        "referenceBodyWidthHeightNormalized": [
+          148.24089306698002,
+          269.23501762632196
+        ],
+        "referencePopupRightInsetFromExistingAnchorRight379": -0.6075205640423178,
+        "currentPopupRightInsetFromExistingAnchorRight379": 0,
+        "referenceSelectedHorizontalInsetsNormalized": [
+          4.618096357226792,
+          4.618096357226792
+        ],
+        "currentBodyHalfOpenFromActualRowsAndExistingPadding": [
+          231,
+          195,
+          379,
+          464
+        ],
+        "currentBodyWidthHeight": [
+          148,
+          269
+        ],
+        "currentBodyBBoxMeasurementMethod": "Current menu surface equals underlying card in portions; bbox is recovered from actual ink/divider/selected-mask extents plus unchanged known padding. Not a fake innerPopup metadata rectangle.",
+        "currentMinusReferenceBodyWidthHeight": [
+          -0.24089306698002133,
+          -0.23501762632196233
+        ],
+        "actualDividerRows": [
+          {
+            "y": 243,
+            "left": 243,
+            "rightExclusive": 367,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 286,
+            "left": 243,
+            "rightExclusive": 367,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 329,
+            "left": 243,
+            "rightExclusive": 367,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 372,
+            "left": 243,
+            "rightExclusive": 367,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 415,
+            "left": 243,
+            "rightExclusive": 367,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          }
+        ],
+        "referenceSelectedMaskHalfOpen": [
+          511,
+          626,
+          812,
+          719
+        ],
+        "referenceSelectedMaskNormalized": [
+          235.98472385428906,
+          289.09283196239716,
+          374.9894242068155,
+          332.0411280846063
+        ],
+        "referenceSelectedMaskWidthHeightNormalized": [
+          139.00470035252644,
+          42.948296122209165
+        ],
+        "currentSelectedExactRgbMask": {
+          "rgb": [
+            238,
+            239,
+            250
+          ],
+          "bboxHalfOpen": [
+            236,
+            244,
+            373,
+            285
+          ],
+          "area": 4929
+        },
+        "currentSelectedIndexZeroBased": 1,
+        "currentSourceRowHeight": 42,
+        "currentSourceOuterPaddingTopBottom": [
+          6,
+          6
+        ],
+        "currentRowPresentation": "Notification",
+        "currentSourceLabelFontSizeSp": 16,
+        "currentSourceYoffset": null,
+        "currentThemeForced": false,
+        "contentDifference": "Actual notification prefs/template/scroll state retained; sample content and reference selected25blue are not forced.",
+        "currentSelectedMaskWidthHeight": [
+          137,
+          41
+        ],
+        "currentMinusReferenceSelectedMaskWidthHeight": [
+          -2.0047003525264415,
+          -1.9482961222091646
+        ],
+        "currentSelectedMaskHorizontalInsets": [
+          5,
+          6
+        ],
+        "allChineseLabelWidthDerivedFontSp": null,
+        "previous01b6634LabelPitches": [
+          47.5,
+          46.5,
+          47.0,
+          47.0,
+          47.0
+        ],
+        "previous01b6634PopupWidthHeight": [
+          148,
+          293
+        ]
+      },
+      "23": {
+        "page": 23,
+        "currentCapture": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/04-023-target-menu.png",
+        "currentSha256": "57cb14a8c64d212d451e377c97fe8ed2bfae7165c72b8eccd77b19c71cf0798c",
+        "currentDimensions": [
+          393,
+          852
+        ],
+        "referenceEmbeddedPath": "/tmp/hetu-pdf04-page23-embedded.jpeg",
+        "referenceSha256": "00a55908ff8ead155cbe7d924f127bb57b2bccb32dbd9f19e1e1a6b789ba249b",
+        "referenceDimensions": [
+          850,
+          1850
+        ],
+        "referenceWidthNormalization": 0.4623529411764706,
+        "coordinateSystem": "Original raw embedded JPEG coordinates;393/referenceWidth scaling. Rendered PDF25px caption excluded.",
+        "fullSizeOriginalRenderedAndFreshCurrentActuallyOpened": true,
+        "referenceLabelInk": [
+          {
+            "crop": [
+              550,
+              673,
+              720,
+              721
+            ],
+            "bboxInclusive": [
+              561,
+              684,
+              615,
+              710
+            ],
+            "width": 55,
+            "height": 27,
+            "centerY": 697.0,
+            "inkPixels": 667,
+            "maskThreshold": "maxRGB<160",
+            "label": "首页",
+            "centerYNormalized": 322.26,
+            "widthNormalized": 25.429411764705883,
+            "heightNormalized": 12.483529411764705
+          },
+          {
+            "crop": [
+              550,
+              749,
+              720,
+              797
+            ],
+            "bboxInclusive": [
+              561,
+              759,
+              615,
+              785
+            ],
+            "width": 55,
+            "height": 27,
+            "centerY": 772.0,
+            "inkPixels": 804,
+            "maskThreshold": "maxRGB<160",
+            "label": "面板",
+            "centerYNormalized": 356.9364705882353,
+            "widthNormalized": 25.429411764705883,
+            "heightNormalized": 12.483529411764705
+          },
+          {
+            "crop": [
+              550,
+              826,
+              720,
+              874
+            ],
+            "bboxInclusive": [
+              561,
+              834,
+              616,
+              860
+            ],
+            "width": 56,
+            "height": 27,
+            "centerY": 847.0,
+            "inkPixels": 809,
+            "maskThreshold": "maxRGB<160",
+            "label": "策略",
+            "centerYNormalized": 391.6129411764706,
+            "widthNormalized": 25.891764705882352,
+            "heightNormalized": 12.483529411764705
+          },
+          {
+            "crop": [
+              550,
+              902,
+              720,
+              950
+            ],
+            "bboxInclusive": [
+              561,
+              910,
+              674,
+              936
+            ],
+            "width": 114,
+            "height": 27,
+            "centerY": 923.0,
+            "inkPixels": 1502,
+            "maskThreshold": "maxRGB<160",
+            "label": "面板浮窗",
+            "centerYNormalized": 426.75176470588235,
+            "widthNormalized": 52.70823529411764,
+            "heightNormalized": 12.483529411764705
+          },
+          {
+            "crop": [
+              550,
+              979,
+              720,
+              1027
+            ],
+            "bboxInclusive": [
+              561,
+              986,
+              674,
+              1012
+            ],
+            "width": 114,
+            "height": 27,
+            "centerY": 999.0,
+            "inkPixels": 1580,
+            "maskThreshold": "maxRGB<160",
+            "label": "策略浮窗",
+            "centerYNormalized": 461.8905882352941,
+            "widthNormalized": 52.70823529411764,
+            "heightNormalized": 12.483529411764705
+          },
+          {
+            "crop": [
+              550,
+              1055,
+              720,
+              1103
+            ],
+            "bboxInclusive": [
+              561,
+              1064,
+              615,
+              1089
+            ],
+            "width": 55,
+            "height": 26,
+            "centerY": 1076.5,
+            "inkPixels": 596,
+            "maskThreshold": "maxRGB<160",
+            "label": "工具",
+            "centerYNormalized": 497.72294117647056,
+            "widthNormalized": 25.429411764705883,
+            "heightNormalized": 12.021176470588236
+          },
+          {
+            "crop": [
+              550,
+              1131,
+              720,
+              1179
+            ],
+            "bboxInclusive": [
+              561,
+              1140,
+              615,
+              1165
+            ],
+            "width": 55,
+            "height": 26,
+            "centerY": 1152.5,
+            "inkPixels": 730,
+            "maskThreshold": "maxRGB<160",
+            "label": "设置",
+            "centerYNormalized": 532.8617647058824,
+            "widthNormalized": 25.429411764705883,
+            "heightNormalized": 12.021176470588236
+          }
+        ],
+        "currentLabelInk": [
+          {
+            "crop": [
+              245,
+              272,
+              333,
+              285
+            ],
+            "bboxInclusive": [
+              257,
+              272,
+              281,
+              284
+            ],
+            "width": 25,
+            "height": 13,
+            "centerY": 278.0,
+            "inkPixels": 129,
+            "maskThreshold": "maxRGB<160",
+            "label": "首页"
+          },
+          {
+            "crop": [
+              245,
+              308,
+              333,
+              320
+            ],
+            "bboxInclusive": [
+              257,
+              308,
+              281,
+              319
+            ],
+            "width": 25,
+            "height": 12,
+            "centerY": 313.5,
+            "inkPixels": 104,
+            "maskThreshold": "maxRGB<160",
+            "label": "面板"
+          },
+          {
+            "crop": [
+              245,
+              342,
+              333,
+              355
+            ],
+            "bboxInclusive": [
+              257,
+              342,
+              281,
+              354
+            ],
+            "width": 25,
+            "height": 13,
+            "centerY": 348.0,
+            "inkPixels": 112,
+            "maskThreshold": "maxRGB<160",
+            "label": "策略"
+          },
+          {
+            "crop": [
+              245,
+              377,
+              333,
+              390
+            ],
+            "bboxInclusive": [
+              257,
+              377,
+              308,
+              389
+            ],
+            "width": 52,
+            "height": 13,
+            "centerY": 383.0,
+            "inkPixels": 208,
+            "maskThreshold": "maxRGB<160",
+            "label": "面板浮窗"
+          },
+          {
+            "crop": [
+              245,
+              412,
+              333,
+              425
+            ],
+            "bboxInclusive": [
+              257,
+              412,
+              308,
+              424
+            ],
+            "width": 52,
+            "height": 13,
+            "centerY": 418.0,
+            "inkPixels": 216,
+            "maskThreshold": "maxRGB<160",
+            "label": "策略浮窗"
+          },
+          {
+            "crop": [
+              245,
+              448,
+              333,
+              460
+            ],
+            "bboxInclusive": [
+              257,
+              448,
+              281,
+              459
+            ],
+            "width": 25,
+            "height": 12,
+            "centerY": 453.5,
+            "inkPixels": 80,
+            "maskThreshold": "maxRGB<160",
+            "label": "工具"
+          },
+          {
+            "crop": [
+              245,
+              483,
+              333,
+              495
+            ],
+            "bboxInclusive": [
+              257,
+              483,
+              281,
+              494
+            ],
+            "width": 25,
+            "height": 12,
+            "centerY": 488.5,
+            "inkPixels": 112,
+            "maskThreshold": "maxRGB<160",
+            "label": "设置"
+          }
+        ],
+        "referenceLabelPitchesNormalized": [
+          34.676470588235304,
+          34.676470588235304,
+          35.13882352941175,
+          35.13882352941175,
+          35.83235294117645,
+          35.13882352941181
+        ],
+        "currentLabelPitches": [
+          35.5,
+          34.5,
+          35.0,
+          35.0,
+          35.5,
+          35.0
+        ],
+        "currentMinusReferenceLabelPitch": [
+          0.8235294117646959,
+          -0.17647058823530415,
+          -0.13882352941175213,
+          -0.13882352941175213,
+          -0.33235294117645253,
+          -0.13882352941180898
+        ],
+        "referenceBodyApproxHalfOpen": [
+          525,
+          650,
+          814,
+          1199
+        ],
+        "referenceWhiteComponentBBox": [
+          526,
+          650,
+          813,
+          1198
+        ],
+        "referenceBodyBoundsNormalized": [
+          242.73529411764704,
+          300.52941176470586,
+          376.3552941176471,
+          554.3611764705882
+        ],
+        "referenceBodyWidthHeightNormalized": [
+          133.62,
+          253.83176470588234
+        ],
+        "referencePopupRightInsetFromExistingAnchorRight379": 2.6447058823529233,
+        "currentPopupRightInsetFromExistingAnchorRight379": 3,
+        "referenceSelectedHorizontalInsetsNormalized": null,
+        "currentBodyHalfOpenFromActualRowsAndExistingPadding": [
+          242,
+          256,
+          376,
+          511
+        ],
+        "currentBodyWidthHeight": [
+          134,
+          255
+        ],
+        "currentBodyBBoxMeasurementMethod": "Current menu surface equals underlying card in portions; bbox is recovered from actual ink/divider/selected-mask extents plus unchanged known padding. Not a fake innerPopup metadata rectangle.",
+        "currentMinusReferenceBodyWidthHeight": [
+          0.37999999999999545,
+          1.1682352941176646
+        ],
+        "actualDividerRows": [
+          {
+            "y": 295,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 330,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 365,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 400,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 435,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 470,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          },
+          {
+            "y": 505,
+            "left": 254,
+            "rightExclusive": 364,
+            "rgb": [
+              244,
+              243,
+              250
+            ]
+          }
+        ],
+        "referenceSelectedMaskHalfOpen": null,
+        "referenceSelectedMaskNormalized": null,
+        "referenceSelectedMaskWidthHeightNormalized": null,
+        "currentSelectedExactRgbMask": null,
+        "currentSelectedIndexZeroBased": 0,
+        "currentSourceRowHeight": 34,
+        "currentSourceOuterPaddingTopBottom": [
+          5,
+          5
+        ],
+        "currentRowPresentation": "Settings",
+        "currentSourceLabelFontSizeSp": 13,
+        "currentSourceYoffset": null,
+        "currentThemeForced": false,
+        "contentDifference": "Actual notification prefs/template/scroll state retained; sample content and reference selected25blue are not forced.",
+        "allChineseLabelWidthDerivedFontSp": null,
+        "previous01b6634LabelPitches": [
+          47.0,
+          47.0,
+          47.0,
+          47.0,
+          47.0,
+          47.5
+        ],
+        "previous01b6634PopupWidthHeight": [
+          148,
+          340
+        ]
+      },
+      "24": {
+        "page": 24,
+        "currentCapture": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/04-024-action-one.png",
+        "currentSha256": "707c0682e1c00ded5a86f0c99a655b75747bdfefa4f5c93ba8e5e86f44897da5",
+        "currentDimensions": [
+          393,
+          852
+        ],
+        "referenceEmbeddedPath": "/tmp/hetu-pdf04-page24-embedded.jpeg",
+        "referenceSha256": "d758119192a8e02100389eb0b2ac31da7db3e11596ed6bb9182e931a6041db42",
+        "referenceDimensions": [
+          850,
+          1850
+        ],
+        "referenceWidthNormalization": 0.4623529411764706,
+        "coordinateSystem": "Original raw embedded JPEG coordinates;393/referenceWidth scaling. Rendered PDF25px caption excluded.",
+        "fullSizeOriginalRenderedAndFreshCurrentActuallyOpened": true,
+        "referenceLabelInk": [
+          {
+            "crop": [
+              540,
+              480,
+              715,
+              530
+            ],
+            "bboxInclusive": [
+              551,
+              487,
+              618,
+              521
+            ],
+            "width": 68,
+            "height": 35,
+            "centerY": 504.0,
+            "inkPixels": 1373,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载",
+            "centerYNormalized": 233.02588235294118,
+            "widthNormalized": 31.439999999999998,
+            "heightNormalized": 16.18235294117647
+          },
+          {
+            "crop": [
+              540,
+              567,
+              715,
+              617
+            ],
+            "bboxInclusive": [
+              551,
+              575,
+              617,
+              608
+            ],
+            "width": 67,
+            "height": 34,
+            "centerY": 591.5,
+            "inkPixels": 1272,
+            "maskThreshold": "maxRGB<160",
+            "label": "重启",
+            "centerYNormalized": 273.48176470588237,
+            "widthNormalized": 30.97764705882353,
+            "heightNormalized": 15.719999999999999
+          },
+          {
+            "crop": [
+              540,
+              652,
+              715,
+              702
+            ],
+            "bboxInclusive": [
+              551,
+              662,
+              618,
+              695
+            ],
+            "width": 68,
+            "height": 34,
+            "centerY": 678.5,
+            "inkPixels": 935,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止",
+            "centerYNormalized": 313.7064705882353,
+            "widthNormalized": 31.439999999999998,
+            "heightNormalized": 15.719999999999999
+          },
+          {
+            "crop": [
+              540,
+              740,
+              715,
+              790
+            ],
+            "bboxInclusive": [
+              552,
+              749,
+              689,
+              782
+            ],
+            "width": 138,
+            "height": 34,
+            "centerY": 765.5,
+            "inkPixels": 2676,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知",
+            "centerYNormalized": 353.93117647058824,
+            "widthNormalized": 63.80470588235294,
+            "heightNormalized": 15.719999999999999
+          },
+          {
+            "crop": [
+              540,
+              827,
+              715,
+              877
+            ],
+            "bboxInclusive": [
+              551,
+              838,
+              583,
+              869
+            ],
+            "width": 33,
+            "height": 32,
+            "centerY": 853.5,
+            "inkPixels": 526,
+            "maskThreshold": "maxRGB<160",
+            "label": "无",
+            "centerYNormalized": 394.61823529411765,
+            "widthNormalized": 15.25764705882353,
+            "heightNormalized": 14.795294117647058
+          }
+        ],
+        "currentLabelInk": [
+          {
+            "crop": [
+              245,
+              290,
+              333,
+              306
+            ],
+            "bboxInclusive": [
+              255,
+              290,
+              286,
+              305
+            ],
+            "width": 32,
+            "height": 16,
+            "centerY": 297.5,
+            "inkPixels": 246,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载"
+          },
+          {
+            "crop": [
+              245,
+              330,
+              333,
+              346
+            ],
+            "bboxInclusive": [
+              252,
+              330,
+              281,
+              345
+            ],
+            "width": 30,
+            "height": 16,
+            "centerY": 337.5,
+            "inkPixels": 166,
+            "maskThreshold": "maxRGB<160",
+            "label": "重启"
+          },
+          {
+            "crop": [
+              245,
+              370,
+              333,
+              386
+            ],
+            "bboxInclusive": [
+              252,
+              370,
+              282,
+              385
+            ],
+            "width": 31,
+            "height": 16,
+            "centerY": 377.5,
+            "inkPixels": 122,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止"
+          },
+          {
+            "crop": [
+              245,
+              410,
+              333,
+              426
+            ],
+            "bboxInclusive": [
+              252,
+              410,
+              314,
+              425
+            ],
+            "width": 63,
+            "height": 16,
+            "centerY": 417.5,
+            "inkPixels": 333,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知"
+          },
+          {
+            "crop": [
+              245,
+              452,
+              333,
+              465
+            ],
+            "bboxInclusive": [
+              252,
+              452,
+              265,
+              464
+            ],
+            "width": 14,
+            "height": 13,
+            "centerY": 458.0,
+            "inkPixels": 57,
+            "maskThreshold": "maxRGB<160",
+            "label": "无"
+          }
+        ],
+        "referenceLabelPitchesNormalized": [
+          40.45588235294119,
+          40.22470588235291,
+          40.224705882352964,
+          40.68705882352941
+        ],
+        "currentLabelPitches": [
+          40.0,
+          40.0,
+          40.0,
+          40.5
+        ],
+        "currentMinusReferenceLabelPitch": [
+          -0.4558823529411882,
+          -0.22470588235290734,
+          -0.22470588235296418,
+          -0.18705882352941217
+        ],
+        "referenceBodyApproxHalfOpen": [
+          512,
+          455,
+          818,
+          912
+        ],
+        "referenceWhiteComponentBBox": null,
+        "referenceBodyBoundsNormalized": [
+          236.72470588235294,
+          210.37058823529412,
+          378.2047058823529,
+          421.66588235294114
+        ],
+        "referenceBodyWidthHeightNormalized": [
+          141.48,
+          211.29529411764705
+        ],
+        "referencePopupRightInsetFromExistingAnchorRight379": 0.7952941176470745,
+        "currentPopupRightInsetFromExistingAnchorRight379": 1,
+        "referenceSelectedHorizontalInsetsNormalized": [
+          3.236470588235294,
+          3.6988235294117646
+        ],
+        "currentBodyHalfOpenFromActualRowsAndExistingPadding": [
+          237,
+          274,
+          378,
+          486
+        ],
+        "currentBodyWidthHeight": [
+          141,
+          212
+        ],
+        "currentBodyBBoxMeasurementMethod": "Current menu surface equals underlying card in portions; bbox is recovered from actual ink/divider/selected-mask extents plus unchanged known padding. Not a fake innerPopup metadata rectangle.",
+        "currentMinusReferenceBodyWidthHeight": [
+          -0.47999999999998977,
+          0.704705882352954
+        ],
+        "actualDividerRows": [],
+        "referenceSelectedMaskHalfOpen": [
+          519,
+          462,
+          810,
+          548
+        ],
+        "referenceSelectedMaskNormalized": [
+          239.96117647058824,
+          213.6070588235294,
+          374.50588235294117,
+          253.3694117647059
+        ],
+        "referenceSelectedMaskWidthHeightNormalized": [
+          134.54470588235293,
+          39.76235294117647
+        ],
+        "currentSelectedExactRgbMask": {
+          "rgb": [
+            238,
+            239,
+            250
+          ],
+          "bboxHalfOpen": [
+            240,
+            277,
+            374,
+            317
+          ],
+          "area": 4519
+        },
+        "currentSelectedIndexZeroBased": 0,
+        "currentSourceRowHeight": 40,
+        "currentSourceOuterPaddingTopBottom": [
+          3,
+          9
+        ],
+        "currentRowPresentation": "Notification",
+        "currentSourceLabelFontSizeSp": 16,
+        "currentSourceYoffset": null,
+        "currentThemeForced": false,
+        "contentDifference": "Actual notification prefs/template/scroll state retained; sample content and reference selected25blue are not forced.",
+        "currentSelectedMaskWidthHeight": [
+          134,
+          40
+        ],
+        "currentMinusReferenceSelectedMaskWidthHeight": [
+          -0.5447058823529289,
+          0.23764705882353354
+        ],
+        "currentSelectedMaskHorizontalInsets": [
+          3,
+          4
+        ],
+        "allChineseLabelWidthDerivedFontSp": null,
+        "previous01b6634LabelPitches": [
+          47.0,
+          47.0,
+          47.0,
+          47.5
+        ],
+        "previous01b6634PopupWidthHeight": [
+          148,
+          246
+        ]
+      },
+      "25": {
+        "page": 25,
+        "currentCapture": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/04-025-action-two.png",
+        "currentSha256": "18ce495f9f3435fe9c98332886be56bfba1e5d2adb614b41544bb860f0c035cc",
+        "currentDimensions": [
+          393,
+          852
+        ],
+        "referenceEmbeddedPath": "/tmp/hetu-pdf04-page25-embedded.jpeg",
+        "referenceSha256": "a97f2882d86e2a8433ee9ee94d5c4422f56d313edc6821d5af320ab87d2e75ab",
+        "referenceDimensions": [
+          851,
+          1849
+        ],
+        "referenceWidthNormalization": 0.4618096357226792,
+        "coordinateSystem": "Original raw embedded JPEG coordinates;393/referenceWidth scaling. Rendered PDF25px caption excluded.",
+        "fullSizeOriginalRenderedAndFreshCurrentActuallyOpened": true,
+        "referenceLabelInk": [
+          {
+            "crop": [
+              530,
+              900,
+              710,
+              953
+            ],
+            "bboxInclusive": [
+              546,
+              916,
+              603,
+              944
+            ],
+            "width": 58,
+            "height": 29,
+            "centerY": 930.0,
+            "inkPixels": 1018,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载",
+            "centerYNormalized": 429.48296122209166,
+            "widthNormalized": 26.784958871915393,
+            "heightNormalized": 13.392479435957696
+          },
+          {
+            "crop": [
+              530,
+              977,
+              710,
+              1035
+            ],
+            "bboxInclusive": [
+              545,
+              991,
+              602,
+              1019
+            ],
+            "width": 58,
+            "height": 29,
+            "centerY": 1005.0,
+            "inkPixels": 998,
+            "maskThreshold": "minRGB<160",
+            "label": "重启",
+            "centerYNormalized": 464.11868390129257,
+            "widthNormalized": 26.784958871915393,
+            "heightNormalized": 13.392479435957696
+          },
+          {
+            "crop": [
+              530,
+              1052,
+              710,
+              1106
+            ],
+            "bboxInclusive": [
+              545,
+              1067,
+              603,
+              1095
+            ],
+            "width": 59,
+            "height": 29,
+            "centerY": 1081.0,
+            "inkPixels": 725,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止",
+            "centerYNormalized": 499.2162162162162,
+            "widthNormalized": 27.246768507638073,
+            "heightNormalized": 13.392479435957696
+          },
+          {
+            "crop": [
+              530,
+              1126,
+              710,
+              1184
+            ],
+            "bboxInclusive": [
+              546,
+              1144,
+              663,
+              1172
+            ],
+            "width": 118,
+            "height": 29,
+            "centerY": 1158.0,
+            "inkPixels": 1903,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知",
+            "centerYNormalized": 534.7755581668625,
+            "widthNormalized": 54.49353701527615,
+            "heightNormalized": 13.392479435957696
+          },
+          {
+            "crop": [
+              530,
+              1204,
+              710,
+              1260
+            ],
+            "bboxInclusive": [
+              546,
+              1222,
+              573,
+              1249
+            ],
+            "width": 28,
+            "height": 28,
+            "centerY": 1235.5,
+            "inkPixels": 384,
+            "maskThreshold": "maxRGB<160",
+            "label": "无",
+            "centerYNormalized": 570.5658049353701,
+            "widthNormalized": 12.930669800235018,
+            "heightNormalized": 12.930669800235018
+          }
+        ],
+        "currentLabelInk": [
+          {
+            "crop": [
+              245,
+              516,
+              333,
+              532
+            ],
+            "bboxInclusive": [
+              252,
+              516,
+              282,
+              531
+            ],
+            "width": 31,
+            "height": 16,
+            "centerY": 523.5,
+            "inkPixels": 180,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载"
+          },
+          {
+            "crop": [
+              245,
+              556,
+              333,
+              572
+            ],
+            "bboxInclusive": [
+              255,
+              556,
+              285,
+              571
+            ],
+            "width": 31,
+            "height": 16,
+            "centerY": 563.5,
+            "inkPixels": 219,
+            "maskThreshold": "maxRGB<160",
+            "label": "重启"
+          },
+          {
+            "crop": [
+              245,
+              596,
+              333,
+              612
+            ],
+            "bboxInclusive": [
+              252,
+              596,
+              282,
+              611
+            ],
+            "width": 31,
+            "height": 16,
+            "centerY": 603.5,
+            "inkPixels": 122,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止"
+          },
+          {
+            "crop": [
+              245,
+              636,
+              333,
+              652
+            ],
+            "bboxInclusive": [
+              252,
+              636,
+              314,
+              651
+            ],
+            "width": 63,
+            "height": 16,
+            "centerY": 643.5,
+            "inkPixels": 333,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知"
+          },
+          {
+            "crop": [
+              245,
+              678,
+              333,
+              691
+            ],
+            "bboxInclusive": [
+              252,
+              678,
+              265,
+              690
+            ],
+            "width": 14,
+            "height": 13,
+            "centerY": 684.0,
+            "inkPixels": 57,
+            "maskThreshold": "maxRGB<160",
+            "label": "无"
+          }
+        ],
+        "referenceLabelPitchesNormalized": [
+          34.63572267920091,
+          35.097532314923626,
+          35.55934195064634,
+          35.790246768507586
+        ],
+        "currentLabelPitches": [
+          40.0,
+          40.0,
+          40.0,
+          40.5
+        ],
+        "currentMinusReferenceLabelPitch": [
+          5.36427732079909,
+          4.902467685076374,
+          4.440658049353658,
+          4.709753231492414
+        ],
+        "referenceBodyApproxHalfOpen": [
+          514,
+          886,
+          820,
+          1279
+        ],
+        "referenceWhiteComponentBBox": [
+          514,
+          870,
+          820,
+          1279
+        ],
+        "referenceBodyBoundsNormalized": [
+          237.3701527614571,
+          409.16333725029375,
+          378.68390129259694,
+          590.6545240893067
+        ],
+        "referenceBodyWidthHeightNormalized": [
+          141.31374853113982,
+          181.49118683901293
+        ],
+        "referencePopupRightInsetFromExistingAnchorRight379": 0.31609870740305723,
+        "currentPopupRightInsetFromExistingAnchorRight379": 1,
+        "referenceSelectedHorizontalInsetsNormalized": [
+          3.6944770857814335,
+          3.2326674500587544
+        ],
+        "currentBodyHalfOpenFromActualRowsAndExistingPadding": [
+          237,
+          500,
+          378,
+          712
+        ],
+        "currentBodyWidthHeight": [
+          141,
+          212
+        ],
+        "currentBodyBBoxMeasurementMethod": "Current menu surface equals underlying card in portions; bbox is recovered from actual ink/divider/selected-mask extents plus unchanged known padding. Not a fake innerPopup metadata rectangle.",
+        "currentMinusReferenceBodyWidthHeight": [
+          -0.31374853113982226,
+          30.508813160987074
+        ],
+        "actualDividerRows": [],
+        "referenceSelectedMaskHalfOpen": [
+          522,
+          968,
+          813,
+          1042
+        ],
+        "referenceSelectedMaskNormalized": [
+          241.06462984723854,
+          447.03172737955344,
+          375.45123384253816,
+          481.2056404230317
+        ],
+        "referenceSelectedMaskWidthHeightNormalized": [
+          134.38660399529965,
+          34.17391304347826
+        ],
+        "currentSelectedExactRgbMask": {
+          "rgb": [
+            238,
+            239,
+            250
+          ],
+          "bboxHalfOpen": [
+            240,
+            543,
+            374,
+            583
+          ],
+          "area": 4551
+        },
+        "currentSelectedIndexZeroBased": 1,
+        "currentSourceRowHeight": 40,
+        "currentSourceOuterPaddingTopBottom": [
+          3,
+          9
+        ],
+        "currentRowPresentation": "Notification",
+        "currentSourceLabelFontSizeSp": 16,
+        "currentSourceYoffset": null,
+        "currentThemeForced": false,
+        "contentDifference": "Actual notification prefs/template/scroll state retained; sample content and reference selected25blue are not forced.",
+        "currentSelectedMaskWidthHeight": [
+          134,
+          40
+        ],
+        "currentMinusReferenceSelectedMaskWidthHeight": [
+          -0.3866039952996516,
+          5.826086956521742
+        ],
+        "currentSelectedMaskHorizontalInsets": [
+          3,
+          4
+        ],
+        "allChineseLabelWidthDerivedFontSp": [
+          {
+            "label": "重载",
+            "fontSpEstimate": 13.82449490163375
+          },
+          {
+            "label": "重启",
+            "fontSpEstimate": 13.82449490163375
+          },
+          {
+            "label": "停止",
+            "fontSpEstimate": 14.062848262006748
+          },
+          {
+            "label": "隐藏通知",
+            "fontSpEstimate": 13.8396284483241
+          }
+        ]
+      },
+      "26": {
+        "page": 26,
+        "currentCapture": "/workspace/scratch/3788973cf567/tmp/ui85-2730954/04-026-action-three.png",
+        "currentSha256": "994331126745cd22e3c5e591544b8cdda91079256b75ee9d1957c724a66cd728",
+        "currentDimensions": [
+          393,
+          852
+        ],
+        "referenceEmbeddedPath": "/tmp/hetu-pdf04-page26-embedded.jpeg",
+        "referenceSha256": "84ce9bc49581c2ef53ac7b9a4ec68252d5e11a025dfe28f34b697929c26475de",
+        "referenceDimensions": [
+          850,
+          1850
+        ],
+        "referenceWidthNormalization": 0.4623529411764706,
+        "coordinateSystem": "Original raw embedded JPEG coordinates;393/referenceWidth scaling. Rendered PDF25px caption excluded.",
+        "fullSizeOriginalRenderedAndFreshCurrentActuallyOpened": true,
+        "referenceLabelInk": [
+          {
+            "crop": [
+              520,
+              1180,
+              711,
+              1240
+            ],
+            "bboxInclusive": [
+              535,
+              1197,
+              595,
+              1226
+            ],
+            "width": 61,
+            "height": 30,
+            "centerY": 1211.5,
+            "inkPixels": 1052,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载",
+            "centerYNormalized": 560.1405882352941,
+            "widthNormalized": 28.203529411764706,
+            "heightNormalized": 13.870588235294118
+          },
+          {
+            "crop": [
+              520,
+              1256,
+              711,
+              1310
+            ],
+            "bboxInclusive": [
+              535,
+              1270,
+              593,
+              1299
+            ],
+            "width": 59,
+            "height": 30,
+            "centerY": 1284.5,
+            "inkPixels": 976,
+            "maskThreshold": "maxRGB<160",
+            "label": "重启",
+            "centerYNormalized": 593.8923529411765,
+            "widthNormalized": 27.278823529411763,
+            "heightNormalized": 13.870588235294118
+          },
+          {
+            "crop": [
+              520,
+              1328,
+              711,
+              1384
+            ],
+            "bboxInclusive": [
+              535,
+              1342,
+              595,
+              1372
+            ],
+            "width": 61,
+            "height": 31,
+            "centerY": 1357.0,
+            "inkPixels": 770,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止",
+            "centerYNormalized": 627.4129411764706,
+            "widthNormalized": 28.203529411764706,
+            "heightNormalized": 14.332941176470587
+          },
+          {
+            "crop": [
+              520,
+              1403,
+              711,
+              1457
+            ],
+            "bboxInclusive": [
+              536,
+              1416,
+              658,
+              1445
+            ],
+            "width": 123,
+            "height": 30,
+            "centerY": 1430.5,
+            "inkPixels": 2011,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知",
+            "centerYNormalized": 661.3958823529412,
+            "widthNormalized": 56.86941176470588,
+            "heightNormalized": 13.870588235294118
+          },
+          {
+            "crop": [
+              520,
+              1475,
+              711,
+              1533
+            ],
+            "bboxInclusive": [
+              536,
+              1490,
+              563,
+              1518
+            ],
+            "width": 28,
+            "height": 29,
+            "centerY": 1504.0,
+            "inkPixels": 380,
+            "maskThreshold": "maxRGB<160",
+            "label": "无",
+            "centerYNormalized": 695.3788235294118,
+            "widthNormalized": 12.945882352941176,
+            "heightNormalized": 13.408235294117647
+          }
+        ],
+        "currentLabelInk": [
+          {
+            "crop": [
+              245,
+              454,
+              333,
+              470
+            ],
+            "bboxInclusive": [
+              252,
+              454,
+              282,
+              469
+            ],
+            "width": 31,
+            "height": 16,
+            "centerY": 461.5,
+            "inkPixels": 180,
+            "maskThreshold": "maxRGB<160",
+            "label": "重载"
+          },
+          {
+            "crop": [
+              245,
+              494,
+              333,
+              510
+            ],
+            "bboxInclusive": [
+              252,
+              494,
+              281,
+              509
+            ],
+            "width": 30,
+            "height": 16,
+            "centerY": 501.5,
+            "inkPixels": 166,
+            "maskThreshold": "maxRGB<160",
+            "label": "重启"
+          },
+          {
+            "crop": [
+              245,
+              534,
+              333,
+              550
+            ],
+            "bboxInclusive": [
+              255,
+              534,
+              286,
+              549
+            ],
+            "width": 32,
+            "height": 16,
+            "centerY": 541.5,
+            "inkPixels": 173,
+            "maskThreshold": "maxRGB<160",
+            "label": "停止"
+          },
+          {
+            "crop": [
+              245,
+              574,
+              333,
+              590
+            ],
+            "bboxInclusive": [
+              252,
+              574,
+              314,
+              589
+            ],
+            "width": 63,
+            "height": 16,
+            "centerY": 581.5,
+            "inkPixels": 333,
+            "maskThreshold": "maxRGB<160",
+            "label": "隐藏通知"
+          },
+          {
+            "crop": [
+              245,
+              616,
+              333,
+              629
+            ],
+            "bboxInclusive": [
+              252,
+              616,
+              265,
+              628
+            ],
+            "width": 14,
+            "height": 13,
+            "centerY": 622.0,
+            "inkPixels": 57,
+            "maskThreshold": "maxRGB<160",
+            "label": "无"
+          }
+        ],
+        "referenceLabelPitchesNormalized": [
+          33.75176470588235,
+          33.5205882352941,
+          33.982941176470604,
+          33.982941176470604
+        ],
+        "currentLabelPitches": [
+          40.0,
+          40.0,
+          40.0,
+          40.5
+        ],
+        "currentMinusReferenceLabelPitch": [
+          6.248235294117649,
+          6.479411764705901,
+          6.017058823529396,
+          6.517058823529396
+        ],
+        "referenceBodyApproxHalfOpen": [
+          502,
+          1163,
+          811,
+          1553
+        ],
+        "referenceWhiteComponentBBox": [
+          502,
+          1163,
+          811,
+          1553
+        ],
+        "referenceBodyBoundsNormalized": [
+          232.10117647058823,
+          537.7164705882353,
+          374.9682352941176,
+          718.0341176470588
+        ],
+        "referenceBodyWidthHeightNormalized": [
+          142.86705882352942,
+          180.31764705882352
+        ],
+        "referencePopupRightInsetFromExistingAnchorRight379": 4.031764705882381,
+        "currentPopupRightInsetFromExistingAnchorRight379": 1,
+        "referenceSelectedHorizontalInsetsNormalized": [
+          6.472941176470588,
+          6.010588235294118
+        ],
+        "currentBodyHalfOpenFromActualRowsAndExistingPadding": [
+          237,
+          438,
+          378,
+          650
+        ],
+        "currentBodyWidthHeight": [
+          141,
+          212
+        ],
+        "currentBodyBBoxMeasurementMethod": "Current menu surface equals underlying card in portions; bbox is recovered from actual ink/divider/selected-mask extents plus unchanged known padding. Not a fake innerPopup metadata rectangle.",
+        "currentMinusReferenceBodyWidthHeight": [
+          -1.867058823529419,
+          31.682352941176475
+        ],
+        "actualDividerRows": [],
+        "referenceSelectedMaskHalfOpen": [
+          516,
+          1324,
+          798,
+          1391
+        ],
+        "referenceSelectedMaskNormalized": [
+          238.5741176470588,
+          612.155294117647,
+          368.9576470588235,
+          643.1329411764706
+        ],
+        "referenceSelectedMaskWidthHeightNormalized": [
+          130.3835294117647,
+          30.97764705882353
+        ],
+        "currentSelectedExactRgbMask": {
+          "rgb": [
+            238,
+            239,
+            250
+          ],
+          "bboxHalfOpen": [
+            240,
+            521,
+            374,
+            561
+          ],
+          "area": 4649
+        },
+        "currentSelectedIndexZeroBased": 2,
+        "currentSourceRowHeight": 40,
+        "currentSourceOuterPaddingTopBottom": [
+          3,
+          9
+        ],
+        "currentRowPresentation": "Notification",
+        "currentSourceLabelFontSizeSp": 16,
+        "currentSourceYoffset": null,
+        "currentThemeForced": false,
+        "contentDifference": "Actual notification prefs/template/scroll state retained; sample content and reference selected25blue are not forced.",
+        "currentSelectedMaskWidthHeight": [
+          134,
+          40
+        ],
+        "currentMinusReferenceSelectedMaskWidthHeight": [
+          3.616470588235302,
+          9.022352941176472
+        ],
+        "currentSelectedMaskHorizontalInsets": [
+          3,
+          4
+        ],
+        "allChineseLabelWidthDerivedFontSp": [
+          {
+            "label": "重载",
+            "fontSpEstimate": 14.556660341555977
+          },
+          {
+            "label": "重启",
+            "fontSpEstimate": 14.548705882352941
+          },
+          {
+            "label": "停止",
+            "fontSpEstimate": 14.101764705882353
+          },
+          {
+            "label": "隐藏通知",
+            "fontSpEstimate": 14.443025210084032
+          }
+        ]
+      }
+    },
+    "findingsByPage": {
+      "22": [
+        "Actually opened rawreference/renderedPDF/freshcurrent. Current menu148x269px versus original width-normalized148.241x269.235; inner body partly reconstructed from actual row/mask/divider geometry because c.surface equals underlying card.",
+        "Fresh label pitches[43.5, 42.5, 43.0, 43.0, 43.0]; original[42.948, 42.948, 43.179, 43.179, 43.41]. All6 intended viewport labels actually visible.",
+        "Fresh first label ink28x15px versus original27.709x14.316; current scoped font16sp. Production font size remains a measurable source token, not automatically OEM.",
+        "Original callback/pick/check/selectedpredicate/theme and existing anchor placement remain. No synthetic preference substitution, forced palette or unmeasured Y correction."
+      ],
+      "23": [
+        "Actually opened rawreference/renderedPDF/freshcurrent. Current menu134x255px versus original width-normalized133.620x253.832; inner body partly reconstructed from actual row/mask/divider geometry because c.surface equals underlying card.",
+        "Fresh label pitches[35.5, 34.5, 35.0, 35.0, 35.5, 35.0]; original[34.676, 34.676, 35.139, 35.139, 35.832, 35.139]. All7 intended viewport labels actually visible.",
+        "Fresh first label ink25x13px versus original25.429x12.484; current scoped font13sp. Production font size remains a measurable source token, not automatically OEM.",
+        "Original callback/pick/check/selectedpredicate/theme and existing anchor placement remain. No synthetic preference substitution, forced palette or unmeasured Y correction.",
+        "All7visible choices including完整设置 are fully legible; current selectedHome has check with no grey filled row. Raw metadata keeps all9choices and source keeps take/drop/max7 scrolling."
+      ],
+      "24": [
+        "Actually opened rawreference/renderedPDF/freshcurrent. Current menu141x212px versus original width-normalized141.480x211.295; inner body partly reconstructed from actual row/mask/divider geometry because c.surface equals underlying card.",
+        "Fresh label pitches[40.0, 40.0, 40.0, 40.5]; original[40.456, 40.225, 40.225, 40.687]. All5 intended viewport labels actually visible.",
+        "Fresh first label ink32x16px versus original31.440x16.182; current scoped font16sp. Production font size remains a measurable source token, not automatically OEM.",
+        "Original callback/pick/check/selectedpredicate/theme and existing anchor placement remain. No synthetic preference substitution, forced palette or unmeasured Y correction."
+      ],
+      "25": [
+        "Actually opened rawreference/renderedPDF/freshcurrent. Current menu141x212px versus original width-normalized141.314x181.491; inner body partly reconstructed from actual row/mask/divider geometry because c.surface equals underlying card.",
+        "Fresh label pitches[40.0, 40.0, 40.0, 40.5]; original[34.636, 35.098, 35.559, 35.79]. All5 intended viewport labels actually visible.",
+        "Fresh first label ink31x16px versus original26.785x13.392; current scoped font16sp. Production font size remains a measurable source token, not automatically OEM.",
+        "Original callback/pick/check/selectedpredicate/theme and existing anchor placement remain. No synthetic preference substitution, forced palette or unmeasured Y correction.",
+        "Original this action slot uses a smaller font/row/menu than PDF24. Shared else currently uses16sp/40dp for all3slots, so this page retains a concrete production-sized residual; it was not falsely inherited or declared1:1.",
+        "Original selected重启bluecore medianRGB10/99/246 (805pixels) while fresh selected重启darkcore23/26/36 (174pixels) and no blue text pixels; same reference24/26selectedblack. Root proposes onlyindex1 currentTheme c.accent nullableoverride, pendingnextsource/newCI."
+      ],
+      "26": [
+        "Actually opened rawreference/renderedPDF/freshcurrent. Current menu141x212px versus original width-normalized142.867x180.318; inner body partly reconstructed from actual row/mask/divider geometry because c.surface equals underlying card.",
+        "Fresh label pitches[40.0, 40.0, 40.0, 40.5]; original[33.752, 33.521, 33.983, 33.983]. All5 intended viewport labels actually visible.",
+        "Fresh first label ink31x16px versus original28.204x13.871; current scoped font16sp. Production font size remains a measurable source token, not automatically OEM.",
+        "Original callback/pick/check/selectedpredicate/theme and existing anchor placement remain. No synthetic preference substitution, forced palette or unmeasured Y correction.",
+        "Original this action slot uses a smaller font/row/menu than PDF24. Shared else currently uses16sp/40dp for all3slots, so this page retains a concrete production-sized residual; it was not falsely inherited or declared1:1."
+      ]
+    },
+    "targetSevenFullyVisible": true,
+    "remainingHighConfidencePresentationDifferences": [
+      {
+        "pages": [
+          25,
+          26
+        ],
+        "kind": "Reference action-slot font/row variation versus one uniform scoped production caller",
+        "source": "ToolScreens.kt NotificationSettingsScreen else HxChoiceSheet",
+        "actualCurrentFontSp": 16,
+        "actualCurrentLabelPitches": [
+          40.0,
+          40.0,
+          40.0,
+          40.5
+        ],
+        "original25PitchesNormalized": [
+          34.63572267920091,
+          35.097532314923626,
+          35.55934195064634,
+          35.790246768507586
+        ],
+        "original26PitchesNormalized": [
+          33.75176470588235,
+          33.5205882352941,
+          33.982941176470604,
+          33.982941176470604
+        ],
+        "currentBodyHeight": 212,
+        "original25BodyHeightNormalized": 181.49118683901293,
+        "original26BodyHeightNormalized": 180.31764705882352,
+        "highConfidenceProductionTokenDifference": true,
+        "narrowSourceChangeAuthorizedOrPerformed": false,
+        "note": "PDF24 keeps about40px/16px while25/26 use about35/34px and13-14px ink. Difference is per-reference-page style; no color/Y proposal or source edit."
+      },
+      {
+        "pages": [
+          11
+        ],
+        "kind": "Inherited actual title/subtitle ink-center separation",
+        "currentTitleSubtitleGap": 24.5,
+        "originalNormalizedGap": 20.805882352941175,
+        "imageExactBytesEqual01b6634": true,
+        "sourceUniquelyDetermined": false,
+        "narrowSourceChangeAuthorizedOrPerformed": false
+      },
+      {
+        "pages": [
+          25
+        ],
+        "kind": "OnlyPDF25selectedactionlabelblue versus currentdark",
+        "referenceMedianRGB": [
+          10,
+          99,
+          246
+        ],
+        "currentMedianRGB": [
+          23,
+          26,
+          36
+        ],
+        "source": "HxChoiceSheet Notificationhelper selectedTextColor/ToolScreens index1 caller",
+        "narrowSourceCandidate": "menuSelectedTextColor nullable defaultnull, onlyindex1 c.accent; theme preserved",
+        "sourceChanged": false,
+        "newCandidateFreshRenderingPassed": false
+      }
+    ],
+    "limitations": [
+      "Raw references22/25are851x1849,23/24/26are850x1850; per-image393/width normalization applied. Never mix renderedPDFcaption coordinates.",
+      "Ink threshold maxRGB<160 matches prior original22/23/24bboxes exactly. Only original25blue selected text uses minRGB<160; declared explicitly.",
+      "White body and selected-reference masks are JPEG/AA thresholded; approximate edges permit±1rawpixel. Fresh selected mask exactRGB excludes some clippedAAedgepixels.",
+      "Current PopupLayoutmetadata covers full393x852window. No inner-popup width is falsely read from that full-frame rectangle.",
+      "22/23/24newscoped row/width/font/selectedgeometry is actually rendered and close to originals; literal pixel1:1 is false.25/26reference style variation remains documented.",
+      "Reference pointer/shadow/color/placement differences persist; HxMenus12dpclip/18dpshadow and original automatic below/above anchor logic are frozen. No further color/Y guess or source edit.",
+      "Actual scroll/draft preference/template data differs sample; those content states and all9targetitems are preserved."
+    ],
+    "narrowNextCandidateProposalNotImplemented": {
+      "scope": "ToolScreens.kt existing else arguments branch only by index; plus root-proposed HxChoiceSheet nullable menuSelectedTextColor defaultnull for Notificationhelper only. No callbacks, data, HxMenus, forcedpalette orYOffset changes.",
+      "index0_PDF24": {
+        "preserveCurrentExactArguments": true
+      },
+      "index1_PDF25": {
+        "widthDp": 141,
+        "endInsetDp": 0,
+        "fontSp": 14,
+        "minHeightDp": 34,
+        "verticalPaddingDp": 5.5,
+        "outerTopDp": 3,
+        "outerBottomDp": 4,
+        "dividers": true,
+        "selectedHorizontalPaddingDp": 3,
+        "selectedTextColor": "currentTheme c.accent; onlyindex1",
+        "targetBodyWidthHeight": [
+          141.31374853113982,
+          181.49118683901293
+        ],
+        "targetLabelPitch": 35.27071092831911,
+        "fontEvidence": "All4sameChinese labels width-derived13.824/13.824/14.063/13.840sp; median13.832, favors14over13.5. Height13.392px; glyph raster uncertainty remains. Candidate font14+vpad5.5 should keep34row and add existing1pxdivider for35pitch, but ownfreshrender required."
+      },
+      "index2_PDF26": {
+        "widthDp": 143,
+        "endInsetDp": 4,
+        "fontSp": 14,
+        "minHeightDp": 34,
+        "verticalPaddingDp": 5,
+        "outerTopDp": 5,
+        "outerBottomDp": 5,
+        "dividers": false,
+        "selectedHorizontalPaddingDp": 6,
+        "targetBodyWidthHeight": [
+          142.86705882352942,
+          180.31764705882352
+        ],
+        "targetLabelPitch": 33.8095588235294,
+        "fontEvidence": "All4sameChinese label width-derived14.557/14.549/14.102/14.443sp; inkheights13.871/13.871/14.333/13.871px.14sp is closest retainedNoto candidate;34row/noDivider matches34pitch, ownfreshrender required.",
+        "remainingSelectedVerticalInset": "Original filledselected67raw=30.978px versus rowpitch33.81px implies approximately1.4px each vertical inset. Existing API only horizontal inset; this ToolScreens-only candidate cannot claim exactselectedheight match."
+      },
+      "freshRenderingPassed": false,
+      "sourceChanged": false,
+      "estimatedGeometryNotAcceptance": true
+    },
+    "original25SelectedBlueAndCurrentDarkActuallySampled": {
+      "referenceCrop": [
+        540,
+        977,
+        610,
+        1035
+      ],
+      "referenceBlueCoreMask": "R<80/G<170/B>200",
+      "referenceBlueCorePixels": 805,
+      "referenceBlueCoreMedianRGB": [
+        10,
+        99,
+        246
+      ],
+      "currentCrop": [
+        254,
+        550,
+        310,
+        580
+      ],
+      "currentBluePixels": 0,
+      "currentDarkCoreMask": "maxRGB<120",
+      "currentDarkCorePixels": 174,
+      "currentDarkCoreMedianRGB": [
+        23,
+        26,
+        36
+      ],
+      "confirmedProductionDifference": true,
+      "sourceCandidateAuthorizedToWrite": false,
+      "defaultThemePaletteMustBePreserved": true
+    }
+  },
+  "immutable273ReviewPath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf04-2730954-visual-review.json",
+  "immutable273ReviewSha256": "a6fff5e5adedf68f6ad5b16f3c660e52577a51e858c0c37a82955c94c1ba1b65",
+  "limitations": [
+    "All candidate dimensions are predictions using actual prior glyph/pitch measurements; currentfont14metrics and ownfreshPNG still must verify them.",
+    "Index1usesnull visualInset because34item+1divider=35pitch; adding.5eachwoulddraw33fill and contradict34.174reference. Root explicitly confirmednull.",
+    "Index2drawBehindonlypaint inset1.5; no extra verticalpadding or layoutheight shrink. All picks/haptic/selected/check data retain oldhandlers.",
+    "Neither reference style color nor body geometry constitutes Google auth/device acceptance. No current candidateCI/installed PASS claimed."
+  ],
+  "gitDiffCheckPassed": true,
+  "sourceStopped": true
+}

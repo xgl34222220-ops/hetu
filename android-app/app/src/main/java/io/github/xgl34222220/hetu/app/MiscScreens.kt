@@ -1,12 +1,19 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ht
+
 import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Image
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +24,15 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -29,6 +45,9 @@ import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.SearchOff
+import androidx.compose.material.icons.rounded.Sort
+import androidx.compose.material.icons.rounded.MoreHoriz
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material3.Checkbox
 import androidx.compose.material3.CheckboxDefaults
 import androidx.compose.material3.FilterChip
@@ -47,12 +66,16 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.ui.AppItem
 import kotlinx.coroutines.CancellationException
@@ -77,8 +100,15 @@ internal fun AppListScreen(vm: HetuViewModel) {
     var scope by remember { mutableStateOf(ProxyRuntimeProfile.load(prefs).appScope.id) }
     var query by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
-    var showSystem by rememberSaveable { mutableStateOf(false) }
+    var showSystem by rememberSaveable { mutableStateOf(true) }
     var onlySelected by rememberSaveable { mutableStateOf(false) }
+    var sortMode by rememberSaveable { mutableStateOf("name") }
+    var descending by rememberSaveable { mutableStateOf(false) }
+    var sortMenu by remember { mutableStateOf(false) }
+    var moreMenu by remember { mutableStateOf(false) }
+    var sortAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    var moreAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
+    val menuOffset = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.roundToPx() }
 
     LaunchedEffect(reload) {
         loading = true
@@ -99,67 +129,100 @@ internal fun AppListScreen(vm: HetuViewModel) {
         ProxyRuntimeSettings.markDirty(prefs, "proxyAppPackages")
         vm.bumpSettings()
     }
-
-    val visible = apps.filter { app ->
-        val key = app.selectionKey
-        (!onlySelected || key in selected) &&
-            (showSystem || !app.system || key in selected) &&
-            (query.isBlank() || app.label.contains(query, true) || app.packageName.contains(query, true))
+    fun setScope(value: String) {
+        scope = value
+        prefs.edit().putString("proxyAppScope", value).apply()
+        ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
+        vm.bumpSettings()
     }
 
-    HxPage(
-        title = "应用名单",
-        subtitle = "已选 ${selected.size} 个 · 修改后重启代理生效",
+    val visible = remember(apps, selected, query, showSystem, onlySelected, sortMode, descending) {
+        val filtered = apps.filter { app ->
+            val key = app.selectionKey
+            (!onlySelected || key in selected) &&
+                (showSystem || !app.system || key in selected) &&
+                (query.isBlank() || app.label.contains(query, true) || app.packageName.contains(query, true) || app.uid.toString().contains(query))
+        }
+        val sorted = when (sortMode) {
+            "uid" -> filtered.sortedBy { it.uid }
+            "package" -> filtered.sortedBy { it.packageName.lowercase() }
+            else -> filtered.sortedBy { it.label.lowercase() }
+        }
+        if (descending) sorted.asReversed() else sorted
+    }
+
+    HxPage(flatCanvas = true, referenceTopBar = true,
+        title = ht("应用管理"),
         onBack = { nav.pop() },
+        largeTitle = false, compactTitleFontSizeSp = 20f,
+        bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
+        overlay = {
+            Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
+                .padding(horizontal = Hx.gutter, vertical = 8.dp)) {
+                Text(buildAnnotatedString {
+                    if (scope == "core") append("核心模式不按 Android UID 区分；名单会保留但暂不生效")
+                    else {
+                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append("已选 ") }
+                        withStyle(SpanStyle(color = c.accent, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 12.sp)) { append(selected.size.toString()) }
+                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append(" 个") }
+                        append(if (scope == "blacklist") " · 名单内应用直连，其余应用由配置规则决定" else " · 仅名单内应用进入代理")
+                    }
+                }, fontSize = 10.5.sp, lineHeight = 15.sp, color = c.textMuted,
+                    modifier = Modifier.fillMaxWidth().testTag("app-routing-summary").clip(RoundedCornerShape(12.dp))
+                        .background(c.surface).heightIn(min = 40.dp).padding(horizontal = 12.dp, vertical = 10.dp))
+            }
+        },
         actions = {
-            HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
+            AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsIcons.Search, "搜索", onClick = {
                 searching = !searching
                 if (!searching) query = ""
             })
-            HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { reload++ }, busy = loading && apps.isNotEmpty())
+            Box {
+                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.ArrowUpDown, "排序",
+                    modifier = Modifier.onGloballyPositioned { sortAnchor = it.boundsInWindow() }, onClick = { sortMenu = true })
+                if (sortMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
+                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { sortMenu = false }, offsetY = menuOffset,
+                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(sortAnchor, 20.dp, .43f)) {
+                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按名称", checked = sortMode == "name") { sortMode = "name"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按 UID", checked = sortMode == "uid") { sortMode = "uid"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按包名", checked = sortMode == "package") { sortMode = "package"; sortMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (descending) "改为升序" else "改为降序", dividerBefore = true) { descending = !descending; sortMenu = false },
+                        ), referenceWidth = 130.dp)
+                    }
+                }
+            }
+            AppListBarAction(io.github.xgl34222220.hetu.home.HomeIcons.CircleCheck, "仅看已选", onClick = { onlySelected = !onlySelected })
+            Box {
+                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.EllipsisVertical, "更多",
+                    modifier = Modifier.onGloballyPositioned { moreAnchor = it.boundsInWindow() }, onClick = { moreMenu = true })
+                if (moreMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
+                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { moreMenu = false }, offsetY = menuOffset,
+                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(moreAnchor, 10.dp, .45f)) {
+                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (showSystem) "隐藏系统应用" else "显示系统应用", checked = showSystem) { showSystem = !showSystem; moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("全选当前结果") { commit(selected + visible.map { it.selectionKey }); moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("清空名单") { commit(emptySet()); moreMenu = false },
+                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("刷新应用") { reload++; moreMenu = false },
+                        ), referenceWidth = 120.dp)
+                    }
+                }
+            }
+            Spacer(Modifier.width(4.dp))
         },
     ) {
-        item(key = "scope") {
-            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 12.dp)) {
-                HxSegmented(
-                    options = listOf("core" to "不区分", "blacklist" to "名单直连", "whitelist" to "名单代理"),
-                    selected = scope,
-                    onSelect = {
-                        scope = it
-                        prefs.edit().putString("proxyAppScope", it).apply()
-                        ProxyRuntimeSettings.markDirty(prefs, "proxyAppScope")
-                        vm.bumpSettings()
-                    },
-                )
-                Text(
-                    when (scope) {
-                        "blacklist" -> "勾选的应用绕过代理，其余应用正常走代理。"
-                        "whitelist" -> "只有勾选的应用走代理，其余应用直连。"
-                        else -> "不按应用区分，全部由配置规则决定；名单会保留但不生效。"
-                    },
-                    style = MaterialTheme.typography.bodySmall,
-                    color = c.textMuted,
-                    modifier = Modifier.padding(start = 4.dp, top = 8.dp),
-                )
+        item(key = "mode-tabs") {
+            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) {
                 if (searching) {
+                    HxSearchField(query, { query = it }, "搜索应用名称、包名或 UID", autoFocus = true)
                     Spacer(Modifier.height(10.dp))
-                    HxSearchField(query, { query = it }, "搜索应用或包名")
                 }
-                Spacer(Modifier.height(10.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                    HxFilterChip("系统应用", showSystem) { showSystem = it }
-                    HxFilterChip("仅已选", onlySelected) { onlySelected = it }
-                    Spacer(Modifier.weight(1f))
-                    Text(
-                        if (visible.isNotEmpty() && visible.all { it.selectionKey in selected }) "取消全选" else "全选",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = c.accent,
-                        modifier = Modifier.clip(Hx.chipShape).clickable(enabled = visible.isNotEmpty()) {
-                            val keys = visible.map { it.selectionKey }.toSet()
-                            commit(if (keys.all { it in selected }) selected - keys else selected + keys)
-                        }.padding(horizontal = 8.dp, vertical = 6.dp),
-                    )
-                }
+                HxSegmented(
+                    options = listOf("blacklist" to "黑名单", "whitelist" to "白名单", "core" to "核心"),
+                    selected = scope,
+                    onSelect = ::setScope,
+                    selectedTextColor = c.accent,
+                )
             }
         }
         if (loading && apps.isEmpty()) {
@@ -169,66 +232,59 @@ internal fun AppListScreen(vm: HetuViewModel) {
         }
         items(visible, key = { it.selectionKey }) { app ->
             val key = app.selectionKey
-            AppRow(vm, app, key in selected) { checked -> commit(if (checked) selected + key else selected - key) }
+            TargetAppRow(vm, app, key in selected, enabled = scope != "core") { checked ->
+                commit(if (checked) selected + key else selected - key)
+            }
         }
+
     }
 }
 
 @Composable
-private fun HxFilterChip(label: String, selected: Boolean, onChange: (Boolean) -> Unit) {
-    val c = Hx.colors
-    FilterChip(
-        selected = selected,
-        onClick = { onChange(!selected) },
-        label = { Text(label) },
-        shape = Hx.pillShape,
-        colors = FilterChipDefaults.filterChipColors(
-            selectedContainerColor = c.accentSoft,
-            selectedLabelColor = c.accent,
-            labelColor = c.textMuted,
-        ),
-    )
-}
-
-@Composable
-private fun AppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, onChange: (Boolean) -> Unit) {
+private fun TargetAppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     val c = Hx.colors
     val icon by produceState<Bitmap?>(app.icon, app.packageName) {
         if (value == null) value = vm.filters.appIcon(app.packageName)
     }
+    val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = Hx.gutter)
-            .padding(bottom = 6.dp)
-            .clip(Hx.rowShape)
+            .padding(bottom = 8.dp)
+            .clip(RoundedCornerShape(18.dp))
             .background(c.surface)
-            .clickable { onChange(!checked) }
-            .padding(start = 12.dp, end = 4.dp, top = 8.dp, bottom = 8.dp),
+            .clickable(enabled = enabled) {
+                haptics.perform(if (checked) io.github.xgl34222220.hetu.ui.HetuHaptic.ToggleOff else io.github.xgl34222220.hetu.ui.HetuHaptic.ToggleOn)
+                onChange(!checked)
+            }
+            .padding(horizontal = 14.dp, vertical = 15.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val bitmap = icon
         if (bitmap != null) {
-            Image(bitmap.asImageBitmap(), null, Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)))
+            Image(bitmap.asImageBitmap(), null, Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)))
         } else {
-            Box(Modifier.size(38.dp).clip(RoundedCornerShape(10.dp)).background(c.surfaceMuted))
+            Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(c.surfaceMuted))
         }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.bodyLarge, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(
-                app.packageName + (if (app.userId != android.os.Process.myUid() / 100000) " · 用户 ${app.userId}" else "") + if (app.system) " · 系统" else "",
-                style = MaterialTheme.typography.bodySmall,
-                color = c.textMuted,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Text(app.label, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Checkbox(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = CheckboxDefaults.colors(checkedColor = c.accent, uncheckedColor = c.textFaint, checkmarkColor = c.onAccent),
-        )
+        Spacer(Modifier.width(8.dp))
+        Text("#${app.uid}", style = MaterialTheme.typography.labelMedium, color = c.accent)
+        Spacer(Modifier.width(10.dp))
+        HxSelectMark(checked && enabled)
+
+    }
+}
+
+@Composable
+private fun AppListBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    // Compact visual spacing from 03A/028. Material keeps its expanded minimum touch bounds.
+    androidx.compose.material3.IconButton(onClick = onClick, modifier = modifier.width(32.dp).height(48.dp)) {
+        androidx.compose.material3.Icon(icon, description, tint = Hx.colors.text, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -237,8 +293,8 @@ private fun AppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, onChange: 
 /* ------------------------------------------------------------------ */
 
 @Composable
-internal fun CoresScreen(vm: HetuViewModel) {
-    val nav = LocalNav.current
+internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
+    val nav = if (onBackOverride == null) LocalNav.current else null
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val c = Hx.colors
@@ -248,6 +304,10 @@ internal fun CoresScreen(vm: HetuViewModel) {
     var working by remember { mutableStateOf<String?>(null) }
     var progress by remember { mutableStateOf("") }
     var importTarget by remember { mutableStateOf<String?>(null) }
+    val families = listOf("mihomo", "xray", "sing-box")
+    var variants by remember { mutableStateOf(families.associateWith { vm.prefs.getString("coreManagerSlot.$it", it).orEmpty() }) }
+    var variantMenu by remember { mutableStateOf<String?>(null) }
+    val cards = coreManagerCards(statuses, variants)
 
     fun load(network: Boolean) {
         checking = true
@@ -290,26 +350,44 @@ internal fun CoresScreen(vm: HetuViewModel) {
         }
     }
 
-    HxPage(
-        title = "核心管理",
-        subtitle = if (vm.coreVersion.isNotBlank()) "运行中：${vm.coreVersion}" else "内置 Mihomo，可在线更新",
-        onBack = { nav.pop() },
+    HxPage(flatCanvas = true, referenceTopBar = true,
+        title = ht("核心管理"),
+        largeTitle = false,
+        onBack = { onBackOverride?.invoke() ?: nav?.pop() },
         actions = { HxBarAction(Icons.Rounded.Refresh, "检查更新", onClick = { load(true) }, busy = checking) },
     ) {
-        if (statuses.isEmpty()) {
-            item(key = "loading") { Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { HxSpinner(26.dp) } }
+        item(key = "core-runtime-status") {
+            Text(
+                when {
+                    !vm.state.running -> "代理未运行"
+                    vm.coreVersion.isNotBlank() -> "运行中：${vm.coreVersion}"
+                    else -> "代理运行中"
+                },
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 28.dp),
+                fontSize = 15.sp,
+                lineHeight = 20.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = c.textMuted,
+                textAlign = TextAlign.Center,
+            )
         }
-        items(statuses, key = { it.id }) { status ->
+        if (statuses.isEmpty()) {
+            item(key = "loading") { HxSkeletonRows(3) }
+        }
+        items(cards, key = { it.first }) { (family, status) ->
             val core = ProxyRuntimeProfile.Core.from(status.id)
             val busy = working == status.id
-            HxSection {
-                HxCard {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        HxIconBadge(Icons.Rounded.Memory)
-                        Spacer(Modifier.width(12.dp))
+            Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 14.dp)) {
+                HxCard(padding = PaddingValues(start = 16.dp, top = 20.dp, end = 16.dp, bottom = 16.dp)) {
+                    Row(Modifier.padding(horizontal = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+                        CoreConceptGlyph(status.id)
+                        Spacer(Modifier.width(16.dp))
                         Column(Modifier.weight(1f)) {
                             Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(status.label, style = MaterialTheme.typography.titleMedium, color = c.text)
+                                Text(coreManagerDisplayName(status.id, status.label),
+                                    modifier = Modifier.weight(1f, fill = status.updateAvailable).hxAnchorSource().clickable(enabled = working == null) { variantMenu = family },
+                                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                                    style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold), color = c.text)
                                 if (status.updateAvailable) {
                                     Spacer(Modifier.width(8.dp))
                                     HxPill("有更新", HxTone.Accent)
@@ -324,20 +402,24 @@ internal fun CoresScreen(vm: HetuViewModel) {
                                     "当前 " + status.installedVersion.ifBlank { if (status.bundled) "内置版本" else "未安装" },
                                     if (status.latestVersion.isNotBlank()) "最新 ${status.latestVersion}" else "",
                                 ).filter { it.isNotBlank() }.joinToString(" · "),
-                                style = MaterialTheme.typography.bodySmall,
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp),
                                 color = c.textMuted,
                             )
                         }
                     }
                     if (busy && progress.isNotBlank()) {
-                        Text(progress, style = MaterialTheme.typography.bodySmall, color = c.accent, modifier = Modifier.padding(top = 10.dp))
+                        Row(Modifier.padding(start = 78.dp, top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            HxSpinner(20.dp)
+                            Spacer(Modifier.width(10.dp))
+                            Text(progress, style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp, fontWeight = FontWeight.SemiBold), color = c.textMuted, maxLines = 2)
+                        }
                     } else if (status.message.isNotBlank()) {
-                        Text(status.message, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(top = 10.dp))
+                        Text(status.message, style = MaterialTheme.typography.bodySmall.copy(fontSize = 13.sp), color = c.textMuted, modifier = Modifier.padding(top = 10.dp))
                     }
-                    Spacer(Modifier.height(14.dp))
+                    Spacer(Modifier.height(if (busy && progress.isNotBlank()) 14.dp else 16.dp))
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        HxButton(
-                            if (status.downloaded) "更新" else "下载",
+                        CoreConceptButton(
+                            if (status.downloaded || status.bundled) "更新" else "下载",
                             onClick = {
                                 working = status.id
                                 progress = ""
@@ -357,14 +439,15 @@ internal fun CoresScreen(vm: HetuViewModel) {
                             },
                             icon = Icons.Rounded.CloudDownload,
                             busy = busy,
+                            filled = status.downloaded || status.bundled,
                             enabled = working == null && status.canDownload,
                             modifier = Modifier.weight(1f),
                         )
-                        HxButton(
+                        CoreConceptButton(
                             "导入",
                             onClick = {
                                 importTarget = status.id
-                                importer.launch(arrayOf("*/*"))
+                                launchDocumentPicker(vm::toast) { importer.launch(arrayOf("*/*")) }
                             },
                             icon = Icons.Rounded.FileOpen,
                             filled = false,
@@ -372,7 +455,7 @@ internal fun CoresScreen(vm: HetuViewModel) {
                             modifier = Modifier.weight(1f),
                         )
                         if (status.downloaded) {
-                            HxButton(
+                            CoreConceptButton(
                                 "删除",
                                 onClick = {
                                     working = status.id
@@ -400,6 +483,16 @@ internal fun CoresScreen(vm: HetuViewModel) {
             }
         }
     }
+    variantMenu?.let { family ->
+        CoreManagerPicker(family, variants[family] ?: family, statuses,
+            cards.filter { it.first != family }.map { it.second.id }.toSet(),
+            onPick = { id ->
+                variants = variants + (family to id)
+                vm.prefs.edit().putString("coreManagerSlot.$family", id).apply()
+                variantMenu = null
+            }, onDismiss = { variantMenu = null })
+    }
+
 }
 
 /* ------------------------------------------------------------------ */
@@ -426,45 +519,69 @@ internal fun AboutScreen(vm: HetuViewModel) {
         }
     }
 
-    HxPage(title = "关于", onBack = { nav.pop() }) {
+    val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
+    HxPage(flatCanvas = true, referenceTopBar = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
         item(key = "brand") {
-            Column(Modifier.fillMaxWidth().padding(vertical = 12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(painterResource(R.drawable.ic_hetu_official), null, Modifier.size(84.dp).clip(RoundedCornerShape(22.dp)))
-                Spacer(Modifier.height(14.dp))
-                Text("河图", style = MaterialTheme.typography.headlineSmall, color = c.text)
-                Text("版本 ${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Root 透明代理与广告过滤，基于 Mihomo。",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = c.textMuted,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                )
-                Spacer(Modifier.height(20.dp))
+            val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
+                listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
+            )
+            // Hero drifts up slower than the list and fades out, handing over to the bar title.
+            Box(
+                Modifier
+                    .fillMaxWidth()
+                    .height(264.dp)
+                    .graphicsLayer {
+                        val offset = if (aboutList.firstVisibleItemIndex == 0) aboutList.firstVisibleItemScrollOffset.toFloat() else size.height
+                        translationY = offset * .45f
+                        alpha = (1f - offset / (size.height * .8f)).coerceIn(0f, 1f)
+                    }
+                    .background(wash),
+                contentAlignment = Alignment.Center,
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Image(
+                        painterResource(R.drawable.ic_hetu_concept),
+                        null,
+                        Modifier
+                            .size(108.dp)
+                            .clip(RoundedCornerShape(26.dp)),
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("河图", fontSize = 32.sp, lineHeight = 40.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.accent)
+                    Text("${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", fontSize = 14.sp, lineHeight = 20.sp, color = c.textMuted)
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        "Root 透明代理与广告过滤，基于 Mihomo。",
+                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
+                        color = c.textMuted,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.padding(horizontal = 32.dp),
+                    )
+                }
             }
+            Spacer(Modifier.height(8.dp))
         }
         item(key = "info") {
-            HxSection("信息") {
-                HxGroup {
-                    HxRow("内置核心", subtitle = revision.ifBlank { "Mihomo" }, icon = Icons.Rounded.Memory)
-                    HxDivider()
-                    HxRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
+            SettingsSection() {
+                SettingsGroup(title = "信息") {
+                    SettingsRow("内置核心", subtitle = "Mihomo", icon = Icons.Rounded.Memory)
+                    SettingsDivider()
+                    SettingsRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
                 }
             }
         }
         item(key = "licenses") {
-            HxSection("开源许可") {
-                HxGroup {
-                    HxNavRow("Mihomo", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Mihomo", "MIHOMO-LICENSE") }
-                    HxDivider()
-                    HxNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("AdGuard", "ADGUARD-LICENSE") }
-                    HxDivider()
-                    HxNavRow("Lucide Icons", subtitle = "ISC", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Lucide", "licenses/lucide.txt") }
+            SettingsSection() {
+                SettingsGroup(title = "开源许可") {
+                    SettingsNavRow("Mihomo", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Mihomo", "MIHOMO-LICENSE") }
+                    SettingsDivider()
+                    SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("AdGuard", "ADGUARD-LICENSE") }
+                    SettingsDivider()
+                    SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Lucide", "licenses/lucide.txt") }
                 }
             }
         }
     }
 
-    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }) }
+    sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, wrapLines = true, referenceDocument = true) }
 }

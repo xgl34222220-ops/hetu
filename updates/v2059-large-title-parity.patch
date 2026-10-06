@@ -1,0 +1,112 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2058
+-        versionName = "0.10.8-v20"
++        versionCode = 2059
++        versionName = "0.10.9-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
+@@ -164,6 +164,7 @@
+     showScrollTop: Boolean = true,
+     largeTitle: Boolean = true,
+     largeTitleStartPadding: Dp = Hx.gutter,
++    largeTitleTopPadding: Dp = 0.dp,
+     largeTitleFontSizeSp: Float? = null,
+     largeTitleBottomPadding: Dp = 10.dp,
+     canvasColor: Color? = null,
+@@ -227,7 +228,7 @@
+                     Row(
+                         Modifier
+                             .fillMaxWidth()
+-                            .padding(start = largeTitleStartPadding, end = Hx.gutter + 2.dp, bottom = largeTitleBottomPadding)
++                            .padding(start = largeTitleStartPadding, end = Hx.gutter + 2.dp, top = largeTitleTopPadding, bottom = largeTitleBottomPadding)
+                             .graphicsLayer {
+                                 val p = headerProgress.value
+                                 alpha = 1f - p * .92f
+@@ -264,6 +265,9 @@
+                                 maxLines = 1,
+                             )
+                         }
++                        if (!collapsed) {
++                            Row(verticalAlignment = Alignment.CenterVertically, content = actions)
++                        }
+                     }
+                 } else if (!subtitle.isNullOrBlank()) item(key = "hx-page-compact-subtitle") {
+                     Text(
+@@ -351,11 +355,13 @@
+                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = "返回", tint = c.text)
+                     }
+                 }
+-                Row(
+-                    modifier = Modifier.align(Alignment.CenterEnd),
+-                    verticalAlignment = Alignment.CenterVertically,
+-                    content = actions,
+-                )
++                if (!largeTitle || collapsed) {
++                    Row(
++                        modifier = Modifier.align(Alignment.CenterEnd),
++                        verticalAlignment = Alignment.CenterVertically,
++                        content = actions,
++                    )
++                }
+             }
+             if (c.dark) HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = c.line.copy(alpha = barAlpha * .28f), thickness = 0.5.dp)
+         }
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+@@ -114,6 +114,7 @@
+         scrollToTopSignal = vm.reselect,
+         bottomPadding = bottomPadding,
+         largeTitleStartPadding = 26.dp,
++        largeTitleTopPadding = 26.dp,
+         largeTitleFontSizeSp = 36f,
+         largeTitleBottomPadding = 18.dp,
+         canvasColor = Hx.colors.canvas,
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -329,6 +329,7 @@
+             scrollToTopSignal = vm.reselect,
+             bottomPadding = bottomPadding,
+             largeTitleStartPadding = 26.dp,
++            largeTitleTopPadding = 26.dp,
+             largeTitleFontSizeSp = 36f,
+             largeTitleBottomPadding = 18.dp,
+             canvasColor = c.canvas,
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt
+@@ -0,0 +1,17 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++class LargeTitleParity59Test {
++    @Test fun rootToolsAndSettingsUseExpandedHeaderActions() {
++        val components = java.io.File("src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt").readText()
++        val tools = java.io.File("src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt").readText()
++        val settings = java.io.File("src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt").readText()
++        assertTrue(components.contains("largeTitleTopPadding: Dp = 0.dp"))
++        assertTrue(components.contains("if (!collapsed)"))
++        assertTrue(components.contains("if (!largeTitle || collapsed)"))
++        assertTrue(tools.contains("largeTitleTopPadding = 26.dp"))
++        assertTrue(settings.contains("largeTitleTopPadding = 26.dp"))
++    }
++}
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -66,7 +66,7 @@
+             assertTrue("Window must be laid out", view.width > 0 && view.height > 0)
+             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+             view.draw(Canvas(bitmap))
+-            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept58"), "$name.png")
++            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept59"), "$name.png")
+             file.parentFile!!.mkdirs()
+             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+             bitmap.recycle()

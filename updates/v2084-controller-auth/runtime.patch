@@ -1,0 +1,1457 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 86cbc46..2a760ec 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2083
+-        versionName = "0.12.13-v20-ui"
++        versionCode = 2084
++        versionName = "0.12.14-v20-auth"
+     }
+
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
+index b5310fe..55b17ef 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java
+@@ -115,6 +115,13 @@ final class LegacyAppMigrator {
+
+     private static boolean portableKey(String key) {
+         if (key == null || key.isEmpty() || key.startsWith("proxySelectedConfig.")) return false;
++        // Local controller identity belongs to this installation and its deployed
++        // runtime. Importing the old app's secret breaks an already running core.
++        // User-entered proxyCustomApi* settings remain portable.
++        if (key.equals("proxyControllerSecret") || key.equals("proxyControllerPort")
++                || key.equals("proxyRootWanted") || key.equals("proxyRootHealthProbeElapsed")
++                || key.equals("proxyRootAppliedSettings") || key.equals("proxyRootTopologyFingerprint")
++                || key.equals("proxyRootValidatedFingerprint") || key.equals("proxyRootCapabilityFingerprint")) return false;
+         String low = key.toLowerCase(Locale.ROOT);
+         if (low.contains("runtime") || low.contains("session") || low.contains("error")
+                 || low.contains("uilast") || low.contains("logoffset") || low.contains("counter")) return false;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
+index 7abcdfd..51bdb44 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
+@@ -9,7 +9,7 @@ import java.nio.charset.StandardCharsets;
+ import java.util.*;
+ import java.util.concurrent.Semaphore;
+
+-/** Authenticated localhost-only Mihomo Clash API client for strategy, delay, providers, rules and connections UI. */
++/** Authenticated Mihomo API client; each request keeps its selected endpoint and credentials together. */
+ final class MihomoControllerClient {
+     private static final int LIMIT=6*1024*1024;
+     static final String IPV6_DELAY_URL="https://[2606:4700:4700::1111]/cdn-cgi/trace";
+@@ -29,9 +29,14 @@ final class MihomoControllerClient {
+     }
+     static final class ControllerHttpException extends IOException {
+         final int statusCode;
+-        ControllerHttpException(int statusCode, String detail) {
+-            super("Mihomo 控制接口返回 "+statusCode+(detail.isEmpty()?"":"："+compact(detail)));
++        final boolean customApi;
++        ControllerHttpException(int statusCode, String detail, boolean customApi) {
++            super(statusCode==401
++                    ? (customApi ? "自定义 Mihomo 控制接口鉴权失败（401），请核对所填 API 地址、端口与 Secret"
++                                 : "本机 Mihomo 控制接口鉴权失败（401），应用凭据与当前运行核心不一致")
++                    : "Mihomo 控制接口返回 "+statusCode+(detail.isEmpty()?"":"："+compact(detail)));
+             this.statusCode=statusCode;
++            this.customApi=customApi;
+         }
+     }
+     private final Context context;
+@@ -41,31 +46,36 @@ final class MihomoControllerClient {
+         return context.getSharedPreferences("hetu",0);
+     }
+
+-    private boolean customApi(){
+-        return prefs().getBoolean("proxyCustomApiEnabled",false);
+-    }
+-
+-    private String host()throws IOException{
+-        if(!customApi())return "127.0.0.1";
+-        String value=prefs().getString("proxyCustomApiHost","127.0.0.1");
+-        value=value==null?"":value.trim();
+-        if(value.isEmpty()||value.length()>253||!value.matches("[A-Za-z0-9.-]+"))
+-            throw new IOException("自定义 Clash API 地址无效");
+-        return value;
+-    }
++    private static final class ControllerEndpoint {
++        final boolean customApi;
++        final String host;
++        final int port;
++        final String secret;
+
+-    private String secret()throws IOException{
+-        String key=customApi()?"proxyCustomApiSecret":"proxyControllerSecret";
+-        String value=prefs().getString(key,"");
+-        value=value==null?"":value;
+-        if(value.indexOf('\r')>=0||value.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
+-        if(!customApi()&&value.isEmpty())throw new IOException("策略控制接口尚未初始化");
+-        return value;
+-    }
++        ControllerEndpoint(Map<String,?> snapshot)throws IOException {
++            // SharedPreferences.getAll() takes one atomic copy. Never reread the mode
++            // while choosing fields: a concurrent Save must not move a local secret
++            // onto a custom endpoint, or a custom secret onto the local controller.
++            customApi=Boolean.TRUE.equals(snapshot.get("proxyCustomApiEnabled"));
++            host=customApi?string(snapshot,"proxyCustomApiHost","127.0.0.1").trim():"127.0.0.1";
++            if(customApi&&(host.isEmpty()||host.length()>253||!host.matches("[A-Za-z0-9.-]+")))
++                throw new IOException("自定义 Clash API 地址无效");
++            int fallback=customApi?9090:MihomoStartupConfig.CONTROLLER_PORT;
++            Object rawPort=snapshot.get(customApi?"proxyCustomApiPort":"proxyControllerPort");
++            if(rawPort!=null&&!(rawPort instanceof Integer))throw new IOException("Clash API 端口设置类型无效");
++            int requested=rawPort==null?fallback:(Integer)rawPort;
++            port=requested>=1024&&requested<=65535?requested:fallback;
++            secret=string(snapshot,customApi?"proxyCustomApiSecret":"proxyControllerSecret","");
++            if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
++            if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
++        }
+
+-    private int port(){
+-        int key=customApi()?prefs().getInt("proxyCustomApiPort",9090):prefs().getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
+-        return key>=1024&&key<=65535?key:(customApi()?9090:MihomoStartupConfig.CONTROLLER_PORT);
++        private static String string(Map<String,?> values,String key,String fallback)throws IOException {
++            Object value=values.get(key);
++            if(value==null)return fallback;
++            if(!(value instanceof String))throw new IOException("Clash API 设置类型无效");
++            return (String)value;
++        }
+     }
+
+     private String customDelayUrl(){
+@@ -205,6 +215,9 @@ final class MihomoControllerClient {
+                     null,
+                     7000
+                 );
++            }catch(ControllerHttpException e){
++                if(e.statusCode==401)throw e;
++                last=e;
+             }catch(Exception e){last=e;}
+         }
+         if(last!=null)throw last;
+@@ -214,7 +227,8 @@ final class MihomoControllerClient {
+     void closeAll()throws Exception{request("DELETE","/connections",null);}
+     boolean waitReady(long timeoutMs){
+         long end=android.os.SystemClock.elapsedRealtime()+timeoutMs;
+-        do{try{version();return true;}catch(Exception ignored){}android.os.SystemClock.sleep(120);}while(android.os.SystemClock.elapsedRealtime()<end);
++        do{try{version();return true;}catch(ControllerHttpException error){if(error.statusCode==401)return false;}
++            catch(Exception ignored){}android.os.SystemClock.sleep(120);}while(android.os.SystemClock.elapsedRealtime()<end);
+         return false;
+     }
+
+@@ -224,23 +238,23 @@ final class MihomoControllerClient {
+
+     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
+         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
+-        int port=port();
+-        String host=host();
+-        String secret=secret();
++        ControllerEndpoint endpoint=new ControllerEndpoint(prefs().getAll());
+         Socket socket=new Socket();
+         try{
+-            socket.connect(new InetSocketAddress(InetAddress.getByName(host),port),2200);
++            socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host),endpoint.port),2200);
+             socket.setSoTimeout(socketTimeoutMs);
+             OutputStream raw=socket.getOutputStream();
+             StringBuilder head=new StringBuilder();
+             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
+-                .append("Host: ").append(host).append(':').append(port).append("\r\n");
+-            if(!secret.isEmpty())head.append("Authorization: Bearer ").append(secret).append("\r\n");
++                .append("Host: ").append(endpoint.host).append(':').append(endpoint.port).append("\r\n");
++            if(!endpoint.secret.isEmpty())head.append("Authorization: Bearer ").append(endpoint.secret).append("\r\n");
+             head.append("Accept: application/json\r\n")
+                 .append("Connection: close\r\n");
+             if(payload.length>0)head.append("Content-Type: application/json; charset=utf-8\r\nContent-Length: ").append(payload.length).append("\r\n");
+             head.append("\r\n");
+-            raw.write(head.toString().getBytes(StandardCharsets.US_ASCII));
++            // Go's HTTP parser retains header value bytes. Preserve a configured UTF-8
++            // secret exactly instead of silently replacing every non-ASCII character.
++            raw.write(head.toString().getBytes(StandardCharsets.UTF_8));
+             if(payload.length>0)raw.write(payload);
+             raw.flush();
+
+@@ -250,6 +264,8 @@ final class MihomoControllerClient {
+             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
+             HashMap<String,String> headers=new HashMap<>();String line;
+             while((line=readLine(in))!=null&&!line.isEmpty()){int colon=line.indexOf(':');if(colon>0)headers.put(line.substring(0,colon).trim().toLowerCase(Locale.ROOT),line.substring(colon+1).trim());}
++            // Do not echo an authentication server's body: it may contain credentials.
++            if(code==401)throw new ControllerHttpException(code,"",endpoint.customApi);
+             byte[] bytes;
+             String transfer=headers.get("transfer-encoding");
+             if(transfer!=null&&transfer.toLowerCase(Locale.ROOT).contains("chunked"))bytes=readChunked(in);
+@@ -258,7 +274,7 @@ final class MihomoControllerClient {
+                 if(len<0||len>LIMIT)throw new IOException("控制接口响应过大");bytes=readFixed(in,len);
+             }else bytes=readToEnd(in);
+             String text=new String(bytes,StandardCharsets.UTF_8);
+-            if(code<200||code>=300)throw new ControllerHttpException(code,text.trim());
++            if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
+             return text.trim().isEmpty()?new JSONObject():new JSONObject(text);
+         }finally{try{socket.close();}catch(Exception ignored){}}
+     }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index 780965b..00802ad 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -95,6 +95,8 @@ internal data class ProxyComposeState(
+     val config: String = "尚未选择配置",
+     val message: String = "",
+     val panelReady: Boolean = false,
++    val controllerReadFailed: Boolean = false,
++    val controllerError: String = "",
+     val groups: List<ProxyGroupUi> = emptyList(),
+     val connections: List<ProxyConnectionUi> = emptyList(),
+     val downloadTotal: Long = 0,
+@@ -142,7 +144,8 @@ internal class ProxyComposeController(context: Context) {
+         val selected = configs.selected(profile.core)
+         val iconMap = try {
+             if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
+-        } catch (_: Exception) { emptyMap() }
++        } catch (cancel: CancellationException) { throw cancel }
++        catch (_: Exception) { emptyMap() }
+
+         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
+         val nowElapsed = android.os.SystemClock.elapsedRealtime()
+@@ -174,7 +177,8 @@ internal class ProxyComposeController(context: Context) {
+                         .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
+                         .apply()
+                 }
+-            } catch (error: Exception) {
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) {
+                 if (fastRunning) JSONObject()
+                     .put("running", true)
+                     .put("healthProbeFailed", true)
+@@ -218,22 +222,43 @@ internal class ProxyComposeController(context: Context) {
+         var up = 0L
+         var memory = 0L
+         var trafficMode = ""
++        var controllerReadFailed = false
++        var controllerError = ""
+
+         if (running) {
+-            try { trafficMode = api.configs().optString("mode", "") } catch (_: Exception) { }
+-            try {
+-                groups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
+-                panelReady = true
+-            } catch (_: Exception) { }
+             try {
++                val freshMode = api.configs().optString("mode", "")
++                val freshGroups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
+                 val rawConnections = api.connections()
++                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
++                val freshConnections = parseConnections(rawConnections, socketUids)
++                // One complete controller snapshot. Partial reads cannot acknowledge a
++                // selection or publish the absent counters as a fresh zero measurement.
++                trafficMode = freshMode
++                groups = freshGroups
++                connections = freshConnections
+                 down = rawConnections.optLong("downloadTotal", 0L)
+                 up = rawConnections.optLong("uploadTotal", 0L)
+                 memory = rawConnections.optLong("memory", 0L)
+-                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
+-                connections = parseConnections(rawConnections, socketUids)
+                 panelReady = true
+-            } catch (_: Exception) { }
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) {
++                controllerReadFailed = true
++                val requestWasCustom = (error as? MihomoControllerClient.ControllerHttpException)?.customApi
++                    ?: prefs.getBoolean("proxyCustomApiEnabled", false)
++                val target = if (requestWasCustom) "自定义控制接口" else "本机控制接口"
++                // Do not expose response bodies: they can contain a custom API secret
++                // even when that secret differs from the local controller credential.
++                controllerError = when (error) {
++                    is MihomoControllerClient.ControllerHttpException -> when (error.statusCode) {
++                        401 -> if (requestWasCustom) "$target 认证失败（HTTP 401），请检查 API 地址和 Secret 后刷新"
++                            else "$target 认证失败（HTTP 401），应用密钥与运行核心不一致；请在工具→诊断工具核对运行状态"
++                        403 -> "$target 拒绝访问（HTTP 403），请检查 API 设置后刷新"
++                        else -> "$target 读取失败（HTTP ${error.statusCode}），请稍后刷新"
++                    }
++                    else -> "$target 读取失败，请检查 API 设置后刷新"
++                }
++            }
+         }
+         ProxyComposeState(
+             running = running,
+@@ -262,6 +287,8 @@ internal class ProxyComposeController(context: Context) {
+                 else -> ""
+             },
+             panelReady = panelReady,
++            controllerReadFailed = controllerReadFailed,
++            controllerError = controllerError,
+             groups = groups,
+             connections = connections,
+             downloadTotal = down,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+index c691a65..f61c934 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.rememberCoroutineScope
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.platform.testTag
+ import dev.chrisbanes.haze.hazeSource
+ import dev.chrisbanes.haze.rememberHazeState
+ import kotlinx.coroutines.CancellationException
+@@ -52,6 +53,7 @@ import androidx.compose.foundation.layout.size
+ import androidx.compose.foundation.shape.CircleShape
+ import androidx.compose.material.icons.rounded.Check
+ import androidx.compose.material.icons.rounded.Close
++import androidx.compose.material.icons.rounded.Info
+ import androidx.compose.material.icons.rounded.PriorityHigh
+ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.geometry.Offset
+@@ -535,10 +537,29 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
+     }
+ }
+
+-private fun hxToastTone(message: String): HxTone = when {
+-    listOf("失败", "错误", "无效", "无法", "异常", "未获得", "超时").any { message.contains(it) } -> HxTone.Bad
++// Status numbers only mean failure in an HTTP/controller-response context, never as item counts.
++private val hxToastHttpFailure = Regex(
++    """(?:(?:^|(?:请求返回|响应(?:状态码)?|服务器返回)\s*[:：]?\s*)HTTP(?:/\d+(?:\.\d+)?)?\s*[:：]?\s*|^(?:(?:Mihomo|Clash)\s*)?控制接口返回\s*)([45]\d{2})(?!\d)""",
++    RegexOption.IGNORE_CASE,
++)
++private val hxToastEnglishFailure = Regex(
++    """(?:^|[：:]\s*)(?:error|failed|failure|unauthorized|forbidden|denied|timeout|cannot|unable|unavailable)\b|\b(?:timed\s+out|connection\s+refused|network\s+is\s+unreachable)\b""",
++    RegexOption.IGNORE_CASE,
++)
++private val hxToastEnglishSuccess = Regex(
++    """^(?:saved|copied|updated|restored|enabled|disabled|disconnected|restarted|started|imported|exported)\b|\b(?:success(?:ful(?:ly)?)?|validation\s+passed|backup\s+completed)\b""",
++    RegexOption.IGNORE_CASE,
++)
++
++internal fun hxToastTone(message: String): HxTone = when {
++    hxToastHttpFailure.containsMatchIn(message) || hxToastEnglishFailure.containsMatchIn(message) ||
++        listOf("失败", "错误", "无效", "无法", "异常", "未获得", "超时", "拒绝").any { message.contains(it) } -> HxTone.Bad
+     listOf("注意", "需要", "请先", "重启代理后").any { message.contains(it) } -> HxTone.Warn
+-    else -> HxTone.Good
++    hxToastEnglishSuccess.containsMatchIn(message) ||
++        listOf("成功", "已保存", "已复制", "已更新", "已恢复", "已启用", "已开启", "已关闭", "已断开", "已重启",
++            "已导出", "已导入", "已备份", "已启动", "已停止", "已切换", "已热重载", "已热更新", "已安装", "已下载",
++            "已删除", "已重命名", "已创建", "已添加", "校验通过", "测速完成").any { message.contains(it) } -> HxTone.Good
++    else -> HxTone.Neutral
+ }
+
+ /** Floating top toast: tone icon, tap or flick up to dismiss. */
+@@ -573,12 +594,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+         border = if (c.dark) androidx.compose.foundation.BorderStroke(0.5.dp, c.line) else null,
+     ) {
+         Row(Modifier.padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+-            Box(Modifier.size(26.dp).clip(CircleShape).background(tone.bg()), contentAlignment = Alignment.Center) {
++            Box(Modifier.testTag("toast-status").size(26.dp).clip(CircleShape).background(tone.bg()), contentAlignment = Alignment.Center) {
+                 Icon(
+                     when (tone) {
+                         HxTone.Bad -> Icons.Rounded.Close
+                         HxTone.Warn -> Icons.Rounded.PriorityHigh
+-                        else -> Icons.Rounded.Check
++                        HxTone.Good -> Icons.Rounded.Check
++                        else -> Icons.Rounded.Info
+                     },
+                     null,
+                     tint = tone.fg(),
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+index d2b40c8..ecc3932 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -308,6 +308,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
+             if (superseded()) return null
+             val now = SystemClock.elapsedRealtime()
++            val controllerSampleValid = next.panelReady && !next.controllerReadFailed
+             val totalTx = TrafficStats.getTotalTxBytes()
+             val totalRx = TrafficStats.getTotalRxBytes()
+             if (next.running && lastLocalAt > 0L && now > lastLocalAt &&
+@@ -328,7 +329,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             // Right after process start a recovering core may briefly look stopped.
+             if (state.running && !next.running && prefs.getBoolean("proxyRootWanted", false) && now - coldStartAt < 2_500L) return null
+
+-            if (next.panelReady && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
++            if (controllerSampleValid && lastAt > 0L && now > lastAt && next.uploadTotal >= lastUp && next.downloadTotal >= lastDown) {
+                 val elapsed = now - lastAt
+                 upRate = ((next.uploadTotal - lastUp) * 1000L / elapsed).coerceAtLeast(0L)
+                 downRate = ((next.downloadTotal - lastDown) * 1000L / elapsed).coerceAtLeast(0L)
+@@ -343,7 +344,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 rateHistory.clear()
+                 upHistory.clear()
+             }
+-            syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
++            if (controllerSampleValid) syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
+
+             var sampleValid = next.running
+             val sampled = if (next.running) {
+@@ -375,7 +376,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 providers = emptyList()
+                 lastProviderRefreshAt = 0L
+                 coreVersion = ""
+-            } else {
++            } else if (!next.controllerReadFailed) {
+                 if (providers.isEmpty() || now - lastProviderRefreshAt > 30_000L) {
+                     val fresh = try { repo.providers() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { providers }
+                     if (superseded()) return null
+@@ -391,11 +392,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+             if (superseded()) return null
+             state = if (next.running && !next.panelReady) {
+-                next.copy(groups = state.groups, connections = state.connections)
++                next.copy(groups = state.groups, connections = state.connections,
++                    downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
++                    memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
+             } else next
+             expectedState = state
+             if (next.running) startupError = null
+-            if (next.panelReady) {
++            if (controllerSampleValid) {
+                 lastAt = now
+                 lastUp = next.uploadTotal
+                 lastDown = next.downloadTotal
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
+index 0fba55a..db04633 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
+@@ -137,7 +137,8 @@ internal fun HetuPanelV2(
+         }
+     }
+     LaunchedEffect(state.uploadTotal, state.downloadTotal, state.connections) {
+-        if (state.running) sampler.sample(SystemClock.elapsedRealtime(), state.uploadTotal, state.downloadTotal, state.connections)
++        if (state.running && state.panelReady && !state.controllerReadFailed)
++            sampler.sample(SystemClock.elapsedRealtime(), state.uploadTotal, state.downloadTotal, state.connections)
+     }
+     // An optimistic selection is dropped as soon as the core reports the same node.
+     LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
+@@ -342,6 +343,8 @@ private fun buildPanelData(
+     sampler: PanelTrafficSampler,
+ ): PanelData {
+     if (!state.running) return PanelData(status = if (starting) PanelStatus.Starting else PanelStatus.NotRunning)
++    if (state.controllerReadFailed) return PanelData(status = PanelStatus.Running,
++        readError = state.controllerError.ifBlank { "控制接口读取失败，请重试或检查 API 设置" })
+     val groupNames = state.groups.mapTo(HashSet()) { it.name }
+     val groups = state.groups.map { g ->
+         PanelGroup(
+@@ -620,8 +623,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+         "logs" -> PanelTab.Logs
+         else -> PanelTab.Groups
+     }
+-    LaunchedEffect(tab, vm.state.running) {
++    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed) {
+         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
++        if (vm.state.controllerReadFailed) return@LaunchedEffect
+         when (tab) {
+             PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
+             PanelTab.Subscriptions -> vm.loadProviders()
+@@ -637,7 +641,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+     LaunchedEffect(vm.state.running) {
+         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+         while (true) {
+-            sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
++            if (vm.state.panelReady && !vm.state.controllerReadFailed) {
++                sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
++            }
+             delay(1_000)
+         }
+     }
+@@ -647,7 +653,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+     val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
+         vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
+         emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler).copy(
+-        refreshing = when (tab) {
++        refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
+             PanelTab.Rules -> vm.rulesLoading
+             PanelTab.RuleSets -> vm.ruleSetsLoading
+             PanelTab.Logs -> vm.logsLoading
+@@ -666,11 +672,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+             io.github.xgl34222220.hetu.PanelApiDraft11(it.customTestUrl, it.testUrl, it.history,
+                 it.externalApi, it.host, it.port, it.secret).save(vm.prefs)
+             vm.bumpSettings()
++            vm.pullRefresh()
+         },
+         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
+         onCopy = { label, text -> copyToClipboard(context, label, text) },
+         onRefresh = {
+-            when (tab) {
++            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (tab) {
+                 PanelTab.Rules -> vm.loadRules()
+                 PanelTab.RuleSets -> vm.loadRuleSets()
+                 PanelTab.Logs -> vm.loadLogs()
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
+index 59aacd2..049592b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
+@@ -191,6 +191,8 @@ internal data class PanelData(
+     val logs: List<PanelLogEntry> = emptyList(),
+     /** Owns the pull indicator; false only after the real read finishes or is cancelled. */
+     val refreshing: Boolean = false,
++    /** A failed controller read is unavailable data, never an empty live snapshot. */
++    val readError: String = "",
+ ) {
+     val running: Boolean get() = status == PanelStatus.Running
+
+@@ -302,6 +304,8 @@ internal sealed interface PanelOverlay {
+     /* bottom sheets */
+     data object LayoutSheet : PanelOverlay
+     data object ApiSheet : PanelOverlay
++    /** Direct entry from a failed read; cancel returns to the panel, not the layout sheet. */
++    data object ApiReadErrorSheet : PanelOverlay
+     data class NodeInfo(val node: String) : PanelOverlay
+     data class ConnectionDetail(val id: String) : PanelOverlay
+
+@@ -310,7 +314,7 @@ internal sealed interface PanelOverlay {
+
+     val isMenu: Boolean get() = this is GroupFilterMenu || this is RankModeMenu || this is RankCountMenu ||
+         this is ConnFilterMenu || this is ConnSortMenu || this is ConnMoreMenu || this is LogOrderMenu
+-    val isSheet: Boolean get() = this is LayoutSheet || this is ApiSheet || this is NodeInfo || this is ConnectionDetail
++    val isSheet: Boolean get() = this is LayoutSheet || this is ApiSheet || this is ApiReadErrorSheet || this is NodeInfo || this is ConnectionDetail
+ }
+
+ /** Everything the panel asks its host to do. Defaults are no-ops so previews need nothing. */
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
+index 36d4019..582ecc9 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt
+@@ -107,7 +107,9 @@ internal fun PanelSheetBody(
+ ) {
+     when (overlay) {
+         PanelOverlay.LayoutSheet -> LayoutSheet(view, onView, onOverlay, actions.onOpenPolicyIcons)
+-        PanelOverlay.ApiSheet -> ApiSheet(view.api, onCancel = { onOverlay(PanelOverlay.LayoutSheet) }) { saved ->
++        PanelOverlay.ApiSheet, PanelOverlay.ApiReadErrorSheet -> ApiSheet(view.api, onCancel = {
++            onOverlay(if (overlay == PanelOverlay.ApiReadErrorSheet) null else PanelOverlay.LayoutSheet)
++        }) { saved ->
+             onView(view.copy(api = saved)); actions.onSaveApi(saved); onOverlay(null)
+         }
+         is PanelOverlay.NodeInfo -> NodeInfoSheet(overlay.node, data, onClose = { onOverlay(null) }, onTest = { actions.onTestNode(overlay.node) }, onCopy = { actions.onCopy("节点名称", overlay.node) })
+@@ -218,7 +220,7 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
+                 PanelSwitchRow("流量与连接历史", draft.history, { edit(draft.copy(history = it)) }, subtitle = "保存最近 24 小时排行所需的数据")
+             }
+             HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+-                PanelSwitchRow("外部 Clash API", draft.externalApi, { edit(draft.copy(externalApi = it)) }, subtitle = if (draft.externalApi) "使用自定义控制器" else "内置 127.0.0.1:9090")
++                PanelSwitchRow("外部 Clash API", draft.externalApi, { edit(draft.copy(externalApi = it)) }, subtitle = if (draft.externalApi) "使用自定义控制器" else "使用河图本机核心")
+                 if (draft.externalApi) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                         Column(Modifier.weight(1f)) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
+index b6ec14d..b36e274 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
+@@ -128,6 +128,17 @@ internal fun PanelScreen(
+                 }
+                 return@LazyColumn
+             }
++            if (data.readError.isNotBlank()) {
++                item(key = "panel-read-error") {
++                    PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError) {
++                        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
++                            HomeButton("重试", actions.onRefresh, loading = data.refreshing)
++                            HomeButton("API 设置", { onOverlay(PanelOverlay.ApiReadErrorSheet) }, kind = HomeButtonKind.Primary)
++                        }
++                    }
++                }
++                return@LazyColumn
++            }
+             if (view.searching && view.tab.searchable) item(key = "panel-search") {
+                 PanelSearchField(view.query, { onView(view.copy(query = it)) }, view.tab.searchHint.orEmpty(), Modifier.panelGutter().padding(bottom = 8.dp), autoFocus = popups)
+             }
+@@ -166,7 +177,7 @@ internal fun PanelScreen(
+         PanelActionBar(data, view, overlay, actions, collapsed, onView, onOverlay, menu)
+
+         // 策略: once a group is open, “定位当前节点” and a collapse pill float above the dock.
+-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && view.tab == PanelTab.Groups }
++        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && view.tab == PanelTab.Groups }
+         if (openGroup != null) {
+             Column(
+                 Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = (bottomPad - 18.dp).coerceAtLeast(16.dp)),
+@@ -227,7 +238,7 @@ private fun PanelActionBar(
+                 Modifier.align(if (wide) Alignment.CenterStart else Alignment.Center).padding(horizontal = HomeDims.gutter).alpha(barAlpha),
+                 color = c.t1, style = HomeType.barTitle,
+             )
+-            if (data.running) Row(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
++            if (data.running && data.readError.isBlank()) Row(Modifier.align(Alignment.CenterEnd).padding(end = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                 val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
+                     Box {
+                         HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint)
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt
+new file mode 100644
+index 0000000..2c0d79e
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt
+@@ -0,0 +1,256 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.content.ContextWrapper
++import android.content.SharedPreferences
++import androidx.test.core.app.ApplicationProvider
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.ByteArrayOutputStream
++import java.io.IOException
++import java.net.InetAddress
++import java.net.ServerSocket
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++
++/** Real TCP requests, original credentials and loopback fixtures; no Root or external service. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35])
++class ControllerAuthenticationTest {
++    private val context get() = ApplicationProvider.getApplicationContext<Context>()
++    private val prefs get() = context.getSharedPreferences("hetu", 0)
++    private val localSecret = "fixture-local-credential"
++    private val customSecret = "fixture-custom-credential"
++
++    @Before fun reset() { prefs.edit().clear().commit() }
++
++    private fun endpoints(localPort: Int, customPort: Int, custom: Boolean = false) {
++        prefs.edit().putBoolean("proxyCustomApiEnabled", custom)
++            .putInt("proxyControllerPort", localPort).putString("proxyControllerSecret", localSecret)
++            .putString("proxyCustomApiHost", "127.0.0.1").putInt("proxyCustomApiPort", customPort)
++            .putString("proxyCustomApiSecret", customSecret).commit()
++    }
++
++    private fun authenticated(server: MockWebServer, expected: String) {
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse =
++                if (request.getHeader("Authorization") == "Bearer $expected")
++                    MockResponse().setBody("{\"version\":\"original-fixture\"}")
++                else MockResponse().setResponseCode(401).setBody("credential mismatch")
++        }
++    }
++
++    @Test fun defaultControllerUsesOnlyItsLocalCredential() {
++        MockWebServer().use { local -> MockWebServer().use { custom ->
++            local.start(); custom.start(); authenticated(local, localSecret)
++            endpoints(local.port, custom.port)
++            assertEquals("original-fixture", MihomoControllerClient(context).version().getString("version"))
++            val request = local.takeRequest(2, TimeUnit.SECONDS)!!
++            assertEquals("Bearer $localSecret", request.getHeader("Authorization"))
++            assertEquals(0, custom.requestCount)
++        } }
++    }
++
++    @Test fun customControllerUsesOnlyTheUserCustomCredential() {
++        MockWebServer().use { local -> MockWebServer().use { custom ->
++            local.start(); custom.start(); authenticated(custom, customSecret)
++            endpoints(local.port, custom.port, custom = true)
++            assertEquals("original-fixture", MihomoControllerClient(context).version().getString("version"))
++            val request = custom.takeRequest(2, TimeUnit.SECONDS)!!
++            assertEquals("Bearer $customSecret", request.getHeader("Authorization"))
++            assertEquals(0, local.requestCount)
++        } }
++    }
++
++    /** Changes the real prefs immediately after the atomic copy, before the request resolves fields. */
++    private class SwitchingPreferences(
++        private val source: SharedPreferences,
++        private val afterCopy: () -> Unit,
++    ) : SharedPreferences by source {
++        var snapshots = 0
++        override fun getAll(): MutableMap<String, *> {
++            val snapshot = HashMap(source.all)
++            snapshots++
++            afterCopy()
++            return snapshot
++        }
++        override fun getBoolean(key: String?, defaultValue: Boolean): Boolean =
++            throw AssertionError("Endpoint mode must come from the atomic snapshot")
++        override fun getString(key: String?, defaultValue: String?): String? =
++            throw AssertionError("Endpoint string must come from the atomic snapshot")
++        override fun getInt(key: String?, defaultValue: Int): Int =
++            throw AssertionError("Endpoint port must come from the atomic snapshot")
++    }
++
++    private fun withPreferences(requestPreferences: SharedPreferences): Context = object : ContextWrapper(context) {
++        override fun getApplicationContext(): Context = this
++        override fun getSharedPreferences(name: String, mode: Int): SharedPreferences {
++            assertEquals("hetu", name)
++            return requestPreferences
++        }
++    }
++
++    @Test fun savingCustomModeCannotForwardAnInflightLocalCredentialToIt() {
++        MockWebServer().use { local -> MockWebServer().use { custom ->
++            local.start(); custom.start(); authenticated(local, localSecret); authenticated(custom, customSecret)
++            endpoints(local.port, custom.port)
++            val switching = SwitchingPreferences(prefs) { prefs.edit().putBoolean("proxyCustomApiEnabled", true).commit() }
++            val client = MihomoControllerClient(withPreferences(switching))
++            assertEquals("original-fixture", client.version().getString("version"))
++            assertEquals("Bearer $localSecret", local.takeRequest(2, TimeUnit.SECONDS)!!.getHeader("Authorization"))
++            assertEquals(0, custom.requestCount)
++            assertEquals(1, switching.snapshots)
++            assertEquals("original-fixture", client.version().getString("version"))
++            assertEquals("Bearer $customSecret", custom.takeRequest(2, TimeUnit.SECONDS)!!.getHeader("Authorization"))
++            assertEquals(2, switching.snapshots)
++        } }
++    }
++
++    @Test fun savingLocalModeCannotMixItWithInflightCustomCredentials() {
++        MockWebServer().use { local -> MockWebServer().use { custom ->
++            local.start(); custom.start(); authenticated(local, localSecret); authenticated(custom, customSecret)
++            endpoints(local.port, custom.port, custom = true)
++            val switching = SwitchingPreferences(prefs) { prefs.edit().putBoolean("proxyCustomApiEnabled", false).commit() }
++            val client = MihomoControllerClient(withPreferences(switching))
++            assertEquals("original-fixture", client.version().getString("version"))
++            assertEquals("Bearer $customSecret", custom.takeRequest(2, TimeUnit.SECONDS)!!.getHeader("Authorization"))
++            assertEquals(0, local.requestCount)
++            assertEquals(1, switching.snapshots)
++            assertEquals("original-fixture", client.version().getString("version"))
++            assertEquals("Bearer $localSecret", local.takeRequest(2, TimeUnit.SECONDS)!!.getHeader("Authorization"))
++            assertEquals(2, switching.snapshots)
++        } }
++    }
++
++    @Test fun local401KeepsItsTypedCodeAndSuppressesCredentialBearingBody() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port)
++            val before = HashMap(prefs.all)
++            server.enqueue(MockResponse().setResponseCode(401).setBody("echo $localSecret $customSecret private-response-detail"))
++            val error = assertThrows(MihomoControllerClient.ControllerHttpException::class.java) {
++                MihomoControllerClient(context).version()
++            }
++            assertEquals(401, error.statusCode)
++            assertFalse(error.customApi)
++            assertTrue(error.message!!.contains("本机"))
++            assertFalse(error.message!!.contains("自定义"))
++            listOf(localSecret, customSecret, "private-response-detail").forEach { assertFalse(error.message!!.contains(it)) }
++            assertEquals(before, prefs.all)
++            assertEquals(1, server.requestCount)
++        }
++    }
++
++    @Test fun custom401UsesCapturedModeEvenWhenSettingsChangeBeforeTheReply() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port, custom = true)
++            server.dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    prefs.edit().putBoolean("proxyCustomApiEnabled", false).commit()
++                    return MockResponse().setResponseCode(401).setBody("echo $customSecret private-response-detail")
++                }
++            }
++            val error = assertThrows(MihomoControllerClient.ControllerHttpException::class.java) {
++                MihomoControllerClient(context).version()
++            }
++            assertEquals(401, error.statusCode)
++            assertTrue(error.customApi)
++            assertTrue(error.message!!.contains("自定义"))
++            assertFalse(error.message!!.contains("本机"))
++            assertFalse(error.message!!.contains(customSecret))
++            assertFalse(error.message!!.contains("private-response-detail"))
++            assertEquals(localSecret, prefs.getString("proxyControllerSecret", ""))
++            assertEquals(customSecret, prefs.getString("proxyCustomApiSecret", ""))
++            assertEquals(1, server.requestCount)
++        }
++    }
++
++    @Test fun groupDelayDoesNotRetryOtherProbeUrlsAfter401() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port)
++            server.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
++            server.enqueue(MockResponse().setBody("{\"node\":42}"))
++            val error = assertThrows(MihomoControllerClient.ControllerHttpException::class.java) {
++                MihomoControllerClient(context).groupDelay("original-group")
++            }
++            assertEquals(401, error.statusCode)
++            assertEquals(1, server.requestCount)
++        }
++    }
++
++    @Test fun readinessStopsAt401WithoutRotatingCredentialsOrRetrying() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port)
++            val before = HashMap(prefs.all)
++            server.enqueue(MockResponse().setResponseCode(401).setBody("Unauthorized"))
++            server.enqueue(MockResponse().setBody("{}"))
++            assertFalse(MihomoControllerClient(context).waitReady(10_000L))
++            assertEquals(1, server.requestCount)
++            assertEquals(before, prefs.all)
++        }
++    }
++
++    @Test fun utf8CredentialBytesReachTheWireUnchangedInBothModes() {
++        val credential = "原创-密钥-é-🔑"
++        for (custom in listOf(false, true)) {
++            ServerSocket(0, 1, InetAddress.getByName("127.0.0.1")).use { server ->
++                val executor = Executors.newSingleThreadExecutor()
++                val captured = executor.submit<ByteArray> {
++                    server.accept().use { socket ->
++                        socket.soTimeout = 3_000
++                        val bytes = ByteArrayOutputStream()
++                        val input = socket.getInputStream()
++                        var state = 0
++                        while (state < 4) {
++                            val byte = input.read()
++                            check(byte >= 0) { "Request headers ended prematurely" }
++                            bytes.write(byte)
++                            val expected = if (state == 0 || state == 2) 13 else 10
++                            state = if (byte == expected) state + 1 else if (byte == 13) 1 else 0
++                            check(bytes.size() <= 8192) { "Fixture request too large" }
++                        }
++                        socket.getOutputStream().write("HTTP/1.1 200 OK\r\nContent-Length: 2\r\nConnection: close\r\n\r\n{}".toByteArray(Charsets.US_ASCII))
++                        bytes.toByteArray()
++                    }
++                }
++                try {
++                    endpoints(server.localPort, server.localPort, custom)
++                    prefs.edit().putString(if (custom) "proxyCustomApiSecret" else "proxyControllerSecret", credential).commit()
++                    MihomoControllerClient(context).version()
++                    val wire = captured.get(3, TimeUnit.SECONDS)
++                    val expected = ("GET /version HTTP/1.1\r\nHost: 127.0.0.1:${server.localPort}\r\n" +
++                        "Authorization: Bearer $credential\r\nAccept: application/json\r\nConnection: close\r\n\r\n").toByteArray(Charsets.UTF_8)
++                    assertArrayEquals(expected, wire)
++                    assertEquals(credential, prefs.getString(if (custom) "proxyCustomApiSecret" else "proxyControllerSecret", ""))
++                } finally { executor.shutdownNow() }
++            }
++        }
++    }
++
++    @Test fun invalidCredentialNewlinesAreRejectedBeforeOpeningASocket() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port, custom = true)
++            prefs.edit().putString("proxyCustomApiSecret", "original\r\nInjected: header").commit()
++            assertThrows(IOException::class.java) { MihomoControllerClient(context).version() }
++            assertEquals(0, server.requestCount)
++        }
++    }
++
++    @Test fun missingLocalCredentialCannotFallBackToTheCustomCredential() {
++        MockWebServer().use { server ->
++            server.start(); endpoints(server.port, server.port)
++            prefs.edit().remove("proxyControllerSecret").commit()
++            val before = HashMap(prefs.all)
++            assertThrows(IOException::class.java) { MihomoControllerClient(context).version() }
++            assertEquals(0, server.requestCount)
++            assertEquals(before, prefs.all)
++        }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+new file mode 100644
+index 0000000..366297a
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+@@ -0,0 +1,218 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.os.Looper
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import org.robolectric.shadow.api.Shadow
++import java.time.Duration
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicBoolean
++import java.util.concurrent.atomic.AtomicReference
++
++/** Actual controller HTTP reads with isolated healthy Root and /proc boundaries. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    PanelActionRuntimeShadows.RootStatus::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class ControllerReadStateTest {
++    private lateinit var app: Application
++    private lateinit var server: MockWebServer
++    private lateinit var controller: ProxyComposeController
++    private var vm: HetuViewModel? = null
++    private val release = CountDownLatch(1)
++    private val controllerReadEntered = CountDownLatch(1)
++    @Volatile private var rejectedPath: String? = null
++    @Volatile private var responseCode = 401
++    @Volatile private var generation = 1
++    @Volatile private var malformed = false
++    @Volatile private var holdConfigs = false
++
++    @Before fun prepare() {
++        // Share the original suspend-capable history shadow and isolate this method's audit.
++        PanelActionRuntimeShadows.HistoryRecord.reset()
++        PanelActionRuntimeShadows.RuntimeSample.reset()
++        PanelActionRuntimeShadows.NoRoot.reset()
++        app = ApplicationProvider.getApplicationContext()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse {
++                    if (holdConfigs && request.path == "/configs") {
++                        controllerReadEntered.countDown()
++                        check(release.await(6, TimeUnit.SECONDS))
++                    }
++                    if (request.path == rejectedPath || rejectedPath == "*") return MockResponse()
++                        .setResponseCode(responseCode).setBody("fixture-custom-secret fixture-local-secret private response")
++                    if (malformed && request.path == "/connections") return MockResponse().setBody("broken json")
++                    return MockResponse().setBody(when (request.path) {
++                        "/configs" -> """{"mode":"rule"}"""
++                        "/proxies" -> """{"proxies":{"SELECT":{"type":"Selector","now":"node-$generation","all":["node-$generation"]},"node-$generation":{"type":"Shadowsocks"}}}"""
++                        "/providers/proxies" -> """{"providers":{}}"""
++                        "/connections" -> """{"downloadTotal":${generation * 2000},"uploadTotal":${generation * 1000},"memory":${generation * 4096},"connections":[{"id":"conn-$generation","metadata":{"host":"example.test","network":"tcp"},"chains":["SELECT"],"upload":5,"download":10}]}"""
++                        "/version" -> """{"version":"fixture"}"""
++                        else -> "{}"
++                    })
++                }
++            }
++            start()
++        }
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).putString("proxyCustomApiSecret", "fixture-custom-secret")
++            .putString("proxyControllerSecret", "fixture-local-secret").putBoolean("proxyApiHistoryEnabled", true).commit()
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77,
++            rssBytes = 8192L, elapsedSeconds = 123L)
++        assertTrue("History singleton must use the original suspend-capable shadow",
++            Shadow.extract<Any>(ProxyApiHistoryStore) is PanelActionRuntimeShadows.HistoryRecord)
++        controller = ProxyComposeController(app)
++    }
++
++    @After fun finish() {
++        release.countDown()
++        vm?.viewModelScope?.cancel()
++        server.shutdown()
++        assertEquals("Controller reads must not mutate Root", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    @Test fun unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot() = runBlocking {
++        rejectedPath = "*"
++        val state = controller.state()
++        assertTrue(state.running)
++        assertTrue(state.dataPlaneHealthy)
++        assertEquals("", state.message)
++        assertFalse(state.panelReady)
++        assertTrue(state.controllerReadFailed)
++        assertTrue(state.controllerError.contains("自定义控制接口"))
++        assertTrue(state.controllerError.contains("401"))
++        assertFalse(state.controllerError.contains("fixture-custom-secret"))
++        assertFalse(state.controllerError.contains("fixture-local-secret"))
++        assertTrue(state.groups.isEmpty())
++        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
++    }
++
++    @Test fun successfulGroupsThenUnauthorizedConnectionsCannotPublishPartialSnapshot() = runBlocking {
++        rejectedPath = "/connections"
++        val state = controller.state()
++        assertTrue(server.requestCount >= 4)
++        assertFalse(state.panelReady)
++        assertTrue(state.controllerReadFailed)
++        assertTrue(state.controllerError.contains("401"))
++        assertTrue(state.groups.isEmpty())
++        assertTrue(state.connections.isEmpty())
++        assertEquals("", state.trafficMode)
++        assertTrue(state.running && state.dataPlaneHealthy)
++    }
++
++    @Test fun otherHttpFailuresAlsoReportMissingControllerData() = runBlocking {
++        rejectedPath = "/configs"
++        for (code in listOf(400, 503)) {
++            responseCode = code
++            val state = controller.state()
++            assertFalse(state.panelReady)
++            assertTrue(state.controllerReadFailed)
++            assertTrue(state.controllerError.contains(code.toString()))
++            assertTrue(state.running && state.dataPlaneHealthy)
++        }
++    }
++
++    @Test fun malformedSuccessfulHttpResponseIsAReadFailure() = runBlocking {
++        malformed = true
++        val state = controller.state()
++        assertTrue(state.controllerReadFailed)
++        assertFalse(state.panelReady)
++        assertTrue(state.controllerError.contains("读取失败"))
++        assertTrue(state.running && state.dataPlaneHealthy)
++    }
++
++    @Test fun failedPollKeepsConfirmedDataRatesTrendsAndHistoryUntilCompleteRecovery() = runBlocking {
++        val model = HetuViewModel(app).also { vm = it }
++        assertNotNull(model.refreshNow())
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
++        generation = 2
++        assertNotNull(model.refreshNow())
++        val confirmed = model.state
++        assertTrue(confirmed.panelReady)
++        assertEquals("node-2", confirmed.groups.single().now)
++        val oldDownRate = model.downRate
++        val oldUpRate = model.upRate
++        val downTrend = model.rateHistory.toList()
++        val upTrend = model.upHistory.toList()
++        val history = PanelActionRuntimeShadows.HistoryRecord.samples.toList()
++        assertTrue(downTrend.isNotEmpty())
++        assertEquals(2, history.size)
++
++        rejectedPath = "/connections"
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
++        val failedRead = model.refreshNow()!!
++        assertTrue(failedRead.controllerReadFailed)
++        assertFalse(failedRead.panelReady)
++        assertTrue(model.state.controllerReadFailed)
++        assertEquals(confirmed.groups, model.state.groups)
++        assertEquals(confirmed.connections, model.state.connections)
++        assertEquals(confirmed.downloadTotal, model.state.downloadTotal)
++        assertEquals(confirmed.uploadTotal, model.state.uploadTotal)
++        assertEquals(confirmed.memoryBytes, model.state.memoryBytes)
++        assertEquals(confirmed.trafficMode, model.state.trafficMode)
++        assertEquals(oldDownRate, model.downRate)
++        assertEquals(oldUpRate, model.upRate)
++        assertEquals(downTrend, model.rateHistory.toList())
++        assertEquals(upTrend, model.upHistory.toList())
++        assertEquals(history, PanelActionRuntimeShadows.HistoryRecord.samples)
++        assertTrue(model.state.running && model.state.dataPlaneHealthy)
++
++        rejectedPath = null
++        generation = 3
++        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofSeconds(1))
++        val recovered = model.refreshNow()!!
++        assertTrue(recovered.panelReady)
++        assertFalse(recovered.controllerReadFailed)
++        assertEquals("", recovered.controllerError)
++        assertEquals("node-3", model.state.groups.single().now)
++        assertEquals(6000L, model.state.downloadTotal)
++        assertEquals(downTrend.size + 1, model.rateHistory.size)
++        assertEquals(history.size + 1, PanelActionRuntimeShadows.HistoryRecord.samples.size)
++    }
++
++    @Test fun cancellationDuringControllerReadPropagatesWithoutPublishingState() = runBlocking {
++        holdConfigs = true
++        val published = AtomicBoolean(false)
++        val completion = AtomicReference<Throwable?>()
++        val job = launch(Dispatchers.Default) {
++            controller.state()
++            published.set(true)
++        }
++        job.invokeOnCompletion { completion.set(it) }
++        assertNotNull(server.takeRequest(3, TimeUnit.SECONDS))
++        assertTrue("Cancellation must interrupt an entered controller read", controllerReadEntered.await(3, TimeUnit.SECONDS))
++        job.cancel()
++        release.countDown()
++        job.join()
++        assertFalse("Cancelled controller read must not publish a state", published.get())
++        assertTrue("Controller read must complete as cancelled", job.isCancelled)
++        assertTrue("Controller cancellation must propagate", completion.get() is CancellationException)
++        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt
+new file mode 100644
+index 0000000..7293696
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt
+@@ -0,0 +1,107 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implementation
++import org.robolectric.annotation.Implements
++import java.io.File
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++
++/** The old sandbox is an original cache fixture; no shell or privileged filesystem is executed. */
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class LegacyControllerMigrationShadow {
++    companion object {
++        var calls = 0
++        var originalPrefs = ""
++        var oldConfig = false
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            calls++
++            check(command.contains("bichen-app-migration") && command.contains("bichen.xml"))
++            check(!command.contains("iptables") && !command.contains("service.d") && !command.contains("kill "))
++            val stage = File(context.cacheDir, "bichen-app-migration")
++            File(stage, "bichen.xml").writeText(originalPrefs)
++            if (oldConfig) {
++                val config = File(stage, "configs/mihomo/original-legacy.yaml")
++                config.parentFile!!.mkdirs()
++                config.writeText("proxies: []\nproxy-groups: []\nrules:\n  - MATCH,DIRECT\n")
++            }
++            return RootBridge.Result(0, "present=1\n")
++        }
++    }
++}
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [LegacyControllerMigrationShadow::class])
++class LegacyControllerCredentialTest {
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++
++    @Before fun reset() {
++        prefs.edit().clear().commit()
++        LegacyAppMigrator::class.java.getDeclaredField("attempted").apply { isAccessible = true }.setBoolean(null, false)
++        LegacyControllerMigrationShadow.calls = 0
++        LegacyControllerMigrationShadow.oldConfig = false
++        LegacyControllerMigrationShadow.originalPrefs = """<?xml version="1.0" encoding="utf-8"?>
++            <map>
++              <string name="proxyControllerSecret">original-old-local-secret</string>
++              <int name="proxyControllerPort" value="29098" />
++              <boolean name="proxyRootWanted" value="true" />
++              <string name="proxyRootAppliedSettings">old-settings-fingerprint</string>
++              <string name="proxyRootTopologyFingerprint">old-topology</string>
++              <string name="proxyRootValidatedFingerprint">old-validation</string>
++              <string name="proxyRootCapabilityFingerprint">old-capability</string>
++              <long name="proxyRootHealthProbeElapsed" value="98765" />
++              <boolean name="proxyCustomApiEnabled" value="true" />
++              <string name="proxyCustomApiHost">original-controller.example</string>
++              <int name="proxyCustomApiPort" value="23456" />
++              <string name="proxyCustomApiSecret">original-custom-secret</string>
++              <string name="proxyBaseMode">tproxy</string>
++              <string name="proxySelectedConfig.mihomo">original-legacy.yaml</string>
++            </map>""".trimIndent()
++    }
++
++    private fun migrate() {
++        val executor = Executors.newSingleThreadExecutor()
++        try { executor.submit { LegacyAppMigrator.migrateIfNeeded(app) }.get(5, TimeUnit.SECONDS) }
++        finally { executor.shutdownNow() }
++        assertTrue(prefs.getBoolean("hetuLegacyAppDataMigrated", false))
++        assertFalse(prefs.contains("hetuLegacyMigrationError"))
++        assertEquals(1, LegacyControllerMigrationShadow.calls)
++    }
++
++    @Test fun oldMigrationCannotReplaceAnExistingLocalControllerSecret() {
++        prefs.edit().putString("proxyControllerSecret", "original-current-local-secret").commit()
++        migrate()
++        assertEquals("original-current-local-secret", prefs.getString("proxyControllerSecret", ""))
++    }
++
++    @Test fun missingLocalIdentityIsNotImportedFromAnUnrelatedInstallation() {
++        migrate()
++        listOf("proxyControllerSecret", "proxyControllerPort", "proxyRootWanted", "proxyRootAppliedSettings",
++            "proxyRootTopologyFingerprint", "proxyRootValidatedFingerprint", "proxyRootCapabilityFingerprint",
++            "proxyRootHealthProbeElapsed").forEach { key -> assertFalse("Local runtime key imported: $key", prefs.contains(key)) }
++    }
++
++    @Test fun customApiAndOriginalConfigImportKeepTheirExistingMigrationBehavior() {
++        LegacyControllerMigrationShadow.oldConfig = true
++        migrate()
++        assertTrue(prefs.getBoolean("proxyCustomApiEnabled", false))
++        assertEquals("original-controller.example", prefs.getString("proxyCustomApiHost", ""))
++        assertEquals(23456, prefs.getInt("proxyCustomApiPort", 0))
++        assertEquals("original-custom-secret", prefs.getString("proxyCustomApiSecret", ""))
++        assertEquals("tproxy", prefs.getString("proxyBaseMode", ""))
++        assertEquals(1, prefs.getInt("hetuLegacyImportedConfigCount", 0))
++        val selected = ProxyConfigLibrary(app).selected(ProxyRuntimeProfile.Core.MIHOMO)
++        assertNotNull(selected)
++        assertEquals("original-legacy.yaml", selected!!.name)
++        assertTrue(ProxyConfigLibrary(app).read(selected).contains("MATCH,DIRECT"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
+index e3cd960..be46b08 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java
+@@ -35,11 +35,13 @@ public final class PanelActionRuntimeShadows {
+
+     @Implements(value = ProxyApiHistoryStore.class, isInAndroidSdk = false)
+     public static class HistoryRecord {
+-        public static boolean pause;
+-        public static Continuation<? super kotlin.Unit> pending;
+-        @Resetter public static void reset() { pause = false; pending = null; }
++        public static volatile boolean pause;
++        public static volatile Continuation<? super kotlin.Unit> pending;
++        public static final java.util.List<kotlin.Pair<Long, Long>> samples = java.util.Collections.synchronizedList(new java.util.ArrayList<>());
++        @Resetter public static void reset() { pause = false; pending = null; samples.clear(); }
+         @Implementation public Object record(Context app, long upload, long download,
+                 java.util.List<ProxyConnectionUi> connections, long now, Continuation<? super kotlin.Unit> done) {
++            samples.add(new kotlin.Pair<>(upload, download));
+             if (pause) { pending = done; return kotlin.coroutines.intrinsics.IntrinsicsKt.getCOROUTINE_SUSPENDED(); }
+             return kotlin.Unit.INSTANCE;
+         }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+index e40a275..0f9e4a9 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+@@ -123,7 +123,7 @@ class PanelActionSafetyTest {
+             if (predicate()) return
+             Thread.sleep(10)
+         }
+-        assertTrue(reason, predicate())
++        assertTrue("$reason [panelReady=${vm.state.panelReady}, readFailed=${vm.state.controllerReadFailed}, pendingSelection=${vm.pendingSelection.keys}, historyPaused=${PanelActionRuntimeShadows.HistoryRecord.pause}, requestPaths=${requestSnapshot().map { it.path }}]", predicate())
+     }
+
+     private fun gate() = CountDownLatch(1).also { gates += it }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt
+new file mode 100644
+index 0000000..6a56d73
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt
+@@ -0,0 +1,126 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.MutableState
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.test.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.dp
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.panel.*
++import kotlinx.coroutines.cancel
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/** A real rendered control error must not look like live zero measurements or a stopped core. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class PanelControllerErrorTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val reason = "Mihomo 控制接口鉴权失败（401）：请核对自定义 API 的 Secret"
++    private var vm: HetuViewModel? = null
++    @After fun finish() { vm?.viewModelScope?.cancel() }
++
++    @Test fun everyTabShowsUnavailableInsteadOfEmptyLiveData() {
++        val tab = mutableStateOf(PanelTab.Overview)
++        rule.setContent {
++            HetuHomeTheme(dark = false) {
++                PanelRoute(PanelData(status = PanelStatus.Running, readError = reason), tab.value,
++                    { tab.value = it }, PanelActions(), contentPadding = PaddingValues(bottom = 96.dp))
++            }
++        }
++        PanelTab.entries.forEach { next ->
++            rule.runOnIdle { tab.value = next }
++            rule.onNodeWithText("无法读取面板").assertIsDisplayed()
++            rule.onNodeWithText(reason).assertIsDisplayed()
++            rule.onNodeWithText("代理未运行").assertDoesNotExist()
++            rule.onNodeWithText("运行概况").assertDoesNotExist()
++            rule.onNodeWithText("0 B/s").assertDoesNotExist()
++            rule.onNodeWithText("全部更新").assertDoesNotExist()
++        }
++    }
++
++    @Test fun retryUsesTheRealRefreshCallbackAndShowsItsBusyState() {
++        val refreshing = mutableStateOf(false)
++        var calls = 0
++        rule.setContent {
++            HetuHomeTheme(dark = false) {
++                PanelRoute(PanelData(status = PanelStatus.Running, readError = reason,
++                    refreshing = refreshing.value), PanelTab.Overview, {},
++                    PanelActions(onRefresh = { calls++; refreshing.value = true }),
++                    contentPadding = PaddingValues(bottom = 96.dp))
++            }
++        }
++        rule.onNodeWithText("重试").performClick()
++        rule.waitForIdle()
++        assertEquals(1, calls)
++        rule.onNodeWithText("重试").assertIsNotEnabled()
++        rule.runOnIdle { refreshing.value = false }
++        rule.onNodeWithText("重试").performClick()
++        assertEquals(2, calls)
++    }
++
++    @Test fun launcherErrorOpensTheActualApiSettingsSheetWithoutStartingProxy() {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        app.getSharedPreferences("hetu", 0).edit().clear().putString("appearance", "light").commit()
++        val model = HetuViewModel(app).also { vm = it; it.viewModelScope.cancel() }
++        model.openPanel("overview")
++        val field = HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
++        @Suppress("UNCHECKED_CAST")
++        val state = field.get(model) as MutableState<ProxyComposeState>
++        state.value = ProxyComposeState(running = true, panelReady = false,
++            controllerReadFailed = true, controllerError = reason)
++        rule.setContent { HetuAppTheme(appearance = "light", dynamic = false) { NewUiPanel(model, 96.dp) } }
++        rule.onNodeWithText("无法读取面板").assertIsDisplayed()
++        rule.onNodeWithText("API 设置").performClick()
++        rule.onNodeWithText("测速与 API").assertIsDisplayed()
++        rule.onNodeWithText("外部 Clash API").assertExists()
++        rule.onNodeWithText("使用河图本机核心").assertExists()
++        rule.onNodeWithText("取消").performClick()
++        rule.onNodeWithText("测速与 API").assertDoesNotExist()
++        rule.onNodeWithText("排序与布局").assertDoesNotExist()
++        rule.onNodeWithText("无法读取面板").assertIsDisplayed()
++        assertTrue(model.state.running)
++        assertNull(model.operation)
++    }
++
++    @Test fun largeFontErrorActionsStayAboveTheDockAndRecoveryShowsActualCounts() {
++        val data = mutableStateOf(PanelData(status = PanelStatus.Running, readError = reason))
++        rule.setContent {
++            CompositionLocalProvider(LocalDensity provides Density(1f, 1.6f)) {
++                HetuHomeTheme(dark = false) {
++                    PanelRoute(data.value, PanelTab.Overview, {}, PanelActions(),
++                        contentPadding = PaddingValues(bottom = 96.dp))
++                }
++            }
++        }
++        rule.onNodeWithText("API 设置").assertIsDisplayed()
++        val retry = rule.onNodeWithText("重试").getUnclippedBoundsInRoot()
++        val api = rule.onNodeWithText("API 设置").getUnclippedBoundsInRoot()
++        assertTrue(retry.bottom < 756.dp)
++        assertTrue(api.bottom < 756.dp)
++        rule.runOnIdle {
++            data.value = PanelData(status = PanelStatus.Running,
++                overview = PanelOverview(strategyCount = 9, ruleCount = 23, connectionCount = 4))
++        }
++        rule.onNodeWithText("无法读取面板").assertDoesNotExist()
++        rule.onNodeWithText("运行概况").assertExists()
++        rule.onNodeWithText("9", useUnmergedTree = true).assertExists()
++        rule.onNodeWithText("23", useUnmergedTree = true).assertExists()
++        rule.onNodeWithText("4", useUnmergedTree = true).assertExists()
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt
+new file mode 100644
+index 0000000..8947237
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt
+@@ -0,0 +1,113 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.graphics.Color
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.asAndroidBitmap
++import androidx.compose.ui.test.captureToImage
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithTag
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.unit.dp
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/** Actual controller errors retain their text and cannot receive the success check/color. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class ToastFeedbackTest {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++
++    @Before fun prepare() {
++        ApplicationProvider.getApplicationContext<Application>().getSharedPreferences("hetu", 0)
++            .edit().clear().putString("appearance", "light").putBoolean("enableBlur", false).commit()
++    }
++
++    @Test fun actualControllerHttpExceptionsAreErrorsForClientAndServerResponses() {
++        listOf(401, 403, 404, 503).forEach { code ->
++            val message = MihomoControllerClient.ControllerHttpException(code, "Unauthorized", false).message!!
++            assertEquals(message, HxTone.Bad, hxToastTone(message))
++        }
++    }
++
++    @Test fun httpErrorContextDoesNotMistakeSuccessfulCountsOrResponseNumbersForErrors() {
++        listOf("HTTP 401", "HTTP/1.1 503 Service Unavailable", "请求返回 HTTP:403")
++            .forEach { assertEquals(it, HxTone.Bad, hxToastTone(it)) }
++        listOf("已导入 401 个节点", "已更新 503 个订阅", "已导出 HTTP 200 日志", "已导出 HTTP 401.yaml",
++            "已导出 Mihomo 控制接口返回 401.yaml", "Saved 401 entries")
++            .forEach { assertEquals(it, HxTone.Good, hxToastTone(it)) }
++        assertEquals(HxTone.Neutral, hxToastTone("HTTP 200"))
++        assertEquals(HxTone.Neutral, hxToastTone("控制接口返回 4010"))
++    }
++
++    @Test fun englishAuthenticationAndTransportErrorsDoNotClaimSuccess() {
++        listOf("Unauthorized", "Error: access denied", "Failed to connect", "Read timed out", "Connection refused")
++            .forEach { assertEquals(it, HxTone.Bad, hxToastTone(it)) }
++        // A saved filename is not an English error message.
++        assertEquals(HxTone.Good, hxToastTone("Saved error.log"))
++    }
++
++    @Test fun genuineSuccessWarningsAndUnknownNoticesKeepDistinctMeanings() {
++        listOf("已保存", "代理已启动", "校验通过", "已断开全部连接", "运行配置已热重载",
++            "已热更新 12 条广告规则（核心已加载）", "开机脚本已安装，重启后自动启动代理", "Updated successfully")
++            .forEach { assertEquals(it, HxTone.Good, hxToastTone(it)) }
++        assertEquals(HxTone.Warn, hxToastTone("已保存，重启代理后生效"))
++        assertEquals(HxTone.Bad, hxToastTone("切换失败：已更新设置但核心未确认"))
++        assertEquals(HxTone.Neutral, hxToastTone("当前配置没有在线订阅"))
++    }
++
++    private fun showThroughRealHost(message: String) {
++        val vm = HetuViewModel(ApplicationProvider.getApplicationContext<Application>())
++        rule.mainClock.autoAdvance = false
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                Box(Modifier.fillMaxSize()) { HxToastHost(vm, extraBottom = 0.dp) }
++            }
++        }
++        rule.mainClock.advanceTimeBy(200)
++        rule.waitForIdle()
++        rule.runOnIdle { vm.toast(message) }
++        rule.mainClock.advanceTimeBy(500)
++        rule.waitForIdle()
++        rule.onNodeWithText(message).assertExists()
++    }
++
++    private fun statusPixelCounts(): Pair<Int, Int> {
++        val bitmap = rule.onNodeWithTag("toast-status", useUnmergedTree = true).captureToImage().asAndroidBitmap()
++        var red = 0
++        var green = 0
++        for (y in 0 until bitmap.height) for (x in 0 until bitmap.width) {
++            val pixel = bitmap.getPixel(x, y)
++            val r = Color.red(pixel); val g = Color.green(pixel); val b = Color.blue(pixel)
++            if (r > g * 1.3 && r > b * 1.3) red++
++            if (g > r * 1.3 && g > b * 1.3) green++
++        }
++        return red to green
++    }
++
++    @Test fun realToastHostPreservesThe401BodyAndRendersAnErrorInsteadOfAGreenCheck() {
++        val message = "Mihomo 控制接口返回 401：{\"message\":\"Unauthorized\"}"
++        showThroughRealHost(message)
++        val (red, green) = statusPixelCounts()
++        assertTrue("Expected the actual error icon color", red > 5)
++        assertEquals("An HTTP error must not draw a green success status", 0, green)
++    }
++
++    @Test fun realToastHostKeepsSuccessfulCountMessagesAndTheirGreenCheck() {
++        showThroughRealHost("已导入 401 个节点")
++        val (red, green) = statusPixelCounts()
++        assertTrue("Expected the actual success icon color", green > 5)
++        assertEquals(0, red)
++    }
++}

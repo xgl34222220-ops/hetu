@@ -1,0 +1,488 @@
+{
+  "schema_version": 1,
+  "created_utc": "2026-10-05T14:07:28.570849+00:00",
+  "scope": "PDF03B production visual style re-audit / source implementation evidence; not a claim of screenshot parity",
+  "repo": {
+    "path": "/workspace/scratch/3788973cf567/hetu",
+    "branch": "test/v20.76-new-ui",
+    "baseline_head": "270f559424f3ef6e3503d2431ea24f81d295d3d7",
+    "git_head_at_capture": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+    "source_implementation_state": "Source committed by root as 7cfdf426400026c06a997f09d3b7eb4defad852b; this agent did not submit or start/cancel CI."
+  },
+  "original_pdf": {
+    "path": "/workspace/scratch/3788973cf567/upload/河图概念图-03B-工具下册-离线版(1).pdf",
+    "sha256": "e89366d0b62f25b053f225b1ada287a2852a4eeaca969106f9d62c1f14a0550a",
+    "actual_page_count": 48,
+    "used_pages": [
+      {
+        "page_1_based": 1,
+        "embedded_image_xref": 3,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "b18e058921a529f548ec922f9a83b35f1123d304dd1442c2110adaf0d2b4d455",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-01.png",
+        "rendered_png_sha256": "a336a78c7849eeaa0f04e7beab7fe1849e7493890b49eaa04cd6338bdafc2e68",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 13,
+        "embedded_image_xref": 29,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "618a242b24af787d2d07f98fd95281093cd0f6480ceeaca45e931fa55e0ce56e",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-13.png",
+        "rendered_png_sha256": "d57e82b4601f0f25f5b91aa4f9e93487e59faec15926b8b23eaeaa65c33e557e",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 18,
+        "embedded_image_xref": 39,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "76d42d4a53c82c1585899ecd48f017619956f30e3feebca0a88e191a78d37f52",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-18.png",
+        "rendered_png_sha256": "ef9afdc9e45458c543c20878fd7f5a5144bd5debbc439335060aa7feda7dac24",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 19,
+        "embedded_image_xref": 41,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "c8a5f6464287b42ae597d266687f86358f802fbc8461e4bca4b195273518b03c",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-19.png",
+        "rendered_png_sha256": "dc5b45495e26e0c539223579d211624a891f4b7ef1b18a83f2e0359a551891f5",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 20,
+        "embedded_image_xref": 43,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "5750024171a893e2bf7377818b0e7ed1eb2177c2c3a332d24b2d5670d367a036",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-20.png",
+        "rendered_png_sha256": "be9c1b7f1c0f172be43e5df0c489c9425cb0e850db1c875a9f4d012a2b748c6f",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 21,
+        "embedded_image_xref": 45,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "76fce4062b1a08daa4c868a821a916711a1e5bc8ba932184632c87d042ffd4c6",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-21.png",
+        "rendered_png_sha256": "53c7db8912ba7f04401933835695fb0663b97104b40dfdf89813e01710068f4b",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 22,
+        "embedded_image_xref": 47,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "91f5c5d740775966ca866f15cc26cf43e440cca23fd83cceabd174eb187d2660",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-22.png",
+        "rendered_png_sha256": "65b504d9f2d4c4d7a113db4834ec05b4637a7554e2667cc3ca64d6128751e314",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      },
+      {
+        "page_1_based": 25,
+        "embedded_image_xref": 53,
+        "embedded_image_dimensions_px": [
+          850,
+          1850
+        ],
+        "embedded_image_sha256": "830f8a19e9d40353aec91601ea22f25f8729c0ebcb5ddbcf452890e73f8f228c",
+        "page_viewport": [
+          425.0,
+          950.0
+        ],
+        "image_placement_rect": [
+          0.0,
+          25.0,
+          425.0,
+          950.0
+        ],
+        "rendered_png_path": "/workspace/scratch/3788973cf567/tmp/pdf-review/03B-25.png",
+        "rendered_png_sha256": "29ca2b3553818fd055cb335e5e7d7ac179957d9ea82164f33b5851c47538b2d2",
+        "rendered_png_dimensions_px": [
+          425,
+          950
+        ]
+      }
+    ]
+  },
+  "folder_vector": {
+    "reference_page": 13,
+    "source_xref": 29,
+    "source_crop_original_image_xyxy": [
+      60,
+      550,
+      140,
+      640
+    ],
+    "mask": "min(R,G,B)<100 && max(R,G,B)<150 in bounded folder crop",
+    "source_ink_bbox_pixel_xyxy_exclusive": [
+      71,
+      562,
+      122,
+      611
+    ],
+    "source_ink_size_px": [
+      51,
+      49
+    ],
+    "source_contour_bbox_xyxy": [
+      70.5,
+      561.5,
+      121.5,
+      610.5
+    ],
+    "contour_count": 3,
+    "contour_vertex_counts": [
+      201,
+      117,
+      137
+    ],
+    "method": "contourpy marching squares at 0.5, no path simplification; uniform scale 24/51; vertically centred",
+    "vector_default_size_dp": [
+      24,
+      24
+    ],
+    "vector_viewport": [
+      24,
+      24
+    ],
+    "vector_ink_bbox": [
+      0,
+      0.47058823529411775,
+      24,
+      23.529411764705884
+    ],
+    "vector_ink_size": [
+      24,
+      23.058823529411764
+    ],
+    "fill_rule": "EvenOdd",
+    "trace_path_sha256": "d0f117a4e1085c3450b5e93201284883c775638f92c2acf0dddd747de1df22b4",
+    "trace_identical_in_source": true,
+    "source_symbol": "FileManagerReferenceIcons.Folder",
+    "vector_name": "HetuPdf03B13.FileManagerFolder",
+    "reference_rows": [
+      13,
+      14
+    ],
+    "background_rows_on_menu_dialog_pages": [
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25
+    ],
+    "new_render_preview_path": "/tmp/b-folder-new-preview.png",
+    "preview_limit": "SVG trace visual preview only; no new Android component/native screenshot yet."
+  },
+  "changes": [
+    {
+      "id": "B1-mode-warning",
+      "pages": [
+        1
+      ],
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+      "symbol": "AdblockScreen",
+      "change": "Only mode warning uses HxBanner(referenceCompact=true).",
+      "reference_measurement": "Reference PNG banner height approx50px / 1.0814 =46.24dp; old20c actual warning occupied approx72dp. Root shared component has min46dp, 11.5sp/14sp text, complete wrapping text.",
+      "callbacks": "Original mode predicate and vm.setTrafficMode(\"rule\") retained.",
+      "new_screenshot_status": "Not yet visually validated."
+    },
+    {
+      "id": "B13-folder",
+      "pages": [
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        21,
+        22,
+        23,
+        24,
+        25
+      ],
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "support_file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt",
+      "symbol": "FileReferenceEntryRow",
+      "change": "Only directory icon uses the directly traced rounded layered folder.",
+      "reference_measurement": "Reference rendered ink approx26x25px =24.04x23.12dp; old20c line icon approx20x17dp. New vector ink24x23.059.",
+      "callbacks": "onClick,onLongClick,trailing chevron, selection, row height/subtitle unchanged.",
+      "new_screenshot_status": "Trace preview inspected; Android screenshot pending."
+    },
+    {
+      "id": "B-file-form-weight",
+      "pages": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        25
+      ],
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "symbol": "FileFolderPage/createFolder/downloadDialog/renameFor",
+      "change": "Exactly 3 HxFormDialog calls opt into labelFontWeight and inputFontWeight SemiBold(600).",
+      "previous_source": "label defaultMedium(500); input MaterialTheme bodyLarge weight with default400. Sizes/lineHeights remain existing.",
+      "reference_measurement": "Prior rendered B25 same-text normalised ink comparison: 新名称 ref approximately244px vs20c158px; config.yaml ref approximately470px vs20c268px, with similar normalised text width. This supports local weight increase; font-family effects remain an independent limitation.",
+      "callbacks": "validate, errorField, onConfirm,onDismiss and repository operations unchanged.",
+      "new_screenshot_status": "Not yet visually validated."
+    },
+    {
+      "id": "B-file-primary-blue",
+      "pages": [
+        18,
+        19,
+        20,
+        21,
+        22,
+        25
+      ],
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "symbol": "FileFolderPage/referenceConfirmColor",
+      "change": "Local confirmColorOverride #1168FE only for default light without dynamic/custom accent; null otherwise.",
+      "sample": {
+        "page": 25,
+        "render_crop_xyxy": [
+          225,
+          578,
+          360,
+          610
+        ],
+        "mask": "B>220 && G<170 && R<80",
+        "median_rgb": [
+          17.0,
+          104.0,
+          254.0
+        ]
+      },
+      "retained": "No global accent change. Other Web panel forms use their existing reference/theme blue. Error outline remains c.accent.",
+      "new_screenshot_status": "Not yet visually validated."
+    },
+    {
+      "id": "B1-success-and-status-glyph",
+      "pages": [
+        1
+      ],
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+      "symbol": "AdblockScreen/statusIcon and VerifyRow",
+      "change": "Existing ToolsIcons PDF45/B1 filled shield vectors replace layered generic Shield+check/exclamation; successful VerifyRow uses PDF45 circle check at26dp and default-light #57C064.",
+      "sample": {
+        "page": 1,
+        "render_crop_xyxy": [
+          33,
+          478,
+          60,
+          508
+        ],
+        "mask": "G-R>55 && G-B>35",
+        "median_rgb": [
+          87.0,
+          192.0,
+          100.0
+        ]
+      },
+      "reference_measurement": "PDF45 check silhouette ink52/56*26≈24.14dp; B1 rendered success circle approx26px/1.0814≈24.04dp. Existing row Box26 retained.",
+      "retained": "Status condition order, tint predicates, ring/circle animations, unknown/false branches, original messages unchanged. Nondefault themes keep c.good.",
+      "new_screenshot_status": "Not yet visually validated."
+    }
+  ],
+  "source_preservation": {
+    "baseline": "270f559424f3ef6e3503d2431ea24f81d295d3d7",
+    "normalization_is_read_only": true,
+    "normalized_whole_files": [
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
+        "current_sha256": "48a158e47edb3275c262d250a2929f75fa89201b450871b982c7b41cb19351ed",
+        "baseline_sha256": "8d2600a82685bd4206e97827ba95a985b50c016776e849dec57bf49dc22737a8",
+        "normalized_presentation_only_sha256": "8d2600a82685bd4206e97827ba95a985b50c016776e849dec57bf49dc22737a8",
+        "matches_baseline_after_reverting_only_documented_presentation_changes": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+        "current_sha256": "d04acf4254ec7fc9ed61cfd0b3f50aba892e0a9f13581476696cb21ef34689ba",
+        "baseline_sha256": "06de1569f47814fa6d0e79c85740354dde9e8d773e38b746489b87ebab6269c4",
+        "normalized_presentation_only_sha256": "06de1569f47814fa6d0e79c85740354dde9e8d773e38b746489b87ebab6269c4",
+        "matches_baseline_after_reverting_only_documented_presentation_changes": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt",
+        "current_sha256": "ad410d6a5093d458647eecd40333625da39ab19f013eda8c7917f635ad835ed9",
+        "baseline_sha256": "8351c56f28f345b0ddbc995e8cf084f3b9718ba235d13c9f9be3b7440483aaac",
+        "normalized_presentation_only_sha256": "8351c56f28f345b0ddbc995e8cf084f3b9718ba235d13c9f9be3b7440483aaac",
+        "matches_baseline_after_reverting_only_documented_presentation_changes": true
+      }
+    ],
+    "manual_callback_checks": {
+      "file_form_validate_onConfirm_onDismiss": "Exact original source remains after removing only nullable style arguments/local colour/icon selection; all create/download/rename repository calls and validation branches retained.",
+      "adblock_perform_busy_cancel_refresh": "Exact original source remains after removing only presentation substitutions; perform, busy gate, cancellation handling, revision and bumpSettings untouched.",
+      "adblock_mode_switch": "Original running/enabled/global-or-direct banner predicate and onAction vm.setTrafficMode(\"rule\") retained. Only this banner passes referenceCompact=true; lastError/reload banner stays default.",
+      "adblock_status_predicates": "Order remains effective, then running && enabled && (global/direct || lastError nonblank), then ordinary Shield. Tint predicates, ring animation, halo, circle76 and shield44 retained.",
+      "verification_predicates": "Original count/injected/loadedInCore/stats truth values, neutralFalse and unknown state retained. Only true glyph/tint render branch receives local reference option.",
+      "global_folder_mapping": "Unchanged; the dedicated ImageVector suffix FileManagerFolder falls through hetuLucideIcon and baiZeLineIcon unchanged. Only FileReferenceEntryRow directory icon selector uses it.",
+      "theme_options": "Both local colour overrides require !c.dark && !vm.dynamicColor && vm.accentHex.isBlank(); otherwise null preserves the existing theme path."
+    },
+    "interpretation": "After undoing only the own listed presentation differences and the explicitly identified concurrent root HxPage canvas/top-bar arguments, all three source files byte-match baseline270. This proves retained callback/validation source but does not assert runtime or screenshot acceptance.",
+    "normalization_context": [
+      "Own 5 documented local visual changes undone in-memory only.",
+      "Root concurrently added referenceTopBar=true to 7 ToolScreens HxPage calls and flatCanvas=true/referenceTopBar=true to AdblockScreen HxPage; these presentation arguments are also undone in-memory for the whole-file source comparison. This agent did not implement those additions."
+    ]
+  },
+  "route_scope": {
+    "tools_route": "ToolsRoute.kt:431 → ToolsFeaturePage; ToolsFeatureRoute.kt:476 → ToolsAdblockScreen",
+    "legacy_secondary": "HetuActivity.kt:338 HxRoute.Adblock → AdblockScreen(vm)",
+    "warning": "The B1 legacy component capture uses AdblockScreen(vm). Tools Tab live page receives its separate ToolsAdblockScreen implementation changes through the tools owner; this report does not claim the routes are identical."
+  },
+  "verification_state": {
+    "read_only_diff_check": "Passed for the 3 owned source files during implementation; no source modified by report creation.",
+    "tests_run_by_this_agent": false,
+    "ci_started_or_cancelled_by_this_agent": false,
+    "old_capture_baseline": "20c screenshots only; older passing CI is not new verification.",
+    "new_component_native_evidence": "Pending newer CI artifact supplied by root.",
+    "candidate_pages_to_open_next": [
+      1,
+      13,
+      14,
+      18,
+      19,
+      20,
+      21,
+      22,
+      25
+    ],
+    "limits": [
+      "No pixel1:1 pass claimed.",
+      "No new compile/test/runtime execution by this agent.",
+      "Font family/OEM rendering is not used to dismiss code font-size/weight differences; source uses explicit local600 options but resultant visual weight still awaits fresh screenshots.",
+      "OS status/navigation bars and real fixture data are excluded from layout claims.",
+      "Colour medians reflect compressed supplied reference images; B1 embedded-JPEG median was [87,192,99], rendered-PNG median [87,192,100], so #57C064 is the rendered reference target.",
+      "Dark/custom/Monet paths require root theme checks; source opt-in condition preserves the original path.",
+      "No Google authentication or real-device fix claims arise from these UI changes."
+    ],
+    "latest_known_run": {
+      "application_commit": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+      "run_id": 37322190390,
+      "status": "In progress per root; fresh artifacts not yet supplied to this agent."
+    }
+  }
+}

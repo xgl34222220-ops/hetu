@@ -1,0 +1,68 @@
+{
+  "schema": 1,
+  "version": "V20.84",
+  "candidateCommit": "7536b69505b2d554a84fb12cc84ba436ea05c14f",
+  "ciRun": 37243939715,
+  "attempt": 1,
+  "conclusion": "failure",
+  "buildJob": 111557984125,
+  "productionApkCompilation": "success",
+  "runtimePayloadAbiAndIconGates": "success",
+  "testCompilation": "failure",
+  "compilerError": "ToastFeedbackTest.kt:10:33 Unresolved reference assertExists",
+  "cause": "The test explicitly imported a SemanticsNodeInteraction member as a package extension.",
+  "unitTestsExecuted": false,
+  "unitTestTotal": null,
+  "lintExecuted": false,
+  "api35Installation": "skipped",
+  "api36Installation": "skipped",
+  "historicalCrashJob": {
+    "id": 111557984329,
+    "conclusion": "success"
+  },
+  "verificationArtifact": {
+    "id": 11317988989,
+    "bytes": 469041,
+    "zipSha256": "5b843ce425c5162c135c780ee8d33ce96ab7e5be5a8e141e09d2eacb36ef3c75"
+  },
+  "sourceProof": {
+    "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+    "baseRun": 37171744564,
+    "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "baselineFiles": 307,
+    "changedOrAddedFiles": 31,
+    "checkoutMatchesGeneratedSource": true,
+    "historicPatchesAppliedToCheckout": false,
+    "presentationLayer": {
+      "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+      "baseRun": 37211142058,
+      "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "changedOrAddedFiles": 68,
+      "protectedRuntimeUnchanged": true
+    },
+    "controllerAuthenticationLayer": {
+      "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+      "baseRun": 37240041766,
+      "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+      "patchSha256": "18eea25566d10d66b756d25cb539c3211d339f7828efc4c45abe4faa26087d9c",
+      "changedOrAddedFiles": 15,
+      "runtimePayloadsUnchanged": true,
+      "dependenciesUnchanged": true,
+      "manifestAndPermissionsUnchanged": true,
+      "unchangedOutsideAuthScope": true,
+      "baselineUnitTests": 392,
+      "expectedUnitTests": 422,
+      "newTestCounts": {
+        "ToastFeedbackTest": 6,
+        "ControllerAuthenticationTest": 11,
+        "LegacyControllerCredentialTest": 3,
+        "ControllerReadStateTest": 6,
+        "PanelControllerErrorTest": 4
+      }
+    }
+  },
+  "correction": "Remove the invalid import only; retain both native toast render assertions and all 422 test selectors, regenerate the independent auth source layer, then run the complete workflow on the corrected commit.",
+  "failureEvidenceRetained": true,
+  "phoneCredentialRecoveryClaimed": false
+}

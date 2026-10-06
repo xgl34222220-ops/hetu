@@ -1,0 +1,47 @@
+{
+  "applicationCommit": "26a0906ed9765c04de1316cdcf99cd0460d9d276",
+  "runId": 37342421613,
+  "apkName": "Hetu-V20.85-Test-26a0906.apk",
+  "apkBytes": 134819454,
+  "apkSha256": "50d8c9658ca612413e83fe1cf80f12ef464fb39c50dcc007b91b8b7b906c2a99",
+  "partCount": 6,
+  "allSixArtifactAndPartHashesVerified": true,
+  "fullApkHashVerified": true,
+  "installedAcceptance": "PASS for this26a application identity; not finalca60825 acceptance",
+  "transportManifestArtifactId": 11359199751,
+  "transportParts": [
+    {
+      "artifactId": 11359362982,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:650fea6fed36b0555dd0683e55d758a59f7b190ec377ffa558b73e3263ab5c35"
+    },
+    {
+      "artifactId": 11359772796,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:2c542c9fc3b7cdb731fa7921e4efc2087fdf4a13632f2cf9600e37b9a4d09eac"
+    },
+    {
+      "artifactId": 11359294191,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:41402c2d1819f985867746d803fbaadd65e2de41bebcbab85b39aa77dce351b0"
+    },
+    {
+      "artifactId": 11359477793,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:c88deb51d920be30835601bbcbf0ef2534a6d9c0d803549f89680b1c6ce1f13f"
+    },
+    {
+      "artifactId": 11359169783,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:72196e16f214a1591a26499521ca7d54a573dffa25e434a3a70e8a31cb000a4c"
+    },
+    {
+      "artifactId": 11359189806,
+      "artifactBytes": 8990468,
+      "artifactDigest": "sha256:5661e2685d3aac33c4613c713b77798a6d7ac0188e36abfcbd277688ccc0f5a2"
+    }
+  ],
+  "installedEvidence": "docs/qa/20261005-v2085-26a0906-installation-success.json",
+  "installedEvidenceSha256": "86643132ab535013c0d161eecda5a8a89a8d64c05da3e2820102b9ebdd16f564",
+  "deliveredAsFinalPackage": false
+}

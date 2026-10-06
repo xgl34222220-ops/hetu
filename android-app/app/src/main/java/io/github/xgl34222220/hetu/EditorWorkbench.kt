@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -102,22 +103,23 @@ internal fun YamlWorkbenchAccessory(
     onSymbol: (String) -> Unit,
 ) {
     val primary = MaterialTheme.colorScheme.primary
-    val keys = yamlWorkbenchSymbols
+    val keys = listOf(":", "-", "[", "]", "{", "}", "#") + yamlWorkbenchSymbols.filter { it !in setOf(":", "-", "[", "]", "{", "}", "#") }
+    val c = Hx.colors
     Row(
-        Modifier.fillMaxWidth().height(42.dp).testTag("yaml-accessory")
-            .background(Color(0xFF12161A))
+        Modifier.fillMaxWidth().height(48.dp).testTag("yaml-accessory")
+            .background(c.canvas)
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 6.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(5.dp),
+            .padding(horizontal = 18.dp, vertical = 5.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         keys.forEach { symbol ->
             val highlighted = symbol == "Tab"
             Box(
-                Modifier.height(32.dp).widthIn(min = 34.dp)
+                Modifier.height(38.dp).widthIn(min = 46.dp)
                     .testTag("yaml-symbol:$symbol")
-                    .clip(RoundedCornerShape(6.dp))
-                    .background(if (highlighted) primary else Color(0xFF1E293B))
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(if (highlighted) primary else c.surface)
                     .clickable(
                         enabled = enabled,
                         role = Role.Button,
@@ -128,7 +130,7 @@ internal fun YamlWorkbenchAccessory(
             ) {
                 Text(
                     symbol,
-                    color = if (enabled) Color.White else Color(0xFF5D6670),
+                    color = if (!enabled) c.textFaint else if (highlighted) c.onAccent else c.text,
                     fontSize = 12.sp,
                     lineHeight = 16.sp,
                     fontFamily = io.github.xgl34222220.hetu.ui.HetuSystemFontFamily,
@@ -136,13 +138,13 @@ internal fun YamlWorkbenchAccessory(
                 )
             }
         }
-        Box(Modifier.width(1.dp).height(20.dp).background(Color(0xFF334155)))
+        Box(Modifier.width(1.dp).height(20.dp).background(c.line))
         listOf(
             Triple("撤销", Icons.Rounded.Undo, canUndo),
             Triple("重做", Icons.Rounded.Redo, canRedo),
         ).forEach { (label, icon, available) ->
             Box(
-                Modifier.size(32.dp).clip(RoundedCornerShape(6.dp))
+                Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
                     .clickable(enabled = enabled && available, role = Role.Button) {
                         if (label == "撤销") onUndo() else onRedo()
                     },
@@ -152,7 +154,7 @@ internal fun YamlWorkbenchAccessory(
                     icon,
                     label,
                     Modifier.size(16.dp),
-                    tint = if (enabled && available) Color(0xFF98A1AA) else Color(0xFF475569),
+                    tint = if (enabled && available) c.text else c.textFaint,
                 )
             }
         }
@@ -193,21 +195,35 @@ internal fun YamlWorkbenchSearch(editor: CodeEditor?, matches: Int, onClose: () 
         }
     }
     DisposableEffect(editor) { onDispose { editor?.searcher?.stopSearch() } }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).testTag("yaml-search")) {
-        OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth().focusRequester(focus).testTag("yaml-search-query"),
-            singleLine = true, placeholder = { Text("搜索配置文本", fontSize = 13.sp) },
-            textStyle = LocalTextStyle.current.copy(fontSize = 13.sp), shape = RoundedCornerShape(12.dp),
-            trailingIcon = { IconButton(onClick = onClose) { Icon(Icons.Rounded.Close, "关闭搜索") } })
-        Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-            Text(if (query.isEmpty()) "输入关键字" else if (pending) "正在搜索…" else "$matches 个匹配",
-                Modifier.weight(1f), color = t.textSecondary, fontSize = 11.sp)
-            val canNavigate = !pending && query.isNotEmpty() && matches > 0
-            IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() }, enabled = canNavigate) {
-                Icon(Icons.Rounded.KeyboardArrowUp, "上一个匹配", Modifier.size(18.dp))
+    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(18.dp))
+        .background(t.cardBackground).padding(horizontal = 8.dp, vertical = 7.dp).testTag("yaml-search"),
+        verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(t.pageBackground)
+            .heightIn(min = 36.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.Search, null, Modifier.size(19.dp), tint = t.textPrimary)
+            Spacer(Modifier.width(8.dp))
+            BasicTextField(query, { query = it }, Modifier.weight(1f).focusRequester(focus).testTag("yaml-search-query"),
+                singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = t.textPrimary),
+                decorationBox = { field -> Box { if (query.isEmpty()) Text("搜索配置文本", color = t.textMuted, fontSize = 13.sp); field() } })
+            if (query.isNotEmpty()) IconButton(onClick = { query = "" }, modifier = Modifier.size(34.dp)) {
+                Icon(Icons.Rounded.Cancel, "清空搜索", Modifier.size(16.dp), tint = t.textMuted)
             }
-            IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() }, enabled = canNavigate) {
-                Icon(Icons.Rounded.KeyboardArrowDown, "下一个匹配", Modifier.size(18.dp))
-            }
+        }
+        Text(if (query.isEmpty()) "0 个匹配" else if (pending) "搜索中…" else "$matches 个匹配",
+            Modifier.padding(horizontal = 10.dp), color = t.textSecondary, fontSize = 11.sp)
+        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
+        val canNavigate = !pending && query.isNotEmpty() && matches > 0
+        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() },
+            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Rounded.KeyboardArrowUp, "上一个匹配", Modifier.size(19.dp))
+        }
+        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() },
+            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Rounded.KeyboardArrowDown, "下一个匹配", Modifier.size(19.dp))
+        }
+        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
+        IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
+            Icon(Icons.Rounded.Close, "关闭搜索", Modifier.size(19.dp))
         }
     }
 }

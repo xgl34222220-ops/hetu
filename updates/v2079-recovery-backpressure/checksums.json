@@ -1,0 +1,9 @@
+{
+  "base": "V20.78 / ed326756; effective app 47609a69",
+  "patchSha256": "631475861cb229880d05b0bfdc99abffe3bb69034c34801fd0f3a39f7d07d69f",
+  "versionCode": 2079,
+  "versionName": "0.12.9-v20",
+  "rootRevision": 151,
+  "userDeviceAccessed": false,
+  "plannedSelectedUnitTests": 324
+}

@@ -1,0 +1,3360 @@
+{
+  "runId": 37346239863,
+  "service": "Mihomo controller isolated loopback fixture; not Google account authentication",
+  "files": {
+    "/tmp/hetu-ci-latest-ca60825/api35/emulator-cleanup.json": {
+      "sha256": "ca2e4ae586c828c1c0cab17d516baf198a90079f69328faa09db07bbfbfe2d0d"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/webview-forward-cleanup.json": {
+      "sha256": "e90c29540573435b67a1ea8eb7e0394639adb32783ae98453f119940ef93a28d"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/panel-target-preflight.json": {
+      "sha256": "a586c5b93fbba697ddd930b1e3812ea405d59e6e87304129208fd1c944c9337c"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/panel-controller-auth-fixture.json": {
+      "sha256": "503194e5a19b99ad349a06e7dde0f930a1d9fb25dc47511ca8e65133373ffa84"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/results.json": {
+      "sha256": "ab87cdff2452fe55c9f010813ac254b1f31e84eeaf7615cbeec47a6799877455"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/panel-controller-fixture-requests.json": {
+      "sha256": "67908a2e751b9dadca45e4ed45954193af23166032b6c35c3ba5f0b390e97f8f"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api35/runner-lifecycle.json": {
+      "sha256": "363af60a8a0a982e534260ce14c7e859f58e03c88ba7fcffab5a925a1db0e543"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/emulator-cleanup.json": {
+      "sha256": "22227220679718958e5ea3a49b52c79898964a207016bdcdd0832303c105514f"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/webview-forward-cleanup.json": {
+      "sha256": "d9fb1fd69dbc226015955f568a8abba8f0b92e915db18f35ab39397fbda03d4d"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/panel-target-preflight.json": {
+      "sha256": "720d4ea90089b04e5a5249f6e61058b8ab758f9e547bcd568fc56a3d6fe670ab"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/panel-controller-auth-fixture.json": {
+      "sha256": "8c3b7f7c114d2b838711912826b702bf1fbe05a2c2cfe29425c67186dd275503"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/results.json": {
+      "sha256": "50e71a140bfa1d09697ea7cd0e02f1ba76504245861a61efb3e64784605b0d2a"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/panel-controller-fixture-requests.json": {
+      "sha256": "fedd0387f703bb75618c17dfa7554701ee75eac7e8c89864da766c548e359f76"
+    },
+    "/tmp/hetu-ci-latest-ca60825/api36/runner-lifecycle.json": {
+      "sha256": "363af60a8a0a982e534260ce14c7e859f58e03c88ba7fcffab5a925a1db0e543"
+    }
+  },
+  "api": {
+    "35": {
+      "proofs": {
+        "emulator-cleanup.json": {
+          "emulator_started": true,
+          "emulator_reaped": true,
+          "pid": 2365,
+          "returncode": 0
+        },
+        "webview-forward-cleanup.json": [
+          {
+            "app_pid": 2221,
+            "local_port": 33121,
+            "removed": true
+          },
+          {
+            "app_pid": 2221,
+            "local_port": 44705,
+            "removed": true
+          }
+        ],
+        "panel-target-preflight.json": {
+          "avd": "hetu-smoke",
+          "apiLevel": 35,
+          "ownedSession": "34907f50a5e04a02839d380b41a777cb",
+          "runnerPid": 2348,
+          "launcherPid": 2362,
+          "launcherStartTicks": 6623,
+          "supervisorPid": 2364,
+          "emulatorPids": [
+            2365
+          ],
+          "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+          "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+          "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+          "serial": "emulator-5554",
+          "nonRootShell": true,
+          "consoleAvdReply": []
+        },
+        "panel-controller-auth-fixture.json": {
+          "result": "PASS",
+          "fixtureOnly": true,
+          "syntheticCachedRuntimeHint": true,
+          "rootMutationActions": 0,
+          "controllerHost": "127.0.0.1",
+          "target": {
+            "avd": "hetu-smoke",
+            "apiLevel": 35,
+            "ownedSession": "34907f50a5e04a02839d380b41a777cb",
+            "runnerPid": 2348,
+            "launcherPid": 2362,
+            "launcherStartTicks": 6623,
+            "supervisorPid": 2364,
+            "emulatorPids": [
+              2365
+            ],
+            "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+            "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+            "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+            "serial": "emulator-5554",
+            "nonRootShell": true,
+            "consoleAvdReply": []
+          },
+          "rootHealthEvidence": false,
+          "toast401Claimed": false,
+          "limitations": "Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.",
+          "originalPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+          "continuityServiceObserved": false,
+          "retryWhile401": {
+            "timeMonotonic": 732.918883233,
+            "bounds": [
+              115,
+              355,
+              177,
+              403
+            ],
+            "input": "native adb tap"
+          },
+          "retryReadyBeforeFixture200": {
+            "observedAtMonotonic": 737.701738644,
+            "enabled": true,
+            "source": "fresh native XML while fixture remained401"
+          },
+          "fixture200AtMonotonic": 737.70173951,
+          "retryAfterFixture200": {
+            "timeMonotonic": 737.701773927,
+            "bounds": [
+              115,
+              355,
+              177,
+              403
+            ],
+            "input": "native adb tap"
+          },
+          "actualBearerAuthorizationVerified": true,
+          "observedNativeCounts": {
+            "策略": 12,
+            "规则": 3,
+            "当前连接": 18
+          },
+          "first200AtMonotonic": 737.746569605,
+          "recoveryObservation": "retry input preceded successful reads; foreground poll also remained active",
+          "exclusiveRetryRecoveryClaimed": false,
+          "restoredPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+          "originalPreferencesRestored": true,
+          "adbReverseRestored": true,
+          "newChecks": [
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ]
+        },
+        "results.json": {
+          "checks": [
+            {
+              "name": "01-home",
+              "result": "passed"
+            },
+            {
+              "name": "00-language-selected",
+              "result": "passed"
+            },
+            {
+              "name": "01-home-language-restored",
+              "result": "passed"
+            },
+            {
+              "name": "01-home-new-ui",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-stopped",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-new-ui-overview",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-new-ui-rulesets",
+              "result": "passed"
+            },
+            {
+              "name": "03-tools",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-entry",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-stop",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-root-error-details",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-root-error-expanded",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-environment",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-overflow",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-document-picker",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-import-cancelled",
+              "result": "passed"
+            },
+            {
+              "name": "04-settings",
+              "result": "passed"
+            },
+            {
+              "name": "boot-settings",
+              "result": "passed"
+            },
+            {
+              "name": "boot-root-denial-visible",
+              "result": "passed"
+            },
+            {
+              "name": "boot-denial-keeps-toggle-off",
+              "result": "passed"
+            },
+            {
+              "name": "05-about",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-entry",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-without-root",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-storage-bound-visible",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-truncation-visible",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-copy-action",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-full-history-preserved",
+              "result": "passed"
+            },
+            {
+              "name": "safe-session-repair-entry",
+              "result": "passed"
+            },
+            {
+              "name": "safe-session-repair-root-denial",
+              "result": "passed"
+            },
+            {
+              "name": "06-web-panels",
+              "result": "passed"
+            },
+            {
+              "name": "07-native-webview",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "08-native-webview-disconnected",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "09-webview-back",
+              "result": "passed"
+            },
+            {
+              "name": "reference-03B-040-native-overview",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-041-native-groups",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-042-native-connections",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-043-native-node-dialog",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-044-native-switch-failure",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "custom-palette-00-TonalSpot-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-01-Neutral-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-02-Vibrant-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-03-Expressive-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-04-Rainbow-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-05-FruitSalad-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-06-Monochrome-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-07-Fidelity-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-08-TonalSpot-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-09-Neutral-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-10-Vibrant-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-11-Expressive-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-12-Rainbow-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-13-FruitSalad-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-14-Monochrome-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-15-Fidelity-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-16-Vibrant-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-17-Vibrant-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-18-Fidelity-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-19-FruitSalad-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-20-Expressive-dark",
+              "result": "passed"
+            },
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ],
+          "passed": 64,
+          "legacyChecksPassed": 59,
+          "paletteCasesPassed": 21,
+          "newPanelAuthChecks": [
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ],
+          "fixtureOnly": true,
+          "rootMutationActions": 0,
+          "rootSetupDenialAttempts": 1,
+          "apiLevel": 35,
+          "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation."
+        },
+        "panel-controller-fixture-requests.json": [
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 713.62732558,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 401,
+            "timeMonotonic": 715.165591807,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/rules",
+            "status": 401,
+            "timeMonotonic": 715.16605538,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 717.436427898,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 719.451749624,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 721.465089111,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 723.481039588,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 725.49338634,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 727.506306965,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 729.51712357,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 731.528572304,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 733.014924341,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 401,
+            "timeMonotonic": 733.304034165,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 733.552798162,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 735.602257365,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 737.619410983,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 737.746569605,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 737.766769857,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 737.788082928,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 737.806144002,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 737.837880825,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/version",
+            "status": 200,
+            "timeMonotonic": 737.841287419,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 737.855986554,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 737.915760865,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/rules",
+            "status": 200,
+            "timeMonotonic": 737.922487988,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 739.633445722,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 739.636462534,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 739.639056246,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 739.643638047,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 739.65056543,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 741.65672563,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 741.659882299,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 741.662434094,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 741.667522171,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 741.67410458,
+            "valid_fixture_authorization": true
+          }
+        ],
+        "runner-lifecycle.json": {
+          "result": "PASS",
+          "kvm_before": {
+            "uid": 0,
+            "gid": 993,
+            "mode": 432,
+            "rdev": 2792
+          },
+          "runner_uid": 1001,
+          "runner_groups": [
+            4,
+            100,
+            118,
+            999,
+            1001
+          ],
+          "privileged_emulator_process": true,
+          "smoke_exit": 0,
+          "launcher_reaped": true,
+          "kvm_after": {
+            "uid": 0,
+            "gid": 993,
+            "mode": 432,
+            "rdev": 2792
+          }
+        }
+      },
+      "summary": {
+        "checks": 64,
+        "legacyChecksPassed": 59,
+        "paletteCasesPassed": 21,
+        "authChecks": 5,
+        "checksAllPassed": true,
+        "rootMutationActions": 0,
+        "authResult": "PASS",
+        "actualBearerAuthorizationVerified": true,
+        "retryReadyBeforeFixture200": {
+          "observedAtMonotonic": 737.701738644,
+          "enabled": true,
+          "source": "fresh native XML while fixture remained401"
+        },
+        "originalPreferencesRestored": true,
+        "restoredHashMatches": true,
+        "adbReverseRestored": true,
+        "actualHttp200Requests": 19,
+        "allHttp200ValidBearer": true,
+        "actualHttp200Paths": [
+          "/configs",
+          "/connections",
+          "/providers/proxies",
+          "/proxies",
+          "/rules",
+          "/version"
+        ],
+        "observedNativeCounts": {
+          "策略": 12,
+          "规则": 3,
+          "当前连接": 18
+        },
+        "exclusiveRetryRecoveryClaimed": false,
+        "runnerLifecycleResult": "PASS",
+        "smokeExit": 0,
+        "launcherReaped": true,
+        "kvmRestored": true,
+        "emulatorReaped": true,
+        "webviewForwardCleanupAllRemoved": true,
+        "nativeFiveActuallyOpened": true,
+        "nativeFiveFrameHashesMatch": true
+      },
+      "nativeScreenshots": [
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-040-native-overview.png",
+          "sha256": "6362fd092b65062e56e44a60ff498fc6af6cf2b62d09791f8a7d1bb70ff0321f",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated overview: fixture Mihomo v1.19.0, current connections18 and groups12.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-040-native-overview.dom.json",
+          "domSha256": "3fda4bf1950176f51c0e4dbe822c25b5c49d85facd7548bb3da2aebb1c4711fd"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-041-native-groups.png",
+          "sha256": "9352db21b503a54c56cfd9efdae86d57e9dee9d289d8bb018999819336521d6c",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated group selector cards: six-node fixtures and current selections.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-041-native-groups.dom.json",
+          "domSha256": "517fa9dcbfc8236cdd68b62408d55e5c95f57d642ca30cbc81246c264ae19765"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-042-native-connections.png",
+          "sha256": "28b326b62753581d34560fa2863177c94b1c99812c40165d73b84e98a5cdd60d",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated connection table: examples and RFC5737 addresses, upload/download counters.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-042-native-connections.dom.json",
+          "domSha256": "971e161a3f629f51dda0ff172df578d07863b8bc96018abeb1079a2a57d4cb12"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-043-native-node-dialog.png",
+          "sha256": "5d14a68c9df88216f1c51c3c2b1844a6906a7c69eee32d07c0ef2dc63da5a1ee",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Six-radio node selection dialog, retained selected node and cancel.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-043-native-node-dialog.dom.json",
+          "domSha256": "98e12fefe1034a74fe2944516acfc576374499c4cb0dfbdb07b7c2d9e9f64984"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-044-native-switch-failure.png",
+          "sha256": "0045d5971871870902e42af6ad5a1d885f6312cbdeb9d87667762b0db6417a34",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Deliberate fixture HTTP503 switch rejection, confirmation dialog.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api35/reference-03B-044-native-switch-failure.dom.json",
+          "domSha256": "202deaf6dcfe8e4a9aa4ca005b59d8dc23d9ba448f5b515a0fa09f50f9447b2c"
+        }
+      ]
+    },
+    "36": {
+      "proofs": {
+        "emulator-cleanup.json": {
+          "emulator_started": true,
+          "emulator_reaped": true,
+          "pid": 2579,
+          "returncode": 0
+        },
+        "webview-forward-cleanup.json": [
+          {
+            "app_pid": 2374,
+            "local_port": 43901,
+            "removed": true
+          },
+          {
+            "app_pid": 2374,
+            "local_port": 44315,
+            "removed": true
+          }
+        ],
+        "panel-target-preflight.json": {
+          "avd": "hetu-smoke",
+          "apiLevel": 36,
+          "ownedSession": "af8f9ec3ea2b4bdaa22149e6de04af28",
+          "runnerPid": 2562,
+          "launcherPid": 2576,
+          "launcherStartTicks": 6208,
+          "supervisorPid": 2578,
+          "emulatorPids": [
+            2579
+          ],
+          "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+          "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+          "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+          "serial": "emulator-5554",
+          "nonRootShell": true,
+          "consoleAvdReply": []
+        },
+        "panel-controller-auth-fixture.json": {
+          "result": "PASS",
+          "fixtureOnly": true,
+          "syntheticCachedRuntimeHint": true,
+          "rootMutationActions": 0,
+          "controllerHost": "127.0.0.1",
+          "target": {
+            "avd": "hetu-smoke",
+            "apiLevel": 36,
+            "ownedSession": "af8f9ec3ea2b4bdaa22149e6de04af28",
+            "runnerPid": 2562,
+            "launcherPid": 2576,
+            "launcherStartTicks": 6208,
+            "supervisorPid": 2578,
+            "emulatorPids": [
+              2579
+            ],
+            "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+            "avdConfigSha256": "8cf35d5f45feb9149f924b182da2360a273320a45df491d86c2a6956c950de02",
+            "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+            "serial": "emulator-5554",
+            "nonRootShell": true,
+            "consoleAvdReply": []
+          },
+          "rootHealthEvidence": false,
+          "toast401Claimed": false,
+          "limitations": "Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.",
+          "originalPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+          "continuityServiceObserved": false,
+          "retryWhile401": {
+            "timeMonotonic": 778.921563058,
+            "bounds": [
+              115,
+              355,
+              177,
+              403
+            ],
+            "input": "native adb tap"
+          },
+          "retryReadyBeforeFixture200": {
+            "observedAtMonotonic": 786.476337419,
+            "enabled": true,
+            "source": "fresh native XML while fixture remained401"
+          },
+          "fixture200AtMonotonic": 786.476338491,
+          "retryAfterFixture200": {
+            "timeMonotonic": 786.476386851,
+            "bounds": [
+              115,
+              355,
+              177,
+              403
+            ],
+            "input": "native adb tap"
+          },
+          "actualBearerAuthorizationVerified": true,
+          "observedNativeCounts": {
+            "策略": 12,
+            "规则": 3,
+            "当前连接": 18
+          },
+          "first200AtMonotonic": 786.514226784,
+          "recoveryObservation": "retry input preceded successful reads; foreground poll also remained active",
+          "exclusiveRetryRecoveryClaimed": false,
+          "restoredPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+          "originalPreferencesRestored": true,
+          "adbReverseRestored": true,
+          "newChecks": [
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ]
+        },
+        "results.json": {
+          "checks": [
+            {
+              "name": "01-home",
+              "result": "passed"
+            },
+            {
+              "name": "00-language-selected",
+              "result": "passed"
+            },
+            {
+              "name": "01-home-language-restored",
+              "result": "passed"
+            },
+            {
+              "name": "01-home-new-ui",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-stopped",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-new-ui-overview",
+              "result": "passed"
+            },
+            {
+              "name": "02-panel-new-ui-rulesets",
+              "result": "passed"
+            },
+            {
+              "name": "03-tools",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-entry",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-stop",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-root-error-details",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-root-error-expanded",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-environment",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-overflow",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-document-picker",
+              "result": "passed"
+            },
+            {
+              "name": "scripts-import-cancelled",
+              "result": "passed"
+            },
+            {
+              "name": "04-settings",
+              "result": "passed"
+            },
+            {
+              "name": "boot-settings",
+              "result": "passed"
+            },
+            {
+              "name": "boot-root-denial-visible",
+              "result": "passed"
+            },
+            {
+              "name": "boot-denial-keeps-toggle-off",
+              "result": "passed"
+            },
+            {
+              "name": "05-about",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-entry",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-without-root",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-storage-bound-visible",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-truncation-visible",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-copy-action",
+              "result": "passed"
+            },
+            {
+              "name": "network-events-full-history-preserved",
+              "result": "passed"
+            },
+            {
+              "name": "safe-session-repair-entry",
+              "result": "passed"
+            },
+            {
+              "name": "safe-session-repair-root-denial",
+              "result": "passed"
+            },
+            {
+              "name": "06-web-panels",
+              "result": "passed"
+            },
+            {
+              "name": "07-native-webview",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "08-native-webview-disconnected",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "09-webview-back",
+              "result": "passed"
+            },
+            {
+              "name": "reference-03B-040-native-overview",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-041-native-groups",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-042-native-connections",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-043-native-node-dialog",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "reference-03B-044-native-switch-failure",
+              "result": "passed",
+              "evidence": "actual Android WebView DOM + native adb screenshot"
+            },
+            {
+              "name": "custom-palette-00-TonalSpot-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-01-Neutral-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-02-Vibrant-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-03-Expressive-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-04-Rainbow-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-05-FruitSalad-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-06-Monochrome-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-07-Fidelity-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-08-TonalSpot-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-09-Neutral-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-10-Vibrant-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-11-Expressive-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-12-Rainbow-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-13-FruitSalad-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-14-Monochrome-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-15-Fidelity-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-16-Vibrant-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-17-Vibrant-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-18-Fidelity-dark",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-19-FruitSalad-light",
+              "result": "passed"
+            },
+            {
+              "name": "custom-palette-20-Expressive-dark",
+              "result": "passed"
+            },
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ],
+          "passed": 64,
+          "legacyChecksPassed": 59,
+          "paletteCasesPassed": 21,
+          "newPanelAuthChecks": [
+            {
+              "name": "panel-controller-401-first-read",
+              "result": "passed",
+              "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+            },
+            {
+              "name": "panel-controller-401-api-settings",
+              "result": "passed",
+              "evidence": "actual NativeCompose ApiSheet opened by native tap"
+            },
+            {
+              "name": "panel-controller-401-retry",
+              "result": "passed",
+              "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+            },
+            {
+              "name": "panel-controller-200-recovered",
+              "result": "passed",
+              "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+            },
+            {
+              "name": "panel-controller-fixture-cleanup",
+              "result": "passed",
+              "evidence": "original preference bytes and retained adb reverses restored; original launcher flow relaunched"
+            }
+          ],
+          "fixtureOnly": true,
+          "rootMutationActions": 0,
+          "rootSetupDenialAttempts": 1,
+          "apiLevel": 36,
+          "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation."
+        },
+        "panel-controller-fixture-requests.json": [
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 758.597552674,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 401,
+            "timeMonotonic": 760.910559728,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/rules",
+            "status": 401,
+            "timeMonotonic": 760.91076514,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 763.161963267,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 765.173689761,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 767.184813872,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 769.193874097,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 771.204413818,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 773.212808056,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 775.222138736,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 777.23117576,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 778.951253048,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 401,
+            "timeMonotonic": 779.28926458,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 779.295477028,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 781.506578166,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 783.83475116,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 401,
+            "timeMonotonic": 785.849238376,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 786.514226784,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 786.519699674,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 786.523861535,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 786.567463055,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 786.729589418,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/version",
+            "status": 200,
+            "timeMonotonic": 786.799046235,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/rules",
+            "status": 200,
+            "timeMonotonic": 786.937063216,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 786.94633544,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 786.948166659,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 787.858575393,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 787.860797645,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 787.863429578,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 787.868311222,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 787.8742125,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/configs",
+            "status": 200,
+            "timeMonotonic": 789.880620387,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/proxies",
+            "status": 200,
+            "timeMonotonic": 789.883043513,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 789.885427464,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/connections",
+            "status": 200,
+            "timeMonotonic": 789.889821868,
+            "valid_fixture_authorization": true
+          },
+          {
+            "method": "GET",
+            "path": "/providers/proxies",
+            "status": 200,
+            "timeMonotonic": 789.897176282,
+            "valid_fixture_authorization": true
+          }
+        ],
+        "runner-lifecycle.json": {
+          "result": "PASS",
+          "kvm_before": {
+            "uid": 0,
+            "gid": 993,
+            "mode": 432,
+            "rdev": 2792
+          },
+          "runner_uid": 1001,
+          "runner_groups": [
+            4,
+            100,
+            118,
+            999,
+            1001
+          ],
+          "privileged_emulator_process": true,
+          "smoke_exit": 0,
+          "launcher_reaped": true,
+          "kvm_after": {
+            "uid": 0,
+            "gid": 993,
+            "mode": 432,
+            "rdev": 2792
+          }
+        }
+      },
+      "summary": {
+        "checks": 64,
+        "legacyChecksPassed": 59,
+        "paletteCasesPassed": 21,
+        "authChecks": 5,
+        "checksAllPassed": true,
+        "rootMutationActions": 0,
+        "authResult": "PASS",
+        "actualBearerAuthorizationVerified": true,
+        "retryReadyBeforeFixture200": {
+          "observedAtMonotonic": 786.476337419,
+          "enabled": true,
+          "source": "fresh native XML while fixture remained401"
+        },
+        "originalPreferencesRestored": true,
+        "restoredHashMatches": true,
+        "adbReverseRestored": true,
+        "actualHttp200Requests": 19,
+        "allHttp200ValidBearer": true,
+        "actualHttp200Paths": [
+          "/configs",
+          "/connections",
+          "/providers/proxies",
+          "/proxies",
+          "/rules",
+          "/version"
+        ],
+        "observedNativeCounts": {
+          "策略": 12,
+          "规则": 3,
+          "当前连接": 18
+        },
+        "exclusiveRetryRecoveryClaimed": false,
+        "runnerLifecycleResult": "PASS",
+        "smokeExit": 0,
+        "launcherReaped": true,
+        "kvmRestored": true,
+        "emulatorReaped": true,
+        "webviewForwardCleanupAllRemoved": true,
+        "nativeFiveActuallyOpened": true,
+        "nativeFiveFrameHashesMatch": true
+      },
+      "nativeScreenshots": [
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-040-native-overview.png",
+          "sha256": "08976eb8e9c88b0d3a5bdacfd82385bfabeee7ff38cdc6dd5e328e7ba82fea2a",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated overview: fixture Mihomo v1.19.0, current connections18 and groups12.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-040-native-overview.dom.json",
+          "domSha256": "3fda4bf1950176f51c0e4dbe822c25b5c49d85facd7548bb3da2aebb1c4711fd"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-041-native-groups.png",
+          "sha256": "11e09569f63bd0963d42a4b628e80f6acf4b56a9ecb109ab6594485ae5d9befe",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated group selector cards: six-node fixtures and current selections.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-041-native-groups.dom.json",
+          "domSha256": "517fa9dcbfc8236cdd68b62408d55e5c95f57d642ca30cbc81246c264ae19765"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-042-native-connections.png",
+          "sha256": "750684dfc4ee5f3aa3d55093d439c6daa25b10fa66202898567cb8683642b6a9",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Populated connection table: examples and RFC5737 addresses, upload/download counters.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-042-native-connections.dom.json",
+          "domSha256": "971e161a3f629f51dda0ff172df578d07863b8bc96018abeb1079a2a57d4cb12"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-043-native-node-dialog.png",
+          "sha256": "95740eac49819b972a196a5dc184dc55f9d3c474a3bd0809e6bbbb6a9aac691b",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Six-radio node selection dialog, retained selected node and cancel.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-043-native-node-dialog.dom.json",
+          "domSha256": "98e12fefe1034a74fe2944516acfc576374499c4cb0dfbdb07b7c2d9e9f64984"
+        },
+        {
+          "path": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-044-native-switch-failure.png",
+          "sha256": "dc1708fa08d193a416f773cbb51aa1d8fe7f444fdb8045a441f212d539671749",
+          "dimensions": [
+            394,
+            852
+          ],
+          "actuallyOpened": true,
+          "observed": "Deliberate fixture HTTP503 switch rejection, confirmation dialog.",
+          "domPath": "/tmp/hetu-ci-latest-ca60825/api36/reference-03B-044-native-switch-failure.dom.json",
+          "domSha256": "202deaf6dcfe8e4a9aa4ca005b59d8dc23d9ba448f5b515a0fa09f50f9447b2c"
+        }
+      ]
+    }
+  },
+  "apk": {
+    "schema": 1,
+    "apkName": "Hetu-0.12.15-v20-pdf.apk",
+    "apkBytes": 134819453,
+    "apkSha256": "f5d1382e55438aaf2f09524c34d59c2d84a730338de6881f04633780a8f13ef7",
+    "chunkBytes": 25165824,
+    "partCount": 6,
+    "parts": [
+      {
+        "index": 0,
+        "name": "part00.bin",
+        "bytes": 25165824,
+        "sha256": "756c063c8d2781940ed0c7fcc09745999657c821d10ee0c68fb196c17c91d3ed"
+      },
+      {
+        "index": 1,
+        "name": "part01.bin",
+        "bytes": 25165824,
+        "sha256": "abbc6657916b474881326e8fb36164a0926d706eced95afac9e27fe487f3b765"
+      },
+      {
+        "index": 2,
+        "name": "part02.bin",
+        "bytes": 25165824,
+        "sha256": "96a32cf5f6405458f253150f36657c71907ee0c01d9de44ddebf05873c1717f6"
+      },
+      {
+        "index": 3,
+        "name": "part03.bin",
+        "bytes": 25165824,
+        "sha256": "9b7b54729cc71f4e47555303ba5fe88bfb846ed1a013dcd15a5e3f5b7dd2670c"
+      },
+      {
+        "index": 4,
+        "name": "part04.bin",
+        "bytes": 25165824,
+        "sha256": "bb86ff98934bd8158ffd5b4ae6f37aba49cd856ba1f5e71305fbad22ea758c94"
+      },
+      {
+        "index": 5,
+        "name": "part05.bin",
+        "bytes": 8990333,
+        "sha256": "292814e5a5f95ecd26da0274f61fda6339883c38ac9cab05ab8af8a3aac4c203"
+      }
+    ]
+  },
+  "github": {
+    "id": 37346239863,
+    "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "status": "completed",
+    "conclusion": "success",
+    "html_url": "https://github.com/xgl34222220-ops/hetu/actions/runs/37346239863",
+    "updated_at": "2026-10-05T17:36:08Z",
+    "jobs": [
+      {
+        "id": 111885396179,
+        "name": "Reproduce V20.74 custom palette crash on API 36 (36)",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 37346239863,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Download pinned historical V20.74 APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          }
+        ]
+      },
+      {
+        "id": 111885396602,
+        "name": "build",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 37346239863,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Regenerate and verify integrated effective source",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Verify presentation patch cannot alter runtime or dependency inputs",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Verify PDF layer preserves frozen UI and diagnostic boundaries",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Verify independent authentication source and test-evidence boundaries",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Regress actual tool viewport gesture bounds",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Regress isolated controller authentication installation fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 9
+          },
+          {
+            "name": "Regress observed nested WebView document topology without weakening surface guards",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 10
+          },
+          {
+            "name": "Verify built-in WebUI behavior with controlled API fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 11
+          },
+          {
+            "name": "Render built-in WebUI with isolated browser fixtures",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 12
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 13
+          },
+          {
+            "name": "Reproduce cache eviction on old production exporter and verify new exporter",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Restore signing identity",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Verify signing identity",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Prepare Android SDK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          },
+          {
+            "name": "Run gradle/actions/setup-gradle@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 18
+          },
+          {
+            "name": "Export effective V20.85 source",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 19
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 20
+          },
+          {
+            "name": "Record resolved MaterialKolor ABI dependencies",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 21
+          },
+          {
+            "name": "Build APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 22
+          },
+          {
+            "name": "Verify APK embeds the tested runtime",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 23
+          },
+          {
+            "name": "Verify packaged MaterialKolor constructors",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 24
+          },
+          {
+            "name": "Verify packaged launcher and concept icon bytes",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 25
+          },
+          {
+            "name": "Runtime unit tests",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 26
+          },
+          {
+            "name": "Android lint compatibility gate",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 27
+          },
+          {
+            "name": "Consolidate native and browser state evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 28
+          },
+          {
+            "name": "Upload concept UI verification evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 29
+          },
+          {
+            "name": "Verify APK",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 30
+          },
+          {
+            "name": "Run actions/upload-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 31
+          },
+          {
+            "name": "Upload APK transport manifest",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 32
+          },
+          {
+            "name": "Upload APK transport part 00",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 33
+          },
+          {
+            "name": "Upload APK transport part 01",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 34
+          },
+          {
+            "name": "Upload APK transport part 02",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 35
+          },
+          {
+            "name": "Upload APK transport part 03",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 36
+          },
+          {
+            "name": "Upload APK transport part 04",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 37
+          },
+          {
+            "name": "Upload APK transport part 05",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 38
+          },
+          {
+            "name": "Post Run gradle/actions/setup-gradle@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 73
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 74
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 75
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 76
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 77
+          }
+        ]
+      },
+      {
+        "id": 111891459466,
+        "name": "Installed APK on Android API 35",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 37346239863,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          }
+        ]
+      },
+      {
+        "id": 111891459484,
+        "name": "Installed APK on Android API 36",
+        "status": "completed",
+        "conclusion": "success",
+        "run_id": 37346239863,
+        "logs_url": null,
+        "steps": [
+          {
+            "name": "Set up job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 1
+          },
+          {
+            "name": "Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 2
+          },
+          {
+            "name": "Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 3
+          },
+          {
+            "name": "Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 4
+          },
+          {
+            "name": "Run actions/download-artifact@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 5
+          },
+          {
+            "name": "Prepare official AOSP emulator",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 6
+          },
+          {
+            "name": "Run installed APK navigation and native WebView smoke",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 7
+          },
+          {
+            "name": "Upload Android smoke evidence",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 8
+          },
+          {
+            "name": "Post Run actions/setup-java@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 14
+          },
+          {
+            "name": "Post Run actions/setup-node@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 15
+          },
+          {
+            "name": "Post Run actions/checkout@v4",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 16
+          },
+          {
+            "name": "Complete job",
+            "status": "completed",
+            "conclusion": "success",
+            "number": 17
+          }
+        ]
+      }
+    ],
+    "artifacts": [
+      {
+        "id": 11361977828,
+        "name": "Hetu-V20.85-Android-36-smoke",
+        "size_in_bytes": 3795843,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361977828",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361977828/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:36:04Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:36:04Z",
+        "digest": "sha256:4b782c07f098ca52949ec861601cdb429bdbb117af0601a9ef17f17933317850",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11361850523,
+        "name": "Hetu-APK",
+        "size_in_bytes": 134819615,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361850523",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361850523/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:22:54Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:22:54Z",
+        "digest": "sha256:a1df17ed59d6438d12e8dd85c0c126580fc6039f9dad5ec4c25769b646e35cf7",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11361825342,
+        "name": "Hetu-V20.85-APK-part00",
+        "size_in_bytes": 25165958,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361825342",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361825342/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:22:56Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:22:56Z",
+        "digest": "sha256:0303f0b6ab5ed2a9a41895d3b5d205d4b938b7526f011044f41aa070880a2e09",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11361598722,
+        "name": "Hetu-V20.85-Android-35-smoke",
+        "size_in_bytes": 3354347,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361598722",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361598722/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:35:19Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:35:19Z",
+        "digest": "sha256:793e0337b81a47735dac314bc256658b55b8aa85f5a0c93966bd8ec481acd714",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11361121747,
+        "name": "Hetu-V20.85-APK-part02",
+        "size_in_bytes": 25165958,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361121747",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361121747/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:23:00Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:23:00Z",
+        "digest": "sha256:76beeb39b28c132d639bbd84339c54a267773b23dde657139621d9cc7581e4de",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11361027444,
+        "name": "Hetu-V20.85-APK-part03",
+        "size_in_bytes": 25165958,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361027444",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11361027444/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:23:02Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:23:02Z",
+        "digest": "sha256:238fbede85be27257bdb23890191f5fec7b5b1222253da4c0d65f36368b0baec",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360947727,
+        "name": "Hetu-V20.85-APK-part05",
+        "size_in_bytes": 8990467,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360947727",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360947727/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:23:05Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:23:05Z",
+        "digest": "sha256:f9fcad01408ae81ca2c87640a45f91ef67964045527d47955918abda1c3ac4dc",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360907974,
+        "name": "Hetu-V20.85-APK-part04",
+        "size_in_bytes": 25165958,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360907974",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360907974/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:23:03Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:23:03Z",
+        "digest": "sha256:945ee5f5c9eb6da90b3bc9fa47a343ede6776ac7339c8bac24ddfbb90d520301",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360907944,
+        "name": "Hetu-V20.85-UI-verification",
+        "size_in_bytes": 14683807,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360907944",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360907944/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:22:50Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:22:50Z",
+        "digest": "sha256:96649400c1e8b4793d6d22e68810be32a6cf0e0d7272eb89e57a515cedc5d071",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360674131,
+        "name": "Hetu-V20.85-APK-part01",
+        "size_in_bytes": 25165958,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360674131",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360674131/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:22:58Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:22:58Z",
+        "digest": "sha256:d0195e2a5b749dede9094ac187bde5ff21cf870621673a39e9575a0ad1ae1b43",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360494512,
+        "name": "Hetu-V20.85-APK-manifest",
+        "size_in_bytes": 2302,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360494512",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360494512/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:22:55Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:22:55Z",
+        "digest": "sha256:dafa7ee51da9e6ed47375d4641ae057391f9b1786822c9abf5e36c57835a1b96",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360123603,
+        "name": "Hetu-V20.74-palette-crash-baseline-Android-36",
+        "size_in_bytes": 683445,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360123603",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360123603/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:11:48Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:11:48Z",
+        "digest": "sha256:d256578729449c2db27a0af97d98b5f834c9b6bef34b0701361ecdb4be68728c",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      },
+      {
+        "id": 11360023713,
+        "name": "Hetu-V20.85-effective-source",
+        "size_in_bytes": 93854530,
+        "url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360023713",
+        "archive_download_url": "https://api.github.com/repos/xgl34222220-ops/hetu/actions/artifacts/11360023713/zip",
+        "expired": false,
+        "created_at": "2026-10-05T17:10:57Z",
+        "expires_at": "2027-01-03T17:08:54Z",
+        "updated_at": "2026-10-05T17:10:57Z",
+        "digest": "sha256:e7073dcc3162a848e5fe49263ccafe6af9493eba932724406c3913b39b5b438b",
+        "workflow_run": {
+          "id": 37346239863,
+          "repository_id": 1367821114,
+          "head_repository_id": 1367821114,
+          "head_branch": "test/v20.76-new-ui",
+          "head_sha": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6"
+        }
+      }
+    ],
+    "downloads": [
+      {
+        "run_id": 37346239863,
+        "expectedSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "artifactSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "api": null,
+        "kind": "ui",
+        "artifact_id": 11360907944,
+        "name": "Hetu-V20.85-UI-verification",
+        "digest": "sha256:96649400c1e8b4793d6d22e68810be32a6cf0e0d7272eb89e57a515cedc5d071",
+        "zip": "/workspace/scratch/3788973cf567/attachments/ced18df0-beb3-419c-a9b9-35240358abad/github-actions-artifact-11360907944.zip",
+        "bytes": 14683807,
+        "target": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence",
+        "flat": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825",
+        "downloadedZipSha256": "96649400c1e8b4793d6d22e68810be32a6cf0e0d7272eb89e57a515cedc5d071"
+      },
+      {
+        "run_id": 37346239863,
+        "expectedSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "artifactSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "api": null,
+        "kind": "manifest",
+        "artifact_id": 11360494512,
+        "name": "Hetu-V20.85-APK-manifest",
+        "digest": "sha256:dafa7ee51da9e6ed47375d4641ae057391f9b1786822c9abf5e36c57835a1b96",
+        "zip": "/workspace/scratch/3788973cf567/attachments/59ec9f56-7015-4007-93fd-689b3e782ce6/github-actions-artifact-11360494512.zip",
+        "bytes": 2302,
+        "target": "/tmp/hetu-ci-latest-ca60825/manifest",
+        "downloadedZipSha256": "dafa7ee51da9e6ed47375d4641ae057391f9b1786822c9abf5e36c57835a1b96"
+      },
+      {
+        "run_id": 37346239863,
+        "expectedSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "artifactSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "api": 35,
+        "kind": "smoke",
+        "artifact_id": 11361598722,
+        "name": "Hetu-V20.85-Android-35-smoke",
+        "digest": "sha256:793e0337b81a47735dac314bc256658b55b8aa85f5a0c93966bd8ec481acd714",
+        "zip": "/workspace/scratch/3788973cf567/attachments/eba1d054-1e7b-4d7f-b3a0-84dfae919e20/github-actions-artifact-11361598722.zip",
+        "bytes": 3354347,
+        "target": "/tmp/hetu-ci-latest-ca60825/api35",
+        "downloadedZipSha256": "793e0337b81a47735dac314bc256658b55b8aa85f5a0c93966bd8ec481acd714"
+      },
+      {
+        "run_id": 37346239863,
+        "expectedSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "artifactSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+        "api": 36,
+        "kind": "smoke",
+        "artifact_id": 11361977828,
+        "name": "Hetu-V20.85-Android-36-smoke",
+        "digest": "sha256:4b782c07f098ca52949ec861601cdb429bdbb117af0601a9ef17f17933317850",
+        "zip": "/workspace/scratch/3788973cf567/attachments/69a07b52-1313-4526-a053-5a911ae22f89/github-actions-artifact-11361977828.zip",
+        "bytes": 3795843,
+        "target": "/tmp/hetu-ci-latest-ca60825/api36",
+        "downloadedZipSha256": "4b782c07f098ca52949ec861601cdb429bdbb117af0601a9ef17f17933317850"
+      }
+    ]
+  },
+  "sourceCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "manifestArtifact": {
+    "run_id": 37346239863,
+    "expectedSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "artifactSource": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+    "api": null,
+    "kind": "manifest",
+    "artifact_id": 11360494512,
+    "name": "Hetu-V20.85-APK-manifest",
+    "digest": "sha256:dafa7ee51da9e6ed47375d4641ae057391f9b1786822c9abf5e36c57835a1b96",
+    "zip": "/workspace/scratch/3788973cf567/attachments/59ec9f56-7015-4007-93fd-689b3e782ce6/github-actions-artifact-11360494512.zip",
+    "bytes": 2302,
+    "target": "/tmp/hetu-ci-latest-ca60825/manifest",
+    "downloadedZipSha256": "dafa7ee51da9e6ed47375d4641ae057391f9b1786822c9abf5e36c57835a1b96"
+  },
+  "limitation": "Fresh disposable AOSP emulator; loopback controller fixture proves native controller error/recovery only. No Google Play account authentication, real Root/core/boot/network, or user device validation.",
+  "googlePlayStore": {
+    "reportedFailureTarget": "Google Play Store",
+    "rootCause": "not-established",
+    "realDeviceFix": "not-verified",
+    "controllerFixtureProvesPlayAuthentication": false,
+    "reason": "Current Play UID/app-scope, paired DNS answers and routes, account-auth HTTP/TLS error, and simultaneous working-proxy comparison are absent."
+  },
+  "build": {
+    "jobId": 111885396602,
+    "conclusion": "success",
+    "unitTestsFromXMLConsolidator": {
+      "baseline": {
+        "baseline": {
+          "tests": 392,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "baselineXmlFiles": 42,
+        "authentication": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "authenticationSuites": {
+          "ControllerAuthenticationTest": {
+            "tests": 11,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "ControllerReadStateTest": {
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "LegacyControllerCredentialTest": {
+            "tests": 3,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "PanelControllerErrorTest": {
+            "tests": 4,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          },
+          "ToastFeedbackTest": {
+            "tests": 6,
+            "failures": 0,
+            "errors": 0,
+            "skipped": 0
+          }
+        },
+        "totalTests": 422,
+        "xmlFiles": 47
+      },
+      "newSuites": {
+        "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "totalTests": 479,
+      "xmlFiles": 49
+    },
+    "originalXMLReview": {
+      "xmlFiles": 49,
+      "summary": {
+        "tests": 479,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      },
+      "xml": [
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AdblockSnifferTest.xml",
+          "sha256": "950c5a5f2c2fd605aca6778bfde2119987de4c361194cb0b9647d6e09f3977f5",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AppCrashReportTest.xml",
+          "sha256": "1e21014006dd3a6fe0ab594298405cd3f4eaa06c04d992d7998eeffd6315fb87",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationConceptParity57Test.xml",
+          "sha256": "51559c2e72a939e98922d3f8a8654945a1fab990f5fb9b8ee41713d25b94274c",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest.xml",
+          "sha256": "becc307755f6449b123ba9b9b28121495cabee56655cdb7bbff12e5efea04f0e",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.AutomationToolsConceptParityTest.xml",
+          "sha256": "015281fbbd8a3d0eb8c9f07b3a8e8b3a35663498c784efefea734ce58e325aee",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.BootStartup60Test.xml",
+          "sha256": "f6c4825b77af1215eb4a8d592e12fba37671db119d79bbf987b29a70dff580db",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptParity57Test.xml",
+          "sha256": "bd4580458757b834f69c77e74716965e8d0f95c1a7480c68fc9a49555c9e1fe6",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptRemainingCoverageTest.xml",
+          "sha256": "2813529eaa0c4372a1d1971b817d5514a5b9a2003259de88c11d1551b912592f",
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ConceptStateCoverageTest.xml",
+          "sha256": "9c1ae35758226666351fc1b15356b06dfa3fecf4d069068006768d6ecc85b714",
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerAuthenticationTest.xml",
+          "sha256": "7e06ec49e8e22822d24a2edd0c2fc6ea66550a176f61e91914bf082539a1dab2",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ControllerReadStateTest.xml",
+          "sha256": "5ae312ffa5a455040a710f5aaa5563f5df21851e8cf9a9262cd7c8488d3ba2cd",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CoreManagerConcept57Test.xml",
+          "sha256": "a3ea06f89a7dc24da363b5f456d4b972b799b99dd575aaf3773d6e13fdfb1c6f",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest.xml",
+          "sha256": "745c6c1d287acffd1b7af7b0dbb5b639c54c1415ee4e19ad3f88302bcc9cc576",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.DocumentPickerSafetyTest.xml",
+          "sha256": "3c9d0b6ab0eea2e8e30cc2560b05618fea8eb09030a6b8988e636016a536c958",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest.xml",
+          "sha256": "353e6ba297ddf2a42d6c1c22d9f6b33c813db1a3680d511983b86da2e8ed3a2d",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.JournalReliabilityTest.xml",
+          "sha256": "0e0f95aae50119db7231999b063f0e4add05a562e7f6ff7358b4698f3a82b6b6",
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LargeTitleParity59Test.xml",
+          "sha256": "34b9c511e31356aa1ea54af62f6bd3ecf3a15844ea6d2bc064160435d7efdf1e",
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.LegacyControllerCredentialTest.xml",
+          "sha256": "c7aa699e44172fb4b60fa702e9424fba391439311436bac18addf7c054174b23",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.MainLanguageBindingTest.xml",
+          "sha256": "c4d8adfdbbdd61f5758150577ba0e037f64d1cdea3113f084dc0c8319055f871",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NativeConceptScreenshotTest.xml",
+          "sha256": "12b358d347dc2945fe0629ce341c5e57ea9b0fffa10aca43e158c33b62f492c1",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkDiagnosticsTest.xml",
+          "sha256": "192e5396a852d34f4a75d595d1029bb7395a5fe6d883dd5cbd5894dd019446eb",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NetworkRecoveryStressTest.xml",
+          "sha256": "ead593911e8a46c4bdf48f1fc56aa1cc3c6ef949ee6b09919a0749889e1a9ede",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewHomePanelInteractionTest.xml",
+          "sha256": "ad67494fd9784f5e51fbeecef8f16bfd825e7ec7372f2cd2db960ec0d73c122e",
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiIntegrationTest.xml",
+          "sha256": "0b9b2602dfcb1f2ada0ba04e95fbe7e80fb322424f5714597037247b22ba17b4",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.NewUiShell83Test.xml",
+          "sha256": "64772fb704b8d67e78e4d27c68dc15590e543bb27efd4b9361f035a777242d67",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelActionSafetyTest.xml",
+          "sha256": "8dd558843a83352e08df086f871b5cb324ecb1a0d91927d94b47df4a8f495fe0",
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelConceptModelTest.xml",
+          "sha256": "241a8248c940d800b0826b601aea20c554f148411311993ea9075d6a7394da68",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelControllerErrorTest.xml",
+          "sha256": "020a7c9f4ff2db02c809a86144df3588a72229f0dac73ae7bc86b3de2a81d8cb",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelLayoutDefaultsTest.xml",
+          "sha256": "f67bca6fdccd21968bd8bb489a8d4538093d89cb558667559e465007c3213e6c",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.PanelModel11Test.xml",
+          "sha256": "cd1cfc502f870f2d61af6dc891a556032652d2b3e83f71816d85c5d2a0da9823",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyAdblockExportTest.xml",
+          "sha256": "1cecc83d1532aa8b22b22604c264127245722ebb7c0b854810404edb6a8ba716",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyLatencyRegressionTest.xml",
+          "sha256": "1607453d5824e29f2be556feb03da285947e93fa1c24082e98387ffe16ee02e9",
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyNetworkJournalTest.xml",
+          "sha256": "6c45afcb49797710b5dbd5a671b43a29108c8d89b6ff0e41746e2b4bff62ab9b",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ProxyScriptSafetyTest.xml",
+          "sha256": "70c92bee4bc5e76060b50034ed3082456026066662fad28e99dab4e6a51b0cf9",
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootAutostartTest.xml",
+          "sha256": "bf4b4000282b2f596e893e98cb5ac4b907a657bdb18fb576941d82384a797de4",
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootHealthUpgradeTest.xml",
+          "sha256": "31077ee7e63121df5b4e14a168a30159091bfcaad1821188428c4f14aac9c4ca",
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RootNetworkRecoveryTest.xml",
+          "sha256": "644760624c386f93d8bba4262f54e8d038ef88f148e1fa385a84fc69d9223ccc",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.Runtime146ContractTest.xml",
+          "sha256": "4cba29a00e9b058a56447843aa612315e17c0b42d9a53ce4b21492e112a37d80",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeStartup15Test.xml",
+          "sha256": "bc76a2028f374e23a2dc4fd05aaad26db85b64d5cee1d4f6134590dfb9521568",
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.RuntimeYaml15Test.xml",
+          "sha256": "5c517d54666ea173db11a01be40f9182a5e8b814178f87e18fd7f22f92f72c3d",
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsBackupParity57Test.xml",
+          "sha256": "01edae7bd3bf25f9062c9ca5853e2f937e31968d2e8753b9e2d668445ab2db9d",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsConceptParityTest.xml",
+          "sha256": "1abe1c7ebd5f31dd7a2a8f1ac719bb2a24eb285b0a686e8d3048406eb3dca71f",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.SettingsPickerParity58Test.xml",
+          "sha256": "e679ec6fb6686d7b2698ac35d198f46c1b82c92af61180126550bd59f7b1dfad",
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToastFeedbackTest.xml",
+          "sha256": "8d0adf812dccac6b61b0e9c126a2b686e4b0470c6fbfc7e97f6d9cbe08851c14",
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.ToolsConceptParityTest.xml",
+          "sha256": "e6e6d367c41bca9bc9d4757bc6f699fdf3f5a02358f98f3336b29a5cbc59a68b",
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83EditorHistoryTest.xml",
+          "sha256": "12edf1f06393c1ff316712d2a2907e476cf0ef1f83cde8b82736eae589ca4002",
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.UI83ToolsTest.xml",
+          "sha256": "04be082b9cc0c8de03f841d780540041fbc46ffe906f43b8378164985b44141d",
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.WanDetails61Test.xml",
+          "sha256": "7103ebaf759e224e767aa86382f85840f0ffc0540fcfa3f5519ea6a75711d54e",
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        {
+          "path": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence/android-app/app/build/test-results/testDebugUnitTest/TEST-io.github.xgl34222220.hetu.tools.ToolsPdf85Test.xml",
+          "sha256": "17a938f0308b69b1c78f18370056fb05c0c31601950e51aee7de24dccd4612fd",
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      ]
+    },
+    "apkRuntimePayloads": 23,
+    "materialKolorConstructorABI": {
+      "constructors": 687,
+      "missing": 0
+    },
+    "lint": "success",
+    "signingCertificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+    "fullJobLog": "/tmp/hetu-ci-latest-ca60825/job-111885396602-complete.log",
+    "fullJobLogSha256": "5c0bfb2feebad26ef2a286f850b947282168d3ddba24704b6eb343715970e774"
+  },
+  "strictEvidenceChecks": [
+    {
+      "name": "fresh-source-and-completed-run",
+      "result": "PASS"
+    },
+    {
+      "name": "all-current-jobs-success",
+      "result": "PASS"
+    },
+    {
+      "name": "fresh-artifact-source-11360907944",
+      "result": "PASS"
+    },
+    {
+      "name": "downloaded-artifact-digest-11360907944",
+      "result": "PASS"
+    },
+    {
+      "name": "fresh-artifact-source-11360494512",
+      "result": "PASS"
+    },
+    {
+      "name": "downloaded-artifact-digest-11360494512",
+      "result": "PASS"
+    },
+    {
+      "name": "fresh-artifact-source-11361598722",
+      "result": "PASS"
+    },
+    {
+      "name": "downloaded-artifact-digest-11361598722",
+      "result": "PASS"
+    },
+    {
+      "name": "fresh-artifact-source-11361977828",
+      "result": "PASS"
+    },
+    {
+      "name": "downloaded-artifact-digest-11361977828",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-64-equals59plus5",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-21-palettes",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-nonroot-owned-AOSP-and-root0",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-auth-fixture-only-pass",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-actual-bearer-six-paths",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-actual401-and200",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-ready-before-fixture200-and-success",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-counts12-3-18",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-no-exclusive-retry-claim",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-original-preferences-and-reverse-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-launcher-and-KVM-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-emulator-and-forward-cleanup",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-frame-sha-reference-03B-040-native-overview.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-frame-sha-reference-03B-041-native-groups.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-frame-sha-reference-03B-042-native-connections.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-frame-sha-reference-03B-043-native-node-dialog.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-native-frame-sha-reference-03B-044-native-switch-failure.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api35-five-distinct-opened-native-frames",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-64-equals59plus5",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-21-palettes",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-nonroot-owned-AOSP-and-root0",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-auth-fixture-only-pass",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-actual-bearer-six-paths",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-actual401-and200",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-ready-before-fixture200-and-success",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-counts12-3-18",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-no-exclusive-retry-claim",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-original-preferences-and-reverse-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-launcher-and-KVM-restored",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-emulator-and-forward-cleanup",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-frame-sha-reference-03B-040-native-overview.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-frame-sha-reference-03B-041-native-groups.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-frame-sha-reference-03B-042-native-connections.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-frame-sha-reference-03B-043-native-node-dialog.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-native-frame-sha-reference-03B-044-native-switch-failure.png",
+      "result": "PASS"
+    },
+    {
+      "name": "api36-five-distinct-opened-native-frames",
+      "result": "PASS"
+    },
+    {
+      "name": "build479-49XML",
+      "result": "PASS"
+    },
+    {
+      "name": "build-new8and49-zero-failure",
+      "result": "PASS"
+    },
+    {
+      "name": "required-build-lint-runtime-signature-steps",
+      "result": "PASS"
+    },
+    {
+      "name": "23-pinned-runtime-payloads",
+      "result": "PASS"
+    },
+    {
+      "name": "687-constructorABI-zero-missing",
+      "result": "PASS"
+    },
+    {
+      "name": "fixed-signature",
+      "result": "PASS"
+    },
+    {
+      "name": "actually-read49-originalXML479-zero-failure",
+      "result": "PASS"
+    }
+  ],
+  "result": "PASS",
+  "passedEvidenceChecks": 53,
+  "failedEvidenceChecks": [],
+  "notExecuted": [
+    "Actual user Google Play Store authentication on device",
+    "Real Root/core/boot/network validation",
+    "130-page pixel-equivalence acceptance: independent UI reference review handled by parent"
+  ],
+  "sourceLayerReconstruction": {
+    "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+    "baseRun": 37171744564,
+    "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "baselineFiles": 307,
+    "changedOrAddedFiles": 31,
+    "checkoutMatchesGeneratedSource": true,
+    "historicPatchesAppliedToCheckout": false,
+    "presentationLayer": {
+      "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+      "baseRun": 37211142058,
+      "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "changedOrAddedFiles": 68,
+      "protectedRuntimeUnchanged": true
+    },
+    "controllerAuthenticationLayer": {
+      "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+      "baseRun": 37240041766,
+      "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+      "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "changedOrAddedFiles": 17,
+      "runtimePayloadsUnchanged": true,
+      "dependenciesUnchanged": true,
+      "manifestAndPermissionsUnchanged": true,
+      "unchangedOutsideAuthScope": true,
+      "baselineUnitTests": 392,
+      "expectedUnitTests": 422,
+      "newTestCounts": {
+        "ToastFeedbackTest": 6,
+        "ControllerAuthenticationTest": 11,
+        "LegacyControllerCredentialTest": 3,
+        "ControllerReadStateTest": 6,
+        "PanelControllerErrorTest": 4
+      }
+    },
+    "pdfReferenceLayer": {
+      "patchSha256": "7d60109b050d8e5b2e8bfa304ee1954893b61d41b7aadaa9ca90c5aee4cf76c3",
+      "frozenInputs": 332,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "expectedUnitTests": 479
+    }
+  },
+  "nativeUiArtifact": {
+    "id": 11360907944,
+    "pngCount": 264,
+    "originalExtraction": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825-evidence",
+    "flatPngDirectory": "/workspace/scratch/3788973cf567/tmp/ui85-ca60825"
+  },
+  "wholeApkByteVerification": {
+    "verified": true,
+    "path": "/workspace/scratch/3788973cf567/Hetu-V20.85-Test-ca60825.apk",
+    "bytes": 134819453,
+    "sha256": "f5d1382e55438aaf2f09524c34d59c2d84a730338de6881f04633780a8f13ef7",
+    "method": "Parent independently downloaded six fresh transport artifacts once and verified ZIP, parts and reassembly; this reviewer independently read the resulting whole APK bytes and SHA without another download.",
+    "transportRecord": "docs/qa/20261005-v2085-ca60825-apk-delivery.json"
+  }
+}

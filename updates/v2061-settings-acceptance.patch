@@ -1,0 +1,206 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 7b7ba33..c8f1211 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2060
+-        versionName = "0.11.0-v20"
++        versionCode = 2061
++        versionName = "0.11.1-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+index b5b4263..b96e828 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -457,10 +457,6 @@ internal fun AboutScreen(vm: HetuViewModel) {
+     val scope = rememberCoroutineScope()
+     val c = Hx.colors
+     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
+-    val revision = remember {
+-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+-    }
+-
+     fun openAsset(title: String, path: String) {
+         scope.launch {
+             val text = withContext(Dispatchers.IO) {
+@@ -515,7 +511,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
+         item(key = "info") {
+             SettingsSection() {
+                 SettingsGroup(title = "信息") {
+-                    SettingsRow("内置核心", subtitle = revision.ifBlank { "Mihomo" }, icon = Icons.Rounded.Memory)
++                    SettingsRow("内置核心", subtitle = "Mihomo", icon = Icons.Rounded.Memory)
+                     SettingsDivider()
+                     SettingsRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
+                 }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index ead86d7..3cbd60e 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -798,9 +798,9 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                                         .clip(RoundedCornerShape(12.dp))
+                                         .then(
+                                             if (selected) Modifier.border(1.5.dp, c.accent, RoundedCornerShape(12.dp))
+-                                            else Modifier.border(1.dp, c.line, RoundedCornerShape(12.dp))
++                                            else Modifier
+                                         )
+-                                        .background(if (selected) c.accentSoft else Color.Transparent)
++                                        .background(if (selected) c.accentSoft else c.surfaceMuted.copy(alpha = .42f))
+                                         .clickable {
+                                             vm.setAppearanceMode(value)
+                                             vm.bumpSettings()
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+index 0baeaa1..0ab72d9 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt
+@@ -6,6 +6,7 @@ import android.graphics.Canvas
+ import androidx.activity.ComponentActivity
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.material3.Text
+ import androidx.compose.foundation.layout.Box
+ import androidx.compose.foundation.layout.fillMaxSize
+ import androidx.compose.ui.Modifier
+@@ -16,6 +17,9 @@ import androidx.compose.ui.test.onNodeWithText
+ import androidx.compose.ui.test.performClick
+ import androidx.compose.ui.test.performScrollTo
+ import androidx.compose.ui.test.performScrollToNode
++import androidx.compose.ui.test.hasSetTextAction
++import androidx.compose.ui.test.performTextReplacement
++import androidx.compose.ui.test.assertExists
+ import androidx.compose.ui.test.hasScrollToIndexAction
+ import androidx.compose.ui.test.hasText
+ import androidx.test.core.app.ApplicationProvider
+@@ -69,7 +73,7 @@ class NativeConceptScreenshotTest {
+             assertTrue("Window must be laid out", view.width > 0 && view.height > 0)
+             val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+             view.draw(Canvas(bitmap))
+-            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept59"), "$name.png")
++            val file = File(System.getProperty("hetu.qa.output", "build/outputs/concept61"), "$name.png")
+             file.parentFile!!.mkdirs()
+             file.outputStream().use { assertTrue(bitmap.compress(Bitmap.CompressFormat.PNG, 100, it)) }
+             bitmap.recycle()
+@@ -116,5 +120,58 @@ class NativeConceptScreenshotTest {
+     @Test fun notificationActionChoice() = snapshotAfter("settings-notification-action1-choice", { NotificationSettingsScreen(vm) {} }) {
+         rule.onAllNodesWithText("动作")[0].performScrollTo().performClick()
+     }
++    @Test fun settingsBackup() = snapshot("settings-backup") { SettingsScreen(vm, 0.dp, initialSubPage = "backup") }
++    @Test fun settingsStartupDownload() = snapshot("settings-startup-download") { SettingsScreen(vm, 0.dp, initialSubPage = "startupDownload") }
++    @Test fun settingsDefaultPanel() = snapshot("settings-default-panel") { SettingsScreen(vm, 0.dp, initialSubPage = "defaultPanel") }
++    @Test fun themeMotion() = snapshotAfter("settings-theme-motion", { HxThemeLabScreen(vm) {} }) {
++        rule.onNode(hasScrollToIndexAction()).performScrollToNode(hasText("界面缩放"))
++        rule.onNodeWithText("界面缩放").assertExists()
++    }
++    @Test fun notificationButtons() = snapshotAfter("settings-notification-buttons", { NotificationSettingsScreen(vm) {} }) {
++        rule.onAllNodesWithText("动作")[2].performScrollTo()
++        rule.onNodeWithText("快捷按钮 3").assertExists()
++    }
++    @Test fun notificationAction2Choice() = snapshotAfter("settings-notification-action2-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onAllNodesWithText("动作")[1].performScrollTo().performClick()
++        rule.onNodeWithText("重载").assertExists()
++        rule.onNodeWithText("重启").assertExists()
++        rule.onNodeWithText("停止").assertExists()
++    }
++    @Test fun notificationAction3Choice() = snapshotAfter("settings-notification-action3-choice", { NotificationSettingsScreen(vm) {} }) {
++        rule.onAllNodesWithText("动作")[2].performScrollTo().performClick()
++        rule.onNodeWithText("隐藏通知").assertExists()
++        rule.onNodeWithText("无").assertExists()
++    }
++    @Test fun mirrorValidation() = snapshotAfter("settings-mirror-invalid", {
++        SettingsMirrorDialog(initial = "", onSave = {}, onDismiss = {})
++    }) {
++        rule.onNode(hasSetTextAction()).performTextReplacement("mirror.example")
++        rule.onNodeWithText("保存").performClick()
++        rule.onNodeWithText("请填写 http/https 地址").assertExists()
++    }
++    @Test fun restoreConfirmation() = snapshotAfter("settings-restore-confirm", {
++        SettingsDialog(title = "恢复备份？", onDismiss = {}, confirmLabel = "恢复", onConfirm = {}) {
++            Text(
++                "备份内的设置与配置将写入当前应用。同名同内容配置会复用；同名不同内容配置将保留为副本。正在运行的代理不会自动重启。",
++                color = Hx.colors.textMuted,
++            )
++        }
++    }) {
++        rule.onNodeWithText("恢复备份？").assertExists()
++        rule.onNodeWithText("取消").assertExists()
++        rule.onNodeWithText("恢复").assertExists()
++    }
++    @Test fun aboutMihomoLicense() = snapshotAfter("settings-license-mihomo", { AboutScreen(vm) }) {
++        rule.onNodeWithText("Mihomo").performScrollTo().performClick()
++        rule.onAllNodesWithText("Mihomo")[1].assertExists()
++    }
++    @Test fun aboutAdguardLicense() = snapshotAfter("settings-license-adguard", { AboutScreen(vm) }) {
++        rule.onNodeWithText("AdGuard DNS Filter").performScrollTo().performClick()
++        rule.onNodeWithText("AdGuard").assertExists()
++    }
++    @Test fun aboutLucideLicense() = snapshotAfter("settings-license-lucide", { AboutScreen(vm) }) {
++        rule.onNodeWithText("Lucide Icons").performScrollTo().performClick()
++        rule.onNodeWithText("Lucide").assertExists()
++    }
+ 
+ }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsStateCoverage61Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsStateCoverage61Test.kt
+new file mode 100644
+index 0000000..ee2add2
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsStateCoverage61Test.kt
+@@ -0,0 +1,56 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import java.io.File
++
++/**
++ * Guard the production controls that correspond to Settings concept pages 03-33.
++ * These are structure/interaction gates; rendered state snapshots live in
++ * [NativeConceptScreenshotTest].
++ */
++class SettingsStateCoverage61Test {
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    @Test fun settingsMenusMatchReferenceOptions() {
++        val s = source("app/SettingsScreen.kt")
++        listOf("overview", "proxies", "providers", "conn", "rules", "sets", "logs").forEach { assertTrue(s.contains("HxChoice(\"$it\"")) }
++        listOf("跟随系统", "简体中文", "繁體中文", "English", "Русский").forEach { assertTrue(s.contains(it)) }
++        listOf("渐进式模糊", "高斯模糊", "80%", "90%", "100%", "110%", "120%").forEach {
++            val ok = s.contains(it) || when (it) {
++                "80%" -> s.contains(".8f")
++                "90%" -> s.contains(".9f")
++                "100%" -> s.contains("1f")
++                "110%" -> s.contains("1.1f")
++                "120%" -> s.contains("1.2f")
++                else -> false
++            }
++            assertTrue("missing theme choice $it", ok)
++        }
++    }
++
++    @Test fun notificationMenusCoverAllThreeButtons() {
++        val s = source("app/ToolScreens.kt")
++        assertTrue(s.contains("listOf(2, 3, 5, 10, 30, 60)"))
++        listOf("首页", "面板", "策略", "面板浮窗", "策略浮窗", "工具", "设置").forEach { assertTrue(s.contains(it)) }
++        listOf("重载", "重启", "停止", "隐藏通知", "无").forEach { assertTrue(s.contains(it)) }
++        assertTrue(s.contains("(0 until 3).forEach"))
++    }
++
++    @Test fun restoreMirrorAndLicensesMatchConceptBoundary() {
++        val settings = source("app/SettingsScreen.kt")
++        val components = source("app/SettingsReferenceComponents.kt")
++        val about = source("app/MiscScreens.kt")
++        assertTrue(settings.contains("恢复备份？"))
++        assertTrue(settings.contains("正在运行的代理不会自动重启"))
++        assertTrue(components.contains("请填写 http/https 地址"))
++        assertTrue(components.contains("SettingsDialog(\"加速下载\""))
++        assertTrue(about.contains("SettingsRow(\"内置核心\", subtitle = \"Mihomo\""))
++        assertTrue(about.contains("openAsset(\"Mihomo\", \"MIHOMO-LICENSE\")"))
++        assertTrue(about.contains("openAsset(\"AdGuard\", \"ADGUARD-LICENSE\")"))
++        assertTrue(about.contains("openAsset(\"Lucide\", \"licenses/lucide.txt\")"))
++        assertFalse(listOf(settings, components, about).any { it.contains("示例数据") })
++    }
++}

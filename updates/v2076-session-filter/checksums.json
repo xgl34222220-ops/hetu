@@ -1,0 +1,7 @@
+{
+  "patchSha256": "9ee6b1088c54bb8e5879c923cc6e2624181df07dca6c8ebc97c45cef6ded6a62",
+  "rootScriptSha256": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+  "runtimeRevision": 151,
+  "appVersionCode": 2076,
+  "expectedUnitTests": 278
+}

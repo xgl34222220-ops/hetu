@@ -1,0 +1,117 @@
+{
+  "schema": 1,
+  "commit": "b49c6d18fff28a82bcf1d059e3abcbe85a12f466",
+  "ciRun": 37169355897,
+  "conclusion": "failure",
+  "buildJob": 111338956055,
+  "failedStep": "Runtime unit tests / compileDebugUnitTestKotlin",
+  "unitTestsExecuted": 0,
+  "error": "JournalReliabilityTest.kt:7:39 Unresolved reference hxCopy; incorrect import io.github.xgl34222220.hetu.app.hxCopy; actual package is io.github.xgl34222220.hetu.",
+  "correction": "Remove the incorrect import. Keep the actual hxCopy call and all assertions unchanged.",
+  "historical2074Job": {
+    "id": 111338956293,
+    "conclusion": "success"
+  },
+  "installedSmoke": "skipped because build failed",
+  "hostFaultGates": "both production before/after stress gates passed",
+  "productionApplicationChangedForCorrection": false,
+  "permissionsChanged": false,
+  "networkJournalStress": {
+    "after": {
+      "attempts": 3000,
+      "storageLimitBytes": 8192,
+      "storedBytes": 8016,
+      "dropped": 2952,
+      "fullStatusVisible": true,
+      "sensitiveStoredMetadataCopied": false,
+      "oversizedHealthEventBytes": 217,
+      "viewTruncationVisible": true,
+      "sourceSha256": "83980b0576665cbcc8d0583758f4d911c3356aed7db8bf37e6ff0d2df2d87b51",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    },
+    "before": {
+      "attempts": 3000,
+      "storageLimitBytes": 8192,
+      "storedBytes": 501000,
+      "dropped": 0,
+      "fullStatusVisible": false,
+      "sensitiveStoredMetadataCopied": true,
+      "oversizedHealthEventBytes": 200190,
+      "viewTruncationVisible": false,
+      "sourceSha256": "8c8fcf2f77897e079c3ca2cd395fe2b3a0b3cf4fdce16931f3d7bc87e961cf9c",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    }
+  },
+  "networkRecoveryStress": {
+    "after": {
+      "cycles": 512,
+      "maxQueuedRecoveries": 1,
+      "drainedAttempts": 1,
+      "latestExecuted": 1,
+      "cancelledWantedExecuted": 0,
+      "eventDuringAttemptPreserved": true,
+      "cancelledTimersRetained": 0,
+      "sourceSha256": "30d5420d27203151c7c27b5e192a54d0c5c9de31b3a91ce7ed9bec16851a8e5e",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    },
+    "before": {
+      "cycles": 512,
+      "maxQueuedRecoveries": 512,
+      "drainedAttempts": 512,
+      "latestExecuted": 1,
+      "cancelledWantedExecuted": 0,
+      "eventDuringAttemptPreserved": true,
+      "cancelledTimersRetained": 4096,
+      "sourceSha256": "b50773343de46622658e65b48a3e00a96863d74033f561fd6bdab304402ae1cd",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    }
+  },
+  "materialKolorAbi": {
+    "apkSha256": "9cb703a5403b469e18dfd25d0bffa4ddcb369ab90bfb1cc623d3090a676d6e7b",
+    "dexCount": 10,
+    "constructorReferences": 687,
+    "missingConstructors": [],
+    "compatible": true,
+    "expectedIncompatibleBaseline": false
+  },
+  "packagedRuntime": {
+    "expected": {
+      "lib/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+      "lib/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+      "assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/cnip/hetu-cn-v4.txt": "88ea1e3bc89ee5966cc66cb2b6b7b8c4993a84bcfa04fe880750e1ec6bae0fa9",
+      "assets/cnip/hetu-cn-v6.txt": "4a3cccf5497148a20a24df381db0ef1a9d114a27441e29b04246f06fc349f03b",
+      "assets/hetu-root.sh": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+      "assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
+      "assets/licenses/lucide.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "assets/licenses/reference-ui-GPL-3.0.txt": "b276bbecaa68377ce9fae470024428aaf90d4b395fee090752d19debab9c7bee",
+      "assets/mihomo-revision.txt": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+      "assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+      "assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+      "assets/rules/adaway.txt": "8c925c37a5eaa5e1c582c76e12301797861addee5ad0fa0e6e46c9dd0136fe55",
+      "assets/rules/adguard.txt": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+      "assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
+      "assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
+      "assets/rules/hagezi.txt": "8846bfdda6fc630d81d2c10181cadc451f099cb7b32474682fc2122b7430cc53",
+      "assets/rules/snapshot.json": "799e1341e6df634a71cb487a11ff9b6847c628310b4f1810c1eeab6f4666cd72",
+      "assets/rules/tracking.txt": "4dd3290bb52e2975f556c33adf081b3430f4e0dc8a75af9841c48def524444c9",
+      "assets/schema/sing-box-official.json": "641f9bb28af79e014afe8a781140b40d357c7adf8fcb5fe5e23b7971a62fa52d",
+      "assets/sources.tsv": "13779a44e0f5493d0f9923eeb341cd496327a068a622751906bdedbe3ccaf420",
+      "assets/hetu-autostart.sh": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+    },
+    "originalPayloadCount": 22,
+    "editedPayloads": [
+      "assets/hetu-root.sh"
+    ],
+    "addedPayloads": [
+      "assets/hetu-autostart.sh"
+    ],
+    "apkVerified": true,
+    "apkSha256": "9cb703a5403b469e18dfd25d0bffa4ddcb369ab90bfb1cc623d3090a676d6e7b"
+  }
+}

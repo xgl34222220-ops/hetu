@@ -1,0 +1,238 @@
+{
+  "schema": 1,
+  "baselineCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+  "branch": "test/v20.76-new-ui",
+  "scope": "03A tools upper volume pages 1-49",
+  "archives": [
+    {
+      "name": "hetu-tools-part1-v20.48.zip",
+      "sha256": "c768701a2e1beae252da9f02bd8717958d5f3aafd2a7ea8a247c17c4ab6b80d5",
+      "zipIntegrityChecked": true
+    },
+    {
+      "name": "hetu-tools-part2-v20.48.zip",
+      "sha256": "dc6d0cffa7c36eafff44543172c80f213456962209fecfccee920f3a0dc49993",
+      "zipIntegrityChecked": true
+    }
+  ],
+  "part2Overrides": [
+    "tools/ToolsAdapter.kt",
+    "tools/ToolsRoute.kt"
+  ],
+  "representedKotlinFiles": 27,
+  "files": {
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "3b8a62e64ef53c1ffea9ca6cf4464117b5ff3b4edca44ab34f12053f6d099b59",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt",
+      "baselineIntegratedSha256": "025541d2775893ad48d11852555c09ca4d0509c291faffdfd7e0750a35fb8137",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "4d1293c85f17a31ec31ffd9d8cec34279bce8c8a90ae842ce2799dd58c189186",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt",
+      "baselineIntegratedSha256": "f3ee1a7387013d61a78fcee3ea6d20f588abb6edac949aa284a9b4ffebdde5e4",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "b0753bc81f25c10408e240f852afa14379c4a9782e4882aec3d389fe888485df",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt",
+      "baselineIntegratedSha256": "05e3c9db5959c0b831378cc244a524f55980fcf8b868b900bc28447fd80a3d66",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "e8cd650425e376af671f332dc173610e1aaa67d4fbdf1e2861192eb3d386cf89",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+      "baselineIntegratedSha256": "af5ce76a084b900157203798452e4745d9a383c7092098e4b6c9a52b29a002ec",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "5a4d5aa227eed2eb9a0fdb7f844ddc3bfb380e10b38f2cef400274a24d8cf812",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt",
+      "baselineIntegratedSha256": "5aa26917857d95c7d6fccd530f1b56fbcde2cc91798337eb32ac0cd04073dddc",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "fc0d951415967f4edae488981a25a89873682040ccd0c2cc9828eba6b83b7574",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt",
+      "baselineIntegratedSha256": "5d2d2a16bc53414e17f73d22cbd93100b3c5b9dac3eb20b1122965a27f477e16",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "8dc23928461d776dcde4f208adbf07a2896f4b109d2690a63777b1e8ed486a0e",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt",
+      "baselineIntegratedSha256": "c3cecac76b556bef0f33ed7291bd1734428a46cac68fc754a99a0e9e997ce1da",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "c5be08cf9c9c1611b676a30f1e018080126dc8640faefeda8c59b0ff250e9bdc",
+      "integratedPath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt",
+      "baselineIntegratedSha256": "22caa0ec04d25b9cf7f587791072c18fbcb2f14f72f97b9a158c49008a9411e5",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "4f1b3ed4262bd0faa93f39b59cec2858236059c04b8fe8429cc64e0456487bb0",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+      "baselineIntegratedSha256": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "fde7617dd1701c565897633a1d92db2f1ce1784aabd2ad65e5bab85ca9cef518",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+      "baselineIntegratedSha256": "e61d1e59f8936409edf54971c2fa1034add4fef1f50df1c7ccca9e47e7ac2e2a",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "4a6e97f0b9ce5f40192ed57a67cd2f41c6d0c545959ec7db460474b09c13c3a6",
+      "integratedPath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt",
+      "baselineIntegratedSha256": "4a6e97f0b9ce5f40192ed57a67cd2f41c6d0c545959ec7db460474b09c13c3a6",
+      "representation": "byte-identical"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "cd9864f50b2c415051aea81f1c92be0b793c896c47c58329ed806ac51fc6c091",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+      "baselineIntegratedSha256": "506ac22816e0cd84a277e609112cd19650499819605ed3c1f4602aad4b3252c5",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "27248fdd36e86e7e2876044bc3bbd00add54f51ec80578ac842016874dd60deb",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt",
+      "baselineIntegratedSha256": "1c24d36853c84c622c2696354ec52d957d812cc060d7372c9d28e391ccd218a6",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsConfigBridge.kt": {
+      "originArchive": "hetu-tools-part1-v20.48.zip",
+      "uploadedSha256": "b520fa3f8b3009e82ee0534d0b5a63201e9aca8d19ae0c5a6c30634f5a4c7c6a",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsConfigBridge.kt",
+      "baselineIntegratedSha256": "dac5205ec8f51eefd2596a2794a028bd0f8d54243d12eeb0e5e2d962c36b3bfa",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "aaab02f5070ee3386924ce98ac20b5d36997170da38ccb181147260044cb3cb4",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt",
+      "baselineIntegratedSha256": "06b93029f588704b80125d049bc014e28103701f103651b88b3752bba63535e4",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureIcons.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "f1c5df6b57a72a06480d6231538db19b9016daee75c4f6b4a192dc39c7e4f10e",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureIcons.kt",
+      "baselineIntegratedSha256": "f1c5df6b57a72a06480d6231538db19b9016daee75c4f6b4a192dc39c7e4f10e",
+      "representation": "byte-identical"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "8958fa0474580d83d48c77061eebe00bfd2f10a5d2e04d5a2e7dd5cbcebd3caa",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt",
+      "baselineIntegratedSha256": "7c707c6561ea6f28def3b865bb830529c5e7f7bbda08b27f62b2ab4da244e227",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "d5f5ff301033c8956fc82e90a1c0e727a4e35e820b76b7b41f1d893fe5eb26e7",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+      "baselineIntegratedSha256": "2297a5681811287817a41c6b721a36b8e1550aef622865075f9bd1f99dd3d968",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "ce565e5e52cde8344d4efb919fa476b0e54d743210c209f88e4cc3ccfcfe2a3a",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+      "baselineIntegratedSha256": "d63a4ac64dea68128edfc61c97a28ef13c1bd46e83756a0691b46f97888d6b97",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "02bbc99f1f12b5d440bd2d82c72535183c70034c100a05dab59dcfcb92d20bc6",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt",
+      "baselineIntegratedSha256": "7a2d5d3ae46f6a48db8b91db0e9413d53447dd58618c70360266c0fd1619ea05",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "f819ad0c1061f32535898c2a727962ed35a4d88675f695af67815020f47609cf",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt",
+      "baselineIntegratedSha256": "8bb72974b9a084a2ccb7fe8bf6e08a4519dea4cfab5f23fa300f2422afd402db",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "0aa7ea24d09ec9a043a29e9c44ed6563de0cefb65e18817abdb1371a14091457",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt",
+      "baselineIntegratedSha256": "c180b7b775b0659ca5698fec658186fde34794e7f0d6abb858fe69eb61c4b348",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "59d46ba14ecbbeebe4e2d64f50ab986588ae1e0655f67b953c9d0782a6beb459",
+      "integratedPath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt",
+      "baselineIntegratedSha256": "e84f56ea39e215aafa38b6f579732a4ca2c8a9218a18f17bccf7cf2680f68c3d",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "ce80078aa24996a42ad6b5c50b7105b83efb0b50dc7bdd730ccf95b41f50f750",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt",
+      "baselineIntegratedSha256": "dd620f4fa699d976bbf6cc062a5f7f91bf352a242fb845398ba71e7aa8fba8af",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "f118e25481f5638952f65e8d6d094b93896dde9aaa0c9ff0ed215b51feef8224",
+      "integratedPath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt",
+      "baselineIntegratedSha256": "f118e25481f5638952f65e8d6d094b93896dde9aaa0c9ff0ed215b51feef8224",
+      "representation": "byte-identical"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "fb153dfc4bb3a83a3f7646954bdca2acf728204cefb02a6b8f726cfe88a8bbed",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt",
+      "baselineIntegratedSha256": "2d2f71b355443b992bfbf45429b830278784c735ab77ca920ea020ec4e047aa8",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    },
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt": {
+      "originArchive": "hetu-tools-part2-v20.48.zip",
+      "uploadedSha256": "85fae77153ad693708d43d721a5ee49d029581a0a300ace8afcc0ec181bbd4d5",
+      "integratedPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt",
+      "baselineIntegratedSha256": "81993494b1c6f28901a0ff3ad2e0727ae2c3d2d6fcbe0e185ed057c6323574ea",
+      "representation": "adapted-for-current-runtime-and-PDF"
+    }
+  },
+  "productionEntry": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt:ToolsScreen -> HetuToolsV2 -> ToolsRoute -> ToolsFeaturePage",
+  "preservedAdaptations": [
+    "CIDR validation",
+    "runtime-verification states",
+    "active application scope lists",
+    "current core information",
+    "core-import busy state",
+    "rule-mode confirmation",
+    "PDF layout refinements",
+    "runtime editor and diagnostics details routes"
+  ],
+  "intakeCorrections": [
+    "await VPN consent before changing saved fallback/autostart preferences",
+    "discard late diagnostics results after a sheet is closed or reopened"
+  ],
+  "verification": {
+    "zipIntegrity": "passed",
+    "all27FilesRepresented": "passed",
+    "androidBuild": "pending-current-intake-CI",
+    "originalAndroidTests": 479,
+    "newAndroidTests": 8,
+    "expectedTotalTests": 487,
+    "deviceTests": "pending-current-intake-CI"
+  }
+}

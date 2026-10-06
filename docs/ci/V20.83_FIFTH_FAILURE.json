@@ -1,0 +1,30 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "b39ed1e83be84b6e933f92858b8b3b4bbe21f323",
+  "ciRun": 37236752423,
+  "attempt": 1,
+  "conclusion": "failure",
+  "units": {"tests": 392, "failures": 0, "errors": 0, "skipped": 0, "xmlFiles": 42},
+  "lint": {"errors": 0, "fatal": 0, "warnings": 298},
+  "passedBuildGates": ["Presentation patch reproduces 68 compilation inputs and preserves runtime/dependencies", "All 23 packaged runtime payloads", "687 MaterialKolor constructor references with zero missing", "Packaged launcher/concept icon bytes", "Fixed certificate and APK identity 2083/0.12.13-v20-ui"],
+  "apk": {
+    "bytes": 134721428,
+    "sha256": "24f96438c1ebe1e648e23352e1191aa91ab472ee938cc62e1eba39dd2abe7c57",
+    "localSixPartTransferAndAllPayloadsVerified": true
+  },
+  "installationFailures": [
+    {"apiLevel": 35, "job": 111539431432, "artifact": 11316222454},
+    {"apiLevel": 36, "job": 111539431418, "artifact": 11316541536}
+  ],
+  "cause": "Both jobs failed in smoke_hetu_apk.py line 362 with UI label unavailable: 诊断工具. The actual failure.xml remains at the tool hub top; its ScrollView bounds are [0,0][394,702]. The old script starts every swipe at y710, outside the corrected scroll viewport, so all seven gestures are ignored. The production entry is still named 诊断工具.",
+  "corrections": [
+    "Calculate real swipe coordinates from the unique application scroll viewport; retain physical taps, retry limit and missing-entry failure.",
+    "Traverse the actual two-layer diagnostic route before opening the network journal, and return through both route layers to the hub.",
+    "Use the actual WebUI hub entry label. Preserve all existing journal, Root denial, native WebView, palette and crash assertions.",
+    "Add a host regression from the observed viewport topology and rerun all original gates. Production compilation inputs are unchanged."
+  ],
+  "visualReview": {"freshUi83Captures": 8, "correctedSettingsCaptures": 6, "blockingClippingOrOcclusionObserved": false},
+  "boundaries": ["The failed run remains failed; passing build and static visual states do not replace installed navigation acceptance.", "Network-journal, native-WebView and 21 palette checks were not reached on either API in this run."]
+}

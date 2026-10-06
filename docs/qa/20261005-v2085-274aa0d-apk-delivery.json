@@ -1,0 +1,56 @@
+{
+  "applicationCommit": "274aa0d2f80dad39884bd3d079a2e02c86a90abd",
+  "runId": 37366522056,
+  "apkName": "Hetu-V20.85-Test-274aa0d.apk",
+  "apkBytes": 134833109,
+  "apkSha256": "b58438e74239312a7cbd32c8675827ee2e3e7b256b59dfb879b06891171b29e3",
+  "partCount": 6,
+  "allSixArtifactAndPartHashesVerified": true,
+  "fullApkHashVerified": true,
+  "installedAcceptance": "PASS own274 strict53/487XML/API35+36 64checks/21palette; realGoogleAccountAuthenticationUnverified",
+  "transportManifestArtifactId": 11370765854,
+  "transportParts": [
+    {
+      "index": 0,
+      "artifactId": 11370875830,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:2423d97cc2bb4871041ae7a629822fe18c48995b2ca7bd4d479d8d253c42ee75"
+    },
+    {
+      "index": 1,
+      "artifactId": 11370740887,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:01df9da59abd6399147f3374a2456917d0738e378536553072e6ef5ec0043af0"
+    },
+    {
+      "index": 2,
+      "artifactId": 11370870798,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:ec502c614614ac872c1808458f23eeb2b76cfb1b1b1b055737b28f0c5a67cdb3"
+    },
+    {
+      "index": 3,
+      "artifactId": 11371020788,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:dfb372fe71decdaabdc574495f2252cf739379da84d689df0738c168c08778da"
+    },
+    {
+      "index": 4,
+      "artifactId": 11371070772,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:1c21fa92c274a32f73e830e5b414c26d7027b833603d13b505c88459a09b0678"
+    },
+    {
+      "index": 5,
+      "artifactId": 11371020799,
+      "artifactBytes": 9004123,
+      "artifactDigest": "sha256:31e352184f594dffd78bdd0c1890c3119d54703efa36f049c09f0de20dc522f6"
+    }
+  ],
+  "ownInstallationEvidence": "docs/qa/20261005-v2085-274aa0d-installation-success.json",
+  "ownInstallationEvidenceSha256": "5190c9f3f1aa5c623cdf1e3f6b3164f1121b7db78aeb18ac9a93e8ba7b636461",
+  "savedForFinalDelivery": true,
+  "deliveredInFinalResponse": false,
+  "saveSucceeded": true,
+  "finalResponseWillLinkThisVerifiedApk": true
+}

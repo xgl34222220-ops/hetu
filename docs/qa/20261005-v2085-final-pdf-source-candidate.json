@@ -1,0 +1,30 @@
+{
+  "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+  "requiredEffectiveInputs": 379,
+  "locallyVerifiedCommittedInputs": 375,
+  "locallyMissingUnchangedPayloadFiles": [
+    "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo",
+    "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo",
+    "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so",
+    "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"
+  ],
+  "completeEffectiveSourceVerified": false,
+  "changedPresentationInputs": 4,
+  "frozenInputs": 375,
+  "fullFourSourceExactTransformsVerified": true,
+  "allTenPriorLayerFilesUnchanged": true,
+  "expectedUnitTests": 487,
+  "expectedTestXmlFiles": 51,
+  "ownCompiledAcceptance": "pending",
+  "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+  "hostChecksPassed": {
+    "finalPresentation": 8,
+    "originalIntakeScope": 18,
+    "intakeEvidence": 5,
+    "originalPdfScope": 6,
+    "originalAuthEvidence": 6,
+    "originalPanelAuthSmoke": 18,
+    "total": 61
+  },
+  "fourPathsHardcodedAndReplacementRejected": true
+}

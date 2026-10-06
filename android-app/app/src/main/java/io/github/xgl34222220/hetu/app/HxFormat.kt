@@ -57,9 +57,8 @@ internal object HxFormat {
         return when {
             value == null || value == 0L -> c.textFaint
             value < 0L -> c.bad
-            value < 300L -> c.good
-            value < 800L -> c.warn
-            else -> c.bad
+            value < 800L -> c.accent
+            else -> c.warn
         }
     }
 

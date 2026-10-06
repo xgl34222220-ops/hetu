@@ -1,0 +1,231 @@
+{
+  "currentApplicationCommit": "20c308da02e4920f6581c5210af291ff6fb63dab",
+  "referencePagesVisuallyReviewed": 49,
+  "pairedOverviewDirectory": "/workspace/scratch/3788973cf567/tmp/ui85-20c-03A-re-audit",
+  "fullSizeHighlightedPages": [
+    1,
+    5,
+    16,
+    25,
+    38
+  ],
+  "excludedAlreadyChangedPages": [
+    29,
+    30,
+    45
+  ],
+  "normalization": "reference PNG425px screen width -> current393dp =393/425; bboxes are ink, not layout boxes",
+  "points": [
+    {
+      "id": "hub-leading-text",
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "file": "ToolsComponents.kt",
+      "function": "ToolsRow (opt-in caller ToolsScreen.ToolsGroup)",
+      "referenceInkBBox": [
+        90,
+        216,
+        168,
+        234
+      ],
+      "currentInkBBox": [
+        75,
+        148,
+        146,
+        165
+      ],
+      "normalizedReferenceInkX": 83.2235294117647,
+      "currentInkX": 75,
+      "sourceLayoutTextOrigin": 74,
+      "sourceCurrentGapDp": 18,
+      "candidateHubOnlyGapDp": 26,
+      "note": "Changing gap to 24dp only moves current ink to81; actual reference ink is83.22. CJK title normalized ink size72.12x16.64 matches current71x17; no size change proven here.",
+      "referencePngSha256": "dfaba404577d2ee746786be6cba501d33b2c48eeac411b1a0c42f82971d1a692",
+      "currentPngSha256": "92fa97fa42c7ca09c82618146077150ae303b376182c90372b0b34cbf637c2e8"
+    },
+    {
+      "id": "hub-icon-tint",
+      "pages": [
+        1,
+        2,
+        3
+      ],
+      "file": "ToolsScreen.kt",
+      "function": "ToolsGroup -> ToolsRow iconTint",
+      "referenceIconBBox": [
+        35,
+        225,
+        59,
+        245
+      ],
+      "currentIconBBox": [
+        33,
+        159,
+        53,
+        176
+      ],
+      "referenceCoreRgbApproximateRange": [
+        [
+          21,
+          24,
+          33
+        ],
+        [
+          36,
+          38,
+          49
+        ]
+      ],
+      "currentSolidRgb": [
+        95,
+        100,
+        115
+      ],
+      "sourceDefault": "LocalHomeColors.current.t2",
+      "candidateHubOnlyTint": "c.t1",
+      "referencePngSha256": "dfaba404577d2ee746786be6cba501d33b2c48eeac411b1a0c42f82971d1a692",
+      "currentPngSha256": "92fa97fa42c7ca09c82618146077150ae303b376182c90372b0b34cbf637c2e8"
+    },
+    {
+      "id": "tools-hairline-opacity",
+      "pages": [
+        13,
+        38
+      ],
+      "file": "ToolsDesign.kt",
+      "function": "ToolsHairline",
+      "referenceLineSample": {
+        "xy": [
+          35,
+          474,
+          393,
+          475
+        ],
+        "medianRgb": [
+          235,
+          236,
+          248
+        ]
+      },
+      "currentLineSample": {
+        "xy": [
+          30,
+          351,
+          364,
+          352
+        ],
+        "medianRgb": [
+          145,
+          145,
+          150
+        ]
+      },
+      "backgroundRgbBoth": [
+        248,
+        247,
+        253
+      ],
+      "source": "c.line.copy(alpha=.45f) overrides base line alpha .08",
+      "candidate": "Preserve base alpha or multiply it; reference effective black alpha is approximately.05, not.45.",
+      "referencePngSha256": "8dc64411d28c465950231967532af1e51d370360fc9149ee1b1773ab4461cc40",
+      "currentPngSha256": "dc0b134a752ac58958a8fb0d6feae31778f171fee265944ab73963a87d720748"
+    },
+    {
+      "id": "yaml-code-font-leading",
+      "pages": [
+        13,
+        14,
+        15,
+        17,
+        18,
+        19,
+        25
+      ],
+      "file": "ToolsYamlEditor.kt",
+      "function": "ToolsEditorType.code",
+      "sourceCurrentFontSp": 12,
+      "sourceCurrentLineHeightSp": 20,
+      "referenceMixedPortBlueInkBBox": [
+        75,
+        316,
+        163,
+        330
+      ],
+      "currentMixedPortBlueInkBBox": [
+        59,
+        229,
+        132,
+        241
+      ],
+      "normalizedReferenceBlueInkSize": [
+        81.37411764705882,
+        12.945882352941176
+      ],
+      "currentBlueInkSize": [
+        73,
+        12
+      ],
+      "referenceFirstTwoBlueLineStarts": [
+        316,
+        334
+      ],
+      "referenceFirstTwoLineGap393dp": 16.64470588235294,
+      "currentFirstTwoBlueLineStarts": [
+        229,
+        249
+      ],
+      "currentFirstTwoLineGapDp": 20,
+      "candidateFontSp": 14,
+      "candidateLineHeightSp": 18,
+      "note": "Fixed same YAML key is independent of fixture values; candidate font/leading still needs new screenshots, not an exact PDF token assertion.",
+      "referencePngSha256": "8dc64411d28c465950231967532af1e51d370360fc9149ee1b1773ab4461cc40",
+      "currentPngSha256": "dc0b134a752ac58958a8fb0d6feae31778f171fee265944ab73963a87d720748",
+      "implementedCandidateFontSp": 13.5,
+      "implementedCandidateLineHeightSp": 18
+    },
+    {
+      "id": "editor-read-failure-icon-size",
+      "pages": [
+        16
+      ],
+      "file": "ToolsEditorScreen.kt + ToolsComponents.kt",
+      "function": "ToolsEditorScreen Failed -> ToolsEmpty",
+      "referenceIconBBox": [
+        189,
+        507,
+        237,
+        566
+      ],
+      "currentIconBBox": [
+        185,
+        420,
+        209,
+        450
+      ],
+      "normalizedReferenceInkSize": [
+        44.385882352941174,
+        54.55764705882353
+      ],
+      "currentInkSize": [
+        24,
+        30
+      ],
+      "sourceCurrentViewportDp": 32,
+      "candidatePage16OnlyViewportDp": 60,
+      "note": "Keep retry and real error message; source glyph dimensions differ independent of fonts/OS. Do not change all empty states without reference evidence.",
+      "referencePngSha256": "748e3c52a80ed5f528c421a92fafe8a8c09d57b22e4b9e78c632b051c1e4f9a8",
+      "currentPngSha256": "de0b6c06e0a5dcc8313a9a0830b19a9c057dfbc0950f671c46e4377738621666"
+    }
+  ],
+  "limitations": [
+    "No source changes or CI operations.",
+    "270f559 pending new CI cannot be judged by20c screenshots.",
+    "Reference JPEG antialiasing limits literal font-family/weight inference; measured offsets, shape sizes, and solid tint differences are explicit.",
+    "Background is near-flat; no added gradient justified."
+  ],
+  "reviewedApplicationCommit": "20c308da02e4920f6581c5210af291ff6fb63dab",
+  "implementationStatus": "Candidate implementation pending fresh source commit and CI; measurements remain from20c."
+}

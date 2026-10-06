@@ -1,0 +1,64 @@
+{
+  "version": "V20.77",
+  "branch": "test/v20.75-theme-compat",
+  "applicationCommit": "34ba4778e36e79ae916c5729e6b848c4218f868f",
+  "runId": 37160754265,
+  "overall": "failure",
+  "unitTests": {
+    "tests": 292,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "RootNetworkRecoveryTest": 13,
+    "RootHealthUpgradeTest": 7,
+    "CustomPaletteCompatibilityTest": 5,
+    "ProxyAdblockExportTest": 8
+  },
+  "shellTests": {
+    "rootHealth": 26,
+    "googleFirewall": 17,
+    "autostart": 17
+  },
+  "buildJob": 111313506069,
+  "build": "success",
+  "lint": "success",
+  "materialkolor": {
+    "constructorReferences": 687,
+    "missingConstructors": 0
+  },
+  "runtimePayloads": 23,
+  "signatureSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+  "apk": {
+    "versionCode": 2077,
+    "versionName": "0.12.7-v20",
+    "bytes": 133336650,
+    "sha256": "1bcd785c1cdfea2e48b01c7de8c45a64a749a862659c423f1ff6e66df634c230"
+  },
+  "android": {
+    "35": {
+      "jobId": 111315576174,
+      "result": "failure",
+      "reason": "duplicate-native-WebView-frame",
+      "groupsEqualsConnections": true,
+      "artifactId": 11288335536
+    },
+    "36": {
+      "jobId": 111315576183,
+      "result": "failure",
+      "reason": "duplicate-native-WebView-frame",
+      "groupsEqualsConnections": true,
+      "groupsEqualsNodeDialog": true
+    }
+  },
+  "priorFailure": {
+    "commit": "6a94d87208f4ce3e5573242205f0c979c271cc36",
+    "runId": 37160159973,
+    "reason": "test-fixture-hidden-Android-API-compile-failure",
+    "newUnitTestsExecuted": false
+  },
+  "nextVerification": "V20.78 repairs native input/screenshot synchronization and reruns all previous gates",
+  "phoneIntermittentOutageResolved": false,
+  "userDeviceAccessed": false,
+  "published": false,
+  "merged": false
+}

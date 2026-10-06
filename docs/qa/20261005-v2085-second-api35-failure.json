@@ -1,0 +1,189 @@
+{
+  "commit": "770f3fa8e252958e9cb05fb0e6a4b6d7aa40edb6",
+  "run": 37293354486,
+  "failedJob": 111720734314,
+  "apiLevel": 35,
+  "artifact": 11339503745,
+  "artifactZipSha256": "7ce591402dfb0a0b378ddbae5c33b38552dbf2d78be2364720f236eebe0f4df6",
+  "build": "passed;479 unit tests",
+  "api36Installation": "passed",
+  "api35Installation": "failed",
+  "failure": "tap_panel_retry requires enabled native retry control; captured node was clickable=true, enabled=false after401 retry",
+  "authenticationReport": {
+    "result": "FAIL",
+    "fixtureOnly": true,
+    "syntheticCachedRuntimeHint": true,
+    "rootMutationActions": 0,
+    "controllerHost": "127.0.0.1",
+    "target": {
+      "avd": "hetu-smoke",
+      "apiLevel": 35,
+      "ownedSession": "1107d76563e84cda934c6154f1108f32",
+      "runnerPid": 2362,
+      "launcherPid": 2376,
+      "launcherStartTicks": 7921,
+      "supervisorPid": 2378,
+      "emulatorPids": [
+        2379
+      ],
+      "avdConfig": "/home/runner/work/_temp/hetu-avd/hetu-smoke.avd/config.ini",
+      "avdConfigSha256": "30c5a2b78790b31e6bdfb2e34d81217e9c96074b9d89432d9289358566c6da52",
+      "proof": "live supervisor process ancestry, SDK argv and disposable AOSP AVD configuration",
+      "serial": "emulator-5554",
+      "nonRootShell": true,
+      "consoleAvdReply": []
+    },
+    "rootHealthEvidence": false,
+    "toast401Claimed": false,
+    "limitations": "Synthetic cached running hint in the owned fresh non-root AOSP sandbox. Loopback401/200 exercises NativeCompose error/recovery only; no real Root/core/network health evidence.",
+    "originalPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+    "continuityServiceObserved": false,
+    "retryWhile401": {
+      "timeMonotonic": 746.671665653,
+      "bounds": [
+        115,
+        355,
+        177,
+        403
+      ],
+      "input": "native adb tap"
+    },
+    "fixture200AtMonotonic": 751.935177016,
+    "restoredPreferencesSha256": "a54f7cc5cde86e19ce68d0616f1e8e1c809b2d89348150f65ebbd1776ba61786",
+    "originalPreferencesRestored": true,
+    "adbReverseRestored": true,
+    "newChecks": [
+      {
+        "name": "panel-controller-401-first-read",
+        "result": "passed",
+        "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+      },
+      {
+        "name": "panel-controller-401-api-settings",
+        "result": "passed",
+        "evidence": "actual NativeCompose ApiSheet opened by native tap"
+      },
+      {
+        "name": "panel-controller-401-retry",
+        "result": "passed",
+        "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+      }
+    ]
+  },
+  "requestLog": [
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 727.419163137,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/rules",
+      "status": 401,
+      "timeMonotonic": 728.776496531,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/providers/proxies",
+      "status": 401,
+      "timeMonotonic": 728.790649414,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 731.108196506,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 733.118039093,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 735.130123235,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 737.147153196,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 739.159819011,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 741.171431168,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 743.183281823,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 745.19464506,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 746.704310285,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/providers/proxies",
+      "status": 401,
+      "timeMonotonic": 746.902705553,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 747.292294625,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 749.35661609,
+      "valid_fixture_authorization": true
+    },
+    {
+      "method": "GET",
+      "path": "/configs",
+      "status": 401,
+      "timeMonotonic": 751.406232591,
+      "valid_fixture_authorization": true
+    }
+  ],
+  "proposedRepair": "Bounded fresh native XML wait while fixture remains401; disabled tap gate preserved; still require actual input, complete authenticated200 reads and exact native12/3/18 counters; no exclusive retry claim",
+  "repairValidation": "18 host guards passed; installed new run pending"
+}

@@ -1,0 +1,339 @@
+{
+  "schemaVersion": 1,
+  "createdUtc": "2026-10-05T19:02:40.154731+00:00",
+  "baselineApplicationCommit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+  "status": "SOURCE_CANDIDATE_IMPLEMENTED_NOT_BUILD_OR_FRESH_CAPTURE_VERIFIED",
+  "source_edits_stopped": true,
+  "sourcesWritten": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt"
+  ],
+  "noAdditionalSourceChangesByThisAgent": true,
+  "scope": "Only existing tools referenceInset clip shape opt-in and scoped Adblock scroll-based subtitle folding. LevelCard alone opts into capsule; no typography/data/callback/fixture change. Existing ToolsTopBar64/78dp height branches are reused without shared default edits.",
+  "approvedParameterNameAdjustment": "referenceSegmentShape accurately describes the branch; parent approved semantic naming. Nullable Shape defaultnull.",
+  "completeFileInverseProof": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+      "compiled01b6634SHA256": "2a351e7bc775f11ee01da6d944a16429a4bbf7f401e93a5badebdd0fcbed497f",
+      "candidateSHA256": "7fa9afa64664706bb8eb0aa7c306d1ac59e59de3f20de489fd5325e6f7754b13",
+      "candidateIsOnlyExplicitReplacements": true,
+      "wholeFileInverseEquals01b6634": true,
+      "inverseSHA256": "2a351e7bc775f11ee01da6d944a16429a4bbf7f401e93a5badebdd0fcbed497f",
+      "replacements": [
+        {
+          "before": "import androidx.compose.ui.graphics.Color\n",
+          "after": "import androidx.compose.ui.graphics.Color\nimport androidx.compose.ui.graphics.Shape\n"
+        },
+        {
+          "before": "    referenceTouchHeight: Dp? = null,\n",
+          "after": "    referenceTouchHeight: Dp? = null,\n    referenceSegmentShape: Shape? = null,\n"
+        },
+        {
+          "before": "                    .clip(ToolsDesignDims.segmentShape)\n",
+          "after": "                    .clip(referenceSegmentShape ?: ToolsDesignDims.segmentShape)\n"
+        }
+      ],
+      "diff": "--- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt@01b6634\n+++ android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt@candidate\n@@ -23,6 +23,7 @@\n import androidx.compose.ui.geometry.Offset\n import androidx.compose.ui.geometry.Size\n import androidx.compose.ui.graphics.Color\n+import androidx.compose.ui.graphics.Shape\n import androidx.compose.ui.graphics.drawscope.Stroke\n import androidx.compose.ui.graphics.vector.ImageVector\n import androidx.compose.ui.semantics.Role\n@@ -295,6 +296,7 @@\n     referenceOuterPadding: Dp? = null,\n     referenceVisualHeight: Dp? = null,\n     referenceTouchHeight: Dp? = null,\n+    referenceSegmentShape: Shape? = null,\n ) {\n     val c = LocalHomeColors.current\n     val haptics = LocalHomeHaptics.current\n@@ -312,7 +314,7 @@\n                 Modifier.weight(1f).heightIn(min = 44.dp)\n                     .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }\n                     .padding(vertical = inset)\n-                    .clip(ToolsDesignDims.segmentShape)\n+                    .clip(referenceSegmentShape ?: ToolsDesignDims.segmentShape)\n                     .background(if (selected == key) c.accentSoft else Color.Transparent)\n                     .padding(vertical = 9.dp - inset)\n             }\n"
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt",
+      "compiled01b6634SHA256": "022b9719d120ae51d59ff3102d3f0a30b54f58a22fc18496841db613c942def9",
+      "candidateSHA256": "2297a5681811287817a41c6b721a36b8e1550aef622865075f9bd1f99dd3d968",
+      "candidateIsOnlyExplicitReplacements": true,
+      "wholeFileInverseEquals01b6634": true,
+      "inverseSHA256": "022b9719d120ae51d59ff3102d3f0a30b54f58a22fc18496841db613c942def9",
+      "replacements": [
+        {
+          "before": "import androidx.compose.foundation.shape.CircleShape\n",
+          "after": "import androidx.compose.foundation.shape.CircleShape\nimport androidx.compose.foundation.shape.RoundedCornerShape\n"
+        },
+        {
+          "before": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = \"在 Mihomo 内按域名拦截广告与追踪\") {\n",
+          "after": "        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null) {\n"
+        },
+        {
+          "before": "                    referenceTouchHeight = 47.dp,\n",
+          "after": "                    referenceTouchHeight = 47.dp,\n                    referenceSegmentShape = RoundedCornerShape(percent = 50),\n"
+        }
+      ],
+      "diff": "--- android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt@01b6634\n+++ android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt@candidate\n@@ -17,6 +17,7 @@\n import androidx.compose.foundation.layout.windowInsetsPadding\n import androidx.compose.foundation.rememberScrollState\n import androidx.compose.foundation.shape.CircleShape\n+import androidx.compose.foundation.shape.RoundedCornerShape\n import androidx.compose.foundation.verticalScroll\n import androidx.compose.material3.Icon\n import androidx.compose.material3.Text\n@@ -89,7 +90,7 @@\n     val ready = state.load is ToolsLoad.Ready\n     val idle = ready && !state.busy\n     Column(modifier.fillMaxSize().background(c.bg)) {\n-        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = \"在 Mihomo 内按域名拦截广告与追踪\") {\n+        HomeTopBar(title = \"广告过滤\", onBack = onBack, subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null) {\n             HomeIconButton(ToolsFeatureIcons.CircleHelp, \"说明\", onHelp)\n             HomeIconButton(HomeIcons.RefreshCw, \"重新检测\", onRefresh, enabled = idle)\n         }\n@@ -244,6 +245,7 @@\n                     referenceOuterPadding = 6.dp,\n                     referenceVisualHeight = 42.dp,\n                     referenceTouchHeight = 47.dp,\n+                    referenceSegmentShape = RoundedCornerShape(percent = 50),\n                 )\n             }\n             Text(state.note, color = c.t2, style = HomeType.note)\n"
+    }
+  ],
+  "sourceInvariantProof": {
+    "legacyNullInsetItemBranchByteEqual": true,
+    "legacyNullInsetItemBranchSHA256": "eba04031f1fc9f8ae877bb511f52ccaa2c52f01ae4b80484a79876aa115411c0",
+    "entireOptionLoopByteEqualAfterUndoingOnlyNewClipExpression": true,
+    "originalOptionLoopSHA256": "69ffb3bd53be52a1a00a1891b2bbfa7bcf5fcdd3ec4d8d4a64d93b28dc168686",
+    "restoredCandidateOptionLoopSHA256": "69ffb3bd53be52a1a00a1891b2bbfa7bcf5fcdd3ec4d8d4a64d93b28dc168686",
+    "selectableRoleEnabledHapticOnSelectLiteralsPreserved": {
+      "minTouch44": {
+        "literal": "Modifier.weight(1f).heightIn(min = 44.dp)",
+        "sourceCountBefore": 2,
+        "sourceCountAfter": 2,
+        "byteLiteralPreserved": true
+      },
+      "touchRowRequiredHeight": {
+        "literal": "Modifier.fillMaxWidth().requiredHeight(referenceTouchHeight ?: 44.dp)",
+        "sourceCountBefore": 1,
+        "sourceCountAfter": 1,
+        "byteLiteralPreserved": true
+      },
+      "visualFrameNoClip": {
+        "literal": "modifier.fillMaxWidth().height(referenceVisualHeight)\n                .background(c.surface, ToolsDesignDims.cardShape).selectableGroup()",
+        "sourceCountBefore": 1,
+        "sourceCountAfter": 1,
+        "byteLiteralPreserved": true
+      },
+      "existingTickOnSelect": {
+        "literal": ".selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }",
+        "sourceCountBefore": 2,
+        "sourceCountAfter": 2,
+        "byteLiteralPreserved": true
+      },
+      "LevelCallbackGeometryLiteralsBytePreserved": true
+    },
+    "reference47DpDeclaredSourceOnly": true,
+    "actual47DpSemanticOrEdgeTapAcceptance": "NOT_EXECUTED_NOT_EXPORTED",
+    "existingDefaultShapeAndDimensionsStill13Dp": true,
+    "nullableDefaultPreservesAllExistingCallers": true,
+    "HomePanelSourceNoEdit": true,
+    "otherSevenToolSourcesEntireFilesStillCompiled01": [
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt",
+        "sha256": "506ac22816e0cd84a277e609112cd19650499819605ed3c1f4602aad4b3252c5",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt",
+        "sha256": "af5ce76a084b900157203798452e4745d9a383c7092098e4b6c9a52b29a002ec",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt",
+        "sha256": "e61d1e59f8936409edf54971c2fa1034add4fef1f50df1c7ccca9e47e7ac2e2a",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt",
+        "sha256": "d63a4ac64dea68128edfc61c97a28ef13c1bd46e83756a0691b46f97888d6b97",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt",
+        "sha256": "5aa26917857d95c7d6fccd530f1b56fbcde2cc91798337eb32ac0cd04073dddc",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt",
+        "sha256": "8bb72974b9a084a2ccb7fe8bf6e08a4519dea4cfab5f23fa300f2422afd402db",
+        "wholeFileEqualsCompiled01b6634": true
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt",
+        "sha256": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+        "wholeFileEqualsCompiled01b6634": true
+      }
+    ]
+  },
+  "sourceCallerProof": {
+    "existingImplementationAlias": "ToolsSegmented as HomeSegmented in ToolsAdblockScreen; not frozen HomeSegmented",
+    "onlyOptInCaller": "LevelCard",
+    "onlyOptInExpression": "referenceSegmentShape = RoundedCornerShape(percent = 50)",
+    "overrideResolutionOnlyInReferenceVisualInsetNonnullBranch": true,
+    "noNewRendererOrVector": true,
+    "touchSelectableBeforePaddingClipOrderUnchanged": true
+  },
+  "measuredReason": "Actual01 A44 dimensions135/336x42/108x37 pass scoped targets but filled end-shape is not capsule: shallow inset differs2.62–5.17dp from PDF. Font/OS bars cannot produce this paint-edge difference.",
+  "geometricDerivation": {
+    "actualSelectedPaintSize": [
+      108,
+      37
+    ],
+    "existingContinuousCornerDp": 13,
+    "capsuleRadiusDp": 18.5,
+    "shapeDefinition": "RoundedCornerShape(percent=50) uses50% of shorter actual selected clipped rectangle37dp. Left/right end arcs radius18.5; straight top/bottom between arcs. No independent new vector or shape implementation.",
+    "circleInsetFormula": "r - sqrt(2*r*d - d*d), r=18.5; compare actual shallow cross-sections with raster/JPEG uncertainty about1pixel.",
+    "crossSections": [
+      {
+        "depthDpApprox": 2,
+        "referenceJPEGRawY": 340,
+        "referenceLeftRawX": 331,
+        "referenceInsetNormalizedDp": 10.171764705882353,
+        "nativeY": 132,
+        "nativeLeftX": 148,
+        "nativeInsetPx": 5,
+        "referenceMinusNativeInsetDp": 5.171764705882353,
+        "candidateCircleRadiusDp": 18.5,
+        "idealCandidateInsetDpAtDepth": 10.133399734659244,
+        "idealCandidateMinusReferenceInsetDp": -0.03836497122310867
+      },
+      {
+        "depthDpApprox": 4,
+        "referenceJPEGRawY": 345,
+        "referenceLeftRawX": 323,
+        "referenceInsetNormalizedDp": 6.472941176470588,
+        "nativeY": 134,
+        "nativeLeftX": 146,
+        "nativeInsetPx": 3,
+        "referenceMinusNativeInsetDp": 3.472941176470588,
+        "candidateCircleRadiusDp": 18.5,
+        "idealCandidateInsetDpAtDepth": 7.010874706923943,
+        "idealCandidateMinusReferenceInsetDp": 0.5379335304533548
+      },
+      {
+        "depthDpApprox": 6,
+        "referenceJPEGRawY": 349,
+        "referenceLeftRawX": 319,
+        "referenceInsetNormalizedDp": 4.623529411764705,
+        "nativeY": 136,
+        "nativeLeftX": 145,
+        "nativeInsetPx": 2,
+        "referenceMinusNativeInsetDp": 2.6235294117647054,
+        "candidateCircleRadiusDp": 18.5,
+        "idealCandidateInsetDpAtDepth": 4.861818303014145,
+        "idealCandidateMinusReferenceInsetDp": 0.23828889124943942
+      }
+    ],
+    "predictedBoxChange": false,
+    "predictedCardTrackSelectedDimensionsRemain": [
+      135,
+      336,
+      42,
+      108,
+      37
+    ],
+    "predictedTitleBodyFooterChange": false,
+    "actualNewCaptureStatus": "NOT_EXECUTED"
+  },
+  "headerFoldingProof": {
+    "scope": "Existing Adblock title subtitle, user-PDF44/45/49 visual provenance; parent-authorized scoped source change only.",
+    "source_edits_stopped": true,
+    "actualPDFReferenceReads": [
+      {
+        "page": 44,
+        "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-44.png",
+        "referenceSHA256": "273d10d66f277a2a7b439e7f407403be9154bf5810077582658c73c4ef1aa913",
+        "actualFullSizeOpened": true,
+        "titleSubtitleROI": [
+          80,
+          118,
+          335,
+          138
+        ],
+        "allRGBThreshold": 190,
+        "darkInkPixelCount": 0,
+        "darkInkBBoxExclusive": null
+      },
+      {
+        "page": 45,
+        "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-45.png",
+        "referenceSHA256": "fcdf25f6a4d99a43820d4f449b9147faa1cd242999cfa49bcfc09eed50f898d1",
+        "actualFullSizeOpened": true,
+        "titleSubtitleROI": [
+          80,
+          118,
+          335,
+          138
+        ],
+        "allRGBThreshold": 190,
+        "darkInkPixelCount": 984,
+        "darkInkBBoxExclusive": [
+          108,
+          125,
+          317,
+          137
+        ]
+      },
+      {
+        "page": 49,
+        "referencePath": "/workspace/scratch/3788973cf567/tmp/pdf-review/03A-49.png",
+        "referenceSHA256": "6881de78a7a7dfe8e336b05735dcbb916904ae7bcac427341549324e620b1cc5",
+        "actualFullSizeOpened": true,
+        "titleSubtitleROI": [
+          80,
+          118,
+          335,
+          138
+        ],
+        "allRGBThreshold": 120,
+        "darkInkPixelCount": 5005,
+        "darkInkBBoxExclusive": [
+          80,
+          118,
+          335,
+          138
+        ]
+      }
+    ],
+    "A44ReferenceSubtitleVisible": false,
+    "A45ReferenceSubtitleVisible": true,
+    "A49ReferenceSubtitleVisible": true,
+    "A49EarlierAbsentClaimCorrected": "Prior dark triptych reading incorrectly described49 as lacking subtitle; individual actual reference49 full-size re-open clearly reads existing subtitle. Correction does not modify the permanently frozen01 report.",
+    "A49BackgroundStage": "Top Protecting Status→verification chain→recent blocked→Level at bottom. This is the recent-blocked confirmation entry; not lower Sources/Domain screen.",
+    "A49ActualFixtureFunction": "Pdf85C49ConfirmAllow with Adblock() and ToolsConfirmAllowDialogCard, not DomainDelete.",
+    "A49FixtureChanged": false,
+    "allPdf85Frames2BytesEqualCompiled01": true,
+    "Pdf85Frames2SHA256": "80e56e19535bf69a86a856287f09fc7a30c99838216c0407da4a43ac31acc564",
+    "sourceHistory": "Identical static subtitle literal independently read at121e0ab(V20.84),ca60825 and01b6634. Not added by the capsule candidate; functional state/callback never attached to this static string.",
+    "headerCallerNewExpression": "subtitle = if (scroll.value == 0) \"在 Mihomo 内按域名拦截广告与追踪\" else null",
+    "headerSourceBehavior": "Top-level scroll0 retains original subtitle on45/49; positive scroll collapses it for44/47/48 using existing ToolsTopBar null branch. All title/back/help/refresh/pull-refresh/state and underlying scroll object/fixture values retained.",
+    "sharedHeaderDefaultsEdited": false,
+    "existingTopBarHeightsDp": {
+      "nonnullSubtitle": 78,
+      "nullSubtitle": 64
+    },
+    "reference44TitleInkBBoxExclusive": [
+      167,
+      91,
+      258,
+      112
+    ],
+    "reference44CardTop": 139,
+    "reference44TitleInkBottomToCardTopNormalized": 24.967058823529413,
+    "current01TitleInkBBoxExclusive": [
+      158,
+      20,
+      237,
+      40
+    ],
+    "current01CardTop": 78,
+    "current01TitleInkBottomToCardTopPx": 38,
+    "observedCurrentExtraGapDp": 13.032941176470587,
+    "candidateFreshHeaderGeometry": "NOT_EXECUTED: source14dp height collapse and title Column centering changes need own fresh screenshot; current01 metrics are not proof of candidate parity.",
+    "productionDefaultOrBusinessCallbackEdits": false,
+    "fixtureEditNotNeeded": "Reference49 is explicitly top stage and shows subtitle; moving it to687 would be the wrong entry stage. Existing44 initial687 and47/48 RulesScroll stay byte-identical."
+  },
+  "geometricDerivationScope": "Capsule derivation describes intrinsic card/track/selected size; header collapse separately changes viewport/header height via existing64dp branch. Neither new candidate is capture-verified.",
+  "reviewEvidencePath": "/workspace/scratch/3788973cf567/hetu/docs/qa/20261005-pdf03a-01b6634-visual-review.json",
+  "reviewEvidenceSHA256": "02db54b73c26903fb9f651002af88fd2f2235d816eb1edf858cb19a5e110e90a",
+  "implementationEvidenceStatus": {
+    "wholeFileReverse2Of2": "PASS",
+    "defaultCallbackLiteralAndLoopReverse": "PASS",
+    "sourceSyntaxStaticReview": "Uses existing Compose Shape/RoundedCornerShape APIs plus existing hoisted scroll.value read in scoped caller; no compiler run by this agent.",
+    "compile": "NOT_EXECUTED_FOR_THIS_CANDIDATE",
+    "freshSelectedContourCapture": "NOT_EXECUTED",
+    "nativeInstallAndNavigationAuth": "NOT_EXECUTED_FOR_THIS_CANDIDATE",
+    "old01RunKept": "No CI start/cancel by this agent; old01 evidence not applied to new source."
+  },
+  "validationRequired": [
+    "Own new application commit/run compile and all required guards/tests; do not borrow01 orca results.",
+    "Actual fresh A44 paired source JPEG control crop + screenshot, measure top/left/right capsule contours at d~2/4/6 and total108x37 selected/336x42 track/card135.",
+    "Hash every03A49PNG; actual reopen any changed21/44/45/47/48/49 as appropriate, inherit exactbytes only.",
+    "Native47dp semantic/touch area only claim if actual bounds/tap evidence exported; this shape clip comes after selectable and does not change source touchheight, but source is not native semantic acceptance."
+  ],
+  "writesExcluded": [
+    "home",
+    "panel",
+    "fixture",
+    "tests",
+    "runtime.patch",
+    "inputs.json",
+    "scope/full-file guards",
+    "CI workflows",
+    "commit",
+    "push",
+    "phone",
+    "Google account",
+    "device network/security"
+  ]
+}

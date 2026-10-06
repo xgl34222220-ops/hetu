@@ -1,0 +1,52 @@
+{
+  "applicationCommit": "ca60825b4edaecc07fc6c4485c264eec8d37cbe6",
+  "runId": 37346239863,
+  "apkName": "Hetu-V20.85-Test-ca60825.apk",
+  "apkBytes": 134819453,
+  "apkSha256": "f5d1382e55438aaf2f09524c34d59c2d84a730338de6881f04633780a8f13ef7",
+  "partCount": 6,
+  "allSixArtifactAndPartHashesVerified": true,
+  "fullApkHashVerified": true,
+  "installedAcceptance": "PASS for its ownca60825 application identity",
+  "transportManifestArtifactId": 11360494512,
+  "transportParts": [
+    {
+      "artifactId": 11361825342,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:0303f0b6ab5ed2a9a41895d3b5d205d4b938b7526f011044f41aa070880a2e09"
+    },
+    {
+      "artifactId": 11360674131,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:d0195e2a5b749dede9094ac187bde5ff21cf870621673a39e9575a0ad1ae1b43"
+    },
+    {
+      "artifactId": 11361121747,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:76beeb39b28c132d639bbd84339c54a267773b23dde657139621d9cc7581e4de"
+    },
+    {
+      "artifactId": 11361027444,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:238fbede85be27257bdb23890191f5fec7b5b1222253da4c0d65f36368b0baec"
+    },
+    {
+      "artifactId": 11360907974,
+      "artifactBytes": 25165958,
+      "artifactDigest": "sha256:945ee5f5c9eb6da90b3bc9fa47a343ede6776ac7339c8bac24ddfbb90d520301"
+    },
+    {
+      "artifactId": 11360947727,
+      "artifactBytes": 8990467,
+      "artifactDigest": "sha256:f9fcad01408ae81ca2c87640a45f91ef67964045527d47955918abda1c3ac4dc"
+    }
+  ],
+  "installedEvidence": "docs/qa/20261005-v2085-ca60825-installation-success.json",
+  "installedEvidenceSha256": "841aa073a3540123d94b9bde16a96cf6ab6adbea334bfea7d958f6c5a55cd024",
+  "userFacingArtifactSaved": true,
+  "userFacingArtifactSaveStatus": "succeeded",
+  "deliveredInProgressAsTestPackage": true,
+  "all130PagePixelAcceptance": false,
+  "remainingProductionUiGeometryTarget": "04/11 notification first group approximately+13.64normalizedpixels; row-by-row measurement underway before scoped fix",
+  "googlePlayFixVerified": false
+}

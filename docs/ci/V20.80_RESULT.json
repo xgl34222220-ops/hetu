@@ -1,0 +1,823 @@
+{
+  "schema": 1,
+  "version": "V20.80",
+  "branch": "test/v20.75-theme-compat",
+  "initialCommit": "b49c6d18fff28a82bcf1d059e3abcbe85a12f466",
+  "finalTestCorrectionCommit": "52ad5701d036a7d8e82199eb4b0999147ee2d38b",
+  "ciRun": 37169862397,
+  "conclusion": "success",
+  "jobs": [
+    {
+      "id": 111340413429,
+      "conclusion": "success"
+    },
+    {
+      "id": 111340413340,
+      "conclusion": "success"
+    },
+    {
+      "id": 111342299922,
+      "conclusion": "success"
+    },
+    {
+      "id": 111342299935,
+      "conclusion": "success"
+    }
+  ],
+  "preservedFirstFailure": "docs/ci/V20.80_FIRST_FAILURE.json / CI37169355897",
+  "preservedPreviousEvidence": {
+    "v2078Commit": "ed326756",
+    "ciRun": 37163668343,
+    "v2079CI": 37166956898
+  },
+  "units": {
+    "tests": 344,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0
+  },
+  "journalReliabilityCases": 17,
+  "networkDiagnosticsCases": 11,
+  "networkRecoveryStress": {
+    "after": {
+      "cycles": 512,
+      "maxQueuedRecoveries": 1,
+      "drainedAttempts": 1,
+      "latestExecuted": 1,
+      "cancelledWantedExecuted": 0,
+      "eventDuringAttemptPreserved": true,
+      "cancelledTimersRetained": 0,
+      "sourceSha256": "30d5420d27203151c7c27b5e192a54d0c5c9de31b3a91ce7ed9bec16851a8e5e",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    },
+    "before": {
+      "cycles": 512,
+      "maxQueuedRecoveries": 512,
+      "drainedAttempts": 512,
+      "latestExecuted": 1,
+      "cancelledWantedExecuted": 0,
+      "eventDuringAttemptPreserved": true,
+      "cancelledTimersRetained": 4096,
+      "sourceSha256": "b50773343de46622658e65b48a3e00a96863d74033f561fd6bdab304402ae1cd",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    }
+  },
+  "networkJournalStress": {
+    "after": {
+      "attempts": 3000,
+      "storageLimitBytes": 8192,
+      "storedBytes": 8016,
+      "dropped": 2952,
+      "fullStatusVisible": true,
+      "sensitiveStoredMetadataCopied": false,
+      "oversizedHealthEventBytes": 217,
+      "viewTruncationVisible": true,
+      "sourceSha256": "83980b0576665cbcc8d0583758f4d911c3356aed7db8bf37e6ff0d2df2d87b51",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    },
+    "before": {
+      "attempts": 3000,
+      "storageLimitBytes": 8192,
+      "storedBytes": 501000,
+      "dropped": 0,
+      "fullStatusVisible": false,
+      "sensitiveStoredMetadataCopied": true,
+      "oversizedHealthEventBytes": 200190,
+      "viewTruncationVisible": false,
+      "sourceSha256": "8c8fcf2f77897e079c3ca2cd395fe2b3a0b3cf4fdce16931f3d7bc87e961cf9c",
+      "fixtureOnly": true,
+      "deviceOrNetworkAccess": false
+    }
+  },
+  "hostCases": 6,
+  "shellCases": 60,
+  "filterFault": {
+    "fixtureOnly": true,
+    "deviceOrNetworkAccess": false,
+    "beforeSourceSha256": "a7518bf438b82eab26c37611c6fad90b818cd8d2c84e119f083091bb2719ac04",
+    "afterSourceSha256": "55b8d560086cf41493a28d074e63ee08f72e7c360c208d63fb36cbb59d46506f",
+    "before": "old-cache-eviction-ENOENT-reproduced",
+    "after": "new-cache-eviction-stable-pair-and-handoff-passed"
+  },
+  "lint": {
+    "errors": 0,
+    "warnings": 278,
+    "hints": 5
+  },
+  "abi": {
+    "apkSha256": "9cb703a5403b469e18dfd25d0bffa4ddcb369ab90bfb1cc623d3090a676d6e7b",
+    "dexCount": 10,
+    "constructorReferences": 687,
+    "missingConstructors": [],
+    "compatible": true,
+    "expectedIncompatibleBaseline": false
+  },
+  "packagedRuntime": {
+    "expected": {
+      "lib/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+      "lib/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+      "assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/cnip/hetu-cn-v4.txt": "88ea1e3bc89ee5966cc66cb2b6b7b8c4993a84bcfa04fe880750e1ec6bae0fa9",
+      "assets/cnip/hetu-cn-v6.txt": "4a3cccf5497148a20a24df381db0ef1a9d114a27441e29b04246f06fc349f03b",
+      "assets/hetu-root.sh": "6b59cc14c687f067ab942d0b4855fcdde6183a874275e1acda6105cbfff0a16b",
+      "assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
+      "assets/licenses/lucide.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "assets/licenses/reference-ui-GPL-3.0.txt": "b276bbecaa68377ce9fae470024428aaf90d4b395fee090752d19debab9c7bee",
+      "assets/mihomo-revision.txt": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+      "assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+      "assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+      "assets/rules/adaway.txt": "8c925c37a5eaa5e1c582c76e12301797861addee5ad0fa0e6e46c9dd0136fe55",
+      "assets/rules/adguard.txt": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+      "assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
+      "assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
+      "assets/rules/hagezi.txt": "8846bfdda6fc630d81d2c10181cadc451f099cb7b32474682fc2122b7430cc53",
+      "assets/rules/snapshot.json": "799e1341e6df634a71cb487a11ff9b6847c628310b4f1810c1eeab6f4666cd72",
+      "assets/rules/tracking.txt": "4dd3290bb52e2975f556c33adf081b3430f4e0dc8a75af9841c48def524444c9",
+      "assets/schema/sing-box-official.json": "641f9bb28af79e014afe8a781140b40d357c7adf8fcb5fe5e23b7971a62fa52d",
+      "assets/sources.tsv": "13779a44e0f5493d0f9923eeb341cd496327a068a622751906bdedbe3ccaf420",
+      "assets/hetu-autostart.sh": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+    },
+    "originalPayloadCount": 22,
+    "editedPayloads": [
+      "assets/hetu-root.sh"
+    ],
+    "addedPayloads": [
+      "assets/hetu-autostart.sh"
+    ],
+    "apkVerified": true,
+    "apkSha256": "9cb703a5403b469e18dfd25d0bffa4ddcb369ab90bfb1cc623d3090a676d6e7b"
+  },
+  "apkManifest": {
+    "schema": 1,
+    "apkName": "Hetu-0.12.10-v20.apk",
+    "apkBytes": 133353134,
+    "apkSha256": "9cb703a5403b469e18dfd25d0bffa4ddcb369ab90bfb1cc623d3090a676d6e7b",
+    "chunkBytes": 25165824,
+    "partCount": 6,
+    "parts": [
+      {
+        "index": 0,
+        "name": "part00.bin",
+        "bytes": 25165824,
+        "sha256": "060f6afd7dcf9def221ee1770199b99e44e4bc716f9679dc9644af9850375eea"
+      },
+      {
+        "index": 1,
+        "name": "part01.bin",
+        "bytes": 25165824,
+        "sha256": "0ef28885b2a1ad1744aaa46ef05e3422fb6574e3afc5dc72beb2acc633360228"
+      },
+      {
+        "index": 2,
+        "name": "part02.bin",
+        "bytes": 25165824,
+        "sha256": "48a80dafbb3e1368f5578f8dd1629b6a0755e36c37f3c27462729712e628bd77"
+      },
+      {
+        "index": 3,
+        "name": "part03.bin",
+        "bytes": 25165824,
+        "sha256": "d71b183da8d19c9d5c0cdc65dcc043bb07279d0c0a43bd4961306816b7dd2fa8"
+      },
+      {
+        "index": 4,
+        "name": "part04.bin",
+        "bytes": 25165824,
+        "sha256": "769d75eb9df1ace40f2356dd22c1b278b9b16df053434f7cea743385cd648adb"
+      },
+      {
+        "index": 5,
+        "name": "part05.bin",
+        "bytes": 7524014,
+        "sha256": "c87ff56d520a704112bb5267ca19923da67241634f4fc20b91638ceadb11c524"
+      }
+    ]
+  },
+  "signingCertificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+  "api": {
+    "35": {
+      "result": {
+        "checks": [
+          {
+            "name": "01-home",
+            "result": "passed"
+          },
+          {
+            "name": "00-language-selected",
+            "result": "passed"
+          },
+          {
+            "name": "01-home-language-restored",
+            "result": "passed"
+          },
+          {
+            "name": "02-panel-stopped",
+            "result": "passed"
+          },
+          {
+            "name": "03-tools",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-entry",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-stop",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-root-error-details",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-root-error-expanded",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-environment",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-overflow",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-document-picker",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-import-cancelled",
+            "result": "passed"
+          },
+          {
+            "name": "04-settings",
+            "result": "passed"
+          },
+          {
+            "name": "boot-settings",
+            "result": "passed"
+          },
+          {
+            "name": "boot-root-denial-visible",
+            "result": "passed"
+          },
+          {
+            "name": "boot-denial-keeps-toggle-off",
+            "result": "passed"
+          },
+          {
+            "name": "05-about",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-entry",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-without-root",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-storage-bound-visible",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-truncation-visible",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-copy-action",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-full-history-preserved",
+            "result": "passed"
+          },
+          {
+            "name": "safe-session-repair-entry",
+            "result": "passed"
+          },
+          {
+            "name": "safe-session-repair-root-denial",
+            "result": "passed"
+          },
+          {
+            "name": "06-web-panels",
+            "result": "passed"
+          },
+          {
+            "name": "07-native-webview",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "08-native-webview-disconnected",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "09-webview-back",
+            "result": "passed"
+          },
+          {
+            "name": "reference-03B-040-native-overview",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-041-native-groups",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-042-native-connections",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-043-native-node-dialog",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-044-native-switch-failure",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "custom-palette-00-TonalSpot-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-01-Neutral-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-02-Vibrant-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-03-Expressive-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-04-Rainbow-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-05-FruitSalad-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-06-Monochrome-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-07-Fidelity-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-08-TonalSpot-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-09-Neutral-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-10-Vibrant-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-11-Expressive-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-12-Rainbow-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-13-FruitSalad-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-14-Monochrome-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-15-Fidelity-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-16-Vibrant-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-17-Vibrant-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-18-Fidelity-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-19-FruitSalad-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-20-Expressive-dark",
+            "result": "passed"
+          }
+        ],
+        "passed": 56,
+        "fixtureOnly": true,
+        "rootMutationActions": 0,
+        "rootSetupDenialAttempts": 1,
+        "apiLevel": 35,
+        "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation."
+      },
+      "journalFixture": {
+        "recent": {
+          "path": "no_backup/hetu-network-events/events-00000000000000000001.jsonl",
+          "sha256": "a62e4b375e3aa33955ca66f6ab79efa943a072d5a8840b4a0eba82074f4a7997",
+          "latestId": "00000000-0000-0000-0000-000000000065",
+          "syntheticOnly": true,
+          "overwrites": false
+        },
+        "overLimitLegacy": {
+          "path": "no_backup/hetu-network-events/events-00000000000000000002.jsonl",
+          "sha256": "41d0e95b9b11968b1f1d9d59e80589eb903325e27f85f3fb067623999e53f93e",
+          "latestId": "00000000-0000-0000-0000-000000000067",
+          "syntheticOnly": true,
+          "overwrites": false
+        },
+        "rootMutationActions": 0,
+        "originalHistoryPreserved": true,
+        "installedClipboardContentsRead": false,
+        "clipboardContentsVerifiedBy": "JournalReliabilityTest actual hxCopy"
+      },
+      "croppedWebViewBodies": {
+        "reference-03B-040-native-overview": "3ff589757bfc1366fc965f067ade938bac1579a8170c082e41e6fc437417fd34",
+        "reference-03B-041-native-groups": "6cbca06cf1701c42c40b4ea5f506c2c234657b05f1f531830372322b59f1150c",
+        "reference-03B-042-native-connections": "d766e075b98eaeb7c1dda22f7675bd94d442d22fbbefea5382eb4a021e43bb52",
+        "reference-03B-043-native-node-dialog": "8b052762279604496ea0cb4d7e77e54a1f325e37edd5ea67a727b18c1cd33c50",
+        "reference-03B-044-native-switch-failure": "2c6ae8b8ae1ca9cc44a7b22ec420f9afb26ee5cf7e019fb48cbde6b13edd8329"
+      },
+      "runnerLifecycle": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      },
+      "cleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2584,
+        "returncode": 0
+      },
+      "scope": "Application crash/ANR gate passed; shell/System UI exceptions are not asserted absent."
+    },
+    "36": {
+      "result": {
+        "checks": [
+          {
+            "name": "01-home",
+            "result": "passed"
+          },
+          {
+            "name": "00-language-selected",
+            "result": "passed"
+          },
+          {
+            "name": "01-home-language-restored",
+            "result": "passed"
+          },
+          {
+            "name": "02-panel-stopped",
+            "result": "passed"
+          },
+          {
+            "name": "03-tools",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-entry",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-stop",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-root-error-details",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-root-error-expanded",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-environment",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-overflow",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-document-picker",
+            "result": "passed"
+          },
+          {
+            "name": "scripts-import-cancelled",
+            "result": "passed"
+          },
+          {
+            "name": "04-settings",
+            "result": "passed"
+          },
+          {
+            "name": "boot-settings",
+            "result": "passed"
+          },
+          {
+            "name": "boot-root-denial-visible",
+            "result": "passed"
+          },
+          {
+            "name": "boot-denial-keeps-toggle-off",
+            "result": "passed"
+          },
+          {
+            "name": "05-about",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-entry",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-without-root",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-storage-bound-visible",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-truncation-visible",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-copy-action",
+            "result": "passed"
+          },
+          {
+            "name": "network-events-full-history-preserved",
+            "result": "passed"
+          },
+          {
+            "name": "safe-session-repair-entry",
+            "result": "passed"
+          },
+          {
+            "name": "safe-session-repair-root-denial",
+            "result": "passed"
+          },
+          {
+            "name": "06-web-panels",
+            "result": "passed"
+          },
+          {
+            "name": "07-native-webview",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "08-native-webview-disconnected",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "09-webview-back",
+            "result": "passed"
+          },
+          {
+            "name": "reference-03B-040-native-overview",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-041-native-groups",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-042-native-connections",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-043-native-node-dialog",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "reference-03B-044-native-switch-failure",
+            "result": "passed",
+            "evidence": "actual Android WebView DOM + native adb screenshot"
+          },
+          {
+            "name": "custom-palette-00-TonalSpot-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-01-Neutral-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-02-Vibrant-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-03-Expressive-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-04-Rainbow-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-05-FruitSalad-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-06-Monochrome-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-07-Fidelity-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-08-TonalSpot-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-09-Neutral-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-10-Vibrant-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-11-Expressive-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-12-Rainbow-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-13-FruitSalad-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-14-Monochrome-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-15-Fidelity-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-16-Vibrant-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-17-Vibrant-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-18-Fidelity-dark",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-19-FruitSalad-light",
+            "result": "passed"
+          },
+          {
+            "name": "custom-palette-20-Expressive-dark",
+            "result": "passed"
+          }
+        ],
+        "passed": 56,
+        "fixtureOnly": true,
+        "rootMutationActions": 0,
+        "rootSetupDenialAttempts": 1,
+        "apiLevel": 36,
+        "limitations": "Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. No K80, real core, Root boot or actual network validation."
+      },
+      "journalFixture": {
+        "recent": {
+          "path": "no_backup/hetu-network-events/events-00000000000000000001.jsonl",
+          "sha256": "a62e4b375e3aa33955ca66f6ab79efa943a072d5a8840b4a0eba82074f4a7997",
+          "latestId": "00000000-0000-0000-0000-000000000065",
+          "syntheticOnly": true,
+          "overwrites": false
+        },
+        "overLimitLegacy": {
+          "path": "no_backup/hetu-network-events/events-00000000000000000002.jsonl",
+          "sha256": "41d0e95b9b11968b1f1d9d59e80589eb903325e27f85f3fb067623999e53f93e",
+          "latestId": "00000000-0000-0000-0000-000000000067",
+          "syntheticOnly": true,
+          "overwrites": false
+        },
+        "rootMutationActions": 0,
+        "originalHistoryPreserved": true,
+        "installedClipboardContentsRead": false,
+        "clipboardContentsVerifiedBy": "JournalReliabilityTest actual hxCopy"
+      },
+      "croppedWebViewBodies": {
+        "reference-03B-040-native-overview": "3ff589757bfc1366fc965f067ade938bac1579a8170c082e41e6fc437417fd34",
+        "reference-03B-041-native-groups": "cd030395109ce0fc32c2c46a2a3982841745982a559daee227e6280986657576",
+        "reference-03B-042-native-connections": "d766e075b98eaeb7c1dda22f7675bd94d442d22fbbefea5382eb4a021e43bb52",
+        "reference-03B-043-native-node-dialog": "0f741610fd6fc63eedacb0cad6007ef0159d95fed1cf382e82b04ccbcdf81765",
+        "reference-03B-044-native-switch-failure": "068335aa53183c1d46c36bad8b0b46e597ca675a235ef1ea9aa1abd968e3af07"
+      },
+      "runnerLifecycle": {
+        "result": "PASS",
+        "kvm_before": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        },
+        "runner_uid": 1001,
+        "runner_groups": [
+          4,
+          100,
+          118,
+          999,
+          1001
+        ],
+        "privileged_emulator_process": true,
+        "smoke_exit": 0,
+        "launcher_reaped": true,
+        "kvm_after": {
+          "uid": 0,
+          "gid": 993,
+          "mode": 432,
+          "rdev": 2792
+        }
+      },
+      "cleanup": {
+        "emulator_started": true,
+        "emulator_reaped": true,
+        "pid": 2371,
+        "returncode": 0
+      },
+      "scope": "Application crash/ANR gate passed; shell/System UI exceptions are not asserted absent."
+    }
+  },
+  "limits": {
+    "newJournalContentBytes": 2097152,
+    "recentRecords": 64,
+    "recentRecordViewBytes": 49152,
+    "readTailBytes": 131072,
+    "retainedHistoryIsNotDeleted": true,
+    "legacyOverQuotaHistoryRetained": true
+  },
+  "limitations": [
+    "Fresh AOSP / original synthetic JVM and Robolectric only.",
+    "Installed clipboard contents are not read; the actual hxCopy helper is checked against real ClipboardManager in Robolectric.",
+    "At quota new records pause; generated IDs do not imply durable records, gaps are reported.",
+    "User phone, real KernelSU/OEM, Google/WeChat long disconnects and long IPv6/TUN/eBPF are not verified; intermittent outage remains unconfirmed."
+  ]
+}

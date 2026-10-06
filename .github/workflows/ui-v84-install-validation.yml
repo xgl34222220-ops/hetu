@@ -1,0 +1,170 @@
+# Explicitly provision this fresh AVD identity; strict live target gates remain unchanged.
+name: Hetu V20.84 fixed APK installation continuation
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hetu-v2084-fixed-install-${{ github.ref }}
+  cancel-in-progress: false
+'on':
+  push:
+    branches:
+    - test/v20.76-new-ui
+    paths:
+    - .github/workflows/ui-v84-install-validation.yml
+  workflow_dispatch: null
+jobs:
+  android-ui-smoke:
+    name: Validate fixed V20.84 APK on API ${{ matrix.api }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        api:
+        - 35
+        - 36
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Regress fixed APK evidence and all changed installation fixtures
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        python3 .github/scripts/test_verify_ui84_reused_apk.py -v 2>&1 | tee out/android-smoke/reused-apk-guard-tests.txt
+
+        python3 .github/scripts/test_hetu_emulator_runner.py -v 2>&1 | tee out/android-smoke/emulator-supervisor-tests.txt
+
+        python3 .github/scripts/test_panel_auth_smoke.py -v 2>&1 | tee out/android-smoke/panel-auth-fixture-tests.txt
+
+        python3 .github/scripts/test_mock_webview_controller.py -v 2>&1 | tee out/android-smoke/controller-fixture-tests.txt
+
+        python3 .github/scripts/test_native_scroll_bounds.py -v 2>&1 | tee out/android-smoke/native-scroll-bounds-tests.txt
+
+        python3 .github/scripts/test_hetu_ui_snapshots.py -v 2>&1 | tee out/android-smoke/ui-snapshot-tests.txt
+
+        python3 .github/scripts/test_hetu_webview_frames.py -v 2>&1 | tee out/android-smoke/webview-frame-tests.txt
+
+        '
+    - name: Fetch immutable V20.84 build evidence
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/37270231154" > out/android-smoke/source-run.json
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/runs/37270231154/attempts/1/jobs?per_page=100" > out/android-smoke/source-jobs.json
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328133959" > out/android-smoke/source-apk-artifact.json
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328238664" > out/android-smoke/source-verification-artifact.json
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328133960" > out/android-smoke/source-manifest-artifact.json
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328133959/zip" > candidate-apk.zip
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328238664/zip" > candidate-verification.zip
+
+        gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/11328133960/zip" > candidate-manifest.zip
+
+        '
+    - name: Prepare official AOSP emulator
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export ANDROID_AVD_HOME="$RUNNER_TEMP/hetu-avd"
+
+        mkdir -p "$ANDROID_AVD_HOME"
+
+        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+        AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+
+        yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''build-tools;37.0.0'' ''system-images;android-${{ matrix.api
+        }};default;x86_64'' 2>&1 | tee out/android-smoke/sdk-prepare.log
+
+        "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
+
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
+        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+
+        test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d'' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
+
+        hw.lcd.width=393
+
+        hw.lcd.height=852
+
+        hw.lcd.density=160
+
+        hw.ramSize=2048
+
+        EOF
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        PYTHONPATH=.github/scripts python3 -c "import os; from pathlib import Path; from run_hetu_emulator import prepare_owned_avd_identity; prepare_owned_avd_identity(Path(os.environ[''ANDROID_AVD_HOME'']) / ''hetu-smoke.avd/config.ini'')"
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
+
+        '
+    - name: Verify unchanged Android inputs, exact signed APK and original successful build gates
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/verify_ui84_reused_apk.py --api ${{ matrix.api }}
+
+        '
+    - name: Run installed APK navigation and native WebView smoke
+      env:
+        HETU_EXPECTED_VERSION: '2084'
+        HETU_EXPECT_NEW_UI: '1'
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+
+        test -x "$ANDROID_HOME/platform-tools/adb"
+
+        "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
+
+        # Uses only this runner''s existing KVM or sudo access. No device permission,
+
+        # group, ACL or SELinux changes; owned supervisor verifies process cleanup.
+
+        python3 .github/scripts/run_hetu_emulator.py
+
+        '
+    - name: Require all 59 original and 5 authentication checks from this installation run
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/verify_ui84_reused_apk.py --installed-results --api ${{ matrix.api }}
+
+        '
+    - name: Upload V20.84 installation continuation evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.84-Android-${{ matrix.api }}-installation-continuation
+        path: out/android-smoke/
+        if-no-files-found: warn

@@ -1,0 +1,24 @@
+{
+  "testedApplication": "7cfdf426400026c06a997f09d3b7eb4defad852b",
+  "newCandidateStatus": "not yet compiled; new CI required",
+  "layerChangedFiles": 39,
+  "layerFrozenFiles": 333,
+  "reconstructedInputs": 372,
+  "exactWholeFileGuards": [
+    "shared-default Home/panel",
+    "native basic settings callbacks",
+    "tools WebUI logic",
+    "bounded Google metadata"
+  ],
+  "hostTests": {
+    "pdfSourceScope": 6,
+    "authResultVerifier": 6,
+    "panelAuthSmoke": 18
+  },
+  "patchSha256": "16c6d5371e00a7db0f3284592d1c0da85c44e4608b6bf75ab3ba080ad2d6085b",
+  "unitTestTarget": 479,
+  "baselineUnitTests": 422,
+  "pixelParityAccepted": false,
+  "googlePlayRootCause": "not established",
+  "googlePlayDeviceFix": "not verified"
+}

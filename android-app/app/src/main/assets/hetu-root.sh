@@ -21,6 +21,10 @@ START_ERROR="$RUN/last-start-error"
 START_TIMING="$RUN/startup-timing"
 LOCK_DIR="$RUN/.txn.lock"
 CLEAN_SNAPSHOT_ACTIVE=0
+FAKE_IP_V4=""
+FAKE_IP_V6=""
+LAN_RETURN_V4="0.0.0.0/8,10.0.0.0/8,100.64.0.0/10,127.0.0.0/8,169.254.0.0/16,172.16.0.0/12,192.168.0.0/16,224.0.0.0/4,240.0.0.0/4"
+LAN_RETURN_V6="::1/128,fc00::/7,fe80::/10,ff00::/8"
 
 BYPASS_MARK=0x08000000
 BYPASS_MASK=0x08000000
@@ -351,6 +355,74 @@ split_safe_cidrs(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do case "$X" in ''|*[!0-9A-Fa-f:./]*|*//*|/*|*/) return 1;; esac; case "$X" in */*) ;; *) return 1;; esac; done
 }
+# Validate only numeric literals; never resolve a hostname or execute configuration text.
+fake_ip_cidrs_valid(){
+  [ "${#2}" -le 16384 ] || return 1
+  printf '%s\n' "$2" | awk -v family="$1" '
+    BEGIN {ok=1}
+    {
+      if($0=="")next;
+      n=split($0,items,",");if(n>256){ok=0;exit}
+      for(i=1;i<=n;i++){
+        if(split(items[i],parts,"/")!=2 || parts[2]!~/^[0-9]+$/){ok=0;exit}
+        max=family==4?32:128;if(parts[2]+0>max){ok=0;exit}
+        addr=parts[1];
+        if(family==4){
+          if(split(addr,words,"\\.")!=4){ok=0;exit}
+          for(j=1;j<=4;j++)if(words[j]!~/^[0-9]+$/ || words[j]+0>255){ok=0;exit}
+        }else{
+          if(addr!~/^[0-9a-fA-F:]+$/ || index(addr,":::")>0){ok=0;exit}
+          if((substr(addr,1,1)==":" && substr(addr,1,2)!="::") ||
+             (substr(addr,length(addr),1)==":" && substr(addr,length(addr)-1)!="::")){ok=0;exit}
+          copy=addr;compressed=gsub(/::/,":",copy);if(compressed>1){ok=0;exit}
+          num=split(copy,words,":");segments=0;
+          for(j=1;j<=num;j++){
+            if(words[j]==""){if(!compressed){ok=0;exit}}else{
+              if(length(words[j])>4){ok=0;exit};segments++
+            }
+          }
+          if((compressed && segments>=8) || (!compressed && segments!=8)){ok=0;exit}
+        }
+      }
+    }
+    END {exit !ok}'
+}
+fake_ip_policy_valid(){
+  case "$FAKE_IP_V4$FAKE_IP_V6" in *,*) return 1;; esac
+  fake_ip_cidrs_valid 4 "$FAKE_IP_V4" && fake_ip_cidrs_valid 6 "$FAKE_IP_V6" &&
+    fake_ip_cidrs_valid 4 "$LAN_RETURN_V4" && fake_ip_cidrs_valid 6 "$LAN_RETURN_V6"
+}
+load_start_fake_ip_policy(){
+  FIP_FILE="$1"
+  FIP_TAIL=$(tail -n 5 "$FIP_FILE") || return 1
+  if [ "$(printf '%s\n' "$FIP_TAIL" | sed -n '1p')" != '# HETU_FAKE_IP_POLICY=1' ]; then
+    # Only the fixed terminal block is metadata. YAML scalar content elsewhere
+    # may contain identical text and cannot override an appended private policy.
+    printf '%s\n' "$FIP_TAIL" | grep -Eq '^# HETU_(FAKE_IP_POLICY|FAKE_IP_V4|FAKE_IP_V6|LAN_RETURN_V4|LAN_RETURN_V6)=' && return 1
+    return 0 # Legacy private copies keep their established defaults.
+  fi
+  FIP_2=$(printf '%s\n' "$FIP_TAIL" | sed -n '2p'); case "$FIP_2" in '# HETU_FAKE_IP_V4='*) FAKE_IP_V4=${FIP_2#*=};; *) return 1;; esac
+  FIP_3=$(printf '%s\n' "$FIP_TAIL" | sed -n '3p'); case "$FIP_3" in '# HETU_FAKE_IP_V6='*) FAKE_IP_V6=${FIP_3#*=};; *) return 1;; esac
+  FIP_4=$(printf '%s\n' "$FIP_TAIL" | sed -n '4p'); case "$FIP_4" in '# HETU_LAN_RETURN_V4='*) LAN_RETURN_V4=${FIP_4#*=};; *) return 1;; esac
+  FIP_5=$(printf '%s\n' "$FIP_TAIL" | sed -n '5p'); case "$FIP_5" in '# HETU_LAN_RETURN_V6='*) LAN_RETURN_V6=${FIP_5#*=};; *) return 1;; esac
+  fake_ip_policy_valid
+}
+load_session_fake_ip_policy(){
+  grep -q '^FAKE_IP_POLICY=' "$SESSION" || return 0
+  # A stopped core does not invalidate the immutable session/rule checksum.
+  # Refuse a different or damaged session instead of guessing a Kill Switch policy.
+  health_session_current || return 1
+  [ "$(grep -c '^FAKE_IP_POLICY=' "$SESSION")" = 1 ] &&
+    [ "$(sed -n 's/^FAKE_IP_POLICY=//p' "$SESSION")" = 1 ] || return 1
+  for FIP_KEY in FAKE_IP_V4 FAKE_IP_V6 LAN_RETURN_V4 LAN_RETURN_V6; do
+    [ "$(grep -c "^$FIP_KEY=" "$SESSION")" = 1 ] || return 1
+  done
+  FAKE_IP_V4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION")
+  FAKE_IP_V6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION")
+  LAN_RETURN_V4=$(sed -n 's/^LAN_RETURN_V4=//p' "$SESSION")
+  LAN_RETURN_V6=$(sed -n 's/^LAN_RETURN_V6=//p' "$SESSION")
+  fake_ip_policy_valid
+}
 split_safe_ifaces(){
   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
   for X in "$@"; do case "$X" in ''|*[!A-Za-z0-9_.:@+-]*) return 1;; esac; [ "$X" != lo ] && [ "$X" != 'lo+' ] || return 1; done
@@ -414,12 +486,14 @@ scoped_reject_unmarked_udp(){
 
 bypass4(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in 0.0.0.0/8 10.0.0.0/8 100.64.0.0/10 127.0.0.0/8 169.254.0.0/16 172.16.0.0/12 192.168.0.0/16 224.0.0.0/4 240.0.0.0/4; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
+  for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 bypass6(){
   C="$1"; T="$2"; CIDRS="$3"
-  for NET in ::1/128 fc00::/7 fe80::/10 ff00::/8; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V6; IFS=$OLDIFS
+  for NET in "$@"; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 
@@ -860,6 +934,7 @@ wait_ready(){
 }
 
 write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$7"; CP="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; { printf 'MODE=%s\n' "$M"; printf 'IPV6=%s\n' "$V6"; printf 'DNS=%s\n' "$DNS"; printf 'DNS_PORT=%s\n' "$DP"; printf 'APP_SCOPE=%s\n' "$S"; printf 'SHARE=%s\n' "$SHARE"; printf 'KILL=%s\n' "$KILL"; printf 'CONTROLLER_PORT=%s\n' "$CP"; printf 'DIRECT_UIDS=%s\n' "$DUIDS"; printf 'DIRECT_GIDS=%s\n' "$DGIDS"; printf 'SHARED_BYPASS_MACS=%s\n' "$MACS";
+    printf 'FAKE_IP_POLICY=1\nFAKE_IP_V4=%s\nFAKE_IP_V6=%s\nLAN_RETURN_V4=%s\nLAN_RETURN_V6=%s\n' "$FAKE_IP_V4" "$FAKE_IP_V6" "$LAN_RETURN_V4" "$LAN_RETURN_V6"
     printf 'DNS6_POLICY=%s\n' "${START_DNS6:-redirect}"
     printf 'TCP=%s\nUDP=%s\n' "$START_TCP" "$START_UDP"
     L_TCP=0; L_UDP=0; L_DNS=0
@@ -871,6 +946,7 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
+  load_session_fake_ip_policy || exit 0
   mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
@@ -883,10 +959,92 @@ watchdog(){
 }
 start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
 
+google_firewall_uids(){
+  # Resolve each installed user/profile. Android can reassign app UIDs after reset.
+  GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
+  [ -n "$GF_USERS" ] || GF_USERS=0
+  for GF_USER in $GF_USERS; do
+    (cmd package list packages -U --user "$GF_USER" 2>/dev/null ||
+      pm list packages -U --user "$GF_USER" 2>/dev/null) |
+      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" {
+        for(i=2;i<=NF;i++) if($i ~ /^uid:[0-9]+$/) {sub(/^uid:/,"",$i); if($i>=10000) print $i}
+      }'
+  done | sort -nu
+}
+google_firewall_cleanup(){
+  # Caller owns the existing Root transaction lock. Never flush a system chain.
+  GF_UIDS=$(google_firewall_uids)
+  [ -n "$GF_UIDS" ] || return 0
+  GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
+  GF_FILE="$RUN/.google-firewall.$$"
+  for GF_TOOL in xt4q xt6q; do
+    for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
+      if ! $GF_TOOL -t filter -S "$GF_CHAIN" > "$GF_FILE" 2>/dev/null; then continue; fi
+      GF_CHECKED=$((GF_CHECKED+1))
+      while IFS= read -r GF_RULE; do
+        # Quotes/comments and inverted/range UID matches are deliberately left intact.
+        case "$GF_RULE" in *\"*|*\'*) continue;; esac
+        if ! printf '%s\n' "$GF_RULE" | awk -v c="$GF_CHAIN" -v uids="$GF_UIDS" '
+          BEGIN{split(uids,ids,/\n/);for(i in ids) allowed[ids[i]]=1}
+          $1=="-A" && $2==c {
+            uid="";target="";inverted=0
+            for(i=3;i<=NF;i++) {
+              if($i=="!") inverted=1
+              if($i=="--uid-owner") uid=$(i+1)
+              if($i=="-j") target=$(i+1)
+            }
+            if(!inverted && uid ~ /^[0-9]+$/ && allowed[uid] && (target=="REJECT" || target=="DROP")) found=1
+          }
+          END{exit !found}'; then continue; fi
+        # Delete the exact specification; line numbers can change under netd.
+        case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
+        set -- $GF_RULE
+        shift 2
+        if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
+          GF_REMOVED=$((GF_REMOVED+1))
+          printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
+        else GF_FAILED=$((GF_FAILED+1)); fi
+        [ "$GF_GLOB_OFF" = 1 ] || set +f
+      done < "$GF_FILE"
+    done
+  done
+  rm -f "$GF_FILE"
+  printf 'checked=%s removed=%s failed=%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" > "$RUN/google-firewall-status"
+  if [ -f "$RUN/google-firewall.log" ]; then
+    tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
+  fi
+}
+google_firewall_maintain(){ (
+  trap 'release_lock' EXIT
+  GF_PID="${1:-}"
+  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
+  monotonic_seconds || exit 0
+  GF_NOW="$MONO_SECONDS"; GF_LAST=$(cat "$RUN/google-firewall-at" 2>/dev/null || true)
+  case "$GF_LAST" in ''|*[!0-9]*) ;; *)
+    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then exit 0; fi;;
+  esac
+  acquire_lock || exit 0
+  [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
+  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
+  printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
+  google_firewall_cleanup
+); }
+
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
-  mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
+  START_VENDOR_CLEAN="${30:-0}"
+  mkdir -p "$RUN" || fail "无法创建运行目录"
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
+    BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+    [ -n "$BOOT_NOW" ] && [ "$HETU_BOOT_RESTORE_ID" = "$BOOT_NOW" ] && [ -f "$BASE/boot/enabled" ] &&
+      [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
+    # A manual/app start may have won while the boot worker waited for this lock.
+    BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
+    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
+  fi
+  : > "$START_TIMING"
   rm -f "$START_ERROR"; start_stage "preflight"
   if [ "$START_FAST_CAPS" != 1 ]; then
     preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" >/dev/null
@@ -895,7 +1053,9 @@ start(){
   fi
   start_stage "ipv6-dns-capability"
   select_dns6_policy
-  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi
+  load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
+  acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   start_stage "stop-old-core"
@@ -948,16 +1108,21 @@ start(){
   if [ "$START_V6" = enable ]; then
     install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
     install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
+    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
     [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
   elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
 
   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
     install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
   fi
+  # Finish the immutable session before its integrity snapshot. Updating it after
+  # health_record would invalidate every status check and disable owned-rule repair.
+  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
   # Record exactly what this session installed, not mutable app preferences.
   health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
+  rm -f "$RUN/google-firewall-at"
+  if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
   rm -f "$START_ERROR"; start_stage "running"
   DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
@@ -1141,14 +1306,46 @@ health_record(){ (
   (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || { rm -rf "$H_TMP"; exit 1; }
   rm -rf "$H_DIR"; mv "$H_TMP" "$H_DIR"
 ); }
-health_session_current(){
-  [ -r "$RUN/network-manifest/session" ] && [ -r "$RUN/network-manifest/pid" ] || return 1
-  cmp -s "$RUN/network-manifest/session" "$SESSION" && cmp -s "$RUN/network-manifest/pid" "$PIDFILE" || return 1
-  H_SUM=$(cd "$RUN/network-manifest" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
-  [ "$H_SUM" = "$(cat "$RUN/network-manifest/checksums" 2>/dev/null)" ]
+health_manifest_valid(){
+  H_DIR="${H_BASELINE_DIR:-$RUN/network-manifest}"
+  [ -r "$H_DIR/session" ] && [ -r "$H_DIR/pid" ] || return 1
+  H_SUM=$(cd "$H_DIR" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) || return 1
+  [ "$H_SUM" = "$(cat "$H_DIR/checksums" 2>/dev/null)" ]
 }
-health_fault(){ H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_session_current(){
+  health_manifest_valid || return 1
+  cmp -s "$H_DIR/session" "$SESSION" && cmp -s "$H_DIR/pid" "$PIDFILE"
+}
+health_legacy_tail(){
+  # Only the known r149 ordering defect is eligible. Never synthesize a missing
+  # baseline or replace its saved network rules with a snapshot of today's rules.
+  health_manifest_valid && cmp -s "$H_DIR/pid" "$PIDFILE" || return 1
+  ! grep -q '^GOOGLE_FIREWALL_CLEAN=' "$H_DIR/session" || return 1
+  H_TAIL=$(tail -n 1 "$SESSION" 2>/dev/null)
+  case "$H_TAIL" in GOOGLE_FIREWALL_CLEAN=0|GOOGLE_FIREWALL_CLEAN=1) ;; *) return 1;; esac
+  { cat "$H_DIR/session"; printf '%s\n' "$H_TAIL"; } | cmp -s - "$SESSION"
+}
+health_fault(){ [ "$H_STATE" = upgrade-required ] || H_STATE=degraded; H_REASON="${H_REASON:+$H_REASON,}$1"; }
 health_unknown(){ H_UNKNOWN=1; H_REASON="${H_REASON:+$H_REASON,}$1"; }
+health_core_and_watchdog(){
+  H_PID=$(cat "$PIDFILE" 2>/dev/null || true)
+  pidcore "$H_PID"; H_ID=$?
+  case "$H_ID" in 0) kill -0 "$H_PID" 2>/dev/null || health_fault core-exited;;
+    2) health_unknown core-identity-read;; *) health_fault core-identity;; esac
+  H_WD=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
+  case "$H_WD" in ''|*[!0-9]*) health_fault watchdog-missing; return;; esac
+  kill -0 "$H_WD" 2>/dev/null || { health_fault watchdog-exited; return; }
+  H_WCMD=$(tr '\000' '\n' 2>/dev/null < "/proc/$H_WD/cmdline") || { health_unknown watchdog-identity-read; return; }
+  [ -n "$H_WCMD" ] || { health_unknown watchdog-identity-read; return; }
+  printf '%s\n' "$H_WCMD" | awk -v s="$BASE/hetu-root.sh" -v p="$H_PID" '
+    $0==s {if(getline>0 && $0=="watchdog" && getline>0 && $0==p) found=1}
+    END{exit !found}' || health_fault watchdog-identity
+}
+health_core_birth(){
+  # /proc stat comm can contain spaces/parentheses. Start ticks are field 22,
+  # or field 20 after the last closing parenthesis, not a PID alone.
+  sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk 'NF>=20 && $20~/^[0-9]+$/ {print $20}'
+}
 health_routes(){
   H_F="$1"; H_RULES=$(ip -"$H_F" rule show 2>/dev/null) || { health_unknown "ipv$H_F-rule-read"; return; }
   H_RULE_OK=$(printf '%s\n' "$H_RULES" | awk -v p="$PREF:" -v m="$MARK/$MASK" -v t="$TABLE" '$1==p && $2=="from" && $3=="all" && $4=="fwmark" && $5==m && ($6=="lookup" || $6=="table") && $7==t {print "yes"}')
@@ -1162,11 +1359,16 @@ health_routes(){
   [ "$H_ROUTE_OK" = yes ] || health_fault "ipv$H_F-local-route"
 }
 health_collect(){
-  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0
-  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; return; fi
-  if ! health_session_current; then H_STATE=upgrade-required; H_REASON=session-manifest-missing; return; fi
+  H_STATE=healthy; H_REASON=''; H_UNKNOWN=0; H_REPAIR_AVAILABLE=false; H_MANIFEST_STATE=current
+  if [ ! -r "$SESSION" ] && [ ! -r "$PIDFILE" ]; then H_STATE=stopped; H_REASON=not-running; H_MANIFEST_STATE=stopped; return; fi
   if [ -d "$LOCK_DIR" ] && [ "$LOCK_HELD" != 1 ]; then H_STATE=unknown; H_REASON=transaction-in-progress; return; fi
-  for H_E in "$RUN/network-manifest"/[46]-*; do
+  if ! health_session_current; then
+    H_STATE=upgrade-required; H_REASON=session-manifest-missing; H_MANIFEST_STATE=missing-or-invalid
+    if health_legacy_tail; then H_MANIFEST_STATE=legacy-tail-mismatch
+    else health_core_and_watchdog; [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown; return; fi
+  fi
+  health_core_and_watchdog
+  for H_E in "$H_DIR"/[46]-*; do
     [ -s "$H_E" ] || continue
     H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
     H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || { health_unknown "$H_KEY-read"; continue; }
@@ -1182,12 +1384,12 @@ health_collect(){
       esac
     done < "$H_E"
   done
-  if [ -s "$RUN/network-manifest/net" ]; then
-    if ! cmp -s "$NET_STATE" "$RUN/network-manifest/net" || ! loadnet; then
+  if [ -s "$H_DIR/net" ]; then
+    if ! cmp -s "$NET_STATE" "$H_DIR/net" || ! loadnet; then
       health_fault routing-journal
     else
-      [ ! -s "$RUN/network-manifest/4-mangle" ] || health_routes 4
-      [ ! -s "$RUN/network-manifest/6-mangle" ] || health_routes 6
+      [ ! -s "$H_DIR/4-mangle" ] || health_routes 4
+      [ ! -s "$H_DIR/6-mangle" ] || health_routes 6
     fi
   fi
   H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
@@ -1203,7 +1405,40 @@ health_collect(){
   fi
   # Never mutate after an incomplete observation, even if another check failed.
   [ "$H_UNKNOWN" = 0 ] || H_STATE=unknown
+  if [ "$H_MANIFEST_STATE" = legacy-tail-mismatch ] && [ "$H_STATE" = upgrade-required ] && [ "$H_REASON" = session-manifest-missing ]; then H_REPAIR_AVAILABLE=true; fi
 }
+health_repair_session(){ (
+  root; acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  H_N=0
+  while :; do
+    H_TMP="$RUN/network-manifest.tail-new.$$.$H_N"; H_BACKUP="$RUN/network-manifest.pre-tail.$$.$H_N"
+    [ -e "$H_TMP" ] || [ -e "$H_BACKUP" ] || break
+    H_N=$((H_N+1)); [ "$H_N" -lt 100 ] || exit 1
+  done
+  H_MOVED=0
+  trap '[ "$H_MOVED" != 1 ] || [ -d "$RUN/network-manifest" ] || mv "$H_BACKUP" "$RUN/network-manifest"; rm -rf "$H_TMP"; release_lock' EXIT
+  health_collect
+  if [ "$H_REPAIR_AVAILABLE" != true ]; then
+    printf '{"ok":false,"message":"运行记录不符合安全修复条件，请查看网络诊断；未改动核心和网络规则"}\n'; exit 0
+  fi
+  H_EXPECTED_PID=$(cat "$PIDFILE"); H_BIRTH=$(health_core_birth "$H_EXPECTED_PID")
+  [ -n "$H_BIRTH" ] || { printf '{"ok":false,"message":"无法确认核心身份，未修复运行记录"}\n'; exit 0; }
+  cp -R "$RUN/network-manifest" "$H_TMP" && cp "$SESSION" "$H_TMP/session" || exit 1
+  (cd "$H_TMP" && { cksum [46]-* session pid; [ ! -f net ] || cksum net; }) > "$H_TMP/checksums" || exit 1
+  H_BASELINE_DIR="$H_TMP"; health_collect
+  [ "$H_STATE" = healthy ] && [ "$H_EXPECTED_PID" = "$(cat "$PIDFILE")" ] && [ "$H_BIRTH" = "$(health_core_birth "$H_EXPECTED_PID")" ] || {
+    printf '{"ok":false,"message":"校验期间运行状态发生变化，未修复运行记录"}\n'; exit 0;
+  }
+  # Keep the original evidence. A failed publish rolls back; even interrupted
+  # publication must fail closed, never treat an absent manifest as healthy.
+  unset H_BASELINE_DIR
+  health_legacy_tail && cmp -s "$H_TMP/session" "$SESSION" || exit 1
+  H_MOVED=1; mv "$RUN/network-manifest" "$H_BACKUP" || exit 1
+  mv "$H_TMP" "$RUN/network-manifest" || exit 1; H_MOVED=0
+  printf '%s pid=%s kind=legacy-google-tail rules=preserved\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_EXPECTED_PID" >> "$RUN/session-repair.log"
+  unset H_BASELINE_DIR; health_collect
+  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","message":"已修复旧版运行记录；核心和网络规则保持原状"}\n' "$H_STATE" "$H_REASON"
+); }
 health_restore_table(){
   H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
   H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
@@ -1251,6 +1486,8 @@ health_repair(){ (
   trap 'release_lock' EXIT
   H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
   [ -n "$H_PID" ] && [ "$H_PID" = "$H_CURRENT" ] && pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
+  # OEM blocks are outside our HETU-chain manifest and can exist while it is healthy.
+  google_firewall_maintain "$H_PID"
   health_collect
   [ "$H_STATE" = degraded ] || exit 0
   H_FIRST="$H_REASON"
@@ -1264,7 +1501,7 @@ health_repair(){ (
   pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
   # Missing metadata or listeners cannot safely be reconstructed from preferences.
   # Keep the core and its existing connections; report instead of restart-looping.
-  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*) exit 0;; esac
+  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*|*core-*|*watchdog-*) exit 0;; esac
   printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
   printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
   if [ -s "$RUN/network-manifest/net" ]; then
@@ -1294,13 +1531,31 @@ health_json(){ (
   root; health_collect
   H_DNS6=$(sed -n 's/^DNS6_POLICY=//p' "$SESSION" 2>/dev/null || true)
   case "$H_DNS6" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) H_DNS6=unknown;; esac
-  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
+  printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
 ); }
 
 case "${1:-status}" in
+  repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-  start) { [ "$#" = 23 ] || [ "$#" = 24 ]; } || fail "参数错误"; root; start "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20}" "${21}" "${22}" "${23}" "${24:-}";;
-  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
+  # Retain the established DNS/process protocol; only UID-scoped Google cleanup is added.
+  start)
+    case "$#" in
+      23|24) ;;
+      31)
+        UNSUPPORTED=""
+        [ "${25}" = 1 ] || UNSUPPORTED="${UNSUPPORTED}DNS TCP 关闭；"
+        [ "${26}" = 1 ] || UNSUPPORTED="${UNSUPPORTED}DNS UDP 关闭；"
+        [ "${27}" = 0 ] || UNSUPPORTED="${UNSUPPORTED}性能模式；"
+        [ -z "${28}" ] || UNSUPPORTED="${UNSUPPORTED}CPU 分配；"
+        [ -z "${29}" ] || UNSUPPORTED="${UNSUPPORTED}内存限制；"
+        [ -z "${30}" ] || UNSUPPORTED="${UNSUPPORTED}I/O 权重；"
+        bool "${31}" || fail "厂商防火墙清理开关必须是 0 或 1"
+        [ -z "$UNSUPPORTED" ] || fail "此运行版暂不支持扩展控制：$UNSUPPORTED 请将列出的设置恢复默认值后重试"
+        ;;
+      *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
+    esac
+    root; shift; start "$@";;
+  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; if [ -f "$BASE/boot/enabled" ]; then BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true); [ -z "$BOOT_NOW" ] || printf '%s\n' "$BOOT_NOW" > "$BASE/boot/stopped-boot"; fi; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;

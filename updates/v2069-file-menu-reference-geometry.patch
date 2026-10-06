@@ -1,0 +1,256 @@
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2068
+-        versionName = "0.11.8-v20"
++        versionCode = 2069
++        versionName = "0.11.9-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt
+@@ -21,6 +21,8 @@
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.height
+ import androidx.compose.foundation.layout.fillMaxWidth
+ import androidx.compose.foundation.layout.padding
+ import androidx.compose.foundation.layout.size
+@@ -139,6 +141,8 @@
+     emphasizeAnchor: Boolean = false,
+     minWidth: Dp = 152.dp,
+     anchorEndInset: Dp = 14.dp,
++    contextEntryOffset: Dp? = null,
++    leftAnchorPointer: Boolean = false,
+     content: @Composable ColumnScope.(close: (() -> Unit) -> Unit) -> Unit,
+ ) {
+     val c = Hx.colors
+@@ -156,6 +160,7 @@
+     }
+     val scrim by animateFloatAsState(if (state.targetState) 1f else 0f, tween(HxMotion.Medium), label = "menuScrim")
+     var origin by remember { mutableStateOf(TransformOrigin(1f, 0f)) }
++    var pointerY by remember { mutableStateOf(0f) }
+ 
+     Popup(
+         popupPositionProvider = HxFullWindowPosition,
+@@ -172,7 +177,11 @@
+                             val mask = Path().apply {
+                                 fillType = PathFillType.EvenOdd
+                                 addRect(Rect(0f, 0f, size.width, size.height))
+-                                if (emphasizeAnchor) addRoundRect(RoundRect(anchor, CornerRadius(12.dp.toPx())))
++                                if (emphasizeAnchor) {
++                                    val focusAnchor = if (leftAnchorPointer && contextEntryOffset != null)
++                                        Rect(anchor.left + 4.dp.toPx(), anchor.top + 6.dp.toPx(), anchor.right - 4.dp.toPx(), anchor.bottom - 6.dp.toPx()) else anchor
++                                    addRoundRect(RoundRect(focusAnchor, CornerRadius(12.dp.toPx())))
++                                }
+                             }
+                             drawPath(mask, Color.Black.copy(alpha = (dimAmount ?: if (c.dark) .42f else .26f).coerceIn(0f, 1f)))
+                         }
+@@ -192,8 +201,10 @@
+                     val x = (anchor.right - with(density) { anchorEndInset.toPx() } - placeable.width).coerceIn(margin, (maxW - margin - placeable.width).coerceAtLeast(margin))
+                     val below = anchor.bottom + with(density) { 4.dp.toPx() }
+                     val opensUp = below + placeable.height > maxH - with(density) { 36.dp.toPx() }
+-                    val y = (if (opensUp) anchor.top - placeable.height - with(density) { 4.dp.toPx() } else below)
++                    val y = (if (contextEntryOffset != null) anchor.bottom + with(density) { contextEntryOffset.toPx() } - placeable.height
++                        else if (opensUp) anchor.top - placeable.height - with(density) { 4.dp.toPx() } else below)
+                         .coerceIn(safeTop, (maxH - safeBottom - placeable.height).coerceAtLeast(safeTop))
++                    pointerY = anchor.center.y - y
+                     origin = TransformOrigin(
+                         ((anchor.right - margin - x) / placeable.width.coerceAtLeast(1)).coerceIn(0f, 1f),
+                         if (opensUp) 1f else 0f,
+@@ -206,6 +217,16 @@
+                     enter = fadeIn(tween(140)) + scaleIn(HxMotion.pop(), initialScale = .72f, transformOrigin = origin),
+                     exit = fadeOut(tween(130)) + scaleOut(tween(150, easing = HxMotion.Exit), targetScale = .85f, transformOrigin = origin),
+                 ) {
++                    Box(Modifier.drawBehind {
++                        if (leftAnchorPointer) {
++                            val cy = pointerY.coerceIn(18.dp.toPx(), (size.height - 18.dp.toPx()).coerceAtLeast(18.dp.toPx()))
++                            val pointer = Path().apply {
++                                moveTo(1f, cy - 6.dp.toPx()); lineTo(-6.dp.toPx(), cy)
++                                lineTo(1f, cy + 6.dp.toPx()); close()
++                            }
++                            drawPath(pointer, c.surface)
++                        }
++                    }) {
+                     Column(
+                         Modifier
+                             .widthIn(min = minWidth, max = 290.dp)
+@@ -219,6 +240,7 @@
+                     ) {
+                         content(close)
+                     }
++                    }
+                 }
+             }
+         }
+@@ -237,6 +259,8 @@
+     icon: ImageVector? = null,
+     selectedTextColor: Color = Hx.colors.accent,
+     compact: Boolean = false,
++    minimumHeight: Dp = 0.dp,
++    labelFontSizeSp: Float? = null,
+     choicePresentation: HxChoicePresentation = HxChoicePresentation.Standard,
+ ) {
+     val c = Hx.colors
+@@ -249,6 +273,7 @@
+                 onClick()
+             }
+             .background(if (choicePresentation == HxChoicePresentation.Notification && selected) c.surfaceMuted else Color.Transparent)
++            .heightIn(min = minimumHeight)
+             .padding(horizontal = 14.dp, vertical = when {
+                 compact -> 6.dp
+                 choicePresentation == HxChoicePresentation.Scale -> 8.dp
+@@ -271,7 +296,7 @@
+                     HxChoicePresentation.Standard -> MaterialTheme.typography.bodyLarge
+                     HxChoicePresentation.Scale -> MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp, lineHeight = 19.sp)
+                     else -> MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 20.sp)
+-                },
++                }.let { if (labelFontSizeSp == null) it else it.copy(fontSize = labelFontSizeSp.sp, lineHeight = 20.sp) },
+                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                 color = when {
+                     danger -> c.bad
+@@ -290,6 +315,8 @@
+     }
+ }
+ 
++internal enum class HxFileEntryMenu { File, Folder }
++
+ internal data class HxMenuAction(
+     val label: String,
+     val icon: ImageVector? = null,
+@@ -302,17 +329,31 @@
+  * known, otherwise a bottom sheet with the same actions.
+  */
+ @Composable
+-internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit, referenceFileMenu: Boolean = false, anchorEndInset: Dp = 14.dp, dimBehind: Boolean? = null, dimAmount: Float? = null, emphasizeAnchor: Boolean = false) {
++internal fun HxActionMenu(title: String, actions: List<HxMenuAction>, onDismiss: () -> Unit, referenceFileMenu: Boolean = false, anchorEndInset: Dp = 14.dp, dimBehind: Boolean? = null, dimAmount: Float? = null, emphasizeAnchor: Boolean = false, entryMenu: HxFileEntryMenu? = null, headerIcon: ImageVector? = null) {
+     val anchor = remember { HxAnchor.take() }
+     if (anchor != null) {
+-        HxAnchoredMenu(anchor, onDismiss, dimBehind = dimBehind ?: !referenceFileMenu, dimAmount = dimAmount, emphasizeAnchor = emphasizeAnchor, anchorEndInset = anchorEndInset) { close ->
+-            if (referenceFileMenu) {
++        HxAnchoredMenu(anchor, onDismiss, dimBehind = dimBehind ?: !referenceFileMenu, dimAmount = dimAmount, emphasizeAnchor = emphasizeAnchor,
++            minWidth = if (entryMenu == HxFileEntryMenu.Folder) 148.dp else 152.dp,
++            anchorEndInset = when (entryMenu) { HxFileEntryMenu.File -> 34.dp; HxFileEntryMenu.Folder -> 54.dp; else -> anchorEndInset },
++            contextEntryOffset = when (entryMenu) { HxFileEntryMenu.File -> 14.dp; HxFileEntryMenu.Folder -> 8.dp; else -> null },
++            leftAnchorPointer = entryMenu == HxFileEntryMenu.Folder) { close ->
++            if (entryMenu != null) {
++                Row(Modifier.fillMaxWidth().heightIn(min = 34.dp).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
++                    if (headerIcon != null) { Icon(headerIcon, null, tint = Hx.colors.text, modifier = Modifier.size(22.dp)); Spacer(Modifier.width(12.dp)) }
++                    Text(title, color = Hx.colors.text, fontSize = if (entryMenu == HxFileEntryMenu.Folder) 16.sp else 15.sp,
++                        lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
++                }
++                HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = Hx.colors.line)
++            } else if (referenceFileMenu) {
+                 Text(title, color = Hx.colors.textMuted, style = MaterialTheme.typography.labelMedium,
+                     modifier = Modifier.padding(horizontal = 14.dp, vertical = 5.dp))
+                 HorizontalDivider(Modifier.padding(horizontal = 12.dp), color = Hx.colors.line)
+             }
+-            actions.forEach { action ->
+-                HxMenuItem(action.label, onClick = { close(action.onClick) }, danger = action.danger, icon = action.icon, compact = referenceFileMenu)
++            actions.forEachIndexed { index, action ->
++                HxMenuItem(action.label, onClick = { close(action.onClick) }, danger = action.danger, icon = action.icon, compact = referenceFileMenu,
++                    minimumHeight = when (entryMenu) { HxFileEntryMenu.File -> 43.dp; HxFileEntryMenu.Folder -> 36.dp; else -> 0.dp },
++                    labelFontSizeSp = if (entryMenu != null) 15f else null)
++                if (entryMenu != null && index < actions.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = Hx.colors.line)
+             }
+         }
+     } else {
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -30,6 +30,17 @@
+ import androidx.compose.foundation.layout.widthIn
+ import androidx.compose.foundation.text.KeyboardOptions
+ import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material.icons.outlined.Folder
++import androidx.compose.material.icons.outlined.Edit
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.graphics.vector.path
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.draw.drawBehind
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.geometry.CornerRadius
+ import androidx.compose.material.icons.Icons
+ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+ import androidx.compose.material.icons.rounded.Add
+@@ -744,11 +755,13 @@
+     menuFor?.let { entry ->
+         HxActionMenu(
+             title = entry.name,
++            entryMenu = if (entry.directory) HxFileEntryMenu.Folder else HxFileEntryMenu.File,
++            headerIcon = if (entry.directory) Icons.Outlined.Folder else null,
+             referenceFileMenu = true, dimBehind = true, dimAmount = if (entry.directory) .38f else .45f, emphasizeAnchor = true,
+             actions = buildList {
+                 if (entry.directory) add(HxMenuAction("打开", Icons.Rounded.FolderOpen) { menuFor = null; onOpen(entry.path) })
+-                else add(HxMenuAction("编辑", Icons.Rounded.Edit) { menuFor = null; openFile(entry) })
+-                add(HxMenuAction("重命名", Icons.Rounded.DriveFileRenameOutline) { menuFor = null; renameFor = entry })
++                else add(HxMenuAction("编辑", Icons.Outlined.Edit) { menuFor = null; openFile(entry) })
++                add(HxMenuAction("重命名", FileRenameGlyph) { menuFor = null; renameFor = entry })
+                 if (!entry.directory) add(HxMenuAction("导出", Icons.Rounded.IosShare) { menuFor = null; exportFor = entry; exporter.launch(entry.name) })
+                 add(HxMenuAction("删除", Icons.Rounded.DeleteOutline, danger = true) { menuFor = null; deleteFor = entry })
+             },
+@@ -831,11 +844,28 @@
+     }
+ }
+ 
++private val FileRenameGlyph by lazy {
++    ImageVector.Builder("FileRename", 24.dp, 24.dp, 24f, 24f).apply {
++        path(fill = null, stroke = SolidColor(Color.Black), strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round) {
++            moveTo(2f, 6f); lineTo(13f, 6f); moveTo(7.5f, 6f); lineTo(7.5f, 19f)
++            moveTo(18f, 3f); lineTo(18f, 21f); moveTo(15f, 3f); lineTo(21f, 3f)
++            moveTo(15f, 21f); lineTo(21f, 21f)
++        }
++    }.build()
++}
++
+ @Composable
+ private fun FileReferenceEntryRow(entry: RuntimeFileEntry, selected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+     val c = Hx.colors
+     HxRow(entry.name, referenceRow = true, referenceTextSizeSp = 18f,
+-        modifier = Modifier.clip(RoundedCornerShape(12.dp)).background(if (selected) c.accentSoft else Color.Transparent),
++        modifier = Modifier.drawBehind {
++            if (selected) {
++                val insetX = if (entry.directory) 4.dp.toPx() else 0f
++                val insetY = if (entry.directory) 6.dp.toPx() else 0f
++                drawRoundRect(c.accentSoft, topLeft = Offset(insetX, insetY),
++                    size = Size(size.width - 2 * insetX, size.height - 2 * insetY), cornerRadius = CornerRadius(12.dp.toPx()))
++            }
++        },
+         minimumHeight = if (entry.directory) 68.dp else 74.dp,
+         subtitle = if (entry.directory) null else listOf(HxFormat.bytes(entry.size), if (entry.modified > 0) HxFormat.ago(entry.modified * 1000L) else "")
+             .filter { it.isNotBlank() }.joinToString(" · "),
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -436,10 +436,22 @@
+         touch("更多"); click("新建文件夹"); capture("03B-019-files-new-folder"); click("取消")
+         touch("更多"); click("下载"); replace(0,"https://example.com/config.yaml"); capture("03B-020-files-download")
+         replace(0,"file:///tmp/config.yaml"); click("下载"); expect("请填写 HTTPS 下载地址"); capture("03B-021-files-download-invalid"); click("取消")
+-        longClick("config.yaml"); capture("03B-016-file-menu"); click("重命名"); capture("03B-022-files-rename")
++        longClick("config.yaml")
++        rule.runOnUiThread {
++            val label = nativeNodes().first { "编辑" in labels(it) }
++            val row = generateSequence(label) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            assertTrue("Reference file menu keeps its measured43dp action rows", row.boundsInWindow.height in 42.5f..44.5f)
++        }
++        capture("03B-016-file-menu"); click("重命名"); capture("03B-022-files-rename")
+         click("重命名"); expect("名称没有变化"); capture("03B-025-files-name-unchanged"); click("取消")
+         longClick("config.yaml"); click("删除"); capture("03B-023-file-delete"); click("取消")
+-        longClick("backup"); capture("03B-017-folder-menu"); click("删除"); capture("03B-024-folder-delete"); click("取消")
++        longClick("backup")
++        rule.runOnUiThread {
++            val label = nativeNodes().first { "打开" in labels(it) }
++            val row = generateSequence(label) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
++            assertTrue("Reference folder menu keeps its measured36dp action rows", row.boundsInWindow.height in 35.5f..37.5f)
++        }
++        capture("03B-017-folder-menu"); click("删除"); capture("03B-024-folder-delete"); click("取消")
+         click("backup"); expectEventually("backup.yaml"); replace(0,"backup"); capture("03B-014-files-subfolder-search")
+     }
+     @Config(sdk = [28]) @Test fun realScriptsActivityReadFixturesAndCancelledDialogs() {

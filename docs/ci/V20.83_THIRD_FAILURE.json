@@ -1,0 +1,53 @@
+{
+  "schema": 1,
+  "version": "V20.83",
+  "branch": "test/v20.76-new-ui",
+  "applicationCommit": "f901f6cfdebeed37fbf34fb2da710f0fe169316a",
+  "ciRun": 37233955357,
+  "attempt": 1,
+  "conclusion": "failure",
+  "units": {"tests": 392, "failures": 6, "errors": 0, "skipped": 0},
+  "failedCases": [
+    {
+      "case": "AutomationSettingsConceptParityTest.licensesAndMockupBoundaryMatchConcept",
+      "cause": "The production source scan found the reference-only label in two preview-data comments and an IDE Preview annotation.",
+      "correction": "Move the four mutually referenced preview and sample files to the test source set. Production boundary and license assertions remain unchanged."
+    },
+    {
+      "case": "AutomationToolsConceptParityTest.toolLandingAndConfigStatesAreReachable",
+      "cause": "The structural test read the old wrapper rather than the new module containing the search field and catalog.",
+      "correction": "Read the wrapper plus the actual tool screen, catalog and route. Retain every entry and editor-recovery assertion."
+    },
+    {
+      "case": "MainLanguageBindingTest.chooserUpdatesMainNavigationAndSurvivesActivityRecreation",
+      "cause": "Tool body labels bypassed the existing language binding while the dock correctly changed to English.",
+      "correction": "Restore production localization at explicit static UI-text boundaries. Preserve raw user filenames, app names, URLs, YAML and diagnostics. Retain original language and recreation assertions."
+    },
+    {
+      "case": "NewUiIntegrationTest.newLauncherKeepsToolsAndDiagnostics",
+      "cause": "The fixture required Lazy-list ScrollToIndex semantics; the production tool hub is a verticalScroll Column.",
+      "correction": "PerformScrollTo on the actual diagnostic action, then click and assert the network journal remains accessible."
+    },
+    {
+      "case": "NewUiShell83Test.toolsConfigurationOwnsDockAndBackReturnsToHub",
+      "cause": "The same obsolete Lazy-list matcher found zero scroll containers.",
+      "correction": "Scroll the actual configuration action into view. Preserve editor, back-stack and dock assertions."
+    },
+    {
+      "case": "NewUiShell83Test.diagnosticDetailKeepsNetworkJournalAccessible",
+      "cause": "The same obsolete Lazy-list matcher found zero scroll containers.",
+      "correction": "Scroll the actual diagnostic action into view. Preserve journal-access and hidden-dock assertions."
+    }
+  ],
+  "passedRelevantSuites": {"NewHomePanelInteractionTest": 9, "UI83EditorHistoryTest": 12},
+  "passedBeforeFailure": [
+    "All source, protected-input and early fixture gates",
+    "Production APK compilation, 23 packaged runtime entries, 687 ABI references with 0 missing, and packaged icon bytes"
+  ],
+  "notExecuted": ["Android lint", "Final APK certificate/version gate", "Candidate API 35 and API 36 installation checks"],
+  "uiVerificationArtifact": 11314004619,
+  "boundaries": [
+    "386 passed cases and six screenshots do not make this failed run a successful delivery.",
+    "The next run must execute all 392 cases and all original remaining gates."
+  ]
+}

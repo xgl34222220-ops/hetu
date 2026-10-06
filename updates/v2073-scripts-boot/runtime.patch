@@ -1,0 +1,1149 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index 1de67f0..10f3d03 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2072
+-        versionName = "0.12.2-v20"
++        versionCode = 2073
++        versionName = "0.12.3-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/assets/hetu-autostart.sh b/android-app/app/src/main/assets/hetu-autostart.sh
+new file mode 100644
+index 0000000..4d17a16
+--- /dev/null
++++ b/android-app/app/src/main/assets/hetu-autostart.sh
+@@ -0,0 +1,81 @@
++#!/system/bin/sh
++# Installed only by the explicit Root autostart setting. late_start must not block.
++if [ "${1:-}" != --worker ]; then
++  unset ASH_STANDALONE
++  /system/bin/sh /data/adb/service.d/hetu-autostart.sh --worker </dev/null >/dev/null 2>&1 &
++  exit 0
++fi
++unset ASH_STANDALONE
++PATH=/system/bin:/system/xbin:/vendor/bin:/data/adb/magisk:$PATH
++export PATH
++umask 077
++BASE=/data/adb/hetu
++BOOT="$BASE/boot"
++LOCK="$BOOT/restore.lock"
++BOOT_ID=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || exit 1
++[ -n "$BOOT_ID" ] && [ -f "$BOOT/enabled" ] || exit 0
++mkdir -p "$BOOT" || exit 1
++# A stale PID from a previous boot must never suppress this boot's restore.
++if ! mkdir "$LOCK" 2>/dev/null; then
++  OWNER_BOOT=$(cat "$LOCK/boot-id" 2>/dev/null)
++  OWNER_PID=$(cat "$LOCK/pid" 2>/dev/null)
++  if [ "$OWNER_BOOT" = "$BOOT_ID" ]; then
++    case "$OWNER_PID" in ''|*[!0-9]*) exit 0;; esac
++    OWNER_CMD=$(tr '\000' ' ' < "/proc/$OWNER_PID/cmdline" 2>/dev/null)
++    case "$OWNER_CMD" in *'/data/adb/service.d/hetu-autostart.sh --worker'*) exit 0;; esac
++  fi
++  rm -rf "$LOCK" || exit 1
++  mkdir "$LOCK" 2>/dev/null || exit 0
++fi
++printf '%s\n' "$BOOT_ID" > "$LOCK/boot-id"
++printf '%s\n' "$$" > "$LOCK/pid"
++trap '[ "$(cat "$LOCK/pid" 2>/dev/null)" != "$$" ] || rm -rf "$LOCK"' EXIT
++state(){
++  printf '%s %s\n' "$BOOT_ID" "$1" > "$BOOT/status.new.$$" && mv -f "$BOOT/status.new.$$" "$BOOT/status"
++}
++allowed(){
++  [ -f "$BOOT/enabled" ] && [ "$BOOT_ID" != "$(cat "$BOOT/stopped-boot" 2>/dev/null)" ]
++}
++alive(){
++  PID=$(cat "$BASE/run/core.pid" 2>/dev/null)
++  case "$PID" in ''|*[!0-9]*) return 1;; esac
++  kill -0 "$PID" 2>/dev/null || return 1
++  EXE=$(readlink "/proc/$PID/exe" 2>/dev/null)
++  [ "$EXE" = "$BASE/bin/core" ] || [ "$EXE" = "$BASE/bin/core (deleted)" ]
++}
++notify_app(){
++  # The native proxy is already running; app/service restrictions cannot undo it.
++  am start-foreground-service --user 0 -n io.github.xgl34222220.hetu/.ProxyNetworkMatchService \
++    -a io.github.xgl34222220.hetu.ROOT_BOOT_RUNNING >/dev/null 2>&1 || true
++}
++state waiting-system
++N=0
++while [ "$(getprop sys.boot_completed)" != 1 ]; do
++  allowed || { state cancelled; exit 0; }
++  N=$((N+1)); [ "$N" -le 300 ] || { state system-timeout; exit 1; }
++  sleep 2
++done
++# Native state/config is in /data/adb and needs no app launch or credential storage.
++# Wait for a route rather than assuming network exists at BOOT_COMPLETED.
++N=0
++while allowed; do
++  if alive; then state running; notify_app; exit 0; fi
++  ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
++  if ! printf '%s\n' "$ROUTE" | grep -q ' dev '; then
++    state waiting-network
++  elif [ ! -r "$BOOT/start.sh" ]; then
++    state missing-plan; exit 1
++  else
++    state restoring
++    export HETU_BOOT_RESTORE_ID="$BOOT_ID"
++    /system/bin/sh "$BOOT/start.sh" >> "$BOOT/restore.log" 2>&1
++    RC=$?
++    # Bound logs even when a provider/network failure keeps the core unready.
++    tail -c 16384 "$BOOT/restore.log" > "$BOOT/restore.log.new.$$" && mv -f "$BOOT/restore.log.new.$$" "$BOOT/restore.log"
++    if [ "$RC" = 0 ] && alive; then state running; notify_app; exit 0; fi
++    state retrying
++  fi
++  N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
++  sleep 10
++done
++state cancelled
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index 75f2e48..c81f2fd 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -958,8 +958,17 @@ google_firewall_maintain(){ (
+ start(){
+   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
+   START_VENDOR_CLEAN="${30:-0}"
+-  mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
++  mkdir -p "$RUN" || fail "无法创建运行目录"
+   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
++  if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
++    BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
++    [ -n "$BOOT_NOW" ] && [ "$HETU_BOOT_RESTORE_ID" = "$BOOT_NOW" ] && [ -f "$BASE/boot/enabled" ] &&
++      [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
++    # A manual/app start may have won while the boot worker waited for this lock.
++    BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
++    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
++  fi
++  : > "$START_TIMING"
+   rm -f "$START_ERROR"; start_stage "preflight"
+   if [ "$START_FAST_CAPS" != 1 ]; then
+     preflight "$START_MODE" "$START_TP" "$START_RP" "$START_V6" "$START_TCP" "$START_UDP" "$START_DNS" "$START_QUIC" "$START_DP" "$START_CP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_KILL" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" >/dev/null
+@@ -1395,7 +1404,7 @@ case "${1:-status}" in
+       *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
+     esac
+     root; shift; start "$@";;
+-  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
++  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; if [ -f "$BASE/boot/enabled" ]; then BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true); [ -z "$BOOT_NOW" ] || printf '%s\n' "$BOOT_NOW" > "$BASE/boot/stopped-boot"; fi; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
+   status) status;;
+   network-health) health_json;;
+   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
+index a61fe29..077cade 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java
+@@ -29,6 +29,17 @@ public final class BootReceiver extends BroadcastReceiver {
+ 
+         boolean bootOrUnlock=Intent.ACTION_BOOT_COMPLETED.equals(action)||Intent.ACTION_USER_UNLOCKED.equals(action);
+         if (!bootOrUnlock) return;
++        if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartInstalled",false)
++                &&!prefs.getBoolean("proxyRootWanted",false)){
++            // Native service.d can restore before credential storage unlock. This
++            // action adopts only a confirmed native start from this boot; it never
++            // turns a same-boot manual stop back into wanted=true.
++            try{
++                Intent sync=new Intent(context,ProxyNetworkMatchService.class).setAction(RootAutostart.ACTION_RUNNING);
++                if(android.os.Build.VERSION.SDK_INT>=26)context.startForegroundService(sync);else context.startService(sync);
++            }catch(Exception e){prefs.edit().putString("proxyRootBootError","开机状态同步未启动："+e.getClass().getSimpleName()).apply();}
++            return;
++        }
+         if (prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootWanted", false)) {
+             // The previous boot's success must not be presented as this attempt.
+             prefs.edit().remove("proxyRootBootRestoreSuccessAt").apply();
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index da924d0..73fc48d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -135,6 +135,8 @@ internal class ProxyComposeController(context: Context) {
+             .take(180)
+     }
+ 
++    suspend fun setAutoStart(enabled: Boolean): String = withContext(Dispatchers.IO) { root.setAutoStart(enabled) }
++
+     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+         val selected = configs.selected(profile.core)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+index 883caed..242950b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@ -43,6 +43,17 @@ public final class ProxyNetworkMatchService extends Service {
+ 
+     @Override public int onStartCommand(Intent i,int f,int id){
+         String action=i==null?"":i.getAction();
++        if(RootAutostart.ACTION_RUNNING.equals(action)&&prefs.getBoolean("proxyRootAutoStart",false)){
++            // Validate native boot state on the worker before publishing recovery intent.
++            worker.execute(()->{
++                if(destroyed||!prefs.getBoolean("proxyRootAutoStart",false))return;
++                try{
++                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime())evaluate();
++                    else if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false))stopSelf();
++                }catch(Exception error){prefs.edit().putString("proxyRootBootError","开机运行状态同步失败："+error.getClass().getSimpleName()).apply();}
++            });
++            return START_STICKY;
++        }
+         if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){
+             stopSelf();return START_NOT_STICKY;
+         }
+@@ -65,7 +76,7 @@ public final class ProxyNetworkMatchService extends Service {
+         ProxyContinuity.ProcessState bootState=probeCoreState();
+         if(bootState==ProxyContinuity.ProcessState.UNKNOWN){
+             prefs.edit().putString("proxyRootBootError","等待 Root 运行状态可确认…").apply();
+-            return ++bootRestoreAttempts<=12?Math.min(5000L,750L+bootRestoreAttempts*350L):0L;
++            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+         }
+         if(bootState==ProxyContinuity.ProcessState.ALIVE){
+             prefs.edit()
+@@ -74,12 +85,16 @@ public final class ProxyNetworkMatchService extends Service {
+                     .apply();
+             return 0L;
+         }
++        if(RootAutostart.restoreInProgress(getApplicationContext())){
++            prefs.edit().putString("proxyRootBootError","Root 开机脚本正在等待或恢复…").apply();
++            return 5000L;
++        }
+         Network network=cm==null?null:cm.getActiveNetwork();
+         NetworkCapabilities caps=network==null||cm==null?null:cm.getNetworkCapabilities(network);
+         boolean internet=caps!=null&&caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET);
+         if(!internet){
+             prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
+-            return ++bootRestoreAttempts<=12?Math.min(5000L,750L+bootRestoreAttempts*350L):0L;
++            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+         }
+         try{
+             JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs));
+@@ -101,7 +116,7 @@ public final class ProxyNetworkMatchService extends Service {
+                     .putString("proxyRootBootError","Root 代理开机恢复失败："+detail)
+                     .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis())
+                     .apply();
+-            return ++bootRestoreAttempts<=8?Math.min(8000L,1200L+bootRestoreAttempts*800L):0L;
++            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
+         }
+     }
+ 
+@@ -120,12 +135,16 @@ public final class ProxyNetworkMatchService extends Service {
+         cb=new ConnectivityManager.NetworkCallback(){
+             @Override public void onAvailable(Network n){
+                 handleDefaultNetwork(n);
+-                if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("proxyRootRuntimeRunning",false))
++                if(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false))
+                     scheduleBootRestore(250L);
+                 evaluate();
+             }
+             @Override public void onLost(Network n){networkHandover.lost(n);evaluate();}
+-            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){evaluate();}
++            @Override public void onCapabilitiesChanged(Network n,NetworkCapabilities c){
++                if(c.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)&&prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootWanted",false))
++                    scheduleBootRestore(250L);
++                evaluate();
++            }
+         };
+         try{cm.registerDefaultNetworkCallback(cb);}
+         catch(Exception e){prefs.edit().putString("networkMatchLastEnvironment","监听失败："+e.getClass().getSimpleName()).apply();}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index 7b09705..0389b1d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 148;
++    static final int RUNTIME_REVISION = 149;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptHooks.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptHooks.kt
+index 2c3544f..a67dd80 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptHooks.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptHooks.kt
+@@ -29,7 +29,27 @@ internal object ProxyScriptHooks {
+         return name
+     }
+ 
+-    private fun managedPath(name: String): String = ROOT + "/" + managedName(name)
++    private fun storedName(name: String): String {
++        require(name.isNotEmpty() && name.length <= 255 && name.none { it == '/' || it == '\u0000' || it == '\n' || it == '\r' || it == '\t' }) { "脚本文件名无效" }
++        require(name != "." && name != ".." && name.endsWith(".sh", true)) { "脚本文件名无效" }
++        require(name != "pre-start.sh" && name != "post-stop.sh") { "不能覆盖河图固定 Hook" }
++        return name
++    }
++
++    private fun managedPath(name: String): String = ROOT + "/" + storedName(name)
++
++    internal fun parseManaged(output: String): List<ManagedScript> {
++        val found = linkedMapOf<String, ManagedScript>()
++        output.lineSequence().forEach { line ->
++            val parts = line.split('\t')
++            if (parts.size != 2) return@forEach
++            val name = runCatching { storedName(parts[0]) }.getOrNull() ?: return@forEach
++            val size = parts[1].trim().toLongOrNull()?.takeIf { it >= 0 } ?: return@forEach
++            // Keep actual filesystem identity. Import sanitization belongs only to new files.
++            found[name] = ManagedScript(name, ROOT + "/" + name, size)
++        }
++        return found.values.sortedBy { it.name.lowercase(java.util.Locale.ROOT) }
++    }
+ 
+     suspend fun ensure(context: Context) = withContext(Dispatchers.IO) {
+         val result = RootBridge.rootShell(
+@@ -93,12 +113,7 @@ internal object ProxyScriptHooks {
+             "done"
+         val result = RootBridge.rootShell(context.applicationContext, command, 6_000L)
+         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "脚本列表读取失败" })
+-        result.output.lineSequence().mapNotNull { line ->
+-            val parts = line.split('\t')
+-            if (parts.size < 2) return@mapNotNull null
+-            val name = runCatching { managedName(parts[0]) }.getOrNull() ?: return@mapNotNull null
+-            ManagedScript(name, ROOT + "/" + name, parts[1].toLongOrNull() ?: 0L)
+-        }.sortedBy { it.name.lowercase() }.toList()
++        parseManaged(result.output)
+     }
+ 
+     suspend fun importManaged(context: Context, fileName: String, bytes: ByteArray): ManagedScript = withContext(Dispatchers.IO) {
+@@ -127,13 +142,9 @@ internal object ProxyScriptHooks {
+         if (!result.ok()) throw IllegalStateException(result.output.ifBlank { "脚本删除失败" })
+     }
+ 
+-    suspend fun runManaged(context: Context, name: String): String = withContext(Dispatchers.IO) {
++    internal fun managedCommand(name: String, mode: String, config: String): String {
+         val path = managedPath(name)
+-        ensure(context)
+-        val prefs = context.applicationContext.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+-        val mode = prefs.getString("proxyUiLastMode", "").orEmpty()
+-        val config = prefs.getString("proxyUiLastConfig", "").orEmpty()
+-        val command = buildString {
++        return buildString {
+             append("test -f ").append(q(path)).append(" || exit 44; ")
+             append("export HETU_HOOK=manual; ")
+             append("export HETU_MODE=").append(q(mode)).append("; ")
+@@ -141,10 +152,19 @@ internal object ProxyScriptHooks {
+             append("export HETU_BASE=/data/adb/hetu; ")
+             append("export HETU_RUN_DIR=/data/adb/hetu/run; ")
+             append("export HETU_SCRIPT_DIR=").append(q(ROOT)).append("; ")
+-            append("{ printf '\\n'; date '+[%Y-%m-%d %H:%M:%S] manual=").append(name.replace("%", "")).append("'; ")
++            append("{ printf '\\n[%s] manual=%s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" ").append(q(name)).append("; ")
+             append("if command -v timeout >/dev/null 2>&1; then timeout 12 sh ").append(q(path))
+             append("; else sh ").append(q(path)).append("; fi; } >> ").append(q(LOG)).append(" 2>&1")
+         }
++    }
++
++    suspend fun runManaged(context: Context, name: String): String = withContext(Dispatchers.IO) {
++        val path = managedPath(name)
++        ensure(context)
++        val prefs = context.applicationContext.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++        val mode = prefs.getString("proxyUiLastMode", "").orEmpty()
++        val config = prefs.getString("proxyUiLastConfig", "").orEmpty()
++        val command = managedCommand(name, mode, config)
+         val result = RootBridge.rootShell(context.applicationContext, command, 18_000L)
+         if (!result.ok()) {
+             throw IllegalStateException(
+@@ -177,10 +197,8 @@ internal object ProxyScriptHooks {
+             append("export HETU_BASE=/data/adb/hetu; ")
+             append("export HETU_RUN_DIR=/data/adb/hetu/run; ")
+             append("export HETU_SCRIPT_DIR=").append(q(ROOT)).append("; ")
+-            append("{ printf '\\n'; date '+[%Y-%m-%d %H:%M:%S] hook=")
+-            append(stage.replace("%", "")).append(" mode=")
+-            append(mode.replace("%", "")).append(" config=")
+-            append(config.replace("%", "")).append("'; ")
++            append("{ printf '\\n[%s] hook=%s mode=%s config=%s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" ")
++            append(q(stage)).append(' ').append(q(mode)).append(' ').append(q(config)).append("; ")
+             append("if command -v timeout >/dev/null 2>&1; then timeout 12 sh ")
+             append(q(path)).append("; else sh ").append(q(path)).append("; fi; ")
+             append("} >> ").append(q(LOG)).append(" 2>&1")
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptImport.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptImport.kt
+new file mode 100644
+index 0000000..35ba621
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptImport.kt
+@@ -0,0 +1,42 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.net.Uri
++import android.provider.OpenableColumns
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++import java.io.ByteArrayOutputStream
++import java.io.InputStream
++
++internal object ProxyScriptImport {
++    const val MAX_BYTES = 64 * 1024
++    data class Source(val name: String, val bytes: ByteArray)
++
++    suspend fun read(context: Context, uri: Uri): Source = withContext(Dispatchers.IO) {
++        val name = context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
++            if (it.moveToFirst()) it.getString(0) else null
++        } ?: uri.lastPathSegment ?: "script.sh"
++        val bytes = context.contentResolver.openInputStream(uri)?.use(::readBounded)
++            ?: throw IllegalStateException("无法读取所选脚本")
++        Source(name, bytes)
++    }
++
++    internal fun readBounded(input: InputStream): ByteArray {
++        val output = ByteArrayOutputStream(8192)
++        val buffer = ByteArray(8192)
++        while (true) {
++            val count = input.read(buffer, 0, minOf(buffer.size, MAX_BYTES + 1 - output.size()))
++            if (count < 0) break
++            if (count == 0) {
++                val one = input.read()
++                if (one < 0) break
++                require(output.size() < MAX_BYTES) { "脚本最多 64 KiB" }
++                output.write(one)
++            } else {
++                require(output.size() + count <= MAX_BYTES) { "脚本最多 64 KiB" }
++                output.write(buffer, 0, count)
++            }
++        }
++        return output.toByteArray()
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+index d0d1f54..d902fed 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+@@ -99,6 +99,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+     var text by remember { mutableStateOf("") }
+     var busy by remember { mutableStateOf(false) }
+     var message by remember { mutableStateOf("") }
++    var messageError by remember { mutableStateOf(false) }
+     var environment by remember { mutableStateOf(false) }
+     var managedRevision by remember { mutableIntStateOf(0) }
+     var hookRevision by remember { mutableIntStateOf(0) }
+@@ -107,6 +108,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+     var deleteTarget by remember { mutableStateOf<ManagedScript?>(null) }
+     val fixedStatus by produceState(initialValue = mapOf<String, Boolean>(), hookRevision) {
+         value = try { entries.associate { it.path to ProxyScriptHooks.read(context, it.path).isNotBlank() } }
++        catch (cancel: CancellationException) { throw cancel }
+         catch (_: Exception) { emptyMap() }
+     }
+     val managedScripts by produceState(initialValue = emptyList<ManagedScript>(), managedRevision) {
+@@ -115,7 +117,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+         } catch (cancel: CancellationException) {
+             throw cancel
+         } catch (failure: Exception) {
+-            message = failure.message ?: "脚本列表读取失败"
++            message = failure.message ?: "脚本列表读取失败"; messageError = true
+             emptyList()
+         }
+     }
+@@ -123,26 +125,16 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+         if (uri == null || busy) return@rememberLauncherForActivityResult
+         scope.launch {
+             busy = true
+-            message = ""
++            messageError = false; message = ""
+             try {
+-                val displayName = context.contentResolver.query(
+-                    uri,
+-                    arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+-                    null,
+-                    null,
+-                    null,
+-                )?.use { cursor ->
+-                    if (cursor.moveToFirst()) cursor.getString(0) else null
+-                } ?: uri.lastPathSegment ?: "script.sh"
+-                val bytes = context.contentResolver.openInputStream(uri)?.use { it.readBytes() }
+-                    ?: throw IllegalStateException("无法读取所选脚本")
+-                val imported = ProxyScriptHooks.importManaged(context, displayName, bytes)
++                val input = ProxyScriptImport.read(context, uri)
++                val imported = ProxyScriptHooks.importManaged(context, input.name, input.bytes)
+                 message = "已导入 " + imported.name
+                 managedRevision++
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (failure: Exception) {
+-                message = failure.message ?: "脚本导入失败"
++                message = failure.message ?: "脚本导入失败"; messageError = true
+             } finally {
+                 busy = false
+             }
+@@ -153,14 +145,14 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+         if (busy) return
+         scope.launch {
+             busy = true
+-            message = ""
++            messageError = false; message = ""
+             try {
+                 text = ProxyScriptHooks.read(context, entry.path)
+                 editor = entry
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (failure: Exception) {
+-                message = failure.message ?: "脚本读取失败"
++                message = failure.message ?: "脚本读取失败"; messageError = true
+             } finally {
+                 busy = false
+             }
+@@ -242,7 +234,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             item("custom-title") {
+                 Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                     Text("自定义脚本", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+-                    TextButton(onClick = { launchDocumentPicker({ message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }, enabled = !busy) {
++                    TextButton(onClick = { launchDocumentPicker({ messageError = true; message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }, enabled = !busy) {
+                         Icon(Icons.Rounded.Add, null, Modifier.size(24.dp), tint = t.textPrimary)
+                         Spacer(Modifier.width(6.dp))
+                         Text("导入", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+@@ -266,10 +258,10 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+                         Row(verticalAlignment = Alignment.CenterVertically) {
+                             IconButton(onClick = {
+                                 if (!busy) scope.launch {
+-                                    busy = true; message = ""
++                                    busy = true; messageError = false; message = ""
+                                     try { message = ProxyScriptHooks.runManaged(context, script.name) }
+                                     catch (cancel: CancellationException) { throw cancel }
+-                                    catch (failure: Exception) { message = failure.message ?: "脚本执行失败" }
++                                    catch (failure: Exception) { message = failure.message ?: "脚本执行失败"; messageError = true }
+                                     finally { busy = false }
+                                 }
+                             }, enabled = !busy, modifier = Modifier.size(38.dp)) { Icon(Icons.Rounded.PlayArrow, "执行", tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp)) }
+@@ -280,7 +272,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             }
+         }
+         if (message.isNotBlank()) {
+-            item("feedback") { HetuTaskFeedback(message, error = message.contains("失败") || message.contains("错误"), busy = busy) }
++            item("feedback") { HetuTaskFeedback(message, error = messageError, busy = busy) }
+         }
+     }
+ 
+@@ -292,7 +284,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             CompositionLocalProvider(LocalHx provides menuColors) {
+                 HxAnchoredMenu(anchor, onDismiss = { menuOpen = false }, minWidth = 160.dp, anchorEndInset = 0.dp) { close ->
+                     HxMenuItem("导入自定义脚本", icon = Icons.Rounded.Add, onClick = {
+-                        close { menuOpen = false; launchDocumentPicker({ message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }
++                        close { menuOpen = false; launchDocumentPicker({ messageError = true; message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }
+                     })
+                     HorizontalDivider(Modifier.padding(horizontal = 14.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
+                     HxMenuItem("脚本环境", icon = Icons.Outlined.Info, onClick = {
+@@ -343,9 +335,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+                                 try {
+                                     ProxyScriptHooks.clear(context, entry.path)
+                                     text = ""
+-                                    message = "已清空${entry.title}脚本"; hookRevision++
++                                    messageError = false; message = "已清空${entry.title}脚本"; hookRevision++
+                                 } catch (failure: Exception) {
+-                                    message = failure.message ?: "清空失败"
++                                    message = failure.message ?: "清空失败"; messageError = true
+                                 } finally {
+                                     busy = false
+                                 }
+@@ -363,11 +355,11 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+                                 busy = true
+                                 try {
+                                     ProxyScriptHooks.write(context, entry.path, text)
+-                                    message = "${entry.title}脚本已保存"
++                                    messageError = false; message = "${entry.title}脚本已保存"
+                                     hookRevision++
+                                     editor = null
+                                 } catch (failure: Exception) {
+-                                    message = failure.message ?: "保存失败"
++                                    message = failure.message ?: "保存失败"; messageError = true
+                                 } finally {
+                                     busy = false
+                                 }
+@@ -418,13 +410,13 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+                                 busy = true
+                                 try {
+                                     ProxyScriptHooks.deleteManaged(context, target.name)
+-                                    message = "已删除 " + target.name
++                                    messageError = false; message = "已删除 " + target.name
+                                     managedRevision++
+                                     deleteTarget = null
+                                 } catch (cancel: CancellationException) {
+                                     throw cancel
+                                 } catch (failure: Exception) {
+-                                    message = failure.message ?: "脚本删除失败"
++                                    message = failure.message ?: "脚本删除失败"; messageError = true
+                                 } finally {
+                                     busy = false
+                                 }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
+new file mode 100644
+index 0000000..93a3d3d
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
+@@ -0,0 +1,87 @@
++package io.github.xgl34222220.hetu;
++
++import android.content.Context;
++import java.io.*;
++import java.nio.charset.StandardCharsets;
++
++/** Owns only Hetu's explicitly installed service.d entry and private boot files. */
++final class RootAutostart {
++    static final String BASE="/data/adb/hetu/boot";
++    static final String ENTRY="/data/adb/service.d/hetu-autostart.sh";
++    static final String ACTION_RUNNING="io.github.xgl34222220.hetu.ROOT_BOOT_RUNNING";
++
++    static String plan(String[] runtimeArgs){
++        if(runtimeArgs.length!=30)throw new IllegalArgumentException("启动参数必须完整");
++        String[] args=runtimeArgs.clone();
++        args[1]=BASE+"/config";
++        // Never reuse config/kernel validation caches from a previous boot.
++        args[19]="0";args[20]="0";
++        StringBuilder out=new StringBuilder("#!/system/bin/sh\nexec /system/bin/sh /data/adb/hetu/hetu-root.sh start");
++        for(String arg:args)out.append(' ').append(RootBridge.quote(arg==null?"":arg));
++        return out.append('\n').toString();
++    }
++
++    static void install(Context context,File config,String[] args,File runtimeScript)throws IOException{
++        RootBridge.requireWorkerThread();
++        File stage=new File(context.getCacheDir(),"hetu-autostart");
++        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法准备开机脚本");
++        File entry=new File(stage,"hetu-autostart.sh"),plan=new File(stage,"start.sh");
++        try(InputStream in=context.getAssets().open("hetu-autostart.sh");OutputStream out=new FileOutputStream(entry)){
++            byte[] buffer=new byte[8192];int n;while((n=in.read(buffer))!=-1)out.write(buffer,0,n);
++        }
++        try(OutputStream out=new FileOutputStream(plan)){out.write(plan(args).getBytes(StandardCharsets.UTF_8));}
++        String suffix=".new."+Long.toHexString(System.nanoTime());
++        StringBuilder cmd=new StringBuilder("set -e; test \"$(id -u)\" = 0; test -x /data/adb/hetu/bin/core; mkdir -p ")
++                .append(RootBridge.quote(BASE)).append(" /data/adb/service.d; chmod 700 ").append(RootBridge.quote(BASE))
++                .append("; chown 0:0 ").append(RootBridge.quote(BASE));
++        copy(cmd,config,BASE+"/config",suffix,"600");
++        copy(cmd,plan,BASE+"/start.sh",suffix,"700");
++        copy(cmd,runtimeScript,"/data/adb/hetu/hetu-root.sh",suffix,"700");
++        copy(cmd,entry,ENTRY,suffix,"700");
++        cmd.append("; printf 1 > ").append(RootBridge.quote(BASE+"/enabled"))
++                .append("; chmod 600 ").append(RootBridge.quote(BASE+"/enabled"))
++                .append("; chown 0:0 ").append(RootBridge.quote(BASE+"/enabled"))
++                .append("; test -x ").append(RootBridge.quote(ENTRY))
++                .append("; test -s ").append(RootBridge.quote(BASE+"/start.sh"))
++                .append("; test -s ").append(RootBridge.quote(BASE+"/config"));
++        check(RootBridge.rootShell(context,cmd.toString(),20000L),"开机脚本安装失败");
++    }
++
++    private static void copy(StringBuilder cmd,File source,String target,String suffix,String mode){
++        String tmp=target+suffix;
++        cmd.append("; cp ").append(RootBridge.quote(source.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
++                .append("; chmod ").append(mode).append(' ').append(RootBridge.quote(tmp))
++                .append("; chown 0:0 ").append(RootBridge.quote(tmp))
++                .append("; mv -f ").append(RootBridge.quote(tmp)).append(' ').append(RootBridge.quote(target));
++    }
++
++    static void remove(Context context)throws IOException{
++        RootBridge.requireWorkerThread();
++        check(RootBridge.rootShell(context,"set -e; test \"$(id -u)\" = 0; rm -f "
++                +RootBridge.quote(ENTRY)+"; test ! -e "+RootBridge.quote(ENTRY)+"; rm -f "+RootBridge.quote(BASE+"/enabled"),10000L),"关闭开机自启失败");
++    }
++
++    static boolean restoreInProgress(Context context){
++        RootBridge.requireWorkerThread();
++        RootBridge.Result r=RootBridge.rootShell(context,
++                "b=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); "
++                +"[ -n \"$b\" ] && [ -f "+RootBridge.quote(BASE+"/enabled")+" ] || exit 1; "
++                +"[ \"$b\" = \"$(cat "+RootBridge.quote(BASE+"/restore.lock/boot-id")+" 2>/dev/null)\" ] || exit 1; "
++                +"p=$(cat "+RootBridge.quote(BASE+"/restore.lock/pid")+" 2>/dev/null); case \"$p\" in ''|*[!0-9]*) exit 1;; esac; "
++                +"c=$(tr '\\000' ' ' < \"/proc/$p/cmdline\" 2>/dev/null); case \"$c\" in *'/data/adb/service.d/hetu-autostart.sh --worker'*) printf 1;; *) exit 1;; esac",3000L);
++        return r.ok()&&"1".equals(r.output.trim());
++    }
++
++    static boolean confirmedRunningThisBoot(Context context){
++        RootBridge.requireWorkerThread();
++        RootBridge.Result r=RootBridge.rootShell(context,"b=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null); "
++                +"[ -n \"$b\" ] && [ -f "+RootBridge.quote(BASE+"/enabled")+" ] || exit 1; "
++                +"[ \"$b\" != \"$(cat "+RootBridge.quote(BASE+"/stopped-boot")+" 2>/dev/null)\" ] || exit 1; "
++                +"[ \"$(cat "+RootBridge.quote(BASE+"/status")+" 2>/dev/null)\" = \"$b running\" ] && printf 1",3000L);
++        return r.ok()&&"1".equals(r.output.trim());
++    }
++
++    private static void check(RootBridge.Result r,String title)throws IOException{
++        if(!r.ok())throw new IOException(title+"（"+r.code+"）："+r.output.trim());
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 482853a..47fe938 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -410,7 +410,8 @@ final class RootProxyManager {
+                     .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
+                     .remove("proxyAdblockLastError")
+                     .apply();
+-            return "运行配置已热重载";
++            String bootWarning=refreshAutostart(p,autostartArgs(p));
++            return "运行配置已热重载"+(bootWarning.isEmpty()?"":"；"+bootWarning);
+         }finally{
+             CONTROL_LOCK.unlock();
+         }
+@@ -520,8 +521,12 @@ final class RootProxyManager {
+                 prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true).apply();
+                 ensureContinuityService(true);
+                 trace.outcome="alreadyRunning";
+-                return new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
++                JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
+                         .put("message","Root 代理已在运行，已忽略重复启动请求");
++                if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartInstalled",false)){
++                    try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
++                }
++                return unchanged;
+             }
+             if(replaceRunning) {
+                 // Preserve the user's intent before any new preparation. The shell start transaction
+@@ -627,12 +632,13 @@ final class RootProxyManager {
+         String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
+         String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
+         JSONObject result;
+-        try{result=runJsonWithTimeout(125000L,"start",
++        String[] bootArgs=new String[]{
+                 BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
+                 bit(profile.tcp),bit(profile.udp),runtimeDns,bit(profile.quicBlocked),
+                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
+                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
+-                dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean);
++                dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
++        try{result=runJsonWithTimeout(125000L,prependStart(bootArgs));
+             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
+         }catch(Exception startFailure){if(adblockCoordinatorEntered)ProxyAdblockCoordinator.exit(context);throw startFailure;}
+ 
+@@ -718,6 +724,8 @@ final class RootProxyManager {
+                 .remove("proxyRootBootError")
+                 .apply();
+         }
++        String bootWarning=refreshAutostart(p,bootArgs);
++        if(!bootWarning.isEmpty())result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+bootWarning);
+         ensureContinuityService(true);
+         trace.outcome="ready";
+         return result;
+@@ -732,6 +740,84 @@ final class RootProxyManager {
+         }
+     }
+ 
++    private static String[] prependStart(String[] args){
++        String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
++    }
++
++    private String[] autostartArgs(Prepared p){
++        ProxyRuntimeProfile profile=p.profile;RootProxyPolicy policy=p.policy;
++        return new String[]{BIN,CONFIG,profile.mode.id,String.valueOf(p.tproxyPort),String.valueOf(p.redirectPort),profile.ipv6.id,
++                bit(profile.tcp),bit(profile.udp),prefs.getBoolean("proxyMihomoDnsForward",true)?profile.dnsHijack.id:"off",bit(profile.quicBlocked),
++                String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),policy.appScope,policy.uidRanges,
++                bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
++                bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
++                bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
++                prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"",
++                prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"",bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
++    }
++
++    private void installAutostart(Prepared p,String[] args)throws Exception{
++        File stage=new File(context.getCacheDir(),"hetu-autostart");
++        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法准备开机脚本");
++        File script=new File(stage,"hetu-root.sh");copyScriptAsset(script);
++        RootAutostart.install(context,new File(CONFIG),args,script);
++    }
++
++    private String refreshAutostart(Prepared p,String[] args){
++        if(!prefs.getBoolean("proxyRootAutoStart",false))return "";
++        try{
++            installAutostart(p,args);
++            prefs.edit().putBoolean("proxyRootAutoStartInstalled",true).remove("proxyRootAutoStartError").apply();
++            return "";
++        }catch(Exception error){
++            String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
++            prefs.edit().putBoolean("proxyRootAutoStartInstalled",false).putString("proxyRootAutoStartError",detail).apply();
++            return "开机脚本未更新："+detail;
++        }
++    }
++
++    boolean adoptBootRuntime()throws Exception{
++        RootBridge.requireWorkerThread();CONTROL_LOCK.lock();
++        try{
++            if(!prefs.getBoolean("proxyRootAutoStart",false)||!RootAutostart.confirmedRunningThisBoot(context))return false;
++            if(probeStartupRuntime().process!=ProxyContinuity.ProcessState.ALIVE)return false;
++            prefs.edit().putBoolean("proxyRootWanted",true).putBoolean("proxyRootRuntimeRunning",true)
++                    .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis()).remove("proxyRootBootError").apply();
++            return true;
++        }finally{CONTROL_LOCK.unlock();}
++    }
++
++    String setAutoStart(boolean enabled)throws Exception{
++        RootBridge.requireWorkerThread();CONTROL_LOCK.lock();
++        try{
++            if(enabled){
++                if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
++                ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
++                ProxyRuntimeProfile.Core bootCore=profile.core;
++                if(bootCore==ProxyRuntimeProfile.Core.MIHOMO_SMART&&!cores.installed(bootCore))bootCore=ProxyRuntimeProfile.Core.MIHOMO;
++                if(!runtimeCoreCurrent(expectedCoreToken(bootCore)))
++                    throw new IOException("请先成功启动一次所选核心，再开启开机自启");
++                Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
++                // Copy the last successfully deployed config. Enabling must not change a
++                // live proxy or claim unvalidated settings are boot-ready.
++                RootBridge.Result available=RootBridge.rootShell(context,"test -x "+RootBridge.quote(SCRIPT)+" && test -s "+RootBridge.quote(CONFIG),4000L);
++                if(!available.ok())throw new IOException("请先成功启动一次代理，再开启开机自启");
++                if(!p.settingsSignature.equals(prefs.getString("proxyRootAppliedSettings","")))
++                    throw new IOException("代理设置已变化，请先启动或重启应用设置，再开启开机自启");
++                // A failed restart may have replaced CONFIG without publishing a
++                // successful settings snapshot. Validate the actual deployed bytes.
++                validateRuntimeConfig();
++                installAutostart(p,autostartArgs(p));
++            }else RootAutostart.remove(context);
++            if(!prefs.edit().putBoolean("proxyRootAutoStart",enabled).putBoolean("proxyRootAutoStartInstalled",enabled)
++                    .remove("proxyRootAutoStartError").commit())throw new IOException("开机自启状态保存失败，请重试");
++            return enabled?"开机脚本已安装，重启后自动启动代理":"开机自启已关闭";
++        }catch(Exception error){
++            prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
++            throw error;
++        }finally{CONTROL_LOCK.unlock();}
++    }
++
+     JSONObject stop()throws Exception{return stop(null);}
+     JSONObject stop(Progress progress)throws Exception{
+         CONTROL_LOCK.lock();
+@@ -823,6 +909,12 @@ final class RootProxyManager {
+         StringBuilder events=new StringBuilder("time=").append(new Date())
+                 .append("\napp=").append(BuildConfig.VERSION_NAME)
+                 .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
++        try{
++            RootBridge.Result boot=RootBridge.rootShell(context,"ls -l "+RootBridge.quote(RootAutostart.ENTRY)+" 2>/dev/null; cat "
++                    +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
++                    +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
++            report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
++        }catch(Exception ignored){}
+         Map<String,?> values=prefs.getAll();
+         for(String key:new String[]{"proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyRootWanted",
+                 "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+index e38bd72..d2b40c8 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
+@@ -466,6 +466,20 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+ 
+     /* ---------------- lifecycle actions ---------------- */
+ 
++    var autoStartBusy by mutableStateOf(false)
++        private set
++
++    fun setAutoStart(enabled: Boolean) {
++        if (autoStartBusy || operation != null) return
++        autoStartBusy = true
++        viewModelScope.launch {
++            try { toast(controller.setAutoStart(enabled)) }
++            catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) { toast(errorText(error, "开机自启设置失败")) }
++            finally { autoStartBusy = false; bumpSettings() }
++        }
++    }
++
+     fun toggle() {
+         if (operation != null) return
+         val stopping = state.running
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index 8e4c39a..fed0118 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -236,7 +236,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+             }
+         }
+     } else if (subPage == "startupDownload") {
+-        val autoStart = prefs.getBoolean("proxyRootAutoStart", false)
++        val autoStart = prefs.getBoolean("proxyRootAutoStart", false) && prefs.getBoolean("proxyRootAutoStartInstalled", false)
++        // Capture changing preferences before the memoized LazyList builder.
++        // A failed setup leaves autoStart false, so it cannot invalidate that builder.
++        val autoStartError = prefs.getString("proxyRootAutoStartError", "").orEmpty()
+         val mirrorOn = prefs.getBoolean("downloadMirrorEnabled", false)
+         val mirrorPrefix = prefs.getString("downloadMirrorPrefix", "").orEmpty()
+         HxPage(
+@@ -250,14 +253,21 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+                         SettingsSwitchRow(
+                             "开机自启",
+                             autoStart,
+-                            { prefs.edit().putBoolean("proxyRootAutoStart", it).apply(); bump() },
+-                            subtitle = "安装 Root 开机脚本，开机后自动启动服务",
++                            { vm.setAutoStart(it) },
++                            enabled = !vm.autoStartBusy && vm.operation == null,
++                            subtitle = if (vm.autoStartBusy) "正在设置开机脚本…" else if (autoStart) "开机脚本已安装，开机后自动启动服务" else "成功启动一次代理后开启，安装 Root 开机脚本",
+                             icon = Icons.Rounded.RestartAlt,
+                             iconTint = c.text,
+                         )
+                     }
+                 }
+             }
++            if (autoStartError.isNotBlank()) {
++                item(key = "autostart-error") {
++                    HxBanner(DiagnosticReport.redact(autoStartError, prefs.getString("proxyControllerSecret", "")).take(220),
++                        tone = HxTone.Warn, modifier = Modifier.padding(horizontal = Hx.gutter))
++                }
++            }
+             item(key = "download") {
+                 SettingsSection {
+                     SettingsGroup {
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java
+index 979f2b2..bde5c0d 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java
+@@ -50,6 +50,12 @@ public class BootStartup60Test {
+         assertNull(((ShadowApplication) Shadow.extract(app)).getNextStartedService());
+         assertFalse(prefs.getBoolean("proxyRootWanted",true));
+     }
++    @Test public void installedNativeBootRequestsConfirmationWithoutRevokingExplicitStop(){
++        seed(true,false);prefs.edit().putBoolean("proxyRootAutoStartInstalled",true).commit();
++        new BootReceiver().onReceive(app,new Intent(Intent.ACTION_USER_UNLOCKED));
++        assertEquals(RootAutostart.ACTION_RUNNING,((ShadowApplication) Shadow.extract(app)).getNextStartedService().getAction());
++        assertFalse(prefs.getBoolean("proxyRootWanted",true));
++    }
+     @Test public void noOptInNeverStarts(){
+         seed(false,true);
+         new BootReceiver().onReceive(app,new Intent(Intent.ACTION_BOOT_COMPLETED));
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+index 359defb..f3f4b13 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt
+@@ -498,6 +498,20 @@ class ConceptRemainingCoverageTest {
+             click("删除"); capture("03B-010-script-delete"); dismissSheet()
+         } finally { controller.pause().stop().destroy(); frame() }
+     }
++    @Config(sdk = [28]) @Test fun existingScriptNamesCannotCrashTheActualPageWithDuplicateKeys() {
++        RemainingRootBridgeShadow.managedListing = "a b.sh\t12\na_b.sh\t34\n"
++        show {}
++        val controller = Robolectric.buildActivity(ProxyScriptsActivity::class.java).setup()
++        try { expectEventually("a b.sh"); expectEventually("a_b.sh"); frame() }
++        finally { controller.pause().stop().destroy(); frame() }
++    }
++    @Config(sdk = [28]) @Test fun rootReadFailureShowsActualErrorDetailsInsteadOfSuccess() {
++        RemainingRootBridgeShadow.managedFailure = true
++        show {}
++        val controller = Robolectric.buildActivity(ProxyScriptsActivity::class.java).setup()
++        try { expectEventually("详情"); click("详情"); expectEventually("复制诊断") }
++        finally { controller.pause().stop().destroy(); frame() }
++    }
+     @Test fun logFilesSelectionSearchAndCancelledClear() {
+         show { HxLogFilesScreen(vm) {} }; expectEventually("INFO"); capture("03B-002-log-files")
+         touch("选择日志"); capture("03B-003-log-file-picker"); click("core.log")
+@@ -616,6 +630,26 @@ class ConceptRemainingCoverageTest {
+         try { frame(); expect("正在加载 Sub-Store…"); capture("03B-039-substore-web-container") }
+         finally { subStore.pause().stop().destroy(); frame() }
+     }
++    @Config(sdk = [28])
++    @Test fun failedBootSetupUpdatesBannerWithoutLeavingSettingsPage() {
++        show { SettingsScreen(vm, androidx.compose.ui.unit.Dp(0f), "startupDownload") {} }
++        expect("开机自启")
++        val error = "无法取得 Root 权限，请在 Root 管理器中授权河图"
++        rule.runOnUiThread {
++            assertFalse(exists(error))
++            vm.prefs.edit().putString("proxyRootAutoStartError", error).commit()
++            vm.bumpSettings()
++        }
++        frame()
++        expect(error)
++        assertFalse(vm.prefs.getBoolean("proxyRootAutoStart", false))
++        rule.runOnUiThread {
++            vm.prefs.edit().remove("proxyRootAutoStartError").commit()
++            vm.bumpSettings()
++        }
++        frame()
++        rule.runOnUiThread { assertFalse("Cleared error remained in the list", exists(error)) }
++    }
+     @Test fun restoreFileResultRequiresConfirmationAndCancelPreservesSettings() {
+         show { SettingsScreen(vm, androidx.compose.ui.unit.Dp(0f), "backup") {} }
+         click("选择文件")
+@@ -683,9 +717,12 @@ class RemainingRootBridgeShadow {
+     companion object {
+         val unexpected = java.util.Collections.synchronizedList(mutableListOf<String>())
+         val commands = java.util.Collections.synchronizedList(mutableListOf<String>())
+-        @JvmStatic @Resetter fun reset() { unexpected.clear(); commands.clear() }
++        var managedFailure = false
++        var managedListing = "network-check.sh\t1480\n"
++        @JvmStatic @Resetter fun reset() { unexpected.clear(); commands.clear(); managedFailure = false; managedListing = "network-check.sh\t1480\n" }
+         @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeoutMs: Long): RootBridge.Result {
+             commands += command
++            if(managedFailure && command.startsWith("for f in '/data/adb/hetu/scripts'")) return RootBridge.Result(126, "无法读取 Root 脚本列表")
+             val response = when {
+                 command.startsWith("set -e; p=\$(readlink -f '") && command.contains("; for f in") && command.contains("stat -c %Y") ->
+                     if (command.contains("readlink -f '/data/adb/hetu/backup'")) "F\tbackup.yaml\t4200\t1790899200\nF\told.yaml\t2800\t1790899200\n"
+@@ -693,7 +730,7 @@ class RemainingRootBridgeShadow {
+                 command == "mkdir -p '/data/adb/hetu/scripts' /data/adb/hetu/run && chmod 700 '/data/adb/hetu/scripts'" -> ""
+                 command == "if [ -f '/data/adb/hetu/scripts/pre-start.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/pre-start.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho ready\n"
+                 command == "if [ -f '/data/adb/hetu/scripts/post-stop.sh' ]; then head -c 131072 '/data/adb/hetu/scripts/post-stop.sh'; fi" -> "#!/system/bin/sh\n# 测试夹具，未执行\necho stopped\n"
+-                command.startsWith("for f in '/data/adb/hetu/scripts'/*.sh;") && command.endsWith("done") -> "network-check.sh\t1480\n"
++                command.startsWith("for f in '/data/adb/hetu/scripts'/*.sh;") && command.endsWith("done") -> managedListing
+                 command == "find '/data/adb/hetu' -maxdepth 2 -type f -name '*.log' -print 2>/dev/null | head -n 200" -> "/data/adb/hetu/run/core.log\n/data/adb/hetu/run/scripts.log\n"
+                 command == "tail -n 1600 '/data/adb/hetu/run/core.log' 2>/dev/null" -> "time=\"2026-10-02T09:00:01Z\" level=info msg=\"[TCP] 192.168.1.12:52000 --> example.com:443 match MATCH using 节点选择[香港 01]\"\ntime=\"2026-10-02T09:00:02Z\" level=warning msg=\"DNS timeout\"\n"
+                 command == "tail -n 1600 '/data/adb/hetu/run/scripts.log' 2>/dev/null" -> "time=\"2026-10-02T09:00:03Z\" level=info msg=\"Hook fixture read only\"\n"
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt
+new file mode 100644
+index 0000000..59384d0
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt
+@@ -0,0 +1,81 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.ByteArrayInputStream
++import java.io.InputStream
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class ProxyScriptSafetyTest {
++    @Test fun distinctExistingNamesNeverCollapseIntoTheSameLazyListKey() {
++        val files = ProxyScriptHooks.parseManaged("a b.sh\t12\na_b.sh\t34\n")
++        assertEquals(listOf("a b.sh", "a_b.sh"), files.map { it.name })
++        assertEquals(2, files.map { it.path }.toSet().size)
++    }
++    @Test fun actualUnicodeFilesystemIdentityIsPreserved() {
++        val file = ProxyScriptHooks.parseManaged("联网检查.sh\t21\n").single()
++        assertEquals("/data/adb/hetu/scripts/联网检查.sh", file.path)
++    }
++    @Test fun repeatedOutputCannotCreateDuplicateComposeKeys() {
++        assertEquals(1, ProxyScriptHooks.parseManaged("check.sh\t12\ncheck.sh\t12\n").size)
++    }
++    @Test fun hooksTraversalAndMalformedSizeAreRejected() {
++        assertEquals(emptyList<ManagedScript>(), ProxyScriptHooks.parseManaged("pre-start.sh\t12\npost-stop.sh\t12\n../evil.sh\t12\ncheck.sh\t-1\ncheck.sh\tx\ncheck.sh\t1\textra\n"))
++    }
++    @Test fun emptyListingIsSupported() { assertTrue(ProxyScriptHooks.parseManaged("").isEmpty()) }
++    @Test fun exactLimitIsAccepted() {
++        val expected = ByteArray(65536) { 97 }
++        assertArrayEquals(expected, ProxyScriptImport.readBounded(ByteArrayInputStream(expected)))
++    }
++    @Test fun oversizedStreamStopsAfterAtMostLimitPlusOne() {
++        var read = 0
++        val input = object : InputStream() {
++            override fun read(): Int { read++; return 97 }
++            override fun read(bytes: ByteArray, off: Int, len: Int): Int {
++                bytes.fill(97, off, off + len); read += len; return len
++            }
++        }
++        try { ProxyScriptImport.readBounded(input); fail("infinite provider must be bounded") }
++        catch (error: IllegalArgumentException) { assertTrue(error.message.orEmpty().contains("64 KiB")) }
++        assertEquals(65537, read)
++    }
++    @Test fun shortReadsAreNotMistakenForEndOfStream() {
++        val expected = "#!/system/bin/sh\nprintf 'hi'\n".toByteArray()
++        val input = object : ByteArrayInputStream(expected) {
++            override fun read(bytes: ByteArray, off: Int, len: Int): Int = super.read(bytes, off, minOf(3, len))
++        }
++        assertArrayEquals(expected, ProxyScriptImport.readBounded(input))
++    }
++    @Test fun zeroByteProviderReadCannotSpinForever() {
++        val source = ByteArrayInputStream("abc".toByteArray())
++        val input = object : InputStream() {
++            override fun read() = source.read()
++            override fun read(bytes: ByteArray, off: Int, len: Int) = if (source.available() > 0) 0 else -1
++        }
++        assertArrayEquals("abc".toByteArray(), ProxyScriptImport.readBounded(input))
++    }
++    @Test fun specialFilenameIsExecutedAsOneFileAndCannotInjectLogCommands() {
++        val folder = java.nio.file.Files.createTempDirectory("hetu-script-command-").toFile()
++        try {
++            val scripts = java.io.File(folder, "scripts").apply { mkdirs() }
++            val run = java.io.File(folder, "run").apply { mkdirs() }
++            val name = "quote'; touch owned; echo '.sh"
++            java.io.File(scripts, name).writeText("printf ran\n")
++            val command = ProxyScriptHooks.managedCommand(name, "tproxy", "config' name")
++                .replace(ProxyScriptHooks.ROOT, scripts.absolutePath).replace("/data/adb/hetu/run", run.absolutePath)
++            val process = ProcessBuilder("sh", "-c", command).directory(folder).start()
++            assertEquals(0, process.waitFor())
++            assertFalse(java.io.File(folder, "owned").exists())
++            val log = java.io.File(run, "scripts.log").readText()
++            assertTrue(log.contains(name)); assertTrue(log.contains("ran"))
++        } finally { folder.deleteRecursively() }
++    }
++    @Test fun emptyScriptIsStillSupported() {
++        assertEquals(0, ProxyScriptImport.readBounded(ByteArrayInputStream(byteArrayOf())).size)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt
+new file mode 100644
+index 0000000..c1cd8e1
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt
+@@ -0,0 +1,77 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implements
++import org.robolectric.annotation.Implementation
++import java.io.File
++import java.util.concurrent.Executors
++
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class AutostartBridgeShadow {
++    companion object {
++        var deny = false
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            require(command.contains("rm -f") && command.contains(RootAutostart.ENTRY)) { "Unexpected mutation: $command" }
++            return if (deny) RootBridge.Result(126, "Root denied") else RootBridge.Result(0, "")
++        }
++    }
++}
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [AutostartBridgeShadow::class])
++class RootAutostartTest {
++    private fun args() = Array(30) { "arg$it" }.also { it[19] = "1"; it[20] = "1" }
++    @Test fun planPreservesThirtyArgumentsAndNeverExecutesTheirText() {
++        val folder = java.nio.file.Files.createTempDirectory("hetu-boot-plan-").toFile()
++        try {
++            val sink = File(folder, "args.bin")
++            val control = File(folder, "control.sh").apply { writeText("printf '%s\\000' \"\$@\" > \"\$HETU_TEST_ARGS\"\n") }
++            val marker = File(folder, "must-not-exist")
++            val values = args().also { it[16] = "a b;'\n\$(touch ${marker.absolutePath})" }
++            val plan = RootAutostart.plan(values).replace("/system/bin/sh", "/bin/sh").replace("/data/adb/hetu/hetu-root.sh", control.absolutePath)
++            val process = ProcessBuilder("sh", "-c", plan).apply { environment()["HETU_TEST_ARGS"] = sink.absolutePath }.start()
++            assertEquals(0, process.waitFor())
++            val actual = sink.readBytes().toString(Charsets.UTF_8).split('\u0000').dropLast(1)
++            assertEquals(31, actual.size)
++            assertEquals("start", actual[0])
++            assertEquals(values[16], actual[17])
++            assertEquals(RootAutostart.BASE + "/config", actual[2])
++            assertEquals("0", actual[20]); assertEquals("0", actual[21])
++            assertFalse(marker.exists())
++        } finally { folder.deleteRecursively() }
++    }
++    @Test fun cacheResetDoesNotMutateNormalStartArguments() {
++        val values = args(); RootAutostart.plan(values)
++        assertEquals("1", values[19]); assertEquals("1", values[20])
++    }
++    @Test(expected = IllegalArgumentException::class) fun partialPlanIsRejected() { RootAutostart.plan(Array(29) { "" }) }
++    private fun change(enabled: Boolean) {
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        val worker = Executors.newSingleThreadExecutor()
++        try { worker.submit<String> { RootProxyManager(app).setAutoStart(enabled) }.get() }
++        finally { worker.shutdownNow() }
++    }
++    private fun seed() = ApplicationProvider.getApplicationContext<Application>().getSharedPreferences("hetu", 0).also {
++        it.edit().clear().putBoolean("proxyRootAutoStart", true).putBoolean("proxyRootAutoStartInstalled", true).commit()
++    }
++    @Test fun failedRootRemovalNeverClaimsTheSettingIsOff() {
++        val prefs = seed(); AutostartBridgeShadow.deny = true
++        try { change(false); fail("Root denied") } catch (error: java.util.concurrent.ExecutionException) { assertTrue(error.cause is java.io.IOException) }
++        assertTrue(prefs.getBoolean("proxyRootAutoStart", false))
++        assertTrue(prefs.getBoolean("proxyRootAutoStartInstalled", false))
++        assertTrue(prefs.getString("proxyRootAutoStartError", "").orEmpty().contains("Root denied"))
++    }
++    @Test fun confirmedRemovalTurnsOffBothAutostartAndInstalledState() {
++        val prefs = seed(); AutostartBridgeShadow.deny = false; change(false)
++        assertFalse(prefs.getBoolean("proxyRootAutoStart", true))
++        assertFalse(prefs.getBoolean("proxyRootAutoStartInstalled", true))
++        assertFalse(prefs.contains("proxyRootAutoStartError"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index 5ecadfb..daac6c8 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -35,8 +35,8 @@ class Runtime146ContractTest {
+     }
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+-        // V20.72 adds opt-in Google firewall repair to the shipped Root shell.
+-        assertEquals(148, ProxyRuntimeSettings.RUNTIME_REVISION)
++        // V20.73 adds serialized native boot restore and per-boot stop cancellation.
++        assertEquals(149, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))
+     }

@@ -24,6 +24,17 @@ import java.util.zip.GZIPInputStream
 import java.util.zip.ZipInputStream
 import javax.net.ssl.HttpsURLConnection
 
+/** Presentation of the actual transfer callback; an unknown total stays unknown. */
+internal fun coreDownloadProgressText(done: Long, total: Long): String {
+    fun bytes(value: Long): String = when {
+        value >= 1_000_000L -> "%.1f MB".format(Locale.ROOT, value / 1_000_000.0)
+        value >= 1_000L -> "%.1f KB".format(Locale.ROOT, value / 1_000.0)
+        else -> "$value B"
+    }
+    val transferred = bytes(done.coerceAtLeast(0L))
+    return "正在下载 · " + if (total > 0L) "$transferred / ${bytes(total)}" else transferred
+}
+
 internal data class ProxyCoreRemoteStatus(
     val id: String,
     val label: String,
@@ -166,12 +177,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
         val asset = resolve(source) ?: throw IOException("没有适配 ${abiLabel()} 的 Android 核心")
         onProgress("下载 ${core.label} ${asset.version}…")
         val archive = download(asset) { done, total ->
-            if (total > 0L) {
-                val percent = ((done * 100L) / total).coerceIn(0L, 100L)
-                onProgress("下载 ${core.label} · $percent%")
-            } else {
-                onProgress("下载 ${core.label} · ${human(done)}")
-            }
+            onProgress(coreDownloadProgressText(done, total))
         }
         val extracted = File(app.cacheDir, "proxy-core-${core.id}-${System.nanoTime()}.bin")
         try {
@@ -585,12 +591,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
         connection.readTimeout = 15_000
         connection.setRequestProperty("User-Agent", "Hetu/${BuildConfig.VERSION_NAME} Android")
         return connection
-    }
-
-    private fun human(value: Long): String = when {
-        value >= 1_048_576L -> "%.1f MiB".format(Locale.ROOT, value / 1_048_576.0)
-        value >= 1024L -> "%.0f KiB".format(Locale.ROOT, value / 1024.0)
-        else -> "$value B"
     }
 
     companion object {

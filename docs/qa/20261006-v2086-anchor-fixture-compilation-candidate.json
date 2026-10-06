@@ -1,0 +1,175 @@
+{
+  "schema": 1,
+  "createdUtc": "2026-10-05T21:42:36.441567+00:00",
+  "failedCommit": "7b8de498dc3c4cd7d044bdbee0e7efe2233d7953",
+  "failedRun": 37376676669,
+  "attempt": 1,
+  "buildJob": 111987368014,
+  "failureStage": "compileDebugUnitTestKotlin",
+  "productionApkCompilationPassed": true,
+  "actualTestXmlFiles": 0,
+  "unitTestsExecuted": false,
+  "lintExecuted": false,
+  "candidateInstallationExecuted": false,
+  "rootMutationCount": "not executed",
+  "compilerErrors": [
+    "DpRect height and width are extensions not imported; test scope resolves incompatible GestureScope members at PanelExpansionAnchorTest.kt:101 and :151"
+  ],
+  "rawBuildLogSha256": "55cf236c91c089abcf7dfdb0fb6ca8f641ef77b19a93b9b3c3445c0c0978ab58",
+  "failedUiArtifact": {
+    "id": 11371912720,
+    "sha256": "90ea4e0556f10e7e295cc2367a435f16f2d9ec8613f1ea4e043b7df4fd77f0a4"
+  },
+  "actualFailedArtifactSourceProof": {
+    "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+    "baseRun": 37171744564,
+    "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "baselineFiles": 307,
+    "changedOrAddedFiles": 31,
+    "checkoutMatchesGeneratedSource": true,
+    "historicPatchesAppliedToCheckout": false,
+    "presentationLayer": {
+      "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+      "baseRun": 37211142058,
+      "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "changedOrAddedFiles": 68,
+      "protectedRuntimeUnchanged": true
+    },
+    "controllerAuthenticationLayer": {
+      "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+      "baseRun": 37240041766,
+      "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+      "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "changedOrAddedFiles": 17,
+      "runtimePayloadsUnchanged": true,
+      "dependenciesUnchanged": true,
+      "manifestAndPermissionsUnchanged": true,
+      "unchangedOutsideAuthScope": true,
+      "baselineUnitTests": 392,
+      "expectedUnitTests": 422,
+      "newTestCounts": {
+        "ToastFeedbackTest": 6,
+        "ControllerAuthenticationTest": 11,
+        "LegacyControllerCredentialTest": 3,
+        "ControllerReadStateTest": 6,
+        "PanelControllerErrorTest": 4
+      }
+    },
+    "pdfReferenceLayer": {
+      "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+      "frozenInputs": 332,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "expectedUnitTests": 479
+    },
+    "toolsIntakeLayer": {
+      "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+      "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+      "changedOrAddedFiles": 5,
+      "frozenInputs": 374,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "baselineUnitTests": 479,
+      "expectedUnitTests": 487,
+      "newTestCounts": {
+        "tools.ToolsDnsConsentIntakeTest": 5,
+        "tools.ToolsDiagIntakeTest": 3
+      }
+    },
+    "finalPdfGeometryLayer": {
+      "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+      "changedOrAddedFiles": 4,
+      "frozenInputs": 375,
+      "expectedUnitTests": 487,
+      "exactWholeFilePresentationTransforms": true,
+      "priorLayersUnchanged": true
+    },
+    "functionFixLayer": {
+      "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+      "patchSha256": "2a394afc8381d8390d34e0c29c150a5850d11299fb28b3bc41ba3c70135f6b62",
+      "changedOrAddedFiles": 16,
+      "frozenInputs": 370,
+      "baselineUnitTests": 487,
+      "expectedUnitTests": 542,
+      "expectedTestXmlFiles": 56,
+      "newTestCounts": {
+        "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
+        "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 10,
+        "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
+        "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
+        "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
+      },
+      "allOriginal487TestsPreserved": true,
+      "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+      "runtimePayloadCount": 23
+    }
+  },
+  "actualFailedArtifactPackagedRuntime": {
+    "expected": {
+      "lib/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+      "lib/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+      "assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+      "assets/cnip/hetu-cn-v4.txt": "88ea1e3bc89ee5966cc66cb2b6b7b8c4993a84bcfa04fe880750e1ec6bae0fa9",
+      "assets/cnip/hetu-cn-v6.txt": "4a3cccf5497148a20a24df381db0ef1a9d114a27441e29b04246f06fc349f03b",
+      "assets/hetu-root.sh": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+      "assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
+      "assets/licenses/lucide.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+      "assets/licenses/reference-ui-GPL-3.0.txt": "b276bbecaa68377ce9fae470024428aaf90d4b395fee090752d19debab9c7bee",
+      "assets/mihomo-revision.txt": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+      "assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+      "assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+      "assets/rules/adaway.txt": "8c925c37a5eaa5e1c582c76e12301797861addee5ad0fa0e6e46c9dd0136fe55",
+      "assets/rules/adguard.txt": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+      "assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
+      "assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
+      "assets/rules/hagezi.txt": "8846bfdda6fc630d81d2c10181cadc451f099cb7b32474682fc2122b7430cc53",
+      "assets/rules/snapshot.json": "799e1341e6df634a71cb487a11ff9b6847c628310b4f1810c1eeab6f4666cd72",
+      "assets/rules/tracking.txt": "4dd3290bb52e2975f556c33adf081b3430f4e0dc8a75af9841c48def524444c9",
+      "assets/schema/sing-box-official.json": "641f9bb28af79e014afe8a781140b40d357c7adf8fcb5fe5e23b7971a62fa52d",
+      "assets/sources.tsv": "13779a44e0f5493d0f9923eeb341cd496327a068a622751906bdedbe3ccaf420",
+      "assets/hetu-autostart.sh": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+    },
+    "originalPayloadCount": 22,
+    "editedPayloads": [
+      "assets/hetu-root.sh"
+    ],
+    "addedPayloads": [
+      "assets/hetu-autostart.sh"
+    ],
+    "apkVerified": true,
+    "apkSha256": "69d27f9f800ddeddba9d227581d9e8bce2a91a0f988de6ce8d7d7fd9f5f02165"
+  },
+  "actualFailedArtifactAbi": {
+    "apkSha256": "69d27f9f800ddeddba9d227581d9e8bce2a91a0f988de6ce8d7d7fd9f5f02165",
+    "dexCount": 12,
+    "constructorReferences": 687,
+    "missingConstructors": [],
+    "compatible": true,
+    "expectedIncompatibleBaseline": false
+  },
+  "fixtureFix": {
+    "scope": "PanelExpansionAnchorTest.kt only; the same two bounds checks use DpRect edge values",
+    "sameFourTests": true,
+    "assertionsAndThresholdsRetained": true,
+    "productionSourcesUnchangedFromFailedCommit": true,
+    "original487TestsPreserved": true,
+    "hostRegressionsAfterFixtureFix": {
+      "newSourceResultWorkflow": 20,
+      "fiveOriginalSourceGates": 47
+    },
+    "newInputsSha256": "d552e625fdbcca9cda09cdb118b5126a416e2bbb2a24fae741349215cfd56b19",
+    "newPatchSha256": "5bb2610455a61a8d934058664c3b3ec39e5efb193fcda275f244b4839e693f6f",
+    "newSourceInputs": 386,
+    "localSourceInputs": 382,
+    "expectedAndroidTests": 542,
+    "expectedXmlFiles": 56,
+    "androidCompiledOrTestsPassed": false
+  },
+  "rawBuildLogRepoPath": "docs/qa/20261006-v2086-7b8de49-build-failure.log"
+}

@@ -15,6 +15,7 @@ public final class NetworkEpoch<N> {
     }
     private N candidate;
     private boolean eligible, blocked;
+    private String capabilities;
     private String links;
     private Snapshot<N> current = new Snapshot<>(null, 0, "waiting");
 
@@ -22,12 +23,16 @@ public final class NetworkEpoch<N> {
     public synchronized boolean isCurrent(Snapshot<N> value) { return value == current; }
     public synchronized void available(N network) {
         if (network == null || Objects.equals(candidate, network)) return;
-        candidate = network; eligible = false; blocked = false; links = null;
+        candidate = network; eligible = false; blocked = false; links = null; capabilities = null;
         publish();
     }
     public synchronized void capabilities(N network, boolean usable) {
-        if (!Objects.equals(candidate, network) || candidate == null || eligible == usable) return;
-        eligible = usable; publish();
+        capabilities(network, usable, null);
+    }
+    public synchronized void capabilities(N network, boolean usable, String signature) {
+        if (!Objects.equals(candidate, network) || candidate == null ||
+                (eligible == usable && Objects.equals(capabilities, signature))) return;
+        eligible = usable; capabilities = signature; publish();
     }
     public synchronized void links(N network, String value) {
         if (!Objects.equals(candidate, network) || candidate == null || Objects.equals(links, value)) return;
@@ -42,7 +47,7 @@ public final class NetworkEpoch<N> {
         if (candidate != null && Objects.equals(candidate, network)) reset();
     }
     public synchronized void reset() {
-        candidate = null; eligible = false; blocked = false; links = null;
+        candidate = null; eligible = false; blocked = false; links = null; capabilities = null;
         current = new Snapshot<>(null, current.epoch + 1, "offline");
     }
     private void publish() {

@@ -2,6 +2,9 @@ package io.github.xgl34222220.hetu
 
 import io.github.xgl34222220.hetu.ui.*
 import android.content.Intent
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import android.graphics.BitmapFactory
 import android.os.Bundle
 import android.os.SystemClock
@@ -189,6 +192,8 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
     var panelTab by rememberSaveable { mutableStateOf(RefPanelTab.Groups) }
     var panelSearchRequest by rememberSaveable { mutableIntStateOf(0) }
     var panelDetailVisible by rememberSaveable { mutableStateOf(false) }
+    var homeDetailVisible by rememberSaveable { mutableStateOf(false) }
+    var panelExpandGroup by rememberSaveable { mutableStateOf<String?>(null) }
     LaunchedEffect(startPageRevision) {
         when (requestedStartPage?.lowercase()) {
             "settings" -> page = RefProxyPage.Settings
@@ -662,26 +667,11 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                             try { refresh() } finally { homeRefreshing = false }
                         }
                     },
-                    onPullRefresh = {
-                        if (!homeRefreshing) scope.launch {
-                            homeRefreshing = true
-                            try {
-                                refreshHomeAll()
-                                if (message.isBlank()) message = "全部刷新完成"
-                            } finally {
-                                homeRefreshing = false
-                            }
-                        }
-                    },
                     onToggle = ::toggle,
                     onReload = ::reload,
                     onRestart = ::restart,
                     onDelay = ::measureSites,
                     diagnosticLoading = diagnosticLoading,
-                    onLog = { scope.launch {
-                        logTitle = "运行日志"
-                        logText = runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }
-                    } },
                     onConnections = {
                         panelTab = RefPanelTab.Connections
                         page = RefProxyPage.Panel
@@ -706,21 +696,28 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                         panelTab = RefPanelTab.Subscriptions
                         page = RefProxyPage.Panel
                     },
+                    startupError = startupError,
+                    onDismissStartupError = { startupError = null },
+                    onTrafficMode = { id -> scope.launch { runCatching { repo.setTrafficMode(id) }; refresh() } },
+                    onOpenNode = {
+                        panelExpandGroup = state.groups.firstOrNull()?.name
+                        panelTab = RefPanelTab.Groups
+                        page = RefProxyPage.Panel
+                    },
+                    onDetailVisibleChange = { homeDetailVisible = it },
                     )
                 }
-                RefProxyPage.Panel -> RefPanel(
+                RefProxyPage.Panel -> io.github.xgl34222220.hetu.panel.HetuPanelV2(
                     state = state,
                     repo = repo,
                     delays = delays,
                     selectedTab = panelTab,
                     onSelectedTabChange = { panelTab = it },
-                    searchRequest = panelSearchRequest,
-                    hazeState = haze,
-                    backdrop = liquidBackdrop.takeIf { liquid },
-                    glassEnabled = blurEnabled && liquidGlassEnabled,
                     onRefreshState = { refresh() },
-                    onOpenSettings = { page = RefProxyPage.Settings },
-                    onDetailVisibleChanged = { panelDetailVisible = it },
+                    onStart = ::toggle,
+                    starting = homeOperation == HomeOperation.Start,
+                    bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 94.dp,
+                    expandGroup = panelExpandGroup,
                 )
                 RefProxyPage.Tools -> RefTools(state) { logTitle = "运行日志"; logText = it }
                 RefProxyPage.Settings -> RefSettings(state, operation, ::restart) { scope.launch { refresh() } }
@@ -729,7 +726,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
                 }
             }
         }
-        if (!panelDetailVisible || page == RefProxyPage.Panel) {
+        if ((!panelDetailVisible || page == RefProxyPage.Panel) && !(homeDetailVisible && page == RefProxyPage.Home)) {
             HetuGlassDock(
                 items = dock,
                 selected = dockPages.indexOf(page).coerceAtLeast(0),
@@ -752,7 +749,7 @@ private fun RefProxyShell(resumeRevision: Int, requestedStartPage: String?, star
             onDismiss = { logText = null },
         )
     }
-    startupError?.let { text ->
+    if (page != RefProxyPage.Home) startupError?.let { text ->
         RefInfoBottomSheet(
             title = "启动失败",
             text = text,
@@ -781,32 +778,30 @@ private fun RefHome(
     hazeState: HazeState,
     glassEnabled: Boolean,
     onRefresh: () -> Unit,
-    onPullRefresh: () -> Unit,
     onToggle: () -> Unit,
     onReload: () -> Unit,
     onRestart: () -> Unit,
     onDelay: () -> Unit,
-    onLog: () -> Unit,
     onSubscription: () -> Unit,
     diagnosticLoading: Boolean,
     onConnections: () -> Unit,
     onSettings: () -> Unit,
     onDiagnostics: () -> Unit,
+    startupError: String?,
+    onDismissStartupError: () -> Unit,
+    onTrafficMode: (String) -> Unit,
+    onOpenNode: () -> Unit,
+    onDetailVisibleChange: (Boolean) -> Unit,
 ) {
-    // compact-home-test92-ui1: presentation-only adapter
+    // hetu-new-ui: presentation-only adapter
     val context = LocalContext.current
     val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
     val total = tracked.sumOf { it.total }.takeIf { it > 0L } ?: cachedSubscription.total
     val used = if (tracked.isNotEmpty()) tracked.sumOf { it.used } else cachedSubscription.used
-    var webUiOpen by remember { mutableStateOf(false) }
-    var coreSheet by remember { mutableStateOf(false) }
-    var coreVersion by remember { mutableStateOf("") }
     val versionRepo = remember { ProxyDashboardRepository(context) }
-    LaunchedEffect(coreSheet, state.running) {
-        if (coreSheet && state.running) coreVersion = versionRepo.coreVersion()
-    }
-    CompactHomeDashboard(
-        data = CompactHomeData(
+    var coreVersion by remember { mutableStateOf("") }
+    LaunchedEffect(state.running) { if (state.running) coreVersion = versionRepo.coreVersion() }
+    val homeData = CompactHomeData(
             running = state.running, busy = operation.isNotBlank() || action != null, operation = action, refreshing = refreshing,
             testing = testing, uptimeSeconds = runtime.elapsedSeconds,
             core = state.core, mode = state.mode, config = state.config,
@@ -817,32 +812,30 @@ private fun RefHome(
             memory = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes,
             cpu = cpuPercent, connections = if (state.panelReady) state.connections.size else cachedConnections,
             diagnosticLoading = diagnosticLoading,
-        ),
-        onRefresh = onRefresh, onPullRefresh = onPullRefresh, onToggle = onToggle, onReload = onReload, onRestart = onRestart,
-        onDelay = onDelay, onWebUi = { HetuWebPanels.openSelected(context) }, onLog = onLog,
-        onSubscription = onSubscription, onConnections = onConnections, onSettings = onSettings,
-        onDiagnostics = onDiagnostics,
-        onAdblock = { context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java)) },
-        onCoreDetails = { coreSheet = true },
+        )
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    io.github.xgl34222220.hetu.home.HetuHomeV2(
+        data = homeData,
+        groups = state.groups,
+        trafficMode = state.trafficMode,
+        startupError = startupError,
+        corePid = runtime.pid,
+        coreVersion = coreVersion,
+        bottomPadding = navBottom + 94.dp,
+        onToggle = onToggle,
+        onReload = onReload,
+        onRestart = onRestart,
+        onDelay = onDelay,
+        onRefresh = onRefresh,
+        onTrafficMode = onTrafficMode,
+        onOpenNode = onOpenNode,
+        onOpenSubscription = onSubscription,
+        onOpenBasicSettings = onSettings,
+        onOpenConfigs = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+        onViewConfig = { context.startActivity(Intent(context, ProxySubscriptionActivity::class.java)) },
+        onDismissStartupError = onDismissStartupError,
+        onDetailVisibleChange = onDetailVisibleChange,
     )
-    if (webUiOpen) CompactHomeWebUiDialog { webUiOpen = false }
-    if (coreSheet) {
-        val rss = runtime.rssBytes.takeIf { it > 0L } ?: state.memoryBytes
-        CoreDetailsSheet19(
-            CoreDetails19(
-                pid = runtime.pid,
-                core = state.core,
-                version = coreVersion,
-                uptime = CompactHomeFormat.uptime(runtime.elapsedSeconds),
-                mode = state.mode,
-                config = state.config,
-                cpu = String.format(java.util.Locale.US, "%.1f%%", cpuPercent),
-                memory = if (rss > 0L) CompactHomeFormat.bytes(rss) else "—",
-                connections = (if (state.panelReady) state.connections.size else cachedConnections).toString(),
-                controller = "127.0.0.1:${state.controllerPort}",
-            ),
-        ) { coreSheet = false }
-    }
 }
 
 @Composable
@@ -2083,7 +2076,7 @@ private fun RefVideoNodeCard19(
                 .background(bg, shape)
                 .border(if (active) 1.2.dp else .5.dp, borderTint, shape)
                 .clip(shape)
-                .hetuPressHighlight(source, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF15403A).copy(alpha = .05f))
+                .hetuPressHighlight(source, if (dark) Color.White.copy(alpha = .05f) else Color(0xFF1D2C52).copy(alpha = .05f))
                 .clickable(interactionSource = source, indication = null, onClick = onSelect)
                 .padding(horizontal = 12.dp, vertical = 10.dp),
             verticalArrangement = Arrangement.SpaceBetween,
@@ -2579,7 +2572,7 @@ private fun RefDetailNodeCard(
             .background(premiumBrush, shape)
             .border(
                 if (active) 1.8.dp else .8.dp,
-                if (active) Color(0xFF12806F) else Color.White.copy(alpha = if (dark) .10f else .92f),
+                if (active) Color(0xFF2A62E8) else Color.White.copy(alpha = if (dark) .10f else .92f),
                 shape,
             )
             .clip(shape)
@@ -2613,7 +2606,7 @@ private fun RefDetailNodeCard(
                     exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                 ) {
                     Box(
-                        Modifier.size(16.dp).background(Color(0xFF12806F), CircleShape),
+                        Modifier.size(16.dp).background(Color(0xFF2A62E8), CircleShape),
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(Icons.Rounded.Check, "已选择", tint = Color.White, modifier = Modifier.size(11.dp))
@@ -2624,12 +2617,12 @@ private fun RefDetailNodeCard(
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Surface(
                 shape = RoundedCornerShape(6.dp),
-                color = if (active) Color(0xFFDDF1EC) else Color(0xFFF4F5F7),
+                color = if (active) Color(0xFFE3EAFD) else Color(0xFFF4F5F7),
             ) {
                 Text(
                     refNodeProtocol(node),
                     Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
-                    color = if (active) Color(0xFF12806F) else Color(0xFF5D6670),
+                    color = if (active) Color(0xFF2A62E8) else Color(0xFF5D6670),
                     fontSize = 9.sp,
                     lineHeight = 12.sp,
                     fontWeight = FontWeight.Medium,
@@ -2814,7 +2807,7 @@ private fun RefGroupCard(
             .background(premiumBrush, shape)
             .border(
                 if (expanded) 1.25.dp else .9.dp,
-                if (expanded) Color(0xFF12806F).copy(alpha = .52f)
+                if (expanded) Color(0xFF2A62E8).copy(alpha = .52f)
                 else if (glassEnabled) {
                     if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .82f)
                 } else if (dark) Color.White.copy(alpha = .10f) else Color(0xFFE4E7EB).copy(alpha = .80f),
@@ -2843,7 +2836,7 @@ private fun RefGroupCard(
             Icon(
                 Icons.Rounded.KeyboardArrowDown,
                 if (expanded) "收起" else "展开",
-                tint = if (expanded) Color(0xFF12806F) else Color(0xFF98A1AA),
+                tint = if (expanded) Color(0xFF2A62E8) else Color(0xFF98A1AA),
                 modifier = Modifier.size(15.dp).graphicsLayer {
                     transformOrigin = TransformOrigin.Center
                     rotationZ = arrowRotation
@@ -2969,7 +2962,7 @@ private fun RefInlineGroupExpansion(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Text("全测速", color = Color(0xFF12806F), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+                    Text("全测速", color = Color(0xFF2A62E8), fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
                     Text("⚡", color = Color(0xFFF59E0B), fontSize = 10.sp)
                 }
             }
@@ -3020,7 +3013,7 @@ private fun RefInlineNodeCard(
     val backgroundBrush = when {
         dark && active -> Brush.verticalGradient(listOf(Color(0xFF172554), Color(0xFF111C38)))
         dark -> Brush.verticalGradient(listOf(Color(0xFF242E3C), Color(0xFF202936)))
-        active -> Brush.verticalGradient(listOf(Color(0xFFF7FBFF), Color(0xFFDDF1EC)))
+        active -> Brush.verticalGradient(listOf(Color(0xFFF7FBFF), Color(0xFFE3EAFD)))
         else -> Brush.verticalGradient(listOf(Color.White, Color.White))
     }
     val borderColor = when {
@@ -3043,8 +3036,8 @@ private fun RefInlineNodeCard(
                         0.dp,
                         shape,
                         clip = false,
-                        ambientColor = if (active) Color(0xFF12806F).copy(alpha = .07f) else Color(0xFF12161A).copy(alpha = .035f),
-                        spotColor = if (active) Color(0xFF12806F).copy(alpha = .10f) else Color(0xFF12161A).copy(alpha = .05f),
+                        ambientColor = if (active) Color(0xFF2A62E8).copy(alpha = .07f) else Color(0xFF12161A).copy(alpha = .035f),
+                        spotColor = if (active) Color(0xFF2A62E8).copy(alpha = .10f) else Color(0xFF12161A).copy(alpha = .05f),
                     )
                     .background(backgroundBrush, shape)
                     .border(if (active) 1.dp else .7.dp, borderColor, shape)
@@ -3063,7 +3056,7 @@ private fun RefInlineNodeCard(
                         }
                         Text(
                             node.name,
-                            color = if (active && !dark) Color(0xFF12806F) else t.textPrimary,
+                            color = if (active && !dark) Color(0xFF2A62E8) else t.textPrimary,
                             fontSize = 12.sp,
                             lineHeight = 14.sp,
                             fontWeight = if (active) FontWeight.ExtraBold else FontWeight.Bold,
@@ -3092,7 +3085,7 @@ private fun RefInlineNodeCard(
                     enter = androidx.compose.animation.scaleIn(initialScale = .15f, animationSpec = spring(dampingRatio = .56f, stiffness = 520f)) + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.scaleOut(targetScale = .45f) + androidx.compose.animation.fadeOut(),
                 ) {
-                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF12806F), modifier = Modifier.size(13.dp).graphicsLayer { alpha = .92f })
+                    Icon(Icons.Rounded.Check, "已选择", tint = Color(0xFF2A62E8), modifier = Modifier.size(13.dp).graphicsLayer { alpha = .92f })
                 }
             }
         }
@@ -3163,7 +3156,7 @@ private fun refGroupBadgePalette(name: String, dark: Boolean): Triple<Color, Col
         value.contains("github") ->
             Triple(Color(0xFFF8FAFC), Color(0xFFE4E7EB), Color(0xFF334155))
         else ->
-            Triple(Color(0xFFDDF1EC), Color(0xFFDDF1EC), Color(0xFF12806F))
+            Triple(Color(0xFFE3EAFD), Color(0xFFE3EAFD), Color(0xFF2A62E8))
     }
     return if (!dark) Triple(base, border.copy(alpha = .70f), tint)
     else Triple(tint.copy(alpha = .14f), tint.copy(alpha = .22f), tint.copy(alpha = .92f))
@@ -3265,7 +3258,7 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
     val pressScale by animateFloatAsState(if (pressed) .90f else 1f, spring(dampingRatio = .68f, stiffness = 680f), label = "latencyPress")
     val shape = CircleShape
     val finalBackground = if (selected) Color.White else background
-    val finalTextColor = if (selected) Color(0xFF12806F) else textColor
+    val finalTextColor = if (selected) Color(0xFF2A62E8) else textColor
     Row(
         Modifier.width(if (onClick != null) 68.dp else 62.dp).height(22.dp)
             .graphicsLayer {
@@ -3275,7 +3268,7 @@ private fun RefDelayBadge(value: Long?, testing: Boolean, onClick: (() -> Unit)?
             }
             .shadow(if (onClick != null) 2.dp else 0.dp, shape, clip = false, ambientColor = finalTextColor.copy(alpha = .10f), spotColor = finalTextColor.copy(alpha = .12f))
             .background(if (testing) finalBackground.copy(alpha = .82f) else finalBackground, shape)
-            .border(.7.dp, if (selected) Color(0xFFDDF1EC) else if (testing) finalTextColor.copy(alpha = .22f + .22f * pulse) else finalTextColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
+            .border(.7.dp, if (selected) Color(0xFFE3EAFD) else if (testing) finalTextColor.copy(alpha = .22f + .22f * pulse) else finalTextColor.copy(alpha = if (onClick != null) .10f else .04f), shape)
             .then(if (onClick != null) Modifier.clickable(enabled = !testing, interactionSource = source, indication = null, onClick = onClick) else Modifier)
             .padding(horizontal = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -3341,6 +3334,7 @@ private fun RefOverviewMetricStrip18(state: ProxyComposeState, ruleCount: Int) {
 
 @Composable
 private fun RefOverviewSubscription19(items: List<DashboardProviderUi>) {
+    val displayLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
     val dark = MaterialTheme.colorScheme.background.luminance() < .5f
     val t = LocalHetuTokens.current
     val tracked = items.filter { it.hasSubscriptionInfo && it.total > 0L }
@@ -3353,7 +3347,7 @@ private fun RefOverviewSubscription19(items: List<DashboardProviderUi>) {
     val expire = tracked.map { it.expire }.filter { it > 0L }.minOrNull()
     val expireText = expire?.let {
         runCatching {
-            java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault())
+            java.text.SimpleDateFormat("yyyy-MM-dd", displayLocale)
                 .format(java.util.Date(if (it < 10_000_000_000L) it * 1000L else it))
         }.getOrDefault("")
     }.orEmpty()
@@ -3664,8 +3658,8 @@ private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, succe
                 Surface(
                     onClick = { if (!refreshing) onRefresh() },
                     shape = RoundedCornerShape(999.dp),
-                    color = if (success) Color(0xFFECFDF5) else Color(0xFFDDF1EC),
-                    border = BorderStroke(1.dp, if (success) Color(0xFFA7F3D0) else Color(0xFFDDF1EC)),
+                    color = if (success) Color(0xFFECFDF5) else Color(0xFFE3EAFD),
+                    border = BorderStroke(1.dp, if (success) Color(0xFFA7F3D0) else Color(0xFFE3EAFD)),
                 ) {
                     Row(Modifier.padding(horizontal = 9.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text(
@@ -3692,7 +3686,7 @@ private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, succe
                     if (progress > 0f) {
                         Box(
                             Modifier.fillMaxWidth(progress.coerceIn(.001f, 1f)).fillMaxHeight()
-                                .background(Brush.horizontalGradient(listOf(Color(0xFF5CCFBC), Color(0xFF6366F1))), CircleShape),
+                                .background(Brush.horizontalGradient(listOf(Color(0xFF7EA6FF), Color(0xFF6366F1))), CircleShape),
                         )
                     }
                 }
@@ -3705,10 +3699,10 @@ private fun RefProviderRow(item: DashboardProviderUi, refreshing: Boolean, succe
                         Text(refBytes(item.download), color = t.textPrimary, fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
                         Text("已下载", color = Color(0xFF98A1AA), fontSize = 10.sp)
                     }
-                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFFDDF1EC), border = BorderStroke(1.dp, Color(0xFFDDF1EC))) {
+                    Surface(modifier = Modifier.weight(1f), shape = RoundedCornerShape(14.dp), color = Color(0xFFE3EAFD), border = BorderStroke(1.dp, Color(0xFFE3EAFD))) {
                         Column(Modifier.padding(horizontal = 7.dp, vertical = 7.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(refBytes(item.remaining), color = Color(0xFF12806F), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
-                            Text("剩余流量", color = Color(0xFF12806F), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                            Text(refBytes(item.remaining), color = Color(0xFF2A62E8), fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, maxLines = 1)
+                            Text("剩余流量", color = Color(0xFF2A62E8), fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                         }
                     }
                 }
@@ -4036,7 +4030,7 @@ private fun RefRuleGroupCard(items: List<ProxyRuleUi>) {
                         item.proxy,
                         color = when {
                             reject -> Color(0xFFF43F5E)
-                            direct -> Color(0xFF12806F)
+                            direct -> Color(0xFF2A62E8)
                             else -> Color(0xFF5D6670)
                         },
                         fontSize = 12.sp,
@@ -4126,7 +4120,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
             RefGroup {
                 RefToolRow(
                     Icons.Rounded.Terminal,
-                    Color(0xFF12806F),
+                    Color(0xFF2A62E8),
                     "运行文件",
                     "启动配置与运行文件",
                     trailingText = if (state.running) "运行中" else "待机",
@@ -4138,7 +4132,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     scope.launch { onLog(runCatching { inspector.runtimeLog() }.getOrElse { it.message ?: "日志读取失败" }) }
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.NetworkCheck, Color(0xFF12806F), "网络诊断", "消息与网络连通性诊断") {
+                RefToolRow(Icons.Rounded.NetworkCheck, Color(0xFF2A62E8), "网络诊断", "消息与网络连通性诊断") {
                     scope.launch {
                         try { onLog(ProxyComposeController(context).diagnostics()) }
                         catch (cancel: CancellationException) { throw cancel }
@@ -4146,7 +4140,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
                     }
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.NetworkCheck, Color(0xFF059669), "修复运行记录", "核对规则与 DNS，修复旧版会话记录") {
+                    scope.launch {
+                        try { onLog(ProxyComposeController(context).repairSessionRecord()) }
+                        catch (cancel: CancellationException) { throw cancel }
+                        catch (error: Exception) { onLog(error.message ?: "运行记录未修复，请查看网络诊断") }
+                    }
+                }
+                RefDivider()
+                RefToolRow(Icons.Rounded.Apps, Color(0xFFF97316), "应用名单", "选择需要代理的应用", trailingText = "管理", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyAppSelectionActivity::class.java))
                 }
             }
@@ -4154,15 +4156,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { Box(Modifier.hetuStaggerIn(stagger, 3)) { RefSectionLabel("网络与共享") } }
         item { Box(Modifier.hetuStaggerIn(stagger, 4)) {
             RefGroup {
-                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停", trailingText = "自动化", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.Wifi, Color(0xFF0EA5E9), "网络匹配", "Wi‑Fi / SSID / 移动网络自动启停", trailingText = "自动化", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyNetworkAutomationActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "让热点与局域网设备使用代理", trailingText = "设置", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.WifiTethering, Color(0xFF10B981), "共享网络", "让热点与局域网设备使用代理", trailingText = "设置", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxySharedNetworkSettingsActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "排除指定网段与网络接口", trailingText = "设置", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.AltRoute, Color(0xFFEF4444), "绕过规则", "排除指定网段与网络接口", trailingText = "设置", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyBypassRulesActivity::class.java))
                 }
             }
@@ -4170,15 +4172,15 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { Box(Modifier.hetuStaggerIn(stagger, 5)) { RefSectionLabel("订阅与数据") } }
         item { Box(Modifier.hetuStaggerIn(stagger, 6)) {
             RefGroup {
-                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF12806F), "订阅管理", "导入、更新与切换配置", trailingText = "管理", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.CloudDownload, Color(0xFF2A62E8), "订阅管理", "导入、更新与切换配置", trailingText = "管理", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxySubscriptionActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Shield, Color(0xFF12806F), "广告过滤", "订阅规则、放行与拦截记录", trailingText = "管理", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.Shield, Color(0xFF2A62E8), "广告过滤", "订阅规则、放行与拦截记录", trailingText = "管理", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyAdblockChainActivity::class.java))
                 }
                 RefDivider()
-                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "国内地址分流", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.Public, Color(0xFFF59E0B), "国内地址分流", "国内 IPv4/IPv6 自动直连", trailingText = "设置", trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyCnIpSettingsActivity::class.java))
                 }
             }
@@ -4186,7 +4188,7 @@ internal fun RefTools(state: ProxyComposeState, onLog: (String) -> Unit) {
         item { Box(Modifier.hetuStaggerIn(stagger, 7)) { RefSectionLabel("核心与更新") } }
         item { Box(Modifier.hetuStaggerIn(stagger, 8)) {
             RefGroup {
-                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF12806F)) {
+                RefToolRow(Icons.Rounded.Memory, Color(0xFF334155), "内核管理", "下载、更新与维护内核", trailingText = state.core.ifBlank { "Mihomo" }, trailingBadge = true, trailingColor = Color(0xFF2A62E8)) {
                     context.startActivity(Intent(context, ProxyCoreActivity::class.java))
                 }
             }
@@ -4230,7 +4232,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
         item { Box(Modifier.hetuStaggerIn(stagger, 0)) { RefTitleBar("设置") } }
         item { Box(Modifier.hetuStaggerIn(stagger, 1)) {
             RefGroup {
-                RefToolRow(Icons.Rounded.Tune, Color(0xFF12806F), "更多功能设置", "通知、Web 面板、脚本、备份与接口管理") {
+                RefToolRow(Icons.Rounded.Tune, Color(0xFF2A62E8), "更多功能设置", "通知、Web 面板、脚本、备份与接口管理") {
                     context.startActivity(Intent(context, Runtime146FeaturesActivity::class.java))
                 }
             }
@@ -4283,7 +4285,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     context.startActivity(Intent(context, ProxyRuntimeCoreSettingsActivity::class.java))
                 }
                 RefDivider()
-                RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF12806F), highlightValue = true) { modePicker = true }
+                RefValueRow("运行模式", state.mode, Icons.Rounded.Tune, Color(0xFF2A62E8), highlightValue = true) { modePicker = true }
                 RefDivider()
                 RefValueRow("IPv6", ProxyRuntimeSettings.ipv6Label(state.ipv6) +
                     if (state.running && state.effectiveIpv6.isNotBlank() && state.effectiveIpv6 != state.ipv6) " · 待应用" else "",
@@ -4291,7 +4293,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                 RefDivider()
                 RefSwitchRow(
                     icon = Icons.Rounded.Bolt,
-                    accent = Color(0xFF12806F),
+                    accent = Color(0xFF2A62E8),
                     title = "开机自启",
                     subtitle = "重启后自动恢复上次启用的代理保护",
                     checked = autoStart,
@@ -4308,7 +4310,7 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     "延迟自动刷新",
                     if (latencyInterval <= 0) "关闭" else "${latencyInterval} 秒",
                     Icons.Rounded.Speed,
-                    Color(0xFF12806F),
+                    Color(0xFF2A62E8),
                     highlightValue = latencyInterval > 0,
                 ) { latencyPicker = true }
                 RefDivider()
@@ -4319,10 +4321,6 @@ internal fun RefSettings(state: ProxyComposeState, operation: String, onApplySet
                     Color(0xFFF97316),
                     highlightValue = true,
                 ) { portsInfo = true }
-                RefDivider()
-                RefValueRow("高级代理配置", "应用范围 · DNS · QUIC · CNIP · 共享 · 绕过", Icons.Rounded.Tune, Color(0xFF0EA5E9), highlightValue = true) {
-                    context.startActivity(Intent(context, ProxyAdvancedSettingsActivity::class.java))
-                }
             }
         } }
         item { Box(Modifier.hetuStaggerIn(stagger, 7)) { RefSectionLabel("界面") } }
@@ -4452,7 +4450,7 @@ private fun RefPortsBottomSheet(controllerPort: Int, onDismiss: () -> Unit) {
                     HorizontalDivider(color = t.outline.copy(alpha = .32f))
                     RefPortDetailRow("Redirect 端口", MihomoStartupConfig.REDIRECT_PORT.toString())
                     HorizontalDivider(color = t.outline.copy(alpha = .32f))
-                    RefPortDetailRow("外部控制器", "127.0.0.1:$controllerPort", Color(0xFF12806F))
+                    RefPortDetailRow("外部控制器", "127.0.0.1:$controllerPort", Color(0xFF2A62E8))
                 }
             }
             FilledTonalButton(
@@ -4683,7 +4681,7 @@ internal fun RefToolRow(
     subtitle: String,
     trailingText: String = "",
     trailingBadge: Boolean = false,
-    trailingColor: Color = Color(0xFF12806F),
+    trailingColor: Color = Color(0xFF2A62E8),
     onClick: () -> Unit,
 ) {
     val t = LocalHetuTokens.current
@@ -4895,11 +4893,11 @@ internal fun RefCollapsingTitleBar(title: String, state: androidx.compose.founda
             else (state.firstVisibleItemScrollOffset / threshold).coerceIn(0f, 1f)
         }
     }
-    val bar = if (dark) t.pageBackground else Color(0xFFF4F5F7)
+    val bar = if (dark) t.pageBackground else Color(0xFFF2F0FB)
     Box(
         Modifier.fillMaxWidth()
             .graphicsLayer { alpha = progress }
-            .background(bar.copy(alpha = .94f))
+            .background(bar.copy(alpha = .82f))
             .statusBarsPadding()
             .height(48.dp),
         contentAlignment = Alignment.Center,
@@ -4910,7 +4908,7 @@ internal fun RefCollapsingTitleBar(title: String, state: androidx.compose.founda
             color = t.textPrimary, fontSize = 17.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold,
         )
         HorizontalDivider(Modifier.align(Alignment.BottomCenter), thickness = .5.dp,
-            color = (if (dark) Color.White else Color(0xFF12161A)).copy(alpha = .08f))
+            color = (if (dark) Color.White else Color(0xFF6F6A80)).copy(alpha = .035f))
     }
 }
 

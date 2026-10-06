@@ -1,0 +1,145 @@
+{
+  "applicationBaseCommit": "01b66345f645aa168d56400ccc89313d3932f3f8",
+  "candidateState": "source stopped; not committed, compiled, visually accepted or installed",
+  "freshRenderingPassed": false,
+  "newCandidateCiExecuted": false,
+  "exactTransforms": [
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "    maxVisibleChoices: Int? = null,\n) {\n    val c = Hx.colors\n",
+      "after": "    maxVisibleChoices: Int? = null,\n    menuItemVerticalPadding: Dp? = null,\n    menuItemMinimumHeight: Dp? = null,\n    menuItemFontSizeSp: Float? = null,\n    menuAnchorEndInset: Dp? = null,\n    menuContentTopPadding: Dp? = null,\n    menuContentBottomPadding: Dp? = null,\n    menuRowPresentation: HxChoicePresentation? = null,\n    menuDividers: Boolean? = null,\n    menuSelectedHorizontalPadding: Dp? = null,\n) {\n    val c = Hx.colors\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth) { close ->\n            if (referenceRadios) {\n",
+      "after": "        val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&\n            (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||\n                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null)\n        val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)\n        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,\n            anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,\n            verticalPadding = if (scopedOuterPadding) 0.dp else 6.dp) { close ->\n            @Composable fun notificationMenuItem(choice: HxChoice) {\n                @Composable fun item() {\n                    HxMenuItem(\n                        choice.label,\n                        onClick = { close { onPick(choice.id) } },\n                        description = choice.description,\n                        selected = choice.id == selected,\n                        selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,\n                        enabled = choice.enabled,\n                        choicePresentation = menuRowPresentation ?: presentation,\n                        compact = menuItemVerticalPadding != null,\n                        compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,\n                        minimumHeight = menuItemMinimumHeight ?: 0.dp,\n                        labelFontSizeSp = menuItemFontSizeSp,\n                    )\n                }\n                if (menuSelectedHorizontalPadding != null && choice.id == selected) {\n                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }\n                } else item()\n            }\n            if (scopedOuterPadding) Spacer(Modifier.height(menuContentTopPadding ?: 6.dp))\n            if (referenceRadios) {\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                HxMenuItem(\n                    choice.label,\n                    onClick = { close { onPick(choice.id) } },\n",
+      "after": "                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(\n                    choice.label,\n                    onClick = { close { onPick(choice.id) } },\n",
+      "count": 2
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))\n",
+      "after": "                if (!scopedNotification || menuDividers != false)\n                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))\n",
+      "count": 2
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "before": "                Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))\n            }\n        }\n        return\n",
+      "after": "                Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))\n            }\n            if (scopedOuterPadding) Spacer(Modifier.height(menuContentBottomPadding ?: 6.dp))\n        }\n        return\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "before": "            \"refresh\" -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n",
+      "after": "            \"refresh\" -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = 148.dp,\n                menuAnchorEndInset = 0.dp,\n                menuItemFontSizeSp = 16f,\n                menuItemMinimumHeight = 42.dp,\n                menuItemVerticalPadding = 9.dp,\n                menuContentTopPadding = 6.dp,\n                menuContentBottomPadding = 6.dp,\n                menuSelectedHorizontalPadding = 5.dp,\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "before": "            \"target\" -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n",
+      "after": "            \"target\" -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = 134.dp,\n                menuAnchorEndInset = 3.dp,\n                menuItemFontSizeSp = 13f,\n                menuItemMinimumHeight = 34.dp,\n                menuItemVerticalPadding = 6.dp,\n                menuContentTopPadding = 5.dp,\n                menuContentBottomPadding = 5.dp,\n                menuRowPresentation = HxChoicePresentation.Settings,\n",
+      "count": 1
+    },
+    {
+      "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "before": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                title = \"快捷按钮 ${index + 1}\",\n",
+      "after": "            else -> HxChoiceSheet(\n                presentation = HxChoicePresentation.Notification,\n                menuWidthOverride = 141.dp,\n                menuAnchorEndInset = 1.dp,\n                menuItemFontSizeSp = 16f,\n                menuItemMinimumHeight = 40.dp,\n                menuItemVerticalPadding = 8.dp,\n                menuContentTopPadding = 3.dp,\n                menuContentBottomPadding = 9.dp,\n                menuSelectedHorizontalPadding = 3.dp,\n                menuDividers = false,\n                title = \"快捷按钮 ${index + 1}\",\n",
+      "count": 1
+    }
+  ],
+  "fileProofs": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+      "baselineSha256": "8606bff5bd043623d7e04591103db6a7365bb9b71a8345317a29d00492b4afb9",
+      "candidateSha256": "c21df0e528e59d4cd28d7f139bab7ed96170a58ca9c4bc708f4379cfd29cc87d",
+      "wholeFileReverseEqualsBase": true,
+      "allTransformForwardCountsAsserted": true,
+      "allTransformReverseCountsAsserted": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
+      "baselineSha256": "1dd75cec90790c89cdc4f69e8376835de297a3cca94b3333c3aca0a07b98a288",
+      "candidateSha256": "3fd7434c34179546596fb7e737564fb4f0a4f2587bff0cbabd25df135dd15bf0",
+      "wholeFileReverseEqualsBase": true,
+      "allTransformForwardCountsAsserted": true,
+      "allTransformReverseCountsAsserted": true
+    }
+  ],
+  "frozenHxMenus": {
+    "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt",
+    "sha256": "aa0a56fd3e199e4d5a4062f18b47d68d12e2afd5c7b7eb182df3804ba810fcb9",
+    "byteEqualToBase": true
+  },
+  "scope": {
+    "shared": "HxChoiceSheet only",
+    "callers": "NotificationSettingsScreen refresh, target, action only",
+    "nullableDefaultsRetainOldPath": true,
+    "noYoffset": true,
+    "noColorOverride": true,
+    "referenceRadioAndMissingAnchorPathsUnchanged": true,
+    "existingDefaultHxMenuItemArgumentBlocksPreserved": 2,
+    "oldToolScreenBeforePickerEntirePrefixUnchanged": true,
+    "targetChoicesNineAndVisibleMaximumSevenPreserved": true,
+    "originalCallbacksLiteralCountUnchanged": [
+      "onPick = { refresh = it.toInt(); picker = null }",
+      "onPick = { target = it; picker = null }",
+      "onPick = { actions[index] = it; picker = null }",
+      "onDismiss = { picker = null }",
+      "maxVisibleChoices = 7",
+      "choices = targetOptions.map { HxChoice(it.first, it.second) }"
+    ],
+    "scrollAndVisibilityLiteralsUnchanged": [
+      "choices.take(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index, choice) }",
+      "choices.drop(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index + maxVisibleChoices, choice) }",
+      "var visibleRowsHeight by remember(maxVisibleChoices, choices) { mutableStateOf<Int?>(null) }"
+    ],
+    "homePanelNoCallerOrSourceChanges": true
+  },
+  "callerParameters": {
+    "04/22": {
+      "widthDp": 148,
+      "endInsetDp": 0,
+      "fontSp": 16,
+      "minHeightDp": 42,
+      "verticalPaddingDp": 9,
+      "outerTopDp": 6,
+      "outerBottomDp": 6,
+      "selectedHorizontalPaddingDp": 5,
+      "dividers": true
+    },
+    "04/23": {
+      "widthDp": 134,
+      "endInsetDp": 3,
+      "fontSp": 13,
+      "minHeightDp": 34,
+      "verticalPaddingDp": 6,
+      "outerTopDp": 5,
+      "outerBottomDp": 5,
+      "rowPresentation": "Settings",
+      "selectedHorizontalPaddingDp": null,
+      "dividers": true,
+      "maxVisibleChoices": 7,
+      "dataChoices": 9
+    },
+    "04/24-26": {
+      "widthDp": 141,
+      "endInsetDp": 1,
+      "fontSp": 16,
+      "minHeightDp": 40,
+      "verticalPaddingDp": 8,
+      "outerTopDp": 3,
+      "outerBottomDp": 9,
+      "selectedHorizontalPaddingDp": 3,
+      "dividers": false
+    }
+  },
+  "measurementProofPath": "/tmp/hetu_pdf04_01b6634_notification_menu_measurement.json",
+  "measurementProofSha256": "7b41920c74f9f72638a4e2e4d6a196fedb07984c5db07ec2a7b8558a1ded05ec",
+  "gitDiffCheckPassed": true
+}

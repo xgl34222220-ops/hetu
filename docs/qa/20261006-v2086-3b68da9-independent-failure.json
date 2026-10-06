@@ -1,0 +1,1630 @@
+{
+  "schema": 2,
+  "result": "FAIL",
+  "purpose": "Only unit XML and original testcase identity recheck of the actual rejected 3b68 CI artifact; no new-candidate acceptance",
+  "runId": 37377929368,
+  "producerHeadSha": "3b68da93082e43263e2cfae8011c05fa7fdcff14",
+  "artifactId": 11372891473,
+  "providerSha256": "726b97431c4a9da77759bba550cb0a0e13a43b233446632c4c542d091bb77af5",
+  "actualSha256": "726b97431c4a9da77759bba550cb0a0e13a43b233446632c4c542d091bb77af5",
+  "actualXmlFiles": 56,
+  "actualTestcases": {
+    "tests": 542,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  "originalCaseIdentitiesChecked": 487,
+  "checks": [
+    {
+      "name": "actual-XML-files-match-function-inputs",
+      "result": "PASS",
+      "detail": 56
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AdblockSnifferTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AppCrashReportTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationConceptParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.AutomationToolsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.BootStartup60Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptRemainingCoverageTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ConceptStateCoverageTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.CoreManagerConcept57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.DocumentPickerSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.JournalReliabilityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.LargeTitleParity59Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.MainLanguageBindingTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NativeConceptScreenshotTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NetworkDiagnosticsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NetworkRecoveryStressTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewHomePanelInteractionTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewUiIntegrationTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.NewUiShell83Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelActionSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelConceptModelTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelLayoutDefaultsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelModel11Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "FAIL",
+      "detail": {
+        "declared": {
+          "tests": 16,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 16,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyAdblockExportTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyLatencyRegressionTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyNetworkJournalTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxyScriptSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootAutostartTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "new-suite-actual-case-class-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS"
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootHealthUpgradeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RootNetworkRecoveryTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.Runtime146ContractTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RuntimeStartup15Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.RuntimeYaml15Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsBackupParity57Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.SettingsPickerParity58Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ToastFeedbackTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.ToolsConceptParityTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.UI83EditorHistoryTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.UI83ToolsTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.WanDetails61Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+      "result": "PASS",
+      "detail": {
+        "declared": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "unchanged-original487-wrapper-chain-pass",
+      "result": "FAIL",
+      "detail": "AssertionError: ('io.github.xgl34222220.hetu.PanelRequestOwnershipTest', {'tests': 16, 'failures': 1, 'errors': 0, 'skipped': 0})"
+    },
+    {
+      "name": "actual-function-testcases-zero-failure",
+      "result": "FAIL",
+      "detail": {
+        "tests": 542,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 5,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ToastFeedbackTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ControllerAuthenticationTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 11,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.LegacyControllerCredentialTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 3,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ControllerReadStateTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 6,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 8,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.tools.ToolsPdf85Test",
+      "result": "PASS",
+      "detail": {
+        "tests": 49,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelExpansionAnchorTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 4,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 10,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 12,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.RootFakeIpRangesTest",
+      "result": "PASS",
+      "detail": {
+        "tests": 13,
+        "failures": 0,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "FAIL",
+      "detail": {
+        "tests": 16,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "retained-original51XML-and487-actual-testcases",
+      "result": "PASS"
+    },
+    {
+      "name": "pinned-ec211b9-original-baseline-ZIP-byte-digest",
+      "result": "PASS"
+    },
+    {
+      "name": "every-original487-case-identity-retained",
+      "result": "PASS",
+      "detail": {
+        "original": 487,
+        "actualOriginal": 487,
+        "missing": [],
+        "unexpected": []
+      }
+    },
+    {
+      "name": "function-report-not-accepted-after-wrapper-failure",
+      "result": "FAIL"
+    }
+  ],
+  "details": {
+    "unitTests": {
+      "xmlFiles": 56,
+      "actualTestcases": {
+        "tests": 542,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      },
+      "suites": {
+        "io.github.xgl34222220.hetu.AdblockSnifferTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AppCrashReportTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationConceptParity57Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.BootStartup60Test": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptParity57Test": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest": {
+          "tests": 26,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ConceptStateCoverageTest": {
+          "tests": 25,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ControllerAuthenticationTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ControllerReadStateTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.DocumentPickerSafetyTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.JournalReliabilityTest": {
+          "tests": 21,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.LargeTitleParity59Test": {
+          "tests": 1,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.LegacyControllerCredentialTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.MainLanguageBindingTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NativeConceptScreenshotTest": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NetworkDiagnosticsTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NetworkRecoveryStressTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewHomePanelInteractionTest": {
+          "tests": 9,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewUiIntegrationTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.NewUiShell83Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelActionSafetyTest": {
+          "tests": 30,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelConceptModelTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelControllerErrorTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelModel11Test": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+          "tests": 16,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyAdblockExportTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+          "tests": 10,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest": {
+          "tests": 16,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyNetworkJournalTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxyScriptSafetyTest": {
+          "tests": 11,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootAutostartTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootHealthUpgradeTest": {
+          "tests": 7,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RootNetworkRecoveryTest": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.Runtime146ContractTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RuntimeStartup15Test": {
+          "tests": 13,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.RuntimeYaml15Test": {
+          "tests": 14,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsBackupParity57Test": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsConceptParityTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.SettingsPickerParity58Test": {
+          "tests": 2,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ToastFeedbackTest": {
+          "tests": 6,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.ToolsConceptParityTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.UI83EditorHistoryTest": {
+          "tests": 12,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.UI83ToolsTest": {
+          "tests": 8,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.WanDetails61Test": {
+          "tests": 4,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest": {
+          "tests": 3,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest": {
+          "tests": 5,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        },
+        "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+          "tests": 49,
+          "failures": 0,
+          "errors": 0,
+          "skipped": 0
+        }
+      },
+      "originalCaseIdentitiesChecked": 487,
+      "originalWrapperResult": null
+    }
+  },
+  "failedEvidenceChecks": [
+    {
+      "name": "actual-XML-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "FAIL",
+      "detail": {
+        "declared": {
+          "tests": 16,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        },
+        "actualTestcases": {
+          "tests": 16,
+          "failures": 1,
+          "errors": 0,
+          "skipped": 0
+        }
+      }
+    },
+    {
+      "name": "unchanged-original487-wrapper-chain-pass",
+      "result": "FAIL",
+      "detail": "AssertionError: ('io.github.xgl34222220.hetu.PanelRequestOwnershipTest', {'tests': 16, 'failures': 1, 'errors': 0, 'skipped': 0})"
+    },
+    {
+      "name": "actual-function-testcases-zero-failure",
+      "result": "FAIL",
+      "detail": {
+        "tests": 542,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "required-suite-io.github.xgl34222220.hetu.PanelRequestOwnershipTest",
+      "result": "FAIL",
+      "detail": {
+        "tests": 16,
+        "failures": 1,
+        "errors": 0,
+        "skipped": 0
+      }
+    },
+    {
+      "name": "function-report-not-accepted-after-wrapper-failure",
+      "result": "FAIL"
+    }
+  ]
+}

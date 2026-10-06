@@ -1,0 +1,635 @@
+diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
+index a639f70..1de67f0 100644
+--- a/android-app/app/build.gradle.kts
++++ b/android-app/app/build.gradle.kts
+@@ -17,8 +17,8 @@ android {
+         applicationId = "io.github.xgl34222220.hetu"
+         minSdk = 26
+         targetSdk = 35
+-        versionCode = 2071
+-        versionName = "0.12.1-v20"
++        versionCode = 2072
++        versionName = "0.12.2-v20"
+     }
+ 
+     // Explicit CI debug identity. No private key is committed or exported.
+diff --git a/android-app/app/src/main/AndroidManifest.xml b/android-app/app/src/main/AndroidManifest.xml
+index 0343989..1383a85 100644
+--- a/android-app/app/src/main/AndroidManifest.xml
++++ b/android-app/app/src/main/AndroidManifest.xml
+@@ -15,7 +15,7 @@
+     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+-    <application android:label="河图" android:theme="@style/AppTheme" android:icon="@drawable/ic_hetu_official" android:roundIcon="@drawable/ic_hetu_official" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config" android:hardwareAccelerated="true" android:enableOnBackInvokedCallback="true">
++    <application android:name=".HetuApplication" android:label="河图" android:theme="@style/AppTheme" android:icon="@drawable/ic_hetu_official" android:roundIcon="@drawable/ic_hetu_official" android:allowBackup="false" android:supportsRtl="true" android:usesCleartextTraffic="false" android:networkSecurityConfig="@xml/network_security_config" android:hardwareAccelerated="true" android:enableOnBackInvokedCallback="true">
+         <service android:name=".UpdateJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="true" />
+         <activity android:name=".CompactMainActivity" android:exported="false" android:windowSoftInputMode="adjustResize" />
+         <activity android:name=".ThemeSettingsActivity" android:label="主题与界面" android:exported="false"  android:launchMode="singleTop" />
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index 1ddfed5..75f2e48 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -883,8 +883,81 @@ watchdog(){
+ }
+ start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
+ 
++google_firewall_uids(){
++  # Resolve each installed user/profile. Android can reassign app UIDs after reset.
++  GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
++  [ -n "$GF_USERS" ] || GF_USERS=0
++  for GF_USER in $GF_USERS; do
++    (cmd package list packages -U --user "$GF_USER" 2>/dev/null ||
++      pm list packages -U --user "$GF_USER" 2>/dev/null) |
++      awk '$1=="package:com.google.android.gms" || $1=="package:com.android.vending" || $1=="package:com.google.android.gsf" {
++        for(i=2;i<=NF;i++) if($i ~ /^uid:[0-9]+$/) {sub(/^uid:/,"",$i); if($i>=10000) print $i}
++      }'
++  done | sort -nu
++}
++google_firewall_cleanup(){
++  # Caller owns the existing Root transaction lock. Never flush a system chain.
++  GF_UIDS=$(google_firewall_uids)
++  [ -n "$GF_UIDS" ] || return 0
++  GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
++  GF_FILE="$RUN/.google-firewall.$$"
++  for GF_TOOL in xt4q xt6q; do
++    for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
++      if ! $GF_TOOL -t filter -S "$GF_CHAIN" > "$GF_FILE" 2>/dev/null; then continue; fi
++      GF_CHECKED=$((GF_CHECKED+1))
++      while IFS= read -r GF_RULE; do
++        # Quotes/comments and inverted/range UID matches are deliberately left intact.
++        case "$GF_RULE" in *\"*|*\'*) continue;; esac
++        if ! printf '%s\n' "$GF_RULE" | awk -v c="$GF_CHAIN" -v uids="$GF_UIDS" '
++          BEGIN{split(uids,ids,/\n/);for(i in ids) allowed[ids[i]]=1}
++          $1=="-A" && $2==c {
++            uid="";target="";inverted=0
++            for(i=3;i<=NF;i++) {
++              if($i=="!") inverted=1
++              if($i=="--uid-owner") uid=$(i+1)
++              if($i=="-j") target=$(i+1)
++            }
++            if(!inverted && uid ~ /^[0-9]+$/ && allowed[uid] && (target=="REJECT" || target=="DROP")) found=1
++          }
++          END{exit !found}'; then continue; fi
++        # Delete the exact specification; line numbers can change under netd.
++        case $- in *f*) GF_GLOB_OFF=1;; *) GF_GLOB_OFF=0; set -f;; esac
++        set -- $GF_RULE
++        shift 2
++        if $GF_TOOL -t filter -D "$GF_CHAIN" "$@" 2>/dev/null; then
++          GF_REMOVED=$((GF_REMOVED+1))
++          printf '%s %s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$GF_TOOL" "$GF_RULE" >> "$RUN/google-firewall.log"
++        else GF_FAILED=$((GF_FAILED+1)); fi
++        [ "$GF_GLOB_OFF" = 1 ] || set +f
++      done < "$GF_FILE"
++    done
++  done
++  rm -f "$GF_FILE"
++  printf 'checked=%s removed=%s failed=%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" > "$RUN/google-firewall-status"
++  if [ -f "$RUN/google-firewall.log" ]; then
++    tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
++  fi
++}
++google_firewall_maintain(){ (
++  trap 'release_lock' EXIT
++  GF_PID="${1:-}"
++  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
++  [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
++  monotonic_seconds || exit 0
++  GF_NOW="$MONO_SECONDS"; GF_LAST=$(cat "$RUN/google-firewall-at" 2>/dev/null || true)
++  case "$GF_LAST" in ''|*[!0-9]*) ;; *)
++    if [ "$GF_NOW" -ge "$GF_LAST" ] && [ $((GF_NOW-GF_LAST)) -lt 60 ]; then exit 0; fi;;
++  esac
++  acquire_lock || exit 0
++  [ "$GF_PID" = "$(cat "$PIDFILE" 2>/dev/null)" ] && pidcore "$GF_PID" && kill -0 "$GF_PID" 2>/dev/null || exit 0
++  [ "$(sed -n 's/^GOOGLE_FIREWALL_CLEAN=//p' "$SESSION" 2>/dev/null)" = 1 ] || exit 0
++  printf '%s\n' "$GF_NOW" > "$RUN/google-firewall-at"
++  google_firewall_cleanup
++); }
++
+ start(){
+   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
++  START_VENDOR_CLEAN="${30:-0}"
+   mkdir -p "$RUN" || fail "无法创建运行目录"; : > "$START_TIMING"
+   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+   rm -f "$START_ERROR"; start_stage "preflight"
+@@ -958,6 +1031,9 @@ start(){
+   # Record exactly what this session installed, not mutable app preferences.
+   health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
+   start_stage "start-watchdog"
++  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION"
++  rm -f "$RUN/google-firewall-at"
++  if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+   rm -f "$START_ERROR"; start_stage "running"
+   DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
+@@ -1251,6 +1327,8 @@ health_repair(){ (
+   trap 'release_lock' EXIT
+   H_PID="${1:-}"; H_CURRENT=$(cat "$PIDFILE" 2>/dev/null || true)
+   [ -n "$H_PID" ] && [ "$H_PID" = "$H_CURRENT" ] && pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
++  # OEM blocks are outside our HETU-chain manifest and can exist while it is healthy.
++  google_firewall_maintain "$H_PID"
+   health_collect
+   [ "$H_STATE" = degraded ] || exit 0
+   H_FIRST="$H_REASON"
+@@ -1299,8 +1377,7 @@ health_json(){ (
+ 
+ case "${1:-status}" in
+   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
+-  # Accept the current Java protocol without enabling previously unshipped controls.
+-  # Old payload behavior is DNS TCP+UDP on and no process/OEM tuning.
++  # Retain the established DNS/process protocol; only UID-scoped Google cleanup is added.
+   start)
+     case "$#" in
+       23|24) ;;
+@@ -1312,7 +1389,7 @@ case "${1:-status}" in
+         [ -z "${28}" ] || UNSUPPORTED="${UNSUPPORTED}CPU 分配；"
+         [ -z "${29}" ] || UNSUPPORTED="${UNSUPPORTED}内存限制；"
+         [ -z "${30}" ] || UNSUPPORTED="${UNSUPPORTED}I/O 权重；"
+-        [ "${31}" = 0 ] || UNSUPPORTED="${UNSUPPORTED}厂商防火墙清理；"
++        bool "${31}" || fail "厂商防火墙清理开关必须是 0 或 1"
+         [ -z "$UNSUPPORTED" ] || fail "此运行版暂不支持扩展控制：$UNSUPPORTED 请将列出的设置恢复默认值后重试"
+         ;;
+       *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/AppCrashReport.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AppCrashReport.java
+new file mode 100644
+index 0000000..1cbeee2
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AppCrashReport.java
+@@ -0,0 +1,55 @@
++package io.github.xgl34222220.hetu;
++
++import android.content.Context;
++import android.os.Build;
++import java.io.File;
++import java.io.FileOutputStream;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.Collections;
++import java.util.IdentityHashMap;
++import java.util.Set;
++
++/** One bounded local report. Exception messages and user configuration are excluded. */
++final class AppCrashReport {
++    private static final int LIMIT = 16384;
++    private static volatile String screen = "startup";
++    static void screen(String value) {
++        screen = value == null ? "unknown" : value.substring(0, Math.min(value.length(), 160));
++    }
++    static Thread.UncaughtExceptionHandler handler(Context context, Thread.UncaughtExceptionHandler previous) {
++        Context app = context.getApplicationContext();
++        return (thread, error) -> {
++            try { save(app, thread, error); } catch (Exception ignored) { }
++            finally { previous.uncaughtException(thread, error); }
++        };
++    }
++    static void save(Context context, Thread thread, Throwable error) throws java.io.IOException {
++        StringBuilder text = new StringBuilder("time=").append(System.currentTimeMillis())
++                .append("\napp=").append(BuildConfig.VERSION_NAME).append(" (").append(BuildConfig.VERSION_CODE).append(")")
++                .append("\nandroid=").append(Build.VERSION.SDK_INT).append("\nmodel=").append(Build.MODEL)
++                .append("\nscreen=").append(screen).append("\nthread=").append(thread.getName()).append('\n');
++        Set<Throwable> seen = Collections.newSetFromMap(new IdentityHashMap<>());
++        int depth = 0;
++        for (Throwable current = error; current != null && seen.add(current) && depth < 8; current = current.getCause(), depth++) {
++            text.append(depth == 0 ? "exception=" : "cause=").append(current.getClass().getName()).append('\n');
++            StackTraceElement[] trace = current.getStackTrace();
++            for (int i = 0; i < Math.min(trace.length, 48) && text.length() < LIMIT; i++)
++                text.append("  at ").append(trace[i]).append('\n');
++        }
++        byte[] data = text.substring(0, Math.min(text.length(), LIMIT / 2)).getBytes(StandardCharsets.UTF_8);
++        try (FileOutputStream stream = new FileOutputStream(new File(context.getFilesDir(), "last-app-crash.txt"))) {
++            stream.write(data, 0, Math.min(data.length, LIMIT));
++        }
++    }
++    static String read(Context context) {
++        File file = new File(context.getFilesDir(), "last-app-crash.txt");
++        if (!file.isFile()) return "尚无已记录的应用闪退";
++        try (java.io.InputStream input = Files.newInputStream(file.toPath())) {
++            byte[] buffer = new byte[LIMIT];
++            int total = 0, count;
++            while (total < buffer.length && (count = input.read(buffer, total, buffer.length - total)) > 0) total += count;
++            return new String(buffer, 0, total, StandardCharsets.UTF_8);
++        } catch (java.io.IOException error) { return "上次闪退记录暂不可读"; }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuApplication.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuApplication.java
+new file mode 100644
+index 0000000..8f92701
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuApplication.java
+@@ -0,0 +1,22 @@
++package io.github.xgl34222220.hetu;
++
++import android.app.Activity;
++import android.app.Application;
++import android.os.Bundle;
++
++public final class HetuApplication extends Application {
++    @Override public void onCreate() {
++        super.onCreate();
++        Thread.UncaughtExceptionHandler previous = Thread.getDefaultUncaughtExceptionHandler();
++        if (previous != null) Thread.setDefaultUncaughtExceptionHandler(AppCrashReport.handler(this, previous));
++        registerActivityLifecycleCallbacks(new ActivityLifecycleCallbacks() {
++            public void onActivityResumed(Activity activity) { AppCrashReport.screen(activity.getClass().getSimpleName()); }
++            public void onActivityCreated(Activity activity, Bundle state) {}
++            public void onActivityStarted(Activity activity) {}
++            public void onActivityPaused(Activity activity) {}
++            public void onActivityStopped(Activity activity) {}
++            public void onActivitySaveInstanceState(Activity activity, Bundle state) {}
++            public void onActivityDestroyed(Activity activity) {}
++        });
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyPolicyIconsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyPolicyIconsActivity.kt
+index b647eb9..c76961d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyPolicyIconsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyPolicyIconsActivity.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++
+ import io.github.xgl34222220.hetu.ui.HetuPageHeader
+ 
+ import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+@@ -253,7 +254,7 @@ private fun ProxyPolicyIconsScreen(onBack: () -> Unit) {
+                             OutlinedButton(
+                                 onClick = {
+                                     importName = name
+-                                    imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/svg+xml"))
++                                    launchDocumentPicker({ message = it }) { imagePicker.launch(arrayOf("image/png", "image/jpeg", "image/webp", "image/svg+xml")) }
+                                 },
+                                 modifier = Modifier.weight(1f),
+                                 shape = RoundedCornerShape(16.dp),
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt
+index 1245a0c..37c99fa 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++
+ import com.mikepenz.aboutlibraries.ui.compose.android.produceLibraries
+ import com.mikepenz.aboutlibraries.ui.compose.m3.LibrariesContainer
+ 
+@@ -614,7 +615,7 @@ private fun ProxyStartupConfigScreen(onBack: () -> Unit) {
+                 shape = RoundedCornerShape(16.dp),
+             ) { Icon(Icons.Rounded.ContentCopy, "复制") }
+             OutlinedButton(
+-                onClick = { exporter.launch("hetu-startup-config.yaml") },
++                onClick = { launchDocumentPicker({ message = it }) { exporter.launch("hetu-startup-config.yaml") } },
+                 enabled = text.isNotBlank(),
+                 shape = RoundedCornerShape(16.dp),
+             ) { Icon(Icons.Rounded.SaveAlt, "导出") }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index e3ba7c5..7b09705 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 147;
++    static final int RUNTIME_REVISION = 148;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+index 57ff543..d0d1f54 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++
+ import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
+ 
+ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
+@@ -241,7 +242,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             item("custom-title") {
+                 Row(Modifier.fillMaxWidth().padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                     Text("自定义脚本", color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+-                    TextButton(onClick = { importer.launch(arrayOf("text/*", "application/octet-stream")) }, enabled = !busy) {
++                    TextButton(onClick = { launchDocumentPicker({ message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }, enabled = !busy) {
+                         Icon(Icons.Rounded.Add, null, Modifier.size(24.dp), tint = t.textPrimary)
+                         Spacer(Modifier.width(6.dp))
+                         Text("导入", color = t.textPrimary, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
+@@ -291,7 +292,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             CompositionLocalProvider(LocalHx provides menuColors) {
+                 HxAnchoredMenu(anchor, onDismiss = { menuOpen = false }, minWidth = 160.dp, anchorEndInset = 0.dp) { close ->
+                     HxMenuItem("导入自定义脚本", icon = Icons.Rounded.Add, onClick = {
+-                        close { menuOpen = false; importer.launch(arrayOf("text/*", "application/octet-stream")) }
++                        close { menuOpen = false; launchDocumentPicker({ message = it }) { importer.launch(arrayOf("text/*", "application/octet-stream")) } }
+                     })
+                     HorizontalDivider(Modifier.padding(horizontal = 14.dp), thickness = .5.dp, color = t.outline.copy(alpha = .55f))
+                     HxMenuItem("脚本环境", icon = Icons.Outlined.Info, onClick = {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+index 8d5bd43..d79929a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++
+ import android.content.Intent
+ import android.graphics.Typeface
+ import android.net.Uri
+@@ -333,7 +334,7 @@ private fun ProxySubscriptionScreen(onBack: () -> Unit) {
+                         }
+                         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                             FilledTonalButton(
+-                                onClick = { importLauncher.launch(arrayOf("*/*")) },
++                                onClick = { launchDocumentPicker({ message = it }) { importLauncher.launch(arrayOf("*/*")) } },
+                                 modifier = Modifier.weight(1f).height(46.dp),
+                                 shape = CircleShape,
+                                 colors = ButtonDefaults.filledTonalButtonColors(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index 365e093..482853a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -819,6 +819,7 @@ final class RootProxyManager {
+     String diagnostics(){
+         RootBridge.requireWorkerThread();
+         DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
++        report.section("上次应用闪退（本地记录）",AppCrashReport.read(context),16384);
+         StringBuilder events=new StringBuilder("time=").append(new Date())
+                 .append("\napp=").append(BuildConfig.VERSION_NAME)
+                 .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
+@@ -876,6 +877,9 @@ final class RootProxyManager {
+             report.section("网络完整性（不等同于外部网站可达）",networkHealth().toString(),2500);
+             RootBridge.Result repairs=RootBridge.rootShell(context,"tail -n 30 "+RootBridge.quote(ROOT+"/run/network-repair.log")+" 2>/dev/null; true",3000L);
+             report.section("网络原位修复记录",repairs.output,5000);
++            RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
++                    +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
++            report.section("Google 服务防火墙修复",google.output,5000);
+         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
+         try{
+             int wechatUid=-1;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146FeaturesActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146FeaturesActivity.kt
+index 67a9136..b4fd62f 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146FeaturesActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146FeaturesActivity.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+ 
++
+ import android.content.Intent
+ import android.os.Bundle
+ import androidx.activity.ComponentActivity
+@@ -109,9 +110,9 @@ internal fun Runtime146Features(onBack: () -> Unit) {
+         } }
+         item { RefSectionLabel("备份与恢复") }
+         item { RefGroup {
+-            RefToolRow(Icons.Rounded.UploadFile, Color(0xFF2A62E8), "导出备份", if (busy) "正在处理…" else "导出应用设置与配置库") { if (!busy) exporter.launch("Hetu-backup.json") }
++            RefToolRow(Icons.Rounded.UploadFile, Color(0xFF2A62E8), "导出备份", if (busy) "正在处理…" else "导出应用设置与配置库") { if (!busy) launchDocumentPicker({ message = it }) { exporter.launch("Hetu-backup.json") } }
+             RefDivider()
+-            RefToolRow(Icons.Rounded.Restore, Color(0xFF2A62E8), "恢复备份", "恢复前确认，不自动卸载或清除应用数据") { if (!busy) importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }
++            RefToolRow(Icons.Rounded.Restore, Color(0xFF2A62E8), "恢复备份", "恢复前确认，不自动卸载或清除应用数据") { if (!busy) launchDocumentPicker({ message = it }) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } }
+             RefDivider()
+             RefToolRow(Icons.Rounded.Info, Color(0xFF5D6670), "关于河图", "版本、开源许可与支持") { open(ProxyAboutActivity::class.java) }
+         } }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+index d7ba416..5919cbd 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+@@ -303,7 +303,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+                     menuFor = null
+                     perform("已切换到 ${config.name}", true) { vm.controller.selectConfig(config.name) }
+                 })
+-                add(HxMenuAction("导出配置", Icons.Rounded.IosShare) { menuFor = null; exportFor = config; exporter.launch(config.name) })
++                add(HxMenuAction("导出配置", Icons.Rounded.IosShare) { menuFor = null; exportFor = config; launchDocumentPicker(vm::toast) { exporter.launch(config.name) } })
+                 if (!config.bundled) {
+                     add(HxMenuAction("重命名", Icons.Rounded.DriveFileRenameOutline) { menuFor = null; renameFor = config })
+                     add(HxMenuAction("删除配置", Icons.Rounded.DeleteOutline, danger = true) { menuFor = null; confirmDelete = config })
+@@ -487,7 +487,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+                         Text("配置文件", style = MaterialTheme.typography.titleSmall, color = c.text)
+                         if (uri != null) HxRow(fileName, icon = Icons.Rounded.Description)
+                         HxNavRow(if (uri == null) "选择配置文件" else "重新选择文件", icon = Icons.Rounded.FolderOpen) {
+-                            if (!busy) chooser.launch(arrayOf("*/*"))
++                            if (!busy) launchDocumentPicker(vm::toast) { chooser.launch(arrayOf("*/*")) }
+                         }
+                         if (attempted && uri == null) Text("请选择配置文件", style = MaterialTheme.typography.bodySmall, color = c.bad)
+                     }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DocumentPickerSafety.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DocumentPickerSafety.kt
+new file mode 100644
+index 0000000..3170511
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DocumentPickerSafety.kt
+@@ -0,0 +1,15 @@
++package io.github.xgl34222220.hetu
++
++import android.content.ActivityNotFoundException
++
++/** Missing or disabled OEM DocumentsUI is an actionable error, not a click crash. */
++internal fun launchDocumentPicker(onError: (String) -> Unit, launch: () -> Unit): Boolean = try {
++    launch()
++    true
++} catch (_: ActivityNotFoundException) {
++    onError("系统文件选择器不可用，请启用文件管理或文档应用后重试")
++    false
++} catch (_: SecurityException) {
++    onError("系统拒绝打开文件选择器，请检查文档应用权限")
++    false
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+index 5532c92..2e74687 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
+@@ -231,6 +231,7 @@ internal fun HetuRoot(vm: HetuViewModel) {
+     val routeHolder = rememberSaveableStateHolder()
+     val scope = rememberCoroutineScope()
+     val c = Hx.colors
++    androidx.compose.runtime.SideEffect { AppCrashReport.screen("${vm.tab.name}/${nav.current.key}") }
+ 
+     // Predictive back: the page follows the finger (shrinks toward the swipe edge with
+     // rounded corners); releasing completes the normal return transition from there.
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+index 825d8c0..d77a122 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -430,7 +430,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
+                             "导入",
+                             onClick = {
+                                 importTarget = status.id
+-                                importer.launch(arrayOf("*/*"))
++                                launchDocumentPicker(vm::toast) { importer.launch(arrayOf("*/*")) }
+                             },
+                             icon = Icons.Rounded.FileOpen,
+                             filled = false,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index 7965c45..8e4c39a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -201,7 +201,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+                     SettingsGroup {
+                         SettingsRow("创建备份", subtitle = "导出当前配置与偏好设置", icon = Icons.Rounded.CloudSync, iconTint = c.text)
+                         Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+-                            HxButton("导出备份", onClick = { exporter.launch("Hetu-backup.json") }, modifier = Modifier.fillMaxWidth(), icon = Icons.Rounded.UploadFile)
++                            HxButton("导出备份", onClick = { launchDocumentPicker(vm::toast) { exporter.launch("Hetu-backup.json") } }, modifier = Modifier.fillMaxWidth(), icon = Icons.Rounded.UploadFile)
+                         }
+                     }
+                 }
+@@ -211,7 +211,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
+                     SettingsGroup {
+                         SettingsRow("从文件恢复", subtitle = "选择河图备份文件，恢复前会再次确认", icon = Icons.Rounded.Restore, iconTint = c.text)
+                         Box(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp)) {
+-                            HxButton("选择文件", onClick = { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) }, modifier = Modifier.fillMaxWidth(), filled = false)
++                            HxButton("选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } }, modifier = Modifier.fillMaxWidth(), filled = false)
+                         }
+                     }
+                 }
+@@ -585,7 +585,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+                         Text("配置选择", style = MaterialTheme.typography.titleSmall, color = c.text, modifier = Modifier.weight(1f))
+                         Icon(
+                             Icons.Rounded.AddCircleOutline, "导入配置", tint = c.text,
+-                            modifier = Modifier.size(26.dp).clip(CircleShape).clickable { importConfig.launch(arrayOf("*/*")) }.padding(2.dp),
++                            modifier = Modifier.size(26.dp).clip(CircleShape).clickable { launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) } }.padding(2.dp),
+                         )
+                     }
+                     configs.forEachIndexed { index, config ->
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
+index a6f0f11..b340437 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
+@@ -78,7 +78,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+                         IconButton(onClick = { hxCopy(context, "启动配置", text) }, enabled = text.isNotBlank()) {
+                             Icon(Icons.Rounded.ContentCopy, "复制", tint = Hx.colors.textMuted)
+                         }
+-                        IconButton(onClick = { exporter.launch("hetu-startup-config.yaml") }, enabled = text.isNotBlank()) {
++                        IconButton(onClick = { launchDocumentPicker({ message = it }) { exporter.launch("hetu-startup-config.yaml") } }, enabled = text.isNotBlank()) {
+                             Icon(Icons.Rounded.IosShare, "导出", tint = Hx.colors.textMuted)
+                         }
+                     }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index 0f50fb0..6161312 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -746,7 +746,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+         title = "文件管理", onDismiss = { moreMenu = false },
+         dimBehind = false,
+         actions = listOf(
+-            HxMenuAction("导入", Icons.Rounded.FileUpload) { moreMenu = false; importer.launch(arrayOf("*/*")) },
++            HxMenuAction("导入", Icons.Rounded.FileUpload) { moreMenu = false; launchDocumentPicker(vm::toast) { importer.launch(arrayOf("*/*")) } },
+             HxMenuAction("下载", Icons.Rounded.SystemUpdateAlt) { moreMenu = false; downloadDialog = true },
+             HxMenuAction("新建文件", Icons.Rounded.NoteAdd) { moreMenu = false; createFolder = false },
+             HxMenuAction("新建文件夹", Icons.Rounded.CreateNewFolder) { moreMenu = false; createFolder = true },
+@@ -763,7 +763,7 @@ private fun FileFolderPage(vm: HetuViewModel, path: String, onOpen: (String) ->
+                 if (entry.directory) add(HxMenuAction("打开", Icons.Rounded.FolderOpen) { menuFor = null; onOpen(entry.path) })
+                 else add(HxMenuAction("编辑", Icons.Outlined.Edit) { menuFor = null; openFile(entry) })
+                 add(HxMenuAction("重命名", FileRenameGlyph) { menuFor = null; renameFor = entry })
+-                if (!entry.directory) add(HxMenuAction("导出", Icons.Rounded.IosShare) { menuFor = null; exportFor = entry; exporter.launch(entry.name) })
++                if (!entry.directory) add(HxMenuAction("导出", Icons.Rounded.IosShare) { menuFor = null; exportFor = entry; launchDocumentPicker(vm::toast) { exporter.launch(entry.name) } })
+                 add(HxMenuAction("删除", Icons.Rounded.DeleteOutline, danger = true) { menuFor = null; deleteFor = entry })
+             },
+             onDismiss = { menuFor = null },
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java
+new file mode 100644
+index 0000000..73bfd7b
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java
+@@ -0,0 +1,52 @@
++package io.github.xgl34222220.hetu;
++
++import android.app.Application;
++import android.content.Context;
++import androidx.test.core.app.ApplicationProvider;
++import java.io.File;
++import java.nio.file.Files;
++import org.junit.Test;
++import org.junit.runner.RunWith;
++import org.robolectric.RobolectricTestRunner;
++import org.robolectric.annotation.Config;
++import static org.junit.Assert.*;
++
++@RunWith(RobolectricTestRunner.class)
++@Config(sdk=35, application=Application.class)
++public class AppCrashReportTest {
++    @Test public void capturesSourceLocationAndCauseWithoutMessageSecrets() throws Exception {
++        Context context=ApplicationProvider.getApplicationContext();
++        AppCrashReport.screen("Tools/files");
++        Throwable cause=new SecurityException("token=private subscription");
++        Throwable error=new IllegalStateException("https://private.example/sub?secret=123",cause);
++        AppCrashReport.save(context,Thread.currentThread(),error);
++        String report=AppCrashReport.read(context);
++        assertTrue(report.contains("Tools/files"));
++        assertTrue(report.contains("java.lang.SecurityException"));
++        assertTrue(report.contains("AppCrashReportTest.java:"));
++        assertFalse(report.contains("private.example"));
++        assertFalse(report.contains("token=private"));
++    }
++    @Test public void overwritesPreviousCrashAndBoundsStoredSize() throws Exception {
++        Context context=ApplicationProvider.getApplicationContext();
++        StackTraceElement[] trace=new StackTraceElement[2000];
++        java.util.Arrays.fill(trace,new StackTraceElement("VeryLong".repeat(500),"method","Source.java",123));
++        Throwable error=new RuntimeException("message");error.setStackTrace(trace);
++        AppCrashReport.save(context,Thread.currentThread(),error);
++        assertTrue(new File(context.getFilesDir(),"last-app-crash.txt").length()<=16384);
++        AppCrashReport.save(context,Thread.currentThread(),new NullPointerException("latest"));
++        assertTrue(AppCrashReport.read(context).contains("java.lang.NullPointerException"));
++        assertFalse(AppCrashReport.read(context).contains("VeryLong"));
++    }
++    @Test public void recordingFailureStillDelegatesToAndroidCrashHandler() throws Exception {
++        Context context=ApplicationProvider.getApplicationContext();
++        File file=new File(context.getFilesDir(),"last-app-crash.txt");
++        Files.deleteIfExists(file.toPath());assertTrue(file.mkdir());
++        final Throwable[] delivered=new Throwable[1];
++        Throwable error=new IllegalArgumentException("real failure");
++        try {
++            AppCrashReport.handler(context,(thread,failure)->delivered[0]=failure).uncaughtException(Thread.currentThread(),error);
++            assertSame(error,delivered[0]);
++        } finally { assertTrue(file.delete()); }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt
+new file mode 100644
+index 0000000..236af85
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt
+@@ -0,0 +1,34 @@
++package io.github.xgl34222220.hetu
++
++import android.content.ActivityNotFoundException
++import android.app.Application
++import org.junit.Assert.*
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class DocumentPickerSafetyTest {
++    @Test fun absentOemPickerReturnsVisibleError() {
++        var message = ""
++        assertFalse(launchDocumentPicker({ message = it }) { throw ActivityNotFoundException("missing DocumentsUI") })
++        assertTrue(message.contains("文件选择器不可用"))
++    }
++    @Test fun disabledDocumentProviderDoesNotCrashClick() {
++        var message = ""
++        assertFalse(launchDocumentPicker({ message = it }) { throw SecurityException("provider disabled") })
++        assertTrue(message.contains("拒绝"))
++    }
++    @Test fun successfulPickerStillLaunchesExactlyOnce() {
++        var launched = 0
++        assertTrue(launchDocumentPicker({ fail(it) }) { launched++ })
++        assertEquals(1, launched)
++    }
++    @Test fun programmingErrorsAreNotSwallowed() {
++        val failure = IllegalStateException("real bug")
++        try { launchDocumentPicker({ fail(it) }) { throw failure }; fail("must propagate") }
++        catch (actual: IllegalStateException) { assertSame(failure, actual) }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index 32c3e13..5ecadfb 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -35,8 +35,8 @@ class Runtime146ContractTest {
+     }
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+-        // V20.60 explicitly introduced startup-protocol revision 147; UI-only deltas keep it.
+-        assertEquals(147, ProxyRuntimeSettings.RUNTIME_REVISION)
++        // V20.72 adds opt-in Google firewall repair to the shipped Root shell.
++        assertEquals(148, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, p))
+     }
