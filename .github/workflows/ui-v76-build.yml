@@ -523,6 +523,7 @@ jobs:
   push:
     branches:
     - test/v20.76-new-ui
+    - main
     paths:
     - android-app/**
     - updates/v2082-new-ui/**

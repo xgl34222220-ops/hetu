@@ -1,13 +1,5 @@
 name: UI92 Runtime146 experience UI8
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/ui92-runtime146-experience8.yml'
-      - 'tools/apply_ui92_runtime146_experience8.py'
-      - 'tools/fix_ui8_layout.py'
-      - 'android-app/app/src/main/java/io/github/xgl34222220/hetu/HomeExperience8.kt'
-      - 'android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi8ExperienceTest.kt'
   workflow_dispatch:
 permissions:
   contents: write
