@@ -28,6 +28,20 @@ def predecessor_view(root, destination):
     missing = previous.keys() - compilation_inputs(root)
     assert missing <= EXTERNAL_PAYLOAD_FILES
     final = {**previous, **layer['changedOrAddedFiles']}
+    reverse_patches = [patch]
+    # Newer presentation layers sit on top of the recorded function map. Their
+    # deltas are legitimate current bytes; they are overlaid here and reversed
+    # first so the disposable view still lands on the exact pre-function tree.
+    homepanel_inputs = root / 'updates/v2087-home-panel-refactor/inputs.json'
+    if homepanel_inputs.exists():
+        from homepanel87_source_scope import validate_layer as validate_homepanel_layer
+        homepanel = json.loads(homepanel_inputs.read_text())
+        validate_homepanel_layer(homepanel, final)
+        homepanel_patch = homepanel_inputs.with_name('ui.patch')
+        assert digest(homepanel_patch) == homepanel['patchSha256'], \
+            'Home/panel patch changed without input update'
+        final = {**final, **homepanel['changedOrAddedFiles']}
+        reverse_patches.insert(0, homepanel_patch)
     # Every available current byte must match the recorded final map before
     # copying/reversing; this never hides unknown production changes.
     available_final = {name: sha for name, sha in final.items() if name not in missing}
@@ -42,8 +56,9 @@ def predecessor_view(root, destination):
     subprocess.run(['git', 'init', '-q'], cwd=destination, check=True)
     for commit in BASE_OBJECTS:
         subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1', str(root), commit], cwd=destination, check=True)
-    subprocess.run(['git', 'apply', '--check', '-R', str(patch)], cwd=destination, check=True)
-    subprocess.run(['git', 'apply', '-R', str(patch)], cwd=destination, check=True)
+    for reverse_patch in reverse_patches:
+        subprocess.run(['git', 'apply', '--check', '-R', str(reverse_patch)], cwd=destination, check=True)
+        subprocess.run(['git', 'apply', '-R', str(reverse_patch)], cwd=destination, check=True)
     validate_source_transforms(destination, root)
     validate_checkout_matches_generated(destination, destination, {name: sha for name, sha in previous.items() if name not in missing})
     return {'baselineInputs': len(previous), 'locallyVerifiedBaselineInputs': len(previous) - len(missing),
