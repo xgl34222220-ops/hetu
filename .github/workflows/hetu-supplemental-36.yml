@@ -1,0 +1,93 @@
+name: Hetu supplemental 36 legacy regression checks
+'on':
+  push:
+    branches:
+    - test/v20.76-new-ui
+    paths:
+    - .github/workflows/hetu-supplemental-36.yml
+  workflow_dispatch: null
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hetu-supplemental36-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  supplemental36:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - name: Load bounded function fixes and fetch exact prior objects
+      run: 'set -euo pipefail
+
+        git fetch --no-tags --depth=1 origin 1dbe40cc4e312c230524092dfe32a2c6cfb5f25d
+
+        git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c
+
+        git fetch --no-tags --depth=1 origin ec211b9ad81748dee30fec43f0a25849559e4623
+
+        python3 .github/scripts/functionfix_ci_config.py export
+
+        '
+    - name: Regenerate and verify integrated effective source
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: "set -euo pipefail\nmkdir -p \"$RUNNER_TEMP/hetu-v2081-source\"\ngh run download 37171744564 --repo \"$GITHUB_REPOSITORY\"\
+        \ --name Hetu-V20.81-effective-source --dir \"$RUNNER_TEMP/hetu-v2081-source\"\nARCHIVE=\"$RUNNER_TEMP/hetu-v2081-source/Hetu-V20.81-effective-source.tar.gz\"\
+        \n# Only ignored native binaries are restored; all effective source is checked in.\npython3 - \"$ARCHIVE\" <<'PYINNER'\n\
+        import hashlib,sys,tarfile\nfrom pathlib import Path\np=Path(sys.argv[1])\nassert hashlib.sha256(p.read_bytes()).hexdigest()=='6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730'\n\
+        with tarfile.open(p) as z:\n for m in z.getmembers():\n  if m.isfile() and (m.name.startswith('android-app/app/src/main/jniLibs/')\
+        \ or m.name.startswith('android-app/app/src/main/assets/mihomo-root/') or m.name=='android-app/app/src/main/assets/mihomo-revision.txt'):\n\
+        \   q=Path(m.name);q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(z.extractfile(m).read())\nPYINNER\npython3\
+        \ .github/scripts/prepare_new_ui_source.py \"$ARCHIVE\"\npython3 .github/scripts/functionfix_ci_config.py runtime-snapshot\n\
+        sh -n android-app/app/src/main/assets/hetu-root.sh\nsh -n android-app/app/src/main/assets/hetu-autostart.sh\npython3\
+        \ tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt\npython3 tools/qa/test_google_firewall.py\
+        \ 2>&1 | tee out/verification/google-firewall-tests.txt\npython3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt\n\
+        python3 tools/qa/test_network_recovery_stress.py --before out/verification/v2078-network-service.java --output out/verification/network-recovery-stress.json\n\
+        python3 tools/qa/test_network_journal_stress.py --before out/verification/v2079-network-journal.java --output out/verification/network-journal-stress.json\n\
+        python3 tools/qa/test_network_journal_symbols.py --before out/verification/v2080-network-journal.java --output out/verification/network-journal-symbols.json\n"
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Prepare Android SDK
+      run: 'set -euo pipefail
+
+        SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path ''*/bin/sdkmanager'' | sort | tail -n 1)
+
+        yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+        "$SDKMANAGER" ''platforms;android-37.0'' ''build-tools;37.0.0''
+
+        '
+    - uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 9.5.0
+    - name: Run all 36 legacy supplemental tests without changing assertions
+      working-directory: android-app
+      run: 'set -euo pipefail
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx3g -Dfile.encoding=UTF-8'' :app:testDebugUnitTest --tests
+        ''*CompactHomeDashboardTest'' --tests ''*Ui92IntegrationTest'' --tests ''*NodeSelectionContinuityTest'' --stacktrace'
+    - name: Verify exact supplemental reports including failures
+      if: always()
+      run: "python3 - <<'PYINNER'\nfrom pathlib import Path\nimport json,xml.etree.ElementTree as ET\nexpected={'io.github.xgl34222220.hetu.CompactHomeDashboardTest':29,'io.github.xgl34222220.hetu.Ui92IntegrationTest':3,'io.github.xgl34222220.hetu.NodeSelectionContinuityTest':4}\n\
+        rows={}\nfor p in Path('android-app/app/build/test-results/testDebugUnitTest').glob('TEST-*.xml'):\n r=ET.parse(p).getroot();rows[r.attrib['name']]={k:int(r.get(k,'0'))\
+        \ for k in ('tests','failures','errors','skipped')}\nPath('supplemental-evidence').mkdir(exist_ok=True)\nPath('supplemental-evidence/36-test-result.json').write_text(json.dumps({'expected':expected,'actual':rows},indent=2))\n\
+        print(json.dumps(rows,indent=2))\nassert set(rows)==set(expected), 'Missing or unexpected suites'\nfor n,count in\
+        \ expected.items():\n assert rows[n]==dict(tests=count,failures=0,errors=0,skipped=0),(n,rows[n])\nPYINNER"
+    - name: Preserve supplemental XML independently from the 545-test gate
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.86-supplemental-36-tests
+        path: 'android-app/app/build/test-results/testDebugUnitTest/
+
+          android-app/app/build/reports/tests/testDebugUnitTest/
+
+          supplemental-evidence/'
+        if-no-files-found: error
