@@ -259,6 +259,30 @@ def main():
                                'allOriginal487TestsPreserved': True,
                                'rootScriptSha256': function['rootScriptSha256'],
                                'runtimePayloadCount': 23}
+        homepanel_report = None
+        homepanel_inputs = ROOT / 'updates/v2087-home-panel-refactor/inputs.json'
+        if homepanel_inputs.exists():
+            from homepanel87_source_scope import validate_layer as validate_homepanel_layer
+            assert function_report is not None, 'Home/panel refactor requires the verified function-fix layer'
+            homepanel = json.loads(homepanel_inputs.read_text())
+            validate_homepanel_layer(homepanel, final_files)
+            homepanel_patch = homepanel_inputs.with_name('ui.patch')
+            assert digest(homepanel_patch) == homepanel['patchSha256'], \
+                'Home/panel patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'Home/panel refactor baseline mismatch: ' + name
+            apply(homepanel_patch, work)
+            for name, sha in homepanel['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Home/panel refactor source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(homepanel['changedOrAddedFiles'])
+            homepanel_report = {'baseCommit': homepanel['baseCommit'],
+                                'patchSha256': homepanel['patchSha256'],
+                                'changedOrAddedFiles': len(homepanel['changedOrAddedFiles']),
+                                'versionCode': homepanel['versionCode'],
+                                'versionName': homepanel['versionName'],
+                                'protectedRuntimeUnchanged': True,
+                                'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)
