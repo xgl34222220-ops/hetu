@@ -341,6 +341,9 @@ private fun buildPanelData(
     subscriptionUpdates: Map<String, PanelUpdate>,
     ruleSetUpdates: Map<String, PanelUpdate>,
     sampler: PanelTrafficSampler,
+    testingGroups: Set<String> = emptySet(),
+    testingAll: Boolean = false,
+    switching: Map<String, String> = emptyMap(),
 ): PanelData {
     if (!state.running) return PanelData(status = if (starting) PanelStatus.Starting else PanelStatus.NotRunning)
     if (state.controllerReadFailed) return PanelData(status = PanelStatus.Running,
@@ -377,6 +380,7 @@ private fun buildPanelData(
             id = c.id,
             host = host,
             time = c.startedAt.takeIf { it.isNotBlank() },
+            timeLabel = formatStarted(c.startedAt),
             network = c.network.substringBefore(" · ").uppercase(Locale.ROOT),
             inbound = c.inbound,
             kind = when {
@@ -408,6 +412,12 @@ private fun buildPanelData(
         globalMode = state.trafficMode.equals("global", ignoreCase = true),
         groups = groups,
         delays = nodeDelays,
+        // The core is up but the controller has not answered once yet: placeholders, not empty states.
+        loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
+        testingGroups = testingGroups,
+        testingAll = testingAll,
+        // Only a pick the core has not confirmed yet counts as switching.
+        switching = switching.filter { (group, node) -> state.groups.firstOrNull { it.name == group }?.now != node },
         overview = PanelOverview(
             strategyCount = groups.count { !it.hidden && !it.isGlobal },
             ruleCount = rules.size,
@@ -448,6 +458,18 @@ private fun buildPanelData(
             )
         },
     )
+}
+
+/** “2026-10-02T08:00:00.12Z” → the local clock time “16:00:00”; anything unparseable keeps its time part. */
+private fun formatStarted(raw: String): String? {
+    val value = raw.trim()
+    if (value.isEmpty()) return null
+    return try {
+        java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalTime()
+            .withNano(0).format(java.time.format.DateTimeFormatter.ISO_LOCAL_TIME)
+    } catch (_: Exception) {
+        if (value.length >= 19 && value[10] == 'T') value.substring(11, 19) else value
+    }
 }
 
 private fun formatExpire(expire: Long): String {
@@ -652,18 +674,23 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     }
     val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
         vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
-        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler).copy(
+        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler,
+        testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
+        switching = vm.pendingSelection.toMap()).copy(
         refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
             PanelTab.Rules -> vm.rulesLoading
             PanelTab.RuleSets -> vm.ruleSetsLoading
             PanelTab.Logs -> vm.logsLoading
             else -> vm.refreshing
         },
+        updatingAllSubscriptions = vm.providersUpdatingAll,
+        updatingAllRuleSets = vm.ruleSetsUpdatingAll,
     )
     val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
     val actions = PanelActions(
         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
+        onTestAll = vm::testAll,
         onUpdateSubscription = vm::updateProvider, onUpdateAllSubscriptions = vm::updateAllProviders,
         onCloseConnection = vm::closeConnection, onCloseAllConnections = vm::closeAll,
         onRefreshRules = vm::loadRules, onUpdateRuleSet = vm::updateRuleSet,

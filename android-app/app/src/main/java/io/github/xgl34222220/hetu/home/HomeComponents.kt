@@ -4,6 +4,7 @@ import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
@@ -15,29 +16,41 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -45,25 +58,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.drawscope.clipRect
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.hazeEffect
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
+import dev.chrisbanes.haze.materials.HazeMaterials
+import dev.chrisbanes.haze.rememberHazeState
+import io.github.xgl34222220.hetu.ui.ht
+import kotlin.math.abs
+import kotlin.math.min
 
 /* ------------------------------------------------------------------ */
 /*  Haptics hook: the host maps these to HetuHaptics                    */
@@ -77,31 +107,32 @@ internal val LocalHomeHaptics = staticCompositionLocalOf<(HomeHaptic) -> Unit> {
 /*  Surfaces                                                            */
 /* ------------------------------------------------------------------ */
 
-/** White card with a 1 px hairline. No elevation anywhere on resting surfaces. */
+/**
+ * Near-white card on the lavender canvas: 24 dp continuous corners, no border and no shadow.
+ * A clickable card dips as a whole (surface included) while pressed.
+ */
 @Composable
 internal fun HomeCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
     clickLabel: String? = null,
     background: Color = LocalHomeColors.current.surface,
+    shape: Shape = HomeDims.cardShape,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    val base = modifier
-        .clip(HomeDims.cardShape)
-        .background(background)
-        .border(1.dp, c.line, HomeDims.cardShape)
-    val interactive = if (onClick == null) base else base.homeTap(onClickLabel = clickLabel, role = Role.Button) {
+    val label = clickLabel?.let { ht(it) }
+    val tappable = if (onClick == null) modifier else modifier.homeTap(onClickLabel = label, role = Role.Button) {
         haptics(HomeHaptic.Tap)
         onClick()
     }
-    Column(interactive, content = content)
+    Column(tappable.clip(shape).background(background), content = content)
 }
 
+/** Hairline between rows of one card. [inset] keeps it clear of the card's rounded edges. */
 @Composable
-internal fun HomeDivider(modifier: Modifier = Modifier) {
-    Box(modifier.fillMaxWidth().height(1.dp).background(LocalHomeColors.current.line))
+internal fun HomeDivider(modifier: Modifier = Modifier, inset: Dp = 0.dp) {
+    Box(modifier.fillMaxWidth().padding(horizontal = inset).height(1.dp).background(LocalHomeColors.current.line))
 }
 
 @Composable
@@ -110,7 +141,7 @@ internal fun HomeVerticalDivider(modifier: Modifier = Modifier) {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Small pieces                                                        */
+/*  Tones                                                               */
 /* ------------------------------------------------------------------ */
 
 internal enum class HomeTone { Neutral, Accent, Good, Warn, Bad }
@@ -137,7 +168,29 @@ internal fun HomeTone.soft(): Color = LocalHomeColors.current.let { c ->
     }
 }
 
-/** 20 dp tall label. [outlined] draws a hairline instead of a fill (used for the hero tags). */
+/** The tone as text on its own soft fill or on a card: deep enough to read at small sizes. */
+@Composable
+internal fun HomeTone.text(): Color = LocalHomeColors.current.let { c ->
+    when (this) {
+        HomeTone.Neutral -> c.t2
+        HomeTone.Accent -> c.accent
+        HomeTone.Good -> c.goodText
+        HomeTone.Warn -> c.warnText
+        HomeTone.Bad -> c.badText
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Shared with 工具: signatures and geometry stay as they were         */
+/* ------------------------------------------------------------------ */
+
+private val SharedBadgeShape = RoundedCornerShape(6.dp)
+private val SharedBannerShape = RoundedCornerShape(12.dp)
+private val SharedBadgeText = TextStyle(fontSize = 11.5.sp, lineHeight = 14.sp, fontWeight = FontWeight.Medium)
+private val SharedNoteText = TextStyle(fontSize = 13.sp, lineHeight = 18.sp)
+private val SharedNoteStrongText = TextStyle(fontSize = 13.sp, lineHeight = 18.sp, fontWeight = FontWeight.SemiBold)
+
+/** 20 dp tall label. [outlined] draws a hairline instead of a fill. 工具 pages use it as it is. */
 @Composable
 internal fun HomeBadge(
     text: String,
@@ -149,45 +202,48 @@ internal fun HomeBadge(
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
-    val shaped = modifier.height(20.dp).clip(HomeDims.badgeShape).let {
-        if (outlined) it.border(1.dp, c.line2, HomeDims.badgeShape) else it.background(tone.soft())
+    val shaped = modifier.height(20.dp).clip(SharedBadgeShape).let {
+        if (outlined) it.border(1.dp, c.line2, SharedBadgeShape) else it.background(tone.soft())
     }
     val interactive = if (onClick == null) shaped else shaped.homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
     Row(interactive.padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         if (icon != null) Icon(icon, null, Modifier.size(12.dp), tint = tone.foreground())
-        Text(text, color = tone.foreground(), style = HomeType.badge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(text, color = tone.foreground(), style = SharedBadgeText, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
-/** Two-letter region code in a hairline box. Replaces flag emoji so every device renders it the same. */
+/** Inline status strip used by the 工具 pages: validation results and risk notes. */
 @Composable
-internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+internal fun HomeBanner(
+    text: String,
+    icon: ImageVector,
+    modifier: Modifier = Modifier,
+    tone: HomeTone = HomeTone.Warn,
+    actionLabel: String? = null,
+    onAction: (() -> Unit)? = null,
+) {
     val c = LocalHomeColors.current
-    val text = code.trim().uppercase().take(3)
-    if (text.isEmpty()) return
-    Box(
-        modifier.height(16.dp).widthIn(min = 22.dp).border(1.dp, c.line2, HomeDims.chipShape).padding(horizontal = 3.dp),
-        contentAlignment = Alignment.Center,
-    ) { Text(text, color = c.t2, style = HomeType.regionCode, maxLines = 1) }
-}
-
-@Composable
-internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp) {
-    Box(modifier.size(size).background(color, CircleShape))
-}
-
-/** Latency with semantic colour: < 150 good, < 300 warn, otherwise bad; timeout bad; unknown t3. */
-@Composable
-internal fun HomeDelayText(delayMs: Long?, modifier: Modifier = Modifier, style: TextStyle = HomeType.delay) {
-    val c = LocalHomeColors.current
-    val (text, color) = when {
-        delayMs == null -> "未知" to c.t3
-        delayMs < 0 -> "超时" to c.bad
-        delayMs < 150 -> "$delayMs ms" to c.good
-        delayMs < 300 -> "$delayMs ms" to c.warn
-        else -> "$delayMs ms" to c.bad
+    val haptics = LocalHomeHaptics.current
+    Row(
+        modifier
+            .fillMaxWidth()
+            .heightIn(min = 44.dp)
+            .clip(SharedBannerShape)
+            .background(tone.soft())
+            .padding(start = 14.dp, end = if (actionLabel == null) 14.dp else 6.dp, top = 6.dp, bottom = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(icon, null, Modifier.size(16.dp), tint = tone.foreground())
+        Spacer(Modifier.width(8.dp))
+        Text(text, Modifier.weight(1f), color = tone.foreground(), style = SharedNoteText)
+        if (actionLabel != null && onAction != null) {
+            Box(
+                Modifier.clip(SharedBadgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
+                    .heightIn(min = 32.dp).padding(horizontal = 8.dp),
+                contentAlignment = Alignment.Center,
+            ) { Text(actionLabel, color = c.accent, style = SharedNoteStrongText, maxLines = 1) }
+        }
     }
-    Text(text, modifier, color = color, style = style, maxLines = 1)
 }
 
 @Composable
@@ -206,31 +262,184 @@ internal fun HomeSpinner(modifier: Modifier = Modifier, size: Dp = 16.dp, color:
     }
 }
 
+/* ------------------------------------------------------------------ */
+/*  Small pieces                                                        */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Capsule label of the concept: 「详情」「已选择」「80%」「INFO」. Soft fill of its tone with the
+ * tone's readable text colour; both cross-fade when the tone changes. With [onClick] it is a button.
+ */
 @Composable
-internal fun HomeProgressBar(fraction: Float?, modifier: Modifier = Modifier, color: Color = LocalHomeColors.current.accent) {
-    val c = LocalHomeColors.current
-    Box(modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(2.dp)).background(c.sunken)) {
-        val value = fraction?.coerceIn(0f, 1f) ?: 0f
-        if (value > 0f) Box(Modifier.fillMaxWidth(value).height(4.dp).clip(RoundedCornerShape(2.dp)).background(color))
+internal fun HomePill(
+    text: String,
+    modifier: Modifier = Modifier,
+    tone: HomeTone = HomeTone.Accent,
+    icon: ImageVector? = null,
+    height: Dp = 24.dp,
+    style: TextStyle = HomeType.badge,
+    leading: (@Composable () -> Unit)? = null,
+    onClick: (() -> Unit)? = null,
+) {
+    val haptics = LocalHomeHaptics.current
+    val fill by animateColorAsState(tone.soft(), HomeMotion.fade(LocalHomeMotionEnabled.current), label = "home-pill-fill")
+    val content by animateColorAsState(tone.text(), HomeMotion.fade(LocalHomeMotionEnabled.current), label = "home-pill-text")
+    val interactive = if (onClick == null) modifier else modifier.homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+    Row(
+        interactive.heightIn(min = height).clip(HomeDims.pillShape).background(fill).padding(horizontal = if (height < 24.dp) 8.dp else 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        if (leading != null) leading()
+        if (icon != null) Icon(icon, null, Modifier.size(13.dp), tint = content)
+        Text(text, color = content, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
+/** Two- or three-letter region code in a hairline box, for regions [HomeFlag] cannot draw. */
+@Composable
+internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+    val c = LocalHomeColors.current
+    val text = code.trim().uppercase().take(3)
+    if (text.isEmpty()) return
+    Box(
+        modifier.height(17.dp).widthIn(min = 24.dp).border(1.dp, c.line2, RoundedCornerShape(4.dp)).padding(horizontal = 3.dp),
+        contentAlignment = Alignment.Center,
+    ) { Text(text, color = c.t2, style = HomeType.regionCode, maxLines = 1) }
+}
+
+/**
+ * Status dot. With [pulse] a ring keeps leaving it, which reads as “live” without drawing the eye.
+ * The pulse is drawn outside the dot's own bounds, so it never changes layout.
+ */
+@Composable
+internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
+    val tint by animateColorAsState(color, HomeMotion.fade(LocalHomeMotionEnabled.current, 320), label = "home-dot")
+    val wave = if (pulse && LocalHomeMotionEnabled.current) {
+        val transition = rememberInfiniteTransition(label = "home-dot-pulse")
+        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate), RepeatMode.Restart), label = "home-dot-wave")
+    } else null
+    Canvas(modifier.size(size)) {
+        val radius = this.size.minDimension / 2f
+        val phase = wave?.value
+        if (phase != null) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
+        drawCircle(tint, radius)
+    }
+}
+
+/** Colour of a latency figure: accent while healthy, amber when slow, red when very slow. */
+internal fun HomeColors.delayColor(ms: Long): Color = when {
+    ms < 300L -> accent
+    ms < 800L -> warnText
+    else -> badText
+}
+
+/** “28 ms” as plain coloured text; null = unknown, negative = timed out. */
+@Composable
+internal fun HomeDelayText(delayMs: Long?, modifier: Modifier = Modifier, style: TextStyle = HomeType.metric) {
+    val c = LocalHomeColors.current
+    val (text, color) = when {
+        delayMs == null -> ht("未知") to c.t3
+        delayMs < 0 -> ht("超时") to c.badText
+        else -> "$delayMs ms" to c.delayColor(delayMs)
+    }
+    HomeRollingText(text, color, style, modifier)
+}
+
+/** Thin rounded bar; the fill eases to its new length. Null [fraction] shows the empty track. */
+@Composable
+internal fun HomeProgressBar(
+    fraction: Float?,
+    modifier: Modifier = Modifier,
+    color: Color = LocalHomeColors.current.accent,
+    track: Color = LocalHomeColors.current.accentSoft,
+    height: Dp = 5.dp,
+) {
+    val value = homeAnimatedFraction(fraction ?: 0f, "home-progress")
+    Canvas(modifier.fillMaxWidth().height(height)) {
+        val radius = CornerRadius(size.height / 2f, size.height / 2f)
+        drawRoundRect(track, cornerRadius = radius)
+        if (value > 0f) drawRoundRect(color, size = Size((size.width * value).coerceAtLeast(size.height), size.height), cornerRadius = radius)
+    }
+}
+
+/** Radio mark of the concept: a ring that fills with the accent and grows a white centre. */
 @Composable
 internal fun HomeRadio(selected: Boolean, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
-    Box(
-        modifier.size(20.dp).border(1.5.dp, if (selected) c.accent else c.line2, CircleShape),
-        contentAlignment = Alignment.Center,
-    ) { if (selected) Box(Modifier.size(10.dp).background(c.accent, CircleShape)) }
+    val motion = LocalHomeMotionEnabled.current
+    val progress by animateFloatAsState(if (selected) 1f else 0f, HomeMotion.pop(motion), label = "home-radio")
+    val ring by animateColorAsState(if (selected) c.accent else c.t3, HomeMotion.fade(motion), label = "home-radio-ring")
+    val knob = c.onAccent
+    Canvas(modifier.size(22.dp)) {
+        val radius = size.minDimension / 2f
+        val stroke = 2.dp.toPx()
+        val p = progress.coerceIn(0f, 1.2f)
+        drawCircle(ring, radius - stroke / 2f, style = Stroke(stroke))
+        if (p > 0f) {
+            drawCircle(ring, (radius - stroke) * min(p, 1f))
+            drawCircle(knob, radius * .34f * p)
+        }
+    }
+}
+
+/** Filled accent disc with a check that pops in; used for the selected node and for menu ticks. */
+@Composable
+internal fun HomeCheckMark(checked: Boolean, modifier: Modifier = Modifier, size: Dp = 22.dp) {
+    val c = LocalHomeColors.current
+    val progress by animateFloatAsState(if (checked) 1f else 0f, HomeMotion.pop(LocalHomeMotionEnabled.current), label = "home-check")
+    val fill = c.accent
+    val mark = c.onAccent
+    Canvas(modifier.size(size)) {
+        val p = progress
+        if (p <= 0.01f) return@Canvas
+        val radius = this.size.minDimension / 2f
+        val centre = Offset(this.size.width / 2f, this.size.height / 2f)
+        drawCircle(fill.copy(alpha = fill.alpha * p.coerceIn(0f, 1f)), radius * p.coerceIn(0f, 1.12f), centre)
+        val s = radius * p.coerceIn(0f, 1f)
+        val path = Path().apply {
+            moveTo(centre.x - s * .46f, centre.y + s * .02f)
+            lineTo(centre.x - s * .12f, centre.y + s * .36f)
+            lineTo(centre.x + s * .48f, centre.y - s * .30f)
+        }
+        drawPath(path, mark, style = Stroke(radius * .22f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+    }
+}
+
+/**
+ * Switch of the concept, 50 × 30 dp. Purely visual: the enclosing row owns the click and the
+ * toggle semantics. The knob travels on a spring and stretches slightly mid-way.
+ */
+@Composable
+internal fun HomeSwitch(checked: Boolean, modifier: Modifier = Modifier, enabled: Boolean = true) {
+    val c = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
+    val position by animateFloatAsState(if (checked) 1f else 0f, HomeMotion.glide(motion), label = "home-switch")
+    val on = c.accent
+    val off = if (c.dark) Color.White.copy(alpha = .22f) else Color(0xFFC6C9D8)
+    Canvas(modifier.size(50.dp, 30.dp).alpha(if (enabled) 1f else .45f)) {
+        val t = position.coerceIn(0f, 1f)
+        val half = size.height / 2f
+        drawRoundRect(lerp(off, on, t), cornerRadius = CornerRadius(half, half))
+        val knob = half - 3.dp.toPx()
+        val stretch = (1f - abs(t - .5f) * 2f) * 4.dp.toPx()
+        val centre = half + (size.width - size.height) * position
+        drawRoundRect(Color.Black.copy(alpha = .10f), Offset(centre - knob - stretch / 2f, half - knob + 1.dp.toPx()), Size(knob * 2f + stretch, knob * 2f), CornerRadius(knob, knob))
+        drawRoundRect(Color.White, Offset(centre - knob - stretch / 2f, half - knob), Size(knob * 2f + stretch, knob * 2f), CornerRadius(knob, knob))
+    }
 }
 
 /* ------------------------------------------------------------------ */
 /*  Buttons                                                             */
 /* ------------------------------------------------------------------ */
 
+/**
+ * Primary = accent fill; Secondary = outlined in the accent (恢复默认, 检测);
+ * Soft = neutral tint with dark text (取消); Ghost = text only.
+ */
 internal enum class HomeButtonKind { Primary, Secondary, Soft, Ghost }
 
-/** 44 dp button. Primary = accent fill; Secondary = surface with hairline; Soft = accent tint; Ghost = text only. */
+/** 50 dp button with 16 dp corners. [danger] swaps the accent for red in every kind. */
 @Composable
 internal fun HomeButton(
     text: String,
@@ -240,35 +449,41 @@ internal fun HomeButton(
     icon: ImageVector? = null,
     enabled: Boolean = true,
     loading: Boolean = false,
+    danger: Boolean = false,
+    height: Dp = 50.dp,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
+    val lead = if (danger) c.bad else c.accent
+    val leadText = if (danger) c.badText else c.accent
+    val onLead = if (danger) (if (c.dark) Color(0xFF1B0808) else Color.White) else c.onAccent
     val (fill, content) = when (kind) {
-        HomeButtonKind.Primary -> c.accent to c.onAccent
-        HomeButtonKind.Secondary -> c.surface to c.t1
-        HomeButtonKind.Soft -> c.accentSoft to c.accent
-        HomeButtonKind.Ghost -> Color.Transparent to c.accent
+        HomeButtonKind.Primary -> lead to onLead
+        HomeButtonKind.Secondary -> c.surface to leadText
+        HomeButtonKind.Soft -> (if (danger) c.badSoft else c.sunken) to (if (danger) c.badText else c.t1)
+        HomeButtonKind.Ghost -> Color.Transparent to leadText
     }
     val shape = HomeDims.controlShape
+    val active = enabled && !loading
     Row(
         modifier
-            .height(HomeDims.touch)
-            .alpha(if (enabled && !loading) 1f else .45f)
+            .heightIn(min = height)
+            .alpha(if (active) 1f else .5f)
+            .homeTap(enabled = active, role = Role.Button) { haptics(if (kind == HomeButtonKind.Primary) HomeHaptic.Confirm else HomeHaptic.Tap); onClick() }
             .clip(shape)
             .background(fill)
-            .let { if (kind == HomeButtonKind.Secondary) it.border(1.dp, c.line2, shape) else it }
-            .homeTap(enabled = enabled && !loading, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .let { if (kind == HomeButtonKind.Secondary) it.border(1.5.dp, lead.copy(alpha = if (c.dark) .70f else .62f), shape) else it }
             .padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
     ) {
-        if (loading) HomeSpinner(size = 16.dp, color = content)
-        else if (icon != null) Icon(icon, null, Modifier.size(18.dp), tint = content)
-        Text(text, color = content, style = HomeType.button, maxLines = 1)
+        if (loading) HomeSpinner(size = 18.dp, color = content)
+        else if (icon != null) Icon(icon, null, Modifier.size(20.dp), tint = content)
+        Text(ht(text), color = content, style = HomeType.button, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
-/** 40 × 44 dp icon button; the glyph itself is 20 dp. */
+/** 48 dp round touch target around a 24 dp glyph. [label] is spoken and never drawn. */
 @Composable
 internal fun HomeIconButton(
     icon: ImageVector,
@@ -278,19 +493,23 @@ internal fun HomeIconButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     tint: Color = LocalHomeColors.current.t1,
+    spinning: Boolean = false,
+    glyph: Dp = 24.dp,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
+    val spoken = ht(label)
+    val angle = homeSpinAngle(spinning)
     Box(
         modifier
-            .size(40.dp, HomeDims.touch)
-            .clip(HomeDims.controlShape)
-            .homeTap(enabled = enabled && !loading, onClickLabel = label, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-            .semantics { contentDescription = label },
+            .size(HomeDims.touch)
+            .clip(CircleShape)
+            .homeTap(enabled = enabled && !loading, onClickLabel = spoken, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .semantics { contentDescription = spoken },
         contentAlignment = Alignment.Center,
     ) {
-        if (loading) HomeSpinner(size = 16.dp, color = c.t2)
-        else Icon(icon, null, Modifier.size(20.dp), tint = if (enabled) tint else c.t3)
+        if (loading) HomeSpinner(size = 20.dp, color = c.t2)
+        else Icon(icon, null, Modifier.size(glyph).graphicsLayer { rotationZ = angle }, tint = if (enabled) tint else c.t3)
     }
 }
 
@@ -298,7 +517,16 @@ internal fun HomeIconButton(
 /*  Segmented control                                                   */
 /* ------------------------------------------------------------------ */
 
-/** Sunken track, 3 dp inset; the selected segment is a surface pill with a hairline. */
+/**
+ * Soft = accent-tinted thumb with accent text (首页模式); Solid = accent thumb with white text
+ * (详情、设置面板); Raised = card-coloured thumb with dark text on a sunken track (inline filters).
+ */
+internal enum class HomeSegmentStyle { Soft, Solid, Raised }
+
+/**
+ * Segmented control whose thumb slides between segments on a spring instead of cross-fading.
+ * The thumb and the separators are drawn behind the labels, so only the draw phase animates.
+ */
 @Composable
 internal fun <T> HomeSegmented(
     options: List<Pair<T, String>>,
@@ -306,71 +534,115 @@ internal fun <T> HomeSegmented(
     onSelect: (T) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
+    style: HomeSegmentStyle = HomeSegmentStyle.Solid,
+    track: Color = LocalHomeColors.current.sunken,
+    height: Dp = 40.dp,
+    corner: Dp = 12.dp,
+    textStyle: TextStyle = HomeType.buttonSmall,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
+    val motion = LocalHomeMotionEnabled.current
+    val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
+    val position = animateFloatAsState(index.toFloat(), HomeMotion.glide(motion), label = "home-seg-thumb")
+    val thumb = when (style) {
+        HomeSegmentStyle.Solid -> c.accent
+        HomeSegmentStyle.Soft -> c.accentSoft
+        HomeSegmentStyle.Raised -> c.surface
+    }
+    val separator = c.line2
+    val count = options.size
     Row(
         modifier
             .fillMaxWidth()
+            .heightIn(min = height)
             .alpha(if (enabled) 1f else .5f)
-            .clip(HomeDims.controlShape)
-            .background(c.sunken)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
+            .clip(RoundedCornerShape(corner))
+            .background(track)
+            .drawBehind {
+                if (count == 0) return@drawBehind
+                val inset = 3.dp.toPx()
+                val cell = (size.width - inset * 2f) / count
+                val at = position.value
+                val radius = (corner.toPx() - inset).coerceAtLeast(0f)
+                // Separators only between two resting segments; they fade as the thumb passes.
+                for (edge in 1 until count) {
+                    val distance = min(abs(edge - at), abs(edge - 1f - at)).coerceIn(0f, 1f)
+                    if (distance > 0f) {
+                        val x = inset + cell * edge
+                        drawLine(separator.copy(alpha = separator.alpha * distance), Offset(x, size.height * .30f), Offset(x, size.height * .70f), 1.dp.toPx())
+                    }
+                }
+                drawRoundRect(thumb, Offset(inset + cell * at, inset), Size(cell, size.height - inset * 2f), CornerRadius(radius, radius))
+            }
+            .padding(3.dp)
+            .selectableGroup(),
     ) {
         options.forEach { (value, label) ->
             val active = value == selected
-            val duration = if (LocalHomeMotionEnabled.current) HomeMotion.SwitchMs else 0
-            val fill by animateColorAsState(if (active) c.surface else Color.Transparent, tween(duration), label = "home-seg-fill")
-            val text by animateColorAsState(if (active) c.t1 else c.t2, tween(duration), label = "home-seg-text")
+            val source = remember { MutableInteractionSource() }
+            val color by animateColorAsState(
+                when {
+                    !active -> c.t2
+                    style == HomeSegmentStyle.Solid -> c.onAccent
+                    style == HomeSegmentStyle.Raised -> c.t1
+                    else -> c.accent
+                },
+                HomeMotion.fade(motion), label = "home-seg-text",
+            )
             Box(
                 Modifier
                     .weight(1f)
-                    .height(32.dp)
-                    .clip(HomeDims.segmentShape)
-                    .background(fill)
-                    .let { if (active) it.border(1.dp, c.line, HomeDims.segmentShape) else it }
-                    .homeTap(enabled = enabled && !active, role = Role.RadioButton) { haptics(HomeHaptic.Tick); onSelect(value) },
+                    .heightIn(min = height - 6.dp)
+                    .selectable(selected = active, interactionSource = source, indication = null, enabled = enabled, role = Role.RadioButton) {
+                        if (!active) { haptics(HomeHaptic.Tick); onSelect(value) }
+                    },
                 contentAlignment = Alignment.Center,
-            ) { Text(label, color = text, style = HomeType.buttonSmall, maxLines = 1) }
+            ) {
+                Text(
+                    ht(label), color = color,
+                    style = if (active) textStyle.copy(fontWeight = FontWeight.Bold) else textStyle,
+                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Banner                                                              */
+/*  Notice                                                              */
 /* ------------------------------------------------------------------ */
 
-/** Inline status strip: validation results, pending restart, risk notes. */
+/** Inline strip of the concept: 「设置已修改，重启后生效」, form results. One tone, optional action. */
 @Composable
-internal fun HomeBanner(
+internal fun HomeNotice(
     text: String,
     icon: ImageVector,
     modifier: Modifier = Modifier,
     tone: HomeTone = HomeTone.Warn,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
+    filled: Boolean = true,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = HomeDims.touch)
+            .heightIn(min = if (filled) 44.dp else 28.dp)
             .clip(HomeDims.controlShape)
-            .background(tone.soft())
-            .padding(start = 14.dp, end = if (actionLabel == null) 14.dp else 6.dp, top = 6.dp, bottom = 6.dp),
+            .let { if (filled) it.background(tone.soft()) else it }
+            .padding(start = if (filled) 14.dp else 4.dp, end = if (actionLabel == null) 14.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, Modifier.size(16.dp), tint = tone.foreground())
+        Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
         Spacer(Modifier.width(8.dp))
-        Text(text, Modifier.weight(1f), color = tone.foreground(), style = HomeType.note)
+        Text(text, Modifier.weight(1f).padding(vertical = 6.dp), color = tone.text(), style = HomeType.noteStrong)
         if (actionLabel != null && onAction != null) {
             Box(
-                Modifier.clip(HomeDims.badgeShape).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }
-                    .heightIn(min = 32.dp).padding(horizontal = 8.dp),
+                Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
-            ) { Text(actionLabel, color = c.accent, style = HomeType.noteStrong, maxLines = 1) }
+            ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
         }
     }
 }
@@ -379,7 +651,10 @@ internal fun HomeBanner(
 /*  Rows                                                                */
 /* ------------------------------------------------------------------ */
 
-/** Label on the left, value on the right; 48 dp tall. Used by detail lists. */
+/**
+ * Label and value on one line. With [labelWidth] the value starts in a fixed column (IP details);
+ * without it the value hugs the right edge (resource details). Unknown values recede.
+ */
 @Composable
 internal fun HomeKeyValueRow(
     label: String,
@@ -391,21 +666,21 @@ internal fun HomeKeyValueRow(
 ) {
     val c = LocalHomeColors.current
     Row(
-        modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(start = 16.dp, end = if (trailing == null) 16.dp else 4.dp),
+        modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(start = HomeDims.cardPadding, end = if (trailing == null) HomeDims.cardPadding else 6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Text(
             label,
             if (labelWidth != null) Modifier.width(labelWidth) else Modifier.weight(1f),
-            color = c.t2, style = HomeType.label, maxLines = 1,
+            color = c.t2, style = HomeType.label, maxLines = 1, overflow = TextOverflow.Ellipsis,
         )
-        if (labelWidth != null) Spacer(Modifier.width(16.dp))
+        if (labelWidth != null) Spacer(Modifier.width(12.dp))
         Text(
             value,
-            if (labelWidth != null) Modifier.weight(1f) else Modifier,
+            (if (labelWidth != null) Modifier.weight(1f) else Modifier.widthIn(max = 220.dp)).padding(vertical = 8.dp),
             color = if (unknown) c.t3 else c.t1,
-            style = if (unknown) HomeType.body else HomeType.rowTitle.copy(fontFeatureSettings = "tnum"),
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
+            style = if (unknown) HomeType.value.copy(fontWeight = FontWeight.Medium) else HomeType.value,
+            maxLines = 2, overflow = TextOverflow.Ellipsis,
             textAlign = if (labelWidth != null) TextAlign.Start else TextAlign.End,
         )
         if (trailing != null) trailing()
@@ -413,10 +688,68 @@ internal fun HomeKeyValueRow(
 }
 
 /* ------------------------------------------------------------------ */
-/*  Top bars                                                            */
+/*  Bars and page scaffold                                              */
 /* ------------------------------------------------------------------ */
 
-/** Sub-page bar: back chevron, centred title with optional subtitle, trailing actions. 52 dp below the status bar. */
+/**
+ * Glass state of a pinned bar: how far it has faded in, and the blur source when the user's
+ * 「模糊效果」switch is on. The blur source is attached to the page only while the bar is
+ * actually visible, so a page resting at the top pays nothing for it.
+ */
+@Stable
+internal class HomeBarGlass internal constructor(
+    internal val haze: HazeState?,
+    private val progress: State<Float>,
+    private val activeState: State<Boolean>,
+) {
+    /** 0 at the top of the page, 1 once content has scrolled beneath the bar. Read in draw. */
+    val shown: Float get() = progress.value
+    val active: Boolean get() = activeState.value
+}
+
+@Composable
+internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
+    val haze = if (LocalHomeBlur.current) rememberHazeState() else null
+    val progress = animateFloatAsState(if (lifted) 1f else 0f, HomeMotion.fade(LocalHomeMotionEnabled.current, 220), label = "home-bar-glass")
+    val active = remember(lifted) { derivedStateOf { lifted || progress.value > .01f } }
+    return remember(haze, progress, active) { HomeBarGlass(haze, progress, active) }
+}
+
+/** Put this on the scrolling content that passes beneath the bar. */
+internal fun Modifier.homeGlassSource(glass: HomeBarGlass): Modifier {
+    val haze = glass.haze
+    return if (haze != null && glass.active) hazeSource(haze) else this
+}
+
+/**
+ * Background of a pinned bar. Invisible at the top of the page; once content scrolls beneath it
+ * the bar turns to frosted glass (real blur when allowed, a near-opaque canvas tint otherwise)
+ * with a hairline along its lower edge.
+ */
+@OptIn(ExperimentalHazeMaterialsApi::class)
+@Composable
+internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier) {
+    if (!glass.active) return
+    val c = LocalHomeColors.current
+    val line = c.line
+    val haze = glass.haze
+    val surface = if (haze != null) {
+        Modifier
+            .hazeEffect(state = haze, style = HazeMaterials.ultraThin()) {
+                blurRadius = 26.dp
+                noiseFactor = .008f
+            }
+            .background(Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))))
+    } else Modifier.background(c.bg.copy(alpha = .965f))
+    Box(
+        modifier
+            .graphicsLayer { alpha = glass.shown }
+            .then(surface)
+            .drawBehind { drawLine(line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx()) },
+    )
+}
+
+/** Sub-page bar content: back chevron, centred title with optional subtitle, trailing actions. Transparent. */
 @Composable
 internal fun HomeTopBar(
     title: String,
@@ -426,15 +759,66 @@ internal fun HomeTopBar(
     actions: @Composable RowScope.() -> Unit = {},
 ) {
     val c = LocalHomeColors.current
-    Box(modifier.fillMaxWidth().background(c.bg).windowInsetsPadding(WindowInsets.statusBars).height(HomeDims.barHeight)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 8.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-            HomeIconButton(HomeIcons.ChevronLeft, "返回", onBack)
+    Box(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).heightIn(min = HomeDims.barHeight)) {
+        Row(Modifier.fillMaxWidth().height(HomeDims.barHeight).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            HomeIconButton(HomeIcons.ChevronLeft, "返回", onBack, glyph = 26.dp)
             Spacer(Modifier.weight(1f))
             actions()
         }
-        Column(Modifier.align(Alignment.Center).padding(horizontal = 64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(title, color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(subtitle, color = c.t3, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        // The title stays on the bar's centre line; a subtitle hangs just below it.
+        Column(Modifier.align(Alignment.TopCenter).padding(horizontal = 64.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            Box(Modifier.height(HomeDims.barHeight), contentAlignment = Alignment.Center) {
+                Text(ht(title), color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            if (subtitle != null) Text(ht(subtitle), Modifier.offset(y = (-12).dp), color = c.t2, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
+        }
+    }
+}
+
+/**
+ * Full-screen sub-page: scrolling content under a glass bar, optional pinned footer.
+ * Content gets the standard gutters and the 14 dp rhythm between cards.
+ */
+@Composable
+internal fun HomeSubPage(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = LocalHomeColors.current
+    val scroll = rememberScrollState()
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    val barHeight = HomeDims.barHeight + if (subtitle != null) 12.dp else 0.dp
+    val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
+    val glass = rememberHomeBarGlass(lifted)
+    Column(modifier.fillMaxSize().background(c.bg).imePadding()) {
+        Box(Modifier.weight(1f).fillMaxWidth()) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .homeGlassSource(glass)
+                    .verticalScroll(scroll)
+                    .let { if (footer == null) it.windowInsetsPadding(WindowInsets.navigationBars) else it }
+                    .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + barHeight + 6.dp, bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
+                content = content,
+            )
+            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight))
+            HomeTopBar(title, onBack, subtitle = subtitle, actions = actions)
+        }
+        if (footer != null) {
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .windowInsetsPadding(WindowInsets.navigationBars)
+                    .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = 8.dp, bottom = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+                content = footer,
+            )
         }
     }
 }
@@ -443,7 +827,7 @@ internal fun HomeTopBar(
 /*  Text field                                                          */
 /* ------------------------------------------------------------------ */
 
-/** Label above a 44 dp sunken field; the border turns accent on focus and red on error. */
+/** Label above a 52 dp outlined field. The outline thickens and turns accent on focus, red on error. */
 @Composable
 internal fun HomeTextField(
     label: String,
@@ -456,12 +840,16 @@ internal fun HomeTextField(
     placeholder: String = "",
 ) {
     val c = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
     val source = remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    val border = when { isError -> c.bad; focused -> c.accent; else -> Color.Transparent }
-    val textStyle = (if (monospace) HomeType.mono.copy(fontSize = HomeType.bodySmall.fontSize, lineHeight = HomeType.body.lineHeight) else HomeType.body).copy(color = c.t1)
-    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Text(label, Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.section)
+    val outline by animateColorAsState(
+        when { isError -> c.bad; focused -> c.accent; else -> c.line2 },
+        HomeMotion.fade(motion), label = "home-field-outline",
+    )
+    val textStyle = (if (monospace) HomeType.mono.copy(fontSize = 15.sp, lineHeight = 22.sp) else HomeType.body).copy(color = c.t1)
+    Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Text(ht(label), Modifier.padding(horizontal = 2.dp), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium))
         BasicTextField(
             value = value,
             onValueChange = onValueChange,
@@ -475,14 +863,14 @@ internal fun HomeTextField(
                 Box(
                     Modifier
                         .fillMaxWidth()
-                        .heightIn(min = HomeDims.touch)
+                        .heightIn(min = 52.dp)
                         .clip(HomeDims.controlShape)
-                        .background(if (focused) c.surface else c.sunken)
-                        .border(1.dp, border, HomeDims.controlShape)
-                        .padding(horizontal = 12.dp),
+                        .background(c.surface)
+                        .border(if (focused || isError) 1.5.dp else 1.dp, outline, HomeDims.controlShape)
+                        .padding(horizontal = 14.dp),
                     contentAlignment = Alignment.CenterStart,
                 ) {
-                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(placeholder, color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1)
+                    if (value.isEmpty() && placeholder.isNotEmpty()) Text(ht(placeholder), color = c.t3, style = textStyle.copy(color = c.t3), maxLines = 1)
                     inner()
                 }
             },
@@ -495,8 +883,11 @@ internal fun HomeTextField(
 /* ------------------------------------------------------------------ */
 
 /**
- * Smooth area chart with three hairline grid rows. Null samples break the curve (missed samples).
- * @param max top of the value axis; the curve keeps 6 dp of head room like the prototype.
+ * Smooth area chart. Null samples break the curve (missed samples are never interpolated).
+ * The line draws itself in from the left once per [reveal] run and ends in a small live dot.
+ *
+ * @param max top of the value axis; the curve keeps a little head room.
+ * @param reveal 0 → 1 progress of the entrance, read in the draw phase.
  */
 @Composable
 internal fun HomeSparkline(
@@ -504,52 +895,67 @@ internal fun HomeSparkline(
     color: Color,
     max: Float,
     modifier: Modifier = Modifier,
-    height: Dp = 72.dp,
+    height: Dp = 76.dp,
     fill: Boolean = true,
+    grid: Boolean = false,
+    reveal: () -> Float = { 1f },
 ) {
-    val grid = LocalHomeColors.current.line
+    val gridColor = LocalHomeColors.current.line
+    val surface = LocalHomeColors.current.surface
     Canvas(modifier.fillMaxWidth().height(height)) {
         val w = size.width
         val h = size.height
-        for (row in 1..3) {
+        if (grid) for (row in 1..3) {
             val y = h * row / 4f
-            drawLine(grid, Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
+            drawLine(gridColor, Offset(0f, y), Offset(w, y), strokeWidth = 1.dp.toPx())
         }
         if (values.size < 2 || max <= 0f) return@Canvas
-        val head = 6.dp.toPx()
-        val foot = 2.dp.toPx()
+        val head = 8.dp.toPx()
+        val foot = 3.dp.toPx()
         val step = w / (values.size - 1)
         val segments = mutableListOf<MutableList<Offset>>()
         var current = mutableListOf<Offset>()
         values.forEachIndexed { index, value ->
             if (value == null) {
-                if (current.isNotEmpty()) segments += current
+                if (current.isNotEmpty()) segments.add(current)
                 current = mutableListOf()
             } else {
-                current += Offset(index * step, h - (value / max).coerceIn(0f, 1f) * (h - head) - foot)
+                current.add(Offset(index * step, h - foot - (value / max).coerceIn(0f, 1f) * (h - head - foot)))
             }
         }
-        if (current.isNotEmpty()) segments += current
-        val stroke = Stroke(1.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
-        for (points in segments) {
-            if (points.size < 2) continue
-            val line = Path().apply {
-                moveTo(points[0].x, points[0].y)
-                for (i in 1 until points.size) {
-                    val midX = (points[i - 1].x + points[i].x) / 2f
-                    cubicTo(midX, points[i - 1].y, midX, points[i].y, points[i].x, points[i].y)
+        if (current.isNotEmpty()) segments.add(current)
+        val stroke = Stroke(2.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round)
+        val shown = reveal().coerceIn(0f, 1f)
+        clipRect(right = w * shown + 4.dp.toPx()) {
+            for (points in segments) {
+                if (points.size < 2) {
+                    points.firstOrNull()?.let { drawCircle(color, 1.5.dp.toPx(), it) }
+                    continue
                 }
-            }
-            if (fill) {
-                val area = Path().apply {
-                    addPath(line)
-                    lineTo(points.last().x, h)
-                    lineTo(points.first().x, h)
-                    close()
+                val line = Path().apply {
+                    moveTo(points[0].x, points[0].y)
+                    for (i in 1 until points.size) {
+                        val midX = (points[i - 1].x + points[i].x) / 2f
+                        cubicTo(midX, points[i - 1].y, midX, points[i].y, points[i].x, points[i].y)
+                    }
                 }
-                drawPath(area, color.copy(alpha = color.alpha * .08f))
+                if (fill) {
+                    val area = Path().apply {
+                        addPath(line)
+                        lineTo(points.last().x, h)
+                        lineTo(points.first().x, h)
+                        close()
+                    }
+                    drawPath(area, Brush.verticalGradient(listOf(color.copy(alpha = color.alpha * .26f), color.copy(alpha = 0f)), startY = 0f, endY = h))
+                }
+                drawPath(line, color, style = stroke)
             }
-            drawPath(line, color, style = stroke)
+        }
+        // Live end point, once the entrance has finished and the newest sample exists.
+        val last = segments.lastOrNull()?.lastOrNull()
+        if (shown >= 1f && last != null && values.last() != null) {
+            drawCircle(surface, 4.5.dp.toPx(), last)
+            drawCircle(color, 3.dp.toPx(), last)
         }
     }
 }
@@ -559,8 +965,9 @@ internal fun HomeSparkline(
 /* ------------------------------------------------------------------ */
 
 /**
- * The inside of a bottom sheet: grab handle, title row, body, optional footer buttons.
+ * The inside of a bottom sheet: grab handle, title row, scrolling body, optional pinned footer.
  * Kept free of ModalBottomSheet so the same content renders in static previews.
+ * @param verbatimTitle true when [title] is data (a host name) rather than UI text.
  */
 @Composable
 internal fun HomeSheetContent(
@@ -570,35 +977,88 @@ internal fun HomeSheetContent(
     onClose: (() -> Unit)? = null,
     trailing: (@Composable RowScope.() -> Unit)? = null,
     footer: (@Composable RowScope.() -> Unit)? = null,
+    verbatimTitle: Boolean = false,
     body: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalHomeColors.current
-    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
-        Box(Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))
+    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars).imePadding()) {
+        Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(40.dp, 5.dp).background(if (c.dark) c.line2 else Color(0xFFC9CCDA), HomeDims.pillShape))
         }
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(title, color = c.t1, style = HomeType.sheetTitle)
-                if (subtitle != null) Text(subtitle, Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.rowSub)
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 8.dp, top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).heightIn(min = HomeDims.touch), verticalArrangement = Arrangement.Center) {
+                Text(if (verbatimTitle) title else ht(title), color = c.t1, style = HomeType.sheetTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 3.dp), color = c.t2, style = HomeType.rowSub)
             }
             when {
                 trailing != null -> trailing()
                 onClose != null -> HomeIconButton(HomeIcons.X, "关闭", onClose)
             }
         }
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = if (footer == null) 24.dp else 16.dp), content = body)
+        Column(
+            Modifier
+                .weight(1f, fill = false)
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 14.dp, end = 14.dp, bottom = if (footer == null) 22.dp else 12.dp),
+            content = body,
+        )
         if (footer != null) {
-            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), content = footer)
+            Row(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 18.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), content = footer)
         }
     }
 }
 
+/** Tinted group inside a sheet: the concept's rounded blocks that hold a few related rows. */
+@Composable
+internal fun HomeSheetGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    val c = LocalHomeColors.current
+    Column(modifier.fillMaxWidth().clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg), content = content)
+}
+
 /** Monospace block used by the failure sheet and other read-only text. */
 @Composable
-internal fun HomeCodeBox(text: String, modifier: Modifier = Modifier) {
+internal fun HomeCodeBox(text: String, modifier: Modifier = Modifier, caption: String? = null) {
     val c = LocalHomeColors.current
-    HomeCard(modifier.fillMaxWidth(), background = c.bg) {
-        Text(text, Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t1, style = HomeType.mono)
+    HomeSheetGroup(modifier) {
+        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (caption != null) Text(ht(caption), color = c.t3, style = HomeType.caption)
+            Text(text, color = c.t1, style = HomeType.body.copy(lineHeight = 26.sp))
+        }
+    }
+}
+
+/**
+ * Centred placeholder: artwork that floats gently, a title, one line of help, optional action.
+ * @param verbatimSubtitle true when [subtitle] is data (an error from the core) rather than UI text.
+ */
+@Composable
+internal fun HomeEmptyState(
+    icon: ImageVector,
+    title: String,
+    subtitle: String,
+    modifier: Modifier = Modifier,
+    tint: Color = LocalHomeColors.current.t3,
+    topPadding: Dp = 72.dp,
+    titleStyle: TextStyle = HomeType.sheetTitle,
+    verbatimSubtitle: Boolean = false,
+    action: (@Composable () -> Unit)? = null,
+) {
+    val c = LocalHomeColors.current
+    val reveal = rememberHomeReveal(title, 360)
+    Column(
+        modifier.fillMaxWidth().padding(start = 28.dp, end = 28.dp, top = topPadding, bottom = 40.dp).graphicsLayer {
+            val p = reveal()
+            alpha = p
+            translationY = (1f - p) * 10.dp.toPx()
+        },
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, null, Modifier.size(64.dp).homeFloat(), tint = tint)
+        Spacer(Modifier.height(18.dp))
+        Text(ht(title), color = c.t1, style = titleStyle, textAlign = TextAlign.Center)
+        // Diagnostics from the core are shown as they came, never run through the vocabulary.
+        Text(if (verbatimSubtitle) subtitle else ht(subtitle), Modifier.padding(top = 6.dp), color = c.t2, style = HomeType.body, textAlign = TextAlign.Center)
+        if (action != null) { Spacer(Modifier.height(20.dp)); action() }
     }
 }

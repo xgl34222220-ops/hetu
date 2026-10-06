@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
@@ -27,9 +28,16 @@ import io.github.xgl34222220.hetu.home.HomeDivider
 import io.github.xgl34222220.hetu.home.HomeFormat
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeProgressBar
+import io.github.xgl34222220.hetu.home.HomeRollingText
 import io.github.xgl34222220.hetu.home.HomeStatusDot
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.fill
+import io.github.xgl34222220.hetu.home.goodText
+import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.rememberHomeReveal
+import io.github.xgl34222220.hetu.ui.HetuStaggerState
+import io.github.xgl34222220.hetu.ui.ht
 
 /** Lazy-list keys of the overview items; [PanelOverviewItems.Trend] is where B04 / B16 / B20 are scrolled to. */
 internal object PanelOverviewItems {
@@ -48,16 +56,18 @@ internal object PanelOverviewItems {
 internal fun LazyListScope.panelOverviewTab(
     overview: PanelOverview,
     view: PanelViewState,
+    stagger: HetuStaggerState,
     onView: (PanelViewState) -> Unit,
     onOpenSubscriptions: () -> Unit,
     onRankCountMenu: () -> Unit,
     rankMenu: @Composable () -> Unit,
 ) {
+    val card = Modifier.panelGutter().padding(bottom = PanelDims.gap).fillMaxWidth()
     item(key = PanelOverviewItems.Summary) {
         val c = LocalHomeColors.current
-        HomeCard(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth()) {
-            Column(Modifier.padding(HomeDims.cardPadding)) {
-                Text("运行概况", Modifier.padding(start = 4.dp, bottom = 12.dp), color = c.t2, style = HomeType.section)
+        HomeCard(card.homeEnter(stagger, 0)) {
+            Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 16.dp, bottom = 18.dp)) {
+                Text(ht("运行概况"), Modifier.padding(bottom = 14.dp), color = c.t1, style = HomeType.rowTitle)
                 Row(Modifier.fillMaxWidth()) {
                     PanelStat(overview.strategyCount.toString(), null, "策略")
                     PanelStat(overview.ruleCount.toString(), null, "规则")
@@ -69,59 +79,61 @@ internal fun LazyListScope.panelOverviewTab(
     val sub = overview.subscription
     if (sub != null) item(key = PanelOverviewItems.Subscription) {
         val c = LocalHomeColors.current
-        HomeCard(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth(), onClick = onOpenSubscriptions, clickLabel = "查看订阅") {
-            Column(Modifier.padding(HomeDims.cardPadding)) {
-                Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("订阅", Modifier.weight(1f), color = c.t2, style = HomeType.section)
-                    if (sub.expire != null) Text("到期 ${sub.expire}", color = c.t3, style = PanelType.tiny)
+        HomeCard(card.homeEnter(stagger, 1), onClick = onOpenSubscriptions, clickLabel = "查看订阅") {
+            Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 16.dp, bottom = 16.dp)) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(ht("订阅"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle)
+                    if (sub.expire != null) Text(ht("到期 %s").fill(sub.expire), color = c.t2, style = HomeType.rowSub, maxLines = 1)
                 }
                 Row(Modifier.fillMaxWidth()) {
                     val (used, usedUnit) = split(HomeFormat.bytes(sub.usedBytes))
                     val (left, leftUnit) = split(HomeFormat.bytes(sub.remainingBytes))
                     val (total, totalUnit) = split(HomeFormat.bytes(sub.totalBytes))
                     PanelStat(used, usedUnit, "已用")
-                    PanelStat(left, leftUnit, "剩余", valueColor = c.accent)
+                    PanelStat(left, leftUnit, "剩余")
                     PanelStat(total, totalUnit, "总量")
                 }
-                HomeProgressBar(sub.usedFraction, Modifier.padding(top = 14.dp, bottom = 10.dp))
+                HomeProgressBar(sub.usedFraction, Modifier.padding(top = 16.dp, bottom = 12.dp))
                 Row(Modifier.fillMaxWidth()) {
-                    Text("${sub.subscriptionCount} 个订阅", Modifier.weight(1f), color = c.t3, style = PanelType.tiny)
-                    Text("${sub.nodeCount} 个节点", color = c.t3, style = PanelType.tiny)
+                    Text(ht("%d 个订阅").fill(sub.subscriptionCount), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub, maxLines = 1)
+                    Text(ht("%d 个节点").fill(sub.nodeCount), color = c.t2, style = HomeType.rowSub, maxLines = 1)
                 }
             }
         }
     }
     item(key = PanelOverviewItems.Speed) {
         val c = LocalHomeColors.current
-        Row(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            SpeedCard("上行速度", HomeFormat.speed(overview.uploadBytesPerSecond), PanelIcons.ArrowUp, c.good, Modifier.weight(1f))
-            SpeedCard("下行速度", HomeFormat.speed(overview.downloadBytesPerSecond), PanelIcons.ArrowDown, c.accent, Modifier.weight(1f))
+        Row(card.homeEnter(stagger, 2), horizontalArrangement = Arrangement.spacedBy(PanelDims.gap)) {
+            SpeedCard("上行速度", HomeFormat.speed(overview.uploadBytesPerSecond), PanelIcons.ArrowUp, c.goodText, c.goodSoft, Modifier.weight(1f))
+            SpeedCard("下行速度", HomeFormat.speed(overview.downloadBytesPerSecond), PanelIcons.ArrowDown, c.accent, c.accentSoft, Modifier.weight(1f))
         }
     }
     item(key = PanelOverviewItems.Total) {
         val c = LocalHomeColors.current
-        HomeCard(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Text("总流量", Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle)
-                TotalValue("↑", HomeFormat.bytes(overview.uploadTotalBytes), c.good)
-                TotalValue("↓", HomeFormat.bytes(overview.downloadTotalBytes), c.accent)
+        HomeCard(card.homeEnter(stagger, 3)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = HomeDims.cardPadding), verticalAlignment = Alignment.CenterVertically) {
+                Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
+                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1)
+                Text("/", Modifier.padding(horizontal = 9.dp), color = c.t2, style = HomeType.value)
+                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1)
             }
         }
     }
     item(key = PanelOverviewItems.Trend) {
         val c = LocalHomeColors.current
-        HomeCard(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth()) {
-            Column(Modifier.padding(HomeDims.cardPadding)) {
-                Row(Modifier.fillMaxWidth().padding(bottom = 12.dp), verticalAlignment = Alignment.Top) {
+        val reveal = rememberHomeReveal(PanelOverviewItems.Trend, 800)
+        HomeCard(card.homeEnter(stagger, 4)) {
+            Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 14.dp, bottom = 16.dp)) {
+                Row(Modifier.fillMaxWidth().padding(bottom = 10.dp), verticalAlignment = Alignment.Top) {
                     Column(Modifier.weight(1f)) {
-                        Text("近期趋势", color = c.t1, style = HomeType.rowTitle.copy(fontWeight = HomeType.value.fontWeight))
-                        Text("最近 60 秒", color = c.t3, style = HomeType.caption)
+                        Text(ht("近期趋势"), color = c.t1, style = HomeType.rowTitle)
+                        Text(ht("最近 60 秒"), color = c.t2, style = HomeType.rowSub)
                     }
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         PanelChip("上行", { onView(view.copy(showUploadTrend = !view.showUploadTrend)) }, selected = view.showUploadTrend,
-                            selectedColor = c.good, selectedFill = c.goodSoft, height = 26.dp, leading = { HomeStatusDot(if (view.showUploadTrend) c.good else c.t3, size = 6.dp) })
+                            selectedColor = c.goodText, selectedFill = c.goodSoft, height = 32.dp, leading = { HomeStatusDot(if (view.showUploadTrend) c.good else c.t3, size = 7.dp) })
                         PanelChip("下行", { onView(view.copy(showDownloadTrend = !view.showDownloadTrend)) }, selected = view.showDownloadTrend,
-                            height = 26.dp, leading = { HomeStatusDot(if (view.showDownloadTrend) c.accent else c.t3, size = 6.dp) })
+                            height = 32.dp, leading = { HomeStatusDot(if (view.showDownloadTrend) c.accent else c.t3, size = 7.dp) })
                     }
                 }
                 PanelTrendChart(
@@ -129,6 +141,7 @@ internal fun LazyListScope.panelOverviewTab(
                         if (view.showDownloadTrend) add(PanelTrendSeries(overview.downloadTrend, c.accent, fill = true))
                         if (view.showUploadTrend) add(PanelTrendSeries(overview.uploadTrend, c.good, fill = false))
                     },
+                    reveal = reveal,
                 )
             }
         }
@@ -136,38 +149,41 @@ internal fun LazyListScope.panelOverviewTab(
     item(key = PanelOverviewItems.Rank) {
         val c = LocalHomeColors.current
         val ranks = PanelLogic.ranks(overview, view.rankMode, view.rankCount)
-        HomeCard(Modifier.panelGutter().padding(bottom = 8.dp).fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(start = 16.dp, end = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+        HomeCard(card.homeEnter(stagger, 5)) {
+            Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(start = HomeDims.cardPadding, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f)) {
-                    Text("实时排行", color = c.t1, style = HomeType.rowTitle.copy(fontWeight = HomeType.value.fontWeight))
-                    Text(view.rankMode.label, color = c.t2, style = HomeType.rowSub)
+                    Text(ht("实时排行"), color = c.t1, style = HomeType.rowTitle)
+                    Text(ht(view.rankMode.label), color = c.t2, style = HomeType.rowSub)
                 }
                 Box {
-                    HomeIconButton(PanelIcons.Ellipsis, "显示数量", onRankCountMenu, tint = c.t2)
+                    HomeIconButton(PanelIcons.CircleEllipsis, "显示数量", onRankCountMenu, glyph = 26.dp)
                     rankMenu()
                 }
             }
             if (ranks.isEmpty()) {
-                HomeDivider()
-                Text("暂无应用流量", Modifier.padding(16.dp), color = c.t3, style = HomeType.note)
-            }
-            ranks.forEach { rank ->
-                HomeDivider()
+                Text(ht("暂无应用流量"), Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 4.dp, bottom = 18.dp), color = c.t2, style = HomeType.note)
+            } else Spacer(Modifier.size(4.dp))
+            ranks.forEachIndexed { index, rank ->
+                if (index > 0) HomeDivider(inset = HomeDims.cardPadding)
                 Row(
-                    Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = 16.dp, vertical = 8.dp),
+                    Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = HomeDims.cardPadding, vertical = 9.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    PanelAvatar(rank.app, rank.packageName)
+                    PanelAvatar(rank.app, rank.packageName, size = 38.dp)
                     Column(Modifier.weight(1f)) {
-                        Text(rank.app, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text("下行 ${HomeFormat.speed(rank.downloadBytesPerSecond)} · 上行 ${HomeFormat.speed(rank.uploadBytesPerSecond)}", color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(rank.app, color = c.t1, style = HomeType.rowTitle.copy(fontSize = HomeType.value.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        Text(
+                            ht("下行") + " " + HomeFormat.speed(rank.downloadBytesPerSecond) + " · " + ht("上行") + " " + HomeFormat.speed(rank.uploadBytesPerSecond),
+                            color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
                     }
                     Text(
-                        if (view.rankMode == PanelRankMode.Connections) "${rank.connections} 条连接" else HomeFormat.bytes(rank.totalBytes),
+                        if (view.rankMode == PanelRankMode.Connections) ht("%d 条连接").fill(rank.connections) else HomeFormat.bytes(rank.totalBytes),
                         color = c.t2, style = HomeType.rowSub, maxLines = 1,
                     )
                 }
             }
+            if (ranks.isNotEmpty()) Spacer(Modifier.size(6.dp))
         }
     }
 }
@@ -179,27 +195,18 @@ private fun split(text: String): Pair<String, String?> {
 }
 
 @Composable
-private fun SpeedCard(label: String, value: String, icon: ImageVector, tint: Color, modifier: Modifier) {
+private fun SpeedCard(label: String, value: String, icon: ImageVector, tint: Color, soft: Color, modifier: Modifier) {
     val c = LocalHomeColors.current
     HomeCard(modifier) {
-        Row(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Box(Modifier.size(32.dp).background(c.sunken, RoundedCornerShape(10.dp)), contentAlignment = Alignment.Center) {
-                Icon(icon, null, Modifier.size(20.dp), tint = tint)
+        Row(Modifier.padding(start = 14.dp, end = 10.dp, top = 14.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(Modifier.size(38.dp).background(soft, RoundedCornerShape(12.dp)), contentAlignment = Alignment.Center) {
+                Icon(icon, null, Modifier.size(22.dp), tint = tint)
             }
+            Spacer(Modifier.width(12.dp))
             Column {
-                Text(label, color = c.t3, style = HomeType.caption, maxLines = 1)
-                Text(value, color = c.t1, style = HomeType.metric.copy(lineHeight = HomeType.sheetTitle.lineHeight), maxLines = 1)
+                Text(ht(label), color = c.t2, style = HomeType.note, maxLines = 1)
+                HomeRollingText(value, tint, HomeType.metric, alignment = Alignment.CenterStart)
             }
         }
-    }
-}
-
-@Composable
-private fun TotalValue(arrow: String, value: String, tint: Color) {
-    val c = LocalHomeColors.current
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(arrow, color = tint, style = HomeType.label)
-        Spacer(Modifier.size(4.dp))
-        Text(value, color = c.t2, style = HomeType.label.copy(fontFeatureSettings = "tnum"), maxLines = 1)
     }
 }

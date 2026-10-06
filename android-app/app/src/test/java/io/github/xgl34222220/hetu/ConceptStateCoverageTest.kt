@@ -376,7 +376,8 @@ class ConceptStateCoverageTest {
             val selected = nativeNodes().first { "按配置" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             assertTrue(selected.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
-            assertEquals(androidx.compose.ui.graphics.Color(0xFF12161A), layouts.single().layoutInput.style.color)
+            // The concept draws the selected segment as a solid accent thumb with on-accent text.
+            assertEquals(androidx.compose.ui.graphics.Color(0xFFFFFFFF), layouts.single().layoutInput.style.color)
         }
         click("1 列", 0); assertEquals(1, vm.prefs.getInt("proxySelectorGroupColumns", 2))
         click("2 列", 0); assertEquals(2, vm.prefs.getInt("proxySelectorGroupColumns", 1))

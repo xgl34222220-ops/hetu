@@ -26,8 +26,8 @@ fun rememberHetuLanguage(): String {
     return language
 }
 
-/** Stable UI vocabulary. Technical diagnostics and user content retain their original text. */
-private val vocabulary = """
+// Two literals on purpose: one JVM string constant may not exceed 65535 UTF-8 bytes.
+private val vocabularyBase = """
 首页|Home|首頁|Главная
 面板|Panel|面板|Панель
 策略|Proxies|策略|Прокси
@@ -355,7 +355,244 @@ Google / 微信连接、分流与最近运行事件|Google / WeChat connections,
 预检、运行副本、诊断信息与紧急恢复|Preflight, runtime copies, diagnostics and emergency recovery|預檢、執行副本、診斷資訊與緊急復原|Проверка, рабочие копии, диагностика и экстренное восстановление
 暂无内容。|No content yet.|暫無內容。|Пока нет содержимого.
 核心按设备 ABI 从发布源直接拉取。内置核心未下载更新时使用 App 自带版本；标注「仅下载管理」的核心只做下载与版本管理。|Cores download from their release sources for the device ABI. Bundled cores use the app version until updated; download-only cores support download and version management.|核心依裝置 ABI 從發佈來源下載。內建核心未更新時使用 App 版本；僅供下載管理的核心只提供下載與版本管理。|Ядра загружаются из источников релизов для ABI устройства. Встроенные ядра используют версию приложения до обновления; остальные поддерживают только загрузку и версии.
-""".trimIndent().lineSequence().map { it.split('|') }.associate { it[0] to it.drop(1) }
+""".trimIndent()
+
+/** 首页 and 面板 (home/, panel/). Same format: 源|English|繁體|Русский. */
+private val vocabularyHomePanel = """
+未知|Unknown|未知|Неизвестно
+超时|Timeout|逾時|Тайм-аут
+河图|Hetu|河圖|Hetu
+局域网 IP 详情|LAN IP details|區域網路 IP 詳情|Локальный IP-адрес
+公网 IP|Public IP|公網 IP|Внешний IP
+局域网 IP|LAN IP|區域網路 IP|Локальный IP
+IP 地址|IP address|IP 位址|IP-адрес
+地理位置|Location|地理位置|Местоположение
+网络运营商|Network provider|網路營運商|Провайдер
+城市|City|城市|Город
+组织|Organization|組織|Организация
+IP 类型|IP type|IP 類型|Тип IP
+时区|Time zone|時區|Часовой пояс
+经纬度|Coordinates|經緯度|Координаты
+网络接口|Network interface|網路介面|Сетевой интерфейс
+代理未运行，公网出口信息需要启动后经核心查询。|The proxy is stopped. Public exit details are looked up through the core once it starts.|代理未執行，公網出口資訊需要啟動後經核心查詢。|Прокси остановлен. Сведения о внешнем адресе запрашиваются через ядро после запуска.
+这是上一次查询的结果；下拉首页或点右上角可重新查询。|This is the previous result. Pull down on Home or tap the refresh button to look it up again.|這是上一次查詢的結果；下拉首頁或點右上角可重新查詢。|Это предыдущий результат. Потяните вниз на главной или нажмите «Обновить», чтобы запросить снова.
+出口信息经代理核心查询，「未知」表示查询源未返回该字段。|Exit details are looked up through the proxy core. “Unknown” means the source did not return that field.|出口資訊經代理核心查詢，「未知」表示查詢來源未回傳該欄位。|Сведения запрашиваются через ядро прокси. «Неизвестно» означает, что источник не вернул это поле.
+公网信息查询失败：%s|Public address lookup failed: %s|公網資訊查詢失敗：%s|Не удалось получить внешний адрес: %s
+本机直测目标|Direct probe targets|本機直測目標|Цели прямой проверки
+河图进程请求，未指定代理节点|Requested by the Hetu process, with no proxy selected|河圖程序請求，未指定代理節點|Запрос от процесса Hetu без выбранного прокси
+恢复默认|Restore defaults|還原預設|По умолчанию
+目标 %d|Target %d|目標 %d|Цель %d
+HTTP(S) 测速地址|HTTP(S) test URL|HTTP(S) 測速位址|URL проверки HTTP(S)
+选择自动刷新间隔|Choose the auto refresh interval|選擇自動重新整理間隔|Выбрать интервал автообновления
+首页停留时按间隔重新测速|Re-test at this interval while Home is open|停留在首頁時依間隔重新測速|Повторять проверку с этим интервалом, пока открыта главная
+%d 秒|%d s|%d 秒|%d с
+API 模式|API mode|API 模式|Режим API
+读取 Mihomo 控制器流量，适合查看代理核心吞吐|Reads traffic from the Mihomo controller: what the proxy core carries|讀取 Mihomo 控制器流量，適合檢視代理核心吞吐|Трафик из контроллера Mihomo: то, что проходит через ядро прокси
+本地|Local|本機|Локально
+本地模式|Local mode|本機模式|Локальный режим
+读取设备本地总流量，适合查看当前网络实际吞吐|Reads the device's total traffic: what the network actually carries|讀取裝置本機總流量，適合檢視目前網路實際吞吐|Общий трафик устройства: фактическая нагрузка сети
+测速目标已保存；返回首页后立即生效|Targets saved. They apply as soon as you return to Home.|測速目標已儲存；返回首頁後立即生效|Цели сохранены и применятся при возврате на главную.
+已恢复默认测速目标|Default targets restored|已還原預設測速目標|Цели по умолчанию восстановлены
+测速目标名称不能为空|Target names cannot be empty|測速目標名稱不能為空|Названия целей не могут быть пустыми
+三个测速目标名称不能重复|The three target names must be different|三個測速目標名稱不能重複|Названия трёх целей должны различаться
+请填写有效的 http/https 测速地址|Enter a valid http/https test URL|請填寫有效的 http/https 測速位址|Укажите корректный URL http/https
+少于 1 分钟|Less than a minute|少於 1 分鐘|Меньше минуты
+%d 分钟|%d min|%d 分鐘|%d мин
+%d 小时 %d 分钟|%d h %d min|%d 小時 %d 分鐘|%d ч %d мин
+%d 天 %d 小时|%d d %d h|%d 天 %d 小時|%d дн %d ч
+运行时长|Uptime|執行時間|Время работы
+进程 PID|Process PID|程序 PID|PID процесса
+核心版本|Core version|核心版本|Версия ядра
+CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CPU
+当前 CPU|Current CPU|目前 CPU|Текущий CPU
+模式|Mode|模式|Режим
+活动连接|Active connections|活動連線|Активные соединения
+本次查看|This session|本次檢視|За этот просмотр
+断开处为缺测|Gaps are missed samples|斷開處為缺測|Разрывы — пропущенные замеры
+等待连续运行采样|Waiting for samples from a running core|等待連續執行取樣|Ожидание замеров работающего ядра
+设置已修改，重启后生效|Settings changed. Restart to apply.|設定已修改，重新啟動後生效|Настройки изменены. Перезапустите для применения.
+立即重启|Restart now|立即重新啟動|Перезапустить
+已运行 %s|Running for %s|已執行 %s|Работает %s
+请稍候…|Please wait…|請稍候…|Подождите…
+打开基础代理配置|Open proxy configuration|開啟基本代理設定|Открыть настройку прокси
+打开配置管理|Open configuration management|開啟設定管理|Открыть управление конфигурациями
+启动中|Starting|啟動中|Запуск
+停止中|Stopping|停止中|Остановка
+直连模式，流量不经过节点|Direct mode: traffic does not go through a proxy|直連模式，流量不經過節點|Прямой режим: трафик идёт без прокси
+节点信息未确认|Proxy not confirmed yet|節點資訊未確認|Прокси ещё не подтверждён
+查看策略与节点|View proxy groups and proxies|檢視策略與節點|Открыть группы и прокси
+本机直测|Direct probe|本機直測|Прямая проверка
+由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。|Requested directly by the Hetu process with no proxy selected. Results do not describe the route other apps take.|由河圖程序直接請求，未指定代理節點；結果不代表其他應用程式的代理路徑。|Запрос напрямую от процесса Hetu без выбранного прокси. Результаты не отражают маршрут других приложений.
+测速目标|Probe targets|測速目標|Цели проверки
+重新测速|Test again|重新測速|Проверить снова
+查看 IP 详情|View IP details|檢視 IP 詳情|Сведения об IP
+切换到 %s|Switch to %s|切換到 %s|Переключить на %s
+查询失败|Lookup failed|查詢失敗|Ошибка запроса
+正在查询|Looking up|正在查詢|Запрос
+等待连接|Waiting for connection|等待連線|Ожидание подключения
+选择网速数据来源|Choose the traffic data source|選擇網速資料來源|Выбрать источник данных о трафике
+查看订阅|View subscriptions|檢視訂閱|Открыть подписки
+剩余 %d%%|%d%% left|剩餘 %d%%|Осталось %d%%
+总量未知|Quota unknown|總量未知|Лимит неизвестен
+查看资源占用|View resource usage|檢視資源佔用|Открыть использование ресурсов
+启动失败|Start failed|啟動失敗|Не удалось запустить
+查看配置|View configuration|檢視設定|Открыть конфигурацию
+重新启动|Start again|重新啟動|Запустить снова
+错误详情|Error details|錯誤詳情|Сведения об ошибке
+测速中|Testing|測速中|Проверка
+测速|Test|測速|Проверить
+没有策略组|No proxy groups|沒有策略群組|Нет групп прокси
+当前配置没有可显示的策略组|This configuration has no proxy groups to show|目前設定沒有可顯示的策略群組|В этой конфигурации нет групп для отображения
+没有匹配的策略|No matching groups|沒有符合的策略|Нет подходящих групп
+已展开|Expanded|已展開|Развёрнуто
+已收起|Collapsed|已收合|Свёрнуто
+收起节点|Collapse proxies|收合節點|Свернуть прокси
+展开节点|Expand proxies|展開節點|Развернуть прокси
+%d 个节点|%d proxies|%d 個節點|Прокси: %d
+测试该组全部节点|Test every proxy in this group|測試此群組全部節點|Проверить все прокси группы
+节点信息|Proxy details|節點資訊|Сведения о прокси
+没有订阅|No subscriptions|沒有訂閱|Нет подписок
+当前配置没有带流量信息的远程订阅|This configuration has no remote subscriptions with traffic information|目前設定沒有帶流量資訊的遠端訂閱|В конфигурации нет удалённых подписок с данными о трафике
+没有匹配的订阅|No matching subscriptions|沒有符合的訂閱|Нет подходящих подписок
+更新中|Updating|更新中|Обновление
+更新失败：%s|Update failed: %s|更新失敗：%s|Ошибка обновления: %s
+重试|Retry|重試|Повторить
+到期 %s|Expires %s|到期 %s|До %s
+更新于 %s|Updated %s|更新於 %s|Обновлено %s
+上传|Uploaded|上傳|Отправлено
+下载|Downloaded|下載|Загружено
+剩余|Remaining|剩餘|Осталось
+已用 %s|%s used|已用 %s|Использовано %s
+总计 %s|%s total|總計 %s|Всего %s
+按应用|By app|依應用程式|По приложениям
+没有匹配的连接|No matching connections|沒有符合的連線|Нет подходящих соединений
+当前筛选下没有连接|No connections match this filter|目前篩選下沒有連線|Нет соединений для этого фильтра
+暂无连接|No connections yet|暫無連線|Соединений пока нет
+新的连接建立后会显示在这里|New connections will appear here|新的連線建立後會顯示在這裡|Новые соединения появятся здесь
+连接详情|Connection details|連線詳情|Сведения о соединениях
+全部断开|Disconnect all|全部中斷|Разорвать все
+收起|Collapse|收合|Свернуть
+展开|Expand|展開|Развернуть
+%d 个连接|%d connections|%d 個連線|Соединений: %d
+没有规则|No rules|沒有規則|Нет правил
+当前配置没有分流规则|This configuration has no routing rules|目前設定沒有分流規則|В конфигурации нет правил маршрутизации
+没有匹配的规则|No matching rules|沒有符合的規則|Нет подходящих правил
+，此处显示 %d 条|, %d shown here|，此處顯示 %d 條|, показано %d
+按配置顺序自上而下匹配，共 %d 条|Matched top to bottom in configuration order, %d in total|依設定順序由上而下比對，共 %d 條|Проверяются сверху вниз в порядке конфигурации, всего %d
+没有规则集|No rule sets|沒有規則集|Нет наборов правил
+当前配置没有 rule-providers|This configuration has no rule-providers|目前設定沒有 rule-providers|В конфигурации нет rule-providers
+没有匹配的规则集|No matching rule sets|沒有符合的規則集|Нет подходящих наборов правил
+%d 条规则|%d rules|%d 條規則|Правил: %d
+更新规则集|Update rule set|更新規則集|Обновить набор правил
+没有匹配的日志|No matching logs|沒有符合的日誌|Нет подходящих записей
+当前等级下暂无日志|No logs at this level yet|目前等級下暫無日誌|На этом уровне записей пока нет
+暂无日志|No logs yet|暫無日誌|Записей пока нет
+核心输出日志后会显示在这里|Logs appear here once the core writes them|核心輸出日誌後會顯示在這裡|Записи появятся здесь, когда ядро их выведет
+搜索策略或当前节点|Search groups or current proxies|搜尋策略或目前節點|Поиск групп или текущих прокси
+搜索订阅|Search subscriptions|搜尋訂閱|Поиск подписок
+搜索主机或应用|Search hosts or apps|搜尋主機或應用程式|Поиск узлов или приложений
+搜索规则|Search rules|搜尋規則|Поиск правил
+搜索规则集|Search rule sets|搜尋規則集|Поиск наборов правил
+搜索日志|Search logs|搜尋日誌|Поиск в журнале
+按配置|As configured|依設定|Как в конфигурации
+代理|Proxy|代理|Прокси
+主机|Host|主機|Узел
+类型|Type|類型|Тип
+连接时间|Connected at|連線時間|Время подключения
+按连接数|By connections|依連線數|По числу соединений
+按总流量|By total traffic|依總流量|По общему трафику
+最新在前|Newest first|最新在前|Сначала новые
+最早在前|Oldest first|最早在前|Сначала старые
+未归属应用|Unattributed|未歸屬應用程式|Без приложения
+显示隐藏策略|Show hidden groups|顯示隱藏策略|Показывать скрытые группы
+根据模式显示 GLOBAL|Show GLOBAL only in global mode|依模式顯示 GLOBAL|Показывать GLOBAL только в глобальном режиме
+按订阅分组节点|Group proxies by subscription|依訂閱將節點分組|Группировать прокси по подпискам
+展开新策略时折叠上一个|Collapse the previous group when opening another|展開新策略時收合上一個|Сворачивать предыдущую группу при открытии новой
+切换节点后断开旧连接|Close old connections after switching proxy|切換節點後中斷舊連線|Разрывать старые соединения после смены прокси
+排行只改变显示顺序，不影响代理行为。|Ranking only changes the display order. It does not affect how the proxy works.|排行只改變顯示順序，不影響代理行為。|Рейтинг меняет только порядок отображения и не влияет на работу прокси.
+显示数量|Number shown|顯示數量|Количество
+排序方式|Sort by|排序方式|Сортировка
+按应用分组|Group by app|依應用程式分組|Группировать по приложениям
+断开全部连接|Disconnect all connections|中斷全部連線|Разорвать все соединения
+连接已结束|Connection ended|連線已結束|Соединение завершено
+这个连接已经关闭，列表会在下次刷新时更新。|This connection has closed. The list updates on the next refresh.|這個連線已經關閉，清單會在下次重新整理時更新。|Соединение закрыто. Список обновится при следующем обновлении.
+1 列|1 column|1 欄|1 столбец
+2 列|2 columns|2 欄|2 столбца
+排序与布局|Sorting and layout|排序與版面配置|Сортировка и вид
+倒序|Reverse order|倒序|Обратный порядок
+策略列数|Group columns|策略欄數|Столбцы групп
+紧凑策略卡|Compact group cards|精簡策略卡|Компактные карточки групп
+节点列数|Proxy columns|節點欄數|Столбцы прокси
+紧凑节点卡|Compact proxy cards|精簡節點卡|Компактные карточки прокси
+名称显示|Name display|名稱顯示|Отображение названий
+单行截断|One line|單行截斷|Одна строка
+自动换行|Wrap|自動換行|Перенос
+测速与 API|Latency test and API|測速與 API|Проверка задержки и API
+设置测速引擎与 API 相关选项|Latency test and API options|設定測速引擎與 API 相關選項|Параметры проверки задержки и API
+测试全部节点|Test all proxies|測試全部節點|Проверить все прокси
+正在测试，完成后会提示可用节点数|Testing. You will be told how many proxies are reachable.|正在測試，完成後會提示可用節點數|Идёт проверка. По завершении будет показано число доступных прокси.
+对当前配置的所有节点测一次延迟|Measure the latency of every proxy in this configuration once|對目前設定的所有節點測一次延遲|Один раз измерить задержку всех прокси конфигурации
+覆盖策略组图标，不修改 YAML|Override group icons without changing YAML|覆寫策略群組圖示，不修改 YAML|Заменить значки групп без изменения YAML
+测速、历史采集与控制器连接|Latency test, history collection and controller connection|測速、歷史採集與控制器連線|Проверка задержки, сбор истории и подключение к контроллеру
+测速地址|Test URL|測速位址|URL проверки
+正在使用自定义测速 URL|Using a custom test URL|正在使用自訂測速 URL|Используется свой URL проверки
+跟随订阅或策略组自带地址|Follows the URL from the subscription or the group|跟隨訂閱或策略群組自帶位址|Используется URL из подписки или группы
+测速 URL|Test URL|測速 URL|URL проверки
+流量与连接历史|Traffic and connection history|流量與連線歷史|История трафика и соединений
+保存最近 24 小时排行所需的数据|Keeps the data needed for the last 24 hours of rankings|儲存最近 24 小時排行所需的資料|Хранит данные для рейтингов за последние 24 часа
+外部 Clash API|External Clash API|外部 Clash API|Внешний Clash API
+使用自定义控制器|Using a custom controller|使用自訂控制器|Используется свой контроллер
+使用河图本机核心|Using Hetu's own core|使用河圖本機核心|Используется встроенное ядро Hetu
+端口|Port|連接埠|Порт
+密钥|Secret|金鑰|Ключ
+未设置|Not set|未設定|Не задан
+测速 URL 必须是完整的 HTTP/HTTPS 地址，且不能包含账号密码|The test URL must be a complete HTTP/HTTPS address without credentials|測速 URL 必須是完整的 HTTP/HTTPS 位址，且不能包含帳號密碼|URL проверки должен быть полным адресом HTTP/HTTPS без учётных данных
+后端主机只填写 IPv4 或域名，不含协议和端口|Enter only an IPv4 address or a domain as host, without scheme or port|後端主機只填寫 IPv4 或網域，不含通訊協定和連接埠|В поле узла укажите только IPv4 или домен, без протокола и порта
+端口范围为 1024–65535|The port must be between 1024 and 65535|連接埠範圍為 1024–65535|Порт должен быть от 1024 до 65535
+Secret 不能包含换行|The secret cannot contain line breaks|Secret 不能包含換行|Ключ не может содержать переносы строк
+复制名称|Copy name|複製名稱|Копировать название
+协议|Protocol|通訊協定|Протокол
+提供商|Provider|提供者|Провайдер
+支持|Supports|支援|Поддержка
+仅 TCP|TCP only|僅 TCP|Только TCP
+%s 建立|Opened at %s|%s 建立|Открыто в %s
+断开此连接|Disconnect this connection|中斷此連線|Разорвать это соединение
+应用|App|應用程式|Приложение
+包名|Package|套件名稱|Пакет
+链路|Chain|鏈路|Цепочка
+速率|Rate|速率|Скорость
+断开全部连接？|Disconnect all connections?|中斷全部連線？|Разорвать все соединения?
+所有应用会立即重新建立连接，正在进行的下载或通话可能中断。|Every app reconnects immediately. Downloads or calls in progress may be interrupted.|所有應用程式會立即重新建立連線，正在進行的下載或通話可能中斷。|Все приложения сразу переподключатся. Текущие загрузки и звонки могут прерваться.
+断开全部|Disconnect all|全部中斷|Разорвать все
+运行概况|Runtime summary|執行概況|Сводка
+当前连接|Connections|目前連線|Соединения
+%d 个订阅|%d subscriptions|%d 個訂閱|Подписок: %d
+上行速度|Upload speed|上行速度|Скорость отправки
+下行速度|Download speed|下行速度|Скорость загрузки
+总流量|Total traffic|總流量|Общий трафик
+近期趋势|Recent trend|近期趨勢|Динамика
+最近 60 秒|Last 60 seconds|最近 60 秒|Последние 60 секунд
+实时排行|Live ranking|即時排行|Рейтинг сейчас
+暂无应用流量|No app traffic yet|暫無應用程式流量|Трафика приложений пока нет
+%d 条连接|%d connections|%d 條連線|Соединений: %d
+代理未运行|Proxy is not running|代理未執行|Прокси не запущен
+启动代理后可查看策略与节点|Start the proxy to see groups and proxies|啟動代理後可檢視策略與節點|Запустите прокси, чтобы увидеть группы и прокси
+启动代理|Start proxy|啟動代理|Запустить прокси
+无法读取面板|Cannot read the panel|無法讀取面板|Не удалось прочитать панель
+API 设置|API settings|API 設定|Настройки API
+定位当前节点|Jump to the current proxy|定位目前節點|Перейти к текущему прокси
+筛选|Filter|篩選|Фильтр
+排行方式|Ranking order|排行方式|Порядок рейтинга
+连接筛选|Filter connections|連線篩選|Фильтр соединений
+全部更新|Update all|全部更新|Обновить все
+连接排序|Sort connections|連線排序|Сортировка соединений
+连接显示|Connection display|連線顯示|Вид соединений
+""".trimIndent()
+
+/** Stable UI vocabulary. Technical diagnostics and user content retain their original text. */
+// Declared after both literals: top-level properties initialise in file order.
+private val vocabulary = (vocabularyBase + "\n" + vocabularyHomePanel)
+    .lineSequence().map { it.split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {
     val index = when { language.startsWith("en") -> 0; language.startsWith("zh-TW") || language.startsWith("zh-HK") || language.contains("Hant") -> 1; language.startsWith("ru") -> 2; else -> return source }

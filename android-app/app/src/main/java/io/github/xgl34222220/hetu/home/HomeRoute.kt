@@ -7,6 +7,8 @@ import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
@@ -64,15 +66,18 @@ internal fun HomeRoute(
         targetState = destination,
         modifier = modifier,
         transitionSpec = {
+            // Push: the new page arrives from the right while the old one sinks back a little.
+            // Pop: the mirror image, with the page that leaves drawn on top.
             val page = HomeMotion.PageMs
+            val ease = HomeMotion.Emphasized
             when {
                 !animate -> EnterTransition.None togetherWith ExitTransition.None
                 targetState != HomeDestination.Main ->
-                    (slideInHorizontally(tween(page, easing = HomeMotion.Emphasized)) { it / 10 } + fadeIn(tween(page))) togetherWith
-                        fadeOut(tween(HomeMotion.SwitchMs))
+                    (slideInHorizontally(tween(page, easing = ease)) { it / 5 } + fadeIn(tween(220, delayMillis = 40))) togetherWith
+                        (slideOutHorizontally(tween(page, easing = ease)) { -it / 12 } + scaleOut(tween(page, easing = ease), targetScale = .97f) + fadeOut(tween(160)))
                 else ->
-                    (slideInHorizontally(tween(page, easing = HomeMotion.Emphasized)) { -it / 18 } + fadeIn(tween(page))) togetherWith
-                        (slideOutHorizontally(tween(page, easing = HomeMotion.Emphasized)) { it / 10 } + fadeOut(tween(HomeMotion.SwitchMs)))
+                    ((slideInHorizontally(tween(page, easing = ease)) { -it / 12 } + scaleIn(tween(page, easing = ease), initialScale = .97f) + fadeIn(tween(220))) togetherWith
+                        (slideOutHorizontally(tween(page, easing = ease)) { it / 5 } + fadeOut(tween(180)))).apply { targetContentZIndex = -1f }
             }
         },
         label = "home-route",
@@ -142,7 +147,7 @@ internal fun HomeRoute(
         HomeModalSheet(onDismiss = actions.onDismissStartFailure) {
             HomeStartFailedSheetContent(
                 detail = failure.detail,
-                onCopy = { actions.onCopy("诊断信息", failure.detail) },
+                onCopy = { haptics(HomeHaptic.Confirm); actions.onCopy("诊断信息", failure.detail) },
                 onViewConfig = { actions.onDismissStartFailure(); actions.onViewConfig() },
                 onRetry = { actions.onDismissStartFailure(); actions.onStart() },
             )
@@ -150,7 +155,7 @@ internal fun HomeRoute(
     }
 }
 
-/** Material 3 bottom sheet dressed with the home tokens: 24 dp top corners, surface fill, no drag-handle slot. */
+/** Material 3 bottom sheet dressed with the home tokens: 28 dp top corners, surface fill, no drag-handle slot. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HomeModalSheet(onDismiss: () -> Unit, content: @Composable () -> Unit) {

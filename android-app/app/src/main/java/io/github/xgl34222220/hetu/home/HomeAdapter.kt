@@ -29,6 +29,7 @@ import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.CompactHomeData
 import io.github.xgl34222220.hetu.HomeOperation
 import io.github.xgl34222220.hetu.HomeResourceSample
+import io.github.xgl34222220.hetu.LocalHxBlur
 import io.github.xgl34222220.hetu.ProxyGroupUi
 import io.github.xgl34222220.hetu.ProxyLatencyTarget
 import io.github.xgl34222220.hetu.ProxyLatencyTargets
@@ -59,6 +60,9 @@ private const val PrefAutoRefresh = "latencyAutoRefreshSeconds"
  * @param corePid `runtime.pid`; [coreVersion] e.g. from `ProxyDashboardRepository.coreVersion()`.
  * @param cpuAffinity / [currentCpu] are not sampled by the source yet; null renders “—”.
  * @param bottomPadding the shell's dock clearance (`HxDockHeight + insets`), same value other tabs get.
+ * @param wanExtras the public-address fields CompactHomeData does not carry (city, organisation, IP type,
+ *        time zone, coordinates) plus the lookup state; without them the IP page shows “未知”.
+ * @param operationText what the running start / stop / restart is doing, shown under the status title.
  * @param onTrafficMode call `repo.setTrafficMode(id)` and refresh, as PanelExtras19 does.
  */
 @Composable
@@ -87,6 +91,8 @@ internal fun HetuHomeV2(
     currentCpu: Int? = null,
     resourceSamples: List<HomeResourceSample>? = null,
     onDetailVisibleChange: (Boolean) -> Unit = {},
+    wanExtras: HomeWanExtras? = null,
+    operationText: String? = null,
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -100,7 +106,7 @@ internal fun HetuHomeV2(
     val sampling = status is HomeStatus.Running || status is HomeStatus.PendingRestart
     val history = rememberResourceHistory(sampling && resourceSamples == null, data.cpu, data.memory)
 
-    val state = data.toHomeUiState(
+    val mapped = data.toHomeUiState(
         status = status,
         groups = groups,
         trafficMode = trafficMode,
@@ -117,6 +123,18 @@ internal fun HetuHomeV2(
             connections = data.connections,
             cpuHistory = resourceSamples?.map { it.cpuPercent } ?: history.first,
             memoryHistoryMb = resourceSamples?.map { it.memoryBytes?.div(1024f * 1024f) } ?: history.second,
+        ),
+    )
+    val state = mapped.copy(
+        statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
+        wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
+            city = wanExtras.city.known(),
+            organization = wanExtras.organization.known(),
+            ipType = wanExtras.ipType.known(),
+            timezone = wanExtras.timezone.known(),
+            coordinates = wanExtras.coordinates.known(),
+            state = HomeWanState.fromId(wanExtras.state),
+            error = wanExtras.error.known(),
         ),
     )
 
@@ -179,6 +197,18 @@ internal fun HetuHomeV2(
 /* ------------------------------------------------------------------ */
 /*  Mapping                                                             */
 /* ------------------------------------------------------------------ */
+
+/** Public-address details that travel next to [CompactHomeData]. Blank or “—” fields count as unknown. */
+internal data class HomeWanExtras(
+    val city: String = "",
+    val organization: String = "",
+    val ipType: String = "",
+    val timezone: String = "",
+    val coordinates: String = "",
+    /** `ProxyRuntimeSnapshot.wanState`: idle, loading, success, stale or failed. */
+    val state: String = "",
+    val error: String = "",
+)
 
 internal fun homeStatusOf(data: CompactHomeData, startupError: String?): HomeStatus = when {
     data.operation == HomeOperation.Restart -> HomeStatus.Restarting
@@ -350,7 +380,10 @@ internal fun HetuHomeThemeFromPrefs(prefs: SharedPreferences, content: @Composab
         }
         ThemeChoice(isDark, isDark && prefs.getBoolean("pureBlackDark", false), presetAccent ?: HomeAccent.Default, customAccent)
     }
-    HetuHomeTheme(dark = dark, accent = preset, pureBlack = pureBlack, customAccent = custom, content = content)
+    HetuHomeTheme(dark = dark, accent = preset, pureBlack = pureBlack, customAccent = custom) {
+        // Pinned bars blur only when the user's「模糊效果」switch allows it.
+        CompositionLocalProvider(LocalHomeBlur provides LocalHxBlur.current, content = content)
+    }
 }
 
 private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
