@@ -78,6 +78,13 @@ def expect(label,name):
  root=capture(name);assert any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')),(label,name)
  checks.append({'name':name,'result':'passed'})
 
+# The home title is localized since the home/panel refactor (河图/Hetu/河圖);
+# the emulator boots en-US, so the title check must accept every variant.
+HOME_TITLES=('河图','Hetu','河圖')
+def expect_any(labels,name):
+ root=capture(name);assert any(any(label==n.get('text','') for label in labels) for n in root.iter('node')),(labels,name)
+ checks.append({'name':name,'result':'passed'})
+
 def switch_node(root,label):
  parents={child:parent for parent in root.iter() for child in parent}
  titles=[n for n in root.iter('node') if n.get('text')==label]
@@ -150,7 +157,7 @@ def wait_for_home():
    adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));recoveries+=1
    time.sleep(20);continue
   assert not any("isn't responding" in title for title in titles),('Unexpected application ANR',titles)
-  if any(n.get('package')==PKG and n.get('text')=='河图' for n in nodes):
+  if any(n.get('package')==PKG and n.get('text') in HOME_TITLES for n in nodes):
    (OUT/'first-frame-ready.json').write_text(json.dumps({'system_ui_wait_recoveries':recoveries,'app_visible':True}))
    return
   assert adb('shell','pidof',PKG,check=False).strip(),'App process exited before first frame'
@@ -549,7 +556,7 @@ def main():
  (OUT/'launch.txt').write_text(adb('shell','am','start','-W','-n',choices[0],timeout=240))
  wait_for_home()
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited at launch'
- expect('河图','01-home')
+ expect_any(HOME_TITLES,'01-home')
  # New language binding follows the actual system locale. Exercise the visible
  # preference picker before collecting the Chinese-reference navigation set.
  root,_=ui()
