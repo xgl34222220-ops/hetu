@@ -81,7 +81,7 @@ internal fun ToolsDiagScreen(
                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
             )
         }
-        if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
+        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
             ToolsCardTitle("运行记录")
             ToolsRow(
                 AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,

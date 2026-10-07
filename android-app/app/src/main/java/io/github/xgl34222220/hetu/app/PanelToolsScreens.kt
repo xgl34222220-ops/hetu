@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.ht
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -112,7 +113,9 @@ internal fun ToolsScreen(
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     io.github.xgl34222220.hetu.tools.HetuToolsV2(
         onLog = vm::toast,
-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = bottomPadding + 24.dp),
+        contentPadding = androidx.compose.foundation.layout.PaddingValues(
+            bottom = maxOf(bottomPadding + 24.dp, HomeDims.dockClearance)
+        ),
         onSubPageVisibleChanged = onSubPageVisibleChanged,
         onConfigChanged = { scope.launch { vm.refreshNow() } },
         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },

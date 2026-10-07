@@ -7806,6 +7806,29 @@ index b4cf06e..1ee2881 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+index 45e1470..820f6b5 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.Dp
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import kotlinx.coroutines.launch
++import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
+ import io.github.xgl34222220.hetu.ui.ht
+ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+@@ -112,7 +113,9 @@ internal fun ToolsScreen(
+     val scope = androidx.compose.runtime.rememberCoroutineScope()
+     io.github.xgl34222220.hetu.tools.HetuToolsV2(
+         onLog = vm::toast,
+-        contentPadding = androidx.compose.foundation.layout.PaddingValues(bottom = bottomPadding + 24.dp),
++        contentPadding = androidx.compose.foundation.layout.PaddingValues(
++            bottom = maxOf(bottomPadding + 24.dp, HomeDims.dockClearance)
++        ),
+         onSubPageVisibleChanged = onSubPageVisibleChanged,
+         onConfigChanged = { scope.launch { vm.refreshNow() } },
+         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
 index b7bc4f6..6ca99c2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
@@ -14417,7 +14440,7 @@ index 7b1d01e..7d3adad 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index 77f1c83..89aeb83 100644
+index 77f1c83..ee40a76 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 @@ -1,38 +1,36 @@
@@ -14550,7 +14573,7 @@ index 77f1c83..89aeb83 100644
 +                subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
 +            )
 +        }
-+        if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
++        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
 +            ToolsCardTitle("运行记录")
 +            ToolsRow(
 +                AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
