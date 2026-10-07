@@ -11,7 +11,7 @@ ADB=str(Path(os.environ['ANDROID_HOME'])/'platform-tools'/'adb')
 OUT=Path(os.environ.get('HETU_SMOKE_OUT','out/android-smoke')); OUT.mkdir(parents=True,exist_ok=True)
 from mock_webview_controller import controller_fixture, panel_controller_fixture, PANEL_AUTH_SECRET
 from native_webview_bounds import webview_bounds
-from native_scroll_bounds import scroll_bounds, scroll_gesture
+from native_scroll_bounds import scroll_bounds, scroll_gesture, scroll_swipe, _dock_top
 from run_hetu_emulator import verify_owned_emulator_target
 checks=[]
 def adb(*args, timeout=90, check=True):
@@ -432,6 +432,87 @@ def tap_panel_retry(root):
  adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2))
  return {'timeMonotonic':tapped,'bounds':[x1,y1,x2,y2],'input':'native adb tap'}
 
+def panel_box(node):
+ match=re.fullmatch(r'\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]',node.get('bounds',''))
+ assert match is not None,('Missing native bounds',node.attrib)
+ box=tuple(map(int,match.groups()));x1,y1,x2,y2=box
+ assert x1>=0 and y1>=0 and x2>x1 and y2>y1,('Invalid native bounds',box)
+ return box
+
+def panel_navigation_frame(raw,viewport):
+ # Read actual WindowManager insets, not an assumed navigation-bar height.
+ frames=set()
+ for source in re.findall(r'(?:mType|type)=navigationBars\b[^}\n]*',raw):
+  if not re.search(r'(?:mVisible|visible)=true\b',source):continue
+  match=re.search(r'(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]',source)
+  if match is None:match=re.search(r'(?:mFrame|frame)=Rect\((-?\d+),\s*(-?\d+)\s*-\s*(-?\d+),\s*(-?\d+)\)',source)
+  if match is not None:
+   frame=tuple(map(int,match.groups()))
+   if frame[0]<=viewport[0] and frame[2]>=viewport[2] and viewport[1]<frame[1]<frame[3]==viewport[3]:frames.add(frame)
+ assert len(frames)==1,('Expected one observed visible navigation-bar frame',sorted(frames))
+ return next(iter(frames))
+
+def panel_footer_geometry(root,nav_top):
+ assert_native_panel(root)
+ labels=panel_labels(root)
+ assert not any('HTTP 401' in label or '无法读取面板' in label for label in labels),'Footer observation returned to controller failure'
+ parents={child:parent for parent in root.iter() for child in parent}
+ tabs=[n for n in root.iter('node') if n.get('text')=='概览']
+ assert len(tabs)==1,('Expected one overview tab',len(tabs))
+ selected=tabs[0]
+ while selected.get('selected')!='true' and selected in parents:selected=parents[selected]
+ assert selected.get('selected')=='true','Footer observation left the selected overview'
+ views=[n for n in root.iter('node') if n.get('package')==PKG and n.get('scrollable')=='true' and panel_box(n)[3]-panel_box(n)[1]>panel_box(n)[2]-panel_box(n)[0]]
+ assert len(views)==1,('Expected one vertical native panel list',len(views))
+ viewport=panel_box(views[0]);dock=_dock_top(root,PKG)
+ bottom=min(nav_top,dock if dock is not None else nav_top)-4
+ top=max(viewport[1],panel_box(selected)[3])+4
+ gesture_viewport=(viewport[0],top,viewport[2],bottom)
+ assert bottom>top,('No unobscured native list viewport',gesture_viewport)
+ titles=[n for n in root.iter('node') if n.get('text')=='未知应用']
+ counts=[n for n in root.iter('node') if n.get('text')=='18 条连接']
+ assert len(titles)==len(counts)==1,('Expected unique controlled final application row',len(titles),len(counts))
+ row=titles[0]
+ while counts[0] not in tuple(row.iter()) and row in parents:row=parents[row]
+ assert row is not views[0] and counts[0] in tuple(row.iter()),'Final application labels do not share a row'
+ ancestor=row
+ while ancestor not in (views[0],root) and ancestor in parents:ancestor=parents[ancestor]
+ assert ancestor is views[0],'Final application row is outside the actual scroll list'
+ bounds=panel_box(row)
+ clear=viewport[0]<=bounds[0]<bounds[2]<=viewport[2] and top<=bounds[1]<bounds[3]<=bottom
+ return {'viewport':viewport,'gestureViewport':gesture_viewport,'dockTop':dock,'navigationTop':nav_top,'rowBounds':bounds,'entireRowUnobscured':clear}
+
+def capture_panel_footer_scroll(expected,report):
+ proof={'result':'FAIL','inputs':[],'observations':[],'rootMutationActions':0}
+ report['footerScroll']=proof
+ before=capture('panel-controller-200-footer-before')
+ assert {label:panel_counter(before,label) for label in expected}==expected
+ vertical=[panel_box(n) for n in before.iter('node') if n.get('package')==PKG and n.get('scrollable')=='true' and panel_box(n)[3]-panel_box(n)[1]>panel_box(n)[2]-panel_box(n)[0]]
+ assert len(vertical)==1,('Expected one vertical native panel list',vertical)
+ raw=adb('shell','dumpsys','window','windows',timeout=30)
+ (OUT/'panel-controller-200-footer-insets.txt').write_text(raw)
+ nav=panel_navigation_frame(raw,vertical[0]);proof['navigationFrame']=nav
+ geometry=panel_footer_geometry(before,nav[1]);proof['observations'].append({'capture':'panel-controller-200-footer-before',**geometry})
+ # Always send real input, even when a different viewport initially fits the row.
+ for attempt in range(1,3):
+  gesture=scroll_swipe(geometry['gestureViewport'])
+  proof['inputs'].append({'direction':'up','coordinates':gesture,'durationMs':400,'timeMonotonic':time.monotonic(),'input':'native adb swipe'})
+  adb('shell','input','swipe',*(str(v) for v in gesture),'400');time.sleep(.5)
+  name=f'panel-controller-200-footer-after-{attempt}'
+  after=capture(name);geometry=panel_footer_geometry(after,nav[1])
+  proof['observations'].append({'capture':name,**geometry})
+  if geometry['entireRowUnobscured']:break
+ assert geometry['entireRowUnobscured'],('Final application row stayed obscured after bounded native swipes',geometry)
+ gesture=scroll_swipe(geometry['gestureViewport'],reverse=True)
+ proof['inputs'].append({'direction':'down','coordinates':gesture,'durationMs':400,'timeMonotonic':time.monotonic(),'input':'native adb swipe'})
+ adb('shell','input','swipe',*(str(v) for v in gesture),'400');time.sleep(.5)
+ returned=capture_panel_when(['运行概况'],'panel-controller-200-footer-returned',expected)
+ assert not any('HTTP 401' in value or '无法读取面板' in value for value in panel_labels(returned))
+ proof['returnedCounts']={label:panel_counter(returned,label) for label in expected}
+ assert proof['returnedCounts']==expected
+ proof['result']='PASS'
+ (OUT/'panel-controller-200-footer-scroll.json').write_text(json.dumps(proof,ensure_ascii=False,indent=2))
+
 def panel_controller_auth_cases(component):
  target=panel_fixture_target()
  report={'result':'FAIL','fixtureOnly':True,'syntheticCachedRuntimeHint':True,
@@ -495,6 +576,8 @@ def panel_controller_auth_cases(component):
      report['recoveryObservation']='poll completed before retry input' if first_success<report['retryAfterFixture200']['timeMonotonic'] else 'retry input preceded successful reads; foreground poll also remained active'
      report['exclusiveRetryRecoveryClaimed']=False
      checks.append({'name':'panel-controller-200-recovered','result':'passed','evidence':'actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log'})
+     capture_panel_footer_scroll(expected,report)
+     checks.append({'name':'panel-controller-200-footer-scroll','result':'passed','evidence':'1-3 actual native swipes; final controlled application row wholly above observed dock/navigation bounds; returned12/3/18 capture'})
    except Exception:
     try:capture('panel-controller-fixture-failure')
     except Exception:pass

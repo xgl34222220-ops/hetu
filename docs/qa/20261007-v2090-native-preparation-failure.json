@@ -1,0 +1,60 @@
+{
+  "schema": "hetu-v2090-native-preparation-failure-v1",
+  "productionCommit": "077f9878c05c9432fb5892f91ac97fcf23d8c6bc",
+  "runId": 37690257063,
+  "runConclusion": "failure",
+  "api35Job": 113039831466,
+  "api35Conclusion": "success",
+  "api36Job": 113039831567,
+  "api36Conclusion": "failure",
+  "applicationChecks": {
+    "api35": 64,
+    "api36": 64,
+    "oldChecksEach": 59,
+    "paletteChecksEach": 21,
+    "authEach": "PASS",
+    "syntheticWantedServiceObservedEach": false,
+    "preferencesAndReverseRestoredEach": true,
+    "rootMutationActions": 0
+  },
+  "native": {
+    "stage": "guest payload preparation before CLI execution and continuous sampling",
+    "error": "RuntimeError: Guest native payload hash, ownership or transported mode differs",
+    "scriptSha256": "bd50a69600f7154832cd64d7278aded909cab0bc7bef52c64df7c846b35a6608",
+    "executedSamples": 0,
+    "continuous900": "NOT_STARTED",
+    "actualGuestHashAndStatRecorded": false,
+    "exactUnderlyingMismatchEstablished": false,
+    "cleanupNonceRemoved": false,
+    "cleanupError": "config.yaml was not created yet; unconditional stat aborted owned nonce removal",
+    "ownedCoreStopped": true,
+    "adbChildReaped": true,
+    "adbForwardRestored": true,
+    "adbReverseRestored": true
+  },
+  "physicalArtifacts": {
+    "api35": {
+      "id": 11514632640,
+      "bytes": 8110241,
+      "sha256": "5fabdb258bbac56da7dff8f944e1ce284834431897683aeed7959986c567ecc7"
+    },
+    "api36": {
+      "id": 11514259892,
+      "bytes": 14760605,
+      "sha256": "41e79097a004d94aa5a1dd32ba5f5a5cc59060f5f7ff487b83e179aaf8622650"
+    }
+  },
+  "priorSamePreparationFailure": {
+    "commit": "41ab3c0ce8bafaa9b607bd0c440571a4c0109839",
+    "runId": 37687804223,
+    "api36Job": 113033111880,
+    "executedSamples": 0,
+    "authPassed": true
+  },
+  "candidateApk": {
+    "bytes": 134978969,
+    "sha256": "8378425f0296bf9c5a6f4a03db4af8da74cc3022139bd244b4a1dd363d02c6a2",
+    "delivered": false
+  },
+  "plannedRepairScope": "Only native QA transport and partial-start cleanup; preserve strict execution payload SHA/UID/GID/700 and private nonce, no guest chmod/chown/ACL/SELinux. Record actual observations. Production compilation inputs403, unit identities631 and original36 remain untouched. Full new exact-SHA CI required; no old run cancelled."
+}

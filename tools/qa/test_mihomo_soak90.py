@@ -3,8 +3,10 @@
 import importlib.util
 import json
 from pathlib import Path
+import shutil
 import socket
 import struct
+import subprocess
 import tempfile
 import time
 import unittest
@@ -253,6 +255,260 @@ class CandidateApkPayloadTests(unittest.TestCase):
         source.write_bytes(self.original[:-1] + b'X')
         with self.assertRaisesRegex(RuntimeError, 'ignored native source differs'):
             soak.native_payload(self.apk)
+
+
+class TransportGuestFixture:
+    """Actual local files/cp shell, with only the guest UID boundary simulated.
+
+    This does not execute any native payload or prove Android Toybox behavior.
+    Push emulates the cited adbd user-bit expansion; the production helper runs
+    its real shell guards and non-preserving cp against disposable host files.
+    """
+    def __init__(self, folder, stage_mode=0o777):
+        self.directory = '/data/local/tmp/hetu-soak90-' + NONCE
+        self.local = Path(folder) / 'owned-nonce'
+        self.local.mkdir(mode=0o700)
+        (self.local / 'owner').write_text(NONCE)
+        (self.local / 'owner').chmod(0o600)
+        self.stage_mode = stage_mode
+        self.stage_bytes = None
+        self.stage_symlink = False
+        self.final_bytes = None
+        self.final_mode = None
+        self.stat_overrides = {}
+        self.fail_copy = False
+        self.commands = []
+
+    def translate(self, path):
+        if not path.startswith(self.directory):
+            raise AssertionError('Fixture cannot access another guest path')
+        return str(self.local) + path[len(self.directory):]
+
+    def run(self, *args, **kwargs):
+        self.commands.append(('run', args))
+        if args in (('forward', '--list'), ('reverse', '--list')):
+            return ''
+        if args[0] == 'push':
+            source, target = Path(args[1]), Path(self.translate(args[2]))
+            if self.stage_symlink:
+                target.symlink_to(source)
+            else:
+                target.write_bytes(source.read_bytes() if self.stage_bytes is None else self.stage_bytes)
+                target.chmod(self.stage_mode)
+            return 'fixture push'
+        if args[:3] == ('shell', 'stat', '-c'):
+            fmt, guest_path = args[3:]
+            if guest_path in self.stat_overrides:
+                return self.stat_overrides[guest_path]
+            raw = subprocess.run(['stat', '-c', fmt, self.translate(guest_path)],
+                                 capture_output=True, text=True, check=True).stdout.strip()
+            if fmt == '%u:%g:%a:%f':
+                return '2000:2000:' + ':'.join(raw.split(':')[2:])
+            return raw
+        if args[:2] == ('shell', 'sha256sum'):
+            return soak.sha256(Path(self.translate(args[2])).read_bytes()) + '  ' + args[2]
+        if args[:2] == ('shell', 'cat'):
+            return Path(self.translate(args[2])).read_text().strip()
+        if args[:3] == ('shell', 'rm', '-rf'):
+            shutil.rmtree(self.translate(args[3]))
+            return ''
+        raise AssertionError('Unexpected guest command: ' + repr(args))
+
+    def shell(self, command, **kwargs):
+        self.commands.append(('shell', command))
+        if ' && cp ' in command and self.fail_copy:
+            raise RuntimeError('fixture cp failed')
+        local_command = command.replace(self.directory, str(self.local))
+        # Actual local UID is deliberately not represented as Android shell UID.
+        # Shim only this identity output; type, permissions, bytes and all shell
+        # guards/cp/umask are genuinely observed on the temporary local files.
+        stat = shutil.which('stat')
+        shim = ('stat() { if [ "$1" = -c ] && [ "$2" = %u:%g:%a ]; then '
+                + stat + ' -c "2000:2000:%a" "$3"; else ' + stat + ' "$@"; fi; }; ')
+        result = subprocess.run(['sh', '-c', shim + local_command], capture_output=True,
+                                text=True, check=True, timeout=kwargs.get('timeout', 15)).stdout.strip()
+        if ' && cp ' in command:
+            target = self.local / 'mihomo'
+            if self.final_bytes is not None:
+                target.write_bytes(self.final_bytes)
+            if self.final_mode is not None:
+                target.chmod(self.final_mode)
+        return result
+
+
+class NativeTransportAndPartialCleanupTests(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.guest = TransportGuestFixture(self.temp.name)
+        self.payload = b'bounded transport fixture; never executed\n'
+        self.digest = soak.sha256(self.payload)
+        self.report = {}
+
+    def tearDown(self):
+        self.temp.cleanup()
+
+    def transport(self):
+        soak.transport_native_payload(self.guest, Path(self.temp.name), self.guest.directory,
+                                      NONCE, self.payload, self.digest, self.report)
+
+    def assert_no_copy_or_execute(self):
+        self.assertFalse((self.guest.local / 'mihomo').exists())
+        self.assertFalse(any(kind == 'shell' and ' && cp ' in value for kind, value in self.guest.commands))
+        self.assertFalse(any(kind == 'run' and value[:2] == ('shell', self.guest.directory + '/mihomo')
+                             for kind, value in self.guest.commands))
+
+    def test_canonical_adb_777_stage_becomes_exact_700_using_actual_cp_umask(self):
+        self.transport()
+        stage, copied = self.guest.local / 'mihomo.transport', self.guest.local / 'mihomo'
+        self.assertEqual(0o777, stage.stat().st_mode & 0o7777)
+        self.assertEqual(0o700, copied.stat().st_mode & 0o7777)
+        self.assertEqual(self.payload, stage.read_bytes())
+        self.assertEqual(self.payload, copied.read_bytes())
+        observations = self.report['guestFileObservations']
+        self.assertEqual('777', observations['transportedStage']['mode'])
+        self.assertEqual('700', observations['privateExecutable']['mode'])
+        self.assertEqual(self.digest, observations['transportedStage']['sha256'])
+        self.assertEqual(self.digest, self.report['guestNativePayloadSha256'])
+        self.assertFalse(self.report['nativeTransportPolicy']['stageExecuted'])
+        command = self.report['nativeTransportPolicy']['copyCommand']
+        self.assertIn('umask 077 && cp ', command)
+        self.assertNotIn('cp -p', command)
+        self.assertNotIn('chmod', command)
+        self.assertNotIn('chown', command)
+
+    def test_already_private_700_stage_keeps_strict_final_700(self):
+        self.guest.stage_mode = 0o700
+        self.transport()
+        self.assertEqual(0o700, (self.guest.local / 'mihomo').stat().st_mode & 0o7777)
+
+    def test_bad_stage_hash_is_recorded_and_never_copied(self):
+        self.guest.stage_bytes = b'wrong or truncated stage'
+        with self.assertRaisesRegex(RuntimeError, 'stage hash'):
+            self.transport()
+        observed = self.report['guestFileObservations']['transportedStage']
+        self.assertEqual(soak.sha256(self.guest.stage_bytes), observed['sha256'])
+        self.assertIn('rawStat', observed)
+        self.assertIn('rawSha256sum', observed)
+        self.assert_no_copy_or_execute()
+
+    def test_foreign_stage_uid_or_gid_is_recorded_and_never_copied(self):
+        for identity in ('0:2000', '2000:0'):
+            with self.subTest(identity=identity):
+                self.guest.stat_overrides[self.guest.directory + '/mihomo.transport'] = identity + ':777:81ff'
+                with self.assertRaisesRegex(RuntimeError, 'stage ownership'):
+                    self.transport()
+                self.assertEqual(identity + ':777:81ff', self.report['guestFileObservations']['transportedStage']['rawStat'])
+                self.assert_no_copy_or_execute()
+                (self.guest.local / 'mihomo.transport').unlink()
+
+    def test_symlink_stage_is_not_hashed_copied_or_executed(self):
+        self.guest.stage_symlink = True
+        with self.assertRaisesRegex(RuntimeError, 'not a regular file'):
+            self.transport()
+        self.assertNotIn('rawSha256sum', self.report['guestFileObservations']['transportedStage'])
+        self.assert_no_copy_or_execute()
+
+    def test_setid_and_every_other_transport_mode_are_refused(self):
+        for mode in (0o4777, 0o2777, 0o1777, 0o755, 0o775, 0o600, 0o666):
+            with self.subTest(mode=oct(mode)):
+                self.guest.stage_mode = mode
+                with self.assertRaisesRegex(RuntimeError, 'stage ownership'):
+                    self.transport()
+                self.assert_no_copy_or_execute()
+                (self.guest.local / 'mihomo.transport').unlink()
+
+    def test_private_copy_failure_keeps_raw_stage_diagnostics_and_no_success_hash(self):
+        self.guest.fail_copy = True
+        with self.assertRaisesRegex(RuntimeError, 'cp failed'):
+            self.transport()
+        self.assertEqual(self.digest, self.report['guestFileObservations']['transportedStage']['sha256'])
+        self.assertIn('cp failed', self.report['nativeTransportPolicy']['copyError'])
+        self.assertNotIn('guestNativePayloadSha256', self.report)
+        self.assertFalse((self.guest.local / 'mihomo').exists())
+
+    def test_final_hash_mode_or_uid_mismatch_cannot_be_accepted(self):
+        for flaw in ('hash', 'mode', 'uid'):
+            with self.subTest(flaw=flaw):
+                if flaw == 'hash':
+                    self.guest.final_bytes = b'bad copied bytes'
+                elif flaw == 'mode':
+                    self.guest.final_mode = 0o777
+                else:
+                    self.guest.stat_overrides[self.guest.directory + '/mihomo'] = '0:2000:700:81c0'
+                with self.assertRaisesRegex(RuntimeError, 'Private native executable'):
+                    self.transport()
+                self.assertIn('rawSha256sum', self.report['guestFileObservations']['privateExecutable'])
+                self.assertNotIn('guestNativePayloadSha256', self.report)
+                self.guest.final_bytes = self.guest.final_mode = None
+                self.guest.stat_overrides.clear()
+                (self.guest.local / 'mihomo.transport').unlink()
+                (self.guest.local / 'mihomo').unlink()
+
+    def test_failed_setup_without_config_still_removes_only_owned_nonce(self):
+        self.guest.stage_bytes = b'bad stage'
+        with self.assertRaises(RuntimeError):
+            self.transport()
+        cleanup = {'ownedNonceDirectoryRemoved': False}
+        soak.remove_owned_nonce(self.guest, self.guest.directory, NONCE, self.report, cleanup)
+        self.assertFalse(cleanup['configurationPresentBeforeRemoval'])
+        self.assertEqual(0, cleanup['configurationBytesBeforeRemoval'])
+        self.assertTrue(cleanup['ownedNonceDirectoryRemoved'])
+        self.assertFalse(self.guest.local.exists())
+
+    def test_production_run_soak_records_transport_failure_and_complete_partial_cleanup(self):
+        self.guest.stage_bytes = b'bad actual transported fixture bytes'
+        shutil.rmtree(self.guest.local)  # Production run_soak must create its own fresh nonce.
+        output = Path(self.temp.name) / 'results'
+        metadata = {'sha256': self.digest, 'bytes': len(self.payload), 'source': 'host test fixture only'}
+        with patch.object(soak, 'Guest', return_value=self.guest), \
+                patch.object(soak, 'owned_target', return_value={'proof': 'simulated host fixture, not AOSP'}), \
+                patch.object(soak, 'native_payload', return_value=(self.payload, self.digest, metadata)), \
+                patch.object(soak, 'guest_ports', return_value=(30100, 30101, 30102, 30103)), \
+                patch.object(soak.uuid, 'uuid4', return_value=Mock(hex=NONCE)):
+            with self.assertRaisesRegex(RuntimeError, 'stage hash'):
+                soak.run_soak(output=output, seconds=900, environment={})
+        report = json.loads((output / 'results.json').read_text())
+        self.assertEqual('FAIL', report['result'])
+        self.assertEqual(0, report['executedSamples'])
+        self.assertNotIn('actualSeconds', report)
+        self.assertIn('rawStat', report['guestFileObservations']['transportedStage'])
+        self.assertEqual(soak.sha256(self.guest.stage_bytes), report['guestFileObservations']['transportedStage']['sha256'])
+        self.assertEqual([], report['cleanup']['errors'])
+        for key in ('ownedGuestCoreStopped', 'adbChildReaped', 'ownedNonceDirectoryRemoved',
+                    'adbForwardRestored', 'adbReverseRestored'):
+            self.assertTrue(report['cleanup'][key], key)
+        self.assertFalse(report['cleanup']['configurationPresentBeforeRemoval'])
+        self.assertEqual(0, report['cleanup']['configurationBytesBeforeRemoval'])
+
+    def test_present_config_bytes_are_recorded_before_owned_removal(self):
+        (self.guest.local / 'config.yaml').write_bytes(b'config fixture\n')
+        cleanup = {}
+        soak.remove_owned_nonce(self.guest, self.guest.directory, NONCE, self.report, cleanup)
+        self.assertTrue(cleanup['configurationPresentBeforeRemoval'])
+        self.assertEqual(len(b'config fixture\n'), cleanup['configurationBytesBeforeRemoval'])
+        self.assertTrue(cleanup['ownedNonceDirectoryRemoved'])
+
+    def test_foreign_marker_parent_mode_uid_or_symlink_directory_is_never_removed(self):
+        for flaw in ('marker', 'mode', 'uid', 'symlink'):
+            with self.subTest(flaw=flaw):
+                if flaw == 'marker':
+                    (self.guest.local / 'owner').write_text('b' * 32)
+                elif flaw == 'mode':
+                    self.guest.local.chmod(0o777)
+                elif flaw == 'uid':
+                    self.guest.stat_overrides[self.guest.directory] = '0:2000:700:41c0'
+                else:
+                    self.guest.stat_overrides[self.guest.directory] = '2000:2000:777:a1ff'
+                cleanup = {'ownedNonceDirectoryRemoved': False}
+                with self.assertRaisesRegex(RuntimeError, 'refusing mutation'):
+                    soak.remove_owned_nonce(self.guest, self.guest.directory, NONCE, self.report, cleanup)
+                self.assertTrue(self.guest.local.exists())
+                self.assertFalse(cleanup['ownedNonceDirectoryRemoved'])
+                self.assertFalse(any(kind == 'run' and value[:3] == ('shell', 'rm', '-rf')
+                                     for kind, value in self.guest.commands))
+                (self.guest.local / 'owner').write_text(NONCE)
+                self.guest.local.chmod(0o700)
+                self.guest.stat_overrides.clear()
 
 
 class EvaluationContractTests(unittest.TestCase):

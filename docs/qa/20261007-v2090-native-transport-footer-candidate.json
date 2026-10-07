@@ -1,0 +1,86 @@
+{
+  "schema": "hetu-v2090-native-transport-footer-candidate-v1",
+  "recordedUtc": "2026-10-07T22:46:41.744048+00:00",
+  "parentCommit": "077f9878c05c9432fb5892f91ac97fcf23d8c6bc",
+  "previousRun": 37690257063,
+  "previousRunConclusion": "failure",
+  "previousNativeExecutedSamples": 0,
+  "productionChanged": false,
+  "compilationInputs": 403,
+  "unitTests": 631,
+  "unitXmlSuites": 64,
+  "original545Preserved": true,
+  "independent36Unchanged": true,
+  "productionPatchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
+  "sourceStop": true,
+  "sourceSha256": {
+    "tools/qa/run_mihomo_soak90.py": "96b0855425500576cfe3b3fbe94311108b7f2c5b073665cdba2dc255b08332e4",
+    "tools/qa/test_mihomo_soak90.py": "6d6d493db0df4d7136b6f236958df292bf09595e82860e4da14979a42b15c895",
+    ".github/scripts/smoke_hetu_apk.py": "1a018cb565a68c6b83e22b7db3f5e449aaeb067c4cc71491cc768bf10b0a59d5",
+    ".github/scripts/test_panel_auth_smoke.py": "bc7acf17fa56c07e6e5035c1606259ad7b33303c26eecfaf38c7f2414351c9ba",
+    ".github/scripts/verify_stability90_delivery.py": "d74d5268e480fa09888e717863aaacb445f0f1819ecec4a65c71e4ffa90e9a15"
+  },
+  "nativeQa": {
+    "originalMethodsRetained": 23,
+    "newMethods": 12,
+    "priorActualHostRunTests": 35,
+    "priorActualHostSeconds": 5.320843882,
+    "structuredExpectationsTargetedTests": 12,
+    "structuredExpectationsActualSeconds": 0.33262297700275667,
+    "rawTargetedLogSha256": "9f136e9626025c849e6411376bd32e64427c80a90ab320b73eb624582ba57bb6",
+    "stageExecuted": false,
+    "allowedStageModes": [
+      "700",
+      "777"
+    ],
+    "stageLocation": "new private 2000:2000:700 nonce directory only",
+    "finalExecutableRequired": {
+      "uid": 2000,
+      "gid": 2000,
+      "mode": "700",
+      "fileType": "regular",
+      "sha256": "same validated original APK-native manifest payload"
+    },
+    "guestPermissionMutation": false,
+    "expectedActualDiagnostic": "Separate guestFileExpectations and guestFileObservations keyed by phase label; expected recorded before guest I/O; absent actual remains absent on failure",
+    "partialStartCleanup": "Only owned private nonce and matching UID/mode/marker, absent config allowed; foreign or changed owner/symlink refused",
+    "guardsAnd900SecondThresholdUnchanged": true
+  },
+  "footerQa": {
+    "hostTests": 24,
+    "scrollBoundsTests": 13,
+    "mockControllerTests": 5,
+    "hostResult": "PASS",
+    "originalHostTestMethods": 18,
+    "originalNavigationAndAuthChecks": 64,
+    "newCheck": "panel-controller-200-footer-scroll",
+    "expectedInstalledChecksEachApi": 65,
+    "maximumRealSwipes": 3,
+    "expectedReturnedCounters": {
+      "策略": 12,
+      "规则": 3,
+      "当前连接": 18
+    },
+    "sourceStopRecordSha256": "1af457b74062e8dea36510e801484869334e6255d998513657c984c0c054ac43"
+  },
+  "deliveryVerifier": {
+    "startedUtc": "2026-10-07T22:46:00.129705+00:00",
+    "finishedUtc": "2026-10-07T22:46:01.046122+00:00",
+    "actualSeconds": 0.916434572005528,
+    "exitCode": 0,
+    "logSha256": "05eb695ff585266337d15c0e7615c3ead0061c58a3087af8858c8dc283a41f1f",
+    "sourceSha256": "d74d5268e480fa09888e717863aaacb445f0f1819ecec4a65c71e4ffa90e9a15",
+    "compile": "PASS",
+    "sourceInputs": 403,
+    "unitTestMethods": 631,
+    "xmlSuites": 64,
+    "patchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
+    "sourceStop": true
+  },
+  "acceptance": "PENDING_NEW_EXACT_SHA_FULL_CI_AND_PHYSICAL_ARTIFACTS",
+  "native900ExecutedByThisCandidate": false,
+  "previousFailuresRetained": true,
+  "oldCisCancelled": false,
+  "mainMergeReleaseDeployDeviceOperations": false,
+  "limitations": "Host files, simulated UID and controlled helper tests do not establish Android native continuous operation. AOSP app process and shell native loopback probes do not establish real phone Root routing, OEM background, Wi-Fi/mobile, commercial subscriptions or Google account authentication."
+}

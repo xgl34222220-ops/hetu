@@ -412,6 +412,138 @@ class Guest:
         return self.run('shell', 'sh', '-c', shlex.quote(command), **kwargs)
 
 
+def observe_guest_node(guest, path, report, label, *, hash_file=False):
+    """Retain raw lstat/hash evidence even when a later ownership guard fails."""
+    record = {'path': path, 'observedUtc': utc_now()}
+    report.setdefault('guestFileObservations', {})[label] = record
+    try:
+        raw = guest.run('shell', 'stat', '-c', '%u:%g:%a:%f', path)
+        record['rawStat'] = raw
+        match = re.fullmatch(r'([0-9]+):([0-9]+):([0-7]+):([a-fA-F0-9]+)', raw)
+        if not match:
+            raise RuntimeError('Guest node stat has an unexpected format: ' + label)
+        uid, gid, mode = int(match[1]), int(match[2]), int(match[3], 8)
+        file_mode = int(match[4], 16)
+        if file_mode & 0o7777 != mode:
+            raise RuntimeError('Guest node stat mode fields disagree: ' + label)
+        record.update(uid=uid, gid=gid, mode=match[3], fileType=oct(file_mode & 0o170000))
+        if hash_file:
+            # Never dereference a transported symlink to collect its hash.
+            if file_mode & 0o170000 != 0o100000:
+                raise RuntimeError('Guest payload is not a regular file: ' + label)
+            raw_hash = guest.run('shell', 'sha256sum', path)
+            record['rawSha256sum'] = raw_hash
+            digest = raw_hash.split()[0] if raw_hash.split() else ''
+            if not re.fullmatch(r'[a-f0-9]{64}', digest):
+                raise RuntimeError('Guest payload hash has an unexpected format: ' + label)
+            record['sha256'] = digest
+        return record
+    except BaseException as error:
+        record['error'] = type(error).__name__ + ': ' + str(error)
+        raise
+
+
+def require_owned_nonce(guest, directory, marker, report, label):
+    if directory != '/data/local/tmp/hetu-soak90-' + marker or not re.fullmatch(r'[a-f0-9]{32}', marker):
+        raise RuntimeError('Invalid owned nonce directory input')
+    # Bind every observation label to its expected values before any guest I/O,
+    # including failures that prevent collecting later actual fields.
+    report.setdefault('guestFileExpectations', {}).update({
+        label + 'Directory': {'path': directory, 'uid': 2000, 'gid': 2000,
+                             'mode': '700', 'fileType': oct(0o040000)},
+        label + 'Marker': {'path': directory + '/owner', 'uid': 2000, 'gid': 2000,
+                          'mode': '600', 'fileType': oct(0o100000), 'rawMarker': marker},
+    })
+    parent = observe_guest_node(guest, directory, report, label + 'Directory')
+    owner = observe_guest_node(guest, directory + '/owner', report, label + 'Marker')
+    if (parent['uid'], parent['gid'], parent['mode'], parent['fileType']) != (2000, 2000, '700', oct(0o040000)):
+        raise RuntimeError('Nonce directory ownership changed; refusing mutation')
+    if (owner['uid'], owner['gid'], owner['mode'], owner['fileType']) != (2000, 2000, '600', oct(0o100000)):
+        raise RuntimeError('Nonce marker ownership changed; refusing mutation')
+    value = guest.run('shell', 'cat', directory + '/owner')
+    owner['rawMarker'] = value
+    if value != marker:
+        raise RuntimeError('Nonce directory marker changed; refusing mutation')
+
+
+def transport_native_payload(guest, output, directory, marker, payload, digest, report):
+    """Copy an unexecuted adb stage into a new, strictly private executable.
+
+    AOSP adbd's send_impl copies user permission bits into group/other bits;
+    its documented algorithm maps a 0700 host source to 0777. That reference is
+    a transport expectation, not evidence of the actual guest: raw observations
+    below identify each guest file. The stage is never executed. Non-preserving
+    cp uses umask 077, and the final file must still be exactly 2000:2000:0700.
+    No guest chmod/chown, preserved ownership/mode, ACL or SELinux changes.
+    """
+    report['nativeTransportPolicy'] = {
+        'adbdReference': 'https://android.googlesource.com/platform/packages/modules/adb/+/refs/heads/main/daemon/file_sync_service.cpp',
+        'referenceOnly': 'send_impl copies user permission bits to group/other; 0700 becomes 0777. Actual guest values are recorded separately.',
+        'allowedStageModes': ['700', '777'], 'stageExecuted': False,
+        'finalRequiredOwnershipMode': '2000:2000:700', 'copyPreservesModeOrOwnership': False,
+    }
+    stage, executable = directory + '/mihomo.transport', directory + '/mihomo'
+    report.setdefault('guestFileExpectations', {}).update({
+        'transportedStage': {'path': stage, 'uid': 2000, 'gid': 2000,
+                             'allowedModes': ['700', '777'], 'fileType': oct(0o100000), 'sha256': digest},
+        'privateExecutable': {'path': executable, 'uid': 2000, 'gid': 2000,
+                              'mode': '700', 'fileType': oct(0o100000), 'sha256': digest},
+    })
+    require_owned_nonce(guest, directory, marker, report, 'beforeTransport')
+    guest.shell(f'test ! -e {stage} && test ! -L {stage} && test ! -e {executable} && test ! -L {executable}')
+    with tempfile.TemporaryDirectory(prefix='hetu-mihomo-transport-', dir=output) as private_transport:
+        local_binary = Path(private_transport) / 'mihomo'
+        local_binary.write_bytes(payload)
+        local_binary.chmod(0o700)  # This new HOST file only; never guest chmod.
+        guest.run('push', str(local_binary), stage, timeout=90)
+    original = observe_guest_node(guest, stage, report, 'transportedStage', hash_file=True)
+    if original['sha256'] != digest:
+        raise RuntimeError('Transported native stage hash differs')
+    if original['uid'] != 2000 or original['gid'] != 2000 or original['mode'] not in ('700', '777'):
+        raise RuntimeError('Transported native stage ownership or exact canonical mode differs')
+    require_owned_nonce(guest, directory, marker, report, 'beforePrivateCopy')
+    # Recheck the private parent/marker and absence in the same shell that
+    # creates the copy. The stage's only accepted modes have no setid bits.
+    command = (f'test ! -L {directory} && test -d {directory} && '
+               f'test "$(stat -c %u:%g:%a {directory})" = 2000:2000:700 && '
+               f'test ! -L {directory}/owner && test "$(cat {directory}/owner)" = {marker} && '
+               f'test ! -L {stage} && test -f {stage} && '
+               f'test "$(stat -c %u:%g:%a {stage})" = 2000:2000:{original["mode"]} && '
+               f'test ! -e {executable} && test ! -L {executable} && '
+               f'umask 077 && cp {stage} {executable}')
+    report['nativeTransportPolicy']['copyCommand'] = command
+    try:
+        guest.shell(command, timeout=90)
+    except BaseException as error:
+        report['nativeTransportPolicy']['copyError'] = type(error).__name__ + ': ' + str(error)
+        raise
+    copied = observe_guest_node(guest, executable, report, 'privateExecutable', hash_file=True)
+    if copied['sha256'] != digest:
+        raise RuntimeError('Private native executable hash differs')
+    if (copied['uid'], copied['gid'], copied['mode']) != (2000, 2000, '700'):
+        raise RuntimeError('Private native executable ownership or mode differs')
+    require_owned_nonce(guest, directory, marker, report, 'afterPrivateCopy')
+    report['guestNativePayloadSha256'] = copied['sha256']
+
+
+def remove_owned_nonce(guest, directory, marker, report, cleanup):
+    """Clean our private folder even when setup failed before config creation."""
+    require_owned_nonce(guest, directory, marker, report, 'beforeCleanup')
+    config = directory + '/config.yaml'
+    size = guest.shell(f'if test -e {config} || test -L {config}; then stat -c %s {config}; else printf absent; fi')
+    if size == 'absent':
+        cleanup['configurationPresentBeforeRemoval'] = False
+        cleanup['configurationBytesBeforeRemoval'] = 0
+    elif re.fullmatch(r'[0-9]+', size):
+        cleanup['configurationPresentBeforeRemoval'] = True
+        cleanup['configurationBytesBeforeRemoval'] = int(size)
+    else:
+        raise RuntimeError('Owned nonce configuration size could not be observed')
+    guest.run('shell', 'rm', '-rf', directory)
+    guest.shell('test ! -e ' + directory + ' && test ! -L ' + directory)
+    cleanup['ownedNonceDirectoryRemoved'] = True
+
+
 def owned_target(environment, guest):
     spec = importlib.util.spec_from_file_location('hetu_soak_owned_runner', ROOT / '.github/scripts/run_hetu_emulator.py')
     module = importlib.util.module_from_spec(spec)
@@ -639,19 +771,7 @@ def run_soak(*, output, seconds=900, environment=None, apk=None):
         candidate_directory = '/data/local/tmp/hetu-soak90-' + marker
         guest.shell(f'test ! -e {candidate_directory} && umask 077 && mkdir {candidate_directory} && printf %s {marker} > {candidate_directory}/owner')
         directory = candidate_directory
-        if guest.run('shell', 'stat', '-c', '%u:%g:%a', directory) != '2000:2000:700':
-            raise RuntimeError('New nonce directory is not private and shell-owned')
-        # Set executable mode only on our new HOST copy. adb sync transports its
-        # source mode; there is deliberately no guest chmod/chown operation.
-        with tempfile.TemporaryDirectory(prefix='hetu-mihomo-transport-', dir=output) as private_transport:
-            local_binary = Path(private_transport) / 'mihomo'
-            local_binary.write_bytes(payload)
-            local_binary.chmod(0o700)
-            guest.run('push', str(local_binary), directory + '/mihomo', timeout=90)
-        actual_digest = guest.run('shell', 'sha256sum', directory + '/mihomo').split()[0]
-        if actual_digest != digest or guest.run('shell', 'stat', '-c', '%u:%g:%a', directory + '/mihomo') != '2000:2000:700':
-            raise RuntimeError('Guest native payload hash, ownership or transported mode differs')
-        report['guestNativePayloadSha256'] = actual_digest
+        transport_native_payload(guest, output, directory, marker, payload, digest, report)
         version = guest.run('shell', directory + '/mihomo', '-v')
         if 'Mihomo' not in version or 'android' not in version.lower():
             raise RuntimeError('Original native executable did not identify as Android Mihomo')
@@ -827,17 +947,7 @@ def run_soak(*, output, seconds=900, environment=None, apk=None):
                 cleanup_errors.append('reverse: ' + str(error))
         if directory is not None and cleanup['ownedGuestCoreStopped']:
             try:
-                # Validate both private ownership and nonce before removing only
-                # this new disposable test folder, never retained app data.
-                owner = guest.run('shell', 'cat', directory + '/owner')
-                private = guest.run('shell', 'stat', '-c', '%u:%g:%a', directory)
-                if owner != marker or private != '2000:2000:700':
-                    raise RuntimeError('Nonce directory ownership changed; refusing removal')
-                log_size = int(guest.run('shell', 'stat', '-c', '%s', directory + '/config.yaml'))
-                cleanup['configurationBytesBeforeRemoval'] = log_size
-                guest.run('shell', 'rm', '-rf', directory)
-                guest.shell('test ! -e ' + directory)
-                cleanup['ownedNonceDirectoryRemoved'] = True
+                remove_owned_nonce(guest, directory, marker, report, cleanup)
             except BaseException as error:
                 cleanup_errors.append('nonce directory: ' + str(error))
         if before_forward is not None:

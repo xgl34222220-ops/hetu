@@ -33,6 +33,20 @@ class PanelAuthSmokeTests(unittest.TestCase):
    self.node('3','[188,130][205,165]'),self.node('规则','[174,172][220,192]'),
    self.node('18','[305,130][335,165]'),self.node('当前连接','[286,172][356,192]')])
   return root
+ def footer(self,row_top=721,missing=False):
+  root=self.overview()
+  selected=ET.SubElement(root,'node',{'package':self.module.PKG,'selected':'true','bounds':'[14,136][74,184]'})
+  selected.append(self.node('概览','[27,148][61,173]',package=self.module.PKG))
+  scroll=ET.SubElement(root,'node',{'package':self.module.PKG,'scrollable':'true','enabled':'true','bounds':'[0,0][394,852]'})
+  if not missing:
+   row=ET.SubElement(scroll,'node',{'package':self.module.PKG,'bounds':f'[14,{row_top}][380,{row_top+131}]'})
+   row.extend([self.node('未知应用',f'[82,{row_top+77}][154,{row_top+103}]',package=self.module.PKG),self.node('18 条连接',f'[301,{row_top+90}][362,{row_top+110}]',package=self.module.PKG)])
+  dock=ET.SubElement(root,'node',{'package':self.module.PKG,'bounds':'[28,736][366,792]'})
+  for label,left,right in [('首页',28,112),('面板',112,196),('工具',196,281),('设置',281,366)]:
+   tab=ET.SubElement(dock,'node',{'package':self.module.PKG,'bounds':f'[{left},736][{right},792]'})
+   tab.append(self.node('',f'[{left},736][{right},792]',package=self.module.PKG,**{'content-desc':label}))
+  return root
+ def nav(self):return 'InsetsSource: {2 mType=navigationBars mFrame=[0,804][394,852] mVisible=true mFlags=[]}'
  def test_preferences_preserve_local_secret_and_unrelated_settings_disable_automation(self):
   result=ET.fromstring(self.module.panel_fixture_preferences(self.original,29184))
   values={n.get('name'):n.text if n.tag=='string' else n.get('value') for n in result}
@@ -130,6 +144,52 @@ class PanelAuthSmokeTests(unittest.TestCase):
    with patch.object(self.module,'adb') as adb:
     with self.assertRaises(AssertionError):self.module.wait_panel_retry_ready(root)
     adb.assert_not_called()
+ def test_footer_uses_actual_dock_and_navigation_bounds_and_detects_occlusion(self):
+  before=self.module.panel_footer_geometry(self.footer(),804)
+  self.assertFalse(before['entireRowUnobscured']);self.assertEqual(736,before['dockTop']);self.assertEqual((0,188,394,732),before['gestureViewport'])
+  self.assertTrue(self.module.panel_footer_geometry(self.footer(430),804)['entireRowUnobscured'])
+  self.assertFalse(self.module.panel_footer_geometry(self.footer(680),710)['entireRowUnobscured'])
+ def test_footer_missing_duplicate_or_failure_state_never_passes_geometry(self):
+  for root in [self.footer(missing=True),self.footer()]:
+   if root.find('.//node[@text="未知应用"]') is not None:
+    if 'HTTP 401' not in self.module.panel_labels(root):root.append(self.node('未知应用','[10,400][100,430]'))
+   with self.assertRaises(AssertionError):self.module.panel_footer_geometry(root,804)
+  root=self.footer();root.append(self.node('HTTP 401'))
+  with self.assertRaisesRegex(AssertionError,'controller failure'):self.module.panel_footer_geometry(root,804)
+  root=self.footer();root.find('.//node[@selected="true"]').set('selected','false')
+  with self.assertRaisesRegex(AssertionError,'selected overview'):self.module.panel_footer_geometry(root,804)
+ def test_navigation_frame_requires_observed_visible_full_width_insets(self):
+  self.assertEqual((0,804,394,852),self.module.panel_navigation_frame(self.nav(),(0,0,394,852)))
+  same_line='InsetsSource: {1 mType=statusBars mFrame=[0,0][394,24] mVisible=true}, '+self.nav()
+  self.assertEqual((0,804,394,852),self.module.panel_navigation_frame(same_line,(0,0,394,852)))
+  with self.assertRaises(AssertionError):self.module.panel_navigation_frame(same_line.replace('mType=navigationBars mFrame=[0,804][394,852] mVisible=true','mType=navigationBars mFrame=[0,804][394,852] mVisible=false'),(0,0,394,852))
+  rect=self.nav().replace('[0,804][394,852]','Rect(0, 804 - 394, 852)')
+  self.assertEqual((0,804,394,852),self.module.panel_navigation_frame(rect,(0,0,394,852)))
+  for raw in ['',self.nav().replace('true','false'),self.nav().replace('394','200'),self.nav()+'\n'+self.nav().replace('804','790')]:
+   with self.assertRaises(AssertionError):self.module.panel_navigation_frame(raw,(0,0,394,852))
+ def test_footer_sends_native_input_recaptures_visible_row_and_returns_actual_counts(self):
+  report={};before=self.footer();visible=self.footer(430)
+  with patch.object(self.module,'capture',side_effect=[before,visible]) as capture,patch.object(self.module,'capture_panel_when',return_value=before) as returned,patch.object(self.module,'adb',return_value=self.nav()) as adb,patch.object(self.module.time,'sleep'):
+   self.module.capture_panel_footer_scroll({'策略':12,'规则':3,'当前连接':18},report)
+  self.assertEqual('PASS',report['footerScroll']['result']);self.assertEqual(2,len(report['footerScroll']['inputs']))
+  swipes=[c for c in adb.call_args_list if c.args[:3]==('shell','input','swipe')]
+  self.assertEqual(2,len(swipes));self.assertTrue(all(c.args[-1]=='400' for c in swipes))
+  self.assertEqual(['panel-controller-200-footer-before','panel-controller-200-footer-after-1'],[c.args[0] for c in capture.call_args_list])
+  returned.assert_called_once_with(['运行概况'],'panel-controller-200-footer-returned',{'策略':12,'规则':3,'当前连接':18})
+  self.assertTrue((self.output/'panel-controller-200-footer-insets.txt').is_file());self.assertTrue((self.output/'panel-controller-200-footer-scroll.json').is_file())
+ def test_footer_occlusion_is_bounded_and_missing_after_swipe_never_fabricates_pass(self):
+  for afters,expected_swipes in [([self.footer(),self.footer()],2),([self.footer(missing=True)],1)]:
+   report={}
+   with patch.object(self.module,'capture',side_effect=[self.footer(),*afters]),patch.object(self.module,'adb',return_value=self.nav()) as adb,patch.object(self.module,'capture_panel_when') as returned,patch.object(self.module.time,'sleep'):
+    with self.assertRaises(AssertionError):self.module.capture_panel_footer_scroll({'策略':12,'规则':3,'当前连接':18},report)
+   self.assertEqual('FAIL',report['footerScroll']['result']);self.assertEqual(expected_swipes,len([c for c in adb.call_args_list if c.args[:3]==('shell','input','swipe')]))
+   returned.assert_not_called();self.assertEqual([],self.module.checks)
+ def test_footer_return_requires_actual_counters_and_no_reappearing401(self):
+  for returned in [self.overview('0'),self.failure()]:
+   report={}
+   with patch.object(self.module,'capture',side_effect=[self.footer(),self.footer(430)]),patch.object(self.module,'capture_panel_when',return_value=returned),patch.object(self.module,'adb',return_value=self.nav()),patch.object(self.module.time,'sleep'):
+    with self.assertRaises(AssertionError):self.module.capture_panel_footer_scroll({'策略':12,'规则':3,'当前连接':18},report)
+   self.assertEqual('FAIL',report['footerScroll']['result']);self.assertEqual([],self.module.checks)
  def test_scenario_failure_restores_preferences_and_removes_only_owned_reverse(self):
   stored=[self.original];reverses=['emulator-5554 tcp:29999 tcp:49999'];calls=[]
   def adb(*args,**kwargs):
