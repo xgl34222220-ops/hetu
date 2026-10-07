@@ -4,7 +4,7 @@
 
 ## 界面（V20）
 
-单一 `HetuActivity` + Compose 导航，界面代码位于 `android-app/app/src/main/java/io/github/xgl34222220/hetu/app/`，设计令牌见 `HxTheme.kt`，变更说明见 [CHANGELOG-V20.md](CHANGELOG-V20.md)。CI：`.github/workflows/hetu-build.yml`。
+单一 `HetuActivity` + Compose 导航，界面代码位于 `android-app/app/src/main/java/io/github/xgl34222220/hetu/app/`，设计令牌见 `HxTheme.kt`，变更说明见 [CHANGELOG-V20.md](CHANGELOG-V20.md)。当前测试构建：`.github/workflows/v2090-build.yml`；完整有效源由独立层逐文件重建核验。
 
 ## 当前架构
 
@@ -42,6 +42,7 @@
 ## 构建
 
 ```sh
+python3 .github/scripts/prepare_new_ui_source.py /path/to/verified/Hetu-V20.81-effective-source.tar.gz
 cd android-app
 gradle :app:assembleDebug --stacktrace
 ```
@@ -53,3 +54,5 @@ JNI 桥接与 Android 源码命名空间均使用 `io.github.xgl34222220.hetu`�
 交付预览 APK 前必须按 [固定预览签名说明](docs/preview-signing.md) 重签并验签，不能直接把 CI 临时 debug 签名包当作可覆盖升级的测试包。
 
 遇到消息延迟，可在高级设置中打开“消息与网络诊断”并复制结果。报告包含实际核心标识、微信连接分流、TCP 保活定时器、最近恢复事件及启动各阶段耗时，不采集聊天内容；已对控制器密钥及日志中的完整 URL 做脱敏。test.88 的源码对照与实机复核范围见 [启动与 BoxProxy 对照](docs/root-startup-test88.md)。
+
+当前稳定性与渐变玻璃测试批次见 [V20.90 验收边界](docs/V20.90_STABILITY_GLASS.md)。只在原测试分支交付；一次构建成功不代表手机长期联网已验证。

@@ -126,4 +126,30 @@ internal object HomeIcons {
         "M12 16v-4",
         "M12 8h.01",
     ) }
+
+    val Hourglass: ImageVector by lazy { vector("Hourglass",
+        "M5 22h14",
+        "M5 2h14",
+        "M17 22v-4.172a2 2 0 0 0-.586-1.414L12 12l-4.414 4.414A2 2 0 0 0 7 17.828V22",
+        "M7 2v4.172a2 2 0 0 0 .586 1.414L12 12l4.414-4.414A2 2 0 0 0 17 6.172V2",
+    ) }
+
+    val ArrowUp: ImageVector by lazy { vector("ArrowUp",
+        "m5 12 7-7 7 7",
+        "M12 19V5",
+    ) }
+
+    val ArrowDown: ImageVector by lazy { vector("ArrowDown",
+        "M12 5v14",
+        "m19 12-7 7-7-7",
+    ) }
+
+    val Activity: ImageVector by lazy { vector("Activity",
+        "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
+    ) }
+
+    val Clock: ImageVector by lazy { vector("Clock",
+        "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+        "M12 6v6l4 2",
+    ) }
 }

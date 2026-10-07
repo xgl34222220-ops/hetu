@@ -1,0 +1,19 @@
+{
+  "after": {
+    "checks": 45,
+    "failures": 0,
+    "resolverWorkersMax": 2,
+    "fixtureDnsOnly": true,
+    "sourceSha256": "3635d55a388db184cd1d08c805a57d2642544db2973f5d42776de1a61e34691c",
+    "productionSourceCompiledVerbatim": true,
+    "androidRootOrDeviceAccess": false
+  },
+  "before": {
+    "checks": 10,
+    "inconclusiveCasesMisclassifiedAsDirect": 10,
+    "externalDnsQueries": 0,
+    "sourceSha256": "7b7541ffebe89952f17b851c3d7943010c58de030e83e519273fd39e87d345ef",
+    "productionSourceCompiledVerbatim": true,
+    "androidRootOrDeviceAccess": false
+  }
+}

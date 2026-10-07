@@ -53,11 +53,15 @@ internal class ProxyDashboardRepository(context: Context) {
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
-    private class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
+    internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
         val stable: Boolean get() = runtimeEpoch >= 0L
         override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
             settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch
         override fun hashCode(): Int = 31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) + mutationEpoch.hashCode()
+        fun sameOrigin(other: ProbeIdentity): Boolean = settings == other.settings && runtimeEpoch == other.runtimeEpoch
+    }
+    internal class SelectionTicket internal constructor(private val settings: Map<String, Any?>, internal val identity: ProbeIdentity) {
+        internal fun client(context: Context) = MihomoControllerClient(context, settings)
     }
     private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
     private val probeSnapshotMutex = Mutex()
@@ -69,11 +73,10 @@ internal class ProxyDashboardRepository(context: Context) {
         "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
         "proxyRootWanted", "proxyRootRuntimeRunning", "proxyRootLastStartupAt",
         "proxyRootAppliedSettings", "proxyRootAppliedRuntimeRevision", "proxyRootTopologyFingerprint",
-        "proxyAdblockSessionGeneration", "proxyNetworkSessionId",
+        "proxyAdblockSessionGeneration", "proxyNetworkSessionId", "proxyNetworkEpoch",
     )
 
-    private fun probeIdentity(): ProbeIdentity {
-        val values = app.getSharedPreferences("hetu", 0).all
+    private fun probeIdentity(values: Map<String, Any?> = app.getSharedPreferences("hetu", 0).all): ProbeIdentity {
         val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
         val configKey = "proxySelectedConfig.${core.id}"
         val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
@@ -92,17 +95,39 @@ internal class ProxyDashboardRepository(context: Context) {
             throw IOException("代理或控制接口已变化，请重新测速")
     }
 
-    private inline fun <T> readCurrentProbe(snapshot: ProbeSnapshot, read: () -> T): T {
-        requireCurrentProbe(snapshot.identity)
+    /** Capture before IO dispatch; the same atomic preference copy binds identity and HTTP. */
+    internal fun captureSelection(): SelectionTicket {
+        val settings = app.getSharedPreferences("hetu", 0).all
+        return SelectionTicket(settings, probeIdentity(settings))
+    }
+
+    private fun requireCurrentOrigin(identity: ProbeIdentity) {
+        if (!identity.stable || !probeIdentity().sameOrigin(identity))
+            throw IOException("代理或控制接口已变化，请刷新后重试")
+    }
+
+    private fun acknowledgeMutation(ticket: SelectionTicket) {
+        // A concurrent successful operation on another group must not invalidate
+        // this operation's origin. Every confirmed current-core mutation advances
+        // observations, while a response from a replaced endpoint cannot do so.
+        requireCurrentOrigin(ticket.identity)
+        probeMutationEpoch.incrementAndGet()
+    }
+
+    private inline fun <T> readCurrentProbe(snapshot: ProbeSnapshot, read: () -> T): T =
+        readCurrentProbe(snapshot.identity, read)
+
+    private inline fun <T> readCurrentProbe(identity: ProbeIdentity, read: () -> T): T {
+        requireCurrentProbe(identity)
         return try {
             val measured = read()
-            requireCurrentProbe(snapshot.identity)
+            requireCurrentProbe(identity)
             measured
         } catch (cancel: CancellationException) { throw cancel }
         catch (error: Exception) {
             // A response from a superseded runtime is not a measurement for the new one,
             // including a core-confirmed failure received after an endpoint switch.
-            requireCurrentProbe(snapshot.identity)
+            requireCurrentProbe(identity)
             throw error
         }
     }
@@ -152,24 +177,32 @@ internal class ProxyDashboardRepository(context: Context) {
 
     suspend fun state(): ProxyComposeState = controller.state()
     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
-    suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false) = withContext(Dispatchers.IO) {
+    suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false,
+        ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
         // Take a live snapshot before switching. A cached UI list includes unrelated
         // DIRECT/message transports, and a post-switch list can include new sessions.
-        val previous = if (disconnectPrevious) api.proxies().optJSONObject(group)
+        val previous = if (disconnectPrevious) operationApi.proxies().optJSONObject(group)
             ?.optString("now").orEmpty() else ""
+        requireCurrentOrigin(ticket.identity)
         val oldIds = if (disconnectPrevious && previous.isNotBlank() && previous != node)
-            selectionConnectionIds(api.connections(), group) else emptyList()
-        api.select(group, node)
+            selectionConnectionIds(operationApi.connections(), group) else emptyList()
+        requireCurrentOrigin(ticket.identity)
+        operationApi.select(group, node)
         // Successful core mutations invalidate both cached metadata and in-flight
         // observations immediately, without waiting behind a blocking snapshot read.
-        probeMutationEpoch.incrementAndGet()
+        acknowledgeMutation(ticket)
         // A failed switch never reaches cleanup. Missing/unknown chains are retained.
         var failed = 0
         for (id in oldIds) {
-            try { api.closeConnection(id) }
+            requireCurrentOrigin(ticket.identity)
+            try { operationApi.closeConnection(id) }
             catch (cancel: CancellationException) { throw cancel }
-            catch (_: Exception) { failed++ }
+            catch (_: Exception) { requireCurrentOrigin(ticket.identity); failed++ }
+            requireCurrentOrigin(ticket.identity)
         }
+        requireCurrentOrigin(ticket.identity)
         app.getSharedPreferences("hetu", 0).edit()
             .putLong("proxyLastSelectionAt", System.currentTimeMillis())
             .putString("proxyLastSelectionGroup", group)
@@ -182,7 +215,11 @@ internal class ProxyDashboardRepository(context: Context) {
     suspend fun trafficMode(): String = withContext(Dispatchers.IO) {
         runCatching { api.configs().optString("mode", "rule").lowercase() }.getOrDefault("rule")
     }
-    suspend fun setTrafficMode(mode: String) = withContext(Dispatchers.IO) { api.setTrafficMode(mode) }
+    suspend fun setTrafficMode(mode: String, ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        ticket.client(app).setTrafficMode(mode)
+        acknowledgeMutation(ticket)
+    }
     /** V19: "v1.19.x Meta" style label from GET /version; empty when the core is down. */
     suspend fun coreVersion(): String = withContext(Dispatchers.IO) {
         runCatching {
@@ -202,15 +239,19 @@ internal class ProxyDashboardRepository(context: Context) {
         parseRuleSets(api.ruleProviders())
     }
 
-    suspend fun refreshSubscriptions(): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
-        val before = remoteProviders(api.proxyProviders())
+    suspend fun refreshSubscriptions(ticket: SelectionTicket = captureSelection()): List<DashboardProviderUi> = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
+        val before = remoteProviders(operationApi.proxyProviders())
+        requireCurrentOrigin(ticket.identity)
         for (chunk in before.chunked(3)) {
             coroutineScope {
                 chunk.map { provider ->
                     async {
                         try {
-                            api.updateProxyProvider(provider.name)
-                            probeMutationEpoch.incrementAndGet()
+                            requireCurrentOrigin(ticket.identity)
+                            operationApi.updateProxyProvider(provider.name)
+                            acknowledgeMutation(ticket)
                         }
                         catch (cancel: CancellationException) { throw cancel }
                         catch (_: Exception) { }
@@ -218,23 +259,32 @@ internal class ProxyDashboardRepository(context: Context) {
                 }.awaitAll()
             }
         }
-        remoteProviders(api.proxyProviders())
+        requireCurrentOrigin(ticket.identity)
+        remoteProviders(operationApi.proxyProviders()).also { requireCurrentOrigin(ticket.identity) }
     }
 
-    suspend fun refreshRuleSets(): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
-        val before = parseRuleSets(api.ruleProviders())
+    suspend fun refreshRuleSets(ticket: SelectionTicket = captureSelection()): List<DashboardRuleSetUi> = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
+        val before = parseRuleSets(operationApi.ruleProviders())
+        requireCurrentOrigin(ticket.identity)
         for (chunk in before.filter { it.vehicleType.equals("HTTP", true) }.chunked(3)) {
             coroutineScope {
                 chunk.map { provider ->
                     async {
-                        try { api.updateRuleProvider(provider.name) }
+                        try {
+                            requireCurrentOrigin(ticket.identity)
+                            operationApi.updateRuleProvider(provider.name)
+                            acknowledgeMutation(ticket)
+                        }
                         catch (cancel: CancellationException) { throw cancel }
                         catch (_: Exception) { }
                     }
                 }.awaitAll()
             }
         }
-        parseRuleSets(api.ruleProviders())
+        requireCurrentOrigin(ticket.identity)
+        parseRuleSets(operationApi.ruleProviders()).also { requireCurrentOrigin(ticket.identity) }
     }
 
     /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
@@ -318,16 +368,20 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */
     suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
-        val raw = api.groupDelay(group)
-        buildMap {
-            val keys = raw.keys()
-            while (keys.hasNext()) {
-                val name = keys.next()
-                // JSONObject.optLong coerces malformed/missing values to a false timeout.
-                // The core contract is an integer measurement, including explicit 0 / -1.
-                when (val value = raw.opt(name)) {
-                    is Int -> put(name, value.toLong())
-                    is Long -> put(name, value)
+        // The Selector endpoint returns one complete wave. A successful selection
+        // or provider update can supersede it without changing the API/settings.
+        readCurrentProbe(probeIdentity()) {
+            val raw = api.groupDelay(group)
+            buildMap {
+                val keys = raw.keys()
+                while (keys.hasNext()) {
+                    val name = keys.next()
+                    // JSONObject.optLong coerces malformed/missing values to a false timeout.
+                    // The core contract is an integer measurement, including explicit 0 / -1.
+                    when (val value = raw.opt(name)) {
+                        is Int -> put(name, value.toLong())
+                        is Long -> put(name, value)
+                    }
                 }
             }
         }
@@ -342,6 +396,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
+        val identity = probeIdentity()
+        requireCurrentProbe(identity)
         val sites = ProxyLatencyTargets.load(app)
         // Hetu's UID is exempt from transparent Root interception. Explicitly enter
         // the running local core so fake DNS and policy routing match the active
@@ -349,22 +405,32 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         val egressPort = if (ProxyStatusBridge.rootProxyRunning(app))
             MihomoStartupConfig.egressProbePort(app.getSharedPreferences("hetu", 0)
                 .getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)) else null
-        coroutineScope {
+        val measured = coroutineScope {
             sites.map { target ->
                 async { target.name to measureSiteLatency(target.url, egressPort) }
             }.awaitAll().toMap()
         }
+        coroutineContext.ensureActive()
+        // A valid response on the previous physical route is not a measurement
+        // for the replacement route, even when the core and API port stay put.
+        requireCurrentProbe(identity)
+        measured
     }
 
-    suspend fun refreshProvider(name: String): DashboardProviderUi? = withContext(Dispatchers.IO) {
-        api.updateProxyProvider(name)
-        probeMutationEpoch.incrementAndGet()
-        remoteProviders(api.proxyProviders()).firstOrNull { it.name == name }
+    suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
+        operationApi.updateProxyProvider(name)
+        acknowledgeMutation(ticket)
+        remoteProviders(operationApi.proxyProviders()).firstOrNull { it.name == name }.also { requireCurrentOrigin(ticket.identity) }
     }
 
-    suspend fun refreshRuleSet(name: String): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
-        api.updateRuleProvider(name)
-        parseRuleSets(api.ruleProviders()).firstOrNull { it.name == name }
+    suspend fun refreshRuleSet(name: String, ticket: SelectionTicket = captureSelection()): DashboardRuleSetUi? = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
+        operationApi.updateRuleProvider(name)
+        acknowledgeMutation(ticket)
+        parseRuleSets(operationApi.ruleProviders()).firstOrNull { it.name == name }.also { requireCurrentOrigin(ticket.identity) }
     }
 
     private suspend fun measureSiteLatency(url: String, egressPort: Int?): Long {

@@ -492,4 +492,146 @@ class ProxyDashboardProbeSafetyTest {
             }
         }
     }
+
+    @Test fun successfulSelectionAndProviderMutationRejectAnInFlightSelectorWave() = runBlocking {
+        for (providerMutation in listOf(false, true)) MockWebServer().use { server ->
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            val mutations = AtomicInteger()
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when (request.requestUrl!!.encodedPath) {
+                    "/group/Route/delay" -> {
+                        entered.countDown()
+                        check(release.await(6, TimeUnit.SECONDS)) { "Selector wave was not released" }
+                        MockResponse().setBody("{\"A\":999,\"B\":998}")
+                    }
+                    "/proxies/Route", "/providers/proxies/sub" -> {
+                        check(request.method == "PUT")
+                        mutations.incrementAndGet()
+                        MockResponse().setResponseCode(204)
+                    }
+                    "/providers/proxies" -> MockResponse().setBody(
+                        "{\"providers\":{\"sub\":{\"vehicleType\":\"HTTP\",\"proxies\":[\"B\"]}}}")
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+            server.start(); selectApi(server)
+            val repository = ProxyDashboardRepository(context)
+            val group = ProxyGroupUi("Route", "Selector", "A", listOf(ProxyNodeUi("A"), ProxyNodeUi("B")))
+            val published = AtomicBoolean(false)
+            supervisorScope {
+                val wave = async(Dispatchers.Default) {
+                    repository.groupDelay(group, listOf("A", "B")).also { published.set(true) }
+                }
+                try {
+                    assertTrue(entered.await(3, TimeUnit.SECONDS))
+                    if (providerMutation) assertEquals(setOf("B"), repository.refreshProvider("sub")!!.nodes)
+                    else repository.select("Route", "B")
+                    assertEquals(1, mutations.get())
+                } finally { release.countDown() }
+                val failure = try { wave.await(); null } catch (error: IOException) { error }
+                assertNotNull("Successful mutation supersedes the whole Selector response", failure)
+                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
+                assertFalse(published.get())
+                assertEquals(if (providerMutation) 3 else 2, server.requestCount)
+            }
+        }
+    }
+
+    @Test fun failedSelectionPreservesAnInFlightSelectorWaveForTheUnchangedRuntime() = runBlocking {
+        MockWebServer().use { server ->
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            server.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse = when (request.requestUrl!!.encodedPath) {
+                    "/group/Route/delay" -> {
+                        entered.countDown()
+                        check(release.await(6, TimeUnit.SECONDS)) { "Selector wave was not released" }
+                        MockResponse().setBody("{\"A\":71,\"B\":72}")
+                    }
+                    "/proxies/Route" -> MockResponse().setResponseCode(401)
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+            server.start(); selectApi(server)
+            val repository = ProxyDashboardRepository(context)
+            supervisorScope {
+                val wave = async(Dispatchers.Default) { repository.groupDelay("Route") }
+                try {
+                    assertTrue(entered.await(3, TimeUnit.SECONDS))
+                    val rejected = try { repository.select("Route", "B"); null }
+                        catch (error: MihomoControllerClient.ControllerHttpException) { error }
+                    assertNotNull(rejected)
+                    assertEquals(401, rejected!!.statusCode)
+                } finally { release.countDown() }
+                assertEquals(mapOf("A" to 71L, "B" to 72L), wave.await())
+                assertEquals(2, server.requestCount)
+            }
+        }
+    }
+
+    @Test fun changedControllerRejectsASelectorResponseAndAcceptsTheNewEndpointWave() = runBlocking {
+        MockWebServer().use { old -> MockWebServer().use { fresh ->
+            val entered = CountDownLatch(1)
+            val release = CountDownLatch(1)
+            old.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    entered.countDown()
+                    check(release.await(6, TimeUnit.SECONDS)) { "Old Selector response was not released" }
+                    return MockResponse().setBody("{\"A\":999}")
+                }
+            }
+            old.start(); fresh.start(); selectApi(old)
+            fresh.enqueue(MockResponse().setBody("{\"A\":22}"))
+            val repository = ProxyDashboardRepository(context)
+            supervisorScope {
+                val wave = async(Dispatchers.Default) { repository.groupDelay("Route") }
+                try {
+                    assertTrue(entered.await(3, TimeUnit.SECONDS))
+                    selectApi(fresh)
+                } finally { release.countDown() }
+                val failure = try { wave.await(); null } catch (error: IOException) { error }
+                assertNotNull(failure)
+                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
+                assertEquals(mapOf("A" to 22L), repository.groupDelay("Route"))
+                assertEquals(1, old.requestCount)
+                assertEquals(1, fresh.requestCount)
+            }
+        } }
+    }
+
+    @Test fun changingPhysicalNetworkEpochOrServiceSessionRejectsACompletedWebsiteWave() = runBlocking {
+        for (replaceSession in listOf(false, true)) MockWebServer().use { proxy ->
+            proxy.start(); rootProxy(proxy.port)
+            prefs.edit().putString("proxyNetworkSessionId", "session-a").putLong("proxyNetworkEpoch", 7L).commit()
+            targets("http://latency.invalid/held")
+            val entered = CountDownLatch(3)
+            val release = CountDownLatch(1)
+            proxy.dispatcher = object : Dispatcher() {
+                override fun dispatch(request: RecordedRequest): MockResponse {
+                    entered.countDown()
+                    check(release.await(6, TimeUnit.SECONDS)) { "Website wave was not released" }
+                    return MockResponse().setResponseCode(204)
+                }
+            }
+            val repository = ProxyDashboardRepository(context)
+            val published = AtomicBoolean(false)
+            supervisorScope {
+                val wave = async(Dispatchers.Default) { repository.siteLatencies().also { published.set(true) } }
+                try {
+                    assertTrue(entered.await(3, TimeUnit.SECONDS))
+                    if (replaceSession) prefs.edit().putString("proxyNetworkSessionId", "session-b")
+                        .putLong("proxyNetworkEpoch", 0L).commit()
+                    else prefs.edit().putLong("proxyNetworkEpoch", 8L).commit()
+                } finally { release.countDown() }
+                val failure = try { wave.await(); null } catch (error: IOException) { error }
+                assertNotNull("Old-route responses cannot become current website measurements", failure)
+                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
+                assertFalse(published.get())
+                assertEquals(3, proxy.requestCount)
+                assertTrue(repository.siteLatencies().values.all { it > 0L })
+                assertEquals(6, proxy.requestCount)
+            }
+        }
+    }
 }

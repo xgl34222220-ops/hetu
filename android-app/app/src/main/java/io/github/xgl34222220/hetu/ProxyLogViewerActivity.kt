@@ -9,9 +9,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.draw.clip
-import androidx.compose.material.icons.rounded.SearchOff
 import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.Article
 import androidx.compose.foundation.horizontalScroll
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -20,51 +18,60 @@ import kotlinx.coroutines.delay
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.MoreHoriz
 import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.Sync
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.layout.boundsInWindow
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.graphicsLayer
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeMenuDivider
+import io.github.xgl34222220.hetu.home.HomeMenuItem
+import io.github.xgl34222220.hetu.home.HomeMenuTitle
+import io.github.xgl34222220.hetu.home.HomeMotion
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomeReveal
+import io.github.xgl34222220.hetu.home.HomeSearchField
+import io.github.xgl34222220.hetu.home.HomeSegmentStyle
+import io.github.xgl34222220.hetu.home.HomeSegmented
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.home.homeSpinAngle
+import io.github.xgl34222220.hetu.panel.PanelIcons
+import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.*
-import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -377,10 +384,13 @@ private fun hxLineLevel(line: String): String {
     }
 }
 
+/**
+ * 日志: one log file at a time, newest lines first by default. The bar picks the file, searches
+ * it and clears it; the two cards under it filter by level and switch live refresh and order.
+ */
 @Composable
 internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
-    val c = Hx.colors
     val scope = rememberCoroutineScope()
     val prefs = vm.prefs
     var revision by remember { mutableIntStateOf(0) }
@@ -390,7 +400,6 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var loading by remember { mutableStateOf(true) }
     var error by remember { mutableStateOf("") }
     var pickFile by remember { mutableStateOf(false) }
-    var pickerAnchor by remember { mutableStateOf<Rect?>(null) }
     var clearConfirm by remember { mutableStateOf(false) }
     var searching by rememberSaveable { mutableStateOf(false) }
     var autoRefresh by rememberSaveable { mutableStateOf(prefs.getBoolean("logAutoRefresh", false)) }
@@ -432,32 +441,29 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
     val selected = files.firstOrNull { it.path == selectedPath }
 
-    HxPage(flatCanvas = true, referenceTopBar = true,
+    HxPage(
         title = selected?.name ?: "core.log",
         largeTitle = false,
-        compactTitleFontSizeSp = 20f,
-        subtitle = if (selected == null) "查看运行日志与调试输出" else "${lines.size} 行 · ${selected.path.removePrefix(LOG_ROOT + "/")}",
+        subtitle = if (selected == null) ht("查看运行日志与调试输出") else "${lines.size} 行 · ${selected.path.removePrefix(LOG_ROOT + "/")}",
         onBack = onBack,
         refreshing = loading && content.isNotEmpty() && !autoRefresh,
         onRefresh = { revision++ },
         actions = {
-            HxBarAction(if (searching) Icons.Rounded.SearchOff else Icons.Rounded.Search, "搜索", onClick = {
+            HxBarAction(if (searching) PanelIcons.SearchX else ToolsIcons.Search, "搜索", onClick = {
                 searching = !searching
                 if (!searching) query = ""
             })
-            IconButton(onClick = { pickFile = true }, modifier = Modifier.onGloballyPositioned { pickerAnchor = it.boundsInWindow() }) {
-                Icon(Icons.Rounded.FolderOpen, "选择日志", tint = c.text)
-            }
-            HxBarAction(Icons.Rounded.DeleteOutline, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+            HxBarAction(HxIcons.FolderOpen, "选择日志", onClick = { pickFile = true }, anchorMenu = true)
+            HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
         },
     ) {
         item(key = "controls") {
-            Column(Modifier.padding(horizontal = 14.dp).padding(bottom = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                if (searching) HxLogSearchField(query, { query = it })
-                HxLogLevelFilter(
-                    selected = level,
-                    onSelect = { level = it },
-                )
+            Column(Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) {
+                HomeReveal(searching) {
+                    HomeSearchField(query, { query = it }, "搜索日志", Modifier.padding(bottom = 10.dp), icon = ToolsIcons.Search)
+                }
+                HxLogLevelFilter(selected = level, onSelect = { level = it })
+                Spacer(Modifier.height(10.dp))
                 HxLogControls(
                     autoRefresh = autoRefresh,
                     newestFirst = newestFirst,
@@ -467,15 +473,13 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             }
         }
         if (error.isNotBlank()) {
-            item(key = "error") { HxBanner(error, tone = HxTone.Bad, modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) }
+            item(key = "error") { HxBanner(error, tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) }
         }
         when {
-            loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(8) }
-            files.isEmpty() -> item(key = "none") { HxEmpty(Icons.Rounded.Article, "暂无日志文件", "代理运行后会在运行目录生成日志") }
-            lines.isEmpty() -> item(key = "empty") { HxEmpty(Icons.Rounded.SearchOff, "当前筛选条件下没有日志") }
-            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { index, line ->
-                HxLogLine(line, first = index == 0, last = index == lines.lastIndex)
-            }
+            loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(6) }
+            files.isEmpty() -> item(key = "none") { HxEmpty(PanelIcons.ScrollText, "暂无日志文件", ht("代理运行后会在运行目录生成日志")) }
+            lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
+            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { _, line -> HxLogLine(line) }
         }
     }
 
@@ -483,7 +487,6 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
         HxLogFilePicker(
             files = files,
             selectedPath = selectedPath,
-            anchor = pickerAnchor,
             onPick = { selectedPath = it; pickFile = false },
             onDismiss = { pickFile = false },
         )
@@ -514,76 +517,18 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
 }
 
-@Composable
-private fun HxLogSearchField(value: String, onChange: (String) -> Unit) {
-    val c = Hx.colors
-    val focus = remember { FocusRequester() }
-    LaunchedEffect(Unit) {
-        delay(60)
-        runCatching { focus.requestFocus() }
-    }
-    Row(
-        Modifier.fillMaxWidth().heightIn(min = 40.dp).clip(Hx.pillShape).background(c.surface)
-            .padding(start = 14.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(Icons.Rounded.Search, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
-        Spacer(Modifier.width(10.dp))
-        BasicTextField(
-            value = value,
-            onValueChange = onChange,
-            modifier = Modifier.weight(1f).focusRequester(focus).padding(vertical = 9.dp)
-                .semantics { contentDescription = "搜索日志" },
-            singleLine = true,
-            textStyle = LocalTextStyle.current.copy(color = c.text, fontSize = 16.sp, lineHeight = 22.sp),
-            cursorBrush = SolidColor(c.accent),
-            decorationBox = { inner ->
-                Box {
-                    if (value.isEmpty()) Text("搜索日志", color = c.textFaint, fontSize = 16.sp, lineHeight = 22.sp)
-                    inner()
-                }
-            },
-        )
-        if (value.isNotEmpty()) {
-            IconButton(onClick = { onChange("") }, modifier = Modifier.size(40.dp)) {
-                Box(Modifier.size(20.dp).clip(CircleShape).background(c.textFaint.copy(alpha = .3f)), contentAlignment = Alignment.Center) {
-                    Icon(Icons.Rounded.Close, "清除", tint = c.surface, modifier = Modifier.size(14.dp))
-                }
-            }
-        } else Spacer(Modifier.width(14.dp))
-    }
-}
-
+/** 全部 / 错误 / 警告 / 信息 / 调试. */
 @Composable
 private fun HxLogLevelFilter(selected: String, onSelect: (String) -> Unit) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val options = listOf("all" to "全部", "error" to "错误", "warn" to "警告", "info" to "信息", "debug" to "调试")
-    Row(
-        Modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(c.surface)
-            .padding(8.dp).selectableGroup(),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        options.forEachIndexed { index, (key, label) ->
-            val active = selected == key
-            Box(
-                Modifier.weight(1f).heightIn(min = 40.dp).clip(RoundedCornerShape(13.dp))
-                    .background(if (active) c.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
-                    .selectable(selected = active, role = Role.Tab) {
-                        if (!active) { haptics.perform(HetuHaptic.Tick); onSelect(key) }
-                    }.padding(vertical = 8.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(label, color = if (active) c.accent else c.textMuted, fontSize = 15.sp,
-                    fontWeight = if (active) FontWeight.Bold else FontWeight.SemiBold, maxLines = 1)
-            }
-            if (index != options.lastIndex) {
-                Box(Modifier.padding(horizontal = 4.dp).width(1.dp).height(20.dp).background(c.line))
-            }
-        }
-    }
+    val c = LocalHomeColors.current
+    HomeSegmented(
+        listOf("all" to ht("全部"), "error" to ht("错误"), "warn" to ht("警告"), "info" to ht("信息"), "debug" to ht("调试")),
+        selected, onSelect, Modifier.fillMaxWidth(),
+        style = HomeSegmentStyle.Soft, track = c.surface, height = 56.dp, corner = 20.dp, textStyle = HomeType.buttonSmall.copy(fontSize = 15.sp), inset = 6.dp,
+    )
 }
 
+/** Live refresh on the left, line order on the right. The refresh glyph turns while it is on. */
 @Composable
 private fun HxLogControls(
     autoRefresh: Boolean,
@@ -591,98 +536,92 @@ private fun HxLogControls(
     onAutoRefresh: (Boolean) -> Unit,
     onOrderChange: () -> Unit,
 ) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val motion = LocalHomeMotionEnabled.current
     Row(
-        Modifier.fillMaxWidth().clip(HomeContinuousShape(24.dp)).background(c.surface).padding(8.dp),
+        Modifier.fillMaxWidth().clip(HomeDims.cardShape).background(c.surface).padding(8.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        val liveSource = remember { MutableInteractionSource() }
+        val liveFill by animateColorAsState(if (autoRefresh) c.accentSoft else c.sunken, HomeMotion.fade(motion), label = "log-live-fill")
+        val liveTint by animateColorAsState(if (autoRefresh) c.accent else c.t2, HomeMotion.fade(motion), label = "log-live-tint")
+        val angle = homeSpinAngle(autoRefresh, periodMs = 2400)
         Row(
-            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
-                .background(if (autoRefresh) c.accentSoft else c.surfaceMuted)
-                .toggleable(value = autoRefresh, role = Role.Switch, onValueChange = onAutoRefresh)
+            Modifier.weight(1f).heightIn(min = 50.dp).clip(HomeDims.controlShape).background(liveFill).homeRowPressTint(liveSource)
+                .toggleable(value = autoRefresh, interactionSource = liveSource, indication = null, role = Role.Switch) { on -> haptics(HomeHaptic.Tick); onAutoRefresh(on) }
                 .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            val tint = if (autoRefresh) c.accent else c.textMuted
-            Icon(Icons.Rounded.Sync, null, tint = tint, modifier = Modifier.size(22.dp))
+            Icon(HomeIcons.RefreshCw, null, Modifier.size(22.dp).graphicsLayer { rotationZ = angle }, tint = liveTint)
             Spacer(Modifier.width(8.dp))
-            Text(if (autoRefresh) "自动刷新中" else "自动刷新", color = tint, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(ht(if (autoRefresh) "自动刷新中" else "自动刷新"), color = liveTint, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
         }
+        val orderSource = remember { MutableInteractionSource() }
+        val flip by animateFloatAsState(if (newestFirst) 0f else 180f, HomeMotion.glide(motion), label = "log-order-flip")
         Row(
-            Modifier.weight(1f).heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp)).background(c.surfaceMuted)
-                .clickable(role = Role.Button, onClick = onOrderChange).padding(horizontal = 8.dp, vertical = 10.dp),
+            Modifier.weight(1f).heightIn(min = 50.dp).clip(HomeDims.controlShape).background(c.sunken).homeRowPressTint(orderSource)
+                .clickable(interactionSource = orderSource, indication = null, role = Role.Button) { haptics(HomeHaptic.Tick); onOrderChange() }
+                .padding(horizontal = 8.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.Center,
         ) {
-            Icon(Icons.Rounded.Sort, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
+            Icon(ToolsFeatureIcons.ArrowDownWideNarrow, null, Modifier.size(22.dp).graphicsLayer { rotationX = flip }, tint = c.t2)
             Spacer(Modifier.width(8.dp))
-            Text(if (newestFirst) "最新在前" else "最早在前", color = c.textMuted, fontSize = 14.sp, fontWeight = FontWeight.SemiBold)
+            Text(ht(if (newestFirst) "最新在前" else "最早在前"), color = c.t2, style = HomeType.buttonSmall.copy(fontSize = 15.sp), maxLines = 1)
         }
     }
 }
 
+/** Which log to read: a menu from the folder button, or a sheet when there is no touch to grow it from. */
 @Composable
 private fun HxLogFilePicker(
     files: List<HetuLogFile>,
     selectedPath: String,
-    anchor: Rect?,
     onPick: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     @Composable
     fun Choices(pick: (String) -> Unit) {
-        Text("选择日志", color = c.text, fontSize = 16.sp, fontWeight = FontWeight.Bold,
-            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 9.dp))
-        HorizontalDivider(Modifier.padding(horizontal = 10.dp), thickness = .5.dp, color = c.line)
         if (files.isEmpty()) {
-            Text("暂无日志", color = c.textMuted, modifier = Modifier.padding(16.dp))
+            Text(ht("暂无日志"), Modifier.padding(horizontal = 12.dp, vertical = 12.dp), color = c.t2, style = HomeType.label)
         }
-        files.forEachIndexed { index, file ->
-            val selected = file.path == selectedPath
-            Row(
-                Modifier.fillMaxWidth()
-                    .selectable(selected = selected, role = Role.RadioButton, onClick = { pick(file.path) })
-                    .semantics { contentDescription = file.path }
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(
-                    Modifier.size(20.dp).clip(CircleShape)
-                        .background(if (selected) c.accent else androidx.compose.ui.graphics.Color.Transparent)
-                        .then(if (selected) Modifier else Modifier.border(1.25.dp, c.textFaint, CircleShape)),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (selected) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
-                }
-                Spacer(Modifier.width(14.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(file.name, color = c.text, fontSize = 16.sp, lineHeight = 21.sp, fontWeight = FontWeight.Medium)
-                    // Preserve disambiguation when different folders contain the same filename.
-                    if (files.count { it.name == file.name } > 1) {
-                        Text(file.path.removePrefix(LOG_ROOT + "/"), color = c.textMuted, fontSize = 11.sp)
-                    }
-                }
-            }
-            if (index != files.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 10.dp), thickness = .5.dp, color = c.line)
+        files.forEach { file ->
+            HomeMenuItem(
+                file.name, { pick(file.path) }, Modifier.semantics { contentDescription = file.path },
+                // Preserve disambiguation when different folders contain the same filename.
+                description = if (files.count { it.name == file.name } > 1) file.path.removePrefix(LOG_ROOT + "/") else null,
+                checked = file.path == selectedPath,
+            )
         }
     }
+    val anchor = remember { HxAnchor.take() }
     if (anchor != null) {
-        HxAnchoredMenu(anchor, onDismiss, minWidth = 152.dp, anchorEndInset = (-36).dp) { close ->
+        HxAnchoredMenu(anchor, onDismiss, minWidth = 200.dp, anchorEndInset = 0.dp) { close ->
+            HomeMenuTitle(ht("选择日志"))
+            HomeMenuDivider()
             Choices { path -> close { onPick(path) } }
         }
     } else {
-        HxSheet(onDismiss = onDismiss) {
+        HxSheet(onDismiss = onDismiss, title = ht("选择日志")) {
             val close = LocalHxSheetClose.current
-            Choices { path -> close { onPick(path) } }
+            Column(Modifier.padding(horizontal = 8.dp)) { Choices { path -> close { onPick(path) } } }
         }
     }
 }
 
+/**
+ * One line of the log as a card: when, how serious, and what was said. A tap unfolds the raw
+ * line; a long press copies it.
+ */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean) {
-    val c = Hx.colors
+private fun LazyItemScope.HxLogLine(line: String) {
+    val c = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
+    val haptics = LocalHomeHaptics.current
     val context = androidx.compose.ui.platform.LocalContext.current
     var expanded by remember(line) { mutableStateOf(false) }
     val parsed = remember(line) { parseStructuredLog(line) }
@@ -692,25 +631,30 @@ private fun LazyItemScope.HxLogLine(line: String, first: Boolean, last: Boolean)
         Regex("""\d{2}:\d{2}:\d{2}""").find(parsed?.time ?: fallback?.time.orEmpty())?.value.orEmpty()
     }
     val message = parsed?.message ?: fallback?.message ?: line
-    val tint = when (level) { "error", "fatal" -> c.bad; "warn", "warning" -> c.warn; "debug" -> c.textFaint; else -> c.accent }
+    val tone = when (level) { "error", "fatal" -> HomeTone.Bad; "warn", "warning" -> HomeTone.Warn; "debug" -> HomeTone.Neutral; else -> HomeTone.Accent }
+    val source = remember { MutableInteractionSource() }
     Column(
-        Modifier.animateItem(fadeInSpec = androidx.compose.animation.core.tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
-            .fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 12.dp)
-            .clip(HomeContinuousShape(24.dp)).background(c.surface)
-            .hxCombinedClick(onLongClick = { hxCopy(context, "日志", line) }, onClick = { expanded = !expanded })
-            .animateContentSize(androidx.compose.animation.core.tween(HxMotion.Medium, easing = HxMotion.Emphasized))
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+        Modifier.then(hetuAnimateItem(motion))
+            .fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
+            .clip(HomeDims.cardShape).background(c.surface)
+            .homeRowPressTint(source)
+            .combinedClickable(
+                interactionSource = source, indication = null,
+                onLongClick = { haptics(HomeHaptic.Confirm); hxCopy(context, "日志", line) },
+                onClick = { haptics(HomeHaptic.Tick); expanded = !expanded },
+            )
+            .animateContentSize(HomeMotion.glide(motion))
+            .padding(horizontal = 18.dp, vertical = 14.dp),
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            if (time.isNotBlank()) {
-                Text(time, fontSize = 14.sp, lineHeight = 19.sp, color = c.text, fontWeight = FontWeight.Medium)
-                Spacer(Modifier.width(10.dp))
-            }
-            Text(if (level.equals("warning", true)) "WARN" else level.uppercase(), fontSize = 13.sp, lineHeight = 17.sp, color = tint,
-                modifier = Modifier.clip(RoundedCornerShape(10.dp)).background(tint.copy(alpha = .1f)).padding(horizontal = 10.dp, vertical = 2.dp))
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (time.isNotBlank()) Text(time, color = c.t2, style = HomeType.delay.copy(fontSize = 15.sp))
+            HomePill(if (level.equals("warning", true)) "WARN" else level.uppercase(), tone = tone, height = 22.dp)
         }
-        Spacer(Modifier.height(7.dp))
-        Text(if (expanded) line else message, fontSize = 16.sp, lineHeight = 23.sp, color = c.text,
-            maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.height(8.dp))
+        Text(
+            if (expanded) line else message, color = c.t1,
+            style = if (expanded) HomeType.mono.copy(fontSize = 13.5.sp, lineHeight = 21.sp) else HomeType.body.copy(lineHeight = 24.sp),
+            maxLines = if (expanded) Int.MAX_VALUE else 5, overflow = TextOverflow.Ellipsis,
+        )
     }
 }

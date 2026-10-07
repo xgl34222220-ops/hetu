@@ -1,0 +1,2256 @@
+{
+  "schema": 1,
+  "baseCommit": "610a523ea524dff521b5d01e7aa78c421399594a",
+  "baseAndroidAppTree": "0f4e341f5245191e29ae5750eb56b626c99d13c7",
+  "originalTestHead": "9769663edcda3a1c33f2eb2594a6b4fd9b4e2a6f",
+  "reusedMainHead": "610a523ea524dff521b5d01e7aa78c421399594a",
+  "versionCode": 2090,
+  "versionName": "0.12.17-v20-glass",
+  "previousInputsSha256": "c0afa2d1e035dbc84e64b49d6319a30af7177b7618afed2b9550c03dc0ff2d27",
+  "previousPatchSha256": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
+  "historicalFilesSha256": {
+    "updates/v2082-new-ui/inputs.json": "2ed0a46bd92aff2567ce6d8a31a2460da918e12837ba82eb38abaa85f8c9511c",
+    "updates/v2082-new-ui/integration.patch": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "updates/v2083-ui-polish/inputs.json": "d5e3c4811f3b3ff579a6b12abb6543c4b4a0c8631fa29f461c711ca198a4b081",
+    "updates/v2083-ui-polish/ui.patch": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+    "updates/v2084-controller-auth/inputs.json": "9ac175a21429d547c7f69e8765d719e4eb391cadd63278d5e58a6c2d6568c911",
+    "updates/v2084-controller-auth/runtime.patch": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+    "updates/v2085-pdf-tools-settings/inputs.json": "46cbff55a3621b544acb10bd72c0fffe1ffd17469bb856630ea32683ae08024f",
+    "updates/v2085-pdf-tools-settings/runtime.patch": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+    "updates/v2085-tools-intake/inputs.json": "7604e646cad209c2fc2a606196d478f76cd41005f5d47ad3e37dbc84ac58339c",
+    "updates/v2085-tools-intake/runtime.patch": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+    "updates/v2085-pdf-final-geometry/inputs.json": "2707c22d2d27110e204777b04eb97223769ca6721c214ea58cbb763c0888c7ce",
+    "updates/v2085-pdf-final-geometry/runtime.patch": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+    ".github/scripts/pdf85_final_transforms.json": "fe4b7fbfb049ba2bf1ec2dca129bdd7c69ace73d2069dcc1e3d01b6a9479626d",
+    "updates/v2086-functionfix/inputs.json": "796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22",
+    "updates/v2086-functionfix/runtime.patch": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
+    "updates/v2087-home-panel-refactor/inputs.json": "f96112d1dc79eec1bbf4973f5e557eaf58639c5c2e7b339d2d2e3267545a86e9",
+    "updates/v2087-home-panel-refactor/ui.patch": "94b7cd170204072f7b1ca76cde5280575fd82fd0bf6e33446c5362160445bcf2",
+    "updates/v2088-ui-refactor/inputs.json": "89e5afbd35aa47a9d92781e50c052acf93efedf7e24ee7bde9a781b19b4ada0f",
+    "updates/v2088-ui-refactor/ui.patch": "74c5a00161b20dac4686d5053a92da60899bd37ddfdf25c140ed4aff4961335e",
+    "updates/v2089-runtime153/inputs.json": "c0afa2d1e035dbc84e64b49d6319a30af7177b7618afed2b9550c03dc0ff2d27",
+    "updates/v2089-runtime153/runtime.patch": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
+    "UI92_RUNTIME146_INPUTS.json": "c14b5eac12dd01471580944cdee56f183f226f92d6495e7c68ea9473c1cdfdbf"
+  },
+  "patchSha256": "4314e520ed0454a935e732bb88f08486d611d1614fd61587f0f8bb46bd19deed",
+  "authorizedFiles": [
+    "android-app/app/build.gradle.kts",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/NativeHomePolish.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUi.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeListKit.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomePreviews.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt"
+  ],
+  "changedOrAddedFiles": {
+    "android-app/app/build.gradle.kts": "d610e4a468561844088efc0c51528fb18dc1f50a5e08973cb7014bb9518a1f1b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java": "3635d55a388db184cd1d08c805a57d2642544db2973f5d42776de1a61e34691c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "27eb9a65a149a17fecbe8eb64434540b74cd43b05f84274d3930043227ac7b34",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/NativeHomePolish.kt": "149a7001090b5e5f4bcb66d4ca7d4ed7a1b32f6883fbfda3ce61ff3937349dc7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "66925619f79bf99516a37f1e16bf5c29636fab54ed2f7f4d8aaa5cb48c322cb1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "17bc176611252b07769dd90f1a59ce7ad094c4a9222b0d83fe430aa6e789d1ec",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUi.java": "84e97c642798172e8be16e1c4b5b5eab9ef069b20aba65e3c9cb96ff6983ac67",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "d47fa090995bdf99238cd30cea60201dded607bbcefa9200145c9ba2574ddb5b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java": "bc28d682b4d788dbfc81a0090134d22a46800df7614fbe8b94779d3bdb956f0a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "d47023f5bc787f6c0bbf8a4fae5413cf896ac78492a98bfd04af5de90a1109a4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "4764792cae8527f65b1a6df5700e49239cb363f7ce954bdbcc50827a8c6e63cc",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "d2186ed53d682cd9f0932b4df9789cdf266b1d99810f5b6a9a56da5efad72732",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt": "c6b261cdaf2f4926501ceeaeb7096c764369d6e5ff4f245bc9d9cf2179351ad3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt": "4365418dfce6d6f6b760694103ea74291623432163181bfb73715d75b784a93e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt": "e8c458a69556d17507ed17a1ecd1970be84a08ef563b80fbf9d92489408937a9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt": "b7d61e8305484b4d4e7ee07f109c74b1d72c5a7e474eced4f9ebe322941358f1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt": "70727a8c5917f27f4ff2c99bcd6552e65676ae6dc9e2cdd216254a56dff13b19",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt": "31b6a2079a481e736143ddcd411df199ac9ce82306e5086bc4bb618cfbba9e97",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt": "39e79372517358d8112dbcb68b473505f02636e19ac0c1b0dbb1b6c7c8917f42",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeListKit.kt": "4d8f4e67fc2ebc7d3f9692ddf933fa0fcc42f205cb8f4aac5cfd011fdc5b02be",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt": "d973f3eba77b50ffc6985eca2ec755ea2c4fd0fbd15e6fc86b34d5b8096ec673",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt": "daa73fc988ee0bbd16d5bd27a8fd823bac5c4679ba1bf00fd7d4a09ecd0a971e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomePreviews.kt": "775e01f69d2b7ffbb8d008f5ef10ba5e1430faa5a390ed2b5054a3fec43888c3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt": "52587cfb1d95ce95533514e897d6a7cf79834b33af1f3a7a21a9dc5f5b82f18c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt": "22644baa354a8de11ebf84e8d05585aac0c0a4401cbf1fe4556c3884ab976fe2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt": "158f84047fa250156d5cbe34f6fedfc2809dc7e8eafc2258ae1ef9122fa27435",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt": "a48cf77df02d1e6becb0705e605e4d40d5b6e22394a72b27911e66d2e3498d72",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt": "e2b365b4255b244a7220f416b80bb36e3607b72cd78b366fdd5118767700b27c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "1817bcbeafb558ce9c336608cc186223487f131594ee5bea97608aa316947d4e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "430e920d5996b6a80d6d95575e06a239312d869804481006535d82865c7691c3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt": "cc2d58ecde69e81d3cef778aa417ac6a88314995579feea0d3ff15ff6f8595c3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDesign.kt": "26930d168438ea58adf9e72715ac5a27b6288a7bc5007b2dbde2e3fff7c6bdbd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "f092180c8ba3f960b577193fb89fbd95d6eb0b887a0872fbd1c5327c899a1a9d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "29dff2e2a769bae74c4c7fc11baf8edd04bae349f185907b12610b901bae4c14",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt": "64591afff3715e6f72c22e41a538c4a43469ec84ada85307853ee3eb5898ca0c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt": "10a4a40f1754f0b6f795e0f22d7cb6299471185fdc5fd98bc3c939597adaaca5",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "f2335a18b9f26adf74f8faee0d158011a7b276966883c7ead5fec2d68e4a91da",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "2cfc4ee6d822d7f0858dbfed916c4f3ab21bb294aec16ab0d86b3d87791b1107",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt": "d844f180696c0c5a32557f1f18a089e6155ec4f76d01cadfa28a111490fed06e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "d420354620fff80edf27a477ced380f12c3d43b2b714be509acda531db5957f7",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "ad6d2fe110fe0c4c4418d6ff196b2ef64bbd5d5d557bd98a84ac87f495b26687",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "a7ecc51aa3e4e38eb2ce5d2b04769f8046cff7addc1d03c7b142d2c18eef368a",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "44187e324099004e58d654495348df231bb1dfbfc8a24f911d5fcdb564d555c6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt": "74c4313d4f045c2e8df6a1c6d265ed16cc76171b1af8ea24e20f4095d45bbac1",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt": "8ce24aa92b001bba4b6f4a5e7c62d3361a0e910a26ff5ed827c720a33fc8da04"
+  },
+  "frozenFiles": {
+    "android-app/CONCEPT_PROGRESS.md": "3082d07fed4014ba5a77d4591ab73af3748413457578339eb42e03be0050172b",
+    "android-app/V2058_TRIGGER.txt": "a5506625ef29a67704caa7bbcacd8afe88c68d7a56f6c313809f48816ddd38d3",
+    "android-app/V2059_TRIGGER.txt": "fab8afca5160fd2fadef637fd1b936afe8ac6f45ef8973965354d20017365691",
+    "android-app/app/src/debug/java/io/github/xgl34222220/hetu/ConceptParityMarker.kt": "4297a937688e2400288725cecc469b47e7e24644672c2b6cbdba1b229255f603",
+    "android-app/app/src/main/AndroidManifest.xml": "a3ce6a7b5b85283b68dc33234f893c9aeaf86fe56ea98cd602d32e592f605956",
+    "android-app/app/src/main/assets/ADGUARD-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "android-app/app/src/main/assets/MIHOMO-LICENSE": "3972dc9744f6499f0f9b2dbf76696f2ae7ad8af9b23dde66d6af86c9dfb36986",
+    "android-app/app/src/main/assets/cnip/hetu-cn-v4.txt": "88ea1e3bc89ee5966cc66cb2b6b7b8c4993a84bcfa04fe880750e1ec6bae0fa9",
+    "android-app/app/src/main/assets/cnip/hetu-cn-v6.txt": "4a3cccf5497148a20a24df381db0ef1a9d114a27441e29b04246f06fc349f03b",
+    "android-app/app/src/main/assets/hetu-autostart.sh": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
+    "android-app/app/src/main/assets/hetu-root.sh": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
+    "android-app/app/src/main/assets/hetu-route.sh": "6505fa375b96621d75fa8adb577bb6c733989c0d50f5d60146dd2b99d4fab851",
+    "android-app/app/src/main/assets/licenses/lucide.txt": "b495047bd93a9b06913511076f504daba17d5bbeb3e0650f3bb53a4220329c57",
+    "android-app/app/src/main/assets/licenses/reference-ui-GPL-3.0.txt": "b276bbecaa68377ce9fae470024428aaf90d4b395fee090752d19debab9c7bee",
+    "android-app/app/src/main/assets/mihomo-revision.txt": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+    "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+    "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+    "android-app/app/src/main/assets/rules/adaway.txt": "8c925c37a5eaa5e1c582c76e12301797861addee5ad0fa0e6e46c9dd0136fe55",
+    "android-app/app/src/main/assets/rules/adguard.txt": "6f7ce8ac19c5c34cd910cd8d3b8e3430b0eee5121a3a5f63bbb84927ed09a0df",
+    "android-app/app/src/main/assets/rules/checksums.sha256": "0895e9d83582de54f2d9063af453a1379077c3f6bc09bdebfd1dd2fb72465cfb",
+    "android-app/app/src/main/assets/rules/china.txt": "4b2b57daca55e2102696b07d4764868328c7215b2de06db50f3acd66ccece502",
+    "android-app/app/src/main/assets/rules/hagezi.txt": "8846bfdda6fc630d81d2c10181cadc451f099cb7b32474682fc2122b7430cc53",
+    "android-app/app/src/main/assets/rules/snapshot.json": "799e1341e6df634a71cb487a11ff9b6847c628310b4f1810c1eeab6f4666cd72",
+    "android-app/app/src/main/assets/rules/tracking.txt": "4dd3290bb52e2975f556c33adf081b3430f4e0dc8a75af9841c48def524444c9",
+    "android-app/app/src/main/assets/schema/sing-box-official.json": "641f9bb28af79e014afe8a781140b40d357c7adf8fcb5fe5e23b7971a62fa52d",
+    "android-app/app/src/main/assets/sources.tsv": "13779a44e0f5493d0f9923eeb341cd496327a068a622751906bdedbe3ccaf420",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockRuleInspection.java": "ae3b75e42288c81a1404c29a4c056fa16900178588a694243a49d66a0fb1f35e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AlignedInstrumentPanel.kt": "613c25ea6ae8f9b6425487cf4624dcca1555f50583a585f7608cc1b53ce540e9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AppCrashReport.java": "dd2b282e6bf054fa12bdd7db5d3857fb54e2aa27c157142cc2a2d310b3d80d39",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AutoMirroredIconCompat.kt": "054d0c7a683d882f1b79ac109173a30d25e649dce17b6ccba15f2cb3679fbc16",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BootReceiver.java": "0629cc38c2eda4c9e0a43a5fa3cca80b5f82e027d8e953e29eafad715f12928d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BoxProxyExactPanel17.kt": "510e7e2035f32c54629d5314c701310e987b9b80d74e1c22610f9d866c216e17",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfig.java": "5630164af1eced3c9cfc516295c23e32a0925594c6aac7b91305f675653890fe",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData1.java": "984cdc8c82d5b62577ff4e2ae315f422325ca727a62aaef4b17670e3a9f51e4c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData2.java": "68294043667c4f5c453f7a94e76b94d36229e43dde41f6b8b86a572660b67281",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData3.java": "f44a5838a3833ff8b80c7834fc7f5b5c7186c31c503a27468a887fefb43329a5",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData4.java": "d7c5c95f4129a57c402ae34e7349d2d59ccb5f887e532e38b03d72d5032fd274",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData5.java": "8aa4f12b305a3bc255d2debea4025eba300b6922d03ae482166547897fd34976",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledProxyConfigData6.java": "89da2d89a43feb013b94ab68dd45221b93033e1911d542f15cee41d047bcf942",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/CompactHomeDashboard.kt": "414beaf6e06fe6b3ce5b1b509f8693729a1025096fb8f6c8b500f1f10bb794fe",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/CompactMainActivity.kt": "3251eb7c7c9ef98a9180d38e44ec10aacdbae1eda8efb073ea21f4c67c861899",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigIconCompatRoot.kt": "02b21917296b6aa7be974bb9e843809be2e8762a4dd55bdb6d37b02478758f47",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfiguredGroupIcon.kt": "85b6af4eb0697b6039c47c885179a0c9098f2a40df3f70a970bb636f534cf43e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/CrystalWorkspace.kt": "747888e1019cf3fc23a3ee506e07b3affeb07783e58a5e5a410cf900b1e0d848",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DiagnosticReport.java": "1ff1ee9475471361b82fe532fb59a24475c1420f9a37be6a3b30539c57b06b6a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsCache.java": "130d3f0794b97ee62caa054ba5213ce6c2e7080fb5ec3fda1919a294f438bb4f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsPacket.java": "47cc2dcd01e832085449f95072e64ee77cabfec03ca3215c1bd992fa667b7531",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsResponseFilter.java": "3fbad938198cce4f3fd9a2c431e0fdb3caa60b4820ab94cfd359d53c4d387f1c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsUpstream.java": "f8193bbb28270a3900ac376dc13ee0d6f76e2d36ee8bc1d8d3ed35a3ff338e2e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsVpnService.java": "3a934152100ee72d2774210e07d627bccfb2090f36966dc773c04016b7a5d233",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/DomainRuleProjection.java": "fd61578b6f6a5c6f723c030dae1b78c11890cd640098734aa35437bcc5865b4a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/EditorWorkbench.kt": "9097667bc369854b2d7d3067d81e76fd9d9e72ef9b708bb1ec0c4ee99010977b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/EncryptedDnsGuard.java": "b653b8dc785398bd5deea8cd3e33bec452f52c03eb146b020c5678f2cea4fcc3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/GoogleConnectionEvidence.java": "03c4b503fa94cd484f27ca6c0a731fb33b56289bbc9ccb18e3f7b1d93254c223",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuApplication.java": "c22e54e3948309e7769fa678d8ac3556592743f30da9506e122037e26d777b66",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuCodeLanguage.java": "4c0f108c3c77e8ab7c421c32c8728b4f472efed86c57c5a724f145186f409286",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuMainActivity.kt": "9c4d058cd053e7e5c8ab909efa034329e600f3e0c58fa8135b45225bca835759",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuOnboardingGate.kt": "1f0c01fc1353e1bf91d51360f5b8abdebf8c010034c8cc8281ce46718f81e3fb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuProxyTileService.kt": "646b5162e1d5257d9622580d0601b52f528229ac2884e9983875ee078437d96c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuSettingsBackup.kt": "b78d5606cb99dd870fbc037e5e4f1568ad2a388cb607b24b010d7ec11241dc8a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HetuYamlLanguage.java": "0dd21edbef31a20414ae5f8a10d1a190f42cc00bf6d90cd3ccc9ae6e229c724d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HomeExperience8.kt": "c12ff22cef7503f86decfda2c8cbffd60a49c26662872c1542309b3f5959adfc",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HomeInteraction7.kt": "0a77bf9ba42c2afb8223a6ba6078798c729b74a45ddcaed06e91b29eba790c86",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/HomeProportions.kt": "16ca22552c34c7b62b9b6cf7b53255691547f0e91e09128b7efdd9878dd64e7c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/IconView.java": "76a1f866c787e338236c9994a42eeb066120e4c6f33756a134b3fedadf21e6bb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/InstrumentRules.kt": "0ebd7675a0f40b13f7fcc542a950dfe1f181aa96ddd2fb48bc2e8f564bee0dff",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/InstrumentWorkspace.kt": "2078452c633e0ae3eddb594125ed4ff5310f2f8614927412c3f9e62a7119f688",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java": "d55cb6b054e8c31abb856b78e045704d1327a6cb17feabadf268090d12ae8cf4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LiquidWorkspace.kt": "b5a723374c0c25a9118d0ad3c54ac00e8e33feed480da6f65e55c6256fba35a4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuSurfaceDrawable.java": "446505e84c3b6b560890337a3ddc357cae93f92c0e31331e2738b5bbbba8f200",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java": "e99cc1b1a171531356993a0e99c06b6023857114cf41b81c65885fcb45c322fc",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java": "6871d040f753e0836ab4984c4bc5bd3df6b3c3629c40d83c86221dd6598b6963",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "0ab30fbbbc0278b33ec0199302d019edce31b7f020d03beef0a55bb89e515dd9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoVpnService.java": "b966f7b83c82616714acf59ca624d3b87b99974fa1266ce3abec4139857ff3a4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MonitoringWorkspace.kt": "4967ffdc6fc2a58f88ccbf009ed27537f1adf3b1fdf5abb5da781c0d24b84c10",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MotionMaterials12.kt": "815394f38ee9b8cf705a47dfa29835b192bda374556dcc23f547d1327d74cf7e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java": "d28195df0a5cbd218ae54fd5cf8bca1ab6b4dd40cf4c0c45aa0bda514f9a0092",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/NonHomeWorkspace.kt": "d2119ac667e172035aff1ee5d11d48559d64f54daf53a127b2d5658a4507fe8d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelControls11.kt": "93411fe2a3ebc63d282bfb6c4377667024aab2e395911968a793e635805c43a3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelExtras19.kt": "76e3e14d58e5898217270a8463a13c041ea9d6a9458bfd5826657fd454f73282",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelNavigation13.kt": "e5276481fa82da739dbcfe16ae37c5f19745d7877c5096da3b552779f1b744b8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelNodePress11.kt": "7777c5c55b1605afe92a52508a6493da7a0dca5698b512c74587237034edd969",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelPolish14.kt": "9ffc48bd324e5b03a3b13b20725034031a88bec04857f2a9552db77a304caac6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelStrategy11.kt": "51ee0cd4358b9630b2940393427056bae8964822587dae61e1a0085e5fb3fa9b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/PanelStrategyModel11.kt": "85fceda36988a822140da127033c9e720ab3f84168f6bd95bd2cbc4801bc16bd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProtectionState.java": "4b3bb9fbe54bcb15adc939a79f283705139955d697c7e31aa6399e3468ff16f2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockChainActivity.kt": "77b02a69925c23ec30d673b2d6a338d5209c1b3468f8f183afc527075d0112d6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockCoordinator.java": "727ba9140e4b32ce3f08d7db8655b85e6c69fa5dfe1e309bef07b981f8ba508c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java": "55b8d560086cf41493a28d074e63ee08f72e7c360c208d63fb36cbb59d46506f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRuntimeBridge.kt": "9e4f93159f4eec8b5ca819b5c31867ebc83753533a5e867c7db67a89047f617d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockSession.java": "4d508cdca18ddd0d2d10c89fda97d504a4e099a2f54dd1b57698e4c4e8f932b2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "fa23127bf99d18ce702274a0efad83c7ed6437f877777de7772de4171aa27349",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt": "83cb53056c2f001fb1fafe6e597ae5b4be063eaa3f2f3cc3c106ade5d2defe29",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppPolicy.java": "a5654290f4972155bafbf8417f0a3a26772aa030dc69f74ba32be52dc0053646",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAppSelectionActivity.kt": "7934a068409f7eb5c86ed527a9db032ba680ecf09893a52578ed5b5adba47f4b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAsyncValue.java": "268d3385db70b59292c14962abcaa7d671712973553e2df3dae1b2ee3a1b8d94",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "b6e579759a02e68cb1408d5117911d375f77a9550634e9c4399d5d7a86a9ea8a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyContinuity.java": "3f1fd5eea80e21670cb0cab534d9cd135228f32c55fbd91b5ce5d9180e9d415b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "4509a71b627dc348a32075205fd7c846a387dfe5e83ade145cb3d2b4a86c30cd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt": "a4d0f3ed7055e3871f54f691750eba59184a4dd458a74c23f0ee1d0f2f7290ba",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt": "4e74bda857a81c7b0da5efc621cad5e762f4c5f4983294acb4fa4704a02b12a2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreStore.java": "e918dceccc70d162321088d2bb5ba63b25947111ccb51ca43ac59167f81630cf",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyFocusedSettingsActivities.kt": "aafdf82cc59f53761609430bf7e898e8a2ef2bd3b9d7991bfde1960e5a8b71b0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyGroupIcons.kt": "ae3815ce243496bafd2b3dd2ebc9d4f30c528e1bcdab2f3bfa3dd4236fd8a81a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt": "13ca470d0664088f3e16e3d135d47f6b092c90be6e8c91b1d198550457d04546",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargets.kt": "c7660825ec4cd13df71e8e0ec958ec588a5d969da5b8316b99c9bc05c6b06f7d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyTargetsActivity.kt": "82c54549217c7e020842df9bb21063ed8713a1c28b6983b4d1d5dfa32c0bb74c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLocalWebUiActivity.kt": "0d93da6d2bb352058eedd04f102e90730032b2c51bf3531e8c9d5becadfd978a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogLines.java": "02bcd8b20c6ba44d1b94b2ce497a4b41a86801cf93c907e555a1282ae6e87694",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt": "b877d996e0c58bdc29635794b17c567c64e7fd45dd324205169cdd8e0ca21c5d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt": "4aa719bb86a1bbc93e11937a8e779d2aaeb0957a09efd4c44f647ef09a89a382",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkHandover.java": "f3622288e42d64a5806139f254c3170df9ca63d97085bbee246b0e4ef16d88a6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkJournal.java": "7286b492510377060d5cd32f2b575e264a4b86f6d51cee8a308dbf8abda45621",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchActivity.java": "7af94334e982ea0c99900498181a8cf9c9c5d772afa8d7904be9fcb99e1afbf9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkState.java": "edb4ea96a77c5bf9a5989e19eaec25ee0eea5bc2835b8f21ada204437825e6ca",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyObservations.java": "8e4cc9ee6083fb10d7d248fb358110a9ea87db3f33a23c114c375acc5d7ca2ff",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyPolicyIconsActivity.kt": "90fcfa4f8a796f4bafb3bc2d286bd9dd489597d5ded3a70f9f827caa81da2400",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyQuickPanelActivities.kt": "5473bb278532514a10cabb087e84552333c27b69d9324ff0e13aaf3e0000060f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyReferenceExtras.kt": "92328a36d8700ecb90c0ecd34b09e27cd38f3502ef4c729ecaba20f16ea4ba9e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRestoreScheduler.java": "fe1073d19f1de4d8ba6682b357048a73c3e99a4f06dd8427ae3296aaedaa2444",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuleInspector.kt": "cdc99b9d561e4888c8128c708579c3be3411e4b544dc5ab5c98706c7351f909e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeInspector.kt": "56d7fac72b8fa7a75525d07fd84efaae5a913b57acd12d9b57aa1b1f1af8b1d3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java": "b565c85afc225d6510d252e83fbce521932a54f70b43cfc230d0858d6d3a3cc9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "b21010f659d92c8a918d60676979b8a195c1e30690a791aaddcacef9104bde52",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptHooks.kt": "8519f7c900e74c5c3774d1b7177e0edf6b54cb204f345c2479433e7098c5fe50",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptImport.kt": "cf1e8ec461d1e04b14e0b06f3ea2e99751d46635917990aca2f8cde55c0b313b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt": "ed62c81fc46c2a41dc25f37b5149313c9b82d6f7fbaa2c083fda32f0ca11a668",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt": "e3a15227cacb3f49fb5a55e2bc67838e029d354310ee38f32c368e2da3301ca8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusBridge.kt": "32f96a7d01fe8d7c0bac5853f33f18f476032011ec7965e779c8781cfdedefa7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStatusNotificationService.kt": "0949a29325a907d4e1329fde4fd33c2e0525ea5d6e8ce351d8ef42d8029471be",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyStore.java": "0a7a7a5620156aa9194f769407e477260ee9d58baa68d58923ec8b5d00e38cbd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubStoreActivity.kt": "8f92822a595a154cc7e0826a2ad852dad0bebb1efe44c224d79b34d12d13745f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySubscriptionActivity.kt": "781235680e0fc35c29b759547ff25cf509ded39ad4f6f487a437d9cfc7c5cbba",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyTaskCoalescer.java": "22105a0a75b4f491ee7303bef787c50608b4315d9bce9d6b6b202d8c2bd99895",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyTilePreferencesActivity.kt": "ed420fd2754d6c1a0447be62951954473e80cbb65a89297a7181ce7a164786c8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUserAppsRepository.kt": "2ed97eb7ef7cad51c498ad054fb540461a1bc7fcfc10eb2a8d38a2440e01cde0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceFileManagerActivity.kt": "963c71eb29dbd7757c5fe3e8518fda08deb5bf029f95d2b44d64b231a61b12d3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceProxyActivity.kt": "4de87074424ae58127e92edffede5b9c3529f4a124abe6c0be20a5b5aa774f11",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ReferenceStrategyMenu.kt": "8c26601df9294efc194ab075c56e2f4b0b3ef6ed2d7e3686974b93f22374742c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "938f93934e87fafdf2eadc84ba97d98ced022bf3a938866f9ad123719ab5bd3c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootBridge.java": "5afab63c48bb5897103125edb97b76204e20d2d06aa4be3807fe32843441ff88",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootCommandReply.java": "030f255728deb612cc9a0d6482659d8d701ddc159687c067157c93b62d8e052e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootFakeIpRanges.java": "9e4a1302e87ef51d91f76ebbcddf514aeed477549b159c1e841eee5135001dd6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyPolicy.java": "a3a17c2b466442df5e27e95b08e4fb448cbd1f332300cf0c6bcdb8621ac85b54",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootShellCommand.java": "3337b0bc97c2be34c4d135c8c35bce56bacdd9076988f3e23b3730b51c1bce22",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootStartupProbe.java": "b387a5bc691e676015e1d4380faa6e269192f46ca37200b60090294342a13b44",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyManager.java": "651854bcc6e238ad9945fdee86222305c8d6f2e9c6ef4416c5014c3ebfa57b99",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuleProfiles.java": "14897c9af46355cfe969a9f1ccb83c2b70966b0ba5467d36f6aa8f06a3976e94",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuleStore.java": "c3b13bb565a52dadaed81535c10045684b5dfb7b21fa6f6826f9b8e5516a41ec",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuleUpdateGate.java": "da1c833d01b2428631d15f1fcbac37c82a5e01a52e998c1f320b562d661b56b1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146Compat.kt": "984e49cf063d61212becef77523376eb10e2c2b858bb12bba241ef434661d84f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/Runtime146FeaturesActivity.kt": "ea01d73a665d2aca2997a3e8b961395aec4f57ac2c9da017ce4556d3a5953d0c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeCompatibility14.java": "a9c74d897c715b7c1df42d3a015abe080d926f73dfeaf665265511de8eab4554",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeEditorScreen.kt": "e703596ecc87ecfbf98acd27d35923170551da2dbd3dc7a96076730a4ae45f97",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeFilesRepository.kt": "9927dcc0091058fd536a805447a6ca8ee3833ecb37721bca32f90c89a1e66b8a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeSchemaRepository.kt": "92e893f09591ed2e121f420f6895e6884f4fe6935ebaee9dd8ff449676b79c63",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RuntimeYaml15.java": "9ef9bfe6dd516d578fde1e5e1fc39f5afcc90dc9cb52fb1bfeb04689103fb90a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/SafeWebViewHost.kt": "103fb9a9c4dd0b9076b7f513f1f4427e472ca6b0943e81e5b8c9a13f6c8a6a8f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/SelectorPresentation.kt": "887000e85b0d3170f7c5076014e0baae949e3ad57b91968140db5a9a0f493fa4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StrategyListProjection.kt": "88330da27cd5c24f9e0bde7f7a186ca9ac4d7f2abf3e6edf0ce7357394c21c76",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StrategyMeasurements.kt": "9972fd16696ab897b69fd9e5005fb99520a778ec7a6d2919b59cb2bc3651aec2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StrategyNodePanel.kt": "0351ee71450a51235b7d5c439561001f2c1c9ce1d59270f995d60b94d06613da",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StructuredLogCard.kt": "6749cd33dae422a0a6cceb8c10b72986493f5b259e7d63bb62d9539302d1612c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/SubscriptionHealthSettings.kt": "856759f25fdb376a261a7220c973e81a920a16cec98ea9e839bbe36bb926509a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ThemeSettingsActivity.kt": "4b6be7dc5b625505fb2ca66ec219302b3fab29f52a93438fffa86db688ad9078",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsConfigBridge.kt": "dac5205ec8f51eefd2596a2794a028bd0f8d54243d12eeb0e5e2d962c36b3bfa",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt": "06b93029f588704b80125d049bc014e28103701f103651b88b3752bba63535e4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/TrafficRankings.kt": "72f1e90c54563612ebdf350a6e1613a4d20d9690381461ace002b73ee02057a4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/UiFeedback.kt": "7919d321cecbab2a27bdc5a282ae62586f26c16813bb57efab7b39e21b63c166",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/UpdateJobService.java": "892fc16355977478e987f3936cb20ec21f7b41235c207e0cfee4a019b9b000bf",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/WebPanelAssets.kt": "e96663cb671a852439750977f2732e3024c8fd3b4cbe17af33977dc822499e66",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/WorkspaceCards.kt": "022ed0652c49890cd12ac7df9753585309ebb2a526ba1db339a7d7442238baed",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt": "4df2c77325b4c054dbaea61e524afa3b5c07d51995260987c938d3493715ef6e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "e803b8df90a1de70212e66847d988bb33831723f35bdfa38c2037eaaac1ee999",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConceptDockIcons.kt": "85b9032330baa76685406edafcd353baff7e098f97bf6371a5a7706d2c352c9d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigIconCompat.kt": "5cb1b6d580b4fbebec7edbc326ff02a5420bd9ff455c4cdafa59e28b19a25a1e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt": "c037f31f292ed35b35d808408df25df017090532639c12d8b4ac677b13813fac",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt": "7eea05d6e1fb222704ef5b8bb887b5991731e4772988dc6c4476ebc632a1d7e9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DocumentPickerSafety.kt": "b414893c7db4ec2cf5b38956bae89c89ff52198eb65e616f4dd6c3865de7fe77",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeDetailsScreen.kt": "9382ac783d554c47fb41bc912bd7f761dd1ec425e5a50ab6ba392de6839c9cd4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HomeScreen.kt": "11751e9e041d9d4d428a4b685820c2437783d9c430f0104445fb33b014be95d4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxFormat.kt": "e664b87a43d7f1fddf62cde9ddf7e18162276ca6be635075286613d656c707b7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxGroupIcon.kt": "cf58345775e830af831b77508b697c059bd70c6a75f8c0642d1bfd9f53c70e3b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt": "c4d60fac5cf9629120d0ca02232e6563c7d5b86b671b236ed9ab73ca5fdf7015",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "51c2baa92de478ac838bd2811d8b37743387f74b459b1e6c2f76457f071d582b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "80227e5b24af8f691fa921d87d1d162774107f20c64a94b96d1b15f796a34df3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "e95548a09a1a95d647cc15c72fbb314f7e147e2a75e19d0aae07ac54ae552637",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTrafficChart.kt": "6e83280fbe2effe8b8e0a9a529d3d3f3f6e51444832b141f4bb49a024dafd5a4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt": "04c13ebf7f4e8012272143efe8d75cd700631e47d81a0ad97fa98d4ad84bfb93",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelOverviewScreen.kt": "578100d9cf5ff617e4ba01a1631febcdfd48ddc9a4a35a566f3c3660e3fd10f3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelStrategyFilter51.kt": "8827b9be290493dac2112848d8cac9cb006987c371e401bed900e4c2c680d265",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelStrategyLayout51.kt": "f22f8c01b60cc7560adb847679949c0e64224ef7d506412f6e47555251e53c28",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelStrategyNodeInfo51.kt": "5e51141ec5f468e523cb659cb02458dbb29cd4a5e7629b8eb7a90ff4260b2ef8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt": "b31f3c25c05262bec2783aa7155e935e8bc4b837265e622e9802433ffcdf3214",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt": "fcd9b5aa28406a07a0f42c3702704bf95a788866e3542b6230118b1f92ec097b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt": "70fba36f619e23e67753709d232607eb0bd4379cc652bd9c812fb0381471a5bb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceIcons.kt": "f1f39a255d055a32a11c641af07db8a3e1f12e4e992cf6b21f7d1285e833e775",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt": "bdf2c786f2a26ba643e5d4ef4f994de044377b50d2c83e2d762a0c640b678947",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": "90921f6e5d313dbf5a723781203bb4306dd1628a40d5038ee5c3e1f07e0cb707",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HeTuDotMatrix.kt": "3e982b1d143e4ea9d8d78d69e9b44eb491c20bde012f7533ebcc6fef3ab46cd9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt": "a90807b97717f3d1c275dea7f6333c20a77ecc7d711b0b5399dcec912f8cf480",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIcons.kt": "e133dc17c00dd18e9fcd985d872b664b07eac5a1353f84fd438fde201b6443fd",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt": "471d67bff982479464f9d542289bdbd4706a78a11b17bb4be5c72453c74f57e3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeIpDetailScreen.kt": "85c5d88f4c53ea6d76e503693336f8f412daaaa57ef647c9d334cd226f0da30a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeLatencyTargetsScreen.kt": "581ea8a0f00e0ebdc8ca48a98be2524ed8cf6bb67d11b30d4adc688542c9f431",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMotionKit.kt": "a73d3a36e5670a0c7d7120a83e0430f7e325b6b16ce2229e6800d86dc593d6c8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRegions.kt": "d9328b31e8d78f9fdd4fe1af9dc530f17e315f68b9b7602c01b8eb1059936b4a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeResourceScreen.kt": "8bf0cb3b468ff408bb05b2bc037279b40cde26d843a0e6adf208e06a9e71f6c3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "fb6268bfcbd159c6353a4ec8209988718a6d732e5e94560a2974b11d9ae0aeed",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelIcons.kt": "185509e9133e7c50f9877b15d0318cdf94ce792e53a17723d3497f8824d2cffe",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "758ae1533b52ef8cbc375170bbfd71c642ba9790b07237cd59828b1f02201ea3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "aa372742695290a67f079409fb5caeb48f5bec9ad4f3926a33bf11659b7891e1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverlays.kt": "addb894b47a2b7f74d9bae25c98b995b2fb49139cd869acc6f1504779d839045",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt": "a5ea8d2881af69fa30d79cf92234b0138fa5687ec26815c7a39cff9f8abc08ed",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelPreviews.kt": "07309819975a0643b2cd24b84ad450011c72de3f6f675aa37c53b183162a63d7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelRoute.kt": "c9c9bd2151f9bba07dc07109860c1f068df1c70c21441861f610211fe429c566",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelSamples.kt": "9609ed34edb2922a9c585270fd65bb450016a296f5aba2411e2f0bf2e9d2cbc5",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt": "1c24d36853c84c622c2696354ec52d957d812cc060d7372c9d28e391ccd218a6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt": "35833a4ac1f9ba59aa329c8a97d93c818263f98a4c22deeb92192dfddeb8c323",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsComponents.kt": "71332f01b0d505e8f95c149c76aefe61a53e65322d74f0cb7bcedcffeacf3353",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt": "244c446c51ec9a8f3daabe62542a9e24a33f8cb9c7bf936a78c4944751817b26",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt": "6af5a4b63ffc05e5c570676696fe66e722495ee3c46f02cbef5b1484ec698df4",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt": "a70f3b46d4f712afbaa5f869aeb7166d7d33e9c6f633f506896c7e739638ef58",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsEditorScreen.kt": "4417b2607bc8139a876b94b27d5987edfc0938387fda42fd70447e3f6aed4e49",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt": "1a83d54414116b349d59089632a7e45f2baea3a1ed7bc2251e2e3b2f43985046",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt": "58d10d41491d49cc3cbd3f8580fb4c724dd524b280a4f6b57a139c20b48ff0c2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureIcons.kt": "f1c5df6b57a72a06480d6231538db19b9016daee75c4f6b4a192dc39c7e4f10e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt": "dd620f4fa699d976bbf6cc062a5f7f91bf352a242fb845398ba71e7aa8fba8af",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt": "221a287029500477c66ed85f868cc04cdfa6c20ccaec0e4a97e347a17577ce6b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsIcons.kt": "addeff18e9c9a3c504cbba07e85f3d742c625e714ec0e5cd555e5027e6885ce2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt": "6576a0de7ad22955c88603cb238e0e9cdfda634312ec383ba9247f7570449e1f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt": "c3cecac76b556bef0f33ed7291bd1734428a46cac68fc754a99a0e9e997ce1da",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt": "46ef0dbe794a4aec2526fa88777fb521af76b653996d1065dc5edbc429a56b9f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt": "05e3c9db5959c0b831378cc244a524f55980fcf8b868b900bc28447fd80a3d66",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "213d1795ed51d69d1d53dec4510a2773e6e1b50e18cd0eb179aa67eed36a7f46",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsVpnConsent.kt": "319e49e6cbb5a284c145568cbbea521055dc181c25dd702b5d1ace3e5e90a903",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt": "027196b6588ec79ddd83f48bef8f13b13275b7e8299aab791238ffb720e9fec9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/BaiZeIcons.kt": "de857a1bcf7b1f69323ba61e2bb7dcd435b43fdaa41ed22c627e4bdbe3bebce1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/CrystalMaterial.kt": "7c68a8f0c798c6aac8e83325d985a77c30895d62a17bc15ec31d13dfbb3bf0d7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/CrystalPopoverHost.kt": "46a7d02e505d73160da048357e34a747c26a346757580968f4de668326e618f6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt": "fa2d3ba1e62c0d103887444f137e815a88306b11339cd0bc4734d9aad1597191",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt": "b3859ed41f2927006704e5ab1d4c79752cb4ae428338b3fe776e87784518cf9b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuInteractions.kt": "b4d40f16cc2ae22a35fb13244f51e21f55884011b7b3a168821383757a050fd2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassLens.kt": "321d0190c3156ca0db543aa22e6b26b6b0571f19ec0e4e02c5ad59459b7f1f22",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLiquidGlassSystem.kt": "a0ea78a078d7759548a6b5fa4f0837727c6f3c3f51c1dee43eb268dcf17e0a2a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLucideIcons.kt": "b55686f16ff2fe8a6230baba46acb8044677bef5cde44b980c9b2e09a436bcde",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLuoShuPrimitives.kt": "5f3efd7273b39a3042ae1d082a8fd8255b6f86f11c338af742590f8c3146b5b0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMicroCrystal.kt": "7ad6458d6b3f51f225221311736f0ac831f684aa4b16c6bbc63d3e1528b1eaef",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt": "267c556332f4617e7af08037a792657d194b48c739e5763f65161f128a0038fb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuPageLayout.kt": "68065f9bef226269b8fee004c272fe0a276e0f8fa5b3c327de07080b78bddc14",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuRefreshBox.kt": "9738f95dd8b4655c98a369a8560084f4795f113d06c16a39b23c4319528fe479",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTabs.kt": "5bb9027f0651121036b2469bc25a832bb6ae324debd59edbe437c1699614e475",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt": "935ca69cbe273e22abadca4cd48440b59acadab4ff51e92afa4e65e0cd734f92",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuVisual.kt": "80d40a12fb611dd3e92cacbfd56c8e60ad9751ea554e86daada8b19ad9c977aa",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/ReferenceGlassComponents.kt": "4a00afefa8219d23dd414b341197e92c6cdd476b0273223e07a3f810ba64a3c0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/ReferenceMiuix.kt": "dd6d842b898b30a4c766c8a07d4b420fe360c1683370c8f22b0b8b8cd2821cec",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/glass/LiquidGlassLens.kt": "95372fe02082c2b28500708f6701f5c3817ee642af401eaae98defca31fe59bd",
+    "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+    "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+    "android-app/app/src/main/res/anim/hetu_route_close_enter.xml": "674bb4a44b4a44ded9c79f0962b981fbdb1bcd3bef8d8a9957591472477c9333",
+    "android-app/app/src/main/res/anim/hetu_route_close_exit.xml": "831ee6bb80c06308f161a9c3ca2f231f7cc9782431abd555fa61e601a4cc576d",
+    "android-app/app/src/main/res/anim/hetu_route_open_enter.xml": "936c12f2e2cf2494657bb60d509ca78f29a3f2ee9e4840171dfbe284c64e7304",
+    "android-app/app/src/main/res/anim/hetu_route_open_exit.xml": "8816a5ebc319c36dc5f761c199d991783290d19824ef5a09bcb30e28ecf2a763",
+    "android-app/app/src/main/res/drawable/ic_hetu.xml": "a95d6b5a5af9a5ad6358e6fc12ab35453e7c9c043ef082234dc6a3139c69b670",
+    "android-app/app/src/main/res/drawable/ic_hetu_concept.png": "31573825cac7536b442c67e7a8110fd5584715a347d9cc8e9ef50cc66b29d04c",
+    "android-app/app/src/main/res/drawable/ic_hetu_official.webp": "ffd1dce1e68a23d47a9a87faf69d94cfbd9dcb428f7cb538fb8ab305199d4fcf",
+    "android-app/app/src/main/res/drawable/ic_qs_hetu.xml": "301b39fa58cb4a4a142ec57e36c4883792bf8e1fbf9af072fcd8edaae311e1db",
+    "android-app/app/src/main/res/values-night-v27/styles.xml": "0c6eaf1c27b1bb5b5172ef0b011143a226b8f89356694f110a374097ef141c2f",
+    "android-app/app/src/main/res/values-night/styles.xml": "d6e24f299dce4c65480836741601c809be6ddea17fa846d1a080e392d536997a",
+    "android-app/app/src/main/res/values-v27/styles.xml": "cd57b007d166ddcd641e6819c664f3d3b9c974760c818235246656b4575d4571",
+    "android-app/app/src/main/res/values/styles.xml": "e4b173a30ee9ffef535e3929778779c1545d8e22b366b867103fea72facea097",
+    "android-app/app/src/main/res/xml/network_security_config.xml": "9187f485f22fde712aea8de5243664710440a9ee08e9f1b172978eef96a15001",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockSnifferTest.java": "4a3eaf83cf7c23b967e6ecb7aebece0bd2e3fa064c750c0563e7298de43eddd6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java": "e47553c52d0cc3520d46f2a81b7c6c146b36c11d7968e7aa00b314810eb1a904",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationConceptParity57Test.kt": "3b56c3de78858f12219b3eb3e5ed8391f03c3668e55549f60f372a8dde7c2a5c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationSettingsConceptParityTest.kt": "3fb3797e4506460a639c6400a9e41b87590946b65febb961d6edcfeaef7de9ec",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt": "0a1ae8c708e0c5f3be605b8d1e0b8a4c94e5b0ac34334329c98f09cd4086c6b4",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java": "ce40eb4d7ca9c5585deede8fd0431d4f314c2d332b572cebf80afcd5587c8c18",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CompactHomeDashboardTest.kt": "60e4a332f4a21bf6a2d891c1f48dc0e087fc47db8c6a955e29ffc9ca27b45f0d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt": "6eb0992c35daa10779179ab8feb6a70716c1492b4f426f0ce7389b5fc19f28e7",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt": "ff9ac2f963129ef08775c4d5f86747d0fc94ddcac479c29ac22e29941cf64c0b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "98941c27cfb0aa8949591615e1f13e7152af0e907d2519f4126bb4648d0691d0",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt": "3102f56bef1b548b81fc4f3b3afbbee6e6add701eeee755a4cb9ff71a037a098",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "337d0ac9b486cbfb83578c35572ca7c3c50b4250c3a08554d20c542f92f76061",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreManagerConcept57Test.kt": "630a5c62cf1d2cdd1119aca1679c59413ef25da444f39786432b35ea13a69183",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt": "30c3f388778f35931ef5e4e98d7a803c33b06403d301678d207879ea0e507bb8",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt": "60be9042c3b11f3d83746bb5989dab556c69ab2d1774da2e69eba4c5e0a9dd12",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java": "880b97d431f61793bbc3c574b5d15efbf3adec18d5d87858a479ac68968f11b4",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi10GridTest.kt": "94142b603a7b124bd63e4151b8538b00097773ac98d5b328ebe7d6592c91bd06",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi11Test.kt": "294d09c1c7c0851d39dc6930823fa49bee6808863feb3aeca77b4ebee5997831",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi5RegressionTest.kt": "d92bde8efedb9a6fb802b0b516558a49b6f1d8ebbb3af493b2f11db6606ec068",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi6RegressionTest.kt": "a9b1753653cee93cd6f16c9dc471d0c56fc681edd56d3f9c1cac55dd5b7a79d8",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi7InteractionTest.kt": "2ced1548276288797aa5f6f6238299f6b80ff3a321c5bc857b042a35ccd7434a",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi8ExperienceTest.kt": "2c14afc89b26023137c965698a0f10438b4af7d595c7966eacbff5b614142c7e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeUi9BentoTest.kt": "09effa80161b5e64a00c5fbeb0d45f93ce4189d2a04e39517d51c7cadf79e355",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt": "09b3bbd7b19bbcb9f11131fe712a5e12acc737ae8f4302ca8ff8ffdf467fce06",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt": "211533f26ee06591e96938440ffdc9dfac89738ed562350752ba5b1686538edb",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt": "1bba913d3184ed507b61b7cfdd64a9eb9cb0b9cd788ba3a89ab62b0ead384767",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt": "58425f9d85a387090c54a2acf806a230e79946ab17ef52759ad8969699c60a32",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionModel12Test.kt": "e64e0dae2492edbd5d3214ab1338ad5aaf0747106308daf618f86192f95ada50",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionUi12Test.kt": "3e724c7ef44b6589771909844889736d751a23ac91245381c2d30dd014f85546",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt": "dcb409e0f2d50a21c853a39b8662ea12eef150a1655b7c956ed187d3e3daa1d9",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeDockUi4Test.kt": "c42f34e82cd1c7c52d02106332e4fd67f3a24ce5a5d6f32b1c739a8bbb8cc846",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt": "989512d266130d8e5cdff9cd37f9a081b1ec53c9fa44a62eb21e4f6f5c615a8e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt": "1fbc9275405d07e4bd80c4e004334796168e4e6b29b268de6524ea4c0b87b7d2",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt": "910854ad971abba4ff571c28f5647e3a7b49dd7195f6882cfa4009dc575e6a37",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt": "9bc429306e15937c9585d55793333c29593209b7e2611ed893352388c48a63ed",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt": "67ae37e9746ed62518dc7e15a4674e91283b262c329a0b24f47b3eff4eb736c5",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NodeSelectionContinuityTest.kt": "c043e0a4bf34d132032264c3f2e14437f0c8df3874050e933652e9955b963271",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionRuntimeShadows.java": "2b01a451e6dcf62d626f4d0d16e5d297a93dba761bb5eb421e6ea6f09b40acaf",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt": "5cc8b464acb8fc5469d99efa900d3547c134a1b13f85a26e81e19c479c928c80",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelConceptModelTest.kt": "b726a06696e4e81f1d30a01cd988dc4321216c5ce12395d2f830bc744404147d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt": "01757ef4f531771e81231a693f18c57dc1c3f07ec84a1fa4b2d5618525cbe44b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt": "f987911e93363d988c0e7c9cc6aa7a7a9b17879d68bf55c6c7901f641224e87d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelLayoutDefaultsTest.kt": "0d31210fe7f57172abe6b8d5922ac5d64121f462a2b7502736a6db2c76bdf8cf",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelModel11Test.kt": "9ef84f92fb9e346c1b64cc0e7800a22d50095a9738a4825f40988d901457a2dc",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelNavigation13Test.kt": "792e19868eb34fde05c0183545f1d031294e8fd1ac6ba7fcac2162ec054d37ab",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelPolish14Test.kt": "d605e9d46578e9b347c4046416fd83e6da47f408f72ef546009335dc1a867cfb",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipShadows.java": "5f7955eaee7c46899b5401d4ceae103dfab6640c30a10eba73418621648294e6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelUi11Test.kt": "9251b6840d579193e2700f4abc4bcf7d117f7656bfc8f7d42fc489f6ed674b31",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt": "6c67b8908c8da774423a327d7b32f4793d1183de1cc0d2f235edbddae41a52af",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyLatencyRegressionTest.kt": "4df15e25bad5c59d3bb7a979457a7bf360a95ae1893d68919dba5a2aa5eee9c6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt": "e259f58a2cdabf6b7fe7187a2b5105e348b193dd0aa713d54b6804cecede31eb",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt": "3c607918614926263adac5b4f0032335f85107669f445eee679a0ee7e0b7196c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java": "52969bec08c3bbb2daeaaad9bbc306974878cfe23e14c852c224be1bc40b27fa",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingCoreDownloadShadow.java": "98d7010577b85be5ce1511431f435fc4d6fafe68c9b0c32babe0610660cb90bb",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RemainingRootManagerShadow.java": "f51c5d812ebb7db9047d9043e9c13a2d06bc4d266abe2a3db5429800fcc9bf18",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt": "4f689e226effa192a511a2a63e62eb524c85757fb289b027a126066047b299ca",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java": "992722b4531ca1ebab5d54f339eccf66d05402a2a16ff16a0af7a3b14a22499b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt": "f858f0fb1dd2567985a42499ec645b7bc6bce0878a0debdbacbf1a23e5d1fb63",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt": "efde1c6e685680735ced8a23f9c8a3ee2007d12cae95cb7fa3eea19322828549",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "97617800f902b6f1d2c9b407e526c235075ae8bf5fc085af9b342860ff1fcddf",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeCompatibility14Test.kt": "a9c85c15700bf18ad78fab2058e260e64f0858b463a801fe3016ab5a282f1b1e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeStartup15Test.java": "e3a0e40efa5533ec4e7aa43fe2b141318659b407a4c8fa1af40c1a45bedece4e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeYaml15Test.java": "bc838ccfab9c0f39c90a4d609fdfacab4ca52f725ced38d38923c901e4e66c5c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsBackupParity57Test.kt": "5c3dbae9908327c05b755dedf3f585b250dc43be0d39355e7de5e79ed9e4382a",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsConceptParityTest.kt": "e16ecbcfd02e023fef71cb6cf388a0c17df894b60e04b4c8d1f817127441d2bb",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsPickerParity58Test.kt": "b265ffd92491fac19fa83837b51e29f4629706e9fc6e45e84894b9510dc8219e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt": "83cd5d6d1128a4156a0b77fa27a0c2bd8cba0874947feb22fb44c38fe0df0859",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToolsConceptParityTest.kt": "4de4548d42f89c7ae4551f3149b4f1d2f1fa72200b0624c869176d8ade5d2795",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83EditorHistoryTest.kt": "e04ee8d57f162e5c2e071ed0eb604ef174c914f8537c1c4f67b2a8ac05df1693",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83ToolsTest.kt": "3743ec35775e2c5d361bbcb58dee4bd5f3c82a3e552cd3ff270f52136bc9cff7",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Ui92IntegrationTest.kt": "ba76f48efa777919278ae2d59707f223d85426f8c2adaf3fc16bbaeb96f8feb8",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/WanDetails61Test.kt": "c0dd43c79d862300eae3b0d84981e7e1080d9c250dbe49c875a879d32a85c548",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames1.kt": "b1d96bdd4b1268a32eeb96eceff04a593a9292445f35c31ecc83f352bb47a969",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/Pdf85Frames2.kt": "80e56e19535bf69a86a856287f09fc7a30c99838216c0407da4a43ac31acc564",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDiagIntakeTest.kt": "c118074aa458ec2b248fdaf8cbda560c5e56c3ab49afeb0d1a690681c5bf989c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDnsConsentIntakeTest.kt": "b627fdfabfbf2f0e616539abaad5a40057fc136be1a026f6842b1bf276913863",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeaturePreviews.kt": "e84f56ea39e215aafa38b6f579732a4ca2c8a9218a18f17bccf7cf2680f68c3d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsFeatureSamples.kt": "f118e25481f5638952f65e8d6d094b93896dde9aaa0c9ff0ed215b51feef8224",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt": "499b204cdd0b41ea18493d73c8daf2468007bffc63a13ce38b919ab5fbdf1a3b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPreviews.kt": "22caa0ec04d25b9cf7f587791072c18fbcb2f14f72f97b9a158c49008a9411e5",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsSamples.kt": "4a6e97f0b9ce5f40192ed57a67cd2f41c6d0c545959ec7db460474b09c13c3a6",
+    "android-app/build.gradle.kts": "88813f0b340fb9f75b242aacc7b7dac5fe49a7ca4e20fcbb5fb0422a51bf0ebc",
+    "android-app/gradle.properties": "1989ce44d3e46ad3ba76539a5d04f2e94603d84add6a5c01e9dbb2537a68e4bd",
+    "android-app/settings.gradle.kts": "5c332bc4af6d70e8e9796cbde5474d699640557d927fb1b93f13cf8edfccb28d"
+  },
+  "externalPayloadFiles": {
+    "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+    "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+    "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+    "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
+  },
+  "runtimePayloadCount": 23,
+  "rootScriptSha256": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
+  "autostartScriptSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
+  "baselineUnitTests": 545,
+  "baselineTestXmlFiles": 56,
+  "baselineUnitTestMethods": {
+    "io.github.xgl34222220.hetu.AdblockSnifferTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockSnifferTest.java",
+      "methods": [
+        "adblockAddsSnifferWhenSourceHasNone",
+        "userSnifferIsRespected",
+        "noSnifferWithoutAdblock",
+        "topLevelKeyDetectionIgnoresNestedKeys"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AppCrashReportTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java",
+      "methods": [
+        "capturesSourceLocationAndCauseWithoutMessageSecrets",
+        "overwritesPreviousCrashAndBoundsStoredSize",
+        "recordingFailureStillDelegatesToAndroidCrashHandler"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationConceptParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationConceptParity57Test.kt",
+      "methods": [
+        "homeConceptStatesHaveProductionControls",
+        "panelConceptMenusHaveProductionControls",
+        "stoppedPanelAndRuntimeStatesAreExplicit",
+        "pdfStateCatalogMatchesAllFiveReferenceBooks"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationSettingsConceptParityTest.kt",
+      "methods": [
+        "basicProxyPickersCoverConceptOptions",
+        "themeAndDefaultPanelPickersCoverConceptOptions",
+        "notificationPickersCoverConceptOptions",
+        "advancedDnsPickerMatchesConcept",
+        "restoreAndMirrorValidationMatchConcept",
+        "licensesAndMockupBoundaryMatchConcept"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt",
+      "methods": [
+        "toolLandingAndConfigStatesAreReachable",
+        "appCoreAndNetworkToolsCoverConceptStates",
+        "adblockConceptStatesHaveProductionControls",
+        "logAndScriptConceptStatesHaveProductionControls",
+        "fileWorkbenchConceptStatesHaveProductionControls",
+        "networkWebPanelAndSubStoreStatesHaveProductionControls"
+      ]
+    },
+    "io.github.xgl34222220.hetu.BootStartup60Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java",
+      "methods": [
+        "optedInWantedBootSchedulesRootRestoreAndClearsOldSuccess",
+        "unlockAlsoSchedulesWantedRestore",
+        "explicitStopIsNeverUndoneByAutostart",
+        "installedNativeBootRequestsConfirmationWithoutRevokingExplicitStop",
+        "noOptInNeverStarts",
+        "upgradePreservesWantedSessionWithoutRestart"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt",
+      "methods": [
+        "offlineHomeResourcesRemainReachableAndBackReturnsHome",
+        "resourceChartsRetainMissingSampleGaps",
+        "ipDetailsProvideDistinctPublicAndLanPages",
+        "compactSwitchRetainsToggleSemantics",
+        "directTargetsScreenUsesSharedPageAndValidatesDuplicates",
+        "activeDockTabDispatchesReselectWithoutChangingDestination"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt",
+      "methods": [
+        "shadowFailsClosedWithoutRunningShell",
+        "configMenusAndCancelledDestructiveDialogs",
+        "narrowConfigLongNameKeepsMenuAndCancelReachable",
+        "existingSubscriptionInvalidDraftAndCancel",
+        "yamlEditorOutlineAndDraftDiscard",
+        "yamlSelectionConflictPreservesDraft",
+        "yamlExternalFileConflictPreservesDraft",
+        "yamlReadAndValidationFailures",
+        "runtimeEditorNativeViewMenusJumpSearchAndDiscard",
+        "fileManagerMenusFormsValidationAndCancellations",
+        "realScriptsActivityReadFixturesAndCancelledDialogs",
+        "existingScriptNamesCannotCrashTheActualPageWithDuplicateKeys",
+        "rootReadFailureShowsActualErrorDetailsInsteadOfSuccess",
+        "logFilesSelectionSearchAndCancelledClear",
+        "startupConfigReadAndRecoveryCancel",
+        "basicProxyActualNativeActivityAndMenus",
+        "toolsAndSettingsCollapsedHeaders",
+        "appListModesSortMenuAndSearch",
+        "panelLogReadSearchAndExpand",
+        "adblockRulesHelpAndDomainDrafts",
+        "adblockRuntimeSnapshotWhitelistCancelAndGlobalWarning",
+        "subStoreControlledProbeStates",
+        "realWebViewNativeContainerBoundaries",
+        "failedBootSetupUpdatesBannerWithoutLeavingSettingsPage",
+        "restoreFileResultRequiresConfirmationAndCancelPreservesSettings",
+        "coreDownloadProgressIsOnlyAnInMemoryCallbackFixture"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptStateCoverageTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt",
+      "methods": [
+        "homeStoppedState",
+        "homeWanAndLanDetailsKeepRealFixtureValues",
+        "resourceChartsKeepMissingSamplesAsGaps",
+        "resourceChartsWaitingStateDoesNotInventZero",
+        "homeLifecycleAndSourceSelection",
+        "homeStartAndFailure",
+        "strategyExpansionSearchAndNodeInfo",
+        "strategySearchKeepsActualGroupCountsAndCurrentNode",
+        "strategyMultiTermSearchKeepsMatchingNodeRows",
+        "strategyFilterAndApiDraft",
+        "settingsNestedPagesAndMirrorValidation",
+        "themeMenusAndScroll",
+        "notificationMenusAreDraftsAndBackDiscards",
+        "toolsSearchAndConfigImportValidation",
+        "subscriptionFormRequiredFieldsAndDiscard",
+        "panelConnectionsMenusDetailsAndCancel",
+        "panelRulesProvidersAndTaskStatuses",
+        "panelOverviewRankingMenus",
+        "directTargetsRejectDuplicateAndSaveValidDraft",
+        "bypassDraftAndDiscard",
+        "networkMatchMenusKeepAutomationDisabled",
+        "bundledLicenseSheets",
+        "actualAdvancedSettingsActivityAndDnsDialog",
+        "corePickerKeepsRuntimeSelectionAndThreeCards",
+        "webPanelCreateEditCancelDeleteAndMode"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ControllerAuthenticationTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt",
+      "methods": [
+        "defaultControllerUsesOnlyItsLocalCredential",
+        "customControllerUsesOnlyTheUserCustomCredential",
+        "savingCustomModeCannotForwardAnInflightLocalCredentialToIt",
+        "savingLocalModeCannotMixItWithInflightCustomCredentials",
+        "local401KeepsItsTypedCodeAndSuppressesCredentialBearingBody",
+        "custom401UsesCapturedModeEvenWhenSettingsChangeBeforeTheReply",
+        "groupDelayDoesNotRetryOtherProbeUrlsAfter401",
+        "readinessStopsAt401WithoutRotatingCredentialsOrRetrying",
+        "utf8CredentialBytesReachTheWireUnchangedInBothModes",
+        "invalidCredentialNewlinesAreRejectedBeforeOpeningASocket",
+        "missingLocalCredentialCannotFallBackToTheCustomCredential"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ControllerReadStateTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt",
+      "methods": [
+        "unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot",
+        "successfulGroupsThenUnauthorizedConnectionsCannotPublishPartialSnapshot",
+        "otherHttpFailuresAlsoReportMissingControllerData",
+        "malformedSuccessfulHttpResponseIsAReadFailure",
+        "failedPollKeepsConfirmedDataRatesTrendsAndHistoryUntilCompleteRecovery",
+        "cancellationDuringControllerReadPropagatesWithoutPublishingState"
+      ]
+    },
+    "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreManagerConcept57Test.kt",
+      "methods": [
+        "defaultSurfaceHasExactlyThreeReferenceCardsInReferenceOrder",
+        "variantSelectionChangesManagementTargetWithoutMutatingSourceCatalog",
+        "independentCoresAreAvailableButNeverNamedFamilyVariants",
+        "invalidOrRemovedPreferenceFallsBackToFamilyWithoutNewCore"
+      ]
+    },
+    "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt",
+      "methods": [
+        "customizedAccentGeneratesEverySupportedPaletteInBothAppearances",
+        "defaultAccentSupportsNondefaultPalettesAndReturnsToBaseTheme",
+        "systemMonetKeepsItsPriorityOverSavedSeedAndPalette",
+        "customizedSeedsSurviveDisposalAndFreshThemeComposition",
+        "monetCanBeRestoredAfterCustomizedDarkPaletteRecomposition"
+      ]
+    },
+    "io.github.xgl34222220.hetu.DocumentPickerSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt",
+      "methods": [
+        "absentOemPickerReturnsVisibleError",
+        "disabledDocumentProviderDoesNotCrashClick",
+        "successfulPickerStillLaunchesExactlyOnce",
+        "programmingErrorsAreNotSwallowed"
+      ]
+    },
+    "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java",
+      "methods": [
+        "authenticationAndPlayDomainsAreIncluded",
+        "googleMetadataIsCaseInsensitiveAndAcceptsDnsRootDot",
+        "suffixLookalikesDoNotConsumeReservedGoogleQuota",
+        "googleSystemProcessesMatchEvenWhenHostIsMissing",
+        "processLookalikesDoNotMatch",
+        "resolvedUidCanMatchIpOnlyConnection",
+        "unknownUidNeverProvesGoogleOwnership",
+        "transportEvidenceExplicitlyDoesNotClaimAuthentication"
+      ]
+    },
+    "io.github.xgl34222220.hetu.JournalReliabilityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt",
+      "methods": [
+        "continuousFaultsStopAtHardBudgetAndPreserveEveryRetainedByte",
+        "oversizedLegacyHistoryCannotGrowAndIsNeverDeleted",
+        "reconstructionKeepsPersistentPauseAndHistoryAtSameBudget",
+        "interleavedInstancesCannotAppendBackIntoCompletedOlderSegment",
+        "copiedLegacyRecordsDropUnknownConfigurationAndCredentialFields",
+        "syntheticStackSymbolsCannotSmuggleAddressesOrNewlinesIntoCapture",
+        "actualCopyHelperPreservesTraceAndBoundaryStatusWithoutCopyingPoisonedMetadata",
+        "configuredSecretIsRedactedFromFieldsAndCurrentTracePointers",
+        "shortSecretExpansionStillProducesWholeRecordsWithinViewBudget",
+        "currentReportRejectsUntrustedStateStringsAndInvalidTraceIds",
+        "healthFaultSizeCannotBypassEventLimitOrDiscloseArbitraryChainNames",
+        "discardedCauseFrameAndFaultDetailsHaveExplicitTruncationFlags",
+        "invalidCanonicalUuidIsSkippedAndCannotAppearAsCorrelatedEvidence",
+        "oversizedRecentRowsAreOmittedWholeAndLatestCompleteTraceIsRetained",
+        "utf8TailWindowAndPoisonedPaddingCannotLeakOrSplitCopiedRecords",
+        "concurrentWriteAcknowledgementsFollowPhysicalRecordOrder",
+        "oversizedDirectEventIsRejectedBeforeAnyHistoricalWrite",
+        "kotlinMangledLocationsFromReportedCrashRemainTraceableThroughCaptureAndCopy",
+        "constructorAndClassInitializerLocationsSurviveCaptureAndLegacyRead",
+        "expandingLegalMethodFormsStillRejectsPoisonedOrOverlongSymbols",
+        "mangledMethodSuffixMatchingConfiguredSecretIsStillRedacted"
+      ]
+    },
+    "io.github.xgl34222220.hetu.LargeTitleParity59Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt",
+      "methods": [
+        "rootToolsAndSettingsUseTheSharedLargeTitle"
+      ]
+    },
+    "io.github.xgl34222220.hetu.LegacyControllerCredentialTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt",
+      "methods": [
+        "oldMigrationCannotReplaceAnExistingLocalControllerSecret",
+        "missingLocalIdentityIsNotImportedFromAnUnrelatedInstallation",
+        "customApiAndOriginalConfigImportKeepTheirExistingMigrationBehavior"
+      ]
+    },
+    "io.github.xgl34222220.hetu.MainLanguageBindingTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt",
+      "methods": [
+        "chooserUpdatesMainNavigationAndSurvivesActivityRecreation",
+        "systemLocaleChangesAndBlankPreferenceFallBackToConfiguration",
+        "userNamesInputsAndDiagnosticsStayVerbatimEvenWhenTheyMatchVocabulary",
+        "vocabularySupportsAllFourLanguagesWithoutTranslatingUnknownText"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NativeConceptScreenshotTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt",
+      "methods": [
+        "homeOffline",
+        "toolsOffline",
+        "settingsOffline",
+        "publicIpOffline",
+        "diagnosticsOffline",
+        "sharedNetworkOffline",
+        "cnipOffline",
+        "networkMatchOffline",
+        "coresOffline",
+        "configsOffline",
+        "themeOffline",
+        "notificationsOffline",
+        "aboutOffline",
+        "panelOverviewOffline",
+        "panelStopped",
+        "webPanelsOffline",
+        "subStoreOffline",
+        "defaultPanelChoice",
+        "themeLanguageChoice",
+        "themeTopBlurChoice",
+        "themeScaleChoice",
+        "notificationRefreshChoice",
+        "notificationTargetChoice",
+        "notificationActionChoice",
+        "notificationAction2Choice",
+        "notificationAction3Choice",
+        "mirrorAddressDialog",
+        "mihomoLicenseSheet",
+        "adguardLicenseSheet",
+        "lucideLicenseSheet"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NetworkDiagnosticsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt",
+      "methods": [
+        "failedHealthReadHasFreshUnknownStateTimestampAndTraceWithoutClaimingHealth",
+        "laterHealthSuccessKeepsTheEarlierFailureRecord",
+        "failedJournalWriteDoesNotChangeHealthOrWantedIntent",
+        "oldHealthAfterNetworkChangeIsRecordedButCannotOverwriteCurrentObservation",
+        "repairExitFailureIsVisibleAndDoesNotTurnIntoNetworkHealthSuccess",
+        "saturatedJournalQueueDoesNotBlockCallbacksAndReportsDroppedEvidence",
+        "alternateTargetSuccessKeepsFirstFailureAndCannotMaskStructuralFault",
+        "handoverDuringFirstProbeDiscardsResultAndDoesNotRequestSecondTarget",
+        "concurrentDroppedEventsCannotRegressTheSharedCounter",
+        "droppedCounterSaturatesAndDoesNotWrapOrOverwriteNewerPersistedCount",
+        "quotaFailureMakesTraceGapVisibleWithoutChangingNetworkHealthOrWanted"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NetworkRecoveryStressTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt",
+      "methods": [
+        "recreationInvalidatesPersistedHealthAndEgressWithoutChangingWantedOrCoreFlag",
+        "sustainedAbaDnsBlockedAndLateCallbacksKeepOneQueuedRecoveryForLatestEpoch",
+        "manualStopCancelsAlreadyQueuedRecoveryAndProbe",
+        "cancelledTimerRacingWithBlockedNetworkCannotQueueRootWork",
+        "dnsChangeAfterTimerFiredInvalidatesQueuedRecoveryUntilNewDebounce",
+        "newEpochDuringRepairRunsOneFreshAttemptAndRejectsOldExitPublication",
+        "duplicateCallbacksAfterFailureDoNotGenerateContinuousRepairs",
+        "lateHealthAfterBlockedDnsUnblockedCombinationCannotPublishHealthy",
+        "newServiceSessionRejectsOldInstanceCoreAndNetworkResultsEvenWithoutDestroyCallback",
+        "serviceCloseCancelsQueuedRecoveryDespiteRacingTimer",
+        "realTimerPolicyRemovesThousandsOfCancelledTasksImmediately",
+        "persistentRetryIsCoalescedAndCloseDuringAttemptSuppressesReschedule",
+        "wantedCancellationStopsRealServiceUnknownCoreBootRetry"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewHomePanelInteractionTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt",
+      "methods": [
+        "physicalHomePullRunsTheActualRefreshCallback",
+        "accessibleHomeRefreshCannotDuplicateAnInflightRead",
+        "everyPanelTabHasAnAccessibleRefreshAndBusyGuard",
+        "launcherTwoColumnCardsShowTheConfiguredArtwork",
+        "launcherOneColumnCardsKeepTheConfiguredArtwork",
+        "changingTheCoreGroupRemovesStaleConfiguredArtwork",
+        "expandedNodesAreReadableAndLatencyTapDoesNotSelect",
+        "largeFontsUseFullWidthRowsWithoutChangingSavedColumns",
+        "zeroSystemAnimatorScaleDisablesTheActualHomeMotionProvider"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewUiIntegrationTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt",
+      "methods": [
+        "launcherShowsNewHome",
+        "launcherPanelContainsAllSevenTabs",
+        "resourceDetailHidesDockAndReturns",
+        "newHomeFailureUsesLatestOperationState",
+        "subscriptionDeepLinkReachesNewPanel",
+        "newLauncherKeepsToolsAndDiagnostics"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewUiShell83Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt",
+      "methods": [
+        "toolsConfigurationOwnsDockAndBackReturnsToHub",
+        "diagnosticDetailKeepsNetworkJournalAccessible",
+        "settingsHubRetainsAllConceptGroups",
+        "requestedConfigurationRouteOpensOnceAndClearsDock"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelActionSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt",
+      "methods": [
+        "completeGroupResultUsesCoreEndpointWithoutChangingSelection",
+        "partialGroupResultPreservesMissingMeasurementsAndUnknownNodes",
+        "malformedGroupEntriesCannotBecomeTimeouts",
+        "repositoryRejectsMalformedValuesButKeepsExactIntegersAndExplicitTimeout",
+        "malformedWholeResponsePreservesMeasurementsAndClearsBusyFlags",
+        "failedGroupResponsePreservesMeasurementsAndClearsBusyFlags",
+        "disconnectedGroupResponsePreservesMeasurementsAndClearsBusyFlags",
+        "cancelledGroupResponseDoesNotApplyLateMeasurementsAndClearsBusyFlags",
+        "duplicateGroupProbeIsSuppressed",
+        "delayedSelectionWaitsForReadbackAndSurvivesNavigationWithNoDuplicatePut",
+        "rejectedSelectionRetainsActualSelectionAndClearsPending",
+        "unchangedReadbackReportsNonconfirmation",
+        "mismatchedReadbackUsesActualStateAndReportsNonconfirmation",
+        "removedGroupReadbackDoesNotConfirmSelection",
+        "failedReadbackDoesNotConfirmSelectionDespiteSuccessfulConnectionRead",
+        "cancelledSelectionKeepsActualSelectionAndClearsPending",
+        "stoppedStateRejectsStaleSelectionCallback",
+        "selectionCompletionAfterStopDoesNotRestartReadbackOrRestoreRunningState",
+        "removedGroupAndAlreadySelectedNodeDoNotSendNewRequests",
+        "stopDuringReadbackDoesNotRestoreStaleRunningSnapshot",
+        "stopOperationDuringReadbackCannotApplyOrConfirmSelection",
+        "unreadableControllerCannotConfirmUsingCachedSelection",
+        "removedNodeDoesNotSendNewSelectionRequest",
+        "stopDuringRuntimeSampleCannotWriteLateRuntimeOrPersistedRunning",
+        "stopDuringProviderReadCannotWriteLateProvidersOrPersistedRunning",
+        "stopDuringVersionReadCannotWriteLateVersionOrPersistedRunning",
+        "stopDuringHistorySuspensionCannotPersistOldRunningSnapshot",
+        "urlTestGroupProbeNeverCallsTheUnfixingGroupEndpoint",
+        "fallbackGroupProbeNeverCallsTheUnfixingGroupEndpoint",
+        "automaticGroupMalformedNodeResultRetainsItsEarlierMeasurement"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelConceptModelTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelConceptModelTest.kt",
+      "methods": [
+        "subscriptionBadgeShowsRemainingNotUsed",
+        "remainingPercentageStaysWithinBounds",
+        "firstConnectionObservationHasNoInventedRate",
+        "ratesUseActualElapsedTimeAndCounterDeltas",
+        "resetCountersNeverShowNegativeThroughput",
+        "removedAndNewConnectionsDoNotReuseAnotherRate"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelControllerErrorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt",
+      "methods": [
+        "everyTabShowsUnavailableInsteadOfEmptyLiveData",
+        "retryUsesTheRealRefreshCallbackAndShowsItsBusyState",
+        "launcherErrorOpensTheActualApiSettingsSheetWithoutStartingProxy",
+        "largeFontErrorActionsStayAboveTheDockAndRecoveryShowsActualCounts"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt",
+      "methods": [
+        "launcherLowerHalfExpansionRetainsTheTappedGroupPosition",
+        "collapsingAnEarlierLargeGroupKeepsTheClickedHeaderAnchored",
+        "rapidSiblingExpansionsLeaveOnlyTheLatestGroupWithoutAQueuedJump",
+        "lastGroupOnASmallLargeFontScreenStaysVisibleAtItsOriginalOffset"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelLayoutDefaultsTest.kt",
+      "methods": [
+        "missingPreferencesUseReferenceCompactTwoColumnLayout",
+        "explicitStandardLayoutSurvivesReadingAndOtherPresentationEdits"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelModel11Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelModel11Test.kt",
+      "methods": [
+        "hiddenAndGlobalFiltersUseActualMetadataAndMode",
+        "searchingNodeAndProviderFiltersChildrenInsteadOfReturningUnrelatedNodes",
+        "expansionSupportsBothExclusiveAndMultipleGroups",
+        "sortAndProviderGroupingReprojectRealData",
+        "thousandsOfNodesHaveBoundedRowSizeAndUniqueStableKeys",
+        "allLayoutOptionsPersistAndReload",
+        "selectionDoesNotChangeUntilBackendAcknowledges",
+        "failureAndCancellationPreserveSelectionAndClearBusyFlag",
+        "staleBackendAcknowledgementNeverCreatesSuccessCheck",
+        "invalidApiDraftCannotModifyExistingConfiguration",
+        "savedApiHostPortSecretAndDelayUrlAreReadByOriginal146Client",
+        "historyToggleControlsActualLocalCollection"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+      "methods": [
+        "sharedGroupsKeepNodeBusyUntilEveryOwnerCompletes",
+        "lateOlderGroupCannotOverwriteTheNewerSharedNodeResult",
+        "apiChangeOldFinallyCannotClearTheNewSameGroupBusyFlag",
+        "stoppingDropsALateGroupResultAndReleasesBusy",
+        "olderIndividualProbeCannotOverwriteALaterGroupResult",
+        "olderGlobalProbeHoldsBusyButCannotOverwriteALaterGroupResult",
+        "olderProviderReadCannotReplaceTheLatestProviderRead",
+        "stoppingDropsALateProviderRead",
+        "apiChangeDropsOldProvidersAndAcceptsTheNewControllerProviders",
+        "stoppingDropsPullRefreshProvidersAndPersistedSiteResults",
+        "apiChangeDropsAnInFlightRefreshStateAndItsCoreHistory",
+        "externalPidChangeInvalidatesOldGroupAndProtectsANewOwner",
+        "ordinaryPollKeepsAnActiveGroupInTheSamePidSession",
+        "oldSiteCompletionCannotClearOrOverwriteTheNewSessionSiteProbe",
+        "staleSingleProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask",
+        "staleBulkProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyAdblockExportTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt",
+      "methods": [
+        "actualExportSurvivesCacheEvictionDuringRuleLoad",
+        "bothProvidersArePublishedSortedFromOneGeneration",
+        "newerExportNeverOverwritesFilesAlreadyBeingHandedToRoot",
+        "failedSecondProviderKeepsThePreviousIndexAndPair",
+        "unchangedRevisionReusesOnlyAHashVerifiedPair",
+        "missingAllowFileForcesACompleteFreshPair",
+        "corruptOrTraversingIndexCannotAuthorizeAnOutsideFile",
+        "unavailableStableDirectoryFailsWithoutTouchingOldSnapshot"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+      "methods": [
+        "runningRootUsesLocalPolicyListenerEvenWithAnUnrelatedCustomController",
+        "stoppedRootKeepsPhysicalDirectMeasurementDespiteAnOldRunningFlag",
+        "anUnavailableRunningListenerNeverFallsBackToPhysicalDirect",
+        "authenticationAccessAndProxyErrorsAreNotSuccessfulWebsiteLatency",
+        "ordinaryRedirectsRemainOnTheExplicitPolicyProxy",
+        "cancellingEnteredWebsiteRequestsCannotPublishCompletedLatencies",
+        "globalWaveKeepsSuccessfulSiblingsLaterChunksAndOnlyConfirmedFailures",
+        "quickWaveRetainsSuccessWhenAnotherSelectedNodeHasAnApiError",
+        "changingApiCoreConfigurationAndRuntimeCannotReusePreviousProbeMetadata",
+        "anOldSnapshotLoadIsRejectedBeforeItCanPolluteTheNewApiCache",
+        "confirmedNestedSelectionRefreshesProbeMetadataButAFailedPutPreservesItsCache",
+        "singleAndBulkProviderUpdatesRefreshCachedMetadataBeforeTestingNewLeaves",
+        "successfulMutationRejectsCollectedGlobalAndAutomaticGroupResultsWhileAnotherProbeIsPending"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyLatencyRegressionTest.kt",
+      "methods": [
+        "providerHistoriesRestoreFortyOfEightyOneHealthyNodesAndSelectedLatency",
+        "staticGroupWinsOverCollidingProviderName",
+        "urlSpecificHistoryIsReadWhenOrdinaryHistoryIsEmpty",
+        "newestFailureDoesNotReviveEarlierHealthyRecord",
+        "perUrlHistoryHonorsExplicitTargetAndTimestampsAcrossTimezones",
+        "ipv6CapabilityFailureCannotReplaceWorkingOrdinaryLatency",
+        "selectedNestedGroupUsesItsSelectedProviderLeafWithoutLooping",
+        "coreRefreshReplacesStaleLocalTimeoutAndOldSuccessfulReading",
+        "stalePollCannotOverwriteNewerLocalProbeButNextPollCanRefreshIt",
+        "oldCustomUrlHistoryDoesNotPinNewerProviderFallbackReading",
+        "providerDelayUsesProviderEndpointAndEncodesEachSegment",
+        "nativeRepositoryMeasuresHttpAndFileProviderNodesWithoutWrongProxiesEndpoint",
+        "wholeWaveIncludesProviderNodesAndReadsMetadataOnce",
+        "authenticationAndMissingNodeErrorsDoNotBecomeTimeoutOrRetryOtherUrls",
+        "onlyCoreConfirmedTimeoutIsTimeoutAndUnreachableIsFailure",
+        "requestFailureRetainsKnownReadingAndReportsErrorWithoutFalseTimeout"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyNetworkJournalTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt",
+      "methods": [
+        "exceptionMessagesAddressesAndCredentialsNeverEnterRecords",
+        "onlyKnownStructuralFaultCodesAreRecorded",
+        "laterHealthyObservationPreservesFailureAndBothTraceIds",
+        "rotationRetainsOldSegmentsByteForByte",
+        "partialWriteIsRetainedAndNextCompleteRecordRemainsReadable",
+        "restartFindsRetainedSegmentsAndAppendsInsteadOfReplacing",
+        "concurrentAppendsProduceWholeUniqueRecords",
+        "recentViewIsBoundedWithoutDeletingOlderRecords",
+        "causeDepthAndFramesHaveFiniteBounds",
+        "applicationJournalUsesStablePrivateDirectoryAndNeedsNoRoot",
+        "separateTargetsKeepFailedAndSuccessfulResultsLinkedToOneRequest"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyScriptSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt",
+      "methods": [
+        "distinctExistingNamesNeverCollapseIntoTheSameLazyListKey",
+        "actualUnicodeFilesystemIdentityIsPreserved",
+        "repeatedOutputCannotCreateDuplicateComposeKeys",
+        "hooksTraversalAndMalformedSizeAreRejected",
+        "emptyListingIsSupported",
+        "exactLimitIsAccepted",
+        "oversizedStreamStopsAfterAtMostLimitPlusOne",
+        "shortReadsAreNotMistakenForEndOfStream",
+        "zeroByteProviderReadCannotSpinForever",
+        "specialFilenameIsExecutedAsOneFileAndCannotInjectLogCommands",
+        "emptyScriptIsStillSupported"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",
+      "methods": [
+        "addWithoutTemplateWritesHttpAndUpdatesBothGroupListStyles",
+        "addWithRealHttpTemplateKeepsHeadersHealthCheckAndIntervalInheritance",
+        "deleteRemovesAllFlowAndBlockReferencesAndRetainsOtherUse",
+        "deletingOnlyUseValueKeepsAnEmptySequenceInBothStyles",
+        "quotedCommaHashAndEscapedProviderNamesAreNotSplitOrUnquotedIncorrectly",
+        "addingQuotedNameRetainsOriginalCrLfEmojiAndUnrelatedSourceBytes",
+        "flowUseCommentsAndTrailingCommasSurviveDeletion",
+        "sharedOrInheritedGroupUsesFailWithoutChangingAnySourceBytes",
+        "deletingAnAnchorStillUsedElsewhereFailsAndKeepsOriginalFile",
+        "unsupportedContainersInvalidTemplatesAndDuplicateFieldsKeepOriginalFiles",
+        "updatingAQuotedFlowUrlPreservesCommentsAndRejectsProviderAliases",
+        "aLastSubscriptionCannotBeDeletedAndNewCachePathsDoNotCollide"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootAutostartTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt",
+      "methods": [
+        "planPreservesThirtyArgumentsAndNeverExecutesTheirText",
+        "cacheResetDoesNotMutateNormalStartArguments",
+        "partialPlanIsRejected",
+        "failedRootRemovalNeverClaimsTheSettingIsOff",
+        "confirmedRemovalTurnsOffBothAutostartAndInstalledState"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
+      "methods": [
+        "officialDefaultsAndExplicitEmptyRangesAreDistinct",
+        "mergePriorityAliasesAndExplicitFieldsUseTheReadOnlyNodeGraph",
+        "disabledDnsMissingEnableAndOtherEnhancedModesReturnNoProtection",
+        "allUnsupportedModesAndOtherCoresAvoidParsingUnrelatedConfigs",
+        "globalDnsAndProfileIpv6FlagsControlOnlyTheIpv6Protection",
+        "numericCidrBoundariesAndIpv4EmbeddedIpv6AreAccepted",
+        "invalidIpv4AddressesPrefixesAndShellTokensAreRejectedWithoutLookup",
+        "invalidIpv6CompressionScopesGroupsAndFamilyAreRejected",
+        "malformedYamlShapesAndBooleansExposeOnlyConstantFailures",
+        "ipv4DefaultBypassSubtractsTheActualMaskedFakeRangeOnly",
+        "ipv6BypassSubtractionIsFiniteExactAndDoesNotBroadenPrivateRouting",
+        "fullFamilyRangesRemoveAllDefaultsWhileUserBypassesRemainOutsideThisModel",
+        "privateStartupCleansForgedOwnedCommentsAndAppendsOneSemanticNeutralTail"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootHealthUpgradeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt",
+      "methods": [
+        "readOnlyInspectorDoesNotInvalidateObservationPublication",
+        "reachableEgressAndOldRunningStatusCannotMaskABrokenDnsListener",
+        "failedInspectorDoesNotFallBackToAnOldHealthyResult",
+        "refusedRepairPreservesDeploymentAndAutostartState",
+        "metadataRepairDoesNotClaimRuntimeUpgradeOrHideSubsequentFaults",
+        "unauthorizedRepairCannotDeployAnInspectorOrChangeSessionPreferences",
+        "supersededRecoveryCannotRunRootCommandsOrChangeDeployment"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootNetworkRecoveryTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt",
+      "methods": [
+        "waitsForCallbackLinksButDoesNotRequireOsValidation",
+        "blockedAndUnblockedInvalidateInFlightResults",
+        "captivePortalWaitsThenUnvalidatedNetworkCanRecover",
+        "sameNetworkIdAfterAtoBtoARejectsOldPublication",
+        "lateOldLossCapabilitiesLinksAndBlockedCannotClearCurrentNetwork",
+        "sameNetworkDnsChangeInvalidatesReachabilityAndPendingResult",
+        "duplicateCallbacksDoNotInvalidateCurrentResult",
+        "missingInterfaceAndLossWaitWithoutInventingReachability",
+        "manualStopIntentRejectsCurrentObservation",
+        "interveningControlTransactionRejectsCurrentNetworkObservation",
+        "destroyedServiceCannotPublishOrAcceptFurtherCallbacks",
+        "vpnCapabilitiesCannotTriggerRootRecovery",
+        "validationChangeOnSameNetworkInvalidatesPreviousObservation"
+      ]
+    },
+    "io.github.xgl34222220.hetu.Runtime146ContractTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt",
+      "methods": [
+        "matchingAppliedSnapshotDoesNotAskForRepeatedRestart",
+        "preferenceChangedDuringApplyRemainsPending",
+        "failedApplyNeverAcknowledgesTheNewConfiguration",
+        "uiVersionBumpDoesNotRequestRuntimeRedeployment",
+        "renamedLatencyTargetsKeepTheirSlotsAndActualMeasurements",
+        "officialCoreAssetsMatchTheUser146Apk"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RuntimeStartup15Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeStartup15Test.java",
+      "methods": [
+        "actualStartupGeneratorAcceptsEightyEightMergedTlsNodes",
+        "allAvailableNonEbpfRuntimeModesStillGenerate",
+        "manyProviderAndPolicyTemplatesDoNotTriggerATlsRewrite",
+        "ruleModeWithSpacesSurvivesTheFullGeneratorAndManyAliases",
+        "blacklistSanitizationRemainsIntactWithManyAliases",
+        "inlinePayloadsPreserveExplicitFingerprintsAndUnicode",
+        "sharedNodeAliasesAreEditedOnlyOnce",
+        "flowTrailingCommaStillProducesValidPrivateYaml",
+        "diagnosticSummaryWorksWithTheTemplateHeavyDocument",
+        "summaryReportsSafeReasonAndLocationRatherThanBlamingGenericYaml",
+        "invalidSourcesDoNotBypassMigrationToReachRuntimeGeneration",
+        "privateCopyGenerationNeverOverwritesTheSourceFile",
+        "existingInlineRulesRefusalIsNotBypassedByTheParserHotfix"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RuntimeYaml15Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeYaml15Test.java",
+      "methods": [
+        "originalUi14FiftyAliasGateRejectsOrdinaryEightyEightTemplates",
+        "eightyEightTemplatesAreAcceptedWithoutExpansion",
+        "collectionAliasBudgetHasAFiniteBoundary",
+        "codePointBudgetIsRetained",
+        "nestingBudgetIsRetained",
+        "syntaxErrorsReportLocationWithoutCredentialsOrCause",
+        "nonMappingAndEmptyRootsAreExplicitlyRejected",
+        "multipleDocumentsAreNotSilentlyTruncated",
+        "untrustedObjectTagsAreNotConstructed",
+        "explicitValueAndMergeSequencePriorityArePreserved",
+        "recursiveMergeTraversalIsFinite",
+        "longAliasChainDoesNotUseRecursiveJavaCalls",
+        "repeatedAliasDagStaysASmallGraph",
+        "sourceTextAndEmojiMarksRemainUnchanged"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsBackupParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsBackupParity57Test.kt",
+      "methods": [
+        "conflictsKeepOriginalAndSelectRestoredCopy",
+        "identicalFileIsReusedWithoutExtraCopy",
+        "backupWithoutSelectedKeyKeepsExistingSelection"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsConceptParityTest.kt",
+      "methods": [
+        "invalidMirrorKeepsDialogOpenAndDoesNotSave",
+        "cancelMirrorDoesNotWriteDraft",
+        "disabledResourceInputCannotChangeAndSwitchRowHasOneCallback",
+        "settingsSwitchExposesOneLabeledControlAndRealCheckedState",
+        "disabledSettingsSwitchRetainsStateAndCannotInvokeCallback",
+        "themeTilesExposeExclusiveSelectionAndChangeActualValue",
+        "accentSwatchesHaveAccessibleNamesAnd48DpTargets",
+        "mirrorPrefixRejectsMalformedHostsAndCredentialOrControlContent"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsPickerParity58Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsPickerParity58Test.kt",
+      "methods": [
+        "rootSettingsChoiceWidthsStayCompact",
+        "composeChoiceMenusDimThePageByDefault"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ToastFeedbackTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt",
+      "methods": [
+        "actualControllerHttpExceptionsAreErrorsForClientAndServerResponses",
+        "httpErrorContextDoesNotMistakeSuccessfulCountsOrResponseNumbersForErrors",
+        "englishAuthenticationAndTransportErrorsDoNotClaimSuccess",
+        "genuineSuccessWarningsAndUnknownNoticesKeepDistinctMeanings",
+        "realToastHostPreservesThe401BodyAndRendersAnErrorInsteadOfAGreenCheck",
+        "realToastHostKeepsSuccessfulCountMessagesAndTheirGreenCheck"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ToolsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToolsConceptParityTest.kt",
+      "methods": [
+        "configurationLinksRequireAnActualHttpHost",
+        "bareHostsAndSchemePrefixesRemainInlineValidationErrors",
+        "linksCannotContainLineBreaksOrExceedTheRepositoryLimit"
+      ]
+    },
+    "io.github.xgl34222220.hetu.UI83EditorHistoryTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83EditorHistoryTest.kt",
+      "methods": [
+        "typingAndBackspacesKeepTheirExistingCoalescing",
+        "caretMovementSeparatesTypingUndoGroups",
+        "accessoryUndoRestoresSelectionWithoutImeComposition",
+        "resetReleasesBothHistoriesAndKeepsTheRequestedBuffer",
+        "smallEditsRetainExactlyTheLatestTwoHundredUndoSteps",
+        "byteBudgetEvictsOldestLargeStepsButKeepsImmediateUndoAndRedo",
+        "currentBufferIsPreservedOutsideTheSnapshotBudget",
+        "undoTransfersAccountForLargerCurrentTextAndEvictOldestAcrossBothStacks",
+        "newEditReleasesObsoleteRedoBeforeItReservesUndoSpace",
+        "accessoryEditAlsoReleasesRedoBeforeEvictingUsefulUndo",
+        "oversizedCurrentCanBeUndoneWithoutRetainingAnOversizedRedoSnapshot",
+        "supplementaryCharactersUseTheirUtf16CharCountForTheBudget"
+      ]
+    },
+    "io.github.xgl34222220.hetu.UI83ToolsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83ToolsTest.kt",
+      "methods": [
+        "unknownTrafficModeNeverClaimsProtectionOrOldHits",
+        "missingStartupOrLiveProviderKeepsProtectionUnverified",
+        "confirmedRuleChainShowsItsActualSessionHits",
+        "confirmedGlobalModeHasAWarningEvenWhenProviderExists",
+        "malformedHttpHostsStayInlineErrors",
+        "cidrValidationRejectsOutOfRangeAddressesAndMasks",
+        "switchingScopesParksLatestListFromTheExistingSettingsScreen",
+        "validationCannotOverwriteAChangedSelectionOrExternalSource"
+      ]
+    },
+    "io.github.xgl34222220.hetu.WanDetails61Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/WanDetails61Test.kt",
+      "methods": [
+        "optionalMetadataUsesOnlyActualResponse",
+        "missingFieldsRemainUnknownNotFakeCoordinates",
+        "actualZeroCoordinatesAreValidAndOutOfRangeIsNot",
+        "failedOrAddresslessResponseIsRejected"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDiagIntakeTest.kt",
+      "methods": [
+        "lateStartupSuccessCannotReplaceAReopenedPendingRequest",
+        "lateReportFailureCannotReplaceAReopenedPendingRequest",
+        "dismissedSheetsDoNotReturnWhenTheirReadsSucceedOrFail"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDnsConsentIntakeTest.kt",
+      "methods": [
+        "deniedConsentPreservesExistingFallbackModeAndAutostart",
+        "grantedConsentCommitsAfterReturnAndStartsExistingVpnExactlyOnce",
+        "explicitOffCancelsPendingEnableAndLateConsentCannotUndoOff",
+        "cancelledRequestCannotAuthorizeTheNextPageRequest",
+        "runningRootPreservesOnOffIntentAndNeverLaunchesOrStartsDnsVpn"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt",
+      "methods": [
+        "page01",
+        "page02",
+        "page03",
+        "page04",
+        "page05",
+        "page06",
+        "page07",
+        "page08",
+        "page09",
+        "page10",
+        "page11",
+        "page12",
+        "page13",
+        "page14",
+        "page15",
+        "page16",
+        "page17",
+        "page18",
+        "page19",
+        "page20",
+        "page21",
+        "page22",
+        "page23",
+        "page24",
+        "page25",
+        "page26",
+        "page27",
+        "page28",
+        "page29",
+        "page30",
+        "page31",
+        "page32",
+        "page33",
+        "page34",
+        "page35",
+        "page36",
+        "page37",
+        "page38",
+        "page39",
+        "page40",
+        "page41",
+        "page42",
+        "page43",
+        "page44",
+        "page45",
+        "page46",
+        "page47",
+        "page48",
+        "page49"
+      ]
+    }
+  },
+  "finalUnitTestMethods": {
+    "io.github.xgl34222220.hetu.AdblockSnifferTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockSnifferTest.java",
+      "methods": [
+        "adblockAddsSnifferWhenSourceHasNone",
+        "userSnifferIsRespected",
+        "noSnifferWithoutAdblock",
+        "topLevelKeyDetectionIgnoresNestedKeys"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AppCrashReportTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AppCrashReportTest.java",
+      "methods": [
+        "capturesSourceLocationAndCauseWithoutMessageSecrets",
+        "overwritesPreviousCrashAndBoundsStoredSize",
+        "recordingFailureStillDelegatesToAndroidCrashHandler"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationConceptParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationConceptParity57Test.kt",
+      "methods": [
+        "homeConceptStatesHaveProductionControls",
+        "panelConceptMenusHaveProductionControls",
+        "stoppedPanelAndRuntimeStatesAreExplicit",
+        "pdfStateCatalogMatchesAllFiveReferenceBooks"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationSettingsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationSettingsConceptParityTest.kt",
+      "methods": [
+        "basicProxyPickersCoverConceptOptions",
+        "themeAndDefaultPanelPickersCoverConceptOptions",
+        "notificationPickersCoverConceptOptions",
+        "advancedDnsPickerMatchesConcept",
+        "restoreAndMirrorValidationMatchConcept",
+        "licensesAndMockupBoundaryMatchConcept"
+      ]
+    },
+    "io.github.xgl34222220.hetu.AutomationToolsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/AutomationToolsConceptParityTest.kt",
+      "methods": [
+        "toolLandingAndConfigStatesAreReachable",
+        "appCoreAndNetworkToolsCoverConceptStates",
+        "adblockConceptStatesHaveProductionControls",
+        "logAndScriptConceptStatesHaveProductionControls",
+        "fileWorkbenchConceptStatesHaveProductionControls",
+        "networkWebPanelAndSubStoreStatesHaveProductionControls"
+      ]
+    },
+    "io.github.xgl34222220.hetu.BootStartup60Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootStartup60Test.java",
+      "methods": [
+        "optedInWantedBootSchedulesRootRestoreAndClearsOldSuccess",
+        "unlockAlsoSchedulesWantedRestore",
+        "explicitStopIsNeverUndoneByAutostart",
+        "installedNativeBootRequestsConfirmationWithoutRevokingExplicitStop",
+        "noOptInNeverStarts",
+        "upgradePreservesWantedSessionWithoutRestart"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt",
+      "methods": [
+        "offlineHomeResourcesRemainReachableAndBackReturnsHome",
+        "resourceChartsRetainMissingSampleGaps",
+        "ipDetailsProvideDistinctPublicAndLanPages",
+        "compactSwitchRetainsToggleSemantics",
+        "directTargetsScreenUsesSharedPageAndValidatesDuplicates",
+        "activeDockTabDispatchesReselectWithoutChangingDestination"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptRemainingCoverageTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt",
+      "methods": [
+        "shadowFailsClosedWithoutRunningShell",
+        "configMenusAndCancelledDestructiveDialogs",
+        "narrowConfigLongNameKeepsMenuAndCancelReachable",
+        "existingSubscriptionInvalidDraftAndCancel",
+        "yamlEditorOutlineAndDraftDiscard",
+        "yamlSelectionConflictPreservesDraft",
+        "yamlExternalFileConflictPreservesDraft",
+        "yamlReadAndValidationFailures",
+        "runtimeEditorNativeViewMenusJumpSearchAndDiscard",
+        "fileManagerMenusFormsValidationAndCancellations",
+        "realScriptsActivityReadFixturesAndCancelledDialogs",
+        "existingScriptNamesCannotCrashTheActualPageWithDuplicateKeys",
+        "rootReadFailureShowsActualErrorDetailsInsteadOfSuccess",
+        "logFilesSelectionSearchAndCancelledClear",
+        "startupConfigReadAndRecoveryCancel",
+        "basicProxyActualNativeActivityAndMenus",
+        "toolsAndSettingsCollapsedHeaders",
+        "appListModesSortMenuAndSearch",
+        "panelLogReadSearchAndExpand",
+        "adblockRulesHelpAndDomainDrafts",
+        "adblockRuntimeSnapshotWhitelistCancelAndGlobalWarning",
+        "subStoreControlledProbeStates",
+        "realWebViewNativeContainerBoundaries",
+        "failedBootSetupUpdatesBannerWithoutLeavingSettingsPage",
+        "restoreFileResultRequiresConfirmationAndCancelPreservesSettings",
+        "coreDownloadProgressIsOnlyAnInMemoryCallbackFixture"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ConceptStateCoverageTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt",
+      "methods": [
+        "homeStoppedState",
+        "homeWanAndLanDetailsKeepRealFixtureValues",
+        "resourceChartsKeepMissingSamplesAsGaps",
+        "resourceChartsWaitingStateDoesNotInventZero",
+        "homeLifecycleAndSourceSelection",
+        "homeStartAndFailure",
+        "strategyExpansionSearchAndNodeInfo",
+        "strategySearchKeepsActualGroupCountsAndCurrentNode",
+        "strategyMultiTermSearchKeepsMatchingNodeRows",
+        "strategyFilterAndApiDraft",
+        "settingsNestedPagesAndMirrorValidation",
+        "themeMenusAndScroll",
+        "notificationMenusAreDraftsAndBackDiscards",
+        "toolsSearchAndConfigImportValidation",
+        "subscriptionFormRequiredFieldsAndDiscard",
+        "panelConnectionsMenusDetailsAndCancel",
+        "panelRulesProvidersAndTaskStatuses",
+        "panelOverviewRankingMenus",
+        "directTargetsRejectDuplicateAndSaveValidDraft",
+        "bypassDraftAndDiscard",
+        "networkMatchMenusKeepAutomationDisabled",
+        "bundledLicenseSheets",
+        "actualAdvancedSettingsActivityAndDnsDialog",
+        "corePickerKeepsRuntimeSelectionAndThreeCards",
+        "webPanelCreateEditCancelDeleteAndMode"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ContinuityForeground90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt",
+      "methods": [
+        "explicitStopWithNoAutomationNeverRequestsAService",
+        "wantedRuntimeReattachesExistingGuardWithoutChangingCoreOrConfigurationIntent",
+        "automationOnlyReattachesButDoesNotInventWantedOrManualOwnership",
+        "repeatedForegroundRequestsUseTheSameExistingServiceComponentAndPreserveIntent",
+        "minimumSupportedApiUsesTheExistingForegroundServiceIntent",
+        "failedAttachmentIsRecordedWithoutAFalseAcknowledgementOrSecretDetails",
+        "retryClearsTheActiveErrorOnlyAfterTheRequestIsAccepted",
+        "stopBetweenRequestAndDeliveryIsRecheckedByTheRealServiceWithoutRootWork"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ControllerAuthenticationTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerAuthenticationTest.kt",
+      "methods": [
+        "defaultControllerUsesOnlyItsLocalCredential",
+        "customControllerUsesOnlyTheUserCustomCredential",
+        "savingCustomModeCannotForwardAnInflightLocalCredentialToIt",
+        "savingLocalModeCannotMixItWithInflightCustomCredentials",
+        "local401KeepsItsTypedCodeAndSuppressesCredentialBearingBody",
+        "custom401UsesCapturedModeEvenWhenSettingsChangeBeforeTheReply",
+        "groupDelayDoesNotRetryOtherProbeUrlsAfter401",
+        "readinessStopsAt401WithoutRotatingCredentialsOrRetrying",
+        "utf8CredentialBytesReachTheWireUnchangedInBothModes",
+        "invalidCredentialNewlinesAreRejectedBeforeOpeningASocket",
+        "missingLocalCredentialCannotFallBackToTheCustomCredential"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ControllerReadStateTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt",
+      "methods": [
+        "unauthorizedFirstReadIsExplicitWithoutChangingHealthyRoot",
+        "successfulGroupsThenUnauthorizedConnectionsCannotPublishPartialSnapshot",
+        "otherHttpFailuresAlsoReportMissingControllerData",
+        "malformedSuccessfulHttpResponseIsAReadFailure",
+        "failedPollKeepsConfirmedDataRatesTrendsAndHistoryUntilCompleteRecovery",
+        "cancellationDuringControllerReadPropagatesWithoutPublishingState"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ControllerRunState90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt",
+      "methods": [
+        "confirmedStoppedSupersedesTheCachedRunningHintAndSkipsControllerReads",
+        "confirmedRunningSupersedesAStoppedHintAndReadsTheController",
+        "missingRunningFieldRetainsOnlyTheHintAndDoesNotClaimDataPlaneHealth",
+        "failedRootObservationRetainsTheHintButRejectsOldHealthyCache",
+        "missingRunningWithoutARunningHintRemainsStopped"
+      ]
+    },
+    "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreManagerConcept57Test.kt",
+      "methods": [
+        "defaultSurfaceHasExactlyThreeReferenceCardsInReferenceOrder",
+        "variantSelectionChangesManagementTargetWithoutMutatingSourceCatalog",
+        "independentCoresAreAvailableButNeverNamedFamilyVariants",
+        "invalidOrRemovedPreferenceFallsBackToFamilyWithoutNewCore"
+      ]
+    },
+    "io.github.xgl34222220.hetu.CustomPaletteCompatibilityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CustomPaletteCompatibilityTest.kt",
+      "methods": [
+        "customizedAccentGeneratesEverySupportedPaletteInBothAppearances",
+        "defaultAccentSupportsNondefaultPalettesAndReturnsToBaseTheme",
+        "systemMonetKeepsItsPriorityOverSavedSeedAndPalette",
+        "customizedSeedsSurviveDisposalAndFreshThemeComposition",
+        "monetCanBeRestoredAfterCustomizedDarkPaletteRecomposition"
+      ]
+    },
+    "io.github.xgl34222220.hetu.DnsTakeoverProbe90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt",
+      "methods": [
+        "onlyAnAnswerInTheRunningFakeRangeEstablishesCapture",
+        "malformedRangesAndAddressesCannotEstablishCapture",
+        "aRealAddressMayBeAFilteredAnswerAndIsInconclusive",
+        "ipv6OnlyAndEmptyAnswersRemainInconclusive",
+        "aFakeAnswerAfterARealOrIpv6AnswerIsStillRecognized",
+        "nxdomainAndResolverFailureDoNotClaimDirectDnsOrPollution",
+        "missingFakeRangeSkipsLookupEntirely",
+        "probeNamesUseReservedInvalidNamespaceAndAreUnique",
+        "timedOutResolversCannotAccumulateUnboundedWorkers",
+        "interruptedCallerPreservesInterruptionAndDoesNotClaimCapture"
+      ]
+    },
+    "io.github.xgl34222220.hetu.DocumentPickerSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/DocumentPickerSafetyTest.kt",
+      "methods": [
+        "absentOemPickerReturnsVisibleError",
+        "disabledDocumentProviderDoesNotCrashClick",
+        "successfulPickerStillLaunchesExactlyOnce",
+        "programmingErrorsAreNotSwallowed"
+      ]
+    },
+    "io.github.xgl34222220.hetu.GlassMaterial90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt",
+      "methods": [
+        "actualFourLauncherTabsKeepTheirDockInLightAppearance",
+        "actualFourLauncherTabsKeepTheirDockInDarkAppearance",
+        "pureBlackCanvasStaysBlackAndMaterialDoesNotAnimateWithMotionOff",
+        "raisedDialogKeepsCancelAndBusyRepeatedClickGuards",
+        "compactLargeTextKeepsTheMaterialAndItsActionsReachable",
+        "faintMetadataRemainsReadableInBothAppearancesAndEveryAccent",
+        "runningCoreWithController401ShowsUnconfirmedConnectionsAndKeepsStopAction",
+        "localTakeoverChecksNeverBecomeAnInternetHealthClaim"
+      ]
+    },
+    "io.github.xgl34222220.hetu.GoogleConnectionEvidenceTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/GoogleConnectionEvidenceTest.java",
+      "methods": [
+        "authenticationAndPlayDomainsAreIncluded",
+        "googleMetadataIsCaseInsensitiveAndAcceptsDnsRootDot",
+        "suffixLookalikesDoNotConsumeReservedGoogleQuota",
+        "googleSystemProcessesMatchEvenWhenHostIsMissing",
+        "processLookalikesDoNotMatch",
+        "resolvedUidCanMatchIpOnlyConnection",
+        "unknownUidNeverProvesGoogleOwnership",
+        "transportEvidenceExplicitlyDoesNotClaimAuthentication"
+      ]
+    },
+    "io.github.xgl34222220.hetu.JournalReliabilityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/JournalReliabilityTest.kt",
+      "methods": [
+        "continuousFaultsStopAtHardBudgetAndPreserveEveryRetainedByte",
+        "oversizedLegacyHistoryCannotGrowAndIsNeverDeleted",
+        "reconstructionKeepsPersistentPauseAndHistoryAtSameBudget",
+        "interleavedInstancesCannotAppendBackIntoCompletedOlderSegment",
+        "copiedLegacyRecordsDropUnknownConfigurationAndCredentialFields",
+        "syntheticStackSymbolsCannotSmuggleAddressesOrNewlinesIntoCapture",
+        "actualCopyHelperPreservesTraceAndBoundaryStatusWithoutCopyingPoisonedMetadata",
+        "configuredSecretIsRedactedFromFieldsAndCurrentTracePointers",
+        "shortSecretExpansionStillProducesWholeRecordsWithinViewBudget",
+        "currentReportRejectsUntrustedStateStringsAndInvalidTraceIds",
+        "healthFaultSizeCannotBypassEventLimitOrDiscloseArbitraryChainNames",
+        "discardedCauseFrameAndFaultDetailsHaveExplicitTruncationFlags",
+        "invalidCanonicalUuidIsSkippedAndCannotAppearAsCorrelatedEvidence",
+        "oversizedRecentRowsAreOmittedWholeAndLatestCompleteTraceIsRetained",
+        "utf8TailWindowAndPoisonedPaddingCannotLeakOrSplitCopiedRecords",
+        "concurrentWriteAcknowledgementsFollowPhysicalRecordOrder",
+        "oversizedDirectEventIsRejectedBeforeAnyHistoricalWrite",
+        "kotlinMangledLocationsFromReportedCrashRemainTraceableThroughCaptureAndCopy",
+        "constructorAndClassInitializerLocationsSurviveCaptureAndLegacyRead",
+        "expandingLegalMethodFormsStillRejectsPoisonedOrOverlongSymbols",
+        "mangledMethodSuffixMatchingConfiguredSecretIsStillRedacted"
+      ]
+    },
+    "io.github.xgl34222220.hetu.LargeTitleParity59Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt",
+      "methods": [
+        "rootToolsAndSettingsUseTheSharedLargeTitle"
+      ]
+    },
+    "io.github.xgl34222220.hetu.LegacyControllerCredentialTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/LegacyControllerCredentialTest.kt",
+      "methods": [
+        "oldMigrationCannotReplaceAnExistingLocalControllerSecret",
+        "missingLocalIdentityIsNotImportedFromAnUnrelatedInstallation",
+        "customApiAndOriginalConfigImportKeepTheirExistingMigrationBehavior"
+      ]
+    },
+    "io.github.xgl34222220.hetu.MainLanguageBindingTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/MainLanguageBindingTest.kt",
+      "methods": [
+        "chooserUpdatesMainNavigationAndSurvivesActivityRecreation",
+        "systemLocaleChangesAndBlankPreferenceFallBackToConfiguration",
+        "userNamesInputsAndDiagnosticsStayVerbatimEvenWhenTheyMatchVocabulary",
+        "vocabularySupportsAllFourLanguagesWithoutTranslatingUnknownText"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NativeConceptScreenshotTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NativeConceptScreenshotTest.kt",
+      "methods": [
+        "homeOffline",
+        "toolsOffline",
+        "settingsOffline",
+        "publicIpOffline",
+        "diagnosticsOffline",
+        "sharedNetworkOffline",
+        "cnipOffline",
+        "networkMatchOffline",
+        "coresOffline",
+        "configsOffline",
+        "themeOffline",
+        "notificationsOffline",
+        "aboutOffline",
+        "panelOverviewOffline",
+        "panelStopped",
+        "webPanelsOffline",
+        "subStoreOffline",
+        "defaultPanelChoice",
+        "themeLanguageChoice",
+        "themeTopBlurChoice",
+        "themeScaleChoice",
+        "notificationRefreshChoice",
+        "notificationTargetChoice",
+        "notificationActionChoice",
+        "notificationAction2Choice",
+        "notificationAction3Choice",
+        "mirrorAddressDialog",
+        "mihomoLicenseSheet",
+        "adguardLicenseSheet",
+        "lucideLicenseSheet"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NetworkDiagnosticsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkDiagnosticsTest.kt",
+      "methods": [
+        "failedHealthReadHasFreshUnknownStateTimestampAndTraceWithoutClaimingHealth",
+        "laterHealthSuccessKeepsTheEarlierFailureRecord",
+        "failedJournalWriteDoesNotChangeHealthOrWantedIntent",
+        "oldHealthAfterNetworkChangeIsRecordedButCannotOverwriteCurrentObservation",
+        "repairExitFailureIsVisibleAndDoesNotTurnIntoNetworkHealthSuccess",
+        "saturatedJournalQueueDoesNotBlockCallbacksAndReportsDroppedEvidence",
+        "alternateTargetSuccessKeepsFirstFailureAndCannotMaskStructuralFault",
+        "handoverDuringFirstProbeDiscardsResultAndDoesNotRequestSecondTarget",
+        "concurrentDroppedEventsCannotRegressTheSharedCounter",
+        "droppedCounterSaturatesAndDoesNotWrapOrOverwriteNewerPersistedCount",
+        "quotaFailureMakesTraceGapVisibleWithoutChangingNetworkHealthOrWanted"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NetworkRecoveryStressTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkRecoveryStressTest.kt",
+      "methods": [
+        "recreationInvalidatesPersistedHealthAndEgressWithoutChangingWantedOrCoreFlag",
+        "sustainedAbaDnsBlockedAndLateCallbacksKeepOneQueuedRecoveryForLatestEpoch",
+        "manualStopCancelsAlreadyQueuedRecoveryAndProbe",
+        "cancelledTimerRacingWithBlockedNetworkCannotQueueRootWork",
+        "dnsChangeAfterTimerFiredInvalidatesQueuedRecoveryUntilNewDebounce",
+        "newEpochDuringRepairRunsOneFreshAttemptAndRejectsOldExitPublication",
+        "duplicateCallbacksAfterFailureDoNotGenerateContinuousRepairs",
+        "lateHealthAfterBlockedDnsUnblockedCombinationCannotPublishHealthy",
+        "newServiceSessionRejectsOldInstanceCoreAndNetworkResultsEvenWithoutDestroyCallback",
+        "serviceCloseCancelsQueuedRecoveryDespiteRacingTimer",
+        "realTimerPolicyRemovesThousandsOfCancelledTasksImmediately",
+        "persistentRetryIsCoalescedAndCloseDuringAttemptSuppressesReschedule",
+        "wantedCancellationStopsRealServiceUnknownCoreBootRetry"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewHomePanelInteractionTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt",
+      "methods": [
+        "physicalHomePullRunsTheActualRefreshCallback",
+        "accessibleHomeRefreshCannotDuplicateAnInflightRead",
+        "everyPanelTabHasAnAccessibleRefreshAndBusyGuard",
+        "launcherTwoColumnCardsShowTheConfiguredArtwork",
+        "launcherOneColumnCardsKeepTheConfiguredArtwork",
+        "changingTheCoreGroupRemovesStaleConfiguredArtwork",
+        "expandedNodesAreReadableAndLatencyTapDoesNotSelect",
+        "largeFontsUseFullWidthRowsWithoutChangingSavedColumns",
+        "zeroSystemAnimatorScaleDisablesTheActualHomeMotionProvider"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewUiIntegrationTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiIntegrationTest.kt",
+      "methods": [
+        "launcherShowsNewHome",
+        "launcherPanelContainsAllSevenTabs",
+        "resourceDetailHidesDockAndReturns",
+        "newHomeFailureUsesLatestOperationState",
+        "subscriptionDeepLinkReachesNewPanel",
+        "newLauncherKeepsToolsAndDiagnostics"
+      ]
+    },
+    "io.github.xgl34222220.hetu.NewUiShell83Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewUiShell83Test.kt",
+      "methods": [
+        "toolsConfigurationOwnsDockAndBackReturnsToHub",
+        "diagnosticDetailKeepsNetworkJournalAccessible",
+        "settingsHubRetainsAllConceptGroups",
+        "requestedConfigurationRouteOpensOnceAndClearsDock"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelActionSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt",
+      "methods": [
+        "completeGroupResultUsesCoreEndpointWithoutChangingSelection",
+        "partialGroupResultPreservesMissingMeasurementsAndUnknownNodes",
+        "malformedGroupEntriesCannotBecomeTimeouts",
+        "repositoryRejectsMalformedValuesButKeepsExactIntegersAndExplicitTimeout",
+        "malformedWholeResponsePreservesMeasurementsAndClearsBusyFlags",
+        "failedGroupResponsePreservesMeasurementsAndClearsBusyFlags",
+        "disconnectedGroupResponsePreservesMeasurementsAndClearsBusyFlags",
+        "cancelledGroupResponseDoesNotApplyLateMeasurementsAndClearsBusyFlags",
+        "duplicateGroupProbeIsSuppressed",
+        "delayedSelectionWaitsForReadbackAndSurvivesNavigationWithNoDuplicatePut",
+        "rejectedSelectionRetainsActualSelectionAndClearsPending",
+        "unchangedReadbackReportsNonconfirmation",
+        "mismatchedReadbackUsesActualStateAndReportsNonconfirmation",
+        "removedGroupReadbackDoesNotConfirmSelection",
+        "failedReadbackDoesNotConfirmSelectionDespiteSuccessfulConnectionRead",
+        "cancelledSelectionKeepsActualSelectionAndClearsPending",
+        "stoppedStateRejectsStaleSelectionCallback",
+        "selectionCompletionAfterStopDoesNotRestartReadbackOrRestoreRunningState",
+        "removedGroupAndAlreadySelectedNodeDoNotSendNewRequests",
+        "stopDuringReadbackDoesNotRestoreStaleRunningSnapshot",
+        "stopOperationDuringReadbackCannotApplyOrConfirmSelection",
+        "unreadableControllerCannotConfirmUsingCachedSelection",
+        "removedNodeDoesNotSendNewSelectionRequest",
+        "stopDuringRuntimeSampleCannotWriteLateRuntimeOrPersistedRunning",
+        "stopDuringProviderReadCannotWriteLateProvidersOrPersistedRunning",
+        "stopDuringVersionReadCannotWriteLateVersionOrPersistedRunning",
+        "stopDuringHistorySuspensionCannotPersistOldRunningSnapshot",
+        "urlTestGroupProbeNeverCallsTheUnfixingGroupEndpoint",
+        "fallbackGroupProbeNeverCallsTheUnfixingGroupEndpoint",
+        "automaticGroupMalformedNodeResultRetainsItsEarlierMeasurement"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelConceptModelTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelConceptModelTest.kt",
+      "methods": [
+        "subscriptionBadgeShowsRemainingNotUsed",
+        "remainingPercentageStaysWithinBounds",
+        "firstConnectionObservationHasNoInventedRate",
+        "ratesUseActualElapsedTimeAndCounterDeltas",
+        "resetCountersNeverShowNegativeThroughput",
+        "removedAndNewConnectionsDoNotReuseAnotherRate"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelControllerErrorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelControllerErrorTest.kt",
+      "methods": [
+        "everyTabShowsUnavailableInsteadOfEmptyLiveData",
+        "retryUsesTheRealRefreshCallbackAndShowsItsBusyState",
+        "launcherErrorOpensTheActualApiSettingsSheetWithoutStartingProxy",
+        "largeFontErrorActionsStayAboveTheDockAndRecoveryShowsActualCounts"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelExpansionAnchorTest.kt",
+      "methods": [
+        "launcherLowerHalfExpansionRetainsTheTappedGroupPosition",
+        "collapsingAnEarlierLargeGroupKeepsTheClickedHeaderAnchored",
+        "rapidSiblingExpansionsLeaveOnlyTheLatestGroupWithoutAQueuedJump",
+        "lastGroupOnASmallLargeFontScreenStaysVisibleAtItsOriginalOffset"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelLayoutDefaultsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelLayoutDefaultsTest.kt",
+      "methods": [
+        "missingPreferencesUseReferenceCompactTwoColumnLayout",
+        "explicitStandardLayoutSurvivesReadingAndOtherPresentationEdits"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelModel11Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelModel11Test.kt",
+      "methods": [
+        "hiddenAndGlobalFiltersUseActualMetadataAndMode",
+        "searchingNodeAndProviderFiltersChildrenInsteadOfReturningUnrelatedNodes",
+        "expansionSupportsBothExclusiveAndMultipleGroups",
+        "sortAndProviderGroupingReprojectRealData",
+        "thousandsOfNodesHaveBoundedRowSizeAndUniqueStableKeys",
+        "allLayoutOptionsPersistAndReload",
+        "selectionDoesNotChangeUntilBackendAcknowledges",
+        "failureAndCancellationPreserveSelectionAndClearBusyFlag",
+        "staleBackendAcknowledgementNeverCreatesSuccessCheck",
+        "invalidApiDraftCannotModifyExistingConfiguration",
+        "savedApiHostPortSecretAndDelayUrlAreReadByOriginal146Client",
+        "historyToggleControlsActualLocalCollection"
+      ]
+    },
+    "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
+      "methods": [
+        "sharedGroupsKeepNodeBusyUntilEveryOwnerCompletes",
+        "lateOlderGroupCannotOverwriteTheNewerSharedNodeResult",
+        "apiChangeOldFinallyCannotClearTheNewSameGroupBusyFlag",
+        "stoppingDropsALateGroupResultAndReleasesBusy",
+        "olderIndividualProbeCannotOverwriteALaterGroupResult",
+        "olderGlobalProbeHoldsBusyButCannotOverwriteALaterGroupResult",
+        "olderProviderReadCannotReplaceTheLatestProviderRead",
+        "stoppingDropsALateProviderRead",
+        "apiChangeDropsOldProvidersAndAcceptsTheNewControllerProviders",
+        "stoppingDropsPullRefreshProvidersAndPersistedSiteResults",
+        "apiChangeDropsAnInFlightRefreshStateAndItsCoreHistory",
+        "externalPidChangeInvalidatesOldGroupAndProtectsANewOwner",
+        "ordinaryPollKeepsAnActiveGroupInTheSamePidSession",
+        "oldSiteCompletionCannotClearOrOverwriteTheNewSessionSiteProbe",
+        "staleSingleProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask",
+        "staleBulkProviderUpdateCannotOverwriteOrReleaseTheNewSessionTask"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyAdblockExportTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyAdblockExportTest.kt",
+      "methods": [
+        "actualExportSurvivesCacheEvictionDuringRuleLoad",
+        "bothProvidersArePublishedSortedFromOneGeneration",
+        "newerExportNeverOverwritesFilesAlreadyBeingHandedToRoot",
+        "failedSecondProviderKeepsThePreviousIndexAndPair",
+        "unchangedRevisionReusesOnlyAHashVerifiedPair",
+        "missingAllowFileForcesACompleteFreshPair",
+        "corruptOrTraversingIndexCannotAuthorizeAnOutsideFile",
+        "unavailableStableDirectoryFailsWithoutTouchingOldSnapshot"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
+      "methods": [
+        "runningRootUsesLocalPolicyListenerEvenWithAnUnrelatedCustomController",
+        "stoppedRootKeepsPhysicalDirectMeasurementDespiteAnOldRunningFlag",
+        "anUnavailableRunningListenerNeverFallsBackToPhysicalDirect",
+        "authenticationAccessAndProxyErrorsAreNotSuccessfulWebsiteLatency",
+        "ordinaryRedirectsRemainOnTheExplicitPolicyProxy",
+        "cancellingEnteredWebsiteRequestsCannotPublishCompletedLatencies",
+        "globalWaveKeepsSuccessfulSiblingsLaterChunksAndOnlyConfirmedFailures",
+        "quickWaveRetainsSuccessWhenAnotherSelectedNodeHasAnApiError",
+        "changingApiCoreConfigurationAndRuntimeCannotReusePreviousProbeMetadata",
+        "anOldSnapshotLoadIsRejectedBeforeItCanPolluteTheNewApiCache",
+        "confirmedNestedSelectionRefreshesProbeMetadataButAFailedPutPreservesItsCache",
+        "singleAndBulkProviderUpdatesRefreshCachedMetadataBeforeTestingNewLeaves",
+        "successfulMutationRejectsCollectedGlobalAndAutomaticGroupResultsWhileAnotherProbeIsPending",
+        "successfulSelectionAndProviderMutationRejectAnInFlightSelectorWave",
+        "failedSelectionPreservesAnInFlightSelectorWaveForTheUnchangedRuntime",
+        "changedControllerRejectsASelectorResponseAndAcceptsTheNewEndpointWave",
+        "changingPhysicalNetworkEpochOrServiceSessionRejectsACompletedWebsiteWave"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyLatencyRegressionTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyLatencyRegressionTest.kt",
+      "methods": [
+        "providerHistoriesRestoreFortyOfEightyOneHealthyNodesAndSelectedLatency",
+        "staticGroupWinsOverCollidingProviderName",
+        "urlSpecificHistoryIsReadWhenOrdinaryHistoryIsEmpty",
+        "newestFailureDoesNotReviveEarlierHealthyRecord",
+        "perUrlHistoryHonorsExplicitTargetAndTimestampsAcrossTimezones",
+        "ipv6CapabilityFailureCannotReplaceWorkingOrdinaryLatency",
+        "selectedNestedGroupUsesItsSelectedProviderLeafWithoutLooping",
+        "coreRefreshReplacesStaleLocalTimeoutAndOldSuccessfulReading",
+        "stalePollCannotOverwriteNewerLocalProbeButNextPollCanRefreshIt",
+        "oldCustomUrlHistoryDoesNotPinNewerProviderFallbackReading",
+        "providerDelayUsesProviderEndpointAndEncodesEachSegment",
+        "nativeRepositoryMeasuresHttpAndFileProviderNodesWithoutWrongProxiesEndpoint",
+        "wholeWaveIncludesProviderNodesAndReadsMetadataOnce",
+        "authenticationAndMissingNodeErrorsDoNotBecomeTimeoutOrRetryOtherUrls",
+        "onlyCoreConfirmedTimeoutIsTimeoutAndUnreachableIsFailure",
+        "requestFailureRetainsKnownReadingAndReportsErrorWithoutFalseTimeout"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyNetworkJournalTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyNetworkJournalTest.kt",
+      "methods": [
+        "exceptionMessagesAddressesAndCredentialsNeverEnterRecords",
+        "onlyKnownStructuralFaultCodesAreRecorded",
+        "laterHealthyObservationPreservesFailureAndBothTraceIds",
+        "rotationRetainsOldSegmentsByteForByte",
+        "partialWriteIsRetainedAndNextCompleteRecordRemainsReadable",
+        "restartFindsRetainedSegmentsAndAppendsInsteadOfReplacing",
+        "concurrentAppendsProduceWholeUniqueRecords",
+        "recentViewIsBoundedWithoutDeletingOlderRecords",
+        "causeDepthAndFramesHaveFiniteBounds",
+        "applicationJournalUsesStablePrivateDirectoryAndNeedsNoRoot",
+        "separateTargetsKeepFailedAndSuccessfulResultsLinkedToOneRequest"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxyScriptSafetyTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyScriptSafetyTest.kt",
+      "methods": [
+        "distinctExistingNamesNeverCollapseIntoTheSameLazyListKey",
+        "actualUnicodeFilesystemIdentityIsPreserved",
+        "repeatedOutputCannotCreateDuplicateComposeKeys",
+        "hooksTraversalAndMalformedSizeAreRejected",
+        "emptyListingIsSupported",
+        "exactLimitIsAccepted",
+        "oversizedStreamStopsAfterAtMostLimitPlusOne",
+        "shortReadsAreNotMistakenForEndOfStream",
+        "zeroByteProviderReadCannotSpinForever",
+        "specialFilenameIsExecutedAsOneFileAndCannotInjectLogCommands",
+        "emptyScriptIsStillSupported"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxySubscriptionIntegrityTest.java",
+      "methods": [
+        "addWithoutTemplateWritesHttpAndUpdatesBothGroupListStyles",
+        "addWithRealHttpTemplateKeepsHeadersHealthCheckAndIntervalInheritance",
+        "deleteRemovesAllFlowAndBlockReferencesAndRetainsOtherUse",
+        "deletingOnlyUseValueKeepsAnEmptySequenceInBothStyles",
+        "quotedCommaHashAndEscapedProviderNamesAreNotSplitOrUnquotedIncorrectly",
+        "addingQuotedNameRetainsOriginalCrLfEmojiAndUnrelatedSourceBytes",
+        "flowUseCommentsAndTrailingCommasSurviveDeletion",
+        "sharedOrInheritedGroupUsesFailWithoutChangingAnySourceBytes",
+        "deletingAnAnchorStillUsedElsewhereFailsAndKeepsOriginalFile",
+        "unsupportedContainersInvalidTemplatesAndDuplicateFieldsKeepOriginalFiles",
+        "updatingAQuotedFlowUrlPreservesCommentsAndRejectsProviderAliases",
+        "aLastSubscriptionCannotBeDeletedAndNewCachePathsDoNotCollide"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RecoveryThrottle90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt",
+      "methods": [
+        "futureWallHistoryCannotDelayTheFirstConfirmedDeadRecovery",
+        "pastWallHistoryCannotBypassTheSameSessionThirtySecondBackoff",
+        "aRecreatedObserverDoesNotInheritAStaleWallOrElapsedGate",
+        "aStoppedIntentCannotRecoverEvenAfterTheBackoffExpires",
+        "noCurrentNetworkDoesNotConsumeTheFirstRecoveryOpportunity",
+        "anUnknownProcessObservationCannotTriggerRecovery"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootAutostartTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootAutostartTest.kt",
+      "methods": [
+        "planPreservesThirtyArgumentsAndNeverExecutesTheirText",
+        "cacheResetDoesNotMutateNormalStartArguments",
+        "partialPlanIsRejected",
+        "failedRootRemovalNeverClaimsTheSettingIsOff",
+        "confirmedRemovalTurnsOffBothAutostartAndInstalledState"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootFakeIpRangesTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootFakeIpRangesTest.java",
+      "methods": [
+        "officialDefaultsAndExplicitEmptyRangesAreDistinct",
+        "mergePriorityAliasesAndExplicitFieldsUseTheReadOnlyNodeGraph",
+        "disabledDnsMissingEnableAndOtherEnhancedModesReturnNoProtection",
+        "allUnsupportedModesAndOtherCoresAvoidParsingUnrelatedConfigs",
+        "globalDnsAndProfileIpv6FlagsControlOnlyTheIpv6Protection",
+        "numericCidrBoundariesAndIpv4EmbeddedIpv6AreAccepted",
+        "invalidIpv4AddressesPrefixesAndShellTokensAreRejectedWithoutLookup",
+        "invalidIpv6CompressionScopesGroupsAndFamilyAreRejected",
+        "malformedYamlShapesAndBooleansExposeOnlyConstantFailures",
+        "ipv4DefaultBypassSubtractsTheActualMaskedFakeRangeOnly",
+        "ipv6BypassSubtractionIsFiniteExactAndDoesNotBroadenPrivateRouting",
+        "fullFamilyRangesRemoveAllDefaultsWhileUserBypassesRemainOutsideThisModel",
+        "privateStartupCleansForgedOwnedCommentsAndAppendsOneSemanticNeutralTail"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootHealthUpgradeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootHealthUpgradeTest.kt",
+      "methods": [
+        "readOnlyInspectorDoesNotInvalidateObservationPublication",
+        "reachableEgressAndOldRunningStatusCannotMaskABrokenDnsListener",
+        "failedInspectorDoesNotFallBackToAnOldHealthyResult",
+        "refusedRepairPreservesDeploymentAndAutostartState",
+        "metadataRepairDoesNotClaimRuntimeUpgradeOrHideSubsequentFaults",
+        "unauthorizedRepairCannotDeployAnInspectorOrChangeSessionPreferences",
+        "supersededRecoveryCannotRunRootCommandsOrChangeDeployment"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RootNetworkRecoveryTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootNetworkRecoveryTest.kt",
+      "methods": [
+        "waitsForCallbackLinksButDoesNotRequireOsValidation",
+        "blockedAndUnblockedInvalidateInFlightResults",
+        "captivePortalWaitsThenUnvalidatedNetworkCanRecover",
+        "sameNetworkIdAfterAtoBtoARejectsOldPublication",
+        "lateOldLossCapabilitiesLinksAndBlockedCannotClearCurrentNetwork",
+        "sameNetworkDnsChangeInvalidatesReachabilityAndPendingResult",
+        "duplicateCallbacksDoNotInvalidateCurrentResult",
+        "missingInterfaceAndLossWaitWithoutInventingReachability",
+        "manualStopIntentRejectsCurrentObservation",
+        "interveningControlTransactionRejectsCurrentNetworkObservation",
+        "destroyedServiceCannotPublishOrAcceptFurtherCallbacks",
+        "vpnCapabilitiesCannotTriggerRootRecovery",
+        "validationChangeOnSameNetworkInvalidatesPreviousObservation"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RuleRequestOwnership90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
+      "methods": [
+        "stoppingDropsLateRuleAndRuleSetReads",
+        "replacementApiCanReadImmediatelyAndOldFinallyKeepsTheNewReadBusy",
+        "singleRuleSetUpdateCannotPublishAfterStop",
+        "oldRuleSetUpdateCannotClearTheReplacementTaskBusyState",
+        "bulkRuleSetUpdateStopsBeforeTheNextChunkAndDropsLateReadbacks",
+        "acknowledgedRuleAndProviderUpdatesSupersedeOlderWholeListReads",
+        "bulkFinalReadRetiresTheSupersededReadBusyFlagWithoutClearingANewerOwner",
+        "physicalEpochAndReplacementSessionRejectOldSelectorResultsAndPreserveTheNewOwner",
+        "physicalEpochAndReplacementSessionRejectOldWebsitePersistenceAndKeepTheNewProbeBusy",
+        "replacementApiClearsOldContentAndBulkMutationUsesOnlyTheCurrentControllerTargets",
+        "confirmedPidChangeAfterAThrottledPollRejectsThePreviousRuntimeWave",
+        "foregroundReattachesOncePerForegroundAndReattachesAfterReturningFromBackground"
+      ]
+    },
+    "io.github.xgl34222220.hetu.Runtime146ContractTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt",
+      "methods": [
+        "matchingAppliedSnapshotDoesNotAskForRepeatedRestart",
+        "preferenceChangedDuringApplyRemainsPending",
+        "failedApplyNeverAcknowledgesTheNewConfiguration",
+        "uiVersionBumpDoesNotRequestRuntimeRedeployment",
+        "renamedLatencyTargetsKeepTheirSlotsAndActualMeasurements",
+        "officialCoreAssetsMatchTheUser146Apk"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RuntimeStartup15Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeStartup15Test.java",
+      "methods": [
+        "actualStartupGeneratorAcceptsEightyEightMergedTlsNodes",
+        "allAvailableNonEbpfRuntimeModesStillGenerate",
+        "manyProviderAndPolicyTemplatesDoNotTriggerATlsRewrite",
+        "ruleModeWithSpacesSurvivesTheFullGeneratorAndManyAliases",
+        "blacklistSanitizationRemainsIntactWithManyAliases",
+        "inlinePayloadsPreserveExplicitFingerprintsAndUnicode",
+        "sharedNodeAliasesAreEditedOnlyOnce",
+        "flowTrailingCommaStillProducesValidPrivateYaml",
+        "diagnosticSummaryWorksWithTheTemplateHeavyDocument",
+        "summaryReportsSafeReasonAndLocationRatherThanBlamingGenericYaml",
+        "invalidSourcesDoNotBypassMigrationToReachRuntimeGeneration",
+        "privateCopyGenerationNeverOverwritesTheSourceFile",
+        "existingInlineRulesRefusalIsNotBypassedByTheParserHotfix"
+      ]
+    },
+    "io.github.xgl34222220.hetu.RuntimeYaml15Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuntimeYaml15Test.java",
+      "methods": [
+        "originalUi14FiftyAliasGateRejectsOrdinaryEightyEightTemplates",
+        "eightyEightTemplatesAreAcceptedWithoutExpansion",
+        "collectionAliasBudgetHasAFiniteBoundary",
+        "codePointBudgetIsRetained",
+        "nestingBudgetIsRetained",
+        "syntaxErrorsReportLocationWithoutCredentialsOrCause",
+        "nonMappingAndEmptyRootsAreExplicitlyRejected",
+        "multipleDocumentsAreNotSilentlyTruncated",
+        "untrustedObjectTagsAreNotConstructed",
+        "explicitValueAndMergeSequencePriorityArePreserved",
+        "recursiveMergeTraversalIsFinite",
+        "longAliasChainDoesNotUseRecursiveJavaCalls",
+        "repeatedAliasDagStaysASmallGraph",
+        "sourceTextAndEmojiMarksRemainUnchanged"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SelectionMutation90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt",
+      "methods": [
+        "replacedApiReceivesNoOldSelectionCleanupAndQueuedTicketCannotRebind",
+        "oldSelectionCannotBlockClearReadBackOrToastOverTheReplacementOwner",
+        "trafficModeSingleAndBulkRuleMutationsInvalidateWebsiteWavesOnlyAfterSuccessfulHttp",
+        "concurrentGroupSelectionsEachAdvanceObservationsWithoutRejectingTheOtherOrigin",
+        "frozenControllerKeepsCapturedEndpointAndCredentialWhileOrdinaryRequestsRemainDynamic"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsBackupParity57Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsBackupParity57Test.kt",
+      "methods": [
+        "conflictsKeepOriginalAndSelectRestoredCopy",
+        "identicalFileIsReusedWithoutExtraCopy",
+        "backupWithoutSelectedKeyKeepsExistingSelection"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsConceptParityTest.kt",
+      "methods": [
+        "invalidMirrorKeepsDialogOpenAndDoesNotSave",
+        "cancelMirrorDoesNotWriteDraft",
+        "disabledResourceInputCannotChangeAndSwitchRowHasOneCallback",
+        "settingsSwitchExposesOneLabeledControlAndRealCheckedState",
+        "disabledSettingsSwitchRetainsStateAndCannotInvokeCallback",
+        "themeTilesExposeExclusiveSelectionAndChangeActualValue",
+        "accentSwatchesHaveAccessibleNamesAnd48DpTargets",
+        "mirrorPrefixRejectsMalformedHostsAndCredentialOrControlContent"
+      ]
+    },
+    "io.github.xgl34222220.hetu.SettingsPickerParity58Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/SettingsPickerParity58Test.kt",
+      "methods": [
+        "rootSettingsChoiceWidthsStayCompact",
+        "composeChoiceMenusDimThePageByDefault"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ToastFeedbackTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt",
+      "methods": [
+        "actualControllerHttpExceptionsAreErrorsForClientAndServerResponses",
+        "httpErrorContextDoesNotMistakeSuccessfulCountsOrResponseNumbersForErrors",
+        "englishAuthenticationAndTransportErrorsDoNotClaimSuccess",
+        "genuineSuccessWarningsAndUnknownNoticesKeepDistinctMeanings",
+        "realToastHostPreservesThe401BodyAndRendersAnErrorInsteadOfAGreenCheck",
+        "realToastHostKeepsSuccessfulCountMessagesAndTheirGreenCheck"
+      ]
+    },
+    "io.github.xgl34222220.hetu.ToolsConceptParityTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToolsConceptParityTest.kt",
+      "methods": [
+        "configurationLinksRequireAnActualHttpHost",
+        "bareHostsAndSchemePrefixesRemainInlineValidationErrors",
+        "linksCannotContainLineBreaksOrExceedTheRepositoryLimit"
+      ]
+    },
+    "io.github.xgl34222220.hetu.UI83EditorHistoryTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83EditorHistoryTest.kt",
+      "methods": [
+        "typingAndBackspacesKeepTheirExistingCoalescing",
+        "caretMovementSeparatesTypingUndoGroups",
+        "accessoryUndoRestoresSelectionWithoutImeComposition",
+        "resetReleasesBothHistoriesAndKeepsTheRequestedBuffer",
+        "smallEditsRetainExactlyTheLatestTwoHundredUndoSteps",
+        "byteBudgetEvictsOldestLargeStepsButKeepsImmediateUndoAndRedo",
+        "currentBufferIsPreservedOutsideTheSnapshotBudget",
+        "undoTransfersAccountForLargerCurrentTextAndEvictOldestAcrossBothStacks",
+        "newEditReleasesObsoleteRedoBeforeItReservesUndoSpace",
+        "accessoryEditAlsoReleasesRedoBeforeEvictingUsefulUndo",
+        "oversizedCurrentCanBeUndoneWithoutRetainingAnOversizedRedoSnapshot",
+        "supplementaryCharactersUseTheirUtf16CharCountForTheBudget"
+      ]
+    },
+    "io.github.xgl34222220.hetu.UI83ToolsTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/UI83ToolsTest.kt",
+      "methods": [
+        "unknownTrafficModeNeverClaimsProtectionOrOldHits",
+        "missingStartupOrLiveProviderKeepsProtectionUnverified",
+        "confirmedRuleChainShowsItsActualSessionHits",
+        "confirmedGlobalModeHasAWarningEvenWhenProviderExists",
+        "malformedHttpHostsStayInlineErrors",
+        "cidrValidationRejectsOutOfRangeAddressesAndMasks",
+        "switchingScopesParksLatestListFromTheExistingSettingsScreen",
+        "validationCannotOverwriteAChangedSelectionOrExternalSource"
+      ]
+    },
+    "io.github.xgl34222220.hetu.WanDetails61Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/WanDetails61Test.kt",
+      "methods": [
+        "optionalMetadataUsesOnlyActualResponse",
+        "missingFieldsRemainUnknownNotFakeCoordinates",
+        "actualZeroCoordinatesAreValidAndOutOfRangeIsNot",
+        "failedOrAddresslessResponseIsRejected"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDiagIntakeTest.kt",
+      "methods": [
+        "lateStartupSuccessCannotReplaceAReopenedPendingRequest",
+        "lateReportFailureCannotReplaceAReopenedPendingRequest",
+        "dismissedSheetsDoNotReturnWhenTheirReadsSucceedOrFail"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsDnsConsentIntakeTest": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsDnsConsentIntakeTest.kt",
+      "methods": [
+        "deniedConsentPreservesExistingFallbackModeAndAutostart",
+        "grantedConsentCommitsAfterReturnAndStartsExistingVpnExactlyOnce",
+        "explicitOffCancelsPendingEnableAndLateConsentCannotUndoOff",
+        "cancelledRequestCannotAuthorizeTheNextPageRequest",
+        "runningRootPreservesOnOffIntentAndNeverLaunchesOrStartsDnsVpn"
+      ]
+    },
+    "io.github.xgl34222220.hetu.tools.ToolsPdf85Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsPdf85Test.kt",
+      "methods": [
+        "page01",
+        "page02",
+        "page03",
+        "page04",
+        "page05",
+        "page06",
+        "page07",
+        "page08",
+        "page09",
+        "page10",
+        "page11",
+        "page12",
+        "page13",
+        "page14",
+        "page15",
+        "page16",
+        "page17",
+        "page18",
+        "page19",
+        "page20",
+        "page21",
+        "page22",
+        "page23",
+        "page24",
+        "page25",
+        "page26",
+        "page27",
+        "page28",
+        "page29",
+        "page30",
+        "page31",
+        "page32",
+        "page33",
+        "page34",
+        "page35",
+        "page36",
+        "page37",
+        "page38",
+        "page39",
+        "page40",
+        "page41",
+        "page42",
+        "page43",
+        "page44",
+        "page45",
+        "page46",
+        "page47",
+        "page48",
+        "page49"
+      ]
+    }
+  },
+  "expectedUnitTests": 603,
+  "expectedTestXmlFiles": 63,
+  "manifestAndPermissionsUnchanged": true,
+  "dependenciesUnchanged": true,
+  "signingUnchanged": true,
+  "nativePayloadsUnchanged": true,
+  "autostartPayloadUnchanged": true,
+  "allBaselineTestMethodsPreserved": true
+}

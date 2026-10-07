@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu.panel
 
+import io.github.xgl34222220.hetu.home.HomeRegions
 import java.util.Locale
 
 /* ------------------------------------------------------------------ */
@@ -142,6 +143,8 @@ internal data class PanelConnection(
     val downloadBytesPerSecond: Long = 0L,
     val uploadTotalBytes: Long = 0L,
     val downloadTotalBytes: Long = 0L,
+    /** [time] as shown on the card (clock time); [time] itself stays sortable. */
+    val timeLabel: String? = time,
 ) {
     /** [chain] runs from the top group to the node that carries the traffic, e.g. 节点选择 → 香港 01. */
     val isDirect: Boolean get() = chain.isEmpty() || chain.last().equals("DIRECT", ignoreCase = true)
@@ -193,6 +196,17 @@ internal data class PanelData(
     val refreshing: Boolean = false,
     /** A failed controller read is unavailable data, never an empty live snapshot. */
     val readError: String = "",
+    /** Running, but the first controller snapshot has not arrived yet: tabs show placeholders. */
+    val loading: Boolean = false,
+    /** Groups whose 测速 is in flight. */
+    val testingGroups: Set<String> = emptySet(),
+    /** A whole-profile latency test is in flight. */
+    val testingAll: Boolean = false,
+    /** group → node the user picked that the core has not confirmed yet. */
+    val switching: Map<String, String> = emptyMap(),
+    /** “全部更新” is running for subscriptions / rule sets, including while single items have already finished. */
+    val updatingAllSubscriptions: Boolean = false,
+    val updatingAllRuleSets: Boolean = false,
 ) {
     val running: Boolean get() = status == PanelStatus.Running
 
@@ -323,6 +337,8 @@ internal class PanelActions(
     val onSelectNode: (group: String, node: String) -> Unit = { _, _ -> },
     val onTestNode: (node: String) -> Unit = {},
     val onTestGroup: (group: String) -> Unit = {},
+    /** 排序与布局 › 测试全部节点. */
+    val onTestAll: () -> Unit = {},
     val onUpdateSubscription: (name: String) -> Unit = {},
     val onUpdateAllSubscriptions: () -> Unit = {},
     val onCloseConnection: (id: String) -> Unit = {},
@@ -497,37 +513,7 @@ internal object PanelLogic {
     }
 }
 
-/** Two-letter region code from a node name. Replaces the flag emoji of the concept mock-ups. */
+/** Two-letter region code from a node name; the table and the emoji detection live in [HomeRegions]. */
 internal object PanelRegions {
-    private val table = listOf(
-        "HK" to listOf("香港", "港", "HK", "HONG KONG", "HONGKONG"),
-        "TW" to listOf("台湾", "台灣", "台", "TW", "TAIWAN"),
-        "JP" to listOf("日本", "日", "JP", "JAPAN", "东京", "大阪"),
-        "SG" to listOf("新加坡", "狮城", "SG", "SINGAPORE"),
-        "KR" to listOf("韩国", "韓國", "韩", "KR", "KOREA", "首尔"),
-        "US" to listOf("美国", "美國", "美", "US", "USA", "UNITED STATES", "洛杉矶", "硅谷"),
-        "GB" to listOf("英国", "英國", "英", "GB", "UK", "UNITED KINGDOM", "伦敦"),
-        "DE" to listOf("德国", "德國", "德", "DE", "GERMANY"),
-        "FR" to listOf("法国", "法國", "法", "FR", "FRANCE"),
-        "AU" to listOf("澳大利亚", "澳洲", "澳", "AU", "AUSTRALIA"),
-        "CA" to listOf("加拿大", "CA", "CANADA"),
-        "NL" to listOf("荷兰", "NL", "NETHERLANDS"),
-        "RU" to listOf("俄罗斯", "俄", "RU", "RUSSIA"),
-        "IN" to listOf("印度", "IN", "INDIA"),
-        "TR" to listOf("土耳其", "TR", "TURKEY"),
-    )
-
-    /** Longest keyword wins, so “澳大利亚” is AU and never matched by a shorter key. Latin keys need a word boundary. */
-    fun codeOf(name: String): String {
-        val upper = name.uppercase(Locale.ROOT)
-        var best = ""
-        var bestLength = 0
-        for ((code, keys) in table) for (key in keys) {
-            if (key.length <= bestLength) continue
-            val latin = key.all { it in 'A'..'Z' || it == ' ' }
-            val hit = if (latin) Regex("(^|[^A-Z])" + Regex.escape(key) + "($|[^A-Z])").containsMatchIn(upper) else name.contains(key)
-            if (hit) { best = code; bestLength = key.length }
-        }
-        return best
-    }
+    fun codeOf(name: String): String = HomeRegions.codeOf(name)
 }

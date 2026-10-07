@@ -1,14 +1,9 @@
 package io.github.xgl34222220.hetu
 
-import io.github.xgl34222220.hetu.ui.CrystalSurface as Surface
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,6 +16,21 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.foundation.background
+import androidx.compose.ui.draw.clip
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeMotion
+import io.github.xgl34222220.hetu.home.HomeSpinner
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.foreground
+import io.github.xgl34222220.hetu.home.soft
 import io.github.xgl34222220.hetu.ui.*
 
 internal object UiFeedback {
@@ -43,11 +53,15 @@ internal object UiFeedback {
     }
 }
 
-/** Lives in normal header flow, never at an absolute offset above tabs. */
+/**
+ * What a task is doing or how it ended, in the page's normal flow: a spinner while it runs, a
+ * green line when it worked, a red one when it did not. A failure keeps its full text behind
+ * 详情, already stripped of secrets, with a button to copy it.
+ */
 @Composable
 internal fun HetuTaskFeedback(text: String, error: Boolean = false, busy: Boolean = false, modifier: Modifier = Modifier) {
     if (text.isBlank() && !busy) return
-    val t = LocalHetuTokens.current
+    val c = LocalHomeColors.current
     val context = LocalContext.current
     val clipboard = LocalClipboardManager.current
     var detailsOpen by remember { mutableStateOf(false) }
@@ -55,28 +69,27 @@ internal fun HetuTaskFeedback(text: String, error: Boolean = false, busy: Boolea
         DiagnosticReport.redact(text, context.getSharedPreferences("hetu", 0).getString("proxyControllerSecret", ""))
     }
     val summary = remember(safeDetails, error) { UiFeedback.summary(safeDetails, error) }
-    val accent = when { error -> t.danger; busy -> MaterialTheme.colorScheme.primary; else -> t.success }
-    Surface(modifier.fillMaxWidth().testTag("task-feedback"), shape = RoundedCornerShape(14.dp),
-        color = if (error) t.dangerContainer else t.controlBackground, shadowElevation = 0.dp) {
-        Column(Modifier.animateContentSize(tween(if (LocalHetuMotionEnabled.current) 180 else 0))) {
-            Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = 12.dp, end = 4.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (busy && !error) HetuBusyIndicator(Modifier.size(16.dp), accent)
-                else Icon(if (error) Icons.Rounded.ErrorOutline else Icons.Rounded.CheckCircle, null, Modifier.size(18.dp), tint = accent)
-                Text(summary.ifBlank { "正在处理…" }, Modifier.weight(1f).padding(vertical = 8.dp),
-                    color = t.textPrimary, fontSize = 12.sp, lineHeight = 18.sp)
-                if (error) TextButton(onClick = { detailsOpen = !detailsOpen }, modifier = Modifier.heightIn(min = 48.dp)) {
-                    Text(if (detailsOpen) "收起" else "详情", fontSize = 12.sp, color = accent)
-                }
-            }
-            if (detailsOpen && error) {
-                Text(safeDetails.take(24_000), Modifier.fillMaxWidth().heightIn(max = 220.dp)
-                    .verticalScroll(rememberScrollState()).padding(horizontal = 12.dp).testTag("task-inline-details"),
-                    color = t.textSecondary, fontSize = 12.sp, lineHeight = 18.sp)
-                TextButton(onClick = { clipboard.setText(AnnotatedString(safeDetails)) }, modifier = Modifier.padding(horizontal = 4.dp)) {
-                    Text("复制诊断")
-                }
-            }
+    val tone = when { error -> HomeTone.Bad; busy -> HomeTone.Accent; else -> HomeTone.Good }
+    val fill by animateColorAsState(tone.soft(), HomeMotion.fade(LocalHomeMotionEnabled.current), label = "task-feedback-fill")
+    Column(
+        modifier.fillMaxWidth().testTag("task-feedback").clip(HomeDims.controlShape).background(fill)
+            .animateContentSize(HomeMotion.glide(LocalHomeMotionEnabled.current)),
+    ) {
+        Row(Modifier.fillMaxWidth().heightIn(min = 50.dp).padding(start = 14.dp, end = 6.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (busy && !error) HomeSpinner(size = 18.dp, color = tone.foreground())
+            else Icon(if (error) HomeIcons.CircleAlert else HomeIcons.CircleCheck, null, Modifier.size(20.dp), tint = tone.foreground())
+            Text(summary.ifBlank { ht("正在处理…") }, Modifier.weight(1f).padding(vertical = 12.dp),
+                color = c.t1, style = HomeType.note.copy(fontWeight = FontWeight.Medium))
+            if (error) HomeButton(if (detailsOpen) "收起" else "详情", { detailsOpen = !detailsOpen }, kind = HomeButtonKind.Ghost, danger = true, height = 48.dp)
+            else Spacer(Modifier.width(8.dp))
+        }
+        if (detailsOpen && error) {
+            Text(safeDetails.take(24_000), Modifier.fillMaxWidth().heightIn(max = 220.dp)
+                .verticalScroll(rememberScrollState()).padding(horizontal = 14.dp).testTag("task-inline-details"),
+                color = c.t2, style = HomeType.mono.copy(fontSize = 12.sp, lineHeight = 18.sp))
+            HomeButton("复制诊断", { clipboard.setText(AnnotatedString(safeDetails)) }, Modifier.padding(start = 2.dp, bottom = 4.dp),
+                kind = HomeButtonKind.Ghost, icon = HomeIcons.Copy, height = 48.dp)
         }
     }
 }

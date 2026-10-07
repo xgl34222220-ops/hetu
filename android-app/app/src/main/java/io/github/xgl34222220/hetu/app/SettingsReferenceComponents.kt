@@ -1,140 +1,139 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.UnfoldMore
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.text.TextStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.ui.baiZeLineIcon
+import io.github.xgl34222220.hetu.home.HomeCardTitle
+import io.github.xgl34222220.hetu.home.HomeDialog
+import io.github.xgl34222220.hetu.home.HomeDialogCard
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeFormField
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeRowDims
+import io.github.xgl34222220.hetu.home.HomeRowDivider
+import io.github.xgl34222220.hetu.home.HomeRowLayout
+import io.github.xgl34222220.hetu.home.HomeSwitchRow
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.homeRowHighlight
 import io.github.xgl34222220.hetu.ui.ht
-import io.github.xgl34222220.hetu.ui.HetuHaptic
-import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 
-/** Settings-only dimensions, measured from the supplied 04 concept sheets.
- * These do not change the denser controls used by the proxy dashboard. */
+/*
+ * The 设置 pages are written against these names. They are the app's shared rows, cards, fields
+ * and dialog under a settings vocabulary, so 设置 and 工具 are built from the same parts.
+ * Parameters that only nudged one page's pixels are still accepted, and ignored.
+ */
+
+/**
+ * One card of rows. With a [title] (drawn as given) the card is headed by it. The card is one group for
+ * accessibility traversal, so its heading and its rows are read (and found) together.
+ */
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(24.dp)).background(Hx.colors.surface)
-            .padding(vertical = 4.dp),
+        Modifier.fillMaxWidth().semantics { isTraversalGroup = true }.clip(HomeDims.cardShape).background(LocalHomeColors.current.surface)
+            .padding(top = if (title == null) 4.dp else 0.dp, bottom = 4.dp),
     ) {
-        if (title != null) Text(
-            title, color = Hx.colors.text, fontSize = 20.sp, lineHeight = 26.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp),
-        )
+        if (title != null) HomeCardTitle(title)
         content()
     }
 }
 
+/** A block of the page: the gutters, the gap to the next block, and the page's entrance. */
 @Composable
 internal fun SettingsSection(content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp).padding(bottom = 14.dp), content = content)
+    Column(Modifier.fillMaxWidth().hxPageEnter().padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap), content = content)
 }
 
+/** Hairline between two rows that both carry an icon: it starts under the text. */
 @Composable
-internal fun SettingsDivider() {
-    Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp).height(.5.dp).background(Hx.colors.line.copy(alpha = .34f)))
-}
+internal fun SettingsDivider() = HomeRowDivider(start = HomeRowDims.textStart)
 
+/**
+ * A row of a settings card. Tappable with [onClick]; a menu opened from it grows out of it.
+ *
+ * @param compact a denser row, for long lists of similar switches.
+ */
 @Composable
 internal fun SettingsRow(
     title: String,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.text,
+    iconTint: Color = LocalHomeColors.current.t1,
     enabled: Boolean = true,
     onClick: (() -> Unit)? = null,
     compact: Boolean = false,
     modifier: Modifier = Modifier,
-    rootReference: Boolean = false,
-    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
-    subtitleFontSizeSp: Float? = null,
-    trailing: @Composable RowScope.() -> Unit = {},
+    @Suppress("UNUSED_PARAMETER") rootReference: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") rowMinHeight: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") subtitleFontSizeSp: Float? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
 ) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
     val source = remember { MutableInteractionSource() }
-    Row(
-        modifier.fillMaxWidth().hxAnchorSource()
-            .then(if (onClick != null) Modifier.hxPressScale(source, .99f)
-                .clickable(interactionSource = source, indication = null, enabled = enabled, onClick = onClick) else Modifier)
-            .heightIn(min = rowMinHeight ?: if (compact) 54.dp else if (subtitle.isNullOrBlank()) 68.dp else 78.dp)
-            .padding(horizontal = 16.dp, vertical = if (compact) 6.dp else 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            Icon(settingsLineIcon(icon), null, tint = iconTint.copy(alpha = if (enabled) 1f else .45f), modifier = Modifier.size(26.dp))
-            Spacer(Modifier.width(24.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(title, fontSize = 18.sp, lineHeight = 24.sp,
-                fontWeight = FontWeight.Bold, color = c.text.copy(alpha = if (enabled) 1f else .45f),
-                maxLines = 2, overflow = TextOverflow.Ellipsis)
-            if (!subtitle.isNullOrBlank()) Text(subtitle, fontSize = (subtitleFontSizeSp ?: 14f).sp, lineHeight = 18.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = c.textMuted.copy(alpha = if (enabled) 1f else .45f), maxLines = 3, overflow = TextOverflow.Ellipsis)
-        }
-        trailing()
-    }
+    val line = subtitle?.takeIf { it.isNotBlank() }
+    val danger = iconTint == c.bad || iconTint == Hx.colors.bad
+    HomeRowLayout(
+        title = AnnotatedString(title),
+        modifier = modifier.hxAnchorSource().homeRowHighlight(source).then(
+            if (onClick == null) Modifier
+            else Modifier.clickable(interactionSource = source, indication = null, enabled = enabled, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() },
+        ),
+        subtitle = line,
+        icon = icon?.let(::hxLineIcon),
+        iconTint = if (danger) c.bad else c.t1,
+        titleMaxLines = 2,
+        subtitleMaxLines = 3,
+        enabled = enabled,
+        minHeight = if (compact) HomeRowDims.compact else null,
+        trailing = trailing,
+    )
 }
 
+/** A row that opens a page, or a picker when [dropdown]; [value] is the current choice. */
 @Composable
 internal fun SettingsNavRow(
     title: String,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.text,
+    iconTint: Color = LocalHomeColors.current.t1,
     value: String? = null,
     dropdown: Boolean = false,
     compact: Boolean = false,
     rootReference: Boolean = false,
-    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
+    rowMinHeight: Dp? = null,
     onClick: () -> Unit,
 ) {
     SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, rootReference = rootReference, rowMinHeight = rowMinHeight) {
-        if (!value.isNullOrBlank()) {
-            Spacer(Modifier.width(8.dp))
-            Text(value, color = Hx.colors.textMuted, fontSize = 15.sp, lineHeight = 20.sp,
-                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 136.dp))
-        }
-        Spacer(Modifier.width(5.dp))
-        Icon(if (dropdown) Icons.Rounded.UnfoldMore else Icons.Rounded.ChevronRight,
-            null, tint = Hx.colors.textMuted, modifier = Modifier.size(20.dp))
+        HxRowValue(value, dropdown)
     }
 }
 
+/** One labelled switch: the whole row toggles and is announced once. */
 @Composable
 internal fun SettingsSwitchRow(
     title: String,
@@ -142,43 +141,23 @@ internal fun SettingsSwitchRow(
     onChange: (Boolean) -> Unit,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.text,
+    @Suppress("UNUSED_PARAMETER") iconTint: Color = LocalHomeColors.current.t1,
     enabled: Boolean = true,
     compact: Boolean = false,
-    rowMinHeight: androidx.compose.ui.unit.Dp? = null,
-    subtitleFontSizeSp: Float? = null,
+    @Suppress("UNUSED_PARAMETER") rowMinHeight: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") subtitleFontSizeSp: Float? = null,
 ) {
-    val source = remember { MutableInteractionSource() }
-    val haptics = rememberHetuHaptics()
-    SettingsRow(title, subtitle, icon, iconTint, enabled, compact = compact,
-        rowMinHeight = rowMinHeight, subtitleFontSizeSp = subtitleFontSizeSp,
-        modifier = Modifier.hxPressScale(source, .99f).semantics(mergeDescendants = true) {}
-            .toggleable(value = checked, enabled = enabled, role = Role.Switch, interactionSource = source, indication = null) { on ->
-                haptics.perform(if (on) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
-                onChange(on)
-            }) {
-        Spacer(Modifier.width(8.dp))
-        // The entire row, including the animated thumb, is one labeled switch.
-        SettingsToggleIndicator(checked, enabled)
-    }
+    HomeSwitchRow(
+        title = AnnotatedString(title), checked = checked, onCheckedChange = onChange,
+        subtitle = subtitle?.takeIf { it.isNotBlank() }, icon = icon?.let(::hxLineIcon), subtitleMaxLines = 3,
+        enabled = enabled, minHeight = if (compact) HomeRowDims.compact else null,
+    )
 }
 
-@Composable
-private fun SettingsToggleIndicator(checked: Boolean, enabled: Boolean) {
-    val c = Hx.colors
-    val offset by animateDpAsState(if (checked) 25.dp else 3.dp, tween(HxMotion.Short), label = "settingsSwitchThumb")
-    val track by animateColorAsState(if (checked) c.accent else if (c.dark) c.surfaceMuted else Color(0xFFC8C9D9),
-        tween(HxMotion.Short), label = "settingsSwitchTrack")
-    val thumb by animateColorAsState(if (checked) c.onAccent else if (c.dark) c.textMuted else Color(0xFF858798),
-        tween(HxMotion.Short), label = "settingsSwitchThumbColor")
-    Box(Modifier.size(width = 50.dp, height = 48.dp).graphicsLayer { alpha = if (enabled) 1f else .4f },
-        contentAlignment = Alignment.CenterStart) {
-        Box(Modifier.fillMaxWidth().height(28.dp).clip(Hx.pillShape).background(track))
-        Box(Modifier.offset(x = offset).size(22.dp).clip(Hx.pillShape).background(thumb))
-    }
-}
-
-/** Filled inset with a label above the actual editable surface, as in sheets 11/12. */
+/**
+ * The app's outlined field. [label] sits above it when given; [error] turns the outline red.
+ * A disabled field shows its value and cannot be edited.
+ */
 @Composable
 internal fun SettingsInput(
     value: String,
@@ -190,110 +169,49 @@ internal fun SettingsInput(
     error: Boolean = false,
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     modifier: Modifier = Modifier,
-    referenceMirror: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") referenceMirror: Boolean = false,
 ) {
-    val c = Hx.colors
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-        .background(if (c.dark) c.surfaceMuted else if (referenceMirror) {
-            if (error) Color(0xFFE9E6FD) else Color(0xFFE6E4FD)
-        } else Color(0xFFE8E5FF))
-        .then(if (error) Modifier.border(1.dp, c.bad, RoundedCornerShape(12.dp)) else Modifier)
-        .then(if (referenceMirror) Modifier.heightIn(min = if (error) 68.dp else 46.dp) else Modifier)
-        .padding(horizontal = 10.dp, vertical = when {
-            referenceMirror && error -> 11.5.dp
-            referenceMirror -> 12.dp
-            label == null -> 9.dp
-            else -> 8.dp
-        })) {
-        if (label != null) {
-            Text(label, color = c.textMuted, fontSize = if (referenceMirror) 13.sp else 11.5.sp,
-                lineHeight = if (referenceMirror) 17.sp else 15.sp,
-                fontWeight = if (referenceMirror) FontWeight.SemiBold else null)
-            Spacer(Modifier.height(if (referenceMirror) 6.dp else 4.dp))
-        }
-        BasicTextField(
-            value = value,
-            onValueChange = onValueChange,
-            enabled = enabled,
-            singleLine = singleLine,
-            keyboardOptions = keyboardOptions,
-            textStyle = TextStyle(color = if (enabled) c.text else c.textMuted,
-                fontSize = if (referenceMirror) 18.sp else 15.sp,
-                lineHeight = if (referenceMirror) 22.sp else 19.sp,
-                fontWeight = if (referenceMirror) FontWeight.SemiBold else null),
-            cursorBrush = SolidColor(c.accent),
-            modifier = Modifier.fillMaxWidth()
-                .then(if (referenceMirror) Modifier.heightIn(min = 22.dp) else Modifier)
-                .clip(RoundedCornerShape(9.dp))
-                .then(if (label != null && !referenceMirror) Modifier.background(c.surface.copy(alpha = .9f)).padding(horizontal = 10.dp, vertical = 8.dp) else Modifier.padding(horizontal = 5.dp)),
-            decorationBox = { field ->
-                Box {
-                    if (value.isBlank() && placeholder.isNotBlank()) Text(placeholder, color = c.textFaint, fontSize = 15.sp, lineHeight = 19.sp)
-                    field()
-                }
-            },
-        )
-    }
+    HomeFormField(
+        label = label.orEmpty(), value = value, onValueChange = onValueChange, modifier = modifier,
+        placeholder = placeholder, error = if (error) "" else null, enabled = enabled,
+        singleLine = singleLine, keyboardOptions = keyboardOptions,
+    )
 }
 
+/** The app's dialog card with free content between the title and 取消 / [confirmLabel]. */
 @Composable
 internal fun SettingsDialog(
     title: String,
     onDismiss: () -> Unit,
     confirmLabel: String,
     onConfirm: () -> Unit,
-    pillButtons: Boolean = false,
-    titleFontSizeSp: Float? = null,
-    titleLineHeightSp: Float? = null,
-    referenceMirrorNormalSpacing: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") pillButtons: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") titleFontSizeSp: Float? = null,
+    @Suppress("UNUSED_PARAMETER") titleLineHeightSp: Float? = null,
+    @Suppress("UNUSED_PARAMETER") referenceMirrorNormalSpacing: Boolean = false,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    HxReferenceDialog(onDismiss = onDismiss) {
-            Text(title, color = Hx.colors.text, fontSize = (titleFontSizeSp ?: 24f).sp, lineHeight = (titleLineHeightSp ?: 30f).sp,
-                fontWeight = FontWeight.Bold, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                modifier = Modifier.fillMaxWidth().padding(top = if (referenceMirrorNormalSpacing) 14.dp else 8.dp,
-                    bottom = if (referenceMirrorNormalSpacing) 16.dp else 20.dp))
-            content()
-            Spacer(Modifier.height(if (referenceMirrorNormalSpacing) 22.dp else 18.dp))
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                SettingsDialogButton(ht("取消"), false, onDismiss, Modifier.weight(1f), pillButtons)
-                SettingsDialogButton(confirmLabel, true, onConfirm, Modifier.weight(1f), pillButtons)
-            }
-            if (referenceMirrorNormalSpacing) Spacer(Modifier.height(6.dp))
+    HomeDialog(onDismiss) {
+        HomeDialogCard(title = title, confirmLabel = confirmLabel, onConfirm = onConfirm, onCancel = onDismiss, content = content)
     }
 }
 
-@Composable
-private fun SettingsDialogButton(label: String, primary: Boolean, onClick: () -> Unit, modifier: Modifier, pillButtons: Boolean) {
-    val source = remember { MutableInteractionSource() }
-    Box(modifier.heightIn(min = 48.dp).hxPressScale(source, .97f).clip(if (pillButtons) Hx.pillShape else RoundedCornerShape(16.dp))
-        .background(if (primary) {
-            if (Hx.colors.accent == Color(0xFF0A62E8)) Color(0xFF004EE4) else Hx.colors.accent
-        } else Hx.colors.accentSoft)
-        .clickable(interactionSource = source, indication = null, onClick = onClick).padding(horizontal = 12.dp, vertical = 12.dp), contentAlignment = Alignment.Center) {
-        Text(label, color = if (primary) Hx.colors.onAccent else Hx.colors.textMuted,
-            fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-    }
-}
-
+/** 加速下载: the mirror prefix put in front of download addresses. Blank switches it off. */
 @Composable
 internal fun SettingsMirrorDialog(initial: String, onSave: (String) -> Unit, onDismiss: () -> Unit) {
-    var value by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(initial) }
-    var error by androidx.compose.runtime.saveable.rememberSaveable { androidx.compose.runtime.mutableStateOf(false) }
-    SettingsDialog(ht("加速下载"), onDismiss, ht("保存"), onConfirm = {
+    var value by rememberSaveable { mutableStateOf(initial) }
+    var error by rememberSaveable { mutableStateOf(false) }
+    val problem = ht("请填写 http/https 地址")
+    SettingsDialog(ht("加速下载"), onDismiss, "保存", onConfirm = {
         val next = value.trim()
         if (!settingsMirrorPrefixValid(next)) error = true
         else onSave(next)
-    }, pillButtons = !error, titleFontSizeSp = if (error) 19f else null,
-        titleLineHeightSp = if (error) 24f else null, referenceMirrorNormalSpacing = !error) {
-        if (!error) {
-            Text(ht("镜像前缀"), color = Hx.colors.textMuted, fontSize = 13.sp)
-            Spacer(Modifier.height(6.dp))
-        }
-        SettingsInput(value, { value = it; error = false }, label = if (error) ht("镜像前缀") else null,
-            error = error, referenceMirror = true)
-        if (error) Text(ht("请填写 http/https 地址"), color = Hx.colors.bad, fontSize = 12.sp,
-            modifier = Modifier.padding(start = 4.dp, top = 5.dp))
+    }) {
+        HomeFormField(
+            label = "镜像前缀", value = value, onValueChange = { value = it; error = false },
+            placeholder = "https://", error = if (error) problem else null,
+            hint = if (error) null else "留空则直接下载。", keyboardType = KeyboardType.Uri, clearable = true,
+        )
     }
 }
 

@@ -67,6 +67,21 @@ internal object HomeDelay {
     const val Timeout = -1L
 }
 
+/** Where the public-address lookup stands. Anything but [Failed] and [Loading] shows the fields as they are. */
+internal enum class HomeWanState {
+    Idle, Loading, Ready, Stale, Failed;
+
+    companion object {
+        fun fromId(id: String?): HomeWanState = when (id?.trim()?.lowercase(Locale.ROOT)) {
+            "loading" -> Loading
+            "success", "ready" -> Ready
+            "stale" -> Stale
+            "failed", "error" -> Failed
+            else -> Idle
+        }
+    }
+}
+
 /** Public exit address as seen through the core. Null fields render as “未知”. */
 internal data class HomeWan(
     val ip: String? = null,
@@ -79,6 +94,9 @@ internal data class HomeWan(
     val ipType: String? = null,
     val timezone: String? = null,
     val coordinates: String? = null,
+    val state: HomeWanState = HomeWanState.Idle,
+    /** Why the last lookup failed; shown only while [state] is [HomeWanState.Failed]. */
+    val error: String? = null,
 )
 
 internal data class HomeLan(val ip: String? = null, val iface: String? = null)
@@ -106,8 +124,35 @@ internal data class HomeResource(
     val hasGap: Boolean get() = cpuHistory.any { it == null } || memoryHistoryMb.any { it == null }
 }
 
+/** Observations stay separate: a core PID, local takeover and Internet reachability differ. */
+internal data class HomeConnectionObservation(
+    val controllerReady: Boolean = false,
+    val controllerReadFailed: Boolean = false,
+    val controllerError: String = "",
+    /** Null until a real local runtime health record exists; true does not prove Internet access. */
+    val takeoverHealthy: Boolean? = null,
+    val runtimeMessage: String = "",
+) {
+    val health: HomeConnectionHealth get() = when {
+        controllerReadFailed -> HomeConnectionHealth.ControllerUnavailable
+        takeoverHealthy == false -> HomeConnectionHealth.TakeoverDegraded
+        !controllerReady || takeoverHealthy == null -> HomeConnectionHealth.Unconfirmed
+        else -> HomeConnectionHealth.LocalReady
+    }
+}
+
+internal enum class HomeConnectionHealth(val caption: String) {
+    Unconfirmed("接管状态未确认 · 出口未验证"),
+    ControllerUnavailable("控制接口异常 · 连接状态未确认"),
+    TakeoverDegraded("接管检查异常 · 出口未验证"),
+    LocalReady("接管检查通过 · 出口未验证"),
+}
+
 internal data class HomeUiState(
     val status: HomeStatus = HomeStatus.NotRunning,
+    /** What the running start / stop / restart is doing right now; replaces “请稍候…” when known. */
+    val statusDetail: String? = null,
+    val connection: HomeConnectionObservation = HomeConnectionObservation(),
     val core: String = "Mihomo",
     val runMode: String = "TPROXY",
     val config: String = "",
@@ -300,6 +345,8 @@ internal object HomeSamples {
     )
 
     val pendingRestartLan = running.copy(status = HomeStatus.PendingRestart(32 * 60L), netSide = HomeNetSide.Lan)
+
+    val wanFailed = running.copy(wan = HomeWan(state = HomeWanState.Failed, error = "查询源无响应"))
 
     val starting = notRunning.copy(status = HomeStatus.Starting)
 

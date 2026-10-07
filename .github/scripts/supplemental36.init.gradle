@@ -1,0 +1,15 @@
+// Preserve the canonical 545+additional reports and run the unchanged legacy
+// suites with their own real Test XML. Assertions, failure handling, filters and
+// Android production inputs remain under their original configuration.
+gradle.projectsEvaluated {
+    gradle.rootProject.allprojects { project ->
+        project.tasks.withType(org.gradle.api.tasks.testing.Test).configureEach { task ->
+            if (task.name == 'testDebugUnitTest') {
+                task.reports.junitXml.outputLocation.set(gradle.rootProject.layout.projectDirectory.dir('../out/supplemental36/test-results'))
+                task.reports.html.outputLocation.set(gradle.rootProject.layout.projectDirectory.dir('../out/supplemental36/reports'))
+                task.outputs.upToDateWhen { false }
+                task.outputs.doNotCacheIf('Require independent current supplemental execution') { true }
+            }
+        }
+    }
+}

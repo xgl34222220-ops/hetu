@@ -168,14 +168,14 @@ class NewHomePanelInteractionTest {
 
     @Test fun launcherTwoColumnCardsShowTheConfiguredArtwork() {
         configuredPanel(2)
-        rule.onNodeWithTag("configured-icon:配置策略", useUnmergedTree = true).assertIsDisplayed().assertWidthIsEqualTo(28.dp)
+        rule.onNodeWithTag("configured-icon:配置策略", useUnmergedTree = true).assertIsDisplayed().assertWidthIsEqualTo(34.dp)
         rule.onNodeWithContentDescription("配置策略 配置图标", useUnmergedTree = true).assertExists()
         snapshot("panel-configured-icon-two-columns")
     }
 
     @Test fun launcherOneColumnCardsKeepTheConfiguredArtwork() {
         configuredPanel(1)
-        rule.onNodeWithTag("configured-icon:配置策略", useUnmergedTree = true).assertIsDisplayed().assertWidthIsEqualTo(28.dp)
+        rule.onNodeWithTag("configured-icon:配置策略", useUnmergedTree = true).assertIsDisplayed().assertWidthIsEqualTo(34.dp)
         snapshot("panel-configured-icon-one-column")
     }
 

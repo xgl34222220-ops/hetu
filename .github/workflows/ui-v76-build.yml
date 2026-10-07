@@ -522,7 +522,6 @@ jobs:
 'on':
   push:
     branches:
-    - test/v20.76-new-ui
     - main
     paths:
     - android-app/**
@@ -533,6 +532,9 @@ jobs:
     - updates/v2085-tools-intake/**
     - updates/v2085-pdf-final-geometry/**
     - updates/v2086-functionfix/**
+    - updates/v2087-home-panel-refactor/**
+    - updates/v2088-ui-refactor/**
+    - updates/v2089-runtime153/**
     - .github/scripts/**
     - .github/workflows/ui-v76-build.yml
     - tools/qa/**

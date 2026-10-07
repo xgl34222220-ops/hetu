@@ -40,6 +40,10 @@ public final class ProxyNetworkMatchService extends Service {
     private volatile boolean destroyed;
     private long automaticStopGeneration;
     private volatile long lastPolicyProbeAt=-90000L;
+    // A wall-clock correction must neither postpone recovery nor bypass its
+    // backoff. This observer session owns its monotonic retry clock; persisted
+    // wall timestamps remain diagnostic history only.
+    private long lastAutoRecoveryElapsed=-1L;
     private volatile long lastAdblockMetricPoll;
     private volatile int bootRestoreAttempts;
     private ProxyRestoreScheduler bootRestores;
@@ -496,10 +500,10 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                 return;
             }
-            long now=System.currentTimeMillis();
-            long last=prefs.getLong("proxyAutoRecoveryAttempt",0L);
-            if(now-last<30000L)return;
-            prefs.edit().putLong("proxyAutoRecoveryAttempt",now).apply();
+            long nowElapsed=SystemClock.elapsedRealtime();
+            if(lastAutoRecoveryElapsed>=0L&&nowElapsed-lastAutoRecoveryElapsed<30000L)return;
+            lastAutoRecoveryElapsed=nowElapsed;
+            prefs.edit().putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis()).apply();
             RootProxyManager root=new RootProxyManager(getApplicationContext());
             JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs),
                     ()->!destroyed&&networkEvents.isCurrent(route));

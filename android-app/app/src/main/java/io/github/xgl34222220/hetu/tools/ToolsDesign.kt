@@ -1,35 +1,35 @@
 package io.github.xgl34222220.hetu.tools
 
-import io.github.xgl34222220.hetu.ui.ht
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.contentDescription
-import androidx.compose.ui.semantics.CustomAccessibilityAction
-import androidx.compose.ui.semantics.customActions
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -38,91 +38,139 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.HomeContinuousShape
-import io.github.xgl34222220.hetu.Hx
-import io.github.xgl34222220.hetu.hxPressScale
-import io.github.xgl34222220.hetu.home.*
+import io.github.xgl34222220.hetu.home.HomeBarScaffold
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCard
+import io.github.xgl34222220.hetu.home.homeGlassPanel
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeDivider
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeRefreshBox
+import io.github.xgl34222220.hetu.home.HomeRowSubStyle
+import io.github.xgl34222220.hetu.home.HomeSegmentStyle
+import io.github.xgl34222220.hetu.home.HomeSegmented
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.homeGlassSource
+import io.github.xgl34222220.hetu.ui.ht
 
-/** Tools-only dimensions from the supplied 03A/03B concepts. Home and panel keep their tokens. */
+/**
+ * Dimensions of the 工具 pages. They are the home tokens under their old names, so the four
+ * tabs share one rhythm: 14 dp gutters and gaps, 24 dp cards, 16 dp controls.
+ */
 internal object ToolsDesignDims {
-    val gutter = 14.dp
-    val gap = 14.dp
-    val cardPadding = 16.dp
-    val rowMinHeight = 64.dp
-    val rowMinHeightSmall = 56.dp
-    val touch = 48.dp
-    val barHeight = 64.dp
-    val dockClearance = 116.dp
-    val cardShape = HomeContinuousShape(24.dp)
-    val controlShape = HomeContinuousShape(14.dp)
-    val segmentShape = HomeContinuousShape(13.dp)
-    val badgeShape = RoundedCornerShape(10.dp)
-    val chipShape = RoundedCornerShape(8.dp)
-    val sheetShape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
-    val menuShape = HomeContinuousShape(20.dp)
+    val gutter = HomeDims.gutter
+    val gap = HomeDims.gap
+    val cardPadding = HomeDims.cardPadding
+    val rowMinHeight = HomeDims.rowMinHeight
+    val rowMinHeightSmall = HomeDims.rowMinHeightSmall
+    val touch = HomeDims.touch
+    val barHeight = HomeDims.barHeight
+    val dockClearance = HomeDims.dockClearance
+    val cardShape = HomeDims.cardShape
+    val innerShape = HomeDims.innerShape
+    val controlShape = HomeDims.controlShape
+    val segmentShape = HomeDims.segmentShape
+    val badgeShape = HomeDims.badgeShape
+    val chipShape = HomeDims.chipShape
+    val sheetShape = HomeDims.sheetShape
+    val menuShape = HomeDims.menuShape
 }
 
+/** The home type scale under its old names, plus the few sizes only the tool pages use. */
 internal object ToolsTypography {
-    val largeTitle = TextStyle(fontSize = 36.sp, lineHeight = 44.sp, fontWeight = FontWeight.Bold)
-    val barTitle = TextStyle(fontSize = 20.sp, lineHeight = 26.sp, fontWeight = FontWeight.Bold)
-    val barSubtitle = TextStyle(fontSize = 14.sp, lineHeight = 19.sp, fontWeight = FontWeight.Medium)
-    val sheetTitle = TextStyle(fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
-    val heroStatus = TextStyle(fontSize = 22.sp, lineHeight = 29.sp, fontWeight = FontWeight.SemiBold)
-    val rowTitle = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.Bold)
-    val body = TextStyle(fontSize = 16.sp, lineHeight = 23.sp)
-    val bodySmall = TextStyle(fontSize = 14.sp, lineHeight = 21.sp)
-    val rowSub = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
-    val section = TextStyle(fontSize = 20.sp, lineHeight = 27.sp, fontWeight = FontWeight.SemiBold)
-    val caption = TextStyle(fontSize = 14.sp, lineHeight = 19.sp)
-    val note = TextStyle(fontSize = 14.sp, lineHeight = 20.sp)
-    val noteStrong = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
-    val label = TextStyle(fontSize = 16.sp, lineHeight = 22.sp)
-    val badge = TextStyle(fontSize = 12.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
-    val value = TextStyle(fontSize = 18.sp, lineHeight = 24.sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
-    val metric = TextStyle(fontSize = 20.sp, lineHeight = 28.sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
-    val metricLarge = TextStyle(fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.SemiBold, fontFeatureSettings = "tnum")
-    val delay = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontWeight = FontWeight.SemiBold)
-    val button = TextStyle(fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.SemiBold)
-    val buttonSmall = TextStyle(fontSize = 14.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold)
+    val largeTitle = HomeType.largeTitle
+    val barTitle = HomeType.barTitle
+    val barSubtitle = HomeType.barSubtitle
+    val sheetTitle = HomeType.sheetTitle
+    val heroStatus = HomeType.heroStatus
+    val rowTitle = HomeType.rowTitle
+    val body = HomeType.body
+    val bodySmall = HomeType.bodySmall
+    val rowSub = HomeRowSubStyle
+    val section = HomeType.section
+    val caption = HomeType.caption
+    val note = HomeType.note
+    val noteStrong = HomeType.noteStrong
+    val label = HomeType.label
+    val badge = HomeType.badge
+    val value = HomeType.value
+    val metric = HomeType.metric
+    val metricLarge = TextStyle(fontSize = 30.sp, lineHeight = 38.sp, fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum")
+    val delay = HomeType.delay
+    val button = HomeType.button
+    val buttonSmall = HomeType.buttonSmall
     val mono = TextStyle(fontSize = 14.sp, lineHeight = 21.sp, fontFamily = FontFamily.Monospace)
 }
 
-/** Use the actual app palette, including live Monet/custom accents, with the concept's flat canvas. */
+/**
+ * Kept for the hosts and previews that wrap the module in it. The palette itself now comes from
+ * the app theme (which provides the home colours for every page), so there is nothing to map.
+ */
 @Composable
-internal fun ToolsConceptTheme(content: @Composable () -> Unit) {
-    val base = LocalHomeColors.current
-    val current = Hx.colors
-    val colors = base.copy(
-        bg = if (current.dark) current.canvas else Color(0xFFECEEFB),
-        surface = if (current.dark) current.surface else Color(0xFFF8F7FD),
-        sunken = current.surfaceMuted,
-        t1 = current.text,
-        t2 = current.textMuted,
-        t3 = current.textFaint,
-        accent = current.accent,
-        onAccent = current.onAccent,
-        accentSoft = current.accentSoft,
-        dark = current.dark,
-    )
-    CompositionLocalProvider(LocalHomeColors provides colors, content = content)
-}
+internal fun ToolsConceptTheme(content: @Composable () -> Unit) = content()
+
+/* ------------------------------------------------------------------ */
+/*  Page frames                                                         */
+/* ------------------------------------------------------------------ */
 
 /** A real refresh gesture, with the same action exposed to keyboard and accessibility users. */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun ToolsPullRefresh(
     refreshing: Boolean,
     onRefresh: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    indicatorTop: Dp = 0.dp,
     content: @Composable () -> Unit,
 ) {
-    val refreshLabel = ht("刷新")
     if (onRefresh == null) Box(modifier) { content() }
-    else PullToRefreshBox(isRefreshing = refreshing, onRefresh = onRefresh,
-        modifier = modifier.semantics {
-            customActions = listOf(CustomAccessibilityAction(refreshLabel) { if (!refreshing) onRefresh(); true })
-        }) { content() }
+    else HomeRefreshBox(refreshing, onRefresh, ht("刷新"), modifier, indicatorPadding = PaddingValues(top = indicatorTop)) { content() }
 }
+
+/**
+ * Sub-page of the tools tab: the content scrolls under a glass bar, cards keep the 14 dp rhythm.
+ *
+ * @param scroll hoisted when the host needs to position the page.
+ * @param footer pinned under the content, above the navigation bar (primary actions of a form).
+ * @param titleInset room kept free on each side of the centred title; raise it for bars with
+ *   more than two actions.
+ */
+@Composable
+internal fun ToolsPage(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    actions: @Composable RowScope.() -> Unit = {},
+    refreshing: Boolean = false,
+    onRefresh: (() -> Unit)? = null,
+    scroll: ScrollState = rememberScrollState(),
+    titleInset: Dp = 104.dp,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
+    HomeBarScaffold(title, onBack, lifted, modifier, subtitle = subtitle, actions = actions, footer = footer, titleInset = titleInset) { top, glass ->
+        ToolsPullRefresh(refreshing, onRefresh, Modifier.fillMaxSize(), indicatorTop = top) {
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .homeGlassSource(glass)
+                    .verticalScroll(scroll)
+                    .let { if (footer == null) it.windowInsetsPadding(WindowInsets.navigationBars) else it }
+                    .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = top + 6.dp, bottom = 32.dp),
+                verticalArrangement = Arrangement.spacedBy(HomeDims.gap),
+                content = content,
+            )
+        }
+    }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Surfaces and controls: the home kit under the names the pages use   */
+/* ------------------------------------------------------------------ */
 
 @Composable
 internal fun ToolsSurfaceCard(
@@ -131,23 +179,10 @@ internal fun ToolsSurfaceCard(
     clickLabel: String? = null,
     background: Color = LocalHomeColors.current.surface,
     content: @Composable ColumnScope.() -> Unit,
-) {
-    val haptics = LocalHomeHaptics.current
-    val source = remember { MutableInteractionSource() }
-    val localizedClickLabel = clickLabel?.let { ht(it) }
-    val shaped = modifier.clip(ToolsDesignDims.cardShape).background(background)
-    val interactive = if (onClick == null) shaped else shaped.hxPressScale(source, .985f)
-        .clickable(interactionSource = source, indication = null, onClickLabel = localizedClickLabel, role = Role.Button) {
-            haptics(HomeHaptic.Tap); onClick()
-        }
-    Column(interactive, content = content)
-}
+) = HomeCard(modifier, onClick, clickLabel, background, content = content)
 
 @Composable
-internal fun ToolsHairline(modifier: Modifier = Modifier) {
-    val line = LocalHomeColors.current.line
-    Box(modifier.fillMaxWidth().height(.5.dp).background(line.copy(alpha = line.alpha * .7f)))
-}
+internal fun ToolsHairline(modifier: Modifier = Modifier) = HomeDivider(modifier)
 
 @Composable
 internal fun ToolsIconButton(
@@ -158,20 +193,13 @@ internal fun ToolsIconButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     tint: Color = LocalHomeColors.current.t1,
-) {
-    val c = LocalHomeColors.current
-    val haptics = LocalHomeHaptics.current
-    val source = remember { MutableInteractionSource() }
-    val localizedLabel = ht(label)
-    Box(modifier.size(48.dp).clip(ToolsDesignDims.controlShape).hxPressScale(source, .94f)
-        .clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
-            onClickLabel = localizedLabel, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-        .semantics { contentDescription = localizedLabel }, contentAlignment = Alignment.Center) {
-        if (loading) HomeSpinner(size = 18.dp, color = c.t2)
-        else Icon(icon, null, Modifier.size(26.dp), tint = if (enabled) tint else c.t3)
-    }
-}
+    spinning: Boolean = false,
+) = HomeIconButton(icon, label, onClick, modifier, enabled, loading, tint, spinning)
 
+/**
+ * Button of a tool page. Soft is the accent tint of the concept (下载, 导入, 保留草稿) unless
+ * [neutral] asks for the grey one that sits next to a primary action (取消).
+ */
 @Composable
 internal fun ToolsButton(
     text: String,
@@ -182,109 +210,13 @@ internal fun ToolsButton(
     enabled: Boolean = true,
     loading: Boolean = false,
     neutral: Boolean = false,
-    spinnerSize: Dp = 18.dp,
-    visualHeight: Dp? = null,
-    textStyle: TextStyle? = null,
-    horizontalPadding: Dp? = null,
-    visualCornerRadius: Dp? = null,
-) {
-    val c = LocalHomeColors.current
-    val haptics = LocalHomeHaptics.current
-    val source = remember { MutableInteractionSource() }
-    val (fill, foreground) = when (kind) {
-        HomeButtonKind.Primary -> c.accent to c.onAccent
-        HomeButtonKind.Secondary -> c.surface to c.t1
-        HomeButtonKind.Soft -> if (neutral) c.sunken to c.t1 else c.accentSoft to c.accent
-        HomeButtonKind.Ghost -> Color.Transparent to c.accent
-    }
-    val backgroundModifier = if (visualHeight == null) Modifier
-        .clip(if (kind == HomeButtonKind.Primary) RoundedCornerShape(24.dp) else ToolsDesignDims.controlShape).background(fill)
-        .then(if (kind == HomeButtonKind.Secondary) Modifier.border(.75.dp, c.line2, ToolsDesignDims.controlShape) else Modifier)
-    else Modifier
-        .drawBehind {
-            val height = visualHeight.toPx().coerceIn(0f, size.height)
-            val top = (size.height - height) / 2f
-            val radius = minOf((visualCornerRadius ?: if (kind == HomeButtonKind.Primary) 24.dp else 14.dp).toPx(), height / 2f, size.width / 2f)
-            drawRoundRect(fill, Offset(0f, top), Size(size.width, height), CornerRadius(radius, radius))
-            if (kind == HomeButtonKind.Secondary) {
-                val stroke = .75.dp.toPx()
-                val borderRadius = (radius - stroke / 2f).coerceAtLeast(0f)
-                drawRoundRect(c.line2, Offset(stroke / 2f, top + stroke / 2f),
-                    Size((size.width - stroke).coerceAtLeast(0f), (height - stroke).coerceAtLeast(0f)),
-                    CornerRadius(borderRadius, borderRadius), style = Stroke(stroke))
-            }
-        }
-    Row(modifier.heightIn(min = 48.dp).alpha(if (enabled) 1f else .45f)
-        .then(backgroundModifier)
-        .hxPressScale(source, .97f).clickable(enabled = enabled && !loading, interactionSource = source, indication = null,
-            role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-        .padding(horizontal = horizontalPadding ?: 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)) {
-        if (loading) HomeSpinner(size = spinnerSize, color = foreground)
-        else if (icon != null) Icon(icon, null, Modifier.size(22.dp), tint = foreground)
-        Text(ht(text), color = foreground, style = textStyle ?: ToolsTypography.button, maxLines = 1)
-    }
-}
+    height: Dp = 50.dp,
+) = HomeButton(text, onClick, modifier, kind, icon, enabled, loading, height = height, tinted = kind == HomeButtonKind.Soft && !neutral)
 
-@Composable
-internal fun ToolsTopBar(
-    title: String,
-    onBack: () -> Unit,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    subtitleStyle: TextStyle? = null,
-    actions: @Composable RowScope.() -> Unit = {},
-) {
-    val c = LocalHomeColors.current
-    Box(modifier.fillMaxWidth().background(c.bg).windowInsetsPadding(WindowInsets.statusBars)
-        .height(if (subtitle == null) ToolsDesignDims.barHeight else 78.dp)) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp).align(Alignment.Center), verticalAlignment = Alignment.CenterVertically) {
-            ToolsIconButton(HomeIcons.ChevronLeft, "返回", onBack)
-            Spacer(Modifier.weight(1f))
-            actions()
-        }
-        Column(Modifier.align(Alignment.Center).padding(horizontal = 72.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(ht(title), color = c.t1, style = ToolsTypography.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (subtitle != null) Text(ht(subtitle), color = c.t3, style = subtitleStyle ?: ToolsTypography.barSubtitle,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-/** Only this frame's UI labels are localized; its caller owns verbatim document/report bodies. */
-@Composable
-internal fun ToolsSheetContent(
-    title: String,
-    modifier: Modifier = Modifier,
-    subtitle: String? = null,
-    onClose: (() -> Unit)? = null,
-    trailing: (@Composable RowScope.() -> Unit)? = null,
-    footer: (@Composable RowScope.() -> Unit)? = null,
-    compactHeader: Boolean = false,
-    body: @Composable ColumnScope.() -> Unit,
-) {
-    val c = LocalHomeColors.current
-    Column(modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.navigationBars)) {
-        Box(Modifier.fillMaxWidth().padding(top = if (compactHeader) 0.dp else 8.dp, bottom = 4.dp), contentAlignment = Alignment.Center) {
-            Box(Modifier.size(36.dp, 4.dp).background(c.line2, RoundedCornerShape(2.dp)))
-        }
-        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 12.dp,
-            top = if (compactHeader) 0.dp else 8.dp, bottom = if (compactHeader) 0.dp else 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text(ht(title), color = c.t1, style = ToolsTypography.sheetTitle)
-                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 2.dp), color = c.t2, style = ToolsTypography.rowSub)
-            }
-            when {
-                trailing != null -> trailing()
-                onClose != null -> ToolsIconButton(HomeIcons.X, "关闭", onClose)
-            }
-        }
-        Column(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = if (footer == null) 24.dp else 16.dp), content = body)
-        if (footer != null) Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 20.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp), content = footer)
-    }
-}
-
+/**
+ * Tabs of a page (黑名单 / 白名单 / 核心, 从文件导入 / 从链接导入): a card-coloured track whose
+ * accent-tinted thumb slides to the chosen tab.
+ */
 @Composable
 internal fun <T> ToolsSegmented(
     options: List<Pair<T, String>>,
@@ -293,54 +225,53 @@ internal fun <T> ToolsSegmented(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
     icons: Map<T, ImageVector> = emptyMap(),
-    referenceVisualInset: Dp? = null,
-    referenceOuterPadding: Dp? = null,
-    referenceVisualHeight: Dp? = null,
-    referenceTouchHeight: Dp? = null,
-    referenceSegmentShape: Shape? = null,
+    track: Color = LocalHomeColors.current.surface,
+    height: Dp = 60.dp,
+) = HomeSegmented(
+    options, selected, onSelect, modifier, enabled,
+    style = HomeSegmentStyle.Soft, track = track, height = height, corner = if (height >= 56.dp) 24.dp else 16.dp,
+    textStyle = if (height >= 56.dp) ToolsTabStyle else HomeType.button, icons = icons, inset = if (height >= 56.dp) 7.dp else 4.dp,
+)
+
+private val ToolsTabStyle = TextStyle(fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold)
+
+/* ------------------------------------------------------------------ */
+/*  Bottom sheet frame                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * The inside of a bottom sheet: grab handle, title row, body, optional pinned footer. Unlike the
+ * home frame the body does not scroll by itself, because the tool sheets bring their own
+ * scrolling blocks (code, outline). Only the frame's labels are localized; bodies are verbatim.
+ */
+@Composable
+internal fun ToolsSheetContent(
+    title: String,
+    modifier: Modifier = Modifier,
+    subtitle: String? = null,
+    onClose: (() -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+    footer: (@Composable ColumnScope.() -> Unit)? = null,
+    body: @Composable ColumnScope.() -> Unit,
 ) {
     val c = LocalHomeColors.current
-    val haptics = LocalHomeHaptics.current
-    val outerModifier = if (referenceOuterPadding == null)
-        modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(8.dp).selectableGroup()
-    else modifier.fillMaxWidth().clip(ToolsDesignDims.cardShape).background(c.surface).padding(referenceOuterPadding).selectableGroup()
-    val optionContent: @Composable RowScope.() -> Unit = {
-        options.forEach { (key, label) ->
-            val itemModifier = if (referenceVisualInset == null) Modifier.weight(1f).heightIn(min = 44.dp).clip(ToolsDesignDims.segmentShape)
-                .background(if (selected == key) c.accentSoft else Color.Transparent)
-                .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
-                .padding(vertical = 9.dp)
-            else {
-                val inset = referenceVisualInset.coerceIn(0.dp, 9.dp)
-                Modifier.weight(1f).heightIn(min = 44.dp)
-                    .selectable(selected = selected == key, enabled = enabled, role = Role.Tab) { haptics(HomeHaptic.Tick); onSelect(key) }
-                    .padding(vertical = inset)
-                    .clip(referenceSegmentShape ?: ToolsDesignDims.segmentShape)
-                    .background(if (selected == key) c.accentSoft else Color.Transparent)
-                    .padding(vertical = 9.dp - inset)
+    Column(modifier.fillMaxWidth().homeGlassPanel(HomeDims.sheetShape, c.raised, raised = true).windowInsetsPadding(WindowInsets.navigationBars).imePadding()) {
+        Box(Modifier.fillMaxWidth().padding(top = 10.dp, bottom = 2.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(40.dp, 5.dp).background(if (c.dark) c.line2 else Color(0xFFC9CCDA), HomeDims.pillShape))
+        }
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp, top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f).heightIn(min = HomeDims.touch), verticalArrangement = Arrangement.Center) {
+                Text(ht(title), Modifier.semantics { heading() }, color = c.t1, style = HomeType.sheetTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                if (subtitle != null) Text(ht(subtitle), Modifier.padding(top = 3.dp), color = c.t2, style = HomeRowSubStyle)
             }
-            Box(itemModifier, contentAlignment = Alignment.Center) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    icons[key]?.let { Icon(it, null, Modifier.size(22.dp), tint = if (selected == key) c.accent else c.t1) }
-                    Text(ht(label), color = if (selected == key) c.accent else c.t1, style = ToolsTypography.rowTitle, maxLines = 1)
-                }
+            when {
+                trailing != null -> trailing()
+                onClose != null -> HomeIconButton(HomeIcons.X, "关闭", onClose)
             }
         }
-    }
-    if (referenceVisualHeight == null) {
-        Row(outerModifier, content = optionContent)
-    } else {
-        // Keep the PDF-sized track separate from the unchanged larger selectable row.
-        Box(
-            modifier.fillMaxWidth().height(referenceVisualHeight)
-                .background(c.surface, ToolsDesignDims.cardShape).selectableGroup(),
-            contentAlignment = Alignment.Center,
-        ) {
-            Row(
-                Modifier.fillMaxWidth().requiredHeight(referenceTouchHeight ?: 44.dp)
-                    .padding(horizontal = referenceOuterPadding ?: 8.dp),
-                content = optionContent,
-            )
+        Column(Modifier.weight(1f, fill = false).fillMaxWidth().padding(start = 14.dp, end = 14.dp, bottom = if (footer == null) 22.dp else 12.dp), content = body)
+        if (footer != null) {
+            Column(Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 6.dp, bottom = 18.dp), verticalArrangement = Arrangement.spacedBy(10.dp), content = footer)
         }
     }
 }

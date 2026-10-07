@@ -195,10 +195,12 @@ class GoogleFirewall(unittest.TestCase):
             result = self.protocol(count); self.assertEqual(result.returncode, 0); self.assertIn('accepted:', result.stdout)
         self.assertEqual(self.protocol(vendor='1').stdout, 'accepted:30:1\n')
 
-    def test_start_protocol_rejects_invalid_flag_and_other_unsupported_controls(self):
+    def test_start_protocol_rejects_invalid_flags_and_accepts_extended_controls(self):
         result = self.protocol(vendor='2'); self.assertEqual(result.returncode, 1)
         self.assertFalse(json.loads(result.stdout)['ok'])
-        result = self.protocol(vendor='1', perf='1'); self.assertEqual(result.returncode, 1)
+        # Runtime 153 implements the extended controls; they used to block every start.
+        self.assertEqual(self.protocol(vendor='1', perf='1').stdout, 'accepted:30:1\n')
+        result = self.protocol(vendor='1', perf='2'); self.assertEqual(result.returncode, 1)
         self.assertIn('性能模式', json.loads(result.stdout)['message'])
 
 

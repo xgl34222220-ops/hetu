@@ -46,7 +46,7 @@ private fun WithSheet(page: @Composable () -> Unit, sheet: @Composable () -> Uni
         page()
         Box(Modifier.fillMaxSize().background(c.scrim))
         Box(
-            Modifier.align(Alignment.BottomCenter).fillMaxWidth().clip(HomeDims.sheetShape).background(c.surface)
+            Modifier.align(Alignment.BottomCenter).fillMaxWidth().homeGlassPanel(HomeDims.sheetShape, c.raised, raised = true)
                 .border(1.dp, c.line, HomeDims.sheetShape),
         ) { sheet() }
     }

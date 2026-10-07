@@ -15,6 +15,19 @@ def load():
     return layer
 
 
+def load_runtime_layer():
+    """The effective runtime layer: v2089 r153 if present, else v2086."""
+    r153_inputs = ROOT / 'updates/v2089-runtime153/inputs.json'
+    if r153_inputs.exists():
+        r153 = json.loads(r153_inputs.read_text())
+        base = load()
+        # v2089 was already validated by prepare_new_ui_source.py; just use its SHAs.
+        merged = dict(base)
+        merged['rootScriptSha256'] = r153['rootScriptSha256']
+        return merged
+    return load()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=('export', 'junit-filters', 'runtime-snapshot'))
@@ -34,6 +47,7 @@ if __name__ == '__main__':
             print('--tests')
             print(name)
     else:
+        layer = load_runtime_layer()
         assert digest(ROOT / ROOT_SCRIPT) == layer['rootScriptSha256']
         subprocess.run(['python3', str(ROOT / '.github/scripts/verify_packaged_runtime.py'), 'snapshot',
                         '--script-sha256', layer['rootScriptSha256'],

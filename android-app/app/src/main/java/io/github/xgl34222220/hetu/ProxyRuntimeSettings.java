@@ -9,7 +9,7 @@ import java.util.*;
 final class ProxyRuntimeSettings {
     static final String DIRTY_KEY = "proxyRootSettingsDirty";
     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
-    static final int RUNTIME_REVISION = 152;
+    static final int RUNTIME_REVISION = 153;
     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
@@ -18,7 +18,7 @@ final class ProxyRuntimeSettings {
             "proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs",
             "proxyMihomoDnsForward","proxyDnsHijackTcp","proxyDnsHijackUdp","proxyPerformanceMode",
             "proxyCpuAffinityEnabled","proxyCpuAffinity","proxyMemoryLimitEnabled","proxyMemoryLimit",
-            "proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup"
+            "proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup","proxyDnsSystemResolver"
     )));
 
     static final String APPLIED_SETTINGS_KEY = "proxyRootAppliedSettings";
@@ -115,6 +115,9 @@ final class ProxyRuntimeSettings {
             append(state,String.valueOf(Boolean.TRUE.equals(values.get(key))));
         for(String key:new String[]{"proxyCpuAffinity","proxyMemoryLimit","proxyIoWeight"})
             append(state,String.valueOf(values.get(key)==null?"":values.get(key)));
+        // On by default. Only the opt-out is part of the snapshot, so a session applied
+        // before this setting existed still matches until the user actually changes it.
+        if(Boolean.FALSE.equals(values.get("proxyDnsSystemResolver")))append(state,"systemResolver=direct");
         for(String key:new String[]{"proxyAppPackages","proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs"}) {
             append(state,key);
             TreeSet<String> sorted=new TreeSet<>();

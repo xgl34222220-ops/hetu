@@ -354,7 +354,7 @@ class ConceptRemainingCoverageTest {
         rule.runOnUiThread {
             val action = nativeNodes().first { "导出配置" in labels(it) }
             val row = generateSequence(action) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
-            assertTrue("Config actions preserve the measured32dp density; actual=${row.boundsInWindow.height}", row.boundsInWindow.height in 31.5f..33f)
+            assertTrue("Config actions use the app's 46dp menu rows; actual=${row.boundsInWindow.height}", row.boundsInWindow.height in 45.5f..47.5f)
         }
         capture("03A-006-current-config-menu"); dismissSheet()
         longClick("备用配置.yaml"); capture("03A-007-other-config-menu"); dismissSheet()
@@ -462,8 +462,9 @@ class ConceptRemainingCoverageTest {
             val title = nativeNodes().first { "新建文件" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
             val layouts = mutableListOf<androidx.compose.ui.text.TextLayoutResult>()
             assertTrue(title.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
-            assertEquals(26f, layouts.single().layoutInput.style.fontSize.value, .01f)
-            assertEquals(0f, layouts.single().getLineLeft(0), 1f)
+            // Every dialog of the app uses the same card: a 22sp title, centred.
+            assertEquals(22f, layouts.single().layoutInput.style.fontSize.value, .01f)
+            assertTrue("Dialog titles are centred", layouts.single().getLineLeft(0) > 1f)
         }
         capture("03B-018-files-new-file"); click("取消")
         touch("更多"); click("新建文件夹"); capture("03B-019-files-new-folder"); click("取消")
@@ -473,7 +474,7 @@ class ConceptRemainingCoverageTest {
         rule.runOnUiThread {
             val label = nativeNodes().first { "编辑" in labels(it) }
             val row = generateSequence(label) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
-            assertTrue("Reference file menu keeps its measured43dp action rows", row.boundsInWindow.height in 42.5f..44.5f)
+            assertTrue("File menu uses the app's 46dp menu rows; actual=${row.boundsInWindow.height}", row.boundsInWindow.height in 45.5f..47.5f)
         }
         capture("03B-016-file-menu"); click("重命名")
         var normalRenameWidth = 0f
@@ -486,7 +487,7 @@ class ConceptRemainingCoverageTest {
         rule.runOnUiThread {
             val title = nativeNodes().first { "重命名" in labels(it) && it.config.getOrNull(SemanticsActions.GetTextLayoutResult)?.action != null }
             val errorWidth = title.boundsInWindow.width
-            assertTrue("Rename validation keeps input and widens only the error card", errorWidth > normalRenameWidth + 20f)
+            assertEquals("Rename validation unfolds under the field; the card keeps its width", normalRenameWidth, errorWidth, 1f)
         }
         capture("03B-025-files-name-unchanged"); click("取消")
         longClick("config.yaml"); click("删除"); capture("03B-023-file-delete"); click("取消")
@@ -494,7 +495,7 @@ class ConceptRemainingCoverageTest {
         rule.runOnUiThread {
             val label = nativeNodes().first { "打开" in labels(it) }
             val row = generateSequence(label) { it.parent }.first { it.config.getOrNull(SemanticsActions.OnClick)?.action != null }
-            assertTrue("Reference folder menu keeps its measured36dp action rows", row.boundsInWindow.height in 35.5f..37.5f)
+            assertTrue("Folder menu uses the app's 46dp menu rows; actual=${row.boundsInWindow.height}", row.boundsInWindow.height in 45.5f..47.5f)
         }
         capture("03B-017-folder-menu"); click("删除"); capture("03B-024-folder-delete"); click("取消")
         click("backup"); expectEventually("backup.yaml"); replace(0,"backup"); capture("03B-014-files-subfolder-search")

@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.home.homeGlassPanel
+import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.ht
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -50,50 +52,31 @@ import androidx.compose.foundation.gestures.draggable
 import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.PriorityHigh
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Home
-import androidx.compose.material.icons.rounded.Dashboard
-import androidx.compose.material.icons.rounded.GridView
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.Hub
-import androidx.compose.material.icons.rounded.Rule
 import androidx.compose.material.icons.rounded.Settings
-import androidx.compose.material.icons.rounded.SwapVert
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
-import androidx.compose.material3.Surface
 import io.github.xgl34222220.hetu.ui.DockItem
 import io.github.xgl34222220.hetu.ui.HetuGlassDock
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
@@ -111,7 +94,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -292,7 +274,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
     BackHandler(enabled = nav.stack.size == 1 && vm.tab != HxTab.Home) { vm.tab = HxTab.Home }
 
     CompositionLocalProvider(LocalNav provides nav, LocalHxBlur provides vm.blurEnabled) {
-        Box(Modifier.fillMaxSize().background(c.canvas)) {
+        Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
             AnimatedContent(
                 targetState = nav.current,
                 transitionSpec = { routeTransition(nav.forward) },
@@ -435,7 +417,7 @@ private fun MainTabs(vm: HetuViewModel) {
             }
         }
     }
-    Box(Modifier.fillMaxSize().background(c.canvas)) {
+    Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
         Box(
             Modifier.fillMaxSize()
                 .then(if (!runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
@@ -528,7 +510,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
     setContent {
         HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
             CompositionLocalProvider(LocalHxBlur provides vm.blurEnabled) {
-                Box(Modifier.fillMaxSize().background(Hx.colors.canvas)) {
+                Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                     content(vm)
                     HxToastHost(vm)
                 }
@@ -562,14 +544,15 @@ internal fun hxToastTone(message: String): HxTone = when {
     else -> HxTone.Neutral
 }
 
-/** Floating top toast: tone icon, tap or flick up to dismiss. */
+/** Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss. */
 @Composable
 private fun HxToast(message: String, onDismiss: () -> Unit) {
-    val c = Hx.colors
+    val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
     val tone = hxToastTone(message)
     var drag by remember { mutableStateOf(0f) }
-    Surface(
-        modifier = Modifier
+    val shape = RoundedCornerShape(50)
+    Row(
+        Modifier
             .graphicsLayer {
                 translationY = drag
                 alpha = (1f - drag / 160f).coerceIn(0f, 1f)
@@ -585,30 +568,26 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
                     }
                 },
             )
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss),
-        shape = RoundedCornerShape(50),
-        color = c.surface,
-        contentColor = c.text,
-        shadowElevation = 14.dp,
-        tonalElevation = 0.dp,
-        border = if (c.dark) androidx.compose.foundation.BorderStroke(0.5.dp, c.line) else null,
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+            .homeGlassPanel(shape, c.raised, raised = true)
+            .heightIn(min = 48.dp)
+            .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(Modifier.padding(start = 8.dp, end = 18.dp, top = 8.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.testTag("toast-status").size(26.dp).clip(CircleShape).background(tone.bg()), contentAlignment = Alignment.Center) {
-                Icon(
-                    when (tone) {
-                        HxTone.Bad -> Icons.Rounded.Close
-                        HxTone.Warn -> Icons.Rounded.PriorityHigh
-                        HxTone.Good -> Icons.Rounded.Check
-                        else -> Icons.Rounded.Info
-                    },
-                    null,
-                    tint = tone.fg(),
-                    modifier = Modifier.size(16.dp),
-                )
-            }
-            Spacer(Modifier.width(9.dp))
-            Text(message, style = MaterialTheme.typography.bodyMedium, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium, color = c.text, maxLines = 2)
+        Box(Modifier.testTag("toast-status").size(26.dp), contentAlignment = Alignment.Center) {
+            Icon(
+                when (tone) {
+                    HxTone.Bad -> io.github.xgl34222220.hetu.panel.PanelIcons.CircleX
+                    HxTone.Warn -> io.github.xgl34222220.hetu.home.HomeIcons.TriangleAlert
+                    HxTone.Good -> io.github.xgl34222220.hetu.home.HomeIcons.CircleCheck
+                    else -> io.github.xgl34222220.hetu.home.HomeIcons.Info
+                },
+                null,
+                tint = tone.fg(),
+                modifier = Modifier.size(22.dp),
+            )
         }
+        Spacer(Modifier.width(10.dp))
+        Text(message, color = c.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), maxLines = 2)
     }
 }

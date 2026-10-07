@@ -77,7 +77,7 @@ internal fun RulesScreen(vm: HetuViewModel, bottomPadding: Dp, forcedSection: St
     var query by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
 
-    LaunchedEffect(section, state.running) {
+    LaunchedEffect(section, state.running, vm.contentRevision) {
         if (!state.running) return@LaunchedEffect
         when (section) {
             "sets" -> if (vm.ruleSets.isEmpty()) vm.loadRuleSets()

@@ -164,4 +164,64 @@ internal object PanelIcons {
         "M12 2v10",
         "M18.4 6.6a9 9 0 1 1-12.77.04",
     ) }
+
+    val Funnel: ImageVector by lazy { vector("Funnel",
+        "M10 20a1 1 0 0 0 .553.895l2 1A1 1 0 0 0 14 21v-7a2 2 0 0 1 .517-1.341L21.74 4.67A1 1 0 0 0 21 3H3a1 1 0 0 0-.742 1.67l7.225 7.989A2 2 0 0 1 10 14z",
+    ) }
+
+    val CircleEllipsis: ImageVector by lazy { vector("CircleEllipsis",
+        "M2 12a10 10 0 1 0 20 0a10 10 0 1 0 -20 0Z",
+        "M17 12h.01",
+        "M12 12h.01",
+        "M7 12h.01",
+    ) }
+
+    val SearchX: ImageVector by lazy { vector("SearchX",
+        "m13.5 8.5-5 5",
+        "m8.5 8.5 5 5",
+        "M3 11a8 8 0 1 0 16 0a8 8 0 1 0 -16 0Z",
+        "m21 21-4.3-4.3",
+    ) }
+
+    val Inbox: ImageVector by lazy { vector("Inbox",
+        "M22 12L16 12L14 15L10 15L8 12L2 12",
+        "M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z",
+    ) }
+
+    val Layers: ImageVector by lazy { vector("Layers",
+        "M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z",
+        "M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12",
+        "M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17",
+    ) }
+
+    val Route: ImageVector by lazy { vector("Route",
+        "M3 19a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+        "M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15",
+        "M15 5a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
+    ) }
+
+    val Link: ImageVector by lazy { vector("Link",
+        "M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71",
+        "M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71",
+    ) }
+
+    val RotateCw: ImageVector by lazy { vector("RotateCw",
+        "M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8",
+        "M21 3v5h-5",
+    ) }
+
+    val ScrollText: ImageVector by lazy { vector("ScrollText",
+        "M15 12h-5",
+        "M15 8h-5",
+        "M19 17V5a2 2 0 0 0-2-2H4",
+        "M8 21h12a2 2 0 0 0 2-2v-1a1 1 0 0 0-1-1H11a1 1 0 0 0-1 1v1a2 2 0 1 1-4 0V5a2 2 0 1 0-4 0v2a1 1 0 0 0 1 1h3",
+    ) }
+
+    val ListTree: ImageVector by lazy { vector("ListTree",
+        "M8 5h13",
+        "M13 12h8",
+        "M13 19h8",
+        "M3 10a2 2 0 0 0 2 2h3",
+        "M3 5v12a2 2 0 0 0 2 2h3",
+    ) }
 }

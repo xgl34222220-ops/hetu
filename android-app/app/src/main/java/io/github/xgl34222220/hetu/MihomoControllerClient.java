@@ -40,7 +40,13 @@ final class MihomoControllerClient {
         }
     }
     private final Context context;
-    MihomoControllerClient(Context c){context=c.getApplicationContext();}
+    private final ControllerEndpoint frozenEndpoint;
+    MihomoControllerClient(Context c){context=c.getApplicationContext();frozenEndpoint=null;}
+    /** A multi-request operation keeps one endpoint/credential pair throughout. */
+    MihomoControllerClient(Context c,Map<String,?> snapshot)throws IOException{
+        context=c.getApplicationContext();
+        frozenEndpoint=new ControllerEndpoint(new HashMap<>(snapshot));
+    }
 
     private android.content.SharedPreferences prefs(){
         return context.getSharedPreferences("hetu",0);
@@ -238,7 +244,7 @@ final class MihomoControllerClient {
 
     private JSONObject request(String method,String path,JSONObject body,int socketTimeoutMs)throws Exception{
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
-        ControllerEndpoint endpoint=new ControllerEndpoint(prefs().getAll());
+        ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
         Socket socket=new Socket();
         try{
             socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host),endpoint.port),2200);

@@ -259,6 +259,108 @@ def main():
                                'allOriginal487TestsPreserved': True,
                                'rootScriptSha256': function['rootScriptSha256'],
                                'runtimePayloadCount': 23}
+        homepanel_report = None
+        homepanel_inputs = ROOT / 'updates/v2087-home-panel-refactor/inputs.json'
+        if homepanel_inputs.exists():
+            from homepanel87_source_scope import validate_layer as validate_homepanel_layer
+            assert function_report is not None, 'Home/panel refactor requires the verified function-fix layer'
+            homepanel = json.loads(homepanel_inputs.read_text())
+            validate_homepanel_layer(homepanel, final_files)
+            homepanel_patch = homepanel_inputs.with_name('ui.patch')
+            assert digest(homepanel_patch) == homepanel['patchSha256'], \
+                'Home/panel patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'Home/panel refactor baseline mismatch: ' + name
+            apply(homepanel_patch, work)
+            for name, sha in homepanel['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'Home/panel refactor source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(homepanel['changedOrAddedFiles'])
+            homepanel_report = {'baseCommit': homepanel['baseCommit'],
+                                'patchSha256': homepanel['patchSha256'],
+                                'changedOrAddedFiles': len(homepanel['changedOrAddedFiles']),
+                                'versionCode': homepanel['versionCode'],
+                                'versionName': homepanel['versionName'],
+                                'protectedRuntimeUnchanged': True,
+                                'reproducedSourceMatchesCheckout': True}
+        ui88_report = None
+        ui88_inputs = ROOT / 'updates/v2088-ui-refactor/inputs.json'
+        if ui88_inputs.exists():
+            from ui88_source_scope import validate_layer as validate_ui88_layer
+            assert homepanel_report is not None, 'UI unification requires the verified home/panel layer'
+            ui88 = json.loads(ui88_inputs.read_text())
+            validate_ui88_layer(ui88, final_files)
+            ui88_patch = ui88_inputs.with_name('ui.patch')
+            assert digest(ui88_patch) == ui88['patchSha256'], \
+                'UI unification patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'UI unification baseline mismatch: ' + name
+            apply(ui88_patch, work)
+            for name, sha in ui88['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'UI unification source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(ui88['changedOrAddedFiles'])
+            ui88_report = {'baseCommit': ui88['baseCommit'],
+                           'patchSha256': ui88['patchSha256'],
+                           'changedOrAddedFiles': len(ui88['changedOrAddedFiles']),
+                           'versionCode': ui88['versionCode'],
+                           'versionName': ui88['versionName'],
+                           'protectedRuntimeUnchanged': True,
+                           'reproducedSourceMatchesCheckout': True}
+        r153_report = None
+        r153_inputs = ROOT / 'updates/v2089-runtime153/inputs.json'
+        if r153_inputs.exists():
+            from runtime153_source_scope import validate_layer as validate_r153_layer
+            assert ui88_report is not None, 'r153 runtime requires the verified v2088 UI layer'
+            r153 = json.loads(r153_inputs.read_text())
+            validate_r153_layer(r153, final_files)
+            r153_patch = r153_inputs.with_name('runtime.patch')
+            assert digest(r153_patch) == r153['patchSha256'], \
+                'r153 runtime patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'r153 baseline mismatch: ' + name
+            apply(r153_patch, work)
+            for name, sha in r153['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'r153 source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(r153['changedOrAddedFiles'])
+            r153_report = {'baseCommit': r153['baseCommit'],
+                           'patchSha256': r153['patchSha256'],
+                           'changedOrAddedFiles': len(r153['changedOrAddedFiles']),
+                           'runtimeRevision': r153['runtimeRevision'],
+                           'versionCode': r153['versionCode'],
+                           'versionName': r153['versionName'],
+                           'protectedPresentationUnchanged': True,
+                           'reproducedSourceMatchesCheckout': True}
+        stability90_report = None
+        stability90_inputs = ROOT / 'updates/v2090-stability-glass/inputs.json'
+        if stability90_inputs.exists():
+            from stability90_source_scope import validate_layer as validate_stability90_layer, validate_version as validate_stability90_version
+            assert r153_report is not None, 'V20.90 requires every verified predecessor layer'
+            stability90 = json.loads(stability90_inputs.read_text())
+            validate_stability90_layer(stability90, final_files)
+            stability90_patch = stability90_inputs.with_name('runtime.patch')
+            assert digest(stability90_patch) == stability90['patchSha256']
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'V20.90 baseline mismatch: ' + name
+            before_build = (work / 'android-app/app/build.gradle.kts').read_text()
+            apply(stability90_patch, work)
+            validate_stability90_version(before_build, (work / 'android-app/app/build.gradle.kts').read_text())
+            for name, sha in stability90['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'V20.90 generated source mismatch: ' + name
+            for name, sha in stability90['frozenFiles'].items():
+                assert digest(work / name) == sha, 'V20.90 changed frozen input: ' + name
+            final_files.update(stability90['changedOrAddedFiles'])
+            stability90_report = {'baseCommit': stability90['baseCommit'],
+                                  'patchSha256': stability90['patchSha256'],
+                                  'changedOrAddedFiles': len(stability90['changedOrAddedFiles']),
+                                  'frozenInputs': len(stability90['frozenFiles']),
+                                  'versionCode': stability90['versionCode'],
+                                  'versionName': stability90['versionName'],
+                                  'expectedUnitTests': stability90['expectedUnitTests'],
+                                  'expectedTestXmlFiles': stability90['expectedTestXmlFiles'],
+                                  'allOriginal545TestcaseIdentitiesPreserved': True,
+                                  'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)
@@ -278,6 +380,14 @@ def main():
             report['finalPdfGeometryLayer'] = final_pdf_report
         if function_report is not None:
             report['functionFixLayer'] = function_report
+        if homepanel_report is not None:
+            report['homePanelLayer'] = homepanel_report
+        if ui88_report is not None:
+            report['toolsSettingsUiLayer'] = ui88_report
+        if r153_report is not None:
+            report['runtime153Layer'] = r153_report
+        if stability90_report is not None:
+            report['stability90Layer'] = stability90_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.home.HetuHomeV2
+import io.github.xgl34222220.hetu.home.HomeWanExtras
 
 /** New presentation, using the same lifecycle and guarded actions as V20.81. */
 @Composable
@@ -45,5 +46,18 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
         cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
         resourceSamples = vm.resourceSamples.toList(),
+        wanExtras = HomeWanExtras(
+            city = rt.wanCity, organization = rt.wanOrganization, ipType = rt.wanIpType,
+            timezone = rt.wanTimezone, coordinates = rt.wanCoordinates,
+            state = rt.wanState, error = rt.wanError,
+        ),
+        operationText = vm.operationText,
+        connection = io.github.xgl34222220.hetu.home.HomeConnectionObservation(
+            controllerReady = vm.state.panelReady,
+            controllerReadFailed = vm.state.controllerReadFailed,
+            controllerError = vm.state.controllerError,
+            takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
+            runtimeMessage = vm.state.message,
+        ),
     )
 }

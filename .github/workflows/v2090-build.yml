@@ -1,0 +1,615 @@
+name: Hetu V20.90 stability and diffuse glass verification
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: hetu-v2090-${{ github.ref }}-${{ github.sha }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - name: Load current layer and fetch exact predecessor objects
+      run: 'set -euo pipefail
+
+        git fetch --no-tags --depth=1 origin 1dbe40cc4e312c230524092dfe32a2c6cfb5f25d
+
+        git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c
+
+        git fetch --no-tags --depth=1 origin ec211b9ad81748dee30fec43f0a25849559e4623
+
+        git fetch --no-tags --depth=1 origin 610a523ea524dff521b5d01e7aa78c421399594a
+
+        git fetch --no-tags --depth=1 origin 9769663edcda3a1c33f2eb2594a6b4fd9b4e2a6f
+
+        python3 .github/scripts/stability90_ci_config.py export
+
+        '
+    - name: Regenerate and verify integrated effective source
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: "set -euo pipefail\nmkdir -p \"$RUNNER_TEMP/hetu-v2081-source\"\ngh run download 37171744564 --repo \"$GITHUB_REPOSITORY\"\
+        \ --name Hetu-V20.81-effective-source --dir \"$RUNNER_TEMP/hetu-v2081-source\"\nARCHIVE=\"$RUNNER_TEMP/hetu-v2081-source/Hetu-V20.81-effective-source.tar.gz\"\
+        \n# Only ignored native binaries are restored; all effective source is checked in.\npython3 - \"$ARCHIVE\" <<'PYINNER'\n\
+        import hashlib,sys,tarfile\nfrom pathlib import Path\np=Path(sys.argv[1])\nassert hashlib.sha256(p.read_bytes()).hexdigest()=='6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730'\n\
+        with tarfile.open(p) as z:\n for m in z.getmembers():\n  if m.isfile() and (m.name.startswith('android-app/app/src/main/jniLibs/')\
+        \ or m.name.startswith('android-app/app/src/main/assets/mihomo-root/') or m.name=='android-app/app/src/main/assets/mihomo-revision.txt'):\n\
+        \   q=Path(m.name);q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(z.extractfile(m).read())\nPYINNER\npython3\
+        \ .github/scripts/prepare_new_ui_source.py \"$ARCHIVE\"\npython3 .github/scripts/stability90_ci_config.py runtime-snapshot\n\
+        sh -n android-app/app/src/main/assets/hetu-root.sh\nsh -n android-app/app/src/main/assets/hetu-autostart.sh\npython3\
+        \ tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt\npython3 tools/qa/test_google_firewall.py\
+        \ 2>&1 | tee out/verification/google-firewall-tests.txt\npython3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt\n\
+        python3 tools/qa/test_network_recovery_stress.py --before out/verification/v2078-network-service.java --output out/verification/network-recovery-stress.json\n\
+        python3 tools/qa/test_network_journal_stress.py --before out/verification/v2079-network-journal.java --output out/verification/network-journal-stress.json\n\
+        python3 tools/qa/test_network_journal_symbols.py --before out/verification/v2080-network-journal.java --output out/verification/network-journal-symbols.json\n\
+        git show 9769663edcda3a1c33f2eb2594a6b4fd9b4e2a6f:android-app/app/src/main/assets/hetu-root.sh > out/verification/runtime152-before.sh\n\
+        HETU_R152_SOURCE=\"$PWD/out/verification/runtime152-before.sh\" python3 tools/qa/test_core_identity_dns.py 2>&1 |\
+        \ tee out/verification/core-identity-dns-tests.txt\n"
+    - name: Verify presentation patch cannot alter runtime or dependency inputs
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
+
+        '
+    - name: Verify PDF layer preserves frozen UI and diagnostic boundaries
+      run: python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_pdf85_source_scope.py
+    - name: Verify uploaded tools intake source and additive test boundaries
+      run: 'set -euo pipefail
+
+        git fetch --no-tags --depth=1 origin 2730954591393c1b81f747cef72adb8940c5a82c
+
+        git fetch --no-tags --depth=1 origin ec211b9ad81748dee30fec43f0a25849559e4623
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_tools_intake_source_scope.py
+
+        python3 .github/scripts/test_tools_intake_test_results.py
+
+        '
+    - name: Verify measured final PDF presentation preserves intake and shared defaults
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_pdf85_final_source_scope.py
+
+        '
+    - name: Verify independent authentication source and test-evidence boundaries
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_auth_source_scope.py 2>&1 | tee out/verification/auth-source-scope-tests.txt
+
+        python3 .github/scripts/test_auth_test_results.py 2>&1 | tee out/verification/auth-test-evidence-tests.txt
+
+        '
+    - name: Execute original function gates on their exact historical source
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_functionfix_source_scope.py
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_functionfix_test_results.py
+
+        python3 .github/scripts/run_stability90_baseline_hosts.py --gate test_functionfix_workflow.py
+
+        python3 tools/qa/test_fake_ip_private_routing.py 2>&1 | tee out/verification/fake-ip-private-routing-tests.txt
+
+        '
+    - name: Verify current source, testcase identities and workflow ownership
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_stability90_evidence.py
+
+        git show 610a523ea524dff521b5d01e7aa78c421399594a:android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java
+        > out/verification/main-DnsTakeoverProbe.java
+
+        python3 tools/qa/test_dns_takeover_probe.py --before out/verification/main-DnsTakeoverProbe.java --output out/verification/dns-takeover-probe90.json
+        2>&1 | tee out/verification/dns-takeover-probe-tests.txt
+
+        python3 -m unittest discover -s tools/qa -p test_mihomo_soak90.py -v 2>&1 | tee out/verification/native-soak-host-guards.txt
+
+        '
+    - name: Run sustained synthetic network recovery state-machine regression
+      timeout-minutes: 20
+      run: 'set -euo pipefail
+
+        python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
+
+        '
+    - name: Regress actual tool viewport gesture bounds
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_native_scroll_bounds.py 2>&1 | tee out/verification/native-scroll-bounds-tests.txt
+
+        '
+    - name: Regress isolated controller authentication installation fixtures
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_mock_webview_controller.py 2>&1 | tee out/verification/mock-controller-fixture-tests.txt
+
+        python3 .github/scripts/test_panel_auth_smoke.py 2>&1 | tee out/verification/panel-auth-smoke-tests.txt
+
+        '
+    - name: Regress observed nested WebView document topology without weakening surface guards
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_native_webview_bounds.py 2>&1 | tee out/verification/native-webview-bounds-tests.txt
+
+        '
+    - name: Verify built-in WebUI behavior with controlled API fixtures
+      run: 'node --check .github/scripts/check_hetu_webview.cjs
+
+        node .github/scripts/test_webui_concept.cjs'
+    - name: Render built-in WebUI with isolated browser fixtures
+      timeout-minutes: 10
+      run: 'set -euo pipefail
+
+        npm install --prefix "$RUNNER_TEMP/hetu-browser-qa" --ignore-scripts --no-audit --no-fund playwright@1.62.1
+
+        "$RUNNER_TEMP/hetu-browser-qa/node_modules/.bin/playwright" install --with-deps chromium
+
+        NODE_PATH="$RUNNER_TEMP/hetu-browser-qa/node_modules" node .github/scripts/test_webui_browser.cjs
+
+        '
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Reproduce cache eviction on old production exporter and verify new exporter
+      run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java
+    - name: Restore signing identity
+      uses: actions/cache/restore@v4
+      with:
+        path: /home/runner/.android/hetu-ui10-debug.jks
+        key: hetu-ui10-debug-signing-v1
+        fail-on-cache-miss: true
+    - name: Verify signing identity
+      run: "set -euo pipefail\ntest -s \"$HETU_TEST_KEYSTORE\"\nkeytool -exportcert -keystore \"$HETU_TEST_KEYSTORE\" -alias\
+        \ androiddebugkey -storepass android \\\n  | openssl dgst -sha256 -r | cut -d ' ' -f1 | grep -qx '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'\n"
+    - name: Prepare Android SDK
+      run: 'set -euo pipefail
+
+        SDKMANAGER=$(find "$ANDROID_HOME/cmdline-tools" -type f -path ''*/bin/sdkmanager'' | sort | tail -n 1)
+
+        yes | "$SDKMANAGER" --licenses >/dev/null || true
+
+        "$SDKMANAGER" ''platforms;android-37.0'' ''build-tools;37.0.0''
+
+        '
+    - uses: gradle/actions/setup-gradle@v4
+      with:
+        gradle-version: 9.5.0
+    - name: Export exact V20.90 effective source
+      run: 'set -euo pipefail
+
+        tar -czf /tmp/Hetu-V20.90-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+
+        sha256sum /tmp/Hetu-V20.90-effective-source.tar.gz
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: error
+        name: Hetu-V20.90-effective-source
+        path: /tmp/Hetu-V20.90-effective-source.tar.gz
+    - name: Record resolved MaterialKolor ABI dependencies
+      working-directory: android-app
+      run: 'set -euo pipefail
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
+        debugRuntimeClasspath --dependency com.materialkolor > ../out/verification/materialkolor-dependency-insight.txt
+
+        cat ../out/verification/materialkolor-dependency-insight.txt
+
+        '
+    - name: Build APK
+      run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
+      working-directory: android-app
+    - name: Verify APK embeds the tested runtime
+      run: python3 .github/scripts/verify_packaged_runtime.py verify
+    - name: Verify packaged MaterialKolor constructors
+      run: python3 .github/scripts/verify_materialkolor_abi.py android-app/app/build/outputs/apk/debug/app-debug.apk --output
+        out/verification/materialkolor-abi.json
+    - name: Verify packaged launcher and concept icon bytes
+      run: python3 .github/scripts/verify_hetu_icons.py apk android-app/app/build/outputs/apk/debug/app-debug.apk
+    - name: Runtime unit tests
+      run: "set -euo pipefail\npython3 ../.github/scripts/stability90_ci_config.py junit-filters > ../out/verification/function-junit-filter-args.txt\n\
+        mapfile -t FUNCTION_TEST_FILTERS < ../out/verification/function-junit-filter-args.txt\ngradle --no-daemon --max-workers=2\
+        \ -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \\\n  --tests '*RuntimeYaml15Test' --tests\
+        \ '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest'\
+        \ --tests '*SettingsConceptParityTest' \\\n  --tests '*CoreManagerConcept57Test' --tests '*SettingsBackupParity57Test'\
+        \ --tests '*ToolsConceptParityTest' --tests '*NativeConceptScreenshotTest' --tests '*SettingsPickerParity58Test' --tests\
+        \ '*LargeTitleParity59Test' --tests '*BootStartup60Test' \\\n  --tests '*ConceptStateCoverageTest' --tests '*ConceptRemainingCoverageTest'\
+        \ --tests '*WanDetails61Test' --tests '*MainLanguageBindingTest' --tests '*PanelLayoutDefaultsTest' --tests '*Runtime146ContractTest'\
+        \ --tests '*PanelModel11Test' --tests '*PanelActionSafetyTest' --tests '*ProxyLatencyRegressionTest' --tests '*DocumentPickerSafetyTest'\
+        \ --tests '*AppCrashReportTest' --tests '*ProxyScriptSafetyTest' --tests '*RootAutostartTest' --tests '*CustomPaletteCompatibilityTest'\
+        \ --tests '*ProxyAdblockExportTest' --tests '*RootHealthUpgradeTest' --tests '*RootNetworkRecoveryTest' --tests '*ProxyNetworkJournalTest'\
+        \ --tests '*NetworkDiagnosticsTest' --tests '*NetworkRecoveryStressTest' --tests '*JournalReliabilityTest' --tests\
+        \ '*NewUiIntegrationTest' --tests '*NewUiShell83Test' --tests '*NewHomePanelInteractionTest' --tests '*UI83ToolsTest'\
+        \ --tests '*UI83EditorHistoryTest' --tests '*ToastFeedbackTest' --tests '*ControllerAuthenticationTest' --tests '*LegacyControllerCredentialTest'\
+        \ --tests '*ControllerReadStateTest' --tests '*PanelControllerErrorTest' --tests '*GoogleConnectionEvidenceTest' --tests\
+        \ '*ToolsPdf85Test' --tests '*ToolsDiagIntakeTest' --tests '*ToolsDnsConsentIntakeTest' \"${FUNCTION_TEST_FILTERS[@]}\"\
+        \ --stacktrace\n"
+      working-directory: android-app
+    - name: Android lint compatibility gate
+      run: gradle --no-daemon --max-workers=1 -Dorg.gradle.jvmargs='-Xmx1500m -Dfile.encoding=UTF-8' :app:lintDebug --stacktrace
+      working-directory: android-app
+    - name: Consolidate native and browser state evidence
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/verify_stability90_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
+
+        python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests "$HETU_EXPECTED_TESTS" --browser-evidence
+        out/verification/webui-browser --browser-commit "$GITHUB_SHA"
+
+        '
+    - if: always()
+      name: Upload concept UI verification evidence
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: warn
+        name: Hetu-V20.90-UI-verification
+        path: 'android-app/app/build/test-results/testDebugUnitTest/
+
+          android-app/app/build/reports/tests/testDebugUnitTest/
+
+          android-app/app/build/reports/lint-results-debug.*
+
+          android-app/app/build/outputs/pdf85/
+
+          android-app/app/build/outputs/ui83/
+
+          android-app/app/build/outputs/concept59/
+
+          android-app/app/build/outputs/concept-state-coverage/
+
+          android-app/app/build/outputs/concept-remaining-coverage/
+
+          out/verification/
+
+          docs/qa/concept-173-current.json
+
+          docs/qa/concept-173-current.md
+
+
+          android-app/app/build/outputs/glass90/
+
+          '
+    - name: Execute all 36 unchanged and applicable supplemental regressions
+      working-directory: android-app
+      run: 'set -euo pipefail
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx3g -Dfile.encoding=UTF-8'' --init-script ../.github/scripts/supplemental36.init.gradle :app:testDebugUnitTest --tests ''*CompactHomeDashboardTest'' --tests ''*Ui92IntegrationTest'' --tests ''*NodeSelectionContinuityTest'' --stacktrace
+
+        '
+    - name: Verify independent supplemental XML and all 36 testcase identities
+      if: always()
+      run: python3 .github/scripts/verify_stability90_supplemental.py --results out/supplemental36/test-results
+    - name: Preserve independent current supplemental evidence including failures
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.90-supplemental-36-tests
+        path: out/supplemental36/
+        if-no-files-found: error
+    - name: Verify APK
+      run: 'set -euo pipefail
+
+        APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+
+        mkdir -p out/apk-transfer
+
+        "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > out/apk-transfer/apk-metadata.txt
+
+        head -3 out/apk-transfer/apk-metadata.txt
+
+        grep -q "versionCode=''2090'' versionName=''0.12.17-v20-glass''" out/apk-transfer/apk-metadata.txt
+
+        "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
+
+        grep -Fq ''701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'' out/apk-transfer/apk-signature.txt
+
+        cat out/apk-transfer/apk-signature.txt
+
+        VERSION=$(grep -oP ''versionName = "\K[^"]+'' android-app/app/build.gradle.kts)
+
+        cp "$APK" "out/Hetu-$VERSION.apk"
+
+        sha256sum out/*.apk
+
+        python3 .github/scripts/split_apk_artifact.py "out/Hetu-$VERSION.apk"
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: error
+        name: Hetu-APK
+        path: out/*.apk
+    - name: Upload APK transport manifest
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: error
+        name: Hetu-V20.90-APK-manifest
+        path: 'out/apk-transfer/manifest.json
+
+          out/apk-transfer/apk-metadata.txt
+
+          out/apk-transfer/apk-signature.txt
+
+          '
+    - name: Upload APK transport part 00
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part00
+        path: out/apk-transfer/part00.bin
+    - name: Upload APK transport part 01
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part01
+        path: out/apk-transfer/part01.bin
+    - name: Upload APK transport part 02
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part02
+        path: out/apk-transfer/part02.bin
+    - name: Upload APK transport part 03
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part03
+        path: out/apk-transfer/part03.bin
+    - name: Upload APK transport part 04
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part04
+        path: out/apk-transfer/part04.bin
+    - name: Upload APK transport part 05
+      uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: ignore
+        name: Hetu-V20.90-APK-part05
+        path: out/apk-transfer/part05.bin
+  android-ui-smoke:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - uses: actions/download-artifact@v4
+      with:
+        name: Hetu-APK
+        path: candidate
+    - name: Prepare official AOSP emulator
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export ANDROID_AVD_HOME="$RUNNER_TEMP/hetu-avd"
+
+        mkdir -p "$ANDROID_AVD_HOME"
+
+        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+        AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
+        out/android-smoke/sdk-prepare.log
+
+        "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
+
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
+        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+
+        test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        python3 -c ''import sys; sys.path.insert(0,".github/scripts"); from run_hetu_emulator import prepare_owned_avd_identity;
+        from pathlib import Path; import os; prepare_owned_avd_identity(Path(os.environ["ANDROID_AVD_HOME"])/"hetu-smoke.avd/config.ini")''
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
+
+        sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d'' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
+
+        hw.lcd.width=393
+
+        hw.lcd.height=852
+
+        hw.lcd.density=160
+
+        hw.ramSize=2048
+
+        EOF
+
+        '
+    - name: Run installed APK navigation and native WebView smoke
+      env:
+        HETU_EXPECTED_VERSION: '2090'
+        HETU_EXPECT_NEW_UI: '1'
+        HETU_NATIVE_SOAK90_SECONDS: ${{ matrix.api == 36 && '900' || '' }}
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+
+        test -x "$ANDROID_HOME/platform-tools/adb"
+
+        "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
+
+        # Uses only this runner''s existing KVM or sudo access. No device permission,
+
+        # group, ACL or SELinux changes; owned supervisor verifies process cleanup.
+
+        python3 .github/scripts/run_hetu_emulator.py
+
+        '
+    - name: Upload Android smoke evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.90-Android-${{ matrix.api }}-smoke
+        path: out/android-smoke/
+        if-no-files-found: warn
+    strategy:
+      fail-fast: false
+      matrix:
+        api:
+        - 35
+        - 36
+    name: Installed APK on Android API ${{ matrix.api }}
+  android-theme-before:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '24'
+    - uses: actions/setup-java@v4
+      with:
+        distribution: temurin
+        java-version: '21'
+    - name: Download pinned historical V20.74 APK
+      env:
+        GH_TOKEN: ${{ github.token }}
+      run: 'set -euo pipefail
+
+        mkdir -p candidate out/verification
+
+        gh run download 37122739246 --repo "$GITHUB_REPOSITORY" --name Hetu-APK --dir candidate
+
+        printf ''%s\n'' ''ea8569b8d3c1aea7ddd969eb9e1f8a6d721dd653ebf554147ae3bbaa6c5d303f  candidate/Hetu-0.12.4-v20.apk''
+        | sha256sum -c -
+
+        python3 .github/scripts/verify_materialkolor_abi.py candidate/Hetu-0.12.4-v20.apk --expect-incompatible --output out/android-smoke/v2074-materialkolor-abi.json
+
+        '
+    - name: Prepare official AOSP emulator
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export ANDROID_AVD_HOME="$RUNNER_TEMP/hetu-avd"
+
+        mkdir -p "$ANDROID_AVD_HOME"
+
+        echo "ANDROID_AVD_HOME=$ANDROID_AVD_HOME" >> "$GITHUB_ENV"
+
+        SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+
+        AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+
+        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
+        out/android-smoke/sdk-prepare.log
+
+        "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
+
+        echo no | "$AVDMANAGER" create avd --force --device pixel_2 --name hetu-smoke --path "$ANDROID_AVD_HOME/hetu-smoke.avd"
+        --package ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee out/android-smoke/avd-prepare.log
+
+        test -f "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-sdk.ini
+
+        python3 -c ''import sys; sys.path.insert(0,".github/scripts"); from run_hetu_emulator import prepare_owned_avd_identity;
+        from pathlib import Path; import os; prepare_owned_avd_identity(Path(os.environ["ANDROID_AVD_HOME"])/"hetu-smoke.avd/config.ini")''
+
+        cp "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" out/android-smoke/owned-avd-config-before-boot.ini
+
+        sed -i ''/^hw.lcd.width=/d;/^hw.lcd.height=/d;/^hw.lcd.density=/d;/^hw.ramSize=/d'' "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini"
+
+        cat >> "$ANDROID_AVD_HOME/hetu-smoke.avd/config.ini" <<''EOF''
+
+        hw.lcd.width=393
+
+        hw.lcd.height=852
+
+        hw.lcd.density=160
+
+        hw.ramSize=2048
+
+        EOF
+
+        '
+    - name: Run installed APK navigation and native WebView smoke
+      env:
+        HETU_EXPECTED_VERSION: '2074'
+        HETU_EXPECT_PALETTE_CRASH: '1'
+      run: 'set -euo pipefail
+
+        mkdir -p out/android-smoke
+
+        export PATH="$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+
+        test -x "$ANDROID_HOME/platform-tools/adb"
+
+        "$ANDROID_HOME/platform-tools/adb" version | tee out/android-smoke/adb-version.txt
+
+        # Uses only this runner''s existing KVM or sudo access. No device permission,
+
+        # group, ACL or SELinux changes; owned supervisor verifies process cleanup.
+
+        python3 .github/scripts/run_hetu_emulator.py
+
+        '
+    - name: Upload Android smoke evidence
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.74-palette-crash-baseline-Android-36
+        path: out/android-smoke/
+        if-no-files-found: warn
+    strategy:
+      fail-fast: false
+      matrix:
+        api:
+        - 36
+    name: Reproduce V20.74 custom palette crash on API 36
+'on':
+  push:
+    branches:
+    - test/v20.76-new-ui
+    paths:
+    - android-app/**
+    - updates/v2082-new-ui/**
+    - updates/v2083-ui-polish/**
+    - updates/v2084-controller-auth/**
+    - updates/v2085-pdf-tools-settings/**
+    - updates/v2085-tools-intake/**
+    - updates/v2085-pdf-final-geometry/**
+    - updates/v2086-functionfix/**
+    - updates/v2087-home-panel-refactor/**
+    - updates/v2088-ui-refactor/**
+    - updates/v2089-runtime153/**
+    - .github/scripts/**
+    - tools/qa/**
+    - updates/v2090-stability-glass/**
+    - .github/workflows/v2090-build.yml
+  workflow_dispatch: null

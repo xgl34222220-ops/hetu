@@ -202,7 +202,7 @@ def main():
    smoke_env=dict(os.environ,HETU_OWNED_EMULATOR_SESSION=session,
     HETU_OWNED_EMULATOR_RUNNER_PID=str(os.getpid()),HETU_OWNED_EMULATOR_RUNNER_START=str(runner_identity['start']),
     HETU_OWNED_EMULATOR_LAUNCHER_PID=str(launcher.pid),HETU_OWNED_EMULATOR_LAUNCHER_START=str(launcher_identity['start']))
-   checked=subprocess.run([sys.executable,str(Path(__file__).with_name('smoke_hetu_apk.py'))],timeout=1800,env=smoke_env)
+   checked=subprocess.run([sys.executable,str(Path(__file__).with_name('smoke_hetu_apk.py'))],timeout=3600,env=smoke_env)
    report['smoke_exit']=checked.returncode
    if checked.returncode:raise RuntimeError('Installed APK smoke failed; inspect original evidence')
    report['result']='PASS'

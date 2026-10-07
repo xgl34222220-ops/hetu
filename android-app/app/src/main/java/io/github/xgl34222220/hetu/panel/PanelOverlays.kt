@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.clickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -22,32 +21,42 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
-import io.github.xgl34222220.hetu.home.HomeCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeDivider
+import io.github.xgl34222220.hetu.home.HomeFlag
 import io.github.xgl34222220.hetu.home.HomeFormat
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.HomeIcons
-import io.github.xgl34222220.hetu.home.HomeRegionCode
+import io.github.xgl34222220.hetu.home.HomeNotice
+import io.github.xgl34222220.hetu.home.HomeRegions
+import io.github.xgl34222220.hetu.home.HomeReveal
 import io.github.xgl34222220.hetu.home.HomeSegmented
 import io.github.xgl34222220.hetu.home.HomeSheetContent
+import io.github.xgl34222220.hetu.home.HomeSheetGroup
+import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTextField
+import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.fill
+import io.github.xgl34222220.hetu.home.goodText
+import io.github.xgl34222220.hetu.home.homeTap
+import io.github.xgl34222220.hetu.ui.ht
 
 /* ------------------------------------------------------------------ */
 /*  Menus                                                               */
 /* ------------------------------------------------------------------ */
 
 /**
- * Body of whichever menu [overlay] names. The 筛选 menu is multi-select and stays open;
- * every other menu applies the pick and closes.
+ * Body of whichever menu [overlay] names. Every menu applies the pick and closes,
+ * the check-box menu of 策略 › 筛选 included.
  */
 @Composable
 internal fun ColumnScope.PanelMenuContent(
@@ -69,6 +78,7 @@ internal fun ColumnScope.PanelMenuContent(
         }
         PanelOverlay.RankModeMenu -> {
             PanelRankMode.entries.forEach { mode -> PanelMenuItem(mode.label, { pick(view.copy(rankMode = mode)) }, selected = view.rankMode == mode) }
+            HomeDivider(Modifier.padding(top = 4.dp), inset = 12.dp)
             PanelMenuNote("排行只改变显示顺序，不影响代理行为。")
         }
         PanelOverlay.RankCountMenu -> {
@@ -83,6 +93,7 @@ internal fun ColumnScope.PanelMenuContent(
         }
         PanelOverlay.ConnMoreMenu -> {
             PanelMenuItem("按应用分组", { pick(view.copy(groupByApp = !view.groupByApp)) }, icon = PanelIcons.LayoutList, selected = view.groupByApp)
+            HomeDivider(inset = 12.dp)
             PanelMenuItem("断开全部连接", { onOverlay(PanelOverlay.CloseAllDialog) }, icon = PanelIcons.Unlink, danger = true)
         }
         PanelOverlay.LogOrderMenu ->
@@ -106,7 +117,7 @@ internal fun PanelSheetBody(
     onOverlay: (PanelOverlay?) -> Unit,
 ) {
     when (overlay) {
-        PanelOverlay.LayoutSheet -> LayoutSheet(view, onView, onOverlay, actions.onOpenPolicyIcons)
+        PanelOverlay.LayoutSheet -> LayoutSheet(data, view, onView, onOverlay, actions)
         PanelOverlay.ApiSheet, PanelOverlay.ApiReadErrorSheet -> ApiSheet(view.api, onCancel = {
             onOverlay(if (overlay == PanelOverlay.ApiReadErrorSheet) null else PanelOverlay.LayoutSheet)
         }) { saved ->
@@ -115,9 +126,9 @@ internal fun PanelSheetBody(
         is PanelOverlay.NodeInfo -> NodeInfoSheet(overlay.node, data, onClose = { onOverlay(null) }, onTest = { actions.onTestNode(overlay.node) }, onCopy = { actions.onCopy("节点名称", overlay.node) })
         is PanelOverlay.ConnectionDetail -> {
             val conn = data.connections.firstOrNull { it.id == overlay.id }
-            if (conn != null) ConnectionSheet(conn, onClose = { onOverlay(null) }) { actions.onCloseConnection(conn.id); onOverlay(null) }
+            if (conn != null) ConnectionSheet(conn, data, onClose = { onOverlay(null) }) { actions.onCloseConnection(conn.id); onOverlay(null) }
             else HomeSheetContent(title = "连接已结束", onClose = { onOverlay(null) }) {
-                Text("这个连接已经关闭，列表会在下次刷新时更新。", Modifier.padding(horizontal = 4.dp), color = LocalHomeColors.current.t2, style = HomeType.label)
+                Text(ht("这个连接已经关闭，列表会在下次刷新时更新。"), Modifier.padding(horizontal = 6.dp), color = LocalHomeColors.current.t2, style = HomeType.body)
             }
         }
         else -> Unit
@@ -126,60 +137,62 @@ internal fun PanelSheetBody(
 
 @Composable
 private fun SheetRow(title: String, control: @Composable () -> Unit) {
-    Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, Modifier.weight(1f), color = LocalHomeColors.current.t1, style = HomeType.rowTitle, maxLines = 1)
+    Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(start = 16.dp, end = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(ht(title), Modifier.weight(1f), color = LocalHomeColors.current.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         control()
     }
 }
 
 @Composable
-private fun SheetNavRow(icon: ImageVector, title: String, subtitle: String, onClick: () -> Unit) {
+private fun SheetNavRow(icon: ImageVector, title: String, subtitle: String, busy: Boolean = false, onClick: () -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     Row(
-        Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).clickable(role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }.padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+        Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).homeTap(enabled = !busy, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }.padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
-        Icon(icon, null, Modifier.size(20.dp), tint = c.t2)
-        Column(Modifier.weight(1f)) {
-            Text(title, color = c.t1, style = HomeType.rowTitle, maxLines = 1)
-            Text(subtitle, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Icon(icon, null, Modifier.size(24.dp), tint = c.t1)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(ht(title), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(ht(subtitle), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        Icon(HomeIcons.ChevronRight, null, Modifier.size(16.dp), tint = c.t3)
+        if (busy) HomeSpinner(size = 20.dp) else Icon(HomeIcons.ChevronRight, null, Modifier.size(20.dp), tint = c.t3)
     }
 }
 
 /** 排序与布局: every control applies immediately, so the list behind the sheet changes live. */
 @Composable
-private fun LayoutSheet(view: PanelViewState, onView: (PanelViewState) -> Unit, onOverlay: (PanelOverlay?) -> Unit, onOpenPolicyIcons: () -> Unit) {
-    val c = LocalHomeColors.current
+private fun LayoutSheet(data: PanelData, view: PanelViewState, onView: (PanelViewState) -> Unit, onOverlay: (PanelOverlay?) -> Unit, actions: PanelActions) {
     val layout = view.layout
     fun set(next: PanelGroupLayout) = onView(view.copy(layout = next))
-    val segment = Modifier.width(176.dp)
+    val wide = Modifier.width(204.dp)
+    val narrow = Modifier.width(204.dp)
     val columns = listOf(1 to "1 列", 2 to "2 列")
     HomeSheetContent(title = "排序与布局", onClose = { onOverlay(null) }) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                SheetRow("排序方式") { HomeSegmented(PanelNodeSort.entries.map { it to it.label }, layout.sort, { set(layout.copy(sort = it)) }, segment) }
-                HomeDivider()
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HomeSheetGroup {
+                SheetRow("排序方式") { HomeSegmented(PanelNodeSort.entries.map { it to it.label }, layout.sort, { set(layout.copy(sort = it)) }, wide, height = 38.dp, corner = 11.dp) }
+                HomeDivider(inset = 16.dp)
                 PanelSwitchRow("倒序", layout.descending, { set(layout.copy(descending = it)) })
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                SheetRow("策略列数") { HomeSegmented(columns, layout.groupColumns, { set(layout.copy(groupColumns = it)) }, segment) }
-                HomeDivider()
+            HomeSheetGroup {
+                SheetRow("策略列数") { HomeSegmented(columns, layout.groupColumns, { set(layout.copy(groupColumns = it)) }, narrow, height = 38.dp, corner = 11.dp) }
+                HomeDivider(inset = 16.dp)
                 PanelSwitchRow("紧凑策略卡", layout.compactGroups, { set(layout.copy(compactGroups = it)) })
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                SheetRow("节点列数") { HomeSegmented(columns, layout.nodeColumns, { set(layout.copy(nodeColumns = it)) }, segment) }
-                HomeDivider()
+            HomeSheetGroup {
+                SheetRow("节点列数") { HomeSegmented(columns, layout.nodeColumns, { set(layout.copy(nodeColumns = it)) }, narrow, height = 38.dp, corner = 11.dp) }
+                HomeDivider(inset = 16.dp)
                 PanelSwitchRow("紧凑节点卡", layout.compactNodes, { set(layout.copy(compactNodes = it)) })
-                HomeDivider()
-                SheetRow("名称显示") { HomeSegmented(listOf(false to "单行截断", true to "自动换行"), layout.wrapNames, { set(layout.copy(wrapNames = it)) }, segment) }
+                HomeDivider(inset = 16.dp)
+                SheetRow("名称显示") { HomeSegmented(listOf(false to "单行截断", true to "自动换行"), layout.wrapNames, { set(layout.copy(wrapNames = it)) }, wide, height = 38.dp, corner = 11.dp) }
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+            HomeSheetGroup {
                 SheetNavRow(HomeIcons.SlidersHorizontal, "测速与 API", "设置测速引擎与 API 相关选项") { onOverlay(PanelOverlay.ApiSheet) }
-                HomeDivider()
-                SheetNavRow(PanelIcons.Image, "策略图标", "覆盖策略组图标，不修改 YAML") { onOverlay(null); onOpenPolicyIcons() }
+                HomeDivider(inset = 16.dp)
+                SheetNavRow(PanelIcons.Gauge, "测试全部节点", if (data.testingAll) "正在测试，完成后会提示可用节点数" else "对当前配置的所有节点测一次延迟", busy = data.testingAll) { actions.onTestAll() }
+                HomeDivider(inset = 16.dp)
+                SheetNavRow(PanelIcons.Image, "策略图标", "覆盖策略组图标，不修改 YAML") { onOverlay(null); actions.onOpenPolicyIcons() }
             }
         }
     }
@@ -191,7 +204,6 @@ private fun LayoutSheet(view: PanelViewState, onView: (PanelViewState) -> Unit, 
  */
 @Composable
 private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (PanelApiSettings) -> Unit) {
-    val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     var draft by remember(saved) { mutableStateOf(saved) }
     var errors by remember { mutableStateOf<Map<String, String>>(emptyMap()) }
@@ -200,7 +212,7 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
         title = "测速与 API",
         subtitle = "测速、历史采集与控制器连接",
         footer = {
-            HomeButton("取消", onCancel, Modifier.weight(1f))
+            HomeButton("取消", onCancel, Modifier.weight(1f), kind = HomeButtonKind.Soft)
             HomeButton("保存", {
                 val found = PanelLogic.validateApi(draft)
                 if (found.isEmpty()) onSave(draft.copy(testUrl = draft.testUrl.trim(), host = draft.host.trim(), port = draft.port.trim()))
@@ -208,32 +220,38 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
             }, Modifier.weight(1f), kind = HomeButtonKind.Primary)
         },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HomeSheetGroup {
                 PanelSwitchRow("测速地址", draft.customTestUrl, { edit(draft.copy(customTestUrl = it)) }, subtitle = if (draft.customTestUrl) "正在使用自定义测速 URL" else "跟随订阅或策略组自带地址")
-                if (draft.customTestUrl) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp)) {
-                    HomeTextField("测速 URL", draft.testUrl, { edit(draft.copy(testUrl = it)) }, monospace = true, isError = "testUrl" in errors, keyboardType = KeyboardType.Uri)
-                    FieldError(errors["testUrl"])
+                HomeReveal(draft.customTestUrl) {
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 16.dp)) {
+                        HomeTextField("测速 URL", draft.testUrl, { edit(draft.copy(testUrl = it)) }, isError = "testUrl" in errors, keyboardType = KeyboardType.Uri)
+                        FieldError(errors["testUrl"])
+                    }
                 }
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+            HomeSheetGroup {
                 PanelSwitchRow("流量与连接历史", draft.history, { edit(draft.copy(history = it)) }, subtitle = "保存最近 24 小时排行所需的数据")
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+            HomeSheetGroup {
                 PanelSwitchRow("外部 Clash API", draft.externalApi, { edit(draft.copy(externalApi = it)) }, subtitle = if (draft.externalApi) "使用自定义控制器" else "使用河图本机核心")
-                if (draft.externalApi) Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Column(Modifier.weight(1f)) {
-                            HomeTextField("主机", draft.host, { edit(draft.copy(host = it)) }, monospace = true, isError = "host" in errors)
-                            FieldError(errors["host"])
+                HomeReveal(draft.externalApi) {
+                    Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 2.dp, bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                        Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Column(Modifier.weight(1f)) {
+                                HomeTextField("主机", draft.host, { edit(draft.copy(host = it)) }, isError = "host" in errors)
+                                FieldError(errors["host"])
+                            }
+                            Column(Modifier.width(112.dp)) {
+                                HomeTextField("端口", draft.port, { edit(draft.copy(port = it)) }, isError = "port" in errors, keyboardType = KeyboardType.Number)
+                                FieldError(errors["port"])
+                            }
                         }
-                        Column(Modifier.width(104.dp)) {
-                            HomeTextField("端口", draft.port, { edit(draft.copy(port = it)) }, monospace = true, isError = "port" in errors, keyboardType = KeyboardType.Number)
-                            FieldError(errors["port"])
+                        Column {
+                            HomeTextField("密钥", draft.secret, { edit(draft.copy(secret = it)) }, isError = "secret" in errors, placeholder = "未设置")
+                            FieldError(errors["secret"])
                         }
                     }
-                    HomeTextField("密钥", draft.secret, { edit(draft.copy(secret = it)) }, monospace = true, placeholder = "未设置")
-                    FieldError(errors["secret"])
                 }
             }
         }
@@ -243,24 +261,24 @@ private fun ApiSheet(saved: PanelApiSettings, onCancel: () -> Unit, onSave: (Pan
 @Composable
 private fun FieldError(message: String?) {
     if (message == null) return
-    val c = LocalHomeColors.current
-    Row(Modifier.padding(start = 2.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-        Icon(HomeIcons.CircleAlert, null, Modifier.size(13.dp), tint = c.bad)
-        Text(message, color = c.bad, style = HomeType.caption)
-    }
+    HomeNotice(ht(message), HomeIcons.CircleAlert, Modifier.padding(top = 4.dp), tone = HomeTone.Bad, filled = false)
 }
 
 @Composable
 private fun DetailRow(label: String, trailing: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text(label, color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1)
+        Text(ht(label), color = LocalHomeColors.current.t2, style = HomeType.label, maxLines = 1)
         Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) { trailing() }
     }
 }
 
 @Composable
 private fun DetailText(text: String, mono: Boolean = false) {
-    Text(text, color = LocalHomeColors.current.t1, style = if (mono) PanelType.monoSmall else HomeType.rowTitle.copy(fontFeatureSettings = "tnum"), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Text(
+        text, color = LocalHomeColors.current.t1,
+        style = if (mono) PanelType.monoSmall else HomeType.value.copy(fontWeight = FontWeight.Medium),
+        maxLines = 1, overflow = TextOverflow.Ellipsis,
+    )
 }
 
 /** 节点信息 (long-press a node): protocol, provider, UDP, latency; footer 测速 / 复制名称. */
@@ -272,60 +290,80 @@ private fun NodeInfoSheet(name: String, data: PanelData, onClose: () -> Unit, on
         title = "节点信息",
         onClose = onClose,
         footer = {
-            HomeButton("测速", onTest, Modifier.weight(1f), icon = PanelIcons.Gauge)
-            HomeButton("复制名称", onCopy, Modifier.weight(1f), icon = HomeIcons.Copy)
+            HomeButton("测速", onTest, Modifier.weight(1f), icon = PanelIcons.Gauge, loading = data.delayOf(name) == PanelDelay.Testing)
+            HomeButton("复制名称", onCopy, Modifier.weight(1f), kind = HomeButtonKind.Soft, icon = HomeIcons.Copy)
         },
     ) {
-        Row(Modifier.padding(start = 4.dp, end = 4.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeRegionCode(node?.regionCode.orEmpty())
-            Text(name, color = c.t1, style = PanelType.nodeTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        Row(Modifier.padding(start = 6.dp, end = 6.dp, top = 2.dp, bottom = 14.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            if (node?.kind == PanelNodeKind.Proxy) HomeFlag(HomeRegions.codeOf(name), height = 22.dp)
+            Text(HomeRegions.withoutFlag(name), color = c.t1, style = PanelType.nodeTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
-        HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+        HomeSheetGroup {
             DetailRow("协议") { DetailText(node?.protocol?.ifBlank { null } ?: HomeFormat.Dash) }
-            HomeDivider()
+            HomeDivider(inset = 16.dp)
             DetailRow("提供商") { DetailText(node?.provider?.ifBlank { null } ?: HomeFormat.Dash) }
-            HomeDivider()
-            DetailRow("支持") { DetailText(if (node?.udp == true) "UDP" else "仅 TCP") }
-            HomeDivider()
-            DetailRow("延迟") { PanelDelayLabel(data.delayOf(name)) }
+            HomeDivider(inset = 16.dp)
+            DetailRow("支持") { DetailText(if (node?.udp == true) "UDP" else ht("仅 TCP")) }
+            HomeDivider(inset = 16.dp)
+            DetailRow("延迟") { PanelDelayLabel(data.delayOf(name), onCard = true) }
         }
     }
 }
 
 /** 连接详情: who (app, package, rule), where (chain, network), how much (totals, rates); footer 断开此连接. */
 @Composable
-private fun ConnectionSheet(conn: PanelConnection, onClose: () -> Unit, onDisconnect: () -> Unit) {
+private fun ConnectionSheet(conn: PanelConnection, data: PanelData, onClose: () -> Unit, onDisconnect: () -> Unit) {
     val c = LocalHomeColors.current
     HomeSheetContent(
         title = conn.host,
-        subtitle = conn.time?.let { "$it 建立" },
+        verbatimTitle = true,
+        subtitle = conn.timeLabel?.let { ht("%s 建立").fill(it) },
         onClose = onClose,
         footer = { PanelDangerButton("断开此连接", onDisconnect, Modifier.weight(1f), soft = true, icon = PanelIcons.Unlink) },
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            HomeSheetGroup {
                 DetailRow("应用") {
-                    if (conn.app.isBlank()) Text(PanelLogic.UnattributedApp, color = c.t3, style = HomeType.label)
-                    else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        PanelAvatar(conn.app, conn.packageName, size = 20.dp)
+                    if (conn.app.isBlank()) Text(ht(PanelLogic.UnattributedApp), color = c.t3, style = HomeType.label)
+                    else Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        PanelAvatar(conn.app, conn.packageName, size = 22.dp)
                         DetailText(conn.app)
                     }
                 }
-                if (conn.packageName.isNotBlank()) { HomeDivider(); DetailRow("包名") { DetailText(conn.packageName, mono = true) } }
-                HomeDivider()
+                if (conn.packageName.isNotBlank()) { HomeDivider(inset = 16.dp); DetailRow("包名") { DetailText(conn.packageName, mono = true) } }
+                HomeDivider(inset = 16.dp)
                 DetailRow("规则") { DetailText(conn.rule.ifBlank { HomeFormat.Dash }) }
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                DetailRow("链路") { DetailText(conn.chainText.ifEmpty { "DIRECT" }) }
-                HomeDivider()
-                DetailRow("网络") { DetailText(listOf(conn.network, conn.inbound).filter { it.isNotBlank() }.joinToString(" · ").ifEmpty { HomeFormat.Dash }) }
+            HomeSheetGroup {
+                DetailRow("链路") {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        val slot = LocalPanelGroupIcon.current
+                        val head = data.groups.firstOrNull { it.name == conn.chain.firstOrNull() }
+                        if (slot != null && head != null) slot(head, Modifier.size(18.dp))
+                        DetailText(conn.chainText.ifEmpty { "DIRECT" })
+                    }
+                }
+                HomeDivider(inset = 16.dp)
+                DetailRow("网络") { DetailText(listOf(conn.network, conn.inbound, conn.kind).filter { it.isNotBlank() }.joinToString(" · ").ifEmpty { HomeFormat.Dash }) }
             }
-            HomeCard(Modifier.fillMaxWidth(), background = c.bg) {
-                DetailRow("流量") { DetailText("↓ ${HomeFormat.bytes(conn.downloadTotalBytes)}   ↑ ${HomeFormat.bytes(conn.uploadTotalBytes)}") }
-                HomeDivider()
-                DetailRow("速率") { DetailText("↓ ${HomeFormat.speed(conn.downloadBytesPerSecond)}   ↑ ${HomeFormat.speed(conn.uploadBytesPerSecond)}") }
+            HomeSheetGroup {
+                DetailRow("流量") { FlowPair(HomeFormat.bytes(conn.downloadTotalBytes), HomeFormat.bytes(conn.uploadTotalBytes)) }
+                HomeDivider(inset = 16.dp)
+                DetailRow("速率") { FlowPair(HomeFormat.speed(conn.downloadBytesPerSecond), HomeFormat.speed(conn.uploadBytesPerSecond)) }
             }
         }
+    }
+}
+
+/** “↓ 30 MB   ↑ 2 MB” with the arrows in the download and upload colours. */
+@Composable
+private fun FlowPair(down: String, up: String) {
+    val c = LocalHomeColors.current
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Icon(PanelIcons.ArrowDown, null, Modifier.size(18.dp), tint = c.accent)
+        Box(Modifier.padding(start = 6.dp, end = 16.dp)) { DetailText(down) }
+        Icon(PanelIcons.ArrowUp, null, Modifier.size(18.dp), tint = c.goodText)
+        Box(Modifier.padding(start = 6.dp)) { DetailText(up) }
     }
 }
 

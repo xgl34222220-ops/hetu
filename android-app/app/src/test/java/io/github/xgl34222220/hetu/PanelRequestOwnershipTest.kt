@@ -57,6 +57,7 @@ class PanelRequestOwnershipTest {
             .putBoolean("proxyCustomApiEnabled", true)
             .putString("proxyCustomApiHost", "127.0.0.1")
             .putInt("proxyCustomApiPort", server.port)
+            .putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
             .putBoolean("proxyApiHistoryEnabled", false).commit()
         PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77)
         vm = HetuViewModel(app)

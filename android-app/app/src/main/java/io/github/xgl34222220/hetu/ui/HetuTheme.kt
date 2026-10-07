@@ -185,46 +185,32 @@ fun HetuTheme(content: @Composable () -> Unit) {
     @Composable
     fun ProvideTokens(inner: @Composable () -> Unit) {
         val scheme = MaterialTheme.colorScheme
-        val tokens = if (dark) {
-            HetuTokens(
-                pageBackground = if (pureBlack) Color.Black else Color(0xFF0D1012),
-                cardBackground = Color(0xFF171B1E),
-                elevatedCardBackground = Color(0xFF20262A),
-                heroBackground = Color(0xFF1D2C52),
-                textPrimary = Color(0xFFF4F5F7),
-                textSecondary = Color(0xFF98A1AA),
-                textMuted = Color(0xFF5D6670),
-                success = Color(0xFF34D399),
-                warning = Color(0xFFFBBF24),
-                danger = Color(0xFFF87171),
-                outline = Color(0xFF283035),
-                controlBackground = Color(0xFF20262A),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .55f) else Color(0xFF1D2C52),
-            )
-        } else {
-            // V19.3: reference palette, sampled from the BoxProxy recording.
-            HetuTokens(
-                pageBackground = Color(0xFFF2F0F9),
-                cardBackground = Color(0xFFFBFAFD),
-                elevatedCardBackground = Color(0xFFF6F3FA),
-                heroBackground = Color(0xFFEDE9F7),
-                textPrimary = Color(0xFF12161A),
-                textSecondary = Color(0xFF686C79),
-                textMuted = Color(0xFFA4A6B0),
-                success = Color(0xFF10B981),
-                warning = Color(0xFFF59E0B),
-                danger = Color(0xFFEF4444),
-                outline = Color(0xFFE7E2EF),
-                controlBackground = Color(0xFFF0ECF7),
-                selectionBackground = if (enableMonet) scheme.primaryContainer.copy(alpha = .62f) else Color(0xFFEAE5F5),
-            )
-        }
+        // The independent activity hosts share the same restrained surfaces and readable text
+        // as the launcher. Their existing Monet and eight MaterialKolor schemes stay intact.
+        val palette = io.github.xgl34222220.hetu.home.homeColors(dark, scheme.primary, pureBlack)
+        val tokens = HetuTokens(
+            pageBackground = palette.bg,
+            cardBackground = palette.surface,
+            elevatedCardBackground = palette.raised,
+            heroBackground = palette.hero,
+            textPrimary = palette.t1,
+            textSecondary = palette.t2,
+            textMuted = palette.t3,
+            success = palette.good,
+            warning = palette.warn,
+            danger = palette.bad,
+            outline = androidx.compose.ui.graphics.lerp(palette.surface, palette.t1, if (dark) .11f else .09f),
+            controlBackground = palette.sunken,
+            selectionBackground = palette.accentSoft,
+        )
         CompositionLocalProvider(
             LocalHetuTokens provides tokens,
             LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
             LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
-            content = { io.github.xgl34222220.hetu.ImmersiveUiHost { inner() } },
+            // Every host of this theme also gets the home design kit (palette, bar style, motion
+            // switch, haptics), so a page drawn with it looks the same in any activity.
+            content = { io.github.xgl34222220.hetu.home.HetuHomeKit(prefs) { io.github.xgl34222220.hetu.ImmersiveUiHost { inner() } } },
         )
     }
 

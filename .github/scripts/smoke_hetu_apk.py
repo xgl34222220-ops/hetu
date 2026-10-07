@@ -3,7 +3,7 @@
 Changes fixture display language and exercises denied Root setup in non-root AOSP.
 Never starts/stops a proxy, imports user data, or clears app data.
 """
-import hashlib, json, os, re, subprocess, time, uuid, xml.etree.ElementTree as ET
+import hashlib, json, os, re, subprocess, sys, time, uuid, xml.etree.ElementTree as ET
 from pathlib import Path
 from contextlib import contextmanager
 PKG='io.github.xgl34222220.hetu'
@@ -78,6 +78,13 @@ def expect(label,name):
  root=capture(name);assert any(label in n.get('text','') or label in n.get('content-desc','') for n in root.iter('node')),(label,name)
  checks.append({'name':name,'result':'passed'})
 
+# The home title is localized since the home/panel refactor (河图/Hetu/河圖);
+# the emulator boots en-US, so the title check must accept every variant.
+HOME_TITLES=('河图','Hetu','河圖')
+def expect_any(labels,name):
+ root=capture(name);assert any(any(label==n.get('text','') for label in labels) for n in root.iter('node')),(labels,name)
+ checks.append({'name':name,'result':'passed'})
+
 def switch_node(root,label):
  parents={child:parent for parent in root.iter() for child in parent}
  titles=[n for n in root.iter('node') if n.get('text')==label]
@@ -150,7 +157,7 @@ def wait_for_home():
    adb('shell','input','tap',str((x1+x2)//2),str((y1+y2)//2));recoveries+=1
    time.sleep(20);continue
   assert not any("isn't responding" in title for title in titles),('Unexpected application ANR',titles)
-  if any(n.get('package')==PKG and n.get('text')=='河图' for n in nodes):
+  if any(n.get('package')==PKG and n.get('text') in HOME_TITLES for n in nodes):
    (OUT/'first-frame-ready.json').write_text(json.dumps({'system_ui_wait_recoveries':recoveries,'app_visible':True}))
    return
   assert adb('shell','pidof',PKG,check=False).strip(),'App process exited before first frame'
@@ -549,7 +556,7 @@ def main():
  (OUT/'launch.txt').write_text(adb('shell','am','start','-W','-n',choices[0],timeout=240))
  wait_for_home()
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited at launch'
- expect('河图','01-home')
+ expect_any(HOME_TITLES,'01-home')
  # New language binding follows the actual system locale. Exercise the visible
  # preference picker before collecting the Chinese-reference navigation set.
  root,_=ui()
@@ -658,6 +665,46 @@ def main():
  (OUT/'last-anr.txt').write_text(adb('shell','dumpsys','activity','lastanr',timeout=60,check=False))
  assert adb('shell','pidof',PKG,check=False).strip(),'App process exited after navigation'
  (OUT/'results.json').write_text(json.dumps({'checks':checks,'passed':len(checks),'legacyChecksPassed':legacy_check_count,'paletteCasesPassed':palette_check_count,'newPanelAuthChecks':checks[legacy_check_count:],'fixtureOnly':True,'rootMutationActions':0,'rootSetupDenialAttempts':1,'apiLevel':int(adb('shell','getprop','ro.build.version.sdk').strip()),'limitations':'Fresh AOSP emulator. Five populated native-WebView states use an isolated loopback fixture with deliberate HTTP503 switch rejection. New panel authentication checks, when enabled for2084+, use synthetic cached running hints and loopback401/200, never real Root/core/network health. No K80, real core, Root boot or actual network validation.'},ensure_ascii=False,indent=2))
+ if os.environ.get('HETU_NATIVE_SOAK90_SECONDS'):
+  def application_identity():
+   pids=adb('shell','pidof',PKG,check=False).split()
+   assert len(pids)==1 and pids[0].isdigit(),'Missing unique application process during native soak'
+   pid=int(pids[0]);raw=adb('shell','cat',f'/proc/{pid}/stat')
+   end=raw.rfind(')');fields=raw[end+2:].split()
+   assert end>0 and int(raw.split(' ',1)[0])==pid and len(fields)>=20 and fields[0] not in ('Z','X'),'Application process is not live'
+   return {'pid':pid,'startTicks':int(fields[19]),'package':PKG,'proof':'installed package PID and Android proc start ticks'}
+  app_before=application_identity();period_started=time.monotonic()
+  sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools/qa'))
+  from run_mihomo_soak90 import run_soak
+  native_report=run_soak(output=OUT/'native-soak90',seconds=int(os.environ['HETU_NATIVE_SOAK90_SECONDS']),environment=os.environ)
+  observation={'result':'FAIL','apkSha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
+   'observedRepositoryCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).resolve().parents[2]).decode().strip(),
+   'before':app_before,'nativeSoakActualSeconds':native_report['actualContinuousSeconds'],
+   'scope':'Application PID continuity while a separate owned native CLI core exchanges controlled loopback traffic',
+   'limitations':'No app VPN/TPROXY, real Root, radio handover, Google/GMS, OEM or device evidence.'}
+  try:
+   observation['after']=application_identity()
+   assert observation['before']==observation['after'],'Application process exited or restarted during native soak'
+   observation['observedWallSeconds']=time.monotonic()-period_started
+   assert observation['nativeSoakActualSeconds']>=900 and observation['observedWallSeconds']>=observation['nativeSoakActualSeconds']
+   after_log=adb('logcat','-d','-v','brief',timeout=30);(OUT/'post-native-application-logcat.txt').write_text(after_log)
+   assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: '+re.escape(PKG),after_log),'Application crash during native soak'
+   assert not re.search(r'ANR in '+re.escape(PKG)+r'(?:\s|\(|:)',after_log),'Application ANR during native soak'
+   # Wake and resume only this fresh owned AOSP application's existing launcher
+   # after the continuity check; do not hide a process restart by relaunching it.
+   adb('shell','input','keyevent','224')
+   adb('shell','input','keyevent','82')
+   adb('shell','am','start','-W','-n',choices[0])
+   assert application_identity()==app_before,'Application process changed while resuming its launcher'
+   final_root=capture('post-native-application')
+   assert any(n.get('package')==PKG for n in final_root.iter('node')),'Final frame does not contain the application UI'
+   assert application_identity()==app_before,'Application process changed during the final UI capture'
+   observation['launcherResumedForFinalCapture']=True
+   observation['applicationUiVisibleInFinalCapture']=True
+   observation['noApplicationFatalOrAnrInRetainedLog']=True
+   observation['result']='PASS'
+  finally:
+   (OUT/'post-native-application.json').write_text(json.dumps(observation,indent=2)+'\n')
 try:main()
 except Exception:
  (OUT/'failure-preferences.xml').write_text(adb('shell','run-as',PKG,'cat','shared_prefs/hetu.xml',check=False))

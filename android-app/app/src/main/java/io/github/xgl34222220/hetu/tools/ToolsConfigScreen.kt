@@ -1,38 +1,41 @@
 package io.github.xgl34222220.hetu.tools
 
-import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
-import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
-import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
-import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
-import io.github.xgl34222220.hetu.tools.ToolsIconButton as HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeCard
+import io.github.xgl34222220.hetu.home.HomeCheckMark
+import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
-import io.github.xgl34222220.hetu.home.HomeSpinner
-import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
+import io.github.xgl34222220.hetu.home.HomeRowDims
+import io.github.xgl34222220.hetu.home.HomeRowDivider
+import io.github.xgl34222220.hetu.home.HomeRowSubStyle
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.rememberHomeStagger
+import io.github.xgl34222220.hetu.home.warnText
+import io.github.xgl34222220.hetu.ui.ht
 
 /**
  * 配置与订阅 (pushed from 工具 › 配置管理). Stateless.
  *
- * - Page 4: 配置管理 card (config rows, 编辑当前 YAML) and 订阅管理 card (proxy-providers of the
- *   current config). Tapping a config row selects it; «⋯» opens the row menu.
- * - Pages 6–8: the menu, whose items depend on the row (current / other / bundled template).
- *   It is a popup anchored to the «⋯» button; [menuFor] names the row whose menu is open.
- * - Pages 9–11 (rename, delete config, delete subscription) are dialogs hosted by `ToolsRoute`;
- *   their cards are at the bottom of this file.
+ * - 配置管理 card: one row per config; the current one carries the accent highlight and a check
+ *   that pops in when the selection moves. Tapping a row selects it; «⋯» opens the row menu,
+ *   a popup anchored to the button ([menuFor] names the row whose menu is open). The menu's
+ *   items depend on the row (current / other / bundled template).
+ * - 订阅管理 card: the proxy-providers of the current config.
+ * - Rename, delete config and delete subscription are dialogs hosted by `ToolsRoute`; their
+ *   cards are at the bottom of this file.
  */
 @Composable
 internal fun ToolsConfigScreen(
@@ -52,26 +55,25 @@ internal fun ToolsConfigScreen(
     modifier: Modifier = Modifier,
     onRefresh: (() -> Unit)? = null,
 ) {
-    val c = LocalHomeColors.current
     val ready = state.load is ToolsLoad.Ready
+    val stagger = rememberHomeStagger()
     ToolsPage(
         title = "配置与订阅",
         onBack = onBack,
         modifier = modifier,
         refreshing = state.refreshing,
         onRefresh = if (state.busy) null else onRefresh,
-        actions = { HomeIconButton(ToolsIcons.Plus, "导入配置", onImport, enabled = ready && !state.busy) },
+        actions = { HomeIconButton(ToolsIcons.Plus, "导入配置", onImport, enabled = ready && !state.busy, glyph = 26.dp) },
     ) {
         ToolsLead("管理源配置与当前配置中的订阅链接。")
         when (val load = state.load) {
-            ToolsLoad.Loading -> Box(Modifier.fillMaxWidth().height(160.dp), contentAlignment = Alignment.Center) { HomeSpinner(size = 20.dp, color = c.t3) }
+            ToolsLoad.Loading -> ToolsLoading()
             is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.FileWarning, "配置读取失败", subtitle = load.message) {
-                HomeButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
+                ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
             }
             ToolsLoad.Ready -> {
-                ConfigCard(state, menuFor, onSelectConfig, onOpenMenu, onDismissMenu, onMenuItem, onEditYaml)
-                Spacer(Modifier.height(HomeDims.gap))
-                SubscriptionCard(state, onAddSubscription, onEditSubscription, onDeleteSubscription)
+                ConfigCard(state, menuFor, onSelectConfig, onOpenMenu, onDismissMenu, onMenuItem, onEditYaml, Modifier.homeEnter(stagger, 0))
+                SubscriptionCard(state, onAddSubscription, onEditSubscription, onDeleteSubscription, Modifier.homeEnter(stagger, 1))
             }
         }
     }
@@ -86,15 +88,15 @@ private fun ConfigCard(
     onDismissMenu: () -> Unit,
     onMenuItem: (ToolsConfig, ToolsConfigMenuItem) -> Unit,
     onEditYaml: () -> Unit,
+    modifier: Modifier,
 ) {
     val c = LocalHomeColors.current
-    val menuOffset = with(LocalDensity.current) { 40.dp.roundToPx() }
-    HomeCard(Modifier.fillMaxWidth()) {
+    val currentLabel = ht("当前配置")
+    HomeCard(modifier.fillMaxWidth()) {
         ToolsCardHeader(ToolsIcons.Folder, "配置管理")
         state.configs.forEach { config ->
             ToolsRow(
                 title = AnnotatedString(config.name),
-                modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.File,
                 subtitle = ht(config.caption),
                 subtitleMaxLines = 1,
@@ -103,11 +105,12 @@ private fun ConfigCard(
                 endPadding = 4.dp,
                 onClick = { onSelectConfig(config) },
                 trailing = {
-                    if (config.current) ToolsCheckBadge()
+                    // Always laid out, so the check can pop in and out as the selection moves.
+                    HomeCheckMark(config.current, Modifier.semantics { if (config.current) contentDescription = currentLabel }, size = 26.dp)
                     Box {
                         HomeIconButton(ToolsIcons.Ellipsis, "更多操作", { onOpenMenu(config) }, enabled = !state.busy, tint = c.t2)
                         if (menuFor == config.name) {
-                            ToolsMenuPopup(onDismiss = onDismissMenu, offsetY = menuOffset) {
+                            ToolsMenuPopup(onDismiss = onDismissMenu) {
                                 ToolsConfigMenuCard(config) { item -> onMenuItem(config, item) }
                             }
                         }
@@ -115,14 +118,15 @@ private fun ConfigCard(
                 },
             )
         }
+        HomeRowDivider(Modifier.padding(top = 4.dp))
         ToolsRow(
             title = AnnotatedString(ht("编辑当前 YAML")),
             icon = ToolsIcons.Pencil,
             titleColor = c.accent,
             iconTint = c.accent,
-            compact = true,
             enabled = !state.busy && state.current != null,
             onClick = onEditYaml,
+            trailing = { ToolsChevron() },
         )
     }
 }
@@ -133,46 +137,48 @@ private fun SubscriptionCard(
     onAdd: () -> Unit,
     onEdit: (ToolsSubscription) -> Unit,
     onDelete: (ToolsSubscription) -> Unit,
+    modifier: Modifier,
 ) {
     val c = LocalHomeColors.current
-    HomeCard(Modifier.fillMaxWidth()) {
+    val deleteLabel = "删除订阅"
+    HomeCard(modifier.fillMaxWidth()) {
         ToolsCardHeader(
             ToolsIcons.Link, "订阅管理", caption = "当前配置的 proxy-providers。",
-            trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null) },
+            trailing = { HomeIconButton(ToolsIcons.Plus, "添加订阅", onAdd, enabled = !state.busy && state.current != null, glyph = 26.dp) },
         )
         if (state.subscriptions.isEmpty()) {
             Text(
                 ht("当前配置没有 proxy-providers。可以添加订阅，或直接编辑 YAML。"),
-                Modifier.padding(horizontal = 16.dp, vertical = 14.dp), color = c.t2, style = HomeType.note,
+                Modifier.padding(horizontal = HomeRowDims.start, vertical = 12.dp), color = c.t2, style = HomeType.note,
             )
         }
-        state.subscriptions.forEach { item ->
+        state.subscriptions.forEachIndexed { index, item ->
+            if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
             ToolsRow(
                 title = AnnotatedString(item.name),
-                modifier = Modifier.padding(horizontal = 10.dp),
                 icon = ToolsIcons.Link,
                 subtitle = if (item.placeholder) ht("尚未填写订阅链接") else item.url,
                 subtitleMaxLines = 1,
-                subtitleStyle = if (item.placeholder) HomeType.rowSub else ToolsType.url,
-                subtitleColor = if (item.placeholder) c.warn else c.t2,
+                subtitleStyle = if (item.placeholder) HomeRowSubStyle else ToolsType.url,
+                subtitleColor = if (item.placeholder) c.warnText else c.t2,
                 enabled = !state.busy,
                 endPadding = 4.dp,
                 onClick = { onEdit(item) },
                 trailing = {
                     ToolsChevron()
-                    HomeIconButton(ToolsIcons.Trash2, "删除订阅", { onDelete(item) }, enabled = !state.busy, tint = c.bad)
+                    HomeIconButton(ToolsIcons.Trash2, deleteLabel, { onDelete(item) }, enabled = !state.busy, tint = c.bad, glyph = 22.dp)
                 },
             )
         }
-        ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(horizontal = 16.dp, vertical = 12.dp))
+        ToolsNote("配置切换后，下次启动或重启代理时生效。", Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, top = 8.dp, bottom = 16.dp))
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Row menu (pages 6–8)                                                */
+/*  Row menu                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Menu of one config row. Items come from [menuItems]: the caption line is the config name. */
+/** Menu of one config row. Items come from [menuItems]; the caption line is the config name. */
 @Composable
 internal fun ToolsConfigMenuCard(config: ToolsConfig, modifier: Modifier = Modifier, onItem: (ToolsConfigMenuItem) -> Unit) {
     ToolsMenuCard(
@@ -191,15 +197,14 @@ internal fun ToolsConfigMenuCard(config: ToolsConfig, modifier: Modifier = Modif
         },
         modifier = modifier,
         title = config.name,
-        captionTitle = config.current,
     )
 }
 
 /* ------------------------------------------------------------------ */
-/*  Dialog cards (pages 9–11)                                           */
+/*  Dialog cards                                                        */
 /* ------------------------------------------------------------------ */
 
-/** Page 9. The error line appears under the field after a failed 保存. */
+/** The error line unfolds under the field after a failed 保存. */
 @Composable
 internal fun ToolsRenameConfigDialogCard(
     overlay: ToolsConfigOverlay.Rename,
@@ -209,13 +214,11 @@ internal fun ToolsRenameConfigDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
-        actions = ToolsDialogActions.ConfigGrid,
         title = "重命名配置", confirmLabel = "保存", onConfirm = onConfirm, onCancel = onCancel,
         modifier = modifier, confirmLoading = overlay.saving,
-    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml", compact = true) }
+    ) { ToolsField("名称", overlay.draft, onDraftChange, error = overlay.error, placeholder = "例如 日常.yaml", enabled = !overlay.saving) }
 }
 
-/** Page 10. */
 @Composable
 internal fun ToolsDeleteConfigDialogCard(
     overlay: ToolsConfigOverlay.DeleteConfig,
@@ -224,15 +227,14 @@ internal fun ToolsDeleteConfigDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
-        actions = ToolsDialogActions.ConfigGrid,
         title = "删除配置？",
         text = "「${overlay.config}」将被永久删除。" + if (overlay.isCurrent) "\n删除后会切换回内置模板。" else "",
         confirmLabel = "删除", confirmKind = ToolsConfirmKind.Danger,
+        icon = ToolsIcons.Trash2, iconTone = HomeTone.Bad,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     )
 }
 
-/** Page 11. */
 @Composable
 internal fun ToolsDeleteSubscriptionDialogCard(
     overlay: ToolsConfigOverlay.DeleteSubscription,
@@ -241,10 +243,10 @@ internal fun ToolsDeleteSubscriptionDialogCard(
     modifier: Modifier = Modifier,
 ) {
     ToolsDialogCard(
-        actions = ToolsDialogActions.Filled,
         title = "删除订阅？",
         text = "从「${overlay.config}」中移除「${overlay.subscription}」\n及其在策略组中的引用。",
-        confirmLabel = "删除", confirmKind = ToolsConfirmKind.DangerSoft,
+        confirmLabel = "删除", confirmKind = ToolsConfirmKind.Danger,
+        icon = ToolsIcons.Trash2, iconTone = HomeTone.Bad,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     )
 }

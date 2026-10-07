@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -108,7 +109,7 @@ internal fun ImmersiveUiHost(content: @Composable () -> Unit) {
         }
         onDispose { }
     }
-    Box(Modifier.fillMaxSize().background(background).testTag("immersive-window")) {
+    Box(Modifier.fillMaxSize().homeDiffuseCanvas(background).testTag("immersive-window")) {
         ModalBackdropHost12(content)
     }
 }

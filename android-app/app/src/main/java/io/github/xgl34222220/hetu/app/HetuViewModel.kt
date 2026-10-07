@@ -173,6 +173,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         private set
     var settingsRevision by mutableIntStateOf(0)
         private set
+    /** Configuration/API identity for content reloads; physical handovers retain these lists. */
+    var contentRevision by mutableLongStateOf(0L)
+        private set
 
     var providers by mutableStateOf<List<DashboardProviderUi>>(emptyList())
         private set
@@ -237,15 +240,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private var runtimeRequestGeneration = 0L
     private var requestSequence = 0L
     private var runtimeRequestSettings = requestSettings()
+    private var runtimeContentSettings = contentSettings(runtimeRequestSettings)
     private val nodeProbeOwners = HashMap<String, MutableSet<Long>>()
     private val latestNodeProbe = HashMap<String, Long>()
     private val groupProbeOwners = HashMap<String, Long>()
+    private val selectionOwners = HashMap<String, Long>()
     private var allProbeOwner: Long? = null
     private var siteProbeOwner: Long? = null
     private var latestProviderRead = 0L
     private var latestSiteRead = 0L
+    private var latestRulesRead = 0L
+    private var latestRuleSetsRead = 0L
     private val providerTaskOwners = HashMap<String, Long>()
     private var providersUpdateAllOwner: Long? = null
+    private val ruleSetTaskOwners = HashMap<String, Long>()
+    private var ruleSetsUpdateAllOwner: Long? = null
 
     /** Ordinary polling must not invalidate a probe; a different core/API/config must. */
     private fun requestSettings(): Map<String, Any?> {
@@ -255,7 +264,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val settings = snapshot.filterKeys { key ->
             key in setOf("proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
             "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
-            "proxyCustomDelayUrlEnabled", "proxyCustomDelayUrl") ||
+            "proxyCustomDelayUrlEnabled", "proxyCustomDelayUrl", "proxyNetworkSessionId", "proxyNetworkEpoch") ||
                 key == configKey || key.startsWith("proxyLatencyTarget")
         }.toMutableMap()
         // ConfigLibrary lazily persists this same default during its first read.
@@ -268,13 +277,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return settings
     }
 
-    private fun invalidateRuntimeRequests() {
+    /** Network handovers invalidate observations without discarding the current config's lists. */
+    private fun contentSettings(settings: Map<String, Any?>): Map<String, Any?> = settings.filterKeys { key ->
+        key in setOf("proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
+            "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret") ||
+            key.startsWith("proxySelectedConfig.")
+    }
+
+    private fun invalidateRuntimeRequests(clearRuleContent: Boolean = true) {
         runtimeRequestGeneration++
         nodeProbeOwners.clear()
         latestNodeProbe.clear()
         groupProbeOwners.clear()
         testingNodes.clear()
         testingGroups.clear()
+        selectionOwners.clear()
+        pendingSelection.clear()
         allProbeOwner = null
         testingAll = false
         siteProbeOwner = null
@@ -283,13 +301,31 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         providerTaskOwners.clear()
         providersUpdateAllOwner = null
         providersUpdatingAll = false
+        // Allow the replacement runtime to read immediately. Old finally blocks
+        // must not clear busy/task state belonging to those replacement reads.
+        latestRulesRead = ++requestSequence
+        latestRuleSetsRead = ++requestSequence
+        rulesLoading = false
+        ruleSetsLoading = false
+        ruleSetTaskOwners.keys.forEach { name -> if (ruleSetTasks[name]?.running == true) ruleSetTasks.remove(name) }
+        ruleSetTaskOwners.clear()
+        ruleSetsUpdateAllOwner = null
+        ruleSetsUpdatingAll = false
+        if (clearRuleContent) {
+            contentRevision++
+            rules = emptyList()
+            ruleSets = emptyList()
+        }
     }
 
     private fun syncRequestSettings() {
         val current = requestSettings()
         if (current != runtimeRequestSettings) {
+            val content = contentSettings(current)
+            val clearRuleContent = content != runtimeContentSettings
+            runtimeContentSettings = content
             runtimeRequestSettings = current
-            invalidateRuntimeRequests()
+            invalidateRuntimeRequests(clearRuleContent)
         }
     }
 
@@ -342,6 +378,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun onForeground() {
         reloadAppearance()
         if (pollJob?.isActive == true) return
+        controller.resumeContinuityFromForeground()
         pollJob = viewModelScope.launch {
             launch {
                 delay(600)
@@ -729,29 +766,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /* ---------------- proxies ---------------- */
 
     fun select(group: String, node: String) {
-        if (!state.running || operation != null || pendingSelection.containsKey(group)) return
+        val request = activeRuntimeRequest() ?: return
+        if (pendingSelection.containsKey(group)) return
         val current = state.groups.firstOrNull { it.name == group } ?: return
         if (current.now == node || current.nodes.none { it.name == node }) return
+        val ticket = repo.captureSelection()
+        val owner = ++requestSequence
+        selectionOwners[group] = owner
         pendingSelection[group] = node
         viewModelScope.launch {
             try {
                 // A stale callback can outlive its screen or race with a stop/config refresh.
-                if (!state.running || operation != null ||
+                if (!currentRuntimeRequest(request) || selectionOwners[group] != owner ||
                     state.groups.none { it.name == group && it.nodes.any { candidate -> candidate.name == node } }) return@launch
-                repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false))
+                repo.select(group, node, prefs.getBoolean("proxySelectorDisconnectOnSelect", false), ticket)
                 // The already-sent PUT cannot be revoked, but must not revive a stopped UI.
-                if (!state.running || operation != null) return@launch
+                if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
                 val fresh = refreshNow()
-                if (!state.running || operation != null) return@launch
+                if (!currentRuntimeRequest(request) || selectionOwners[group] != owner) return@launch
                 val actual = fresh?.takeIf { it.running && it.panelReady }
                     ?.groups?.firstOrNull { it.name == group }?.now
                 check(actual == node) { "核心尚未确认所选节点，当前为 ${actual.orEmpty().ifBlank { "未知" }}" }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast("切换失败：" + errorText(error, "未知错误"))
+                if (currentRuntimeRequest(request) && selectionOwners[group] == owner)
+                    toast("切换失败：" + errorText(error, "未知错误"))
             } finally {
-                pendingSelection.remove(group)
+                if (selectionOwners[group] == owner) {
+                    selectionOwners.remove(group)
+                    pendingSelection.remove(group)
+                }
             }
         }
     }
@@ -939,95 +984,144 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /* ---------------- rules / rule sets / providers ---------------- */
 
     fun loadRules() {
-        if (rulesLoading || !state.running) return
+        val request = activeRuntimeRequest() ?: return
+        if (rulesLoading) return
+        val owner = (++requestSequence).also { latestRulesRead = it }
         rulesLoading = true
         viewModelScope.launch {
             try {
-                rules = controller.rules()
+                val fresh = controller.rules()
+                if (currentRuntimeRequest(request) && latestRulesRead == owner) rules = fresh
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "规则读取失败"))
+                if (currentRuntimeRequest(request) && latestRulesRead == owner) toast(errorText(error, "规则读取失败"))
             } finally {
-                rulesLoading = false
+                if (latestRulesRead == owner) rulesLoading = false
             }
         }
     }
 
     fun loadRuleSets() {
-        if (ruleSetsLoading || !state.running) return
+        val request = activeRuntimeRequest() ?: return
+        if (ruleSetsLoading) return
+        val owner = (++requestSequence).also { latestRuleSetsRead = it }
         ruleSetsLoading = true
         viewModelScope.launch {
             try {
-                ruleSets = repo.ruleSets()
+                val fresh = repo.ruleSets()
+                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) ruleSets = fresh
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "规则集读取失败"))
+                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) toast(errorText(error, "规则集读取失败"))
             } finally {
-                ruleSetsLoading = false
+                if (latestRuleSetsRead == owner) ruleSetsLoading = false
             }
         }
     }
 
     fun updateRuleSet(name: String) {
-        if (ruleSetTasks[name]?.running == true || !state.running) return
+        val request = activeRuntimeRequest() ?: return
+        if (ruleSetTasks[name]?.running == true) return
+        val owner = ++requestSequence
+        ruleSetTaskOwners[name] = owner
         ruleSetTasks[name] = HxTask(running = true)
         viewModelScope.launch {
             try {
                 val fresh = repo.refreshRuleSet(name)
-                if (fresh != null) ruleSets = ruleSets.map { if (it.name == name) fresh else it }
+                if (!currentRuntimeRequest(request) || ruleSetTaskOwners[name] != owner) return@launch
+                // Earlier whole-list reads cannot overwrite this acknowledged mutation.
+                latestRuleSetsRead = ++requestSequence
+                ruleSetsLoading = false
+                if (fresh != null) ruleSets = if (ruleSets.none { it.name == name }) ruleSets + fresh
+                    else ruleSets.map { if (it.name == name) fresh else it }
                 ruleSetTasks[name] = HxTask(ok = true, message = "已更新")
             } catch (cancel: CancellationException) {
-                ruleSetTasks.remove(name)
+                if (ruleSetTaskOwners[name] == owner) ruleSetTasks.remove(name)
                 throw cancel
             } catch (error: Exception) {
-                ruleSetTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+                if (currentRuntimeRequest(request) && ruleSetTaskOwners[name] == owner)
+                    ruleSetTasks[name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+            } finally {
+                if (ruleSetTaskOwners[name] == owner) {
+                    ruleSetTaskOwners.remove(name)
+                    if (ruleSetTasks[name]?.running == true) ruleSetTasks.remove(name)
+                }
             }
         }
     }
 
     /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
     fun updateAllRuleSets() {
-        if (ruleSetsUpdatingAll || !state.running) return
+        val request = activeRuntimeRequest() ?: return
+        if (ruleSetsUpdatingAll) return
+        val owner = ++requestSequence
+        ruleSetsUpdateAllOwner = owner
         ruleSetsUpdatingAll = true
         viewModelScope.launch {
             var ok = 0
             var failed = 0
             try {
-                val list = ruleSets.ifEmpty { repo.ruleSets().also { ruleSets = it } }
+                // Cached UI rows can belong to an earlier config on the same API.
+                // Mutations always take their targets from the current controller.
+                val initialReadOwner = (++requestSequence).also { latestRuleSetsRead = it }
+                ruleSetsLoading = false
+                val list = repo.ruleSets()
+                if (!currentRuntimeRequest(request) || ruleSetsUpdateAllOwner != owner) return@launch
+                if (initialReadOwner == latestRuleSetsRead) ruleSets = list
                 val targets = list.filter { it.vehicleType.equals("HTTP", ignoreCase = true) }
                 if (targets.isEmpty()) {
                     toast("没有可在线更新的规则集（本地/内联规则集无需更新）")
                     return@launch
                 }
-                targets.forEach { ruleSetTasks[it.name] = HxTask(running = true) }
+                targets.forEach { ruleSetTaskOwners[it.name] = owner; ruleSetTasks[it.name] = HxTask(running = true) }
                 for (chunk in targets.chunked(3)) {
+                    if (!currentRuntimeRequest(request) || ruleSetsUpdateAllOwner != owner) return@launch
                     coroutineScope {
                         chunk.map { item ->
                             async {
+                                if (!currentRuntimeRequest(request) || ruleSetTaskOwners[item.name] != owner) return@async
                                 try {
                                     repo.refreshRuleSet(item.name)
-                                    ruleSetTasks[item.name] = HxTask(ok = true, message = "已更新")
-                                    ok++
+                                    if (currentRuntimeRequest(request) && ruleSetTaskOwners[item.name] == owner) {
+                                        latestRuleSetsRead = ++requestSequence
+                                        ruleSetsLoading = false
+                                        ruleSetTasks[item.name] = HxTask(ok = true, message = "已更新")
+                                        ok++
+                                    }
                                 } catch (cancel: CancellationException) {
                                     throw cancel
                                 } catch (error: Exception) {
-                                    ruleSetTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
-                                    failed++
+                                    if (currentRuntimeRequest(request) && ruleSetTaskOwners[item.name] == owner) {
+                                        ruleSetTasks[item.name] = HxTask(ok = false, message = errorText(error, "更新失败"))
+                                        failed++
+                                    }
                                 }
                             }
                         }.awaitAll()
                     }
                 }
-                ruleSets = try { repo.ruleSets() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { ruleSets }
+                if (!currentRuntimeRequest(request) || ruleSetsUpdateAllOwner != owner) return@launch
+                val readOwner = (++requestSequence).also { latestRuleSetsRead = it }
+                // This read supersedes earlier ordinary reads. Retire their busy
+                // flag now; their finally blocks no longer own it. A later ordinary
+                // read can take ownership and keep its own busy flag until done.
+                ruleSetsLoading = false
+                val fresh = try { repo.ruleSets() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { ruleSets }
+                if (!currentRuntimeRequest(request) || ruleSetsUpdateAllOwner != owner) return@launch
+                if (readOwner == latestRuleSetsRead) ruleSets = fresh
                 toast(if (failed == 0) "全部 $ok 个规则集已更新" else "已更新 $ok 个，$failed 个失败")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "规则集更新失败"))
+                if (currentRuntimeRequest(request) && ruleSetsUpdateAllOwner == owner) toast(errorText(error, "规则集更新失败"))
             } finally {
-                ruleSetsUpdatingAll = false
+                ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
+                    ruleSetTaskOwners.remove(name)
+                    if (ruleSetTasks[name]?.running == true) ruleSetTasks.remove(name)
+                }
+                if (ruleSetsUpdateAllOwner == owner) { ruleSetsUpdateAllOwner = null; ruleSetsUpdatingAll = false }
             }
         }
     }
@@ -1060,6 +1154,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             try {
                 val fresh = repo.refreshProvider(name)
                 if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
+                beginProviderRead()
                 if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
                 providerTasks[name] = HxTask(ok = true, message = "已更新")
                 refreshNow()

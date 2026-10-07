@@ -42,7 +42,6 @@ public final class RootTproxyActivity extends Activity {
 
     private void build(){
         LinearLayout shell=u.col();u.window(shell);
-        if(!u.dark)shell.setBackground(new android.graphics.drawable.GradientDrawable(android.graphics.drawable.GradientDrawable.Orientation.TOP_BOTTOM,new int[]{0xffeeeffb,0xffeceefb}));
         ScrollView scroll=new ScrollView(this);scroll.setVerticalScrollBarEnabled(false);scroll.setClipToPadding(false);
         LinearLayout body=u.col();body.setPadding(u.dp(12),0,u.dp(12),u.dp(32));scroll.addView(body);shell.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
 
@@ -154,11 +153,11 @@ public final class RootTproxyActivity extends Activity {
     }
 
     private void showChoice(View anchor,String[] labels,String[] descriptions,boolean[] enabled,int selected,int widthDp,java.util.function.IntConsumer pick){
-        LinearLayout options=u.col();options.setPadding(u.dp(5),u.dp(5),u.dp(5),u.dp(5));options.setBackground(u.bg(u.dark?u.surface:0xfffbfaff,16));
+        LinearLayout options=u.col();options.setPadding(u.dp(5),u.dp(5),u.dp(5),u.dp(5));options.setBackground(u.glassPanel(u.elevated,16));
         ScrollView viewport=new ScrollView(this);viewport.setVerticalScrollBarEnabled(false);viewport.addView(options);
         int width=Math.min(u.dp(widthDp),getResources().getDisplayMetrics().widthPixels-u.dp(24));
         PopupWindow popup=new PopupWindow(viewport,width,ViewGroup.LayoutParams.WRAP_CONTENT,true);
-        popup.setBackgroundDrawable(u.bg(u.dark?u.surface:0xfffbfaff,16));popup.setElevation(u.dp(12));popup.setOutsideTouchable(true);
+        popup.setBackgroundDrawable(u.glassPanel(u.elevated,16));popup.setElevation(0);popup.setOutsideTouchable(true);
         for(int i=0;i<labels.length;i++){
             final int index=i;LinearLayout row=u.row();row.setMinimumHeight(u.dp(descriptions[i].isEmpty()?44:58));row.setPadding(u.dp(10),u.dp(8),u.dp(8),u.dp(8));row.setBackground(u.touch(i==selected?(u.dark?u.soft:0xffe9edff):android.graphics.Color.TRANSPARENT,10));row.setAlpha(enabled[i]?1f:.45f);
             LinearLayout lines=u.col();lines.addView(u.text(labels[i],14.5f,u.text,true));if(!descriptions[i].isEmpty()){u.gap(lines,3);lines.addView(u.text(descriptions[i],10.5f,u.muted,false));}row.addView(lines,new LinearLayout.LayoutParams(0,-2,1));
@@ -182,7 +181,7 @@ public final class RootTproxyActivity extends Activity {
     }
 
     private LinearLayout settingsCard(LinearLayout parent){
-        LinearLayout card=u.col();card.setBackground(u.bg(u.dark?u.surface:0xfff8f7fd,20));
+        LinearLayout card=u.col();card.setBackground(u.glassPanel(u.surface,20));
         LinearLayout.LayoutParams lp=new LinearLayout.LayoutParams(-1,-2);lp.bottomMargin=u.dp(12);parent.addView(card,lp);return card;
     }
     private void settingsDivider(LinearLayout parent){View line=new View(this);line.setBackgroundColor(u.dark?u.divider:0xffeeedf8);parent.addView(line,new LinearLayout.LayoutParams(-1,u.dp(.5f)));}
