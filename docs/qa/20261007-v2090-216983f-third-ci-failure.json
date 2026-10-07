@@ -1,0 +1,59 @@
+{
+  "schema": 1,
+  "commit": "216983f9697b8113b27460760496ef50281aa03e",
+  "run": 37676094281,
+  "buildJob": 112979865792,
+  "stage": "testDebugUnitTest",
+  "actualXmlFiles": 63,
+  "actualCounts": {
+    "tests": 603,
+    "failures": 1,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failedCases": [
+    {
+      "class": "io.github.xgl34222220.hetu.GlassMaterial90Test",
+      "method": "localTakeoverChecksNeverBecomeAnInternetHealthClaim",
+      "diagnostic": "java.lang.AssertionError: Rendered hero caption must remain readable: dark / 1.0361363"
+    }
+  ],
+  "originalPreviouslyFailedSuites": {
+    "PanelControllerErrorTest": {
+      "tests": "4",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    },
+    "ToolsDiagIntakeTest": {
+      "tests": "3",
+      "failures": "0",
+      "errors": "0",
+      "skipped": "0"
+    }
+  },
+  "actualGlassPngs": 16,
+  "neverExecuted": [
+    "Android lint",
+    "supplemental36",
+    "host900 for this commit",
+    "installed candidate on API35/API36",
+    "native900 for this commit"
+  ],
+  "uiArtifact": {
+    "id": 11507378664,
+    "outerZipBytes": 36158184,
+    "outerZipSha256": "aa7c74ffefb3e1581c35f9ab3db9100d51cd3474c3a5a72e1e9eda33f9de321c"
+  },
+  "sourceArtifact": {
+    "artifactId": 11505854753,
+    "commit": "216983f9697b8113b27460760496ef50281aa03e",
+    "outerZipBytes": 93983642,
+    "outerZipSha256": "7bf768f951dffc9b01be959dee665a2d3ea781a74fc9d73aa359acc42899a314",
+    "tarBytes": 93983458,
+    "tarSha256": "c958cc3017474803b40a889a7a9249aaf6677ea516f9108e1249ffd592c3fea7",
+    "transportResumedAfterDetectedPartial": true
+  },
+  "diagnosis": "New fixture saved light appearance preferences but passed dark to the external theme and contrast sampler. The real home adapter reads preferences again; its captured image was light. Fix the fixture through the actual appearance setter and verify real background brightness, retaining the 4.5 contrast threshold. Production palette is unchanged.",
+  "runUrl": "https://github.com/xgl34222220-ops/hetu/actions/runs/37676094281"
+}

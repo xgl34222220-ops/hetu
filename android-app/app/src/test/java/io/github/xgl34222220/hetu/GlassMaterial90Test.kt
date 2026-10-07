@@ -208,6 +208,7 @@ class GlassMaterial90Test {
             strongest = if (dark) maxOf(strongest, lum) else minOf(strongest, lum)
         }
         val bg = background.luminance()
+        assertTrue("Rendered material must match the requested appearance: $appearance / $bg", if (dark) bg < .5f else bg > .5f)
         val contrast = (maxOf(bg, strongest) + .05f) / (minOf(bg, strongest) + .05f)
         assertTrue("Rendered hero caption must remain readable: $appearance / $contrast", contrast >= 4.5f)
     }
@@ -220,6 +221,9 @@ class GlassMaterial90Test {
         val localReady = original.copy(connection = HomeConnectionObservation(controllerReady = true, takeoverHealthy = true))
         assertEquals(HomeGlyphMode.On, localReady.homeHeroGlyphMode())
         assertTrue(localReady.connection.health.caption.contains("出口未验证"))
+        vm.setAppearanceMode("dark")
+        assertEquals("dark", vm.appearance)
+        assertEquals("dark", vm.prefs.getString("appearance", ""))
         @Suppress("UNCHECKED_CAST")
         fun actualState(state: ProxyComposeState) {
             val field = HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
@@ -236,7 +240,7 @@ class GlassMaterial90Test {
                 LocalNav provides remember { HxNav() },
                 LocalHxBlur provides vm.blurEnabled,
             ) {
-                HetuAppTheme("dark", false) { NewUiHome(vm, 16.dp) {} }
+                HetuAppTheme(vm.appearance, false) { NewUiHome(vm, 16.dp) {} }
             }
         }
         settle()

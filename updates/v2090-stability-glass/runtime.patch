@@ -2425,10 +2425,10 @@ index 0000000..a19945f
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
 new file mode 100644
-index 0000000..c0094b9
+index 0000000..cc1f35d
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
-@@ -0,0 +1,256 @@
+@@ -0,0 +1,260 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -2639,6 +2639,7 @@ index 0000000..c0094b9
 +            strongest = if (dark) maxOf(strongest, lum) else minOf(strongest, lum)
 +        }
 +        val bg = background.luminance()
++        assertTrue("Rendered material must match the requested appearance: $appearance / $bg", if (dark) bg < .5f else bg > .5f)
 +        val contrast = (maxOf(bg, strongest) + .05f) / (minOf(bg, strongest) + .05f)
 +        assertTrue("Rendered hero caption must remain readable: $appearance / $contrast", contrast >= 4.5f)
 +    }
@@ -2651,6 +2652,9 @@ index 0000000..c0094b9
 +        val localReady = original.copy(connection = HomeConnectionObservation(controllerReady = true, takeoverHealthy = true))
 +        assertEquals(HomeGlyphMode.On, localReady.homeHeroGlyphMode())
 +        assertTrue(localReady.connection.health.caption.contains("出口未验证"))
++        vm.setAppearanceMode("dark")
++        assertEquals("dark", vm.appearance)
++        assertEquals("dark", vm.prefs.getString("appearance", ""))
 +        @Suppress("UNCHECKED_CAST")
 +        fun actualState(state: ProxyComposeState) {
 +            val field = HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
@@ -2667,7 +2671,7 @@ index 0000000..c0094b9
 +                LocalNav provides remember { HxNav() },
 +                LocalHxBlur provides vm.blurEnabled,
 +            ) {
-+                HetuAppTheme("dark", false) { NewUiHome(vm, 16.dp) {} }
++                HetuAppTheme(vm.appearance, false) { NewUiHome(vm, 16.dp) {} }
 +            }
 +        }
 +        settle()

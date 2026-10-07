@@ -32,7 +32,7 @@
     "updates/v2089-runtime153/runtime.patch": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
     "UI92_RUNTIME146_INPUTS.json": "c14b5eac12dd01471580944cdee56f183f226f92d6495e7c68ea9473c1cdfdbf"
   },
-  "patchSha256": "369e8fa8552e8fbc235f5d727e19da6b99ebb20ec77442af0c861cbe6f63fc3a",
+  "patchSha256": "5e3bb7fd4356024518bf9df214cf523d81bef09ebbfe1ec9d4fc6fcbd099301b",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java",
@@ -122,7 +122,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "f2335a18b9f26adf74f8faee0d158011a7b276966883c7ead5fec2d68e4a91da",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "2cfc4ee6d822d7f0858dbfed916c4f3ab21bb294aec16ab0d86b3d87791b1107",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt": "d844f180696c0c5a32557f1f18a089e6155ec4f76d01cadfa28a111490fed06e",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "ffcce42e91a80c066cc125cbeec6ea1fa906209bf7e11213a1e7c646b8ae7fb6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "9658806e45dbc28d56759ce51f892b9a45d9ddf87c4b32062a69715cf170cb87",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "ad6d2fe110fe0c4c4418d6ff196b2ef64bbd5d5d557bd98a84ac87f495b26687",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "a7ecc51aa3e4e38eb2ce5d2b04769f8046cff7addc1d03c7b142d2c18eef368a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "0aebd74b9944b026cc1498daa7c5d7e4bd3a61226259d73aea4c5f559a78a50e",
