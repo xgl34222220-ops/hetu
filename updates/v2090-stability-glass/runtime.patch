@@ -2427,7 +2427,7 @@ index 0000000..a19945f
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
 new file mode 100644
-index 0000000..802d254
+index 0000000..fc7e6cf
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
 @@ -0,0 +1,252 @@
@@ -2627,15 +2627,15 @@ index 0000000..802d254
 +
 +    /** Sample the actual rendered caption ink against a text-free part of its actual material. */
 +    private fun assertCaptionContrast(bitmap: Bitmap, appearance: String) {
-+        val hero = rule.onNodeWithTag("home-status-material").getUnclippedBoundsInRoot()
-+        val caption = rule.onNodeWithTag("home-connection-caption").getUnclippedBoundsInRoot()
-+        val background = Color(bitmap.getPixel((hero.left.value + 36f).toInt(), (hero.top.value + 5f).toInt()))
++        val hero = rule.onNodeWithTag("home-status-material").fetchSemanticsNode().boundsInWindow
++        val caption = rule.onNodeWithTag("home-connection-caption").fetchSemanticsNode().boundsInWindow
++        val background = Color(bitmap.getPixel((hero.left + 36f).toInt(), (hero.top + 5f).toInt()))
 +        val dark = appearance == "dark"
 +        var strongest = if (dark) 0f else 1f
-+        val left = caption.left.value.toInt().coerceAtLeast(0)
-+        val right = caption.right.value.toInt().coerceAtMost(bitmap.width)
-+        val top = caption.top.value.toInt().coerceAtLeast(0)
-+        val bottom = caption.bottom.value.toInt().coerceAtMost(bitmap.height)
++        val left = caption.left.toInt().coerceAtLeast(0)
++        val right = caption.right.toInt().coerceAtMost(bitmap.width)
++        val top = caption.top.toInt().coerceAtLeast(0)
++        val bottom = caption.bottom.toInt().coerceAtMost(bitmap.height)
 +        for (y in top until bottom) for (x in left until right) {
 +            val lum = Color(bitmap.getPixel(x, y)).luminance()
 +            strongest = if (dark) maxOf(strongest, lum) else minOf(strongest, lum)
@@ -2848,10 +2848,10 @@ index a746d44..009eab6 100644
  }
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt
 new file mode 100644
-index 0000000..48cdd0d
+index 0000000..88d9225
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt
-@@ -0,0 +1,131 @@
+@@ -0,0 +1,132 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -2893,7 +2893,8 @@ index 0000000..48cdd0d
 +
 +@Implements(value = RootProxyManager::class, isInAndroidSdk = false)
 +class RecoveryThrottleManager90Shadow {
-+    @Implementation fun startIfWanted(profile: ProxyRuntimeProfile, currentNetwork: BooleanSupplier): JSONObject {
++    @Implementation(methodName = "startIfWanted")
++    private fun startIfWanted(profile: ProxyRuntimeProfile, currentNetwork: BooleanSupplier): JSONObject {
 +        check(currentNetwork.asBoolean)
 +        attempts++
 +        // Remain confirmed DEAD so repeated maintenance actually tests backoff.

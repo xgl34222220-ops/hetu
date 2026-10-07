@@ -20,15 +20,16 @@ from pathlib import Path
 import re
 import select
 import shlex
-import shutil
 import signal
 import socket
 import socketserver
 import struct
 import subprocess
+import tempfile
 import threading
 import time
 import uuid
+import zipfile
 
 ROOT = Path(__file__).resolve().parents[2]
 PAYLOAD = 'assets/mihomo-root/x86_64/mihomo'
@@ -428,16 +429,45 @@ def owned_target(environment, guest):
     return dict(owned, serial=SERIAL, shellUid=2000, guestApi=api, guestAbi='x86_64')
 
 
-def native_payload():
-    source = ROOT / 'android-app/app/src/main' / PAYLOAD
-    data = source.read_bytes()
+def native_payload(apk=None):
+    """Read the installed candidate's unique original core, never a job-local cache.
+
+    A checkout's ignored binary is optional. If present it must match the actual
+    candidate APK bytes too; a stale local source cannot replace the APK payload.
+    No APK member is extracted to a path by this read-only function.
+    """
+    if apk is None:
+        candidates = sorted((ROOT / 'candidate').glob('*.apk'))
+        if len(candidates) != 1:
+            raise RuntimeError('Native soak requires one unambiguous downloaded candidate APK')
+        apk = candidates[0]
+    apk = Path(apk).resolve()
+    if not apk.is_file():
+        raise RuntimeError('Native soak candidate APK is missing')
+    with zipfile.ZipFile(apk) as archive:
+        matches = [member for member in archive.infolist() if member.filename == PAYLOAD]
+        if len(matches) != 1 or matches[0].is_dir():
+            raise RuntimeError('Candidate APK must contain exactly one original native core member')
+        member = matches[0]
+        if member.flag_bits & 1 or not 1024 * 1024 < member.file_size <= 96 * 1024 * 1024:
+            raise RuntimeError('Candidate native core member is encrypted or outside its bounded size')
+        data = archive.read(member)
     expected = json.loads((ROOT / 'UI92_RUNTIME146_INPUTS.json').read_text())['original146_payload'][PAYLOAD]
     if sha256(data) != expected:
-        raise RuntimeError('Native soak payload differs from the pinned original146 manifest')
+        raise RuntimeError('Candidate APK native payload differs from the pinned original146 manifest')
     # ELF64/little-endian/x86_64; Android linker rather than a host Linux replacement.
     if data[:6] != b'\x7fELF\x02\x01' or struct.unpack('<H', data[18:20])[0] != 62 or b'/system/bin/linker64\0' not in data:
         raise RuntimeError('Native soak requires the original Android x86_64 executable')
-    return source, expected, len(data)
+    source = ROOT / 'android-app/app/src/main' / PAYLOAD
+    source_verified = source.is_file()
+    if source_verified and source.read_bytes() != data:
+        raise RuntimeError('Present ignored native source differs from the candidate APK core')
+    metadata = {'path': PAYLOAD, 'sha256': expected, 'bytes': len(data),
+                'manifest': 'UI92_RUNTIME146_INPUTS.json/original146_payload',
+                'source': 'downloaded candidate APK', 'candidateApk': str(apk),
+                'candidateApkSha256': sha256(apk.read_bytes()),
+                'presentIgnoredSourceVerified': source_verified}
+    return data, expected, metadata
 
 
 def process_identity(guest, pid, directory):
@@ -561,7 +591,7 @@ def evaluate(samples, seconds, elapsed, fixture_events, resource_samples):
             'maxFileDescriptors': max(value['fileDescriptors'] for value in resource_samples)}
 
 
-def run_soak(*, output, seconds=900, environment=None):
+def run_soak(*, output, seconds=900, environment=None, apk=None):
     """Called directly inside smoke_hetu_apk.py, retaining runner parent identity.
 
     Any failure writes results.json before raising; short durations are refused
@@ -595,8 +625,8 @@ def run_soak(*, output, seconds=900, environment=None):
         signal.signal(signum, interrupted)
     try:
         report['target'] = owned_target(environment, guest)  # Mandatory live proof before any mutation.
-        source, digest, size = native_payload()
-        report['nativePayload'] = {'path': PAYLOAD, 'sha256': digest, 'bytes': size, 'manifest': 'UI92_RUNTIME146_INPUTS.json/original146_payload'}
+        payload, digest, metadata = native_payload(apk)
+        report['nativePayload'] = metadata
         report['nativeManifestSha256'] = sha256((ROOT / 'UI92_RUNTIME146_INPUTS.json').read_bytes())
         report['soakScriptSha256'] = sha256(Path(__file__).read_bytes())
         report['observedRepositoryCommit'] = subprocess.run(['git', 'rev-parse', 'HEAD'], cwd=ROOT,
@@ -613,13 +643,11 @@ def run_soak(*, output, seconds=900, environment=None):
             raise RuntimeError('New nonce directory is not private and shell-owned')
         # Set executable mode only on our new HOST copy. adb sync transports its
         # source mode; there is deliberately no guest chmod/chown operation.
-        local_binary = output / 'mihomo-host-transport'
-        shutil.copyfile(source, local_binary)
-        local_binary.chmod(0o700)
-        try:
+        with tempfile.TemporaryDirectory(prefix='hetu-mihomo-transport-', dir=output) as private_transport:
+            local_binary = Path(private_transport) / 'mihomo'
+            local_binary.write_bytes(payload)
+            local_binary.chmod(0o700)
             guest.run('push', str(local_binary), directory + '/mihomo', timeout=90)
-        finally:
-            local_binary.unlink(missing_ok=True)
         actual_digest = guest.run('shell', 'sha256sum', directory + '/mihomo').split()[0]
         if actual_digest != digest or guest.run('shell', 'stat', '-c', '%u:%g:%a', directory + '/mihomo') != '2000:2000:700':
             raise RuntimeError('Guest native payload hash, ownership or transported mode differs')
@@ -844,8 +872,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--output', type=Path, default=ROOT / 'out/android-smoke/native-soak90')
     parser.add_argument('--seconds', type=int, default=900)
+    parser.add_argument('--apk', type=Path, help='The exact candidate APK installed by the current smoke')
     args = parser.parse_args()
-    run_soak(output=args.output, seconds=args.seconds)
+    run_soak(output=args.output, seconds=args.seconds, apk=args.apk)
 
 
 if __name__ == '__main__':

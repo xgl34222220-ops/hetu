@@ -126,6 +126,7 @@ def audit(args):
     evaluated = evaluate(samples, native['requestedSeconds'], native['actualContinuousSeconds'], requests, native['resourceObservations'])
     assert native['result'] == 'PASS' and native['executedSamples'] == len(samples)
     assert native['observedRepositoryCommit'] == args.commit
+    assert native['nativePayload']['candidateApkSha256'] == sha(args.apk), 'Native soak did not use this delivered candidate APK'
     assert native['soakScriptSha256'] == sha(ROOT / 'tools/qa/run_mihomo_soak90.py')
     assert native['nativeManifestSha256'] == sha(ROOT / 'UI92_RUNTIME146_INPUTS.json')
     assert all(native[k] == v for k, v in evaluated.items())

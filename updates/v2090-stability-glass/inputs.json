@@ -32,7 +32,7 @@
     "updates/v2089-runtime153/runtime.patch": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
     "UI92_RUNTIME146_INPUTS.json": "c14b5eac12dd01471580944cdee56f183f226f92d6495e7c68ea9473c1cdfdbf"
   },
-  "patchSha256": "4314e520ed0454a935e732bb88f08486d611d1614fd61587f0f8bb46bd19deed",
+  "patchSha256": "fe295d76bbb5caa9417ee2412fae8bdf9cab38809ae6f2916c8485a9efd20de7",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java",
@@ -122,10 +122,10 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "f2335a18b9f26adf74f8faee0d158011a7b276966883c7ead5fec2d68e4a91da",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "2cfc4ee6d822d7f0858dbfed916c4f3ab21bb294aec16ab0d86b3d87791b1107",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt": "d844f180696c0c5a32557f1f18a089e6155ec4f76d01cadfa28a111490fed06e",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "d420354620fff80edf27a477ced380f12c3d43b2b714be509acda531db5957f7",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "4ca6f091b4f0078b2cfef0df6bbf38921a293812cdcdf9f05b387be0c3b91343",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "ad6d2fe110fe0c4c4418d6ff196b2ef64bbd5d5d557bd98a84ac87f495b26687",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "a7ecc51aa3e4e38eb2ce5d2b04769f8046cff7addc1d03c7b142d2c18eef368a",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "44187e324099004e58d654495348df231bb1dfbfc8a24f911d5fcdb564d555c6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "0aebd74b9944b026cc1498daa7c5d7e4bd3a61226259d73aea4c5f559a78a50e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt": "74c4313d4f045c2e8df6a1c6d265ed16cc76171b1af8ea24e20f4095d45bbac1",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt": "8ce24aa92b001bba4b6f4a5e7c62d3361a0e910a26ff5ed827c720a33fc8da04"
   },

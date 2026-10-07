@@ -194,15 +194,15 @@ class GlassMaterial90Test {
 
     /** Sample the actual rendered caption ink against a text-free part of its actual material. */
     private fun assertCaptionContrast(bitmap: Bitmap, appearance: String) {
-        val hero = rule.onNodeWithTag("home-status-material").getUnclippedBoundsInRoot()
-        val caption = rule.onNodeWithTag("home-connection-caption").getUnclippedBoundsInRoot()
-        val background = Color(bitmap.getPixel((hero.left.value + 36f).toInt(), (hero.top.value + 5f).toInt()))
+        val hero = rule.onNodeWithTag("home-status-material").fetchSemanticsNode().boundsInWindow
+        val caption = rule.onNodeWithTag("home-connection-caption").fetchSemanticsNode().boundsInWindow
+        val background = Color(bitmap.getPixel((hero.left + 36f).toInt(), (hero.top + 5f).toInt()))
         val dark = appearance == "dark"
         var strongest = if (dark) 0f else 1f
-        val left = caption.left.value.toInt().coerceAtLeast(0)
-        val right = caption.right.value.toInt().coerceAtMost(bitmap.width)
-        val top = caption.top.value.toInt().coerceAtLeast(0)
-        val bottom = caption.bottom.value.toInt().coerceAtMost(bitmap.height)
+        val left = caption.left.toInt().coerceAtLeast(0)
+        val right = caption.right.toInt().coerceAtMost(bitmap.width)
+        val top = caption.top.toInt().coerceAtLeast(0)
+        val bottom = caption.bottom.toInt().coerceAtMost(bitmap.height)
         for (y in top until bottom) for (x in left until right) {
             val lum = Color(bitmap.getPixel(x, y)).luminance()
             strongest = if (dark) maxOf(strongest, lum) else minOf(strongest, lum)

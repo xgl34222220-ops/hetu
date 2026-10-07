@@ -145,6 +145,15 @@ class Stability90EvidenceTests(unittest.TestCase):
         self.assertNotIn('contents: write', current)
         self.assertNotIn('actions: write', current)
         self.assertNotIn('gh release', current)
+        ordered = ('    - name: Build APK\n', '    - name: Runtime unit tests\n',
+                   '    - name: Android lint compatibility gate\n',
+                   '    - name: Execute all 36 unchanged and applicable supplemental regressions\n',
+                   '    - name: Verify independent supplemental XML and all 36 testcase identities\n',
+                   '    - name: Run sustained synthetic network recovery state-machine regression\n',
+                   '      name: Upload concept UI verification evidence\n', '    - name: Verify APK\n')
+        positions = [current.index(marker) for marker in ordered]
+        self.assertEqual(positions, sorted(positions), 'Android failures must precede the mandatory soak; evidence and APK transport follow it')
+        self.assertIn('    - if: always()\n      name: Upload concept UI verification evidence', current)
 
 
 if __name__ == '__main__':

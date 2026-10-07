@@ -676,7 +676,7 @@ def main():
   app_before=application_identity();period_started=time.monotonic()
   sys.path.insert(0,str(Path(__file__).resolve().parents[2]/'tools/qa'))
   from run_mihomo_soak90 import run_soak
-  native_report=run_soak(output=OUT/'native-soak90',seconds=int(os.environ['HETU_NATIVE_SOAK90_SECONDS']),environment=os.environ)
+  native_report=run_soak(output=OUT/'native-soak90',seconds=int(os.environ['HETU_NATIVE_SOAK90_SECONDS']),environment=os.environ,apk=apk)
   observation={'result':'FAIL','apkSha256':hashlib.sha256(apk.read_bytes()).hexdigest(),
    'observedRepositoryCommit':subprocess.check_output(['git','rev-parse','HEAD'],cwd=Path(__file__).resolve().parents[2]).decode().strip(),
    'before':app_before,'nativeSoakActualSeconds':native_report['actualContinuousSeconds'],

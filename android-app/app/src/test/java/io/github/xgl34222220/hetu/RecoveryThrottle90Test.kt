@@ -39,7 +39,8 @@ class RecoveryThrottleBridge90Shadow {
 
 @Implements(value = RootProxyManager::class, isInAndroidSdk = false)
 class RecoveryThrottleManager90Shadow {
-    @Implementation fun startIfWanted(profile: ProxyRuntimeProfile, currentNetwork: BooleanSupplier): JSONObject {
+    @Implementation(methodName = "startIfWanted")
+    private fun startIfWanted(profile: ProxyRuntimeProfile, currentNetwork: BooleanSupplier): JSONObject {
         check(currentNetwork.asBoolean)
         attempts++
         // Remain confirmed DEAD so repeated maintenance actually tests backoff.

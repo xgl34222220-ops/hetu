@@ -112,13 +112,6 @@ jobs:
         python3 -m unittest discover -s tools/qa -p test_mihomo_soak90.py -v 2>&1 | tee out/verification/native-soak-host-guards.txt
 
         '
-    - name: Run sustained synthetic network recovery state-machine regression
-      timeout-minutes: 20
-      run: 'set -euo pipefail
-
-        python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
-
-        '
     - name: Regress actual tool viewport gesture bounds
       run: 'set -euo pipefail
 
@@ -247,6 +240,30 @@ jobs:
         out/verification/webui-browser --browser-commit "$GITHUB_SHA"
 
         '
+    - name: Execute all 36 unchanged and applicable supplemental regressions
+      working-directory: android-app
+      run: 'set -euo pipefail
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx3g -Dfile.encoding=UTF-8'' --init-script ../.github/scripts/supplemental36.init.gradle :app:testDebugUnitTest --tests ''*CompactHomeDashboardTest'' --tests ''*Ui92IntegrationTest'' --tests ''*NodeSelectionContinuityTest'' --stacktrace
+
+        '
+    - name: Verify independent supplemental XML and all 36 testcase identities
+      if: always()
+      run: python3 .github/scripts/verify_stability90_supplemental.py --results out/supplemental36/test-results
+    - name: Preserve independent current supplemental evidence including failures
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: Hetu-V20.90-supplemental-36-tests
+        path: out/supplemental36/
+        if-no-files-found: error
+    - name: Run sustained synthetic network recovery state-machine regression
+      timeout-minutes: 20
+      run: 'set -euo pipefail
+
+        python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
+
+        '
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
@@ -279,23 +296,6 @@ jobs:
           android-app/app/build/outputs/glass90/
 
           '
-    - name: Execute all 36 unchanged and applicable supplemental regressions
-      working-directory: android-app
-      run: 'set -euo pipefail
-
-        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx3g -Dfile.encoding=UTF-8'' --init-script ../.github/scripts/supplemental36.init.gradle :app:testDebugUnitTest --tests ''*CompactHomeDashboardTest'' --tests ''*Ui92IntegrationTest'' --tests ''*NodeSelectionContinuityTest'' --stacktrace
-
-        '
-    - name: Verify independent supplemental XML and all 36 testcase identities
-      if: always()
-      run: python3 .github/scripts/verify_stability90_supplemental.py --results out/supplemental36/test-results
-    - name: Preserve independent current supplemental evidence including failures
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: Hetu-V20.90-supplemental-36-tests
-        path: out/supplemental36/
-        if-no-files-found: error
     - name: Verify APK
       run: 'set -euo pipefail
 

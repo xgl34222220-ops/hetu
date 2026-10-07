@@ -8,7 +8,9 @@ import struct
 import tempfile
 import time
 import unittest
+import warnings
 from unittest.mock import Mock, patch
+import zipfile
 
 spec = importlib.util.spec_from_file_location('soak', Path(__file__).with_name('run_mihomo_soak90.py'))
 soak = importlib.util.module_from_spec(spec)
@@ -85,11 +87,21 @@ class GuardTests(unittest.TestCase):
                 soak.configuration(*ports)
 
     def test_payload_is_the_pinned_android_native_manifest_payload(self):
-        source, digest, size = soak.native_payload()
+        # Build-job restoration makes the real original bytes available here.
+        # Package those bytes in an actual ZIP; the Android API job instead
+        # supplies its already-installed APK through the same read-only path.
+        source = soak.ROOT / 'android-app/app/src/main' / soak.PAYLOAD
+        original = source.read_bytes()
+        with tempfile.TemporaryDirectory() as folder:
+            apk = Path(folder) / 'current.apk'
+            with zipfile.ZipFile(apk, 'w') as archive:
+                archive.writestr(soak.PAYLOAD, original)
+            payload, digest, metadata = soak.native_payload(apk)
         manifest = json.loads((soak.ROOT / 'UI92_RUNTIME146_INPUTS.json').read_text())
         self.assertEqual(manifest['original146_payload'][soak.PAYLOAD], digest)
-        self.assertGreater(size, 1000000)
-        self.assertEqual('mihomo', source.name)
+        self.assertEqual(original, payload)
+        self.assertGreater(metadata['bytes'], 1000000)
+        self.assertTrue(metadata['presentIgnoredSourceVerified'])
 
     def test_foreign_process_argv_is_refused_even_when_pid_exists(self):
         guest = Mock()
@@ -146,6 +158,101 @@ class GuardTests(unittest.TestCase):
             soak.recv_header(stream)
         with self.assertRaises(ValueError):
             soak.dns_question(b'\0' * 16)
+
+
+class CandidateApkPayloadTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        # A bounded Android ELF surrogate exercises genuine ZIP transport. The
+        # suite uses its own trusted-manifest fixture, never changes production
+        # manifest data, and does not claim to execute this synthetic binary.
+        cls.original = bytearray(b'\0' * (1024 * 1024 + 1))
+        cls.original[:6] = b'\x7fELF\x02\x01'
+        cls.original[18:20] = struct.pack('<H', 62)
+        cls.original[64:85] = b'/system/bin/linker64\0'
+        cls.original = bytes(cls.original)
+
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.root = Path(self.temp.name)
+        self.apk = self.root / 'candidate/current.apk'
+        self.apk.parent.mkdir()
+        self.manifest = self.root / 'UI92_RUNTIME146_INPUTS.json'
+        self.write_manifest(self.original)
+        self.root_patch = patch.object(soak, 'ROOT', self.root)
+        self.root_patch.start()
+
+    def tearDown(self):
+        self.root_patch.stop()
+        self.temp.cleanup()
+
+    def write_manifest(self, payload):
+        self.manifest.write_text(json.dumps({'original146_payload': {soak.PAYLOAD: soak.sha256(payload)}}))
+
+    def write_apk(self, *members):
+        with warnings.catch_warnings():
+            warnings.simplefilter('ignore', UserWarning)
+            with zipfile.ZipFile(self.apk, 'w') as archive:
+                for name, data in members:
+                    archive.writestr(name, data)
+
+    def test_unique_candidate_native_works_without_ignored_cross_job_source(self):
+        self.write_apk((soak.PAYLOAD, self.original))
+        payload, digest, metadata = soak.native_payload(self.apk)
+        self.assertEqual(self.original, payload)
+        self.assertEqual(soak.sha256(self.original), digest)
+        self.assertEqual('downloaded candidate APK', metadata['source'])
+        self.assertEqual(soak.sha256(self.apk.read_bytes()), metadata['candidateApkSha256'])
+        self.assertFalse(metadata['presentIgnoredSourceVerified'])
+
+    def test_exact_current_apk_argument_does_not_search_an_alternative(self):
+        self.write_apk((soak.PAYLOAD, self.original))
+        with self.assertRaisesRegex(RuntimeError, 'missing'):
+            soak.native_payload(self.root / 'missing-installed.apk')
+        self.assertEqual(self.original, soak.native_payload()[0])
+        (self.apk.parent / 'second.apk').write_bytes(self.apk.read_bytes())
+        with self.assertRaisesRegex(RuntimeError, 'unambiguous'):
+            soak.native_payload()
+        self.assertEqual(self.original, soak.native_payload(self.apk)[0])
+
+    def test_missing_or_duplicate_native_zip_member_is_refused(self):
+        for members in ([('assets/unrelated', b'other')],
+                        [(soak.PAYLOAD, self.original), (soak.PAYLOAD, self.original)]):
+            with self.subTest(members=len(members)):
+                self.write_apk(*members)
+                with self.assertRaisesRegex(RuntimeError, 'exactly one'):
+                    soak.native_payload(self.apk)
+
+    def test_candidate_native_sha_mismatch_is_refused(self):
+        altered = self.original[:-1] + b'X'
+        self.write_apk((soak.PAYLOAD, altered))
+        with self.assertRaisesRegex(RuntimeError, 'pinned original146'):
+            soak.native_payload(self.apk)
+
+    def test_sha_matching_wrong_elf_architecture_or_host_linker_is_refused(self):
+        for kind in ('magic', 'architecture', 'linker'):
+            altered = bytearray(self.original)
+            if kind == 'magic':
+                altered[:4] = b'FAKE'
+            elif kind == 'architecture':
+                altered[18:20] = struct.pack('<H', 183)
+            else:
+                altered[64:85] = b'/lib64/ld-linux.so\0\0\0'
+            altered = bytes(altered)
+            self.write_manifest(altered)  # Test-only trusted hash; ELF still must fail.
+            self.write_apk((soak.PAYLOAD, altered))
+            with self.subTest(kind=kind), self.assertRaisesRegex(RuntimeError, 'Android x86_64'):
+                soak.native_payload(self.apk)
+
+    def test_present_ignored_source_must_match_actual_candidate_payload(self):
+        self.write_apk((soak.PAYLOAD, self.original))
+        source = self.root / 'android-app/app/src/main' / soak.PAYLOAD
+        source.parent.mkdir(parents=True)
+        source.write_bytes(self.original)
+        self.assertTrue(soak.native_payload(self.apk)[2]['presentIgnoredSourceVerified'])
+        source.write_bytes(self.original[:-1] + b'X')
+        with self.assertRaisesRegex(RuntimeError, 'ignored native source differs'):
+            soak.native_payload(self.apk)
 
 
 class EvaluationContractTests(unittest.TestCase):
