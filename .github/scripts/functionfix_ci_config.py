@@ -15,6 +15,31 @@ def load():
     return layer
 
 
+def load_runtime_layer():
+    """The effective runtime layer: v2089 r153 if present, else v2086."""
+    r153_inputs = ROOT / 'updates/v2089-runtime153/inputs.json'
+    if r153_inputs.exists():
+        from runtime153_source_scope import validate_layer as validate_r153
+        r153 = json.loads(r153_inputs.read_text())
+        # previous is the v2086-final file map; validate against it.
+        base = load()
+        # Build the file map after v2086 + presentation layers from the checkout.
+        import subprocess, hashlib
+        out = subprocess.run(['git', 'ls-files', 'android-app'], cwd=str(ROOT),
+                             capture_output=True, text=True).stdout.split()
+        prev = {}
+        for f in out:
+            blob = subprocess.run(['git', 'show', f'HEAD:{f}'], cwd=str(ROOT),
+                                  capture_output=True).stdout
+            prev[f] = hashlib.sha256(blob).hexdigest()
+        validate_r153(r153, prev)
+        # Return a merged view: v2086 constants + r153 runtime SHAs.
+        merged = dict(base)
+        merged['rootScriptSha256'] = r153['rootScriptSha256']
+        return merged
+    return load()
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('mode', choices=('export', 'junit-filters', 'runtime-snapshot'))
@@ -34,6 +59,7 @@ if __name__ == '__main__':
             print('--tests')
             print(name)
     else:
+        layer = load_runtime_layer()
         assert digest(ROOT / ROOT_SCRIPT) == layer['rootScriptSha256']
         subprocess.run(['python3', str(ROOT / '.github/scripts/verify_packaged_runtime.py'), 'snapshot',
                         '--script-sha256', layer['rootScriptSha256'],
