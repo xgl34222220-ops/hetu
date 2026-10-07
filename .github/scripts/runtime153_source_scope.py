@@ -37,8 +37,6 @@ ALLOWED_FILES = {
     PACKAGE + 'RootProxyManager.java',
     PACKAGE + 'ui/HetuLanguage.kt',
     'android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt',
-    'tools/qa/test_core_identity_dns.py',
-    'tools/qa/test_google_firewall.py',
 }
 BUILD_FILE = 'android-app/app/build.gradle.kts'
 

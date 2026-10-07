@@ -8,11 +8,9 @@
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "b21010f659d92c8a918d60676979b8a195c1e30690a791aaddcacef9104bde52",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "9672893d13b7200a648b9ebfa13805e28f14c5c19ae11d27f3f322e2b2eeab71",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "d56366e2c37b0211a911b6aa91656fe4d2a4fd9a31576d67579be9f275bdba80",
-  "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "97617800f902b6f1d2c9b407e526c235075ae8bf5fc085af9b342860ff1fcddf",
-  "tools/qa/test_core_identity_dns.py": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
-  "tools/qa/test_google_firewall.py": "e32b2f79b982462458e7cca5cc5f47ad03f962208f873c5341c0c790bcc8a57f"
+  "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "97617800f902b6f1d2c9b407e526c235075ae8bf5fc085af9b342860ff1fcddf"
  },
- "patchSha256": "0452a968bf8d32533090393fb71ddbebc500838b7137ba85a571691f66a6db0c",
+ "patchSha256": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
  "previousInputsSha256": "89e5afbd35aa47a9d92781e50c052acf93efedf7e24ee7bde9a781b19b4ada0f",
  "previousPatchSha256": "74c5a00161b20dac4686d5053a92da60899bd37ddfdf25c140ed4aff4961335e",
  "protectedPresentationUnchanged": true,
