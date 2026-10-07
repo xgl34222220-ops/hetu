@@ -92,10 +92,24 @@ def validate_version_only(before, after):
 def validate_revision_only(before, after):
     original = 'static final int RUNTIME_REVISION = 151;'
     assert before.count(original) == 1
-    # v2086: 151->152; v2089 r153 layer: 151->153 (via 152). Both are bounded.
-    assert after == before.replace(original, 'static final int RUNTIME_REVISION = 152;', 1) or \
-           after == before.replace(original, 'static final int RUNTIME_REVISION = 153;', 1), \
-           'Runtime revision input changed beyond 151 to 152/153'
+    # v2086 allowed: 151->152. v2089 r153 layer allowed: 151->153 plus the two
+    # bounded additions (proxyDnsSystemResolver RESTART_KEY, systemResolver=direct).
+    step152 = before.replace(original, 'static final int RUNTIME_REVISION = 152;', 1)
+    if after == step152:
+        return
+    # Build the expected v2089 state from the 151 base.
+    expected = before.replace(original, 'static final int RUNTIME_REVISION = 153;', 1)
+    # v2089 hunk 1: RESTART_KEYS gains proxyDnsSystemResolver.
+    old_keys = '"proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup"'
+    new_keys = '"proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup","proxyDnsSystemResolver"'
+    assert expected.count(old_keys) == 1
+    expected = expected.replace(old_keys, new_keys, 1)
+    # v2089 hunk 2: systemResolver=direct snapshot logic.
+    hunk2_old = 'for(String key:new String[]{"proxyCpuAffinity","proxyMemoryLimit","proxyIoWeight"})\n            append(state,String.valueOf(values.get(key)==null?"":values.get(key)));'
+    hunk2_new = hunk2_old + '\n        // On by default. Only the opt-out is part of the snapshot, so a session applied\n        // before this setting existed still matches until the user actually changes it.\n        if(Boolean.FALSE.equals(values.get("proxyDnsSystemResolver")))append(state,"systemResolver=direct");'
+    assert expected.count(hunk2_old) == 1
+    expected = expected.replace(hunk2_old, hunk2_new, 1)
+    assert after == expected, 'Runtime revision input changed beyond 151 to 152/153 + v2089 bounds'
 
 
 def validate_contract_only(before, after):
