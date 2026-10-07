@@ -8,6 +8,7 @@ import argparse
 import hashlib
 import json
 from pathlib import Path
+import re
 import subprocess
 import sys
 import tarfile
@@ -24,6 +25,26 @@ REQUIRED_GLASS_PREVIEWS = frozenset(
     + ['pure-black-motion-off.png', 'pure-black-motion-off-after-5s.png', 'dialog-ready.png',
        'dialog-busy.png', 'compact-large-text.png', 'home-controller-401.png',
        'home-takeover-unobserved.png', 'home-takeover-degraded.png', 'home-local-checks-ready.png'])
+PINNED_CERTIFICATE_SHA256 = '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad'
+
+
+def verify_apk_signature_report(signature):
+    lines = signature.splitlines()
+    certificates = [line for line in lines if re.search(r'certificate\s+SHA-256\b', line, re.IGNORECASE)]
+    assert len(certificates) == 1, 'Missing or multiple APK signer certificates'
+    certificate = re.fullmatch(r'(Signer #1|V2 Signer:) certificate SHA-256 digest: ([0-9a-fA-F]{64})', certificates[0])
+    assert certificate is not None, 'Malformed APK signer certificate report'
+    assert certificate[2].lower() == PINNED_CERTIFICATE_SHA256, 'APK signing certificate differs'
+    labels = set()
+    for line in lines:
+        if re.match(r'^(?:Signer\b|V\d+ Signer\b)', line):
+            label = re.match(r'^(Signer #\d+|V\d+ Signer:)(?=\s)', line)
+            assert label is not None, 'Malformed APK signer report label'
+            labels.add(label[1])
+        if line.startswith('Number of signers:'):
+            assert line == 'Number of signers: 1', 'APK report does not identify one signer'
+    assert labels == {certificate[1]}, 'Multiple or inconsistent APK signer identities'
+    return certificate[2].lower()
 
 
 def verify_glass_previews(images):
@@ -82,7 +103,7 @@ def audit(args):
     signature = args.manifest.with_name('apk-signature.txt').read_text()
     assert "package: name='io.github.xgl34222220.hetu'" in metadata
     assert "versionCode='2090' versionName='0.12.17-v20-glass'" in metadata
-    assert 'Signer #1 certificate SHA-256 digest: 701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad' in signature
+    verify_apk_signature_report(signature)
     runtime = json.loads((ROOT / 'UI92_RUNTIME146_INPUTS.json').read_text())['original146_payload']
     payloads = {**runtime, 'assets/hetu-root.sh': layer['rootScriptSha256'],
                 'assets/hetu-autostart.sh': layer['autostartScriptSha256']}
@@ -144,7 +165,6 @@ def audit(args):
     post_ui = ET.parse(locate(args.api36_dir, 'post-native-application.xml')).getroot()
     assert any(n.get('package') == 'io.github.xgl34222220.hetu' for n in post_ui.iter('node'))
     postlog = locate(args.api36_dir, 'post-native-application-logcat.txt').read_text()
-    import re
     assert not re.search(r'FATAL EXCEPTION[\s\S]{0,1000}Process: io\.github\.xgl34222220\.hetu', postlog)
     assert not re.search(r'ANR in io\.github\.xgl34222220\.hetu(?:\s|\(|:)', postlog)
     model_path = locate(args.ui_dir, 'network-model-soak90/report.json')

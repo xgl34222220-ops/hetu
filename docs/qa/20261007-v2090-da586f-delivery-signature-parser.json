@@ -1,0 +1,16 @@
+{
+  "type": "Observed pre-delivery validator format mismatch",
+  "commit": "da586f771e266c61e56d557892d1f705011cc557",
+  "runId": 37677953857,
+  "buildJobId": 112986217215,
+  "buildConclusion": "success",
+  "artifactId": 11508919246,
+  "signatureFile": "apk-signature.txt",
+  "actualCertificatePrefix": "V2 Signer: certificate SHA-256 digest: ",
+  "pinnedCertificateSha256": "701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad",
+  "defectiveValidator": "verify_stability90_delivery.py asserted legacy literal Signer #1 certificate SHA-256 digest, incompatible with actual SDK37 text output",
+  "result": "Final aggregate would reject current verified certificate record. Not an APK signing failure; no whole delivery audit PASS claimed.",
+  "correction": "Parse exact supported signer record syntax, require unique expected certificate identity, reject absent malformed mismatch or multiple signer records; retain actual CI apksigner verification + physical APK hash bound to it.",
+  "oldCi": "Continues without cancellation; API35/API36 currently running. Prior build/source/UI/test/host evidence retained, next exact commit must execute full CI.",
+  "productionSourceChanged": false
+}
