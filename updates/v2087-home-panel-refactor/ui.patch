@@ -1272,7 +1272,7 @@ index f740f9f..02bd363 100644
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt
 new file mode 100644
-index 0000000..9d097da
+index 0000000..e11af45
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeFlags.kt
 @@ -0,0 +1,280 @@
@@ -1348,12 +1348,12 @@ index 0000000..9d097da
 +/*  Drawing helpers                                                     */
 +/* ------------------------------------------------------------------ */
 +
-+private fun DrawScope.horizontal(vararg colors: Color) {
++private fun DrawScope.horizontal(colors: List<Color>) {
 +    val band = size.height / colors.size
 +    colors.forEachIndexed { index, color -> drawRect(color, Offset(0f, index * band), Size(size.width, band + 1f)) }
 +}
 +
-+private fun DrawScope.vertical(vararg colors: Color) {
++private fun DrawScope.vertical(colors: List<Color>) {
 +    val band = size.width / colors.size
 +    colors.forEachIndexed { index, color -> drawRect(color, Offset(index * band, 0f), Size(band + 1f, size.height)) }
 +}
@@ -1436,7 +1436,7 @@ index 0000000..9d097da
 +    },
 +    "SG" to {
 +        val red = Color(0xFFEF3340)
-+        horizontal(red, White)
++        horizontal(listOf(red, White))
 +        crescent(Offset(size.width * .24f, size.height * .25f), size.height * .15f, White, red, size.height * .07f)
 +        drawCircle(White, size.height * .045f, Offset(size.width * .40f, size.height * .25f))
 +    },
@@ -1459,7 +1459,7 @@ index 0000000..9d097da
 +    },
 +    "US" to {
 +        val red = Color(0xFFB22234)
-+        horizontal(red, White, red, White, red, White, red)
++        horizontal(listOf(red, White, red, White, red, White, red))
 +        drawRect(Color(0xFF3C3B6E), Offset.Zero, Size(size.width * .44f, size.height * 4f / 7f))
 +        for (row in 0 until 2) for (col in 0 until 3) {
 +            drawCircle(White, size.height * .032f, Offset(size.width * (.09f + col * .13f), size.height * (.17f + row * .23f)))
@@ -1482,26 +1482,26 @@ index 0000000..9d097da
 +        drawRect(red, Offset(size.width * .75f, 0f), Size(size.width * .25f, size.height))
 +        star(Offset(size.width / 2f, size.height * .52f), size.height * .26f, red, points = 6)
 +    },
-+    "DE" to { horizontal(Color(0xFF14161C), Color(0xFFDD0000), Color(0xFFFFCE00)) },
-+    "FR" to { vertical(Color(0xFF0055A4), White, Color(0xFFEF4135)) },
-+    "NL" to { horizontal(Color(0xFFAE1C28), White, Color(0xFF21468B)) },
-+    "LU" to { horizontal(Color(0xFFEF3340), White, Color(0xFF00A3E0)) },
-+    "RU" to { horizontal(White, Color(0xFF0039A6), Color(0xFFD52B1E)) },
-+    "IT" to { vertical(Color(0xFF009246), White, Color(0xFFCE2B37)) },
-+    "IE" to { vertical(Color(0xFF169B62), White, Color(0xFFFF883E)) },
-+    "BE" to { vertical(Color(0xFF14161C), Color(0xFFFDDA24), Color(0xFFEF3340)) },
++    "DE" to { horizontal(listOf(Color(0xFF14161C), Color(0xFFDD0000), Color(0xFFFFCE00))) },
++    "FR" to { vertical(listOf(Color(0xFF0055A4), White, Color(0xFFEF4135))) },
++    "NL" to { horizontal(listOf(Color(0xFFAE1C28), White, Color(0xFF21468B))) },
++    "LU" to { horizontal(listOf(Color(0xFFEF3340), White, Color(0xFF00A3E0))) },
++    "RU" to { horizontal(listOf(White, Color(0xFF0039A6), Color(0xFFD52B1E))) },
++    "IT" to { vertical(listOf(Color(0xFF009246), White, Color(0xFFCE2B37))) },
++    "IE" to { vertical(listOf(Color(0xFF169B62), White, Color(0xFFFF883E))) },
++    "BE" to { vertical(listOf(Color(0xFF14161C), Color(0xFFFDDA24), Color(0xFFEF3340))) },
 +    "ES" to {
 +        drawRect(Color(0xFFAA151B))
 +        drawRect(Color(0xFFF1BF00), Offset(0f, size.height * .25f), Size(size.width, size.height * .5f))
 +    },
-+    "AT" to { horizontal(Color(0xFFED2939), White, Color(0xFFED2939)) },
-+    "HU" to { horizontal(Color(0xFFCE2939), White, Color(0xFF477050)) },
-+    "PL" to { horizontal(White, Color(0xFFDC143C)) },
-+    "UA" to { horizontal(Color(0xFF0057B7), Color(0xFFFFD700)) },
-+    "ID" to { horizontal(Color(0xFFCE1126), White) },
++    "AT" to { horizontal(listOf(Color(0xFFED2939), White, Color(0xFFED2939))) },
++    "HU" to { horizontal(listOf(Color(0xFFCE2939), White, Color(0xFF477050))) },
++    "PL" to { horizontal(listOf(White, Color(0xFFDC143C))) },
++    "UA" to { horizontal(listOf(Color(0xFF0057B7), Color(0xFFFFD700))) },
++    "ID" to { horizontal(listOf(Color(0xFFCE1126), White)) },
 +    "TH" to {
 +        val red = Color(0xFFA51931)
-+        horizontal(red, White, Color(0xFF2D2A4A), Color(0xFF2D2A4A), White, red)
++        horizontal(listOf(red, White, Color(0xFF2D2A4A), Color(0xFF2D2A4A), White, red))
 +    },
 +    "VN" to {
 +        drawRect(Color(0xFFDA251D))
@@ -1522,7 +1522,7 @@ index 0000000..9d097da
 +        star(Offset(size.width * .60f, size.height / 2f), size.height * .11f, White)
 +    },
 +    "IN" to {
-+        horizontal(Color(0xFFFF9933), White, Color(0xFF138808))
++        horizontal(listOf(Color(0xFFFF9933), White, Color(0xFF138808)))
 +        drawCircle(Color(0xFF000080), size.height * .12f, Offset(size.width / 2f, size.height / 2f), style = Stroke(size.height * .04f))
 +    },
 +    "CH" to {
@@ -1548,11 +1548,11 @@ index 0000000..9d097da
 +    },
 +    "AR" to {
 +        val sky = Color(0xFF74ACDF)
-+        horizontal(sky, White, sky)
++        horizontal(listOf(sky, White, sky))
 +        drawCircle(Color(0xFFF6B40E), size.height * .09f, Offset(size.width / 2f, size.height / 2f))
 +    },
 +    "AE" to {
-+        horizontal(Color(0xFF00732F), White, Color(0xFF14161C))
++        horizontal(listOf(Color(0xFF00732F), White, Color(0xFF14161C)))
 +        drawRect(Color(0xFFFF0000), Offset.Zero, Size(size.width * .26f, size.height))
 +    },
 +)
