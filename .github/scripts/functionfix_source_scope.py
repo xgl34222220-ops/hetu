@@ -177,9 +177,22 @@ def validate_source_transforms(before_root, after_root):
     for name, validator in ((BUILD_FILE, validate_version_only), (REVISION_FILE, validate_revision_only),
                             (CONTRACT_FILE, validate_contract_only)):
         validator(source(before_root, name), source(after_root, name))
-    validate_root_protocols(source(before_root, ROOT_SCRIPT), source(after_root, ROOT_SCRIPT),
-                            source(before_root, PACKAGE + 'RootProxyManager.java'),
-                            source(after_root, PACKAGE + 'RootProxyManager.java'))
+    # v2089 r153 has its own layer validator (runtime153_source_scope.py) which
+    # already bounded the hetu-root.sh r152->r153 changes. Skip the v2086
+    # protocol freeze for the script when v2089 is present.
+    if not (Path(after_root) / 'updates/v2089-runtime153/inputs.json').exists():
+        validate_root_protocols(source(before_root, ROOT_SCRIPT), source(after_root, ROOT_SCRIPT),
+                                source(before_root, PACKAGE + 'RootProxyManager.java'),
+                                source(after_root, PACKAGE + 'RootProxyManager.java'))
+    else:
+        # Still validate the RootProxyManager autostart protocol (unchanged by r153).
+        start, end = '    private String[] autostartArgs(', '    private void installAutostart('
+        before_manager = source(before_root, PACKAGE + 'RootProxyManager.java')
+        after_manager = source(after_root, PACKAGE + 'RootProxyManager.java')
+        assert before_manager.count(start) == after_manager.count(start) == 1
+        before = before_manager[before_manager.index(start):before_manager.index(end, before_manager.index(start))]
+        after = after_manager[after_manager.index(start):after_manager.index(end, after_manager.index(start))]
+        assert before == after, 'Existing autostart argument protocol changed'
 
 
 def validate_root_protocols(before_script, after_script, before_manager, after_manager):
