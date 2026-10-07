@@ -92,13 +92,18 @@ def validate_version_only(before, after):
 def validate_revision_only(before, after):
     original = 'static final int RUNTIME_REVISION = 151;'
     assert before.count(original) == 1
-    assert after == before.replace(original, 'static final int RUNTIME_REVISION = 152;', 1), 'Runtime revision input changed beyond 151 to 152'
+    # v2086: 151->152; v2089 r153 layer: 151->153 (via 152). Both are bounded.
+    assert after == before.replace(original, 'static final int RUNTIME_REVISION = 152;', 1) or \
+           after == before.replace(original, 'static final int RUNTIME_REVISION = 153;', 1), \
+           'Runtime revision input changed beyond 151 to 152/153'
 
 
 def validate_contract_only(before, after):
     original = 'assertEquals(151, ProxyRuntimeSettings.RUNTIME_REVISION)'
     assert before.count(original) == 1
-    assert after == before.replace(original, 'assertEquals(152, ProxyRuntimeSettings.RUNTIME_REVISION)', 1), 'Original runtime contract assertion changed beyond its pinned revision'
+    assert after == before.replace(original, 'assertEquals(152, ProxyRuntimeSettings.RUNTIME_REVISION)', 1) or \
+           after == before.replace(original, 'assertEquals(153, ProxyRuntimeSettings.RUNTIME_REVISION)', 1), \
+           'Original runtime contract assertion changed beyond its pinned revision'
 
 
 def validate_new_tests(root, plan=None):
