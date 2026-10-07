@@ -1,0 +1,137 @@
+{
+  "recordedUtc": "2026-10-07T21:11:02.777313+00:00",
+  "candidateParent": "6c464b589e782e718cc6ce53f3ed34f8e6f155ff",
+  "result": "SOURCE_AND_HOST_VERIFIED_ANDROID_PENDING",
+  "layer": {
+    "requiredInputs": 402,
+    "changedInputs": 46,
+    "frozenInputs": 356,
+    "expectedUnitTests": 619,
+    "expectedTestXmlFiles": 63,
+    "original545MethodsRetained": true,
+    "supplemental36Unchanged": true,
+    "patchSha256": "b00fa5d492549ee39241ba13d3b478315bca62598bc0bdcfceadc093d90ecd32",
+    "rootScriptSha256": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
+    "autostartScriptSha256": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9"
+  },
+  "performed": [
+    "Full effective-source reconstruction from the pinned original archive matched all 402 checkout inputs",
+    "16/16 stability evidence host tests passed",
+    "11/11 bounded SDK installer host tests passed; independent reviewer repeated them and matched actual legacy bad ZIP log",
+    "git diff --check passed"
+  ],
+  "foregroundRepair": {
+    "recorded_at_utc": "2026-10-07T21:10:09Z",
+    "source_head_before_fix": "6c464b589e782e718cc6ce53f3ed34f8e6f155ff",
+    "source_stop": true,
+    "scope_files": [
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+        "sha256": "c5d2fbe6bf03512dca85b62bb66648d091fbb2f4a77f910698098ed1c455784f"
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt",
+        "sha256": "478273797007d61ca46e04ee951553fe84c0988432ead18c7018c578860a4bf6"
+      },
+      {
+        "file": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt",
+        "sha256": "c700c47af825c7bcfbf07ff5a2c49572248791cf03c34aad7d181c68519ee4ab"
+      },
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt",
+        "sha256": "1f3268ca75c50786166c0732aec6dc19cc1f59d9b61c107be27fb1af01a2e678"
+      },
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
+        "sha256": "a9283ec98da1ac8d7c460278ab0c6cc815811efc4286bf2be3621b4266ec72e0"
+      }
+    ],
+    "test_methods": [
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt",
+        "before_method_count": 8,
+        "after_method_count": 12,
+        "removed_methods": [],
+        "added_methods": [
+          "aControlTransactionInvalidatesAnEarlierRootObservation",
+          "changedSessionOrPhysicalEpochRejectsAnEarlierRootObservation",
+          "disablingAutomationRejectsItsEarlierIdleObservationEvenIfWantedIsNowTrue",
+          "syntheticWantedAndRunningHintsCannotSupplyRootAuthority"
+        ]
+      },
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
+        "before_method_count": 12,
+        "after_method_count": 24,
+        "removed_methods": [],
+        "added_methods": [
+          "aFreshRootResultFinishingAfterBackgroundCannotRequestAForegroundService",
+          "anActiveControlOperationCannotConsumeFreshForegroundAuthority",
+          "cachedWantedAndRunningStateCannotStartTheForegroundGuard",
+          "deniedRootObservationCannotStartTheForegroundGuardFromRunningHints",
+          "freshDeadManagedSessionStillReattachesItsWantedRecoveryGuard",
+          "freshInstalledIdleRootStatusPreservesEnabledNetworkAutomationWithoutInventingWanted",
+          "freshKillSwitchRetainedDeadSessionStillReattachesItsWantedRecoveryGuard",
+          "freshStatusMissingRawPidCannotReuseCachedPidAsRootAuthority",
+          "freshUnhealthyLiveCoreStillReattachesWithoutTreatingDataPlaneHealthAsAuthority",
+          "freshUnknownInstalledRuntimeCannotArmTheForegroundGuard",
+          "freshWatchdogClearedManualSessionStillReattachesItsWantedRecoveryGuard",
+          "missingScriptIdleFallbackCannotArmEvenEnabledNetworkAutomation"
+        ]
+      }
+    ],
+    "expected_android_methods": 619,
+    "old_android_methods": 603,
+    "original545_preservation": "No original method removed or assertion weakened; parent canonical inventory must confirm all original545.",
+    "local_verification": {
+      "git_diff_check": "PASS",
+      "android_compile_execution": "NOT_RUN: no local Gradle/SDK. Requires exact new candidate CI."
+    },
+    "authority_contract": {
+      "source": "Same successful existing worker Root/script status read only; ephemeral packet, not retained UI state.",
+      "successful_status": "ok=true, raw running is Boolean",
+      "live": "Raw PID > 0, independent from dataPlaneHealthy.",
+      "dead": "Installed runtimeSchema > 0, networkIntegrity in stopped/degraded/upgrade-required. Covers actual watchdog KILL0/KILL1 script classifications; injected controlled Root reply tests do not prove phone operation.",
+      "reject": [
+        "cached status",
+        "Root denied/failed read",
+        "missing-script no-schema fallback",
+        "unknown status",
+        "raw live PID missing despite cached PID"
+      ],
+      "publish_fences": [
+        "current Wanted or enabled automation",
+        "automation-only reason requires automation still enabled",
+        "Root CONTROL_LOCK observation ticket",
+        "current network session and epoch",
+        "same foreground generation",
+        "no active operation"
+      ],
+      "root_io": "No new Root call. Attachment boundary does no Root work; reuses existing worker status.",
+      "production_explicit_start": "Existing explicit user start ensureContinuityService path unchanged."
+    },
+    "actual_installed_previous_failure": {
+      "sha": "da586f771e266c61e56d557892d1f705011cc557",
+      "run": 37677953857,
+      "api35": "FAIL original smoke line461 syntheticWanted continuity service unexpectedly started",
+      "api36": "FAIL same original smoke line461",
+      "native900": "NOT_STARTED on both because prior stage failed"
+    },
+    "verification_limits": [
+      "No Android execution of this new source yet.",
+      "No physical rooted phone, OEM service loss, Wi-Fi/mobile switch or Google account authentication proof.",
+      "Previous host900 and readiness audit are separately source-bound and not proof of final source/root full-chain."
+    ]
+  },
+  "boundaries": {
+    "android619Executed": false,
+    "installedApi35Passed": false,
+    "installedApi36Passed": false,
+    "native900Executed": false,
+    "phoneEvidence": false,
+    "oldCisCancelled": false,
+    "mainMerged": false,
+    "newRootCallsOrPermissions": false,
+    "apkEligibleForDelivery": false
+  }
+}

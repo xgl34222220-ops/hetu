@@ -962,21 +962,29 @@ final class RootProxyManager {
     /** Called only from a foreground Activity lifecycle; reattach the observer after
      * process/package/OEM loss without replacing the core or changing wanted intent.
      * True acknowledges the service request, never proves that the service stayed alive. */
-    boolean resumeContinuityFromForeground(){
-        if(!prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("networkMatchEnabled",false))return false;
-        try{
+    boolean resumeContinuityFromForeground(boolean rootObserved,long ticket,String networkSession,long networkEpoch,
+                                          boolean automationOnly){
+        if(!rootObserved)return false;
+        final boolean[] accepted={false};
+        publishObservation(ticket,()->{
+            if(automationOnly&&!prefs.getBoolean("networkMatchEnabled",false))return;
+            if(!prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("networkMatchEnabled",false))return;
+            if(!Objects.equals(networkSession,prefs.getString("proxyNetworkSessionId",""))
+                    ||networkEpoch!=prefs.getLong("proxyNetworkEpoch",0L))return;
+          try{
             Intent intent=new Intent(context,ProxyNetworkMatchService.class);
             android.content.ComponentName requested=Build.VERSION.SDK_INT>=26
                     ?context.startForegroundService(intent):context.startService(intent);
             if(requested==null)throw new IllegalStateException("service-request-not-accepted");
             prefs.edit().putLong("proxyContinuityResumeRequestedAt",System.currentTimeMillis())
                     .remove("proxyContinuityResumeError").apply();
-            return true;
-        }catch(Exception error){
+            accepted[0]=true;
+          }catch(Exception error){
             prefs.edit().putLong("proxyContinuityResumeFailedAt",System.currentTimeMillis())
                     .putString("proxyContinuityResumeError",error.getClass().getSimpleName()).apply();
-            return false;
-        }
+          }
+        });
+        return accepted[0];
     }
 
     private void ensureContinuityService(boolean running){

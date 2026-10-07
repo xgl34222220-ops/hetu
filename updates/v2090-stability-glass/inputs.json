@@ -32,7 +32,7 @@
     "updates/v2089-runtime153/runtime.patch": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
     "UI92_RUNTIME146_INPUTS.json": "c14b5eac12dd01471580944cdee56f183f226f92d6495e7c68ea9473c1cdfdbf"
   },
-  "patchSha256": "5e3bb7fd4356024518bf9df214cf523d81bef09ebbfe1ec9d4fc6fcbd099301b",
+  "patchSha256": "b00fa5d492549ee39241ba13d3b478315bca62598bc0bdcfceadc093d90ecd32",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java",
@@ -86,15 +86,15 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java": "3635d55a388db184cd1d08c805a57d2642544db2973f5d42776de1a61e34691c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "27eb9a65a149a17fecbe8eb64434540b74cd43b05f84274d3930043227ac7b34",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NativeHomePolish.kt": "149a7001090b5e5f4bcb66d4ca7d4ed7a1b32f6883fbfda3ce61ff3937349dc7",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "66925619f79bf99516a37f1e16bf5c29636fab54ed2f7f4d8aaa5cb48c322cb1",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "478273797007d61ca46e04ee951553fe84c0988432ead18c7018c578860a4bf6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "17bc176611252b07769dd90f1a59ce7ad094c4a9222b0d83fe430aa6e789d1ec",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUi.java": "84e97c642798172e8be16e1c4b5b5eab9ef069b20aba65e3c9cb96ff6983ac67",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "d47fa090995bdf99238cd30cea60201dded607bbcefa9200145c9ba2574ddb5b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "c5d2fbe6bf03512dca85b62bb66648d091fbb2f4a77f910698098ed1c455784f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java": "bc28d682b4d788dbfc81a0090134d22a46800df7614fbe8b94779d3bdb956f0a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "d47023f5bc787f6c0bbf8a4fae5413cf896ac78492a98bfd04af5de90a1109a4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "4764792cae8527f65b1a6df5700e49239cb363f7ce954bdbcc50827a8c6e63cc",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "d2186ed53d682cd9f0932b4df9789cdf266b1d99810f5b6a9a56da5efad72732",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "c700c47af825c7bcfbf07ff5a2c49572248791cf03c34aad7d181c68519ee4ab",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt": "03cf261887a4fb35368f14974e6af24a7336d96c2554b04f9d288755cf5c5184",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMenus.kt": "4365418dfce6d6f6b760694103ea74291623432163181bfb73715d75b784a93e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt": "e8c458a69556d17507ed17a1ecd1970be84a08ef563b80fbf9d92489408937a9",
@@ -118,7 +118,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "f092180c8ba3f960b577193fb89fbd95d6eb0b887a0872fbd1c5327c899a1a9d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "29dff2e2a769bae74c4c7fc11baf8edd04bae349f185907b12610b901bae4c14",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt": "64591afff3715e6f72c22e41a538c4a43469ec84ada85307853ee3eb5898ca0c",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt": "10a4a40f1754f0b6f795e0f22d7cb6299471185fdc5fd98bc3c939597adaaca5",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt": "1f3268ca75c50786166c0732aec6dc19cc1f59d9b61c107be27fb1af01a2e678",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "f2335a18b9f26adf74f8faee0d158011a7b276966883c7ead5fec2d68e4a91da",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "2cfc4ee6d822d7f0858dbfed916c4f3ab21bb294aec16ab0d86b3d87791b1107",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt": "d844f180696c0c5a32557f1f18a089e6155ec4f76d01cadfa28a111490fed06e",
@@ -126,7 +126,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "ad6d2fe110fe0c4c4418d6ff196b2ef64bbd5d5d557bd98a84ac87f495b26687",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "a7ecc51aa3e4e38eb2ce5d2b04769f8046cff7addc1d03c7b142d2c18eef368a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "0aebd74b9944b026cc1498daa7c5d7e4bd3a61226259d73aea4c5f559a78a50e",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt": "74c4313d4f045c2e8df6a1c6d265ed16cc76171b1af8ea24e20f4095d45bbac1",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt": "a9283ec98da1ac8d7c460278ab0c6cc815811efc4286bf2be3621b4266ec72e0",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt": "8ce24aa92b001bba4b6f4a5e7c62d3361a0e910a26ff5ed827c720a33fc8da04"
   },
   "frozenFiles": {
@@ -1460,6 +1460,10 @@
     "io.github.xgl34222220.hetu.ContinuityForeground90Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt",
       "methods": [
+        "syntheticWantedAndRunningHintsCannotSupplyRootAuthority",
+        "aControlTransactionInvalidatesAnEarlierRootObservation",
+        "changedSessionOrPhysicalEpochRejectsAnEarlierRootObservation",
+        "disablingAutomationRejectsItsEarlierIdleObservationEvenIfWantedIsNowTrue",
         "explicitStopWithNoAutomationNeverRequestsAService",
         "wantedRuntimeReattachesExistingGuardWithoutChangingCoreOrConfigurationIntent",
         "automationOnlyReattachesButDoesNotInventWantedOrManualOwnership",
@@ -2025,7 +2029,19 @@
         "physicalEpochAndReplacementSessionRejectOldWebsitePersistenceAndKeepTheNewProbeBusy",
         "replacementApiClearsOldContentAndBulkMutationUsesOnlyTheCurrentControllerTargets",
         "confirmedPidChangeAfterAThrottledPollRejectsThePreviousRuntimeWave",
-        "foregroundReattachesOncePerForegroundAndReattachesAfterReturningFromBackground"
+        "foregroundReattachesOncePerForegroundAndReattachesAfterReturningFromBackground",
+        "cachedWantedAndRunningStateCannotStartTheForegroundGuard",
+        "deniedRootObservationCannotStartTheForegroundGuardFromRunningHints",
+        "freshStatusMissingRawPidCannotReuseCachedPidAsRootAuthority",
+        "freshUnknownInstalledRuntimeCannotArmTheForegroundGuard",
+        "freshUnhealthyLiveCoreStillReattachesWithoutTreatingDataPlaneHealthAsAuthority",
+        "freshDeadManagedSessionStillReattachesItsWantedRecoveryGuard",
+        "freshWatchdogClearedManualSessionStillReattachesItsWantedRecoveryGuard",
+        "freshKillSwitchRetainedDeadSessionStillReattachesItsWantedRecoveryGuard",
+        "missingScriptIdleFallbackCannotArmEvenEnabledNetworkAutomation",
+        "freshInstalledIdleRootStatusPreservesEnabledNetworkAutomationWithoutInventingWanted",
+        "aFreshRootResultFinishingAfterBackgroundCannotRequestAForegroundService",
+        "anActiveControlOperationCannotConsumeFreshForegroundAuthority"
       ]
     },
     "io.github.xgl34222220.hetu.Runtime146ContractTest": {
@@ -2245,7 +2261,7 @@
       ]
     }
   },
-  "expectedUnitTests": 603,
+  "expectedUnitTests": 619,
   "expectedTestXmlFiles": 63,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesUnchanged": true,

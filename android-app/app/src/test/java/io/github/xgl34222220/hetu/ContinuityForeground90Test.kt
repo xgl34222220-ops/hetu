@@ -53,11 +53,58 @@ class ContinuityForeground90Test {
     private fun protectedIntent() = prefs.all.filterKeys {
         it in setOf("proxyRootWanted", "networkMatchEnabled", "proxyRootSessionOwner", "proxyRootAutoStart", "proxySelectedConfig.mihomo")
     }
+    // The caller's actual worker observation supplies authority; the attachment
+    // boundary itself must remain free of Root work.
+    private fun resume(root: RootProxyManager = RootProxyManager(app), observed: Boolean = true,
+                       ticket: Long = RootProxyManager.observationTicket(),
+                       session: String = prefs.getString("proxyNetworkSessionId", "").orEmpty(),
+                       epoch: Long = prefs.getLong("proxyNetworkEpoch", 0L),
+                       automationOnly: Boolean = false) =
+        root.resumeContinuityFromForeground(observed, ticket, session, epoch, automationOnly)
+
+    @Test fun syntheticWantedAndRunningHintsCannotSupplyRootAuthority() {
+        prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
+            .putInt("proxyRootObservedPid", 77).putInt("proxyRootRuntimeSchema", 4).commit()
+        val before = prefs.all
+        assertFalse(resume(observed = false))
+        assertNull(shadowOf(app).nextStartedService)
+        assertEquals(before, prefs.all)
+        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
+    }
+    @Test fun aControlTransactionInvalidatesAnEarlierRootObservation() {
+        prefs.edit().putBoolean("proxyRootWanted", true).commit()
+        val ticket = RootProxyManager.observationTicket()
+        val control = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
+        control.lock(); control.unlock()
+        val before = prefs.all
+        assertFalse(resume(ticket = ticket))
+        assertNull(shadowOf(app).nextStartedService)
+        assertEquals(before, prefs.all)
+        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
+    }
+    @Test fun changedSessionOrPhysicalEpochRejectsAnEarlierRootObservation() {
+        prefs.edit().putBoolean("proxyRootWanted", true).putString("proxyNetworkSessionId", "current")
+            .putLong("proxyNetworkEpoch", 9L).commit()
+        val before = prefs.all
+        assertFalse(resume(session = "old"))
+        assertFalse(resume(epoch = 8L))
+        assertNull(shadowOf(app).nextStartedService)
+        assertEquals(before, prefs.all)
+        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
+    }
+    @Test fun disablingAutomationRejectsItsEarlierIdleObservationEvenIfWantedIsNowTrue() {
+        prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("networkMatchEnabled", false).commit()
+        val before = prefs.all
+        assertFalse(resume(automationOnly = true))
+        assertNull(shadowOf(app).nextStartedService)
+        assertEquals(before, prefs.all)
+        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
+    }
 
     @Test fun explicitStopWithNoAutomationNeverRequestsAService() {
         prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", false).commit()
         val before = prefs.all
-        assertFalse(RootProxyManager(app).resumeContinuityFromForeground())
+        assertFalse(resume())
         assertNull(shadowOf(app).nextStartedService)
         assertEquals(before, prefs.all)
         assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
@@ -65,7 +112,7 @@ class ContinuityForeground90Test {
     @Test fun wantedRuntimeReattachesExistingGuardWithoutChangingCoreOrConfigurationIntent() {
         prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true).commit()
         val before = protectedIntent()
-        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
+        assertTrue(resume())
         nextGuard()
         assertNull(shadowOf(app).nextStartedService)
         assertEquals(before, protectedIntent())
@@ -75,7 +122,7 @@ class ContinuityForeground90Test {
     @Test fun automationOnlyReattachesButDoesNotInventWantedOrManualOwnership() {
         prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", true).commit()
         val before = protectedIntent()
-        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
+        assertTrue(resume())
         nextGuard()
         assertEquals(before, protectedIntent())
         assertFalse(prefs.getBoolean("proxyRootWanted", true))
@@ -85,13 +132,13 @@ class ContinuityForeground90Test {
         prefs.edit().putBoolean("proxyRootWanted", true).commit()
         val root = RootProxyManager(app)
         val before = protectedIntent()
-        repeat(2) { assertTrue(root.resumeContinuityFromForeground()); nextGuard() }
+        repeat(2) { assertTrue(resume(root)); nextGuard() }
         assertEquals(before, protectedIntent())
         assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
     }
     @Test @Config(sdk = [26]) fun minimumSupportedApiUsesTheExistingForegroundServiceIntent() {
         prefs.edit().putBoolean("proxyRootWanted", true).commit()
-        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
+        assertTrue(resume())
         nextGuard()
         assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
     }
@@ -102,7 +149,7 @@ class ContinuityForeground90Test {
             override fun startForegroundService(intent: Intent): ComponentName? = throw IllegalStateException("fixture-secret-must-not-be-recorded")
         }
         val before = protectedIntent()
-        assertFalse(RootProxyManager(failing).resumeContinuityFromForeground())
+        assertFalse(resume(RootProxyManager(failing)))
         assertEquals("IllegalStateException", prefs.getString("proxyContinuityResumeError", ""))
         assertTrue(prefs.getLong("proxyContinuityResumeFailedAt", 0) > 0)
         assertFalse(prefs.contains("proxyContinuityResumeRequestedAt"))
@@ -111,14 +158,14 @@ class ContinuityForeground90Test {
     }
     @Test fun retryClearsTheActiveErrorOnlyAfterTheRequestIsAccepted() {
         prefs.edit().putBoolean("proxyRootWanted", true).putString("proxyContinuityResumeError", "old-failure").commit()
-        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
+        assertTrue(resume())
         nextGuard()
         assertFalse(prefs.contains("proxyContinuityResumeError"))
         assertTrue(prefs.getBoolean("proxyRootWanted", false))
     }
     @Test fun stopBetweenRequestAndDeliveryIsRecheckedByTheRealServiceWithoutRootWork() {
         prefs.edit().putBoolean("proxyRootWanted", true).commit()
-        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
+        assertTrue(resume())
         val request = nextGuard()
         prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", false).commit()
         val controller = Robolectric.buildService(ProxyNetworkMatchService::class.java).create()

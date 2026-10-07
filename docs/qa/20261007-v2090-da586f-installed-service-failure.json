@@ -1,0 +1,44 @@
+{
+  "commit": "da586f771e266c61e56d557892d1f705011cc557",
+  "runId": 37677953857,
+  "build": {
+    "result": "success",
+    "hostModelActualSeconds": 900.24095988,
+    "hostCycles": 300,
+    "unitTests": 603,
+    "supplementalTests": 36
+  },
+  "installed": {
+    "35": {
+      "jobId": 112999038249,
+      "result": "failure",
+      "artifactId": 11509607558,
+      "physicalZipSha256": "136b947d80741ef5ecb0b4ecbb3be1a1bae703e518995c3bf82115ad38c87d2c"
+    },
+    "36": {
+      "jobId": 112999038256,
+      "result": "failure",
+      "artifactId": 11509682706,
+      "physicalZipSha256": "a099ad307fcb89f813f29b7676ab697ee7ff03435cebe67789b41b2c8364bb15"
+    }
+  },
+  "failedAssertion": "Synthetic Wanted unexpectedly started continuity service",
+  "location": ".github/scripts/smoke_hetu_apk.py:461 panel_controller_auth_cases",
+  "actualService": "ProxyNetworkMatchService observed as foregroundService via dumpsys in both owned non-root AOSP sandboxes",
+  "actualCauseUnderInvestigation": "resumeContinuityFromForeground invoked before state polling and keyed only on preferenceWanted/networkMatchEnabled",
+  "native900": "NOT_STARTED; assertion failed before run_soak invocation",
+  "fixtureCleanup": {
+    "originalPreferencesRestored": true,
+    "adbReverseRestored": true,
+    "emulatorsReaped": true,
+    "KvmUnchanged": true
+  },
+  "phoneEvidence": false,
+  "currentFifthHead": "6c464b589e782e718cc6ce53f3ed34f8e6f155ff",
+  "fifthRunStillRunning": 37682589978,
+  "oldCisCancelled": false,
+  "next": "Keep original service absence assertion; repair foreground observation eligibility, regenerate strict layer and run new exact CI.",
+  "sourceConfirmedFixtureCause": "Foreground reattachment requested before the fresh Root status poll using only preferenceWanted/networkMatchEnabled. This explains the observed non-root fixture service request, not a unique real-phone offline cause.",
+  "watchdogContract": "Actual existing root script clears PID/MODE/SESSION after KILL=0 core exit, producing fresh schema4 stopped; KILL=1 retains SESSION without PID, producing upgrade-required. Narrow eligibility repair must preserve both current wanted recovery paths.",
+  "newCandidateEvidence": "NOT_YET_EXECUTED: unchanged original installed service-absence assertion and all gates required for a new production candidate SHA."
+}

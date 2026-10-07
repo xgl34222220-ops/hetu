@@ -115,6 +115,13 @@ internal data class ProxyComposeState(
     val dataPlaneHealthy: Boolean = false,
     val healthObserved: Boolean = false,
     val trafficMode: String = "",
+    // Ephemeral authority from this read only; cached UI/health hints never arm
+    // Android service recovery. This is independent from dataPlaneHealthy.
+    val continuityRootObserved: Boolean = false,
+    val continuityAutomationOnly: Boolean = false,
+    val continuityObservationTicket: Long = -1L,
+    val continuityObservationSession: String = "",
+    val continuityObservationNetworkEpoch: Long = 0L,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -139,7 +146,10 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun setAutoStart(enabled: Boolean): String = withContext(Dispatchers.IO) { root.setAutoStart(enabled) }
-    fun resumeContinuityFromForeground(): Boolean = root.resumeContinuityFromForeground()
+    fun resumeContinuityFromForeground(observation: ProxyComposeState): Boolean =
+        root.resumeContinuityFromForeground(observation.continuityRootObserved,
+            observation.continuityObservationTicket, observation.continuityObservationSession,
+            observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
@@ -160,9 +170,27 @@ internal class ProxyComposeController(context: Context) {
         // boot must never suppress the first real status verification.
         val shouldProbeHealth = !fastRunning || lastHealth <= 0L || nowElapsed < lastHealth ||
             nowElapsed - lastHealth >= probeInterval
+        var continuityRootObserved = false
+        var continuityAutomationOnly = false
+        val continuityTicket = RootProxyManager.observationTicket()
+        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
+        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
         val status = if (shouldProbeHealth) {
             try {
                 root.status().also { live ->
+                    // Only this successful current Root/script read is authority.
+                    // The watchdog clears a dead PID and, without kill switch,
+                    // its session too: stopped/upgrade-required must retain the
+                    // existing wanted recovery. Neither cache, missing-script
+                    // fallback nor unknown reads can authorize attachment.
+                    val installedStopped = live.optInt("runtimeSchema", 0) > 0 &&
+                        live.optString("networkIntegrity") in setOf("stopped", "degraded", "upgrade-required")
+                    continuityAutomationOnly = !live.optBoolean("running", false) && installedStopped &&
+                        !prefs.getBoolean("proxyRootWanted", false) && prefs.getBoolean("networkMatchEnabled", false)
+                    continuityRootObserved = continuityTicket >= 0L && live.optBoolean("ok", false) &&
+                        live.opt("running") is Boolean &&
+                        if (live.optBoolean("running", false)) live.optInt("pid", 0) > 0
+                        else installedStopped
                     // Preserve the last confirmed process through throttled reads.
                     // A missing PID is unknown; an explicit stopped status clears it.
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
@@ -336,6 +364,11 @@ internal class ProxyComposeController(context: Context) {
             dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
             healthObserved = healthObserved,
             trafficMode = trafficMode,
+            continuityRootObserved = continuityRootObserved,
+            continuityAutomationOnly = continuityAutomationOnly,
+            continuityObservationTicket = if (continuityRootObserved) continuityTicket else -1L,
+            continuityObservationSession = continuitySession,
+            continuityObservationNetworkEpoch = continuityNetworkEpoch,
         )
     }
 

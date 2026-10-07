@@ -16,6 +16,14 @@ jobs:
     - uses: actions/setup-node@v4
       with:
         node-version: '24'
+    - name: Regress bounded SDK installer retries with controlled processes
+      run: 'set -euo pipefail
+
+        mkdir -p out/verification
+
+        python3 .github/scripts/test_install_hetu_ci_sdk.py -v 2>&1 | tee out/verification/sdk-installer-host-tests.txt
+
+        '
     - name: Load current layer and fetch exact predecessor objects
       run: 'set -euo pipefail
 
@@ -416,7 +424,7 @@ jobs:
 
         AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
-        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
+        python3 .github/scripts/install_hetu_ci_sdk.py --sdkmanager "$SDKMANAGER" --api "${{ matrix.api }}" --output out/android-smoke/sdk-prepare-attempts 2>&1 | tee
         out/android-smoke/sdk-prepare.log
 
         "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''
@@ -526,7 +534,7 @@ jobs:
 
         AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
 
-        "$SDKMANAGER" ''platform-tools'' ''emulator'' ''system-images;android-${{ matrix.api }};default;x86_64'' 2>&1 | tee
+        python3 .github/scripts/install_hetu_ci_sdk.py --sdkmanager "$SDKMANAGER" --api "${{ matrix.api }}" --output out/android-smoke/sdk-prepare-attempts 2>&1 | tee
         out/android-smoke/sdk-prepare.log
 
         "$AVDMANAGER" list device --compact | grep -qx ''pixel_2''

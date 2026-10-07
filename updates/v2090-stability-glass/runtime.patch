@@ -182,29 +182,61 @@ index b936fda..ec78b9f 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 6b33725..d93bc3c 100644
+index 6b33725..5168ac2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-@@ -113,6 +113,7 @@ internal data class ProxyComposeState(
+@@ -113,7 +113,15 @@ internal data class ProxyComposeState(
      val dnsListenerReady: Boolean = false,
      val watchdog: Boolean = false,
      val dataPlaneHealthy: Boolean = false,
 +    val healthObserved: Boolean = false,
      val trafficMode: String = "",
++    // Ephemeral authority from this read only; cached UI/health hints never arm
++    // Android service recovery. This is independent from dataPlaneHealthy.
++    val continuityRootObserved: Boolean = false,
++    val continuityAutomationOnly: Boolean = false,
++    val continuityObservationTicket: Long = -1L,
++    val continuityObservationSession: String = "",
++    val continuityObservationNetworkEpoch: Long = 0L,
  )
 
-@@ -138,6 +139,7 @@ internal class ProxyComposeController(context: Context) {
+ internal class ProxyComposeController(context: Context) {
+@@ -138,6 +146,10 @@ internal class ProxyComposeController(context: Context) {
      }
 
      suspend fun setAutoStart(enabled: Boolean): String = withContext(Dispatchers.IO) { root.setAutoStart(enabled) }
-+    fun resumeContinuityFromForeground(): Boolean = root.resumeContinuityFromForeground()
++    fun resumeContinuityFromForeground(observation: ProxyComposeState): Boolean =
++        root.resumeContinuityFromForeground(observation.continuityRootObserved,
++            observation.continuityObservationTicket, observation.continuityObservationSession,
++            observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
      suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
-@@ -161,8 +163,14 @@ internal class ProxyComposeController(context: Context) {
+@@ -158,11 +170,35 @@ internal class ProxyComposeController(context: Context) {
+         // boot must never suppress the first real status verification.
+         val shouldProbeHealth = !fastRunning || lastHealth <= 0L || nowElapsed < lastHealth ||
+             nowElapsed - lastHealth >= probeInterval
++        var continuityRootObserved = false
++        var continuityAutomationOnly = false
++        val continuityTicket = RootProxyManager.observationTicket()
++        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
++        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
          val status = if (shouldProbeHealth) {
              try {
                  root.status().also { live ->
++                    // Only this successful current Root/script read is authority.
++                    // The watchdog clears a dead PID and, without kill switch,
++                    // its session too: stopped/upgrade-required must retain the
++                    // existing wanted recovery. Neither cache, missing-script
++                    // fallback nor unknown reads can authorize attachment.
++                    val installedStopped = live.optInt("runtimeSchema", 0) > 0 &&
++                        live.optString("networkIntegrity") in setOf("stopped", "degraded", "upgrade-required")
++                    continuityAutomationOnly = !live.optBoolean("running", false) && installedStopped &&
++                        !prefs.getBoolean("proxyRootWanted", false) && prefs.getBoolean("networkMatchEnabled", false)
++                    continuityRootObserved = continuityTicket >= 0L && live.optBoolean("ok", false) &&
++                        live.opt("running") is Boolean &&
++                        if (live.optBoolean("running", false)) live.optInt("pid", 0) > 0
++                        else installedStopped
 +                    // Preserve the last confirmed process through throttled reads.
 +                    // A missing PID is unknown; an explicit stopped status clears it.
 +                    val observedPid = if (!live.optBoolean("running", fastRunning)) 0
@@ -216,7 +248,7 @@ index 6b33725..d93bc3c 100644
                          .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
                          .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
                          .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
-@@ -175,6 +183,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -175,6 +211,7 @@ internal class ProxyComposeController(context: Context) {
                          .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
                          .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
                          .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
@@ -224,7 +256,7 @@ index 6b33725..d93bc3c 100644
                          // What 高级代理配置 shows under its switches: how DNS is really captured,
                          // and what the last vendor-firewall pass and resource tuning did.
                          .putString("proxyRootSystemDns", live.optString("systemDns", ""))
-@@ -191,6 +200,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -191,6 +228,7 @@ internal class ProxyComposeController(context: Context) {
              catch (error: Exception) {
                  if (fastRunning) JSONObject()
                      .put("running", true)
@@ -232,7 +264,7 @@ index 6b33725..d93bc3c 100644
                      .put("healthProbeFailed", true)
                      .put("message", userSafeRuntimeMessage(error.message))
                      .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
-@@ -210,6 +220,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -210,6 +248,7 @@ internal class ProxyComposeController(context: Context) {
          } else {
              JSONObject()
                  .put("running", true)
@@ -240,7 +272,7 @@ index 6b33725..d93bc3c 100644
                  .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                  .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                  .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
-@@ -223,7 +234,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -223,7 +262,12 @@ internal class ProxyComposeController(context: Context) {
                  .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                  .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
          }
@@ -254,7 +286,7 @@ index 6b33725..d93bc3c 100644
          prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
          var groups = emptyList<ProxyGroupUi>()
          var connections = emptyList<ProxyConnectionUi>()
-@@ -317,7 +333,8 @@ internal class ProxyComposeController(context: Context) {
+@@ -317,8 +361,14 @@ internal class ProxyComposeController(context: Context) {
              dnsIpv6Rule = status.optBoolean("dnsIpv6Rule", false),
              dnsListenerReady = status.optBoolean("dnsListenerReady", false),
              watchdog = status.optBoolean("watchdog", false),
@@ -262,8 +294,14 @@ index 6b33725..d93bc3c 100644
 +            dataPlaneHealthy = healthObserved && status.optBoolean("dataPlaneHealthy", false),
 +            healthObserved = healthObserved,
              trafficMode = trafficMode,
++            continuityRootObserved = continuityRootObserved,
++            continuityAutomationOnly = continuityAutomationOnly,
++            continuityObservationTicket = if (continuityRootObserved) continuityTicket else -1L,
++            continuityObservationSession = continuitySession,
++            continuityObservationNetworkEpoch = continuityNetworkEpoch,
          )
      }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 index e968e48..60c990f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
@@ -662,37 +700,45 @@ index da0f6c2..639e117 100644
          else w.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
          shell.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets b=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());android.graphics.Insets k=i.getInsets(WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,Math.max(b.bottom,k.bottom));}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 8a47f8c..d419d18 100644
+index 8a47f8c..ece35c8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-@@ -959,6 +959,26 @@ final class RootProxyManager {
+@@ -959,6 +959,34 @@ final class RootProxyManager {
          return state;
      }
 
 +    /** Called only from a foreground Activity lifecycle; reattach the observer after
 +     * process/package/OEM loss without replacing the core or changing wanted intent.
 +     * True acknowledges the service request, never proves that the service stayed alive. */
-+    boolean resumeContinuityFromForeground(){
-+        if(!prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("networkMatchEnabled",false))return false;
-+        try{
++    boolean resumeContinuityFromForeground(boolean rootObserved,long ticket,String networkSession,long networkEpoch,
++                                          boolean automationOnly){
++        if(!rootObserved)return false;
++        final boolean[] accepted={false};
++        publishObservation(ticket,()->{
++            if(automationOnly&&!prefs.getBoolean("networkMatchEnabled",false))return;
++            if(!prefs.getBoolean("proxyRootWanted",false)&&!prefs.getBoolean("networkMatchEnabled",false))return;
++            if(!Objects.equals(networkSession,prefs.getString("proxyNetworkSessionId",""))
++                    ||networkEpoch!=prefs.getLong("proxyNetworkEpoch",0L))return;
++          try{
 +            Intent intent=new Intent(context,ProxyNetworkMatchService.class);
 +            android.content.ComponentName requested=Build.VERSION.SDK_INT>=26
 +                    ?context.startForegroundService(intent):context.startService(intent);
 +            if(requested==null)throw new IllegalStateException("service-request-not-accepted");
 +            prefs.edit().putLong("proxyContinuityResumeRequestedAt",System.currentTimeMillis())
 +                    .remove("proxyContinuityResumeError").apply();
-+            return true;
-+        }catch(Exception error){
++            accepted[0]=true;
++          }catch(Exception error){
 +            prefs.edit().putLong("proxyContinuityResumeFailedAt",System.currentTimeMillis())
 +                    .putString("proxyContinuityResumeError",error.getClass().getSimpleName()).apply();
-+            return false;
-+        }
++          }
++        });
++        return accepted[0];
 +    }
 +
      private void ensureContinuityService(boolean running){
          try{
              Intent intent=new Intent(context,ProxyNetworkMatchService.class);
-@@ -987,6 +1007,7 @@ final class RootProxyManager {
+@@ -987,6 +1015,7 @@ final class RootProxyManager {
          Map<String,?> values=prefs.getAll();
          for(String key:new String[]{"proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyRootWanted",
                  "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
@@ -807,7 +853,7 @@ index 197ed77..2b1a624 100644
              .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
          verticalAlignment = Alignment.CenterVertically,
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index c2dfa9e..8479d03 100644
+index c2dfa9e..250b8a8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -173,6 +173,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
@@ -908,15 +954,72 @@ index c2dfa9e..8479d03 100644
          }
      }
 
-@@ -342,6 +378,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -339,9 +375,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     private fun beginProviderRead(): Long = (++requestSequence).also { latestProviderRead = it }
+     private fun beginSiteRead(): Long = (++requestSequence).also { latestSiteRead = it }
+
++    private var foregroundActive = false
++    private var foregroundGeneration = 0L
++    private var continuityAttachedForeground = -1L
++
      fun onForeground() {
          reloadAppearance()
          if (pollJob?.isActive == true) return
-+        controller.resumeContinuityFromForeground()
++        foregroundActive = true
++        foregroundGeneration++
          pollJob = viewModelScope.launch {
              launch {
                  delay(600)
-@@ -729,29 +766,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -364,6 +406,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun onBackground() {
++        foregroundActive = false
++        foregroundGeneration++
+         pollJob?.cancel()
+         pollJob = null
+     }
+@@ -405,6 +449,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
+     suspend fun refreshNow(): ProxyComposeState? {
++        val observedForeground = foregroundGeneration
+         var expectedState = state
+         var expectedRequest = captureRuntimeRequest()
+         val operationBefore = operation
+@@ -415,6 +460,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             val next = repo.state()
+             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
+             if (superseded()) return null
++            // The existing worker status read supplies authority. A cached
++            // wanted/running hint alone must never start an Android guardian.
++            if (operationBefore == null && foregroundActive && foregroundGeneration == observedForeground &&
++                continuityAttachedForeground != observedForeground &&
++                controller.resumeContinuityFromForeground(next)) {
++                continuityAttachedForeground = observedForeground
++            }
+             if (next.running != state.running ||
+                 (next.corePid > 0 && state.corePid > 0 && next.corePid != state.corePid)) {
+                 invalidateRuntimeRequests()
+@@ -508,11 +560,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             }
+
+             if (superseded()) return null
++            // Authority belongs to this worker result, never to retained UI state.
++            val displayed = next.copy(continuityRootObserved = false, continuityAutomationOnly = false,
++                continuityObservationTicket = -1L, continuityObservationSession = "",
++                continuityObservationNetworkEpoch = 0L)
+             state = if (next.running && !next.panelReady) {
+-                next.copy(groups = state.groups, connections = state.connections,
++                displayed.copy(groups = state.groups, connections = state.connections,
+                     downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
+                     memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
+-            } else next
++            } else displayed
+             expectedState = state
+             if (next.running) startupError = null
+             if (controllerSampleValid) {
+@@ -729,29 +785,37 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -961,7 +1064,7 @@ index c2dfa9e..8479d03 100644
              }
          }
      }
-@@ -939,95 +984,144 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -939,95 +1003,144 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- rules / rule sets / providers ---------------- */
 
      fun loadRules() {
@@ -1128,7 +1231,7 @@ index c2dfa9e..8479d03 100644
              }
          }
      }
-@@ -1060,6 +1154,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1060,6 +1173,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              try {
                  val fresh = repo.refreshProvider(name)
                  if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
@@ -2016,10 +2119,10 @@ index 7671cce..c5d6deb 100644
              LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt
 new file mode 100644
-index 0000000..e5fc0f8
+index 0000000..71bd148
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt
-@@ -0,0 +1,137 @@
+@@ -0,0 +1,184 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -2075,11 +2178,58 @@ index 0000000..e5fc0f8
 +    private fun protectedIntent() = prefs.all.filterKeys {
 +        it in setOf("proxyRootWanted", "networkMatchEnabled", "proxyRootSessionOwner", "proxyRootAutoStart", "proxySelectedConfig.mihomo")
 +    }
++    // The caller's actual worker observation supplies authority; the attachment
++    // boundary itself must remain free of Root work.
++    private fun resume(root: RootProxyManager = RootProxyManager(app), observed: Boolean = true,
++                       ticket: Long = RootProxyManager.observationTicket(),
++                       session: String = prefs.getString("proxyNetworkSessionId", "").orEmpty(),
++                       epoch: Long = prefs.getLong("proxyNetworkEpoch", 0L),
++                       automationOnly: Boolean = false) =
++        root.resumeContinuityFromForeground(observed, ticket, session, epoch, automationOnly)
++
++    @Test fun syntheticWantedAndRunningHintsCannotSupplyRootAuthority() {
++        prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
++            .putInt("proxyRootObservedPid", 77).putInt("proxyRootRuntimeSchema", 4).commit()
++        val before = prefs.all
++        assertFalse(resume(observed = false))
++        assertNull(shadowOf(app).nextStartedService)
++        assertEquals(before, prefs.all)
++        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
++    }
++    @Test fun aControlTransactionInvalidatesAnEarlierRootObservation() {
++        prefs.edit().putBoolean("proxyRootWanted", true).commit()
++        val ticket = RootProxyManager.observationTicket()
++        val control = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
++        control.lock(); control.unlock()
++        val before = prefs.all
++        assertFalse(resume(ticket = ticket))
++        assertNull(shadowOf(app).nextStartedService)
++        assertEquals(before, prefs.all)
++        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
++    }
++    @Test fun changedSessionOrPhysicalEpochRejectsAnEarlierRootObservation() {
++        prefs.edit().putBoolean("proxyRootWanted", true).putString("proxyNetworkSessionId", "current")
++            .putLong("proxyNetworkEpoch", 9L).commit()
++        val before = prefs.all
++        assertFalse(resume(session = "old"))
++        assertFalse(resume(epoch = 8L))
++        assertNull(shadowOf(app).nextStartedService)
++        assertEquals(before, prefs.all)
++        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
++    }
++    @Test fun disablingAutomationRejectsItsEarlierIdleObservationEvenIfWantedIsNowTrue() {
++        prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("networkMatchEnabled", false).commit()
++        val before = prefs.all
++        assertFalse(resume(automationOnly = true))
++        assertNull(shadowOf(app).nextStartedService)
++        assertEquals(before, prefs.all)
++        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
++    }
 +
 +    @Test fun explicitStopWithNoAutomationNeverRequestsAService() {
 +        prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", false).commit()
 +        val before = prefs.all
-+        assertFalse(RootProxyManager(app).resumeContinuityFromForeground())
++        assertFalse(resume())
 +        assertNull(shadowOf(app).nextStartedService)
 +        assertEquals(before, prefs.all)
 +        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
@@ -2087,7 +2237,7 @@ index 0000000..e5fc0f8
 +    @Test fun wantedRuntimeReattachesExistingGuardWithoutChangingCoreOrConfigurationIntent() {
 +        prefs.edit().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true).commit()
 +        val before = protectedIntent()
-+        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
++        assertTrue(resume())
 +        nextGuard()
 +        assertNull(shadowOf(app).nextStartedService)
 +        assertEquals(before, protectedIntent())
@@ -2097,7 +2247,7 @@ index 0000000..e5fc0f8
 +    @Test fun automationOnlyReattachesButDoesNotInventWantedOrManualOwnership() {
 +        prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", true).commit()
 +        val before = protectedIntent()
-+        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
++        assertTrue(resume())
 +        nextGuard()
 +        assertEquals(before, protectedIntent())
 +        assertFalse(prefs.getBoolean("proxyRootWanted", true))
@@ -2107,13 +2257,13 @@ index 0000000..e5fc0f8
 +        prefs.edit().putBoolean("proxyRootWanted", true).commit()
 +        val root = RootProxyManager(app)
 +        val before = protectedIntent()
-+        repeat(2) { assertTrue(root.resumeContinuityFromForeground()); nextGuard() }
++        repeat(2) { assertTrue(resume(root)); nextGuard() }
 +        assertEquals(before, protectedIntent())
 +        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
 +    }
 +    @Test @Config(sdk = [26]) fun minimumSupportedApiUsesTheExistingForegroundServiceIntent() {
 +        prefs.edit().putBoolean("proxyRootWanted", true).commit()
-+        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
++        assertTrue(resume())
 +        nextGuard()
 +        assertEquals(0, ContinuityForegroundBridge90Shadow.rootCalls)
 +    }
@@ -2124,7 +2274,7 @@ index 0000000..e5fc0f8
 +            override fun startForegroundService(intent: Intent): ComponentName? = throw IllegalStateException("fixture-secret-must-not-be-recorded")
 +        }
 +        val before = protectedIntent()
-+        assertFalse(RootProxyManager(failing).resumeContinuityFromForeground())
++        assertFalse(resume(RootProxyManager(failing)))
 +        assertEquals("IllegalStateException", prefs.getString("proxyContinuityResumeError", ""))
 +        assertTrue(prefs.getLong("proxyContinuityResumeFailedAt", 0) > 0)
 +        assertFalse(prefs.contains("proxyContinuityResumeRequestedAt"))
@@ -2133,14 +2283,14 @@ index 0000000..e5fc0f8
 +    }
 +    @Test fun retryClearsTheActiveErrorOnlyAfterTheRequestIsAccepted() {
 +        prefs.edit().putBoolean("proxyRootWanted", true).putString("proxyContinuityResumeError", "old-failure").commit()
-+        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
++        assertTrue(resume())
 +        nextGuard()
 +        assertFalse(prefs.contains("proxyContinuityResumeError"))
 +        assertTrue(prefs.getBoolean("proxyRootWanted", false))
 +    }
 +    @Test fun stopBetweenRequestAndDeliveryIsRecheckedByTheRealServiceWithoutRootWork() {
 +        prefs.edit().putBoolean("proxyRootWanted", true).commit()
-+        assertTrue(RootProxyManager(app).resumeContinuityFromForeground())
++        assertTrue(resume())
 +        val request = nextGuard()
 +        prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", false).commit()
 +        val controller = Robolectric.buildService(ProxyNetworkMatchService::class.java).create()
@@ -2992,13 +3142,14 @@ index 0000000..88d9225
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt
 new file mode 100644
-index 0000000..ccface5
+index 0000000..ca85130
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt
-@@ -0,0 +1,424 @@
+@@ -0,0 +1,609 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
++import android.content.Intent
 +import android.os.Looper
 +import androidx.compose.runtime.MutableState
 +import androidx.lifecycle.viewModelScope
@@ -3047,7 +3198,7 @@ index 0000000..ccface5
 +    @Before fun prepare() {
 +        PanelActionRuntimeShadows.NoRoot.reset()
 +        ControllerRunState90Shadows.RootStatus.reset()
-+        ControllerRunState90Shadows.RootStatus.reply = "{\"running\":true,\"dataPlaneHealthy\":true,\"pid\":77}"
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":true,\"dataPlaneHealthy\":true,\"pid\":77}"
 +        PanelActionRuntimeShadows.RuntimeSample.reset()
 +        PanelActionRuntimeShadows.HistoryRecord.reset()
 +        PanelRequestOwnershipShadows.Sites.reset()
@@ -3378,7 +3529,7 @@ index 0000000..ccface5
 +        vm.delays["shared"] = 44L
 +        vm.testGroup(ProxyGroupUi("R", "Selector", "shared", listOf(ProxyNodeUi("shared"))))
 +        eventually("Old PID wave enters") { entered.count == 0L }
-+        ControllerRunState90Shadows.RootStatus.reply = "{\"running\":true,\"dataPlaneHealthy\":true,\"pid\":88}"
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":true,\"dataPlaneHealthy\":true,\"pid\":88}"
 +        ShadowSystemClock.advanceBy(Duration.ofSeconds(2))
 +        refreshed = false
 +        vm.viewModelScope.launch { vm.refreshNow(); refreshed = true }
@@ -3398,26 +3549,210 @@ index 0000000..ccface5
 +    }
 +
 +    private fun prefsForceFreshHealth() { vm.prefs.edit().putLong("proxyRootHealthProbeElapsed", 0L).commit() }
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun drainServices() { while (shadowOf(app).nextStartedService != null) { } }
++    private fun awaitGuard(): Intent {
++        var guard: Intent? = null
++        eventually("A fresh authorized worker observation requests the guard") {
++            if (guard == null) guard = shadowOf(app).nextStartedService
++            guard != null
++        }
++        return guard!!
++    }
++    private fun finishForegroundRead() {
++        eventually("Foreground snapshot completes") { vm.loadedOnce }
++        vm.onBackground(); awaitActions()
++    }
 +
 +    @Test fun foregroundReattachesOncePerForegroundAndReattachesAfterReturningFromBackground() {
-+        val app: Application = ApplicationProvider.getApplicationContext()
-+        while (shadowOf(app).nextStartedService != null) { }
++        drainServices(); prefsForceFreshHealth()
 +        vm.onForeground()
-+        val first = shadowOf(app).nextStartedService
++        val first = awaitGuard()
 +        assertNotNull(first)
 +        assertEquals(ProxyNetworkMatchService::class.java.name, first!!.component!!.className)
 +        assertNull(first.action)
 +        vm.onForeground()
 +        assertNull("Duplicate callback in the same foreground must not request another observer", shadowOf(app).nextStartedService)
 +        vm.onBackground()
++        awaitActions(); prefsForceFreshHealth()
 +        vm.onForeground()
-+        val next = shadowOf(app).nextStartedService
++        val next = awaitGuard()
 +        assertNotNull(next)
 +        assertEquals(ProxyNetworkMatchService::class.java.name, next!!.component!!.className)
 +        assertNull(next.action)
 +        assertTrue(vm.prefs.getBoolean("proxyRootWanted", false))
 +        vm.onBackground(); awaitActions()
 +        assertEquals(0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    @Test fun cachedWantedAndRunningStateCannotStartTheForegroundGuard() {
++        drainServices()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(1))
++        vm.prefs.edit().putLong("proxyRootHealthProbeElapsed", android.os.SystemClock.elapsedRealtime())
++            .putInt("proxyRootObservedPid", 77).putInt("proxyRootRuntimeSchema", 4)
++            .putBoolean("proxyRootHealthObserved", true).putBoolean("proxyRootDataPlaneHealthy", true).commit()
++        vm.onForeground(); finishForegroundRead()
++        assertTrue(vm.state.running)
++        assertTrue(vm.state.panelReady)
++        assertEquals(0, ControllerRunState90Shadows.RootStatus.reads)
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++        assertFalse(vm.state.continuityRootObserved)
++    }
++
++    @Test fun deniedRootObservationCannotStartTheForegroundGuardFromRunningHints() {
++        drainServices(); prefsForceFreshHealth()
++        ControllerRunState90Shadows.RootStatus.fail = true
++        vm.onForeground(); finishForegroundRead()
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        assertTrue(vm.state.running)
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++        assertFalse(vm.state.continuityRootObserved)
++    }
++
++    @Test fun freshStatusMissingRawPidCannotReuseCachedPidAsRootAuthority() {
++        drainServices(); prefsForceFreshHealth()
++        vm.prefs.edit().putInt("proxyRootObservedPid", 77).commit()
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":true,\"dataPlaneHealthy\":true}"
++        vm.onForeground(); finishForegroundRead()
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        assertEquals("The display may retain its last confirmed PID", 77, vm.state.corePid)
++        assertTrue(vm.state.running)
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++    }
++
++    @Test fun freshUnknownInstalledRuntimeCannotArmTheForegroundGuard() {
++        drainServices(); prefsForceFreshHealth()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(3))
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"pid\":0,\"runtimeSchema\":4,\"networkIntegrity\":\"unknown\",\"networkFault\":\"transaction-in-progress\",\"dataPlaneHealthy\":false}"
++        vm.onForeground(); finishForegroundRead()
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        assertTrue(vm.prefs.getBoolean("proxyRootWanted", false))
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++    }
++
++    @Test fun freshUnhealthyLiveCoreStillReattachesWithoutTreatingDataPlaneHealthAsAuthority() {
++        drainServices(); prefsForceFreshHealth()
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":true,\"pid\":77,\"dataPlaneHealthy\":false}"
++        vm.onForeground()
++        assertEquals(ProxyNetworkMatchService::class.java.name, awaitGuard().component!!.className)
++        finishForegroundRead()
++        assertTrue(vm.state.running)
++        assertFalse(vm.state.dataPlaneHealthy)
++        assertFalse(vm.state.continuityRootObserved)
++        assertEquals(-1L, vm.state.continuityObservationTicket)
++    }
++
++    @Test fun freshDeadManagedSessionStillReattachesItsWantedRecoveryGuard() {
++        drainServices(); prefsForceFreshHealth()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(3))
++        vm.prefs.edit().putString("proxyNetworkSessionId", "existing-managed-session").putLong("proxyNetworkEpoch", 9L).commit()
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"pid\":0,\"runtimeSchema\":4,\"networkIntegrity\":\"degraded\",\"networkFault\":\"core-identity\",\"dataPlaneHealthy\":false}"
++        vm.onForeground()
++        assertEquals(ProxyNetworkMatchService::class.java.name, awaitGuard().component!!.className)
++        finishForegroundRead()
++        assertFalse(vm.state.running)
++        assertTrue(vm.prefs.getBoolean("proxyRootWanted", false))
++        assertEquals("existing-managed-session", vm.prefs.getString("proxyNetworkSessionId", ""))
++        assertEquals(9L, vm.prefs.getLong("proxyNetworkEpoch", 0L))
++        assertFalse(vm.state.continuityRootObserved)
++    }
++
++    @Test fun freshWatchdogClearedManualSessionStillReattachesItsWantedRecoveryGuard() {
++        drainServices(); prefsForceFreshHealth()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(3))
++        vm.prefs.edit().putString("proxyNetworkSessionId", "previous-manual-session")
++            .putString("proxyRootSessionOwner", "manual").putLong("proxyNetworkEpoch", 9L).commit()
++        // Actual watchdog KILL=0 removes PID/MODE/SESSION; health_collect reports
++        // stopped/not-running. This isolates that Root reply, not a phone watchdog.
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"pid\":0,\"runtimeSchema\":4,\"networkIntegrity\":\"stopped\",\"networkFault\":\"not-running\",\"mode\":\"none\",\"dataPlaneHealthy\":false}"
++        vm.onForeground()
++        assertEquals(ProxyNetworkMatchService::class.java.name, awaitGuard().component!!.className)
++        finishForegroundRead()
++        assertFalse(vm.state.running)
++        assertTrue(vm.prefs.getBoolean("proxyRootWanted", false))
++        assertEquals("manual", vm.prefs.getString("proxyRootSessionOwner", ""))
++        assertEquals("previous-manual-session", vm.prefs.getString("proxyNetworkSessionId", ""))
++        assertEquals(9L, vm.prefs.getLong("proxyNetworkEpoch", 0L))
++    }
++
++    @Test fun freshKillSwitchRetainedDeadSessionStillReattachesItsWantedRecoveryGuard() {
++        drainServices(); prefsForceFreshHealth()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(3))
++        vm.prefs.edit().putString("proxyNetworkSessionId", "kill-switch-session")
++            .putBoolean("proxyRootKillSwitch", true).putLong("proxyNetworkEpoch", 9L).commit()
++        // Actual watchdog KILL=1 retains SESSION but removes PIDFILE, so the
++        // manifest no longer matches and the installed script reports upgrade-required.
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"pid\":0,\"runtimeSchema\":4,\"networkIntegrity\":\"upgrade-required\",\"networkFault\":\"session-manifest-missing,core-identity,watchdog-missing\",\"killSwitchActive\":true,\"dataPlaneHealthy\":false}"
++        vm.onForeground()
++        assertEquals(ProxyNetworkMatchService::class.java.name, awaitGuard().component!!.className)
++        finishForegroundRead()
++        assertFalse(vm.state.running)
++        assertTrue(vm.prefs.getBoolean("proxyRootWanted", false))
++        assertTrue(vm.prefs.getBoolean("proxyRootKillSwitch", false))
++        assertEquals("kill-switch-session", vm.prefs.getString("proxyNetworkSessionId", ""))
++        assertEquals(9L, vm.prefs.getLong("proxyNetworkEpoch", 0L))
++    }
++
++    @Test fun missingScriptIdleFallbackCannotArmEvenEnabledNetworkAutomation() {
++        drainServices(); prefsForceFreshHealth()
++        ShadowSystemClock.advanceBy(Duration.ofSeconds(3))
++        vm.prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", true).commit()
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"state\":\"idle\",\"message\":\"尚未启动\"}"
++        vm.onForeground(); finishForegroundRead()
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        assertFalse(vm.state.running)
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++        assertTrue(vm.prefs.getBoolean("networkMatchEnabled", false))
++        assertFalse(vm.prefs.getBoolean("proxyRootWanted", true))
++    }
++
++    @Test fun freshInstalledIdleRootStatusPreservesEnabledNetworkAutomationWithoutInventingWanted() {
++        drainServices(); prefsForceFreshHealth()
++        vm.prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("networkMatchEnabled", true)
++            .putString("proxyRootSessionOwner", "network-match").commit()
++        fixture("state", vm.state.copy(running = false))
++        ControllerRunState90Shadows.RootStatus.reply = "{\"ok\":true,\"running\":false,\"pid\":0,\"runtimeSchema\":4,\"networkIntegrity\":\"stopped\",\"dataPlaneHealthy\":false}"
++        vm.onForeground()
++        assertEquals(ProxyNetworkMatchService::class.java.name, awaitGuard().component!!.className)
++        finishForegroundRead()
++        assertFalse(vm.state.running)
++        assertFalse(vm.prefs.getBoolean("proxyRootWanted", true))
++        assertTrue(vm.prefs.getBoolean("networkMatchEnabled", false))
++        assertEquals("network-match", vm.prefs.getString("proxyRootSessionOwner", ""))
++        assertFalse(vm.state.continuityRootObserved)
++    }
++
++    @Test fun aFreshRootResultFinishingAfterBackgroundCannotRequestAForegroundService() {
++        drainServices(); prefsForceFreshHealth()
++        val entered = CountDownLatch(1); val old = gate()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/configs") {
++            entered.countDown(); old.hold(); normal(req)
++        } else normal(req) }
++        vm.onForeground()
++        eventually("Existing worker read has fresh Root authority and is awaiting actual HTTP") { entered.count == 0L }
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        vm.onBackground(); old.countDown(); awaitActions()
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++    }
++
++    @Test fun anActiveControlOperationCannotConsumeFreshForegroundAuthority() {
++        drainServices(); prefsForceFreshHealth()
++        fixture("operation", HxRunOp.Reload)
++        vm.onForeground()
++        var refreshed = false
++        vm.viewModelScope.launch { vm.refreshNow(); refreshed = true }
++        eventually("Actual operation-owned refresh finishes") { refreshed }
++        assertEquals(1, ControllerRunState90Shadows.RootStatus.reads)
++        vm.onBackground(); awaitActions()
++        assertNull(shadowOf(app).nextStartedService)
++        assertFalse(vm.prefs.contains("proxyContinuityResumeRequestedAt"))
++        assertEquals(HxRunOp.Reload, vm.operation)
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt

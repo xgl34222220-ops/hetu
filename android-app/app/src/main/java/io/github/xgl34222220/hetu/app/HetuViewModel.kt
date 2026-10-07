@@ -375,10 +375,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private fun beginProviderRead(): Long = (++requestSequence).also { latestProviderRead = it }
     private fun beginSiteRead(): Long = (++requestSequence).also { latestSiteRead = it }
 
+    private var foregroundActive = false
+    private var foregroundGeneration = 0L
+    private var continuityAttachedForeground = -1L
+
     fun onForeground() {
         reloadAppearance()
         if (pollJob?.isActive == true) return
-        controller.resumeContinuityFromForeground()
+        foregroundActive = true
+        foregroundGeneration++
         pollJob = viewModelScope.launch {
             launch {
                 delay(600)
@@ -401,6 +406,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun onBackground() {
+        foregroundActive = false
+        foregroundGeneration++
         pollJob?.cancel()
         pollJob = null
     }
@@ -442,6 +449,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
     suspend fun refreshNow(): ProxyComposeState? {
+        val observedForeground = foregroundGeneration
         var expectedState = state
         var expectedRequest = captureRuntimeRequest()
         val operationBefore = operation
@@ -452,6 +460,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             val next = repo.state()
             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
             if (superseded()) return null
+            // The existing worker status read supplies authority. A cached
+            // wanted/running hint alone must never start an Android guardian.
+            if (operationBefore == null && foregroundActive && foregroundGeneration == observedForeground &&
+                continuityAttachedForeground != observedForeground &&
+                controller.resumeContinuityFromForeground(next)) {
+                continuityAttachedForeground = observedForeground
+            }
             if (next.running != state.running ||
                 (next.corePid > 0 && state.corePid > 0 && next.corePid != state.corePid)) {
                 invalidateRuntimeRequests()
@@ -545,11 +560,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             }
 
             if (superseded()) return null
+            // Authority belongs to this worker result, never to retained UI state.
+            val displayed = next.copy(continuityRootObserved = false, continuityAutomationOnly = false,
+                continuityObservationTicket = -1L, continuityObservationSession = "",
+                continuityObservationNetworkEpoch = 0L)
             state = if (next.running && !next.panelReady) {
-                next.copy(groups = state.groups, connections = state.connections,
+                displayed.copy(groups = state.groups, connections = state.connections,
                     downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
                     memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
-            } else next
+            } else displayed
             expectedState = state
             if (next.running) startupError = null
             if (controllerSampleValid) {
