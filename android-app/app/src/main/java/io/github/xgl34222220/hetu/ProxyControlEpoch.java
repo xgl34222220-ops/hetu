@@ -11,6 +11,7 @@ final class ProxyControlEpoch {
         generation.incrementAndGet(); return true;
     }
     void unlock() { gate.unlock(); }
+    boolean isHeldByCurrentThread() { return gate.isHeldByCurrentThread(); }
     long observe() {
         if (gate.isLocked()) return -1;
         long ticket = generation.get();

@@ -159,6 +159,20 @@ internal class ProxyComposeController(context: Context) {
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { emptyMap() }
 
+        val continuityTicket = RootProxyManager.observationTicket()
+        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
+        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
+        fun currentObservation(publish: () -> Unit = {}): Boolean {
+            var matched = false
+            val accepted = RootProxyManager.publishObservation(continuityTicket) {
+                if (continuitySession == prefs.getString("proxyNetworkSessionId", "").orEmpty() &&
+                    continuityNetworkEpoch == prefs.getLong("proxyNetworkEpoch", 0L)) {
+                    publish()
+                    matched = true
+                }
+            }
+            return accepted && matched
+        }
         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
         val nowElapsed = android.os.SystemClock.elapsedRealtime()
         val lastStartupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
@@ -172,9 +186,7 @@ internal class ProxyComposeController(context: Context) {
             nowElapsed - lastHealth >= probeInterval
         var continuityRootObserved = false
         var continuityAutomationOnly = false
-        val continuityTicket = RootProxyManager.observationTicket()
-        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
-        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
+        var freshStatus = false
         val status = if (shouldProbeHealth) {
             try {
                 root.status().also { live ->
@@ -196,33 +208,7 @@ internal class ProxyComposeController(context: Context) {
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                         else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                     if (observedPid > 0) live.put("pid", observedPid)
-                    prefs.edit()
-                        .putLong("proxyRootHealthProbeElapsed", nowElapsed)
-                        .putInt("proxyRootObservedPid", observedPid)
-                        .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
-                        .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
-                        .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
-                        .putString("proxyRootEffectiveIpv6", live.optString("ipv6Mode", ""))
-                        .putBoolean("proxyRootIpv6Disabled", live.optBoolean("ipv6DisabledByHetu", false))
-                        .putBoolean("proxyRootIpv6DisableGuard", live.optBoolean("ipv6DisableGuard", false))
-                        .putString("proxyRootDnsMode", live.optString("dnsMode", ""))
-                        .putBoolean("proxyRootDnsIpv4Rule", live.optBoolean("dnsIpv4Rule", false))
-                        .putBoolean("proxyRootDnsIpv6Rule", live.optBoolean("dnsIpv6Rule", false))
-                        .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
-                        .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
-                        .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
-                        .putBoolean("proxyRootHealthObserved", live.opt("dataPlaneHealthy") is Boolean)
-                        // What 高级代理配置 shows under its switches: how DNS is really captured,
-                        // and what the last vendor-firewall pass and resource tuning did.
-                        .putString("proxyRootSystemDns", live.optString("systemDns", ""))
-                        .putString("proxyRootCoreGroup", live.optString("coreGroup", ""))
-                        .putBoolean("proxyRootDotGuard", live.optBoolean("dotGuard", false))
-                        .putString("proxyRootPrivateDns", live.optString("privateDns", ""))
-                        .putString("proxyRootVendorFirewall", live.optString("vendorFirewall", ""))
-                        .putString("proxyRootVendorFirewallDetail", live.optString("vendorFirewallDetail", ""))
-                        .putString("proxyRootTuning", live.optString("tuning", ""))
-                        .putBoolean("proxyRootStatusRunning", live.optBoolean("running", false))
-                        .apply()
+                    freshStatus = true
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) {
@@ -268,7 +254,42 @@ internal class ProxyComposeController(context: Context) {
         val healthObserved = !status.optBoolean("healthProbeFailed", false) &&
             if (shouldProbeHealth) status.opt("dataPlaneHealthy") is Boolean
             else prefs.getBoolean("proxyRootHealthObserved", false)
-        prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
+        // All observational writes share the read's original control/session/
+        // physical-network ownership. Keep this guard outside Root fallback catch:
+        // a superseded read must not turn into a cached running write.
+        if (!currentObservation {
+            if (freshStatus) {
+                val edit = prefs.edit().putBoolean("proxyRootRuntimeRunning", running)
+                    .putLong("proxyRootHealthProbeElapsed", nowElapsed)
+                    .putInt("proxyRootObservedPid", status.optInt("pid", 0))
+                    .putInt("proxyRootRuntimeSchema", status.optInt("runtimeSchema", 0))
+                    .putBoolean("proxyRootIpv4Rules", status.optBoolean("ipv4Rules", false))
+                    .putBoolean("proxyRootIpv6Rules", status.optBoolean("ipv6Rules", false))
+                    .putString("proxyRootEffectiveIpv6", status.optString("ipv6Mode", ""))
+                    .putBoolean("proxyRootIpv6Disabled", status.optBoolean("ipv6DisabledByHetu", false))
+                    .putBoolean("proxyRootIpv6DisableGuard", status.optBoolean("ipv6DisableGuard", false))
+                    .putString("proxyRootDnsMode", status.optString("dnsMode", ""))
+                    .putBoolean("proxyRootDnsIpv4Rule", status.optBoolean("dnsIpv4Rule", false))
+                    .putBoolean("proxyRootDnsIpv6Rule", status.optBoolean("dnsIpv6Rule", false))
+                    .putBoolean("proxyRootDnsListenerReady", status.optBoolean("dnsListenerReady", false))
+                    .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
+                    .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
+                    .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
+                    // What 高级代理配置 shows under its switches: how DNS is really captured,
+                    // and what the last vendor-firewall pass and resource tuning did.
+                    .putString("proxyRootSystemDns", status.optString("systemDns", ""))
+                    .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
+                    .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
+                    .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
+                    .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
+                    .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
+                    .putString("proxyRootTuning", status.optString("tuning", ""))
+                    .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
+                val livePort = status.optInt("controllerPort", 0)
+                if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
+                edit.apply()
+            } else prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
+        }) throw IOException("运行状态读取已被新的操作替代，请重试")
         var groups = emptyList<ProxyGroupUi>()
         var connections = emptyList<ProxyConnectionUi>()
         var panelReady = false
@@ -314,7 +335,7 @@ internal class ProxyComposeController(context: Context) {
                 }
             }
         }
-        ProxyComposeState(
+        val observed = ProxyComposeState(
             running = running,
             core = profile.core.label,
             mode = profile.mode.label,
@@ -370,6 +391,10 @@ internal class ProxyComposeController(context: Context) {
             continuityObservationSession = continuitySession,
             continuityObservationNetworkEpoch = continuityNetworkEpoch,
         )
+        // HTTP can finish after a same-configuration control transaction; that
+        // late readback also loses ownership even if the UI generation is unchanged.
+        if (!currentObservation()) throw IOException("运行状态读取已被新的操作替代，请重试")
+        observed
     }
 
     suspend fun ensureRuntimeFiles(): String = withContext(Dispatchers.IO) {

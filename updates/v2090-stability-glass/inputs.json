@@ -32,13 +32,14 @@
     "updates/v2089-runtime153/runtime.patch": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
     "UI92_RUNTIME146_INPUTS.json": "c14b5eac12dd01471580944cdee56f183f226f92d6495e7c68ea9473c1cdfdbf"
   },
-  "patchSha256": "b00fa5d492549ee39241ba13d3b478315bca62598bc0bdcfceadc093d90ecd32",
+  "patchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NativeHomePolish.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUi.java",
@@ -78,6 +79,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt"
   ],
@@ -86,11 +88,12 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java": "3635d55a388db184cd1d08c805a57d2642544db2973f5d42776de1a61e34691c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "27eb9a65a149a17fecbe8eb64434540b74cd43b05f84274d3930043227ac7b34",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NativeHomePolish.kt": "149a7001090b5e5f4bcb66d4ca7d4ed7a1b32f6883fbfda3ce61ff3937349dc7",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "478273797007d61ca46e04ee951553fe84c0988432ead18c7018c578860a4bf6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "4b5a6bd4ee974ec7726f2f430864f1d12863950ed675d68315a6c1899d21e90f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "89f919343d06f378cc4a3908616ab58d68811ce6d47983900c2e82c14cd3dd09",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "17bc176611252b07769dd90f1a59ce7ad094c4a9222b0d83fe430aa6e789d1ec",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyUi.java": "84e97c642798172e8be16e1c4b5b5eab9ef069b20aba65e3c9cb96ff6983ac67",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "c5d2fbe6bf03512dca85b62bb66648d091fbb2f4a77f910698098ed1c455784f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "2a1079749b9e5b21084e04c2b3c746f077193a3d8fce1727072ce04d9040b638",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootTproxyActivity.java": "bc28d682b4d788dbfc81a0090134d22a46800df7614fbe8b94779d3bdb956f0a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "d47023f5bc787f6c0bbf8a4fae5413cf896ac78492a98bfd04af5de90a1109a4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "4764792cae8527f65b1a6df5700e49239cb363f7ce954bdbcc50827a8c6e63cc",
@@ -119,13 +122,14 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "29dff2e2a769bae74c4c7fc11baf8edd04bae349f185907b12610b901bae4c14",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt": "64591afff3715e6f72c22e41a538c4a43469ec84ada85307853ee3eb5898ca0c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ContinuityForeground90Test.kt": "1f3268ca75c50786166c0732aec6dc19cc1f59d9b61c107be27fb1af01a2e678",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "f2335a18b9f26adf74f8faee0d158011a7b276966883c7ead5fec2d68e4a91da",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "2cfc4ee6d822d7f0858dbfed916c4f3ab21bb294aec16ab0d86b3d87791b1107",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "c9217ccdb3113f85feb73caeddffc535f55ed99c43ffe8f7e1c4120e9db3ee7b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "5fcc28d806c33543a48a6a8c79dfa133dbb543605edf2bdc196db2b92b291dec",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt": "d844f180696c0c5a32557f1f18a089e6155ec4f76d01cadfa28a111490fed06e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt": "9658806e45dbc28d56759ce51f892b9a45d9ddf87c4b32062a69715cf170cb87",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelRequestOwnershipTest.kt": "ad6d2fe110fe0c4c4418d6ff196b2ef64bbd5d5d557bd98a84ac87f495b26687",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyDashboardProbeSafetyTest.kt": "a7ecc51aa3e4e38eb2ce5d2b04769f8046cff7addc1d03c7b142d2c18eef368a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RecoveryThrottle90Test.kt": "0aebd74b9944b026cc1498daa7c5d7e4bd3a61226259d73aea4c5f559a78a50e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt": "b1f6b54d4409da9fbf88951e88d04fe314c01edc32ae5b99373cae79cbb9b00d",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt": "a9283ec98da1ac8d7c460278ab0c6cc815811efc4286bf2be3621b4266ec72e0",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/SelectionMutation90Test.kt": "8ce24aa92b001bba4b6f4a5e7c62d3361a0e910a26ff5ed827c720a33fc8da04"
   },
@@ -228,7 +232,6 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAsyncValue.java": "268d3385db70b59292c14962abcaa7d671712973553e2df3dae1b2ee3a1b8d94",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "b6e579759a02e68cb1408d5117911d375f77a9550634e9c4399d5d7a86a9ea8a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyContinuity.java": "3f1fd5eea80e21670cb0cab534d9cd135228f32c55fbd91b5ce5d9180e9d415b",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "4509a71b627dc348a32075205fd7c846a387dfe5e83ade145cb3d2b4a86c30cd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreActivity.kt": "a4d0f3ed7055e3871f54f691750eba59184a4dd458a74c23f0ee1d0f2f7290ba",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt": "4e74bda857a81c7b0da5efc621cad5e762f4c5f4983294acb4fa4704a02b12a2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreStore.java": "e918dceccc70d162321088d2bb5ba63b25947111ccb51ca43ac59167f81630cf",
@@ -1508,7 +1511,15 @@
         "confirmedRunningSupersedesAStoppedHintAndReadsTheController",
         "missingRunningFieldRetainsOnlyTheHintAndDoesNotClaimDataPlaneHealth",
         "failedRootObservationRetainsTheHintButRejectsOldHealthyCache",
-        "missingRunningWithoutARunningHintRemainsStopped"
+        "missingRunningWithoutARunningHintRemainsStopped",
+        "lateRootReadCannotOverwriteAReplacementControlSnapshot",
+        "lateRootReadCannotRewriteRuntimeAfterAnExplicitStop",
+        "lateFailedRootReadCannotRewriteReplacementThroughItsCachedFallback",
+        "unchangedRootObservationPublishesItsCompleteSnapshotAndLivePort",
+        "changedSessionRejectsRootObservationWithoutAControlTransaction",
+        "changedPhysicalEpochRejectsRootObservationWithoutAControlTransaction",
+        "aCachedReadDuringAnotherThreadsControlTransactionCannotPublishRunning",
+        "controllerHttpFinishingAfterSameConfigurationControlCannotReturnAnOldSnapshot"
       ]
     },
     "io.github.xgl34222220.hetu.CoreManagerConcept57Test": {
@@ -2015,6 +2026,15 @@
         "validationChangeOnSameNetworkInvalidatesPreviousObservation"
       ]
     },
+    "io.github.xgl34222220.hetu.RootObservationOwnership90Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt",
+      "methods": [
+        "unchangedActualManagerStatusAdoptsItsNormalizedLivePort",
+        "lateActualManagerStatusCannotReplaceANewerControlEndpoint",
+        "actualManagerStatusPreservesTheExistingSameThreadControlOwnerContract",
+        "anotherThreadsControlLockCannotLendStatusPublicationOwnership"
+      ]
+    },
     "io.github.xgl34222220.hetu.RuleRequestOwnership90Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt",
       "methods": [
@@ -2261,8 +2281,8 @@
       ]
     }
   },
-  "expectedUnitTests": 619,
-  "expectedTestXmlFiles": 63,
+  "expectedUnitTests": 631,
+  "expectedTestXmlFiles": 64,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesUnchanged": true,
   "signingUnchanged": true,

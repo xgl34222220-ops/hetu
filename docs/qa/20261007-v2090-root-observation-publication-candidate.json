@@ -1,0 +1,100 @@
+{
+  "recordedUtc": "2026-10-07T21:30:58.805217+00:00",
+  "candidateParent": "41ab3c0ce8bafaa9b607bd0c440571a4c0109839",
+  "precedingRunContinues": 37687804223,
+  "result": "SOURCE_AND_HOST_VERIFIED_ANDROID_PENDING",
+  "confirmedSourceRace": "Old Root reply can write PID/health/probe time/running and controllerPort after a new control or route owner; VM rejection occurs after these side effects. A successful stop with wanted=false is not claimed to necessarily revive the UI.",
+  "repair": "Guard every observation publication and final return by captured control ticket/session/epoch. Manager preserves live-port adoption and its true same-thread control owner path. No extra Root commands/locks/permissions, no bridge/reload/Root-script changes.",
+  "sourceSha256": {
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "2a1079749b9e5b21084e04c2b3c746f077193a3d8fce1727072ce04d9040b638",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "4b5a6bd4ee974ec7726f2f430864f1d12863950ed675d68315a6c1899d21e90f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "89f919343d06f378cc4a3908616ab58d68811ce6d47983900c2e82c14cd3dd09"
+  },
+  "layer": {
+    "requiredInputs": 403,
+    "changedInputs": 48,
+    "frozenInputs": 355,
+    "expectedUnitTests": 631,
+    "expectedTestXmlFiles": 64,
+    "patchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
+    "original545MethodIdentitiesRetained": true,
+    "independent36Unchanged": true
+  },
+  "regressions": {
+    "controllerOriginal5Retained": true,
+    "controllerNewLatchesAndHttp": 8,
+    "actualManagerReadonlyRootReplyFixtures": 4,
+    "addedAfter619": 12
+  },
+  "executedHere": [
+    "All effective compilation inputs matched source reconstructed from pinned original archive",
+    "16/16 evidence host guards passed",
+    "git diff --check passed"
+  ],
+  "pending": [
+    "Actual631/64 XML",
+    "lint",
+    "new APK/signing/payload validation",
+    "API35/36 original SyntheticWanted guard and navigation",
+    "host/native actual900 and physical delivery binding"
+  ],
+  "oldCisCancelled": false,
+  "phoneEvidence": false,
+  "apkEligibleForDelivery": false,
+  "sourceStopReport": {
+    "result": "SOURCE_STOP_NOT_ANDROID_EXECUTED",
+    "atUtc": "2026-10-07T21:30:30Z",
+    "headBeforeFix": "41ab3c0ce8bafaa9b607bd0c440571a4c0109839",
+    "oldMethods": 619,
+    "newMethods": 631,
+    "expectedXmlSuites": 64,
+    "sourceHashes": {
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "2a1079749b9e5b21084e04c2b3c746f077193a3d8fce1727072ce04d9040b638",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "4b5a6bd4ee974ec7726f2f430864f1d12863950ed675d68315a6c1899d21e90f",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "89f919343d06f378cc4a3908616ab58d68811ce6d47983900c2e82c14cd3dd09",
+      "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java": "c9217ccdb3113f85feb73caeddffc535f55ed99c43ffe8f7e1c4120e9db3ee7b",
+      "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt": "5fcc28d806c33543a48a6a8c79dfa133dbb543605edf2bdc196db2b92b291dec",
+      "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt": "b1f6b54d4409da9fbf88951e88d04fe314c01edc32ae5b99373cae79cbb9b00d"
+    },
+    "testMethods": [
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt",
+        "before": 5,
+        "after": 13,
+        "removed": [],
+        "added": [
+          "aCachedReadDuringAnotherThreadsControlTransactionCannotPublishRunning",
+          "changedPhysicalEpochRejectsRootObservationWithoutAControlTransaction",
+          "changedSessionRejectsRootObservationWithoutAControlTransaction",
+          "controllerHttpFinishingAfterSameConfigurationControlCannotReturnAnOldSnapshot",
+          "lateFailedRootReadCannotRewriteReplacementThroughItsCachedFallback",
+          "lateRootReadCannotOverwriteAReplacementControlSnapshot",
+          "lateRootReadCannotRewriteRuntimeAfterAnExplicitStop",
+          "unchangedRootObservationPublishesItsCompleteSnapshotAndLivePort"
+        ]
+      },
+      {
+        "file": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt",
+        "before": 0,
+        "after": 4,
+        "removed": [],
+        "added": [
+          "actualManagerStatusPreservesTheExistingSameThreadControlOwnerContract",
+          "anotherThreadsControlLockCannotLendStatusPublicationOwnership",
+          "lateActualManagerStatusCannotReplaceANewerControlEndpoint",
+          "unchangedActualManagerStatusAdoptsItsNormalizedLivePort"
+        ]
+      }
+    ],
+    "localDiffCheck": "PASS",
+    "rootPermissionOrIoExpansion": false,
+    "rootScriptChanged": false,
+    "vmContinuityRuleTestsChanged": false,
+    "managerContract": "Captures ticket/currentroute/actual same-thread control ownership before existing Root IO. Port adoption and whole return guarded by original ticket/currentroute; true owner runs adoption under original lock, another thread cannot borrow busy sentinel. Existing bridge reload and owned adblock refresh port adoption preserved without new Root reads.",
+    "controllerContract": "Fresh health/PID/probeElapsed/valid controllerPort/runtimeRunning atomically published under original ticket/currentroute. Failure/cached hint runtime writes use same publisher outside Root catch. Whole snapshot return rechecks original ticket/currentroute after HTTP; supersession ordinary IOException, not cancellation.",
+    "regressionScope": "Controlled Java/Kotlin Root reply latches, actual production CONTROL_LOCK transactions, actual loopback controller HTTP; RootOwnership uses actual RootManager.status with read-only RootBridge shadow only. No phone/su/deployedRoot execution.",
+    "actualRunBoundaries": "41ab3c sixth CI37687804223 continues without cancellation and predates this new fix. Its results cannot prove these new bytes; requires new canonical commit/exact CI.",
+    "fixtureCorrection": "Only new cached busy regression explicitly initializes normal bundled config selection before the full prefs equality snapshot; assertions and 631 method count unchanged."
+  },
+  "fixtureReview": "Only new busy-cache fixture explicitly initializes the normal bundled selected config before taking its all-preferences equality snapshot; whole equality and original5 methods retained."
+}

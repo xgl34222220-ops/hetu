@@ -945,6 +945,10 @@ final class RootProxyManager {
     }
 
     JSONObject status()throws Exception{
+        final boolean controlOwned=CONTROL_LOCK.isHeldByCurrentThread();
+        final long ticket=observationTicket();
+        final String networkSession=prefs.getString("proxyNetworkSessionId","");
+        final long networkEpoch=prefs.getLong("proxyNetworkEpoch",0L);
         JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
         if(state.optBoolean("running",false)){
             JSONObject health=networkHealth();
@@ -952,10 +956,20 @@ final class RootProxyManager {
                 state.put(key,health.get(key));
         }
         int livePort=liveControllerPort(state);
-        if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
-            prefs.edit().putInt("proxyControllerPort",livePort).apply();
-            state.put("controllerPort",livePort);
-        }
+        if(livePort>0)state.put("controllerPort",livePort);
+        final boolean[] current={false};
+        Runnable publish=()->{
+            if(!Objects.equals(networkSession,prefs.getString("proxyNetworkSessionId",""))
+                    ||networkEpoch!=prefs.getLong("proxyNetworkEpoch",0L))return;
+            if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort)
+                prefs.edit().putInt("proxyControllerPort",livePort).apply();
+            current[0]=true;
+        };
+        // Existing operation-owned reads stay inside their original lock. A
+        // different thread's transaction never lends ownership to an observer.
+        if(controlOwned&&CONTROL_LOCK.isHeldByCurrentThread())publish.run();
+        else publishObservation(ticket,publish);
+        if(!current[0])throw new IOException("运行状态读取已被新的操作替代，请重试");
         return state;
     }
 

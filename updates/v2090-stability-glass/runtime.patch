@@ -182,7 +182,7 @@ index b936fda..ec78b9f 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 6b33725..5168ac2 100644
+index 6b33725..4f004b9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -113,7 +113,15 @@ internal data class ProxyComposeState(
@@ -212,18 +212,62 @@ index 6b33725..5168ac2 100644
 
      suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
-@@ -158,11 +170,35 @@ internal class ProxyComposeController(context: Context) {
+@@ -147,6 +159,20 @@ internal class ProxyComposeController(context: Context) {
+         } catch (cancel: CancellationException) { throw cancel }
+         catch (_: Exception) { emptyMap() }
+
++        val continuityTicket = RootProxyManager.observationTicket()
++        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
++        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
++        fun currentObservation(publish: () -> Unit = {}): Boolean {
++            var matched = false
++            val accepted = RootProxyManager.publishObservation(continuityTicket) {
++                if (continuitySession == prefs.getString("proxyNetworkSessionId", "").orEmpty() &&
++                    continuityNetworkEpoch == prefs.getLong("proxyNetworkEpoch", 0L)) {
++                    publish()
++                    matched = true
++                }
++            }
++            return accepted && matched
++        }
+         val fastRunning = ProxyStatusBridge.rootProxyRunning(app)
+         val nowElapsed = android.os.SystemClock.elapsedRealtime()
+         val lastStartupAt = prefs.getLong("proxyRootLastStartupAt", 0L)
+@@ -158,39 +184,37 @@ internal class ProxyComposeController(context: Context) {
          // boot must never suppress the first real status verification.
          val shouldProbeHealth = !fastRunning || lastHealth <= 0L || nowElapsed < lastHealth ||
              nowElapsed - lastHealth >= probeInterval
 +        var continuityRootObserved = false
 +        var continuityAutomationOnly = false
-+        val continuityTicket = RootProxyManager.observationTicket()
-+        val continuitySession = prefs.getString("proxyNetworkSessionId", "").orEmpty()
-+        val continuityNetworkEpoch = prefs.getLong("proxyNetworkEpoch", 0L)
++        var freshStatus = false
          val status = if (shouldProbeHealth) {
              try {
                  root.status().also { live ->
+-                    prefs.edit()
+-                        .putLong("proxyRootHealthProbeElapsed", nowElapsed)
+-                        .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
+-                        .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
+-                        .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
+-                        .putString("proxyRootEffectiveIpv6", live.optString("ipv6Mode", ""))
+-                        .putBoolean("proxyRootIpv6Disabled", live.optBoolean("ipv6DisabledByHetu", false))
+-                        .putBoolean("proxyRootIpv6DisableGuard", live.optBoolean("ipv6DisableGuard", false))
+-                        .putString("proxyRootDnsMode", live.optString("dnsMode", ""))
+-                        .putBoolean("proxyRootDnsIpv4Rule", live.optBoolean("dnsIpv4Rule", false))
+-                        .putBoolean("proxyRootDnsIpv6Rule", live.optBoolean("dnsIpv6Rule", false))
+-                        .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
+-                        .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
+-                        .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
+-                        // What 高级代理配置 shows under its switches: how DNS is really captured,
+-                        // and what the last vendor-firewall pass and resource tuning did.
+-                        .putString("proxyRootSystemDns", live.optString("systemDns", ""))
+-                        .putString("proxyRootCoreGroup", live.optString("coreGroup", ""))
+-                        .putBoolean("proxyRootDotGuard", live.optBoolean("dotGuard", false))
+-                        .putString("proxyRootPrivateDns", live.optString("privateDns", ""))
+-                        .putString("proxyRootVendorFirewall", live.optString("vendorFirewall", ""))
+-                        .putString("proxyRootVendorFirewallDetail", live.optString("vendorFirewallDetail", ""))
+-                        .putString("proxyRootTuning", live.optString("tuning", ""))
+-                        .putBoolean("proxyRootStatusRunning", live.optBoolean("running", false))
+-                        .apply()
 +                    // Only this successful current Root/script read is authority.
 +                    // The watchdog clears a dead PID and, without kill switch,
 +                    // its session too: stopped/upgrade-required must retain the
@@ -242,21 +286,9 @@ index 6b33725..5168ac2 100644
 +                    val observedPid = if (!live.optBoolean("running", fastRunning)) 0
 +                        else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
 +                    if (observedPid > 0) live.put("pid", observedPid)
-                     prefs.edit()
-                         .putLong("proxyRootHealthProbeElapsed", nowElapsed)
-+                        .putInt("proxyRootObservedPid", observedPid)
-                         .putInt("proxyRootRuntimeSchema", live.optInt("runtimeSchema", 0))
-                         .putBoolean("proxyRootIpv4Rules", live.optBoolean("ipv4Rules", false))
-                         .putBoolean("proxyRootIpv6Rules", live.optBoolean("ipv6Rules", false))
-@@ -175,6 +211,7 @@ internal class ProxyComposeController(context: Context) {
-                         .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
-                         .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
-                         .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
-+                        .putBoolean("proxyRootHealthObserved", live.opt("dataPlaneHealthy") is Boolean)
-                         // What 高级代理配置 shows under its switches: how DNS is really captured,
-                         // and what the last vendor-firewall pass and resource tuning did.
-                         .putString("proxyRootSystemDns", live.optString("systemDns", ""))
-@@ -191,6 +228,7 @@ internal class ProxyComposeController(context: Context) {
++                    freshStatus = true
+                 }
+             } catch (cancel: CancellationException) { throw cancel }
              catch (error: Exception) {
                  if (fastRunning) JSONObject()
                      .put("running", true)
@@ -264,7 +296,7 @@ index 6b33725..5168ac2 100644
                      .put("healthProbeFailed", true)
                      .put("message", userSafeRuntimeMessage(error.message))
                      .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
-@@ -210,6 +248,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -210,6 +234,7 @@ internal class ProxyComposeController(context: Context) {
          } else {
              JSONObject()
                  .put("running", true)
@@ -272,21 +304,67 @@ index 6b33725..5168ac2 100644
                  .put("runtimeSchema", prefs.getInt("proxyRootRuntimeSchema", 0))
                  .put("ipv4Rules", prefs.getBoolean("proxyRootIpv4Rules", false))
                  .put("ipv6Rules", prefs.getBoolean("proxyRootIpv6Rules", false))
-@@ -223,7 +262,12 @@ internal class ProxyComposeController(context: Context) {
+@@ -223,8 +248,48 @@ internal class ProxyComposeController(context: Context) {
                  .put("watchdog", prefs.getBoolean("proxyRootWatchdog", false))
                  .put("dataPlaneHealthy", prefs.getBoolean("proxyRootDataPlaneHealthy", false))
          }
 -        val running = status.optBoolean("running", fastRunning) || fastRunning
+-        prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
 +        // A completed status observation supersedes the cached fast hint, including
 +        // a confirmed stopped core. Missing/failed observations keep only the hint.
 +        val running = status.optBoolean("running", fastRunning)
 +        val healthObserved = !status.optBoolean("healthProbeFailed", false) &&
 +            if (shouldProbeHealth) status.opt("dataPlaneHealthy") is Boolean
 +            else prefs.getBoolean("proxyRootHealthObserved", false)
-         prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
++        // All observational writes share the read's original control/session/
++        // physical-network ownership. Keep this guard outside Root fallback catch:
++        // a superseded read must not turn into a cached running write.
++        if (!currentObservation {
++            if (freshStatus) {
++                val edit = prefs.edit().putBoolean("proxyRootRuntimeRunning", running)
++                    .putLong("proxyRootHealthProbeElapsed", nowElapsed)
++                    .putInt("proxyRootObservedPid", status.optInt("pid", 0))
++                    .putInt("proxyRootRuntimeSchema", status.optInt("runtimeSchema", 0))
++                    .putBoolean("proxyRootIpv4Rules", status.optBoolean("ipv4Rules", false))
++                    .putBoolean("proxyRootIpv6Rules", status.optBoolean("ipv6Rules", false))
++                    .putString("proxyRootEffectiveIpv6", status.optString("ipv6Mode", ""))
++                    .putBoolean("proxyRootIpv6Disabled", status.optBoolean("ipv6DisabledByHetu", false))
++                    .putBoolean("proxyRootIpv6DisableGuard", status.optBoolean("ipv6DisableGuard", false))
++                    .putString("proxyRootDnsMode", status.optString("dnsMode", ""))
++                    .putBoolean("proxyRootDnsIpv4Rule", status.optBoolean("dnsIpv4Rule", false))
++                    .putBoolean("proxyRootDnsIpv6Rule", status.optBoolean("dnsIpv6Rule", false))
++                    .putBoolean("proxyRootDnsListenerReady", status.optBoolean("dnsListenerReady", false))
++                    .putBoolean("proxyRootWatchdog", status.optBoolean("watchdog", false))
++                    .putBoolean("proxyRootDataPlaneHealthy", status.optBoolean("dataPlaneHealthy", false))
++                    .putBoolean("proxyRootHealthObserved", status.opt("dataPlaneHealthy") is Boolean)
++                    // What 高级代理配置 shows under its switches: how DNS is really captured,
++                    // and what the last vendor-firewall pass and resource tuning did.
++                    .putString("proxyRootSystemDns", status.optString("systemDns", ""))
++                    .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
++                    .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
++                    .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
++                    .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
++                    .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
++                    .putString("proxyRootTuning", status.optString("tuning", ""))
++                    .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
++                val livePort = status.optInt("controllerPort", 0)
++                if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
++                edit.apply()
++            } else prefs.edit().putBoolean("proxyRootRuntimeRunning", running).apply()
++        }) throw IOException("运行状态读取已被新的操作替代，请重试")
          var groups = emptyList<ProxyGroupUi>()
          var connections = emptyList<ProxyConnectionUi>()
-@@ -317,8 +361,14 @@ internal class ProxyComposeController(context: Context) {
+         var panelReady = false
+@@ -270,7 +335,7 @@ internal class ProxyComposeController(context: Context) {
+                 }
+             }
+         }
+-        ProxyComposeState(
++        val observed = ProxyComposeState(
+             running = running,
+             core = profile.core.label,
+             mode = profile.mode.label,
+@@ -317,9 +382,19 @@ internal class ProxyComposeController(context: Context) {
              dnsIpv6Rule = status.optBoolean("dnsIpv6Rule", false),
              dnsListenerReady = status.optBoolean("dnsListenerReady", false),
              watchdog = status.optBoolean("watchdog", false),
@@ -300,8 +378,25 @@ index 6b33725..5168ac2 100644
 +            continuityObservationSession = continuitySession,
 +            continuityObservationNetworkEpoch = continuityNetworkEpoch,
          )
++        // HTTP can finish after a same-configuration control transaction; that
++        // late readback also loses ownership even if the UI generation is unchanged.
++        if (!currentObservation()) throw IOException("运行状态读取已被新的操作替代，请重试")
++        observed
      }
 
+     suspend fun ensureRuntimeFiles(): String = withContext(Dispatchers.IO) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
+index 8a643bc..76318e4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
+@@ -11,6 +11,7 @@ final class ProxyControlEpoch {
+         generation.incrementAndGet(); return true;
+     }
+     void unlock() { gate.unlock(); }
++    boolean isHeldByCurrentThread() { return gate.isHeldByCurrentThread(); }
+     long observe() {
+         if (gate.isLocked()) return -1;
+         long ticket = generation.get();
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 index e968e48..60c990f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
@@ -700,10 +795,42 @@ index da0f6c2..639e117 100644
          else w.getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_LAYOUT_STABLE|View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN|View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION|(dark?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR));
          shell.setOnApplyWindowInsetsListener((v,i)->{if(Build.VERSION.SDK_INT>=30){android.graphics.Insets b=i.getInsets(WindowInsets.Type.systemBars()|WindowInsets.Type.displayCutout());android.graphics.Insets k=i.getInsets(WindowInsets.Type.ime());v.setPadding(b.left,b.top,b.right,Math.max(b.bottom,k.bottom));}else v.setPadding(i.getSystemWindowInsetLeft(),i.getSystemWindowInsetTop(),i.getSystemWindowInsetRight(),i.getSystemWindowInsetBottom());return i;});
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 8a47f8c..ece35c8 100644
+index 8a47f8c..9cd82da 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-@@ -959,6 +959,34 @@ final class RootProxyManager {
+@@ -945,6 +945,10 @@ final class RootProxyManager {
+     }
+
+     JSONObject status()throws Exception{
++        final boolean controlOwned=CONTROL_LOCK.isHeldByCurrentThread();
++        final long ticket=observationTicket();
++        final String networkSession=prefs.getString("proxyNetworkSessionId","");
++        final long networkEpoch=prefs.getLong("proxyNetworkEpoch",0L);
+         JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false).put("state","idle").put("message","尚未启动"));
+         if(state.optBoolean("running",false)){
+             JSONObject health=networkHealth();
+@@ -952,13 +956,51 @@ final class RootProxyManager {
+                 state.put(key,health.get(key));
+         }
+         int livePort=liveControllerPort(state);
+-        if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort){
+-            prefs.edit().putInt("proxyControllerPort",livePort).apply();
+-            state.put("controllerPort",livePort);
+-        }
++        if(livePort>0)state.put("controllerPort",livePort);
++        final boolean[] current={false};
++        Runnable publish=()->{
++            if(!Objects.equals(networkSession,prefs.getString("proxyNetworkSessionId",""))
++                    ||networkEpoch!=prefs.getLong("proxyNetworkEpoch",0L))return;
++            if(livePort>0&&prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT)!=livePort)
++                prefs.edit().putInt("proxyControllerPort",livePort).apply();
++            current[0]=true;
++        };
++        // Existing operation-owned reads stay inside their original lock. A
++        // different thread's transaction never lends ownership to an observer.
++        if(controlOwned&&CONTROL_LOCK.isHeldByCurrentThread())publish.run();
++        else publishObservation(ticket,publish);
++        if(!current[0])throw new IOException("运行状态读取已被新的操作替代，请重试");
          return state;
      }
 
@@ -738,7 +865,7 @@ index 8a47f8c..ece35c8 100644
      private void ensureContinuityService(boolean running){
          try{
              Intent intent=new Intent(context,ProxyNetworkMatchService.class);
-@@ -987,6 +1015,7 @@ final class RootProxyManager {
+@@ -987,6 +1029,7 @@ final class RootProxyManager {
          Map<String,?> values=prefs.getAll();
          for(String key:new String[]{"proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyRootWanted",
                  "proxyRootRuntimeRunning","proxyRootRuntimeRefreshPending","proxyRootBootError",
@@ -2309,13 +2436,15 @@ index 0000000..71bd148
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java
 new file mode 100644
-index 0000000..39c8409
+index 0000000..04c8b40
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Shadows.java
-@@ -0,0 +1,23 @@
+@@ -0,0 +1,36 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
++import java.util.concurrent.CountDownLatch;
++import java.util.concurrent.TimeUnit;
 +import org.json.JSONObject;
 +import org.robolectric.annotation.Implementation;
 +import org.robolectric.annotation.Implements;
@@ -2325,27 +2454,40 @@ index 0000000..39c8409
 +public final class ControllerRunState90Shadows {
 +    @Implements(value = RootProxyManager.class, isInAndroidSdk = false)
 +    public static class RootStatus {
-+        public static String reply = "{}";
-+        public static boolean fail;
-+        public static int reads;
-+        @Resetter public static void reset() { reply = "{}"; fail = false; reads = 0; }
++        public static volatile String reply = "{}";
++        public static volatile boolean fail;
++        public static volatile int reads;
++        public static volatile CountDownLatch entered;
++        public static volatile CountDownLatch gate;
++        @Resetter public static void reset() {
++            if (gate != null) gate.countDown();
++            reply = "{}"; fail = false; reads = 0; entered = null; gate = null;
++        }
 +        @Implementation public JSONObject status() throws Exception {
++            String captured = reply;
++            boolean capturedFailure = fail;
 +            reads++;
-+            if (fail) throw new IOException("运行状态暂时无法确认");
-+            return new JSONObject(reply);
++            CountDownLatch capturedEntered = entered, capturedGate = gate;
++            if (capturedEntered != null) capturedEntered.countDown();
++            if (capturedGate != null && !capturedGate.await(8, TimeUnit.SECONDS))
++                throw new AssertionError("Controlled Root observation was not released");
++            if (capturedFailure) throw new IOException("运行状态暂时无法确认");
++            return new JSONObject(captured);
 +        }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt
 new file mode 100644
-index 0000000..ede43d0
+index 0000000..cf574ea
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerRunState90Test.kt
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,294 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
 +import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
 +import kotlinx.coroutines.runBlocking
 +import okhttp3.mockwebserver.Dispatcher
 +import okhttp3.mockwebserver.MockResponse
@@ -2359,7 +2501,11 @@ index 0000000..ede43d0
 +import org.robolectric.RobolectricTestRunner
 +import org.robolectric.annotation.Config
 +import org.robolectric.shadows.ShadowSystemClock
++import org.robolectric.util.ReflectionHelpers
++import java.io.IOException
 +import java.time.Duration
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
 +
 +@RunWith(RobolectricTestRunner::class)
 +@Config(sdk = [35], application = Application::class, shadows = [
@@ -2395,6 +2541,7 @@ index 0000000..ede43d0
 +    }
 +
 +    @After fun finish() {
++        ControllerRunState90Shadows.RootStatus.gate?.countDown()
 +        server.shutdown()
 +        assertEquals("No fixture may mutate Root", 0, PanelActionRuntimeShadows.NoRoot.calls)
 +    }
@@ -2469,6 +2616,164 @@ index 0000000..ede43d0
 +        assertFalse(observed.healthObserved)
 +        assertFalse(prefs.getBoolean("proxyRootRuntimeRunning", true))
 +        assertEquals(0, server.requestCount)
++    }
++
++    private val control get() = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
++    private val replyA = "{\"ok\":true,\"running\":true,\"pid\":77,\"runtimeSchema\":4,\"ipv4Rules\":true,\"dnsMode\":\"a\",\"dataPlaneHealthy\":true,\"controllerPort\":29091}"
++    private val replyB = "{\"ok\":true,\"running\":true,\"pid\":88,\"runtimeSchema\":4,\"ipv4Rules\":false,\"dnsMode\":\"b\",\"dataPlaneHealthy\":false,\"controllerPort\":29107}"
++    private fun heldReply(failure: Boolean = false): Pair<CountDownLatch, CountDownLatch> {
++        val entered = CountDownLatch(1); val release = CountDownLatch(1)
++        ControllerRunState90Shadows.RootStatus.reply = replyA
++        ControllerRunState90Shadows.RootStatus.fail = failure
++        ControllerRunState90Shadows.RootStatus.entered = entered
++        ControllerRunState90Shadows.RootStatus.gate = release
++        return entered to release
++    }
++    private fun writeReplacement(stopped: Boolean = false, changeSession: Boolean = true) {
++        control.lock()
++        try {
++            val edit = prefs.edit().putBoolean("proxyRootWanted", !stopped)
++                .putBoolean("proxyRootRuntimeRunning", !stopped).putInt("proxyRootObservedPid", if (stopped) 0 else 88)
++                .putLong("proxyRootHealthProbeElapsed", 777L).putBoolean("proxyRootHealthObserved", false)
++                .putBoolean("proxyRootDataPlaneHealthy", false).putBoolean("proxyRootStatusRunning", !stopped)
++                .putInt("proxyRootRuntimeSchema", 4).putBoolean("proxyRootIpv4Rules", false)
++                .putString("proxyRootDnsMode", "b").putInt("proxyControllerPort", 29107)
++            if (changeSession) edit.putString("proxyNetworkSessionId", "replacement").putLong("proxyNetworkEpoch", 9L)
++            assertTrue(edit.commit())
++        } finally { control.unlock() }
++    }
++    private fun assertSuperseded(result: Result<ProxyComposeState>) {
++        assertTrue("Late observation must be rejected, not published as fallback", result.exceptionOrNull() is IOException)
++    }
++    private suspend fun nextReplacementRead(controller: ProxyComposeController, stopped: Boolean = false) {
++        ControllerRunState90Shadows.RootStatus.entered = null
++        ControllerRunState90Shadows.RootStatus.gate = null
++        ControllerRunState90Shadows.RootStatus.fail = false
++        ControllerRunState90Shadows.RootStatus.reply = if (stopped) "{\"ok\":true,\"running\":false,\"runtimeSchema\":4,\"networkIntegrity\":\"stopped\"}" else replyB
++        prefs.edit().putLong("proxyRootHealthProbeElapsed", 0L).commit()
++        val next = controller.state()
++        assertEquals(!stopped, next.running)
++        assertEquals(if (stopped) 0 else 88, next.corePid)
++        assertEquals(!stopped, prefs.getBoolean("proxyRootRuntimeRunning", stopped))
++    }
++
++    @Test fun lateRootReadCannotOverwriteAReplacementControlSnapshot() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply()
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            writeReplacement(); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all)
++            assertEquals(0, server.requestCount)
++            nextReplacementRead(controller)
++        } finally { release.countDown() }
++    }
++
++    @Test fun lateRootReadCannotRewriteRuntimeAfterAnExplicitStop() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply()
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            writeReplacement(stopped = true); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all)
++            assertFalse(ProxyStatusBridge.rootProxyRunning(app))
++            assertEquals(0, server.requestCount)
++            nextReplacementRead(controller, stopped = true)
++        } finally { release.countDown() }
++    }
++
++    @Test fun lateFailedRootReadCannotRewriteReplacementThroughItsCachedFallback() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply(failure = true)
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            writeReplacement(); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all)
++            assertEquals(0, server.requestCount)
++            nextReplacementRead(controller)
++        } finally { release.countDown() }
++    }
++
++    @Test fun unchangedRootObservationPublishesItsCompleteSnapshotAndLivePort() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply()
++        val pending = async(Dispatchers.IO) { controller.state() }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS)); release.countDown()
++            val next = pending.await()
++            assertTrue(next.running); assertTrue(next.panelReady); assertTrue(next.dataPlaneHealthy)
++            assertEquals(77, prefs.getInt("proxyRootObservedPid", 0))
++            assertEquals(29091, prefs.getInt("proxyControllerPort", 0))
++            assertEquals("a", prefs.getString("proxyRootDnsMode", ""))
++            assertTrue(prefs.getLong("proxyRootHealthProbeElapsed", 0L) > 0L)
++            assertEquals(4, server.requestCount)
++        } finally { release.countDown() }
++    }
++
++    @Test fun changedSessionRejectsRootObservationWithoutAControlTransaction() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply()
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            prefs.edit().putString("proxyNetworkSessionId", "replacement").commit(); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all); assertEquals(0, server.requestCount)
++            nextReplacementRead(controller)
++        } finally { release.countDown() }
++    }
++
++    @Test fun changedPhysicalEpochRejectsRootObservationWithoutAControlTransaction() = runBlocking {
++        val controller = ProxyComposeController(app); val (entered, release) = heldReply()
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            prefs.edit().putLong("proxyNetworkEpoch", 9L).commit(); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all); assertEquals(0, server.requestCount)
++            nextReplacementRead(controller)
++        } finally { release.countDown() }
++    }
++
++    @Test fun aCachedReadDuringAnotherThreadsControlTransactionCannotPublishRunning() = runBlocking {
++        ProxyConfigLibrary(app).selected(ProxyRuntimeProfile.Core.MIHOMO)
++        prefs.edit().putLong("proxyRootHealthProbeElapsed", android.os.SystemClock.elapsedRealtime())
++            .putInt("proxyRootObservedPid", 88).commit()
++        val before = prefs.all; val controller = ProxyComposeController(app)
++        control.lock()
++        try {
++            assertSuperseded(async(Dispatchers.IO) { runCatching { controller.state() } }.await())
++            assertEquals(before, prefs.all); assertEquals(0, ControllerRunState90Shadows.RootStatus.reads)
++            assertEquals(0, server.requestCount)
++        } finally { control.unlock() }
++        assertTrue(controller.state().panelReady)
++        assertEquals(0, ControllerRunState90Shadows.RootStatus.reads)
++    }
++
++    @Test fun controllerHttpFinishingAfterSameConfigurationControlCannotReturnAnOldSnapshot() = runBlocking {
++        val entered = CountDownLatch(1); val release = CountDownLatch(1)
++        val original = server.dispatcher
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                if (request.path == "/configs") {
++                    entered.countDown(); check(release.await(8, TimeUnit.SECONDS))
++                }
++                return original.dispatch(request)
++            }
++        }
++        ControllerRunState90Shadows.RootStatus.reply = replyA
++        val controller = ProxyComposeController(app)
++        val pending = async(Dispatchers.IO) { runCatching { controller.state() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            assertEquals(77, prefs.getInt("proxyRootObservedPid", 0))
++            writeReplacement(changeSession = false); val before = prefs.all
++            release.countDown(); assertSuperseded(pending.await())
++            assertEquals(before, prefs.all)
++            assertEquals(4, server.requestCount)
++            nextReplacementRead(controller)
++        } finally { release.countDown() }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DnsTakeoverProbe90Test.kt
@@ -3138,6 +3443,125 @@ index 0000000..88d9225
 +        assertFalse(prefs.contains("proxyAutoRecoveryAttempt"))
 +        RecoveryThrottleBridge90Shadow.processAnswer = "0"; maintain()
 +        assertEquals(1, RecoveryThrottleManager90Shadow.attempts)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt
+new file mode 100644
+index 0000000..d4e1f18
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RootObservationOwnership90Test.kt
+@@ -0,0 +1,113 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.Implementation
++import org.robolectric.annotation.Implements
++import org.robolectric.util.ReflectionHelpers
++import java.io.IOException
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++
++/** Only the read-only Root command reply is isolated. Real status, current
++ * control ownership and endpoint adoption run unchanged; no real su is used. */
++@Implements(value = RootBridge::class, isInAndroidSdk = false)
++class RootObservationBridge90Shadow {
++    companion object {
++        @Volatile var reply = "{}"
++        @Volatile var entered: CountDownLatch? = null
++        @Volatile var gate: CountDownLatch? = null
++        val commands = Collections.synchronizedList(mutableListOf<String>())
++        @JvmStatic @Implementation fun rootShell(context: Context, command: String, timeout: Long): RootBridge.Result {
++            check(command.contains("hetu-root.sh") && command.contains("'status'")) {
++                "This fixture permits the existing read-only status command only"
++            }
++            val captured = reply
++            val capturedEntered = entered; val capturedGate = gate
++            commands += command
++            capturedEntered?.countDown()
++            check(capturedGate == null || capturedGate.await(8, TimeUnit.SECONDS))
++            return RootBridge.Result(0, captured)
++        }
++    }
++}
++
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [RootObservationBridge90Shadow::class])
++class RootObservationOwnership90Test {
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private val control get() = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
++    private val worker = Executors.newSingleThreadExecutor()
++    @Before fun prepare() {
++        prefs.edit().clear().putInt("proxyControllerPort", 29107)
++            .putString("proxyNetworkSessionId", "existing").putLong("proxyNetworkEpoch", 1L).commit()
++        RootObservationBridge90Shadow.reply = "{\"ok\":true,\"running\":false,\"runtimeSchema\":4,\"networkIntegrity\":\"stopped\",\"controllerPort\":29091}"
++        RootObservationBridge90Shadow.entered = null; RootObservationBridge90Shadow.gate = null
++        RootObservationBridge90Shadow.commands.clear()
++    }
++    @After fun finish() {
++        RootObservationBridge90Shadow.gate?.countDown()
++        worker.shutdownNow()
++        assertTrue(worker.awaitTermination(5, TimeUnit.SECONDS))
++        assertEquals("Only the existing status read may execute", 1, RootObservationBridge90Shadow.commands.size)
++    }
++
++    @Test fun unchangedActualManagerStatusAdoptsItsNormalizedLivePort() {
++        val reply = worker.submit<JSONObject> { RootProxyManager(app).status() }.get(5, TimeUnit.SECONDS)
++        assertEquals(29091, reply.getInt("controllerPort"))
++        assertEquals(29091, prefs.getInt("proxyControllerPort", 0))
++    }
++
++    @Test fun lateActualManagerStatusCannotReplaceANewerControlEndpoint() {
++        val entered = CountDownLatch(1); val release = CountDownLatch(1)
++        RootObservationBridge90Shadow.entered = entered; RootObservationBridge90Shadow.gate = release
++        val pending = worker.submit<Result<JSONObject>> { runCatching { RootProxyManager(app).status() } }
++        try {
++            assertTrue(entered.await(5, TimeUnit.SECONDS))
++            control.lock()
++            try {
++                prefs.edit().putInt("proxyControllerPort", 29108).putString("proxyNetworkSessionId", "replacement")
++                    .putLong("proxyNetworkEpoch", 9L).commit()
++            } finally { control.unlock() }
++            val before = prefs.all
++            release.countDown()
++            assertTrue(pending.get(5, TimeUnit.SECONDS).exceptionOrNull() is IOException)
++            assertEquals(before, prefs.all)
++        } finally { release.countDown() }
++    }
++
++    @Test fun actualManagerStatusPreservesTheExistingSameThreadControlOwnerContract() {
++        val reply = worker.submit<JSONObject> {
++            control.lock()
++            try {
++                assertEquals("observe retains its original busy sentinel", -1L, RootProxyManager.observationTicket())
++                RootProxyManager(app).status()
++            } finally { control.unlock() }
++        }.get(5, TimeUnit.SECONDS)
++        assertEquals(29091, reply.getInt("controllerPort"))
++        assertEquals(29091, prefs.getInt("proxyControllerPort", 0))
++    }
++
++    @Test fun anotherThreadsControlLockCannotLendStatusPublicationOwnership() {
++        val before = prefs.all
++        control.lock()
++        try {
++            val result = worker.submit<Result<JSONObject>> { runCatching { RootProxyManager(app).status() } }
++                .get(5, TimeUnit.SECONDS)
++            assertTrue(result.exceptionOrNull() is IOException)
++            assertEquals(before, prefs.all)
++        } finally { control.unlock() }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/RuleRequestOwnership90Test.kt
