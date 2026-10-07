@@ -175,6 +175,16 @@ internal class ProxyComposeController(context: Context) {
                         .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
                         .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
                         .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
+                        // What 高级代理配置 shows under its switches: how DNS is really captured,
+                        // and what the last vendor-firewall pass and resource tuning did.
+                        .putString("proxyRootSystemDns", live.optString("systemDns", ""))
+                        .putString("proxyRootCoreGroup", live.optString("coreGroup", ""))
+                        .putBoolean("proxyRootDotGuard", live.optBoolean("dotGuard", false))
+                        .putString("proxyRootPrivateDns", live.optString("privateDns", ""))
+                        .putString("proxyRootVendorFirewall", live.optString("vendorFirewall", ""))
+                        .putString("proxyRootVendorFirewallDetail", live.optString("vendorFirewallDetail", ""))
+                        .putString("proxyRootTuning", live.optString("tuning", ""))
+                        .putBoolean("proxyRootStatusRunning", live.optBoolean("running", false))
                         .apply()
                 }
             } catch (cancel: CancellationException) { throw cancel }

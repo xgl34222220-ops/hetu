@@ -42,6 +42,7 @@ import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeRowPressTint
 import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.tools.ToolsIcons
@@ -67,6 +68,8 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
+    // What the running core last reported. Cached by the status probe; blank on a runtime that predates these fields.
+    val live = remember(revision) { OtherLiveState.load(prefs) }
 
     fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
@@ -76,7 +79,11 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
         item(key = "abilities") {
             SettingsSection {
                 SettingsGroup(title = ht("代理能力")) {
-                    OtherSwitch("性能模式", prefs.getBoolean("proxyPerformanceMode", false), icon = PanelIcons.Gauge) { putBool("proxyPerformanceMode", it) }
+                    val performance = prefs.getBoolean("proxyPerformanceMode", false)
+                    OtherSwitch(
+                        "性能模式", performance, icon = PanelIcons.Gauge,
+                        subtitle = tuningNote(ht("提高核心进程的调度优先级"), live.tuning("priority").takeIf { performance }),
+                    ) { putBool("proxyPerformanceMode", it) }
                     SettingsDivider()
                     OtherSwitch("QUIC", !profile.quicBlocked, icon = PanelIcons.Zap) { putBool("proxyQuicBlocked", !it) }
                     SettingsDivider()
@@ -103,6 +110,19 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         ProxyRuntimeProfile.DnsHijack.OFF -> ht("关闭")
                         else -> "TPROXY"
                     }, dropdown = true, compact = true, icon = PanelIcons.Globe) { choice = "dns" }
+                    SettingsDivider()
+                    // The system resolver runs as root, the identity the rules used to exempt wholesale.
+                    val resolver = prefs.getBoolean("proxyDnsSystemResolver", true)
+                    OtherSwitch(
+                        "接管系统解析", resolver, enabled = dnsEnabled && protocolControl, icon = PanelIcons.ShieldCheck,
+                        subtitle = when {
+                            !resolver -> ht("已关闭：系统解析器直接向网络的 DNS 查询")
+                            !live.running || live.systemDns.isBlank() || live.systemDns == "unknown" -> ht("让系统解析器的查询也进入核心，应用不再拿到被污染的地址")
+                            live.systemDns == "captured" && live.privateDns == "hostname" -> ht("系统设置了指定的私人 DNS：解析走它的加密通道，不经过核心的 DNS")
+                            live.systemDns == "captured" -> ht("已生效：系统解析器的查询进入核心")
+                            else -> ht("未生效：Root 管理器的 BusyBox 无法切换核心的用户组，仍按旧方式运行")
+                        },
+                    ) { putBool("proxyDnsSystemResolver", it) }
                 }
             }
         }
@@ -112,6 +132,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 SettingsGroup(title = ht("资源限制")) {
                     ResourceSetting(
                         title = "CPU 核心分配",
+                        subtitle = tuningNote(ht("只让核心在这些 CPU 上运行，如 0-3 或 0,2,4-6"), live.tuning("cpu").takeIf { prefs.getBoolean("proxyCpuAffinityEnabled", false) }),
                         icon = ToolsIcons.Cpu,
                         enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
                         value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
@@ -122,6 +143,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                     )
                     ResourceSetting(
                         title = "内存限制",
+                        subtitle = tuningNote(ht("Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M"), live.tuning("memory").takeIf { prefs.getBoolean("proxyMemoryLimitEnabled", false) }),
                         icon = HxIcons.MemoryStick,
                         enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
                         value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
@@ -132,6 +154,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                     )
                     ResourceSetting(
                         title = "磁盘 I/O 权重",
+                        subtitle = tuningNote(ht("0 最优先，7 最靠后"), live.tuning("io").takeIf { prefs.getBoolean("proxyIoWeightEnabled", false) }),
                         icon = HxIcons.HardDrive,
                         enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
                         value = prefs.getString("proxyIoWeight", "4").orEmpty(),
@@ -147,7 +170,17 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
         item(key = "vendor") {
             SettingsSection {
                 SettingsGroup(title = ht("厂商防火墙")) {
-                    OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = HxIcons.BrushCleaning) { putBool("proxyVendorFirewallCleanup", it) }
+                    val cleanup = prefs.getBoolean("proxyVendorFirewallCleanup", false)
+                    val about = ht("删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用")
+                    OtherSwitch(
+                        "启动时清理", cleanup, icon = HxIcons.BrushCleaning,
+                        subtitle = when {
+                            !cleanup || !live.running || live.firewallDetail.isBlank() -> about
+                            live.firewallField("uids") == "0" -> ht("没有找到已安装的 Google 服务，本次没有可清理的对象")
+                            live.firewallField("chains").isNullOrBlank() -> ht("本机没有这类厂商规则链，这个开关在这台设备上不起作用")
+                            else -> ht("本机有这类规则链。本次检查 %s 条，删除 %s 条").fill(live.firewallCount("checked"), live.firewallCount("removed"))
+                        },
+                    ) { putBool("proxyVendorFirewallCleanup", it) }
                 }
             }
         }
@@ -186,8 +219,45 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
 }
 
 @Composable
-private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
-    SettingsSwitchRow(ht(title), checked, onChange, enabled = enabled, compact = true, icon = icon)
+private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, subtitle: String? = null, onChange: (Boolean) -> Unit) {
+    SettingsSwitchRow(ht(title), checked, onChange, subtitle = subtitle, enabled = enabled, compact = true, icon = icon)
+}
+
+/** [about], followed by whether the running core took the setting. [state] is null while there is nothing to report. */
+@Composable
+private fun tuningNote(about: String, state: String?): String = when (state) {
+    "applied" -> about + ht("。本次已生效")
+    "failed" -> about + ht("。本次未生效：系统不允许调整")
+    else -> about
+}
+
+/** The last status the Root script reported for the running core, as the status probe cached it. */
+private class OtherLiveState(
+    val running: Boolean,
+    val systemDns: String,
+    val privateDns: String,
+    private val tuningReport: String,
+    private val firewall: String,
+    val firewallDetail: String,
+) {
+    /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
+    fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
+    fun firewallField(key: String): String? = field(firewallDetail, key)
+    fun firewallCount(key: String): String = field(firewall, key)?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) } ?: "0"
+
+    private fun field(line: String, key: String): String? =
+        line.split(' ').firstOrNull { it.startsWith("$key=") }?.substringAfter('=')
+
+    companion object {
+        fun load(prefs: android.content.SharedPreferences) = OtherLiveState(
+            running = prefs.getBoolean("proxyRootStatusRunning", false),
+            systemDns = prefs.getString("proxyRootSystemDns", "").orEmpty(),
+            privateDns = prefs.getString("proxyRootPrivateDns", "").orEmpty(),
+            tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
+            firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
+            firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
+        )
+    }
 }
 
 /** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
@@ -199,11 +269,12 @@ private fun ResourceSetting(
     hint: String,
     keyboardType: KeyboardType,
     icon: ImageVector? = null,
+    subtitle: String? = null,
     onEnabled: (Boolean) -> Unit,
     onValue: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-        SettingsSwitchRow(ht(title), enabled, onEnabled, compact = true, icon = icon)
+        SettingsSwitchRow(ht(title), enabled, onEnabled, subtitle = subtitle, compact = true, icon = icon)
         SettingsInput(
             value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),

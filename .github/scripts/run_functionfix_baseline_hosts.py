@@ -52,6 +52,16 @@ def predecessor_view(root, destination):
             'UI unification patch changed without input update'
         final = {**final, **ui88['changedOrAddedFiles']}
         reverse_patches.insert(0, ui88_patch)
+    r153_inputs = root / 'updates/v2089-runtime153/inputs.json'
+    if r153_inputs.exists():
+        from runtime153_source_scope import validate_layer as validate_r153_layer
+        r153 = json.loads(r153_inputs.read_text())
+        validate_r153_layer(r153, final)
+        r153_patch = r153_inputs.with_name('runtime.patch')
+        assert digest(r153_patch) == r153['patchSha256'], \
+            'r153 runtime patch changed without input update'
+        final = {**final, **r153['changedOrAddedFiles']}
+        reverse_patches.insert(0, r153_patch)
     # Every available current byte must match the recorded final map before
     # copying/reversing; this never hides unknown production changes.
     available_final = {name: sha for name, sha in final.items() if name not in missing}

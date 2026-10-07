@@ -1,0 +1,1215 @@
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+index b91cf3d..ae832da 100755
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -1,5 +1,5 @@
+ #!/system/bin/sh
+-# Hetu Root transparent proxy controller v3. JSON only on stdout.
++# Hetu Root transparent proxy controller v3 (runtime revision 153). JSON only on stdout.
+ set -u
+ umask 077
+ 
+@@ -35,6 +35,18 @@ MASK=""
+ TABLE=""
+ PREF=""
+ LOCK_HELD=0
++# xt_owner sees the credentials of the process that created a socket. Android resolves
++# names in netd, which is root, so "root sockets are the core" also exempts the system
++# resolver from DNS takeover. The core therefore runs as root with the net_admin group
++# whenever the Root manager's BusyBox can start it that way; nothing else is root:net_admin.
++CORE_GROUP_ID=3005
++CORE_GID=""
++CORE_RUNNER=""
++CORE_SPEC=""
++SYSTEM_DNS=exempt
++DNS_PROTOS="tcp udp"
++DOT_GUARD=0
++PRIVATE_DNS=unknown
+ 
+ LEGACY_MARK=0x2333
+ LEGACY_MASK=0xffff
+@@ -47,6 +59,7 @@ NOUT=HETU_NOUT
+ NPRE=HETU_NPRE
+ DNSOUT=HETU_DNSOUT
+ DNSPRE=HETU_DNSPRE
++DOTOUT=HETU_DOTOUT
+ QUICOUT=HETU_QUICOUT
+ QUICFWD=HETU_QUICFWD
+ WROUT=HETU_WROUT
+@@ -218,6 +231,7 @@ cleanup4(){
+   unhook xt4 nat OUTPUT "$DNSOUT"; unhook xt4 nat PREROUTING "$DNSPRE"
+   unhook xt4 nat OUTPUT "$NOUT"; unhook xt4 nat PREROUTING "$NPRE"
+   unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
++  unhook xt4 filter OUTPUT "$DOTOUT"
+   unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
+   unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
+   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
+@@ -231,6 +245,7 @@ cleanup6(){
+   unhook xt6 nat OUTPUT "$DNSOUT"; unhook xt6 nat PREROUTING "$DNSPRE"
+   unhook xt6 nat OUTPUT "$NOUT"; unhook xt6 nat PREROUTING "$NPRE"
+   unhook xt6 filter OUTPUT "$QUICOUT"; unhook xt6 filter FORWARD "$QUICFWD"
++  unhook xt6 filter OUTPUT "$DOTOUT"
+   unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
+   unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
+   unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"
+@@ -441,10 +456,40 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+ iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
+ iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
+ shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
+-blacklist_returns(){ BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; [ "$S" = blacklist ] || return 0; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -j RETURN || return 1; done; }
+-direct_uid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -j RETURN || return 1; done; }
+-direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do "$BIN" -t "$T" -A "$C" -m owner --gid-owner "$G" -j RETURN || return 1; done; }
+-system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; "$BIN" -t "$T" -A "$C" -m owner --uid-owner 0-9999 -j RETURN || return 1; }
++# Once the system resolver is answered by the core, any process can be handed an address
++# from the fake-IP range, and such an address exists only inside the core. An owner-based
++# exemption therefore keeps its direct path for every real address and lets these through.
++fake_range(){
++  [ "$SYSTEM_DNS" = captured ] || return 0
++  case "$1" in xt6|xt6q) printf '%s' "$FAKE_IP_V6";; *) printf '%s' "$FAKE_IP_V4";; esac
++}
++owner_return(){
++  OR_BIN="$1"; OR_T="$2"; OR_C="$3"; shift 3; OR_FAKE=$(fake_range "$OR_BIN")
++  if [ -n "$OR_FAKE" ]; then "$OR_BIN" -t "$OR_T" -A "$OR_C" ! -d "$OR_FAKE" -m owner "$@" -j RETURN
++  else "$OR_BIN" -t "$OR_T" -A "$OR_C" -m owner "$@" -j RETURN; fi
++}
++# The core's own sockets, told apart from every other root socket.
++core_return(){
++  [ -n "$CORE_GID" ] || return 0
++  "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
++}
++blacklist_returns(){ BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; [ "$S" = blacklist ] || return 0; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
++direct_uid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
++direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
++system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
++# 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
++# local process needs its own way into the core. Only present while the system resolver
++# is captured; otherwise unlisted applications are never handed such an address.
++fake_mark(){
++  FM_BIN="$1"; FM_C="$2"; FM_S="$3"; FM_PROTO="$4"; [ "$FM_S" = whitelist ] || return 0
++  FM_FAKE=$(fake_range "$FM_BIN"); [ -n "$FM_FAKE" ] || return 0
++  "$FM_BIN" -t mangle -A "$FM_C" -d "$FM_FAKE" -p "$FM_PROTO" -j MARK --set-xmark "$MARK/$MASK"
++}
++fake_redirect(){
++  FR_BIN="$1"; FR_C="$2"; FR_S="$3"; FR_TO="$4"; [ "$FR_S" = whitelist ] || return 0
++  FR_FAKE=$(fake_range "$FR_BIN"); [ -n "$FR_FAKE" ] || return 0
++  "$FR_BIN" -t nat -A "$FR_C" -d "$FR_FAKE" -p tcp -j REDIRECT --to-ports "$FR_TO"
++}
+ append_scoped(){
+   BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; shift 5
+   if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do :; done; fi
+@@ -680,6 +725,7 @@ install_mangle4(){
+   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
+   route4 || return 1; xt4 -t mangle -N "$MOUT" || return 1; xt4 -t mangle -N "$MPRE" || return 1
+   xt4 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
++  core_return xt4 mangle "$MOUT" || return 1
+   system_uid_return xt4 mangle "$MOUT" "$S" || return 1
+   direct_uid_returns xt4 mangle "$MOUT" "$DUIDS" || return 1
+   direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
+@@ -697,9 +743,9 @@ install_mangle4(){
+     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
+   fi
+   if [ "$M" = tproxy ]; then
+-    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+-    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
++    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+   if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MOUT" || return 1; fi
+   xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
+ }
+@@ -709,6 +755,7 @@ install_mangle6(){
+   NEED=0; case "$M" in tproxy) if [ "$TCP" = 1 ] || [ "$UDP" = 1 ]; then NEED=1; fi;; enhance) [ "$UDP" = 1 ] && NEED=1;; esac; [ "$NEED" = 1 ] || return 0
+   route6 || return 1; xt6 -t mangle -N "$MOUT" || return 1; xt6 -t mangle -N "$MPRE" || return 1
+   xt6 -t mangle -A "$MOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1
++  core_return xt6 mangle "$MOUT" || return 1
+   system_uid_return xt6 mangle "$MOUT" "$S" || return 1
+   direct_uid_returns xt6 mangle "$MOUT" "$DUIDS" || return 1
+   direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
+@@ -726,33 +773,61 @@ install_mangle6(){
+     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
+   fi
+   if [ "$M" = tproxy ]; then
+-    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+-    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
++    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+   if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MOUT" || return 1; fi
+   xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
+ }
+ 
+ install_redirect4(){
+   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
+-  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
++  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt4 nat "$NOUT" || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt4 "$NOUT" "$S" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
+   if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+ }
+ install_redirect6(){
+   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; v6supported || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
+-  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
++  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt6 nat "$NOUT" || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt6 "$NOUT" "$S" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
+   if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+ }
+ 
++# Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
++# otherwise every root socket as before (and with them the system resolver).
++dns_owner_return(){
++  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT"
++  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
++}
++# 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
++# application and is root, so it needs a rule of its own.
++dns_resolver_redirect(){
++  [ "$2" = whitelist ] && [ "$SYSTEM_DNS" = captured ] || return 0
++  "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -p "$3" --dport 53 -j REDIRECT --to-ports "$4"
++}
++# Opportunistic Private DNS moves the resolver to TLS on port 853 as soon as the network's
++# DNS server passes validation, which would take it out of port-53 takeover some time
++# after connecting. Refusing only the resolver's own probe keeps it on port 53. A Private
++# DNS host name the user configured is a deliberate choice and is left alone.
++install_dot_guard(){
++  DG_BIN="$1"
++  "$DG_BIN" -t filter -N "$DOTOUT" || return 1
++  core_return "$DG_BIN" filter "$DOTOUT" || return 1
++  "$DG_BIN" -t filter -A "$DOTOUT" -m owner --uid-owner 0 -p tcp --dport 853 -j REJECT --reject-with tcp-reset || return 1
++  "$DG_BIN" -t filter -I OUTPUT 1 -j "$DOTOUT" || return 1
++}
++remove_dot_guard(){
++  while "$1" -t filter -C OUTPUT -j "$DOTOUT" >/dev/null 2>&1; do "$1" -t filter -D OUTPUT -j "$DOTOUT" >/dev/null 2>&1 || break; done
++  "$1" -t filter -F "$DOTOUT" >/dev/null 2>&1 || true; "$1" -t filter -X "$DOTOUT" >/dev/null 2>&1 || true
++}
++
+ install_dns_redirect4(){
+-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt4 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
+-  for X in tcp udp; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
++  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
++  for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
++  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+ }
+ install_dns_redirect6(){
+-  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; xt6 -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
+-  for X in tcp udp; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; for X in tcp udp; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
++  P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt6 || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
++  for X in $DNS_PROTOS; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt6 "$S" "$X" "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
++  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+ }
+ 
+ install_udp_leak_guard4(){
+@@ -959,6 +1034,118 @@ watchdog(){
+ }
+ start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
+ 
++# The combined owner match must exist before the core is started under the new identity.
++probe_core_owner(){
++  PCO_BIN="$1"
++  "$PCO_BIN" -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; "$PCO_BIN" -t mangle -F HETU_PROBE >/dev/null 2>&1 || true
++  "$PCO_BIN" -t mangle -A HETU_PROBE -m owner --uid-owner 0 --gid-owner "$CORE_GROUP_ID" -j RETURN >/dev/null 2>&1; PCO_RC=$?
++  "$PCO_BIN" -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; "$PCO_BIN" -t mangle -X HETU_PROBE >/dev/null 2>&1 || true
++  return "$PCO_RC"
++}
++# Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
++# root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
++# asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
++core_identity_prepare(){
++  CORE_GID=""; CORE_RUNNER=""; CORE_SPEC=""; SYSTEM_DNS=exempt
++  [ ! -f "$BASE/policy/system-dns-direct" ] || return 0
++  CI_MAGISK=$(magisk --path 2>/dev/null || true)
++  for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
++    [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
++    for CI_SPEC in root:net_admin "0:$CORE_GROUP_ID"; do
++      CI_IDS="$("$CI_BB" setuidgid "$CI_SPEC" "$CI_BB" id -u 2>/dev/null):$("$CI_BB" setuidgid "$CI_SPEC" "$CI_BB" id -g 2>/dev/null)"
++      if [ "$CI_IDS" = "0:$CORE_GROUP_ID" ]; then CORE_RUNNER="$CI_BB"; CORE_SPEC="$CI_SPEC"; break 2; fi
++    done
++  done
++  [ -n "$CORE_RUNNER" ] || return 0
++  if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
++  if [ "$START_V6" != bypass ] && v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
++  return 0
++}
++core_launch(){
++  [ -z "${START_MEM_BYTES:-}" ] || { GOMEMLIMIT="$START_MEM_BYTES"; export GOMEMLIMIT; }
++  if [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 &
++  else "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & fi
++  START_PID=$!
++  [ -n "$CORE_RUNNER" ] || return 0
++  # setuidgid replaces itself with the core; identity checks wait for that, briefly.
++  CL_N=0
++  while [ "$CL_N" -lt 40 ]; do
++    pidcore "$START_PID" && break
++    kill -0 "$START_PID" >/dev/null 2>&1 || break
++    sleep 0.025; CL_N=$((CL_N+1))
++  done
++}
++# Trust what the kernel reports for the running core, not what was asked for.
++core_identity_confirm(){
++  CORE_GID=""; SYSTEM_DNS=exempt
++  [ -n "$CORE_RUNNER" ] || return 0
++  CI_GID=$(awk '$1=="Gid:" {print $2; exit}' "/proc/$1/status" 2>/dev/null)
++  [ "$CI_GID" = "$CORE_GROUP_ID" ] || return 0
++  CORE_GID="$CORE_GROUP_ID"
++  [ "$START_DNS" != off ] || return 0
++  case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
++}
++
++# 高级代理配置 → 资源限制 / 性能模式. Each is applied to the running core on a best-effort
++# basis and reported in $RUN/tuning-status; none of them can fail a start once validated.
++cpu_mask(){
++  # Shell arithmetic only: not every awk on a rooted device has exponentiation.
++  CM_MASK=0
++  case "$1" in ''|*[!0-9,-]*) return 1;; esac
++  OLDIFS=$IFS; IFS=,; set -- $1; IFS=$OLDIFS
++  [ "$#" -ge 1 ] || return 1
++  for CM_P in "$@"; do
++    case "$CM_P" in
++      ''|-*|*-|*-*-*) return 1;;
++      *-*) CM_A=${CM_P%-*}; CM_B=${CM_P#*-};;
++      *) CM_A=$CM_P; CM_B=$CM_P;;
++    esac
++    case "$CM_A:$CM_B" in 0?*:*|*:0?*|???*:*|*:???*) return 1;; esac
++    [ "$CM_A" -le "$CM_B" ] && [ "$CM_B" -le 23 ] || return 1
++    CM_C=$CM_A; while [ "$CM_C" -le "$CM_B" ]; do CM_MASK=$((CM_MASK | (1 << CM_C))); CM_C=$((CM_C+1)); done
++  done
++  [ "$CM_MASK" -gt 0 ] || return 1
++  printf '%x\n' "$CM_MASK"
++}
++mem_bytes(){
++  printf '%s\n' "$1" | awk '
++    { v=toupper($0); sub(/I?B$/,"",v); u=0
++      if(v ~ /^[0-9]+$/){n=v+0;u=1}
++      else if(v ~ /^[0-9]+K$/){n=substr(v,1,length(v)-1)+0;u=1024}
++      else if(v ~ /^[0-9]+M$/){n=substr(v,1,length(v)-1)+0;u=1048576}
++      else if(v ~ /^[0-9]+G$/){n=substr(v,1,length(v)-1)+0;u=1073741824}
++      if(u==0) exit 1
++      b=n*u; if(b<33554432 || b>17179869184) exit 1
++      printf "%.0f\n", b }'
++}
++tuning_valid(){
++  START_CPU_MASK=""; START_MEM_BYTES=""; TUNE_ERROR=""
++  if [ -n "$START_CPU" ]; then START_CPU_MASK=$(cpu_mask "$START_CPU") || { TUNE_ERROR="CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）"; return 1; }; fi
++  if [ -n "$START_MEM" ]; then START_MEM_BYTES=$(mem_bytes "$START_MEM") || { TUNE_ERROR="内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M"; return 1; }; fi
++  if [ -n "$START_IO" ]; then case "$START_IO" in [0-7]) ;; *) TUNE_ERROR="磁盘 I/O 权重应为 0-7"; return 1;; esac; fi
++  return 0
++}
++core_tune(){
++  CT_PID="$1"; CT_REPORT=""
++  if [ "$START_PERF" = 1 ]; then
++    CT_OK=1; for CT_T in /proc/"$CT_PID"/task/[0-9]*; do renice -n -10 -p "${CT_T##*/}" >/dev/null 2>&1 || CT_OK=0; done
++    if [ "$CT_OK" = 1 ]; then CT_REPORT="${CT_REPORT}priority=applied "; else CT_REPORT="${CT_REPORT}priority=failed "; fi
++  fi
++  if [ -n "$START_CPU_MASK" ]; then
++    CT_OK=1
++    if ! taskset -ap "$START_CPU_MASK" "$CT_PID" >/dev/null 2>&1; then
++      for CT_T in /proc/"$CT_PID"/task/[0-9]*; do taskset -p "$START_CPU_MASK" "${CT_T##*/}" >/dev/null 2>&1 || CT_OK=0; done
++    fi
++    if [ "$CT_OK" = 1 ]; then CT_REPORT="${CT_REPORT}cpu=applied:$START_CPU_MASK "; else CT_REPORT="${CT_REPORT}cpu=failed "; fi
++  fi
++  if [ -n "$START_IO" ]; then
++    CT_OK=1; for CT_T in /proc/"$CT_PID"/task/[0-9]*; do ionice -c 2 -n "$START_IO" -p "${CT_T##*/}" >/dev/null 2>&1 || CT_OK=0; done
++    if [ "$CT_OK" = 1 ]; then CT_REPORT="${CT_REPORT}io=applied:$START_IO "; else CT_REPORT="${CT_REPORT}io=failed "; fi
++  fi
++  [ -z "$START_MEM_BYTES" ] || CT_REPORT="${CT_REPORT}memory=applied:$START_MEM_BYTES "
++  printf '%s\n' "${CT_REPORT:-none}" > "$RUN/tuning-status" 2>/dev/null || true
++}
++
+ google_firewall_uids(){
+   # Resolve each installed user/profile. Android can reassign app UIDs after reset.
+   GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
+@@ -974,13 +1161,18 @@ google_firewall_uids(){
+ google_firewall_cleanup(){
+   # Caller owns the existing Root transaction lock. Never flush a system chain.
+   GF_UIDS=$(google_firewall_uids)
+-  [ -n "$GF_UIDS" ] || return 0
++  GF_PRESENT=""
++  if [ -z "$GF_UIDS" ]; then
++    printf 'uids=0 chains= at=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
++    return 0
++  fi
+   GF_REMOVED=0; GF_FAILED=0; GF_CHECKED=0
+   GF_FILE="$RUN/.google-firewall.$$"
+   for GF_TOOL in xt4q xt6q; do
+     for GF_CHAIN in fw_INPUT fw_OUTPUT fw_OUTPUT_oplus_dns zte_fw_gms; do
+       if ! $GF_TOOL -t filter -S "$GF_CHAIN" > "$GF_FILE" 2>/dev/null; then continue; fi
+       GF_CHECKED=$((GF_CHECKED+1))
++      case ",$GF_PRESENT," in *",$GF_CHAIN,"*) ;; *) GF_PRESENT="${GF_PRESENT:+$GF_PRESENT,}$GF_CHAIN";; esac
+       while IFS= read -r GF_RULE; do
+         # Quotes/comments and inverted/range UID matches are deliberately left intact.
+         case "$GF_RULE" in *\"*|*\'*) continue;; esac
+@@ -1010,6 +1202,8 @@ google_firewall_cleanup(){
+   done
+   rm -f "$GF_FILE"
+   printf 'checked=%s removed=%s failed=%s\n' "$GF_CHECKED" "$GF_REMOVED" "$GF_FAILED" > "$RUN/google-firewall-status"
++  # Which vendor chains this device has at all: without any of them the switch does nothing.
++  printf 'uids=%s chains=%s at=%s\n' "$(printf '%s\n' "$GF_UIDS" | grep -c .)" "$GF_PRESENT" "$(date '+%Y-%m-%dT%H:%M:%S%z')" > "$RUN/google-firewall-detail" 2>/dev/null || true
+   if [ -f "$RUN/google-firewall.log" ]; then
+     tail -n 60 "$RUN/google-firewall.log" > "$RUN/.google-log.$$" && mv "$RUN/.google-log.$$" "$RUN/google-firewall.log"
+   fi
+@@ -1034,6 +1228,12 @@ google_firewall_maintain(){ (
+ start(){
+   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
+   START_VENDOR_CLEAN="${30:-0}"
++  START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
++  bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
++  tuning_valid || fail "$TUNE_ERROR"
++  DNS_PROTOS=""; [ "$START_DNS_TCP" = 0 ] || DNS_PROTOS=tcp; [ "$START_DNS_UDP" = 0 ] || DNS_PROTOS="${DNS_PROTOS:+$DNS_PROTOS }udp"
++  # Neither protocol captured is the same as DNS takeover switched off.
++  [ -n "$DNS_PROTOS" ] || START_DNS=off
+   mkdir -p "$RUN" || fail "无法创建运行目录"
+   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+   if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
+@@ -1071,8 +1271,10 @@ start(){
+   fi
+ 
+   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
++  start_stage "core-identity"
++  core_identity_prepare
+   start_stage "launch-core"
+-  : > "$LOG"; "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & START_PID=$!; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
++  : > "$LOG"; core_launch; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+   start_stage "wait-listeners"
+   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
+   if [ "$READY_RC" -ne 0 ]; then
+@@ -1087,6 +1289,8 @@ start(){
+     fi
+   fi
+ 
++  core_identity_confirm "$START_PID"
++  core_tune "$START_PID"
+   start_stage "install-ipv4-tproxy"
+   install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+   start_stage "install-ipv4-redirect"
+@@ -1115,8 +1319,21 @@ start(){
+   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
+     install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
+   fi
++  start_stage "install-dot-guard"
++  if [ "$SYSTEM_DNS" = captured ]; then
++    PRIVATE_DNS=$(settings get global private_dns_mode 2>/dev/null | head -n 1)
++    case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
++    if [ "$PRIVATE_DNS" != hostname ]; then
++      # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
++      if install_dot_guard xt4; then DOT_GUARD=1; else remove_dot_guard xt4; fi
++      if [ "$DOT_GUARD" = 1 ] && { [ "$START_V6" = enable ] || [ "$START_V6" = disable ]; } && v6supported && has ip6tables; then
++        install_dot_guard xt6 || remove_dot_guard xt6
++      fi
++    fi
++  fi
+   # Finish the immutable session before its integrity snapshot. Updating it after
+   # health_record would invalidate every status check and disable owned-rule repair.
++  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 DNS 接管状态，已停止本次启动"; }
+   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
+   # Record exactly what this session installed, not mutable app preferences.
+   health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
+@@ -1125,7 +1342,7 @@ start(){
+   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+   rm -f "$START_ERROR"; start_stage "running"
+-  DESC="tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
++  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
+   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
+ }
+ 
+@@ -1153,6 +1370,12 @@ status(){
+   case "$DNS6POLICY" in redirect|blocked-no-nat|blocked-no-redirect|off|core) ;; *) DNS6POLICY=unknown;; esac
+   DPV=$(sed -n 's/^DNS_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); case "$DPV" in ''|*[!0-9]*) DPV=1053;; esac
+   IPV6V=$(sed -n 's/^IPV6=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$IPV6V" ] || IPV6V=enable
++  SYSDNSV=$(sed -n 's/^SYSTEM_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$SYSDNSV" in captured|exempt) ;; *) SYSDNSV=unknown;; esac
++  COREGIDV=$(sed -n 's/^CORE_GID=//p' "$SESSION" 2>/dev/null | head -n 1); case "$COREGIDV" in *[!0-9]*) COREGIDV='';; esac
++  DOTV=false; [ "$(sed -n 's/^DOT_GUARD=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || DOTV=true
++  PDNSV=$(sed -n 's/^PRIVATE_DNS=//p' "$SESSION" 2>/dev/null | head -n 1); case "$PDNSV" in off|opportunistic|hostname) ;; *) PDNSV=unknown;; esac
++  GFV=$(head -n 1 "$RUN/google-firewall-status" 2>/dev/null | tr -cd 'a-z0-9= '); GFDV=$(head -n 1 "$RUN/google-firewall-detail" 2>/dev/null | tr -cd 'A-Za-z0-9=_,:+ -')
++  TUNEV=$(head -n 1 "$RUN/tuning-status" 2>/dev/null | tr -cd 'a-z0-9=: ')
+   CPV=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1)
+   case "$CPV" in ''|*[!0-9]*) CPV=0;; esac
+   if [ "$CPV" = 0 ]; then
+@@ -1264,14 +1487,14 @@ status(){
+   if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
+   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
+   SP=$(state_value PREF 2>/dev/null || true)
+-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$LOG" "$CHECKLOG"
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG"
+ }
+ 
+ # Session-bound network integrity. No remote reachability failure restarts the core.
+ # iptables-restore --noflush commits only the named Hetu chains, never netd tables.
+ health_owned(){
+-  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
+-       $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
++  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
++       $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
+ }
+ health_record(){ (
+   H_DIR="$RUN/network-manifest"; H_TMP="$H_DIR.new.$$"
+@@ -1459,7 +1682,7 @@ health_restore_table(){
+       [ "$H_COUNT" != 1 ] || continue
+       while [ "$H_COUNT" -gt 0 ]; do printf '%s\n' "$H_LINE" | sed 's/^-A /-D /' >> "$H_BATCH"; H_COUNT=$((H_COUNT-1)); done
+       # DNS/IPv6/UDP guards were installed at the front; preserve that contract.
+-      case "$H_LINE" in *HETU_DNS*|*HETU_V6*|*HETU_WR*) printf '%s\n' "$H_LINE" | sed 's/^-A /-I /' >> "$H_BATCH";; *) printf '%s\n' "$H_LINE" >> "$H_BATCH";; esac
++      case "$H_LINE" in *HETU_DNS*|*HETU_DOT*|*HETU_V6*|*HETU_WR*) printf '%s\n' "$H_LINE" | sed 's/^-A /-I /' >> "$H_BATCH";; *) printf '%s\n' "$H_LINE" >> "$H_BATCH";; esac
+       H_CHANGED=1;;
+     esac
+   done < "$H_E"
+@@ -1537,20 +1760,16 @@ health_json(){ (
+ case "${1:-status}" in
+   repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
+   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
+-  # Retain the established DNS/process protocol; only UID-scoped Google cleanup is added.
++  # 31 fields: DNS protocols, priority, CPU, memory, I/O and vendor-firewall cleanup follow the
++  # established 23/24. The values themselves are validated in start(), before any change.
+   start)
+     case "$#" in
+       23|24) ;;
+       31)
+-        UNSUPPORTED=""
+-        [ "${25}" = 1 ] || UNSUPPORTED="${UNSUPPORTED}DNS TCP 关闭；"
+-        [ "${26}" = 1 ] || UNSUPPORTED="${UNSUPPORTED}DNS UDP 关闭；"
+-        [ "${27}" = 0 ] || UNSUPPORTED="${UNSUPPORTED}性能模式；"
+-        [ -z "${28}" ] || UNSUPPORTED="${UNSUPPORTED}CPU 分配；"
+-        [ -z "${29}" ] || UNSUPPORTED="${UNSUPPORTED}内存限制；"
+-        [ -z "${30}" ] || UNSUPPORTED="${UNSUPPORTED}I/O 权重；"
++        bool "${25}" || fail "DNS TCP 劫持开关必须是 0 或 1"
++        bool "${26}" || fail "DNS UDP 劫持开关必须是 0 或 1"
++        bool "${27}" || fail "性能模式开关必须是 0 或 1"
+         bool "${31}" || fail "厂商防火墙清理开关必须是 0 或 1"
+-        [ -z "$UNSUPPORTED" ] || fail "此运行版暂不支持扩展控制：$UNSUPPORTED 请将列出的设置恢复默认值后重试"
+         ;;
+       *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
+     esac
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java
+new file mode 100644
+index 0000000..d98aad3
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java
+@@ -0,0 +1,96 @@
++package io.github.xgl34222220.hetu;
++
++import java.net.InetAddress;
++import java.security.SecureRandom;
++import java.util.Locale;
++import java.util.concurrent.ExecutorService;
++import java.util.concurrent.Executors;
++import java.util.concurrent.Future;
++import java.util.concurrent.TimeUnit;
++
++/**
++ * Asks the system resolver, the way every application does, for a name that does not exist.
++ * A core in fake-IP mode answers any name from its fake range, so the answer tells whether
++ * ordinary lookups on this device reach the core or still go to the network's DNS server.
++ */
++final class DnsTakeoverProbe {
++    static final String CAPTURED = "captured";
++    static final String DIRECT = "direct";
++    static final String INCONCLUSIVE = "inconclusive";
++
++    private DnsTakeoverProbe() { }
++
++    static final class Result {
++        final String verdict, name, answer;
++        Result(String verdict, String name, String answer) { this.verdict = verdict; this.name = name; this.answer = answer; }
++
++        String describe() {
++            switch (verdict) {
++                case CAPTURED: return "系统解析已进入核心：" + name + " → " + answer + "（fake-ip）";
++                case DIRECT: return "系统解析没有进入核心：" + name + " → " + answer
++                        + "。应用拿到的是网络 DNS 的应答，被污染的域名会连到错误地址。";
++                default: return "无法判断：" + answer;
++            }
++        }
++    }
++
++    /** IPv4 only: the probe is compared with the IPv4 fake range. */
++    static boolean inCidr(String address, String cidr) {
++        try {
++            String[] parts = cidr.trim().split("/");
++            if (parts.length != 2) return false;
++            int bits = Integer.parseInt(parts[1]);
++            if (bits < 0 || bits > 32) return false;
++            long mask = bits == 0 ? 0L : (0xFFFFFFFFL << (32 - bits)) & 0xFFFFFFFFL;
++            return (value(address) & mask) == (value(parts[0]) & mask);
++        } catch (RuntimeException invalid) {
++            return false;
++        }
++    }
++
++    private static long value(String address) {
++        String[] octets = address.trim().split("\\.");
++        if (octets.length != 4) throw new IllegalArgumentException(address);
++        long out = 0;
++        for (String octet : octets) {
++            int n = Integer.parseInt(octet);
++            if (n < 0 || n > 255) throw new IllegalArgumentException(address);
++            out = (out << 8) | n;
++        }
++        return out;
++    }
++
++    static String verdict(String answer, String fakeCidr) {
++        if (fakeCidr == null || fakeCidr.trim().isEmpty()) return INCONCLUSIVE;
++        if (answer == null || answer.isEmpty()) return DIRECT;
++        return inCidr(answer, fakeCidr) ? CAPTURED : DIRECT;
++    }
++
++    /** Blocking; call from a worker thread. Never throws. */
++    static Result run(String fakeCidr, long timeoutMs) {
++        if (fakeCidr == null || fakeCidr.trim().isEmpty())
++            return new Result(INCONCLUSIVE, "", "当前运行配置没有 fake-ip 网段（redir-host 或核心未运行），这种方式分辨不出来");
++        byte[] random = new byte[6];
++        new SecureRandom().nextBytes(random);
++        StringBuilder label = new StringBuilder("connect-");
++        for (byte b : random) label.append(String.format(Locale.ROOT, "%02x", b & 255));
++        final String name = label.append(".hetu-dns-probe.com").toString();
++        ExecutorService worker = Executors.newSingleThreadExecutor();
++        try {
++            Future<String> lookup = worker.submit(() -> {
++                for (InetAddress address : InetAddress.getAllByName(name))
++                    if (address.getAddress().length == 4) return address.getHostAddress();
++                return "";
++            });
++            String answer;
++            try { answer = lookup.get(Math.max(500L, timeoutMs), TimeUnit.MILLISECONDS); }
++            catch (java.util.concurrent.TimeoutException slow) { lookup.cancel(true); return new Result(INCONCLUSIVE, name, "解析超时"); }
++            catch (java.util.concurrent.ExecutionException failed) { answer = ""; }
++            catch (InterruptedException interrupted) { Thread.currentThread().interrupt(); return new Result(INCONCLUSIVE, name, "已中断"); }
++            String verdict = verdict(answer, fakeCidr);
++            return new Result(verdict, name, answer.isEmpty() ? "域名不存在" : answer);
++        } finally {
++            worker.shutdownNow();
++        }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+index e889cb9..65d651c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+@@ -42,6 +42,7 @@ import io.github.xgl34222220.hetu.home.HomeRowDims
+ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
++import io.github.xgl34222220.hetu.home.fill
+ import io.github.xgl34222220.hetu.home.homeRowPressTint
+ import io.github.xgl34222220.hetu.panel.PanelIcons
+ import io.github.xgl34222220.hetu.tools.ToolsIcons
+@@ -67,6 +68,8 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+     var revision by remember { mutableIntStateOf(0) }
+     var choice by remember { mutableStateOf<String?>(null) }
+     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
++    // What the running core last reported. Cached by the status probe; blank on a runtime that predates these fields.
++    val live = remember(revision) { OtherLiveState.load(prefs) }
+ 
+     fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
+     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
+@@ -76,7 +79,11 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+         item(key = "abilities") {
+             SettingsSection {
+                 SettingsGroup(title = ht("代理能力")) {
+-                    OtherSwitch("性能模式", prefs.getBoolean("proxyPerformanceMode", false), icon = PanelIcons.Gauge) { putBool("proxyPerformanceMode", it) }
++                    val performance = prefs.getBoolean("proxyPerformanceMode", false)
++                    OtherSwitch(
++                        "性能模式", performance, icon = PanelIcons.Gauge,
++                        subtitle = tuningNote(ht("提高核心进程的调度优先级"), live.tuning("priority").takeIf { performance }),
++                    ) { putBool("proxyPerformanceMode", it) }
+                     SettingsDivider()
+                     OtherSwitch("QUIC", !profile.quicBlocked, icon = PanelIcons.Zap) { putBool("proxyQuicBlocked", !it) }
+                     SettingsDivider()
+@@ -103,6 +110,19 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         ProxyRuntimeProfile.DnsHijack.OFF -> ht("关闭")
+                         else -> "TPROXY"
+                     }, dropdown = true, compact = true, icon = PanelIcons.Globe) { choice = "dns" }
++                    SettingsDivider()
++                    // The system resolver runs as root, the identity the rules used to exempt wholesale.
++                    val resolver = prefs.getBoolean("proxyDnsSystemResolver", true)
++                    OtherSwitch(
++                        "接管系统解析", resolver, enabled = dnsEnabled && protocolControl, icon = PanelIcons.ShieldCheck,
++                        subtitle = when {
++                            !resolver -> ht("已关闭：系统解析器直接向网络的 DNS 查询")
++                            !live.running || live.systemDns.isBlank() || live.systemDns == "unknown" -> ht("让系统解析器的查询也进入核心，应用不再拿到被污染的地址")
++                            live.systemDns == "captured" && live.privateDns == "hostname" -> ht("系统设置了指定的私人 DNS：解析走它的加密通道，不经过核心的 DNS")
++                            live.systemDns == "captured" -> ht("已生效：系统解析器的查询进入核心")
++                            else -> ht("未生效：Root 管理器的 BusyBox 无法切换核心的用户组，仍按旧方式运行")
++                        },
++                    ) { putBool("proxyDnsSystemResolver", it) }
+                 }
+             }
+         }
+@@ -112,6 +132,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                 SettingsGroup(title = ht("资源限制")) {
+                     ResourceSetting(
+                         title = "CPU 核心分配",
++                        subtitle = tuningNote(ht("只让核心在这些 CPU 上运行，如 0-3 或 0,2,4-6"), live.tuning("cpu").takeIf { prefs.getBoolean("proxyCpuAffinityEnabled", false) }),
+                         icon = ToolsIcons.Cpu,
+                         enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
+                         value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
+@@ -122,6 +143,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                     )
+                     ResourceSetting(
+                         title = "内存限制",
++                        subtitle = tuningNote(ht("Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M"), live.tuning("memory").takeIf { prefs.getBoolean("proxyMemoryLimitEnabled", false) }),
+                         icon = HxIcons.MemoryStick,
+                         enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
+                         value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
+@@ -132,6 +154,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                     )
+                     ResourceSetting(
+                         title = "磁盘 I/O 权重",
++                        subtitle = tuningNote(ht("0 最优先，7 最靠后"), live.tuning("io").takeIf { prefs.getBoolean("proxyIoWeightEnabled", false) }),
+                         icon = HxIcons.HardDrive,
+                         enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
+                         value = prefs.getString("proxyIoWeight", "4").orEmpty(),
+@@ -147,7 +170,17 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+         item(key = "vendor") {
+             SettingsSection {
+                 SettingsGroup(title = ht("厂商防火墙")) {
+-                    OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = HxIcons.BrushCleaning) { putBool("proxyVendorFirewallCleanup", it) }
++                    val cleanup = prefs.getBoolean("proxyVendorFirewallCleanup", false)
++                    val about = ht("删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用")
++                    OtherSwitch(
++                        "启动时清理", cleanup, icon = HxIcons.BrushCleaning,
++                        subtitle = when {
++                            !cleanup || !live.running || live.firewallDetail.isBlank() -> about
++                            live.firewallField("uids") == "0" -> ht("没有找到已安装的 Google 服务，本次没有可清理的对象")
++                            live.firewallField("chains").isNullOrBlank() -> ht("本机没有这类厂商规则链，这个开关在这台设备上不起作用")
++                            else -> ht("本机有这类规则链。本次检查 %s 条，删除 %s 条").fill(live.firewallCount("checked"), live.firewallCount("removed"))
++                        },
++                    ) { putBool("proxyVendorFirewallCleanup", it) }
+                 }
+             }
+         }
+@@ -186,8 +219,45 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+ }
+ 
+ @Composable
+-private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
+-    SettingsSwitchRow(ht(title), checked, onChange, enabled = enabled, compact = true, icon = icon)
++private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, subtitle: String? = null, onChange: (Boolean) -> Unit) {
++    SettingsSwitchRow(ht(title), checked, onChange, subtitle = subtitle, enabled = enabled, compact = true, icon = icon)
++}
++
++/** [about], followed by whether the running core took the setting. [state] is null while there is nothing to report. */
++@Composable
++private fun tuningNote(about: String, state: String?): String = when (state) {
++    "applied" -> about + ht("。本次已生效")
++    "failed" -> about + ht("。本次未生效：系统不允许调整")
++    else -> about
++}
++
++/** The last status the Root script reported for the running core, as the status probe cached it. */
++private class OtherLiveState(
++    val running: Boolean,
++    val systemDns: String,
++    val privateDns: String,
++    private val tuningReport: String,
++    private val firewall: String,
++    val firewallDetail: String,
++) {
++    /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
++    fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
++    fun firewallField(key: String): String? = field(firewallDetail, key)
++    fun firewallCount(key: String): String = field(firewall, key)?.takeIf { it.isNotEmpty() && it.all(Char::isDigit) } ?: "0"
++
++    private fun field(line: String, key: String): String? =
++        line.split(' ').firstOrNull { it.startsWith("$key=") }?.substringAfter('=')
++
++    companion object {
++        fun load(prefs: android.content.SharedPreferences) = OtherLiveState(
++            running = prefs.getBoolean("proxyRootStatusRunning", false),
++            systemDns = prefs.getString("proxyRootSystemDns", "").orEmpty(),
++            privateDns = prefs.getString("proxyRootPrivateDns", "").orEmpty(),
++            tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
++            firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
++            firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
++        )
++    }
+ }
+ 
+ /** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
+@@ -199,11 +269,12 @@ private fun ResourceSetting(
+     hint: String,
+     keyboardType: KeyboardType,
+     icon: ImageVector? = null,
++    subtitle: String? = null,
+     onEnabled: (Boolean) -> Unit,
+     onValue: (String) -> Unit,
+ ) {
+     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+-        SettingsSwitchRow(ht(title), enabled, onEnabled, compact = true, icon = icon)
++        SettingsSwitchRow(ht(title), enabled, onEnabled, subtitle = subtitle, compact = true, icon = icon)
+         SettingsInput(
+             value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
+             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+index 00802ad..6b33725 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -175,6 +175,16 @@ internal class ProxyComposeController(context: Context) {
+                         .putBoolean("proxyRootDnsListenerReady", live.optBoolean("dnsListenerReady", false))
+                         .putBoolean("proxyRootWatchdog", live.optBoolean("watchdog", false))
+                         .putBoolean("proxyRootDataPlaneHealthy", live.optBoolean("dataPlaneHealthy", false))
++                        // What 高级代理配置 shows under its switches: how DNS is really captured,
++                        // and what the last vendor-firewall pass and resource tuning did.
++                        .putString("proxyRootSystemDns", live.optString("systemDns", ""))
++                        .putString("proxyRootCoreGroup", live.optString("coreGroup", ""))
++                        .putBoolean("proxyRootDotGuard", live.optBoolean("dotGuard", false))
++                        .putString("proxyRootPrivateDns", live.optString("privateDns", ""))
++                        .putString("proxyRootVendorFirewall", live.optString("vendorFirewall", ""))
++                        .putString("proxyRootVendorFirewallDetail", live.optString("vendorFirewallDetail", ""))
++                        .putString("proxyRootTuning", live.optString("tuning", ""))
++                        .putBoolean("proxyRootStatusRunning", live.optBoolean("running", false))
+                         .apply()
+                 }
+             } catch (cancel: CancellationException) { throw cancel }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+index 3e503ef..7ebf26f 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java
+@@ -9,7 +9,7 @@ import java.util.*;
+ final class ProxyRuntimeSettings {
+     static final String DIRTY_KEY = "proxyRootSettingsDirty";
+     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
+-    static final int RUNTIME_REVISION = 152;
++    static final int RUNTIME_REVISION = 153;
+     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
+     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
+             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
+@@ -18,7 +18,7 @@ final class ProxyRuntimeSettings {
+             "proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs",
+             "proxyMihomoDnsForward","proxyDnsHijackTcp","proxyDnsHijackUdp","proxyPerformanceMode",
+             "proxyCpuAffinityEnabled","proxyCpuAffinity","proxyMemoryLimitEnabled","proxyMemoryLimit",
+-            "proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup"
++            "proxyIoWeightEnabled","proxyIoWeight","proxyVendorFirewallCleanup","proxyDnsSystemResolver"
+     )));
+ 
+     static final String APPLIED_SETTINGS_KEY = "proxyRootAppliedSettings";
+@@ -115,6 +115,9 @@ final class ProxyRuntimeSettings {
+             append(state,String.valueOf(Boolean.TRUE.equals(values.get(key))));
+         for(String key:new String[]{"proxyCpuAffinity","proxyMemoryLimit","proxyIoWeight"})
+             append(state,String.valueOf(values.get(key)==null?"":values.get(key)));
++        // On by default. Only the opt-out is part of the snapshot, so a session applied
++        // before this setting existed still matches until the user actually changes it.
++        if(Boolean.FALSE.equals(values.get("proxyDnsSystemResolver")))append(state,"systemResolver=direct");
+         for(String key:new String[]{"proxyAppPackages","proxyDirectGids","proxyBypassCidrs","proxyBypassInterfaces","proxySharedBypassMacs"}) {
+             append(state,key);
+             TreeSet<String> sorted=new TreeSet<>();
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+index ac3dc6b..8a47f8c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -24,6 +24,8 @@ final class RootProxyManager {
+     private static final String SCRIPT=ROOT+"/hetu-root.sh";
+     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
+     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
++    /** hetu-root.sh keeps plain root as the core identity while this file exists in ROOT/policy. */
++    static final String SYSTEM_DNS_DIRECT_MARKER="system-dns-direct";
+     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
+     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
+     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
+@@ -344,6 +346,7 @@ final class RootProxyManager {
+                 +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
+                 +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
+                 +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
++                +"|systemDns="+bit(prefs.getBoolean("proxyDnsSystemResolver",true))
+                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
+                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
+                 +"|sharedMacs="+policy.sharedBypassMacs
+@@ -681,6 +684,8 @@ final class RootProxyManager {
+                 .putBoolean("proxyRootEgressPending",true)
+                 .putInt("proxyRootEgressProbeAttempts",0)
+                 .remove("proxyRootEgressProbeLastError")
++                // What the running core answers from; the DNS takeover self-check compares with it.
++                .putString("proxyRootFakeIpV4",p.fakeIps==null?"":p.fakeIps.ipv4)
+                 .apply();
+ 
+         String warning=policy.warning();
+@@ -1039,9 +1044,20 @@ final class RootProxyManager {
+             RootBridge.Result sessionRepairs=RootBridge.rootShell(context,"tail -n 20 "+RootBridge.quote(ROOT+"/run/session-repair.log")+" 2>/dev/null; true",3000L);
+             report.section("运行记录兼容修复",sessionRepairs.output,3000);
+             RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
++                    +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
+                     +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
+-            report.section("Google 服务防火墙修复",google.output,5000);
++            report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
+         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
++        try{
++            // Whether ordinary lookups reach the core: the session's own record, the rule counters
++            // (root-owned port 53 packets are the system resolver), and one real lookup from this app.
++            String dns="grep -E '^(DNS|DNS_PORT|CORE_GID|SYSTEM_DNS|DOT_GUARD|PRIVATE_DNS|DNS_PROTOS)=' "+RootBridge.quote(ROOT+"/run/session.state")
++                    +" 2>/dev/null; echo '--- DNS takeover counters ---'; iptables -w 1 -t nat -nvxL HETU_DNSOUT 2>/dev/null; "
++                    +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
++                    +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
++            String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
++            report.section("DNS 接管（系统解析是否进入核心）",probe+"\n"+RootBridge.rootShell(context,dns,5000L).output,6000);
++        }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
+         try{
+             int wechatUid=-1;
+             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
+@@ -1300,6 +1316,13 @@ final class RootProxyManager {
+                 .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
+                 .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
+                 .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT));
++        // The script reads this marker, not an argument: the 30-field start protocol and the
++        // stored boot plan stay as they are. Present = leave the system resolver alone.
++        String policyDir=ROOT+"/policy",resolverMarker=policyDir+"/"+SYSTEM_DNS_DIRECT_MARKER;
++        cmd.append("; mkdir -p ").append(RootBridge.quote(policyDir)).append("; chmod 700 ").append(RootBridge.quote(policyDir));
++        if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
++        else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
++                .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
+         if(deployCore){
+             cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
+                     .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
+index 862d59f..84164db 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
+@@ -944,6 +944,22 @@ TCP 走 Redirect，UDP 走 TPROXY|TCP through Redirect, UDP through TPROXY|TCP 
+ Root 下的 TUN 虚拟网卡|A TUN virtual interface under root|Root 下的 TUN 虛擬網路卡|Виртуальный интерфейс TUN под root
+ eBPF 重定向到 TUN|eBPF redirect into TUN|eBPF 重新導向至 TUN|Перенаправление eBPF в TUN
+ 暂不可用|Not available yet|暫不可用|Пока недоступно
++提高核心进程的调度优先级|Raises the scheduling priority of the core process|提高核心行程的排程優先權|Повышает приоритет планирования процесса ядра
++。本次已生效|. Applied to this run|。本次已生效|. Применено в этом запуске
++。本次未生效：系统不允许调整|. Not applied to this run: the system refused the change|。本次未生效：系統不允許調整|. Не применено в этом запуске: система отклонила изменение
++接管系统解析|Capture the system resolver|接管系統解析|Перехватывать системный резолвер
++已关闭：系统解析器直接向网络的 DNS 查询|Off: the system resolver asks the network's DNS directly|已關閉：系統解析器直接向網路的 DNS 查詢|Выключено: системный резолвер обращается к DNS сети напрямую
++让系统解析器的查询也进入核心，应用不再拿到被污染的地址|Sends the system resolver's lookups through the core too, so apps stop receiving poisoned addresses|讓系統解析器的查詢也進入核心，應用程式不再拿到被污染的位址|Запросы системного резолвера тоже идут через ядро, и приложения больше не получают подменённые адреса
++系统设置了指定的私人 DNS：解析走它的加密通道，不经过核心的 DNS|The system uses a named Private DNS: lookups go through its encrypted channel, not the core's DNS|系統設定了指定的私人 DNS：解析走它的加密通道，不經過核心的 DNS|В системе задан частный DNS по имени: запросы идут по его шифрованному каналу, минуя DNS ядра
++已生效：系统解析器的查询进入核心|Active: the system resolver's lookups go through the core|已生效：系統解析器的查詢進入核心|Работает: запросы системного резолвера идут через ядро
++未生效：Root 管理器的 BusyBox 无法切换核心的用户组，仍按旧方式运行|Not active: the root manager's BusyBox cannot switch the core's group, so the old behaviour is kept|未生效：Root 管理器的 BusyBox 無法切換核心的使用者群組，仍按舊方式執行|Не работает: BusyBox менеджера root не может сменить группу ядра, сохранено прежнее поведение
++只让核心在这些 CPU 上运行，如 0-3 或 0,2,4-6|Runs the core only on these CPUs, e.g. 0-3 or 0,2,4-6|只讓核心在這些 CPU 上執行，如 0-3 或 0,2,4-6|Ядро работает только на этих CPU, например 0-3 или 0,2,4-6
++Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M|A soft limit for the Go runtime: it collects harder near the limit and never kills the core; at least 32M|Go 執行階段的軟上限：接近時更積極回收，不會結束核心；不低於 32M|Мягкий предел для среды Go: у предела память освобождается активнее, ядро не завершается; не менее 32M
++0 最优先，7 最靠后|0 is the highest priority, 7 the lowest|0 最優先，7 最靠後|0 — высший приоритет, 7 — низший
++删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用|Removes vendor firewall rules that block Google services; only useful on systems that have such chains|刪除廠商防火牆裡攔截 Google 服務的規則，只在帶有這類規則鏈的系統上有用|Удаляет правила файрвола производителя, блокирующие сервисы Google; полезно только там, где такие цепочки есть
++没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
++本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
++本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
+ """.trimIndent()
+ 
+ /** Stable UI vocabulary. Technical diagnostics and user content retain their original text. */
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+index 7b1ee7a..19743ed 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt
+@@ -36,7 +36,7 @@ class Runtime146ContractTest {
+     @Test fun uiVersionBumpDoesNotRequestRuntimeRedeployment() {
+         val p = prefs()
+         // V20.74 deploys the corrected snapshot on the next explicit Start/Restart.
+-        assertEquals(152, ProxyRuntimeSettings.RUNTIME_REVISION)
++        assertEquals(153, ProxyRuntimeSettings.RUNTIME_REVISION)
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 149, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 150, true))
+         assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
+diff --git a/tools/qa/test_core_identity_dns.py b/tools/qa/test_core_identity_dns.py
+new file mode 100644
+index 0000000..7566058
+--- /dev/null
++++ b/tools/qa/test_core_identity_dns.py
+@@ -0,0 +1,290 @@
++#!/usr/bin/env python3
++"""Runtime 153: the core's own identity, system-resolver DNS takeover and the tuning controls.
++
++Every xtables entry point is a shell recording function; nothing here touches host rules.
++Set HETU_R152_SOURCE to a preserved runtime-152 script to also prove that, without the
++separate core identity, the installed rules are the ones runtime 152 installed.
++"""
++import itertools
++import os
++from pathlib import Path
++import shlex
++import subprocess
++import tempfile
++import unittest
++
++REPO = Path(__file__).resolve().parents[2]
++SCRIPT = REPO / 'android-app/app/src/main/assets/hetu-root.sh'
++SOURCE = SCRIPT.read_text()
++PREFIX = SOURCE.rsplit('\ncase "${1:-status}" in', 1)[0]
++FAKE4 = '198.18.0.0/16'
++FAKE6 = 'fdfe:dcba:9876::/64'
++LAN4 = '10.0.0.0/8,192.168.0.0/16'
++CORE = '-m owner --uid-owner 0 --gid-owner 3005 -j RETURN'
++
++RECORDERS = r'''
++xt4(){ printf 'xt4 %s\n' "$*" >> "$CALLS"; case " $* " in *" $XT4_FAIL "*) return 1;; esac; return 0; }
++xt6(){ printf 'xt6 %s\n' "$*" >> "$CALLS"; case " $* " in *" $XT6_FAIL "*) return 1;; esac; return 0; }
++xt4q(){ xt4 "$@"; }
++xt6q(){ xt6 "$@"; }
++route4(){ :; }
++route6(){ :; }
++v6supported(){ return 0; }
++local_destination_return(){ :; }
++XT4_FAIL="${XT4_FAIL:-<none>}"; XT6_FAIL="${XT6_FAIL:-<none>}"
++'''
++
++# busybox stand-in: `busybox setuidgid SPEC busybox id -u|-g`
++BUSYBOX = r'''#!/bin/sh
++[ "$1" = setuidgid ] || exit 64
++SPEC="$2"; shift 3
++case ",$BB_REFUSE," in *",$SPEC,"*) exit 1;; esac
++[ "$1" = id ] || exit 65
++case "$2" in -u) printf '%s\n' "${BB_UID:-0}";; -g) printf '%s\n' "${BB_GID:-3005}";; *) exit 66;; esac
++'''
++
++
++class Harness(unittest.TestCase):
++    source = PREFIX
++
++    def setUp(self):
++        self.temp = tempfile.TemporaryDirectory(prefix='hetu-core-identity-qa-')
++        self.base = Path(self.temp.name)
++        self.calls = self.base / 'calls'
++        self.functions = self.base / 'functions.sh'
++        self.functions.write_text(self.source + '\n')
++
++    def tearDown(self): self.temp.cleanup()
++
++    def sh(self, body, env=None, functions=None):
++        harness = self.base / 'harness.sh'
++        harness.write_text('. ' + shlex.quote(str(functions or self.functions)) + '\n' +
++                           'BASE=' + shlex.quote(str(self.base / 'base')) + '; RUN="$BASE/run"; mkdir -p "$RUN"\n' +
++                           'CALLS=' + shlex.quote(str(self.calls)) + '\n' + RECORDERS + body + '\n')
++        return subprocess.run(['sh', str(harness)], env=dict(os.environ, **(env or {})),
++                              text=True, capture_output=True, timeout=20)
++
++    def rules(self, body, env=None, functions=None):
++        if self.calls.exists(): self.calls.unlink()
++        result = self.sh(body, env, functions)
++        self.assertEqual((result.returncode, result.stderr), (0, ''), result.stdout + result.stderr)
++        return self.calls.read_text().splitlines() if self.calls.exists() else []
++
++    @staticmethod
++    def state(captured, protos='tcp udp'):
++        gid, dns = ('3005', 'captured') if captured else ('', 'exempt')
++        return (f'CORE_GID={gid}; SYSTEM_DNS={dns}; FAKE_IP_V4={FAKE4}; FAKE_IP_V6={FAKE6}; '
++                f'DNS_PROTOS="{protos}"\n')
++
++    @staticmethod
++    def install(mode='tproxy', scope='blacklist', uids='10100', share=0, direct='10200', gids='', family='4'):
++        lan = LAN4 if family == '4' else 'fc00::/7'
++        return (f'install_mangle{family} 7893 {mode} 1 1 tproxy {scope} "{uids}" {share} "{lan}" "" "{direct}" "{gids}" ""\n'
++                f'install_redirect{family} 7892 {mode} 1 {scope} "{uids}" {share} "{lan}" "" "{direct}" "{gids}" ""\n'
++                f'install_dns_redirect{family} 1053 {scope} "{uids}" {share} "" ""\n')
++
++    def chain(self, lines, tool, table, name):
++        head = f'{tool} -t {table} -A {name} '
++        return [x[len(head):] for x in lines if x.startswith(head)]
++
++
++class RuleShapes(Harness):
++    def test_without_the_core_identity_every_root_socket_stays_out_of_dns_takeover(self):
++        lines = self.rules(self.state(False) + self.install())
++        dns = self.chain(lines, 'xt4', 'nat', 'HETU_DNSOUT')
++        self.assertIn('-m owner --uid-owner 0 -j RETURN', dns)
++        self.assertFalse([x for x in lines if '--gid-owner 3005' in x or '! -d' in x], lines)
++        self.assertIn('-m owner --uid-owner 0-9999 -j RETURN', self.chain(lines, 'xt4', 'mangle', 'HETU_MOUT'))
++
++    def test_captured_exempts_only_the_core_and_lets_fake_ip_flows_through(self):
++        lines = self.rules(self.state(True) + self.install())
++        dns = self.chain(lines, 'xt4', 'nat', 'HETU_DNSOUT')
++        self.assertIn(CORE, dns)
++        self.assertNotIn('-m owner --uid-owner 0 -j RETURN', dns)
++        self.assertEqual(dns[-2:], ['-p tcp --dport 53 -j REDIRECT --to-ports 1053',
++                                    '-p udp --dport 53 -j REDIRECT --to-ports 1053'])
++        mout = self.chain(lines, 'xt4', 'mangle', 'HETU_MOUT')
++        self.assertEqual(mout[1], CORE, mout)
++        self.assertIn(f'! -d {FAKE4} -m owner --uid-owner 0-9999 -j RETURN', mout)
++        self.assertIn(f'! -d {FAKE4} -m owner --uid-owner 10200 -j RETURN', mout)   # bypassed application
++        self.assertIn(f'! -d {FAKE4} -m owner --uid-owner 10100 -j RETURN', mout)   # blacklisted application
++        self.assertFalse([x for x in mout if '-m owner' in x and x.endswith('-j RETURN') and x != CORE and '! -d' not in x], mout)
++
++    def test_captured_ipv6_uses_the_ipv6_fake_range(self):
++        lines = self.rules(self.state(True) + self.install(family='6'))
++        mout = self.chain(lines, 'xt6', 'mangle', 'HETU_MOUT')
++        self.assertEqual(mout[1], CORE, mout)
++        self.assertIn(f'! -d {FAKE6} -m owner --uid-owner 0-9999 -j RETURN', mout)
++        self.assertIn(CORE, self.chain(lines, 'xt6', 'nat', 'HETU_DNSOUT'))
++        self.assertFalse([x for x in lines if FAKE4 in x], lines)
++
++    def test_group_exemption_keeps_its_direct_path_for_real_addresses_only(self):
++        lines = self.rules(self.state(True) + self.install(gids='3003'))
++        self.assertIn(f'! -d {FAKE4} -m owner --gid-owner 3003 -j RETURN', self.chain(lines, 'xt4', 'mangle', 'HETU_MOUT'))
++
++    def test_selected_applications_scope_gets_a_resolver_redirect_and_fake_ip_entries(self):
++        lines = self.rules(self.state(True) + self.install(scope='whitelist'))
++        dns = self.chain(lines, 'xt4', 'nat', 'HETU_DNSOUT')
++        for proto in ('tcp', 'udp'):
++            self.assertIn(f'-m owner --uid-owner 10100 -p {proto} --dport 53 -j REDIRECT --to-ports 1053', dns)
++            self.assertIn(f'-m owner --uid-owner 0 -p {proto} --dport 53 -j REDIRECT --to-ports 1053', dns)
++        self.assertLess(dns.index(CORE), dns.index('-m owner --uid-owner 0 -p tcp --dport 53 -j REDIRECT --to-ports 1053'))
++
++    def test_selected_applications_scope_marks_use_the_script_mark(self):
++        mark = '0x2024/0xffff'
++        lines = self.rules(self.state(True) + 'MARK=0x2024; MASK=0xffff\n' + self.install(scope='whitelist'))
++        mout = self.chain(lines, 'xt4', 'mangle', 'HETU_MOUT')
++        self.assertIn(f'-d {FAKE4} -p tcp -j MARK --set-xmark {mark}', mout)
++        self.assertIn(f'-d {FAKE4} -p udp -j MARK --set-xmark {mark}', mout)
++        self.assertFalse([x for x in mout if '--uid-owner 0-9999' in x], mout)
++
++    def test_selected_applications_redirect_mode_redirects_fake_ip_tcp(self):
++        lines = self.rules(self.state(True) + self.install(mode='redirect', scope='whitelist'))
++        self.assertIn(f'-d {FAKE4} -p tcp -j REDIRECT --to-ports 7892', self.chain(lines, 'xt4', 'nat', 'HETU_NOUT'))
++
++    def test_selected_applications_scope_is_untouched_while_the_resolver_is_exempt(self):
++        lines = self.rules(self.state(False) + self.install(scope='whitelist'))
++        self.assertFalse([x for x in lines if FAKE4 in x or '--uid-owner 0 -p' in x], lines)
++
++    def test_dns_protocol_switches_select_the_redirected_protocols(self):
++        for protos, kept, dropped in (('udp', 'udp', 'tcp'), ('tcp', 'tcp', 'udp')):
++            lines = self.rules(self.state(True, protos) + self.install(share=1))
++            for name in ('HETU_DNSOUT', 'HETU_DNSPRE'):
++                dns = self.chain(lines, 'xt4', 'nat', name)
++                self.assertIn(f'-p {kept} --dport 53 -j REDIRECT --to-ports 1053', dns)
++                self.assertFalse([x for x in dns if f'-p {dropped} ' in x], dns)
++
++    def test_dot_guard_refuses_only_the_resolver_probe(self):
++        lines = self.rules(self.state(True) + 'install_dot_guard xt4\n')
++        self.assertEqual(lines, ['xt4 -t filter -N HETU_DOTOUT',
++                                 'xt4 -t filter -A HETU_DOTOUT ' + CORE,
++                                 'xt4 -t filter -A HETU_DOTOUT -m owner --uid-owner 0 -p tcp --dport 853 -j REJECT --reject-with tcp-reset',
++                                 'xt4 -t filter -I OUTPUT 1 -j HETU_DOTOUT'])
++
++    def test_dot_guard_chain_is_owned_cleaned_and_recorded(self):
++        self.assertIn('DOTOUT=HETU_DOTOUT', SOURCE)
++        for function in ('cleanup4', 'cleanup6'):
++            body = SOURCE.split('\n' + function + '(){', 1)[1].split('\n}\n', 1)[0]
++            self.assertIn('$DOTOUT', body, function)
++        start = SOURCE.split('\nstart(){', 1)[1]
++        self.assertLess(start.index("printf 'CORE_GID=%s"), start.index('GOOGLE_FIREWALL_CLEAN='))
++
++
++@unittest.skipUnless(os.environ.get('HETU_R152_SOURCE'), 'set HETU_R152_SOURCE to compare against runtime 152')
++class LegacyParity(Harness):
++    def test_rules_without_the_core_identity_match_runtime_152(self):
++        old = self.base / 'r152.sh'
++        old.write_text(Path(os.environ['HETU_R152_SOURCE']).read_text().rsplit('\ncase "${1:-status}" in', 1)[0] + '\n')
++        fake = f'FAKE_IP_V4={FAKE4}; FAKE_IP_V6={FAKE6}\n'
++        for mode, scope, share, family in itertools.product(('tproxy', 'redirect', 'enhance'), ('blacklist', 'whitelist'), (0, 1), ('4', '6')):
++            body = self.install(mode=mode, scope=scope, share=share, gids='3003', family=family)
++            new = self.rules(self.state(False) + body)
++            self.assertEqual(new, self.rules(fake + body, functions=old), (mode, scope, share, family))
++            self.assertTrue(new)
++
++
++class CoreIdentity(Harness):
++    def setUp(self):
++        super().setUp()
++        self.magisk = self.base / 'magisk-root'
++        (self.magisk / '.magisk').mkdir(parents=True)
++        self.busybox = self.magisk / '.magisk/busybox'
++        self.busybox.write_text(BUSYBOX); self.busybox.chmod(0o755)
++        for fixed in ('/data/adb/ksu/bin/busybox', '/data/adb/ap/bin/busybox', '/data/adb/magisk/busybox'):
++            if os.path.exists(fixed): self.skipTest(fixed + ' exists on this host')
++
++    def prepare(self, env=None, before='', v6='bypass'):
++        body = ('magisk(){ printf "%s\\n" ' + shlex.quote(str(self.magisk)) + '; }\n' +
++                f'START_V6={v6}\n' + before + 'core_identity_prepare\n'
++                'printf "runner=%s spec=%s dns=%s\\n" "$CORE_RUNNER" "$CORE_SPEC" "$SYSTEM_DNS"\n')
++        result = self.sh(body, env)
++        self.assertEqual((result.returncode, result.stderr), (0, ''), result.stdout + result.stderr)
++        return result.stdout.strip()
++
++    def test_busybox_that_yields_root_net_admin_becomes_the_runner(self):
++        self.assertEqual(self.prepare(), f'runner={self.busybox} spec=root:net_admin dns=exempt')
++
++    def test_numeric_spec_is_the_fallback(self):
++        self.assertEqual(self.prepare({'BB_REFUSE': 'root:net_admin'}), f'runner={self.busybox} spec=0:3005 dns=exempt')
++
++    def test_wrong_identity_or_missing_applet_keeps_the_old_start(self):
++        self.assertEqual(self.prepare({'BB_GID': '0'}), 'runner= spec= dns=exempt')
++        self.assertEqual(self.prepare({'BB_UID': '2000'}), 'runner= spec= dns=exempt')
++        self.assertEqual(self.prepare({'BB_REFUSE': 'root:net_admin,0:3005'}), 'runner= spec= dns=exempt')
++
++    def test_opt_out_marker_keeps_the_old_start(self):
++        before = 'mkdir -p "$BASE/policy"; : > "$BASE/policy/system-dns-direct"\n'
++        self.assertEqual(self.prepare(before=before), 'runner= spec= dns=exempt')
++
++    def test_kernel_without_the_combined_owner_match_keeps_the_old_start(self):
++        self.assertEqual(self.prepare({'XT4_FAIL': '--gid-owner'}), 'runner= spec= dns=exempt')
++        self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}, before='has(){ return 0; }\n', v6='enable'), 'runner= spec= dns=exempt')
++        self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}), f'runner={self.busybox} spec=root:net_admin dns=exempt')
++
++    def confirm(self, gid, dns='tproxy', mode='tproxy', runner='/bb'):
++        body = (f'awk(){{ printf "%s\\n" "{gid}"; }}\nCORE_RUNNER={runner}; START_DNS={dns}; START_MODE={mode}\n'
++                'core_identity_confirm 4242\nprintf "gid=%s dns=%s\\n" "$CORE_GID" "$SYSTEM_DNS"\n')
++        result = self.sh(body)
++        self.assertEqual((result.returncode, result.stderr), (0, ''), result.stdout + result.stderr)
++        return result.stdout.strip()
++
++    def test_confirmation_trusts_only_what_the_kernel_reports(self):
++        self.assertEqual(self.confirm('3005'), 'gid=3005 dns=captured')
++        self.assertEqual(self.confirm('3005', mode='redirect'), 'gid=3005 dns=captured')
++        self.assertEqual(self.confirm('0'), 'gid= dns=exempt')
++        self.assertEqual(self.confirm(''), 'gid= dns=exempt')
++        self.assertEqual(self.confirm('3005', runner=''), 'gid= dns=exempt')
++
++    def test_resolver_capture_needs_dns_takeover_and_an_xtables_mode(self):
++        self.assertEqual(self.confirm('3005', dns='off'), 'gid=3005 dns=exempt')
++        self.assertEqual(self.confirm('3005', mode='tun'), 'gid=3005 dns=exempt')
++        self.assertEqual(self.confirm('3005', mode='ebpf'), 'gid=3005 dns=exempt')
++
++
++class Tuning(Harness):
++    def value(self, call):
++        result = self.sh(call + '; printf "rc=%s\\n" "$?"')
++        self.assertEqual(result.stderr, '', result.stderr)
++        return result.stdout.strip()
++
++    def test_cpu_mask(self):
++        for text, mask in (('0', '1'), ('0-3', 'f'), ('0,2,4-6', '75'), ('7', '80'), ('0-7', 'ff'), ('23', '800000'), ('4-7,0', 'f1')):
++            self.assertEqual(self.value(f'cpu_mask {shlex.quote(text)}'), mask + '\nrc=0', text)
++        for text in ('', 'a', '0-', '-3', '3-1', '24', '0-24', '1-2-3', '00', '0,,1', '0 1', '1;id', '100'):
++            self.assertEqual(self.value(f'cpu_mask {shlex.quote(text)}'), 'rc=1', text)
++
++    def test_memory_limit_bytes(self):
++        for text, size in (('32M', 33554432), ('128M', 134217728), ('128m', 134217728), ('1G', 1073741824),
++                           ('64MiB', 67108864), ('64MB', 67108864), ('65536K', 67108864), ('33554432', 33554432), ('16G', 17179869184)):
++            self.assertEqual(self.value(f'mem_bytes {shlex.quote(text)}'), f'{size}\nrc=0', text)
++        for text in ('', '31M', '100', '17G', 'abc', '1.5G', '-1G', '128 M', '1T', '128M;id'):
++            self.assertEqual(self.value(f'mem_bytes {shlex.quote(text)}'), 'rc=1', text)
++
++    def test_invalid_values_are_named_before_anything_changes(self):
++        def valid(cpu='', mem='', io=''):
++            return self.value(f'START_CPU={shlex.quote(cpu)}; START_MEM={shlex.quote(mem)}; START_IO={shlex.quote(io)}; '
++                              'tuning_valid; RC=$?; printf "%s|%s|%s\\n" "$START_CPU_MASK" "$START_MEM_BYTES" "$TUNE_ERROR"; (exit $RC)')
++        self.assertEqual(valid(), '||\nrc=0')
++        self.assertEqual(valid('0-3', '128M', '4'), 'f|134217728|\nrc=0')
++        self.assertIn('CPU 核心分配格式无效', valid(cpu='9-1'))
++        self.assertIn('内存限制格式无效', valid(mem='8M'))
++        self.assertIn('磁盘 I/O 权重应为 0-7', valid(io='8'))
++        self.assertTrue(valid(io='8').endswith('rc=1'))
++
++    def test_tuning_report_names_each_requested_control(self):
++        tools = ('renice(){ printf "renice %s\\n" "$*" >> "$CALLS"; }\n'
++                 'taskset(){ printf "taskset %s\\n" "$*" >> "$CALLS"; }\n'
++                 'ionice(){ printf "ionice %s\\n" "$*" >> "$CALLS"; [ "${IONICE_FAIL:-0}" != 1 ]; }\n')
++        body = tools + 'START_PERF=1; START_CPU_MASK=f; START_IO=3; START_MEM_BYTES=134217728; core_tune $$; cat "$RUN/tuning-status"\n'
++        result = self.sh(body)
++        self.assertEqual(result.stdout.strip(), 'priority=applied cpu=applied:f io=applied:3 memory=applied:134217728')
++        calls = self.calls.read_text().splitlines()
++        self.assertTrue(any(x.startswith('renice -n -10 -p ') for x in calls), calls)
++        self.assertTrue(any(x.startswith('taskset -ap f ') for x in calls), calls)
++        self.assertTrue(any(x.startswith('ionice -c 2 -n 3 -p ') for x in calls), calls)
++        self.assertEqual(self.sh(tools + 'START_PERF=0; START_CPU_MASK=; START_IO=; START_MEM_BYTES=; core_tune $$; cat "$RUN/tuning-status"\n').stdout.strip(), 'none')
++        failed = self.sh(tools + 'START_PERF=0; START_CPU_MASK=; START_IO=3; START_MEM_BYTES=; core_tune $$; cat "$RUN/tuning-status"\n', {'IONICE_FAIL': '1'})
++        self.assertEqual(failed.stdout.strip(), 'io=failed')
++
++
++if __name__ == '__main__': unittest.main(verbosity=2)
+diff --git a/tools/qa/test_google_firewall.py b/tools/qa/test_google_firewall.py
+index 7df23e2..6dcc513 100644
+--- a/tools/qa/test_google_firewall.py
++++ b/tools/qa/test_google_firewall.py
+@@ -195,10 +195,12 @@ class GoogleFirewall(unittest.TestCase):
+             result = self.protocol(count); self.assertEqual(result.returncode, 0); self.assertIn('accepted:', result.stdout)
+         self.assertEqual(self.protocol(vendor='1').stdout, 'accepted:30:1\n')
+ 
+-    def test_start_protocol_rejects_invalid_flag_and_other_unsupported_controls(self):
++    def test_start_protocol_rejects_invalid_flags_and_accepts_extended_controls(self):
+         result = self.protocol(vendor='2'); self.assertEqual(result.returncode, 1)
+         self.assertFalse(json.loads(result.stdout)['ok'])
+-        result = self.protocol(vendor='1', perf='1'); self.assertEqual(result.returncode, 1)
++        # Runtime 153 implements the extended controls; they used to block every start.
++        self.assertEqual(self.protocol(vendor='1', perf='1').stdout, 'accepted:30:1\n')
++        result = self.protocol(vendor='1', perf='2'); self.assertEqual(result.returncode, 1)
+         self.assertIn('性能模式', json.loads(result.stdout)['message'])
+ 
+ 

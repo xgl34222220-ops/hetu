@@ -24,6 +24,8 @@ final class RootProxyManager {
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
+    /** hetu-root.sh keeps plain root as the core identity while this file exists in ROOT/policy. */
+    static final String SYSTEM_DNS_DIRECT_MARKER="system-dns-direct";
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
@@ -344,6 +346,7 @@ final class RootProxyManager {
                 +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                 +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                 +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
+                +"|systemDns="+bit(prefs.getBoolean("proxyDnsSystemResolver",true))
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
                 +"|sharedMacs="+policy.sharedBypassMacs
@@ -681,6 +684,8 @@ final class RootProxyManager {
                 .putBoolean("proxyRootEgressPending",true)
                 .putInt("proxyRootEgressProbeAttempts",0)
                 .remove("proxyRootEgressProbeLastError")
+                // What the running core answers from; the DNS takeover self-check compares with it.
+                .putString("proxyRootFakeIpV4",p.fakeIps==null?"":p.fakeIps.ipv4)
                 .apply();
 
         String warning=policy.warning();
@@ -1039,9 +1044,20 @@ final class RootProxyManager {
             RootBridge.Result sessionRepairs=RootBridge.rootShell(context,"tail -n 20 "+RootBridge.quote(ROOT+"/run/session-repair.log")+" 2>/dev/null; true",3000L);
             report.section("运行记录兼容修复",sessionRepairs.output,3000);
             RootBridge.Result google=RootBridge.rootShell(context,"cat "+RootBridge.quote(ROOT+"/run/google-firewall-status")
+                    +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                     +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
-            report.section("Google 服务防火墙修复",google.output,5000);
+            report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
         }catch(Exception error){report.section("网络完整性",String.valueOf(error),1000);}
+        try{
+            // Whether ordinary lookups reach the core: the session's own record, the rule counters
+            // (root-owned port 53 packets are the system resolver), and one real lookup from this app.
+            String dns="grep -E '^(DNS|DNS_PORT|CORE_GID|SYSTEM_DNS|DOT_GUARD|PRIVATE_DNS|DNS_PROTOS)=' "+RootBridge.quote(ROOT+"/run/session.state")
+                    +" 2>/dev/null; echo '--- DNS takeover counters ---'; iptables -w 1 -t nat -nvxL HETU_DNSOUT 2>/dev/null; "
+                    +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
+                    +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
+            String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
+            report.section("DNS 接管（系统解析是否进入核心）",probe+"\n"+RootBridge.rootShell(context,dns,5000L).output,6000);
+        }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
         try{
             int wechatUid=-1;
             try{wechatUid=context.getPackageManager().getApplicationInfo("com.tencent.mm",0).uid;}catch(Exception ignored){}
@@ -1300,6 +1316,13 @@ final class RootProxyManager {
                 .append("; chmod 700 ").append(RootBridge.quote(scriptTmp)).append("; chown 0:0 ").append(RootBridge.quote(scriptTmp))
                 .append("; mv -f ").append(RootBridge.quote(scriptTmp)).append(' ').append(RootBridge.quote(SCRIPT))
                 .append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT));
+        // The script reads this marker, not an argument: the 30-field start protocol and the
+        // stored boot plan stay as they are. Present = leave the system resolver alone.
+        String policyDir=ROOT+"/policy",resolverMarker=policyDir+"/"+SYSTEM_DNS_DIRECT_MARKER;
+        cmd.append("; mkdir -p ").append(RootBridge.quote(policyDir)).append("; chmod 700 ").append(RootBridge.quote(policyDir));
+        if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
+        else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
+                .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
         if(deployCore){
             cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
                     .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))

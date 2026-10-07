@@ -52,6 +52,7 @@ jobs:
         sh -n android-app/app/src/main/assets/hetu-root.sh
 
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
+        python3 tools/qa/test_core_identity_dns.py 2>&1 | tee out/verification/core-identity-dns-tests.txt
 
         python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 aa5fdb7d05e04f1b36a15af13d6525de5e2c3c0190e96d3361c2abf54ea2a008
 
@@ -74,6 +75,7 @@ jobs:
         python3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt
 
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
+        python3 tools/qa/test_core_identity_dns.py 2>&1 | tee out/verification/core-identity-dns-tests.txt
 
         python3 .github/scripts/verify_packaged_runtime.py snapshot --script-sha256 32291ca1ef266c1561122fe4ebd2329d3ffacb889c6992f92234afcceaa25fed --autostart-sha256
         3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9
@@ -131,6 +133,7 @@ jobs:
         python3 tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt
 
         python3 tools/qa/test_google_firewall.py 2>&1 | tee out/verification/google-firewall-tests.txt
+        python3 tools/qa/test_core_identity_dns.py 2>&1 | tee out/verification/core-identity-dns-tests.txt
 
         python3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt
 

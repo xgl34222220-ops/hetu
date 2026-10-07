@@ -307,6 +307,31 @@ def main():
                            'versionName': ui88['versionName'],
                            'protectedRuntimeUnchanged': True,
                            'reproducedSourceMatchesCheckout': True}
+        r153_report = None
+        r153_inputs = ROOT / 'updates/v2089-runtime153/inputs.json'
+        if r153_inputs.exists():
+            from runtime153_source_scope import validate_layer as validate_r153_layer
+            assert ui88_report is not None, 'r153 runtime requires the verified v2088 UI layer'
+            r153 = json.loads(r153_inputs.read_text())
+            validate_r153_layer(r153, final_files)
+            r153_patch = r153_inputs.with_name('runtime.patch')
+            assert digest(r153_patch) == r153['patchSha256'], \
+                'r153 runtime patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'r153 baseline mismatch: ' + name
+            apply(r153_patch, work)
+            for name, sha in r153['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'r153 source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(r153['changedOrAddedFiles'])
+            r153_report = {'baseCommit': r153['baseCommit'],
+                           'patchSha256': r153['patchSha256'],
+                           'changedOrAddedFiles': len(r153['changedOrAddedFiles']),
+                           'runtimeRevision': r153['runtimeRevision'],
+                           'versionCode': r153['versionCode'],
+                           'versionName': r153['versionName'],
+                           'protectedPresentationUnchanged': True,
+                           'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)

@@ -944,6 +944,22 @@ TCP 走 Redirect，UDP 走 TPROXY|TCP through Redirect, UDP through TPROXY|TCP �
 Root 下的 TUN 虚拟网卡|A TUN virtual interface under root|Root 下的 TUN 虛擬網路卡|Виртуальный интерфейс TUN под root
 eBPF 重定向到 TUN|eBPF redirect into TUN|eBPF 重新導向至 TUN|Перенаправление eBPF в TUN
 暂不可用|Not available yet|暫不可用|Пока недоступно
+提高核心进程的调度优先级|Raises the scheduling priority of the core process|提高核心行程的排程優先權|Повышает приоритет планирования процесса ядра
+。本次已生效|. Applied to this run|。本次已生效|. Применено в этом запуске
+。本次未生效：系统不允许调整|. Not applied to this run: the system refused the change|。本次未生效：系統不允許調整|. Не применено в этом запуске: система отклонила изменение
+接管系统解析|Capture the system resolver|接管系統解析|Перехватывать системный резолвер
+已关闭：系统解析器直接向网络的 DNS 查询|Off: the system resolver asks the network's DNS directly|已關閉：系統解析器直接向網路的 DNS 查詢|Выключено: системный резолвер обращается к DNS сети напрямую
+让系统解析器的查询也进入核心，应用不再拿到被污染的地址|Sends the system resolver's lookups through the core too, so apps stop receiving poisoned addresses|讓系統解析器的查詢也進入核心，應用程式不再拿到被污染的位址|Запросы системного резолвера тоже идут через ядро, и приложения больше не получают подменённые адреса
+系统设置了指定的私人 DNS：解析走它的加密通道，不经过核心的 DNS|The system uses a named Private DNS: lookups go through its encrypted channel, not the core's DNS|系統設定了指定的私人 DNS：解析走它的加密通道，不經過核心的 DNS|В системе задан частный DNS по имени: запросы идут по его шифрованному каналу, минуя DNS ядра
+已生效：系统解析器的查询进入核心|Active: the system resolver's lookups go through the core|已生效：系統解析器的查詢進入核心|Работает: запросы системного резолвера идут через ядро
+未生效：Root 管理器的 BusyBox 无法切换核心的用户组，仍按旧方式运行|Not active: the root manager's BusyBox cannot switch the core's group, so the old behaviour is kept|未生效：Root 管理器的 BusyBox 無法切換核心的使用者群組，仍按舊方式執行|Не работает: BusyBox менеджера root не может сменить группу ядра, сохранено прежнее поведение
+只让核心在这些 CPU 上运行，如 0-3 或 0,2,4-6|Runs the core only on these CPUs, e.g. 0-3 or 0,2,4-6|只讓核心在這些 CPU 上執行，如 0-3 或 0,2,4-6|Ядро работает только на этих CPU, например 0-3 или 0,2,4-6
+Go 运行时的软上限：接近时更积极回收，不会结束核心；不低于 32M|A soft limit for the Go runtime: it collects harder near the limit and never kills the core; at least 32M|Go 執行階段的軟上限：接近時更積極回收，不會結束核心；不低於 32M|Мягкий предел для среды Go: у предела память освобождается активнее, ядро не завершается; не менее 32M
+0 最优先，7 最靠后|0 is the highest priority, 7 the lowest|0 最優先，7 最靠後|0 — высший приоритет, 7 — низший
+删除厂商防火墙里拦截 Google 服务的规则，只在带这类规则链的系统上有用|Removes vendor firewall rules that block Google services; only useful on systems that have such chains|刪除廠商防火牆裡攔截 Google 服務的規則，只在帶有這類規則鏈的系統上有用|Удаляет правила файрвола производителя, блокирующие сервисы Google; полезно только там, где такие цепочки есть
+没有找到已安装的 Google 服务，本次没有可清理的对象|No installed Google services were found, so there was nothing to clean this time|沒有找到已安裝的 Google 服務，本次沒有可清理的對象|Установленные сервисы Google не найдены, очищать было нечего
+本机没有这类厂商规则链，这个开关在这台设备上不起作用|This device has no such vendor chains; the switch does nothing here|本機沒有這類廠商規則鏈，這個開關在這台裝置上不起作用|На этом устройстве нет таких цепочек производителя; переключатель здесь ничего не делает
+本机有这类规则链。本次检查 %s 条，删除 %s 条|This device has such chains. Checked %s rules and removed %s this time|本機有這類規則鏈。本次檢查 %s 條，刪除 %s 條|На устройстве есть такие цепочки. В этот раз проверено правил: %s, удалено: %s
 """.trimIndent()
 
 /** Stable UI vocabulary. Technical diagnostics and user content retain their original text. */
