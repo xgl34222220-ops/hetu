@@ -40,7 +40,6 @@ import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeCheckMark
-import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeFlag
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.HomeMotion

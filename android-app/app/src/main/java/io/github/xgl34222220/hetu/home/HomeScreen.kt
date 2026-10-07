@@ -59,10 +59,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.ui.HetuStaggerState
 import io.github.xgl34222220.hetu.ui.ht
 import java.util.Locale
 

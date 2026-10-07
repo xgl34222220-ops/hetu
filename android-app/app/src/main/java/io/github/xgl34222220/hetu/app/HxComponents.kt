@@ -1,56 +1,21 @@
 package io.github.xgl34222220.hetu
 
-import io.github.xgl34222220.hetu.ui.HetuHaptic
-import io.github.xgl34222220.hetu.ui.ht
-import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.widget.Toast
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
-import androidx.compose.animation.togetherWith
-import androidx.compose.material.icons.rounded.KeyboardArrowUp
-import androidx.compose.material.icons.rounded.UnfoldMore
-import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import kotlinx.coroutines.launch
-import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.animateDpAsState
-import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.LocalIndication
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.toggleable
-import androidx.compose.ui.semantics.Role
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.window.DialogWindowProvider
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -59,110 +24,185 @@ import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.statusBars
-import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material.icons.rounded.ChevronRight
-import androidx.compose.material.icons.rounded.Close
-import androidx.compose.material.icons.rounded.Cancel
-import androidx.compose.material.icons.rounded.ContentCopy
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Error
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
-import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.Layout
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.isTraversalGroup
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import dev.chrisbanes.haze.hazeEffect
-import dev.chrisbanes.haze.hazeSource
-import dev.chrisbanes.haze.materials.ExperimentalHazeMaterialsApi
-import dev.chrisbanes.haze.materials.HazeMaterials
-import dev.chrisbanes.haze.rememberHazeState
+import io.github.xgl34222220.hetu.home.HomeBarBackdrop
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCardTitle
+import io.github.xgl34222220.hetu.home.HomeChevron
+import io.github.xgl34222220.hetu.home.HomeDialog
+import io.github.xgl34222220.hetu.home.HomeDialogCard
+import io.github.xgl34222220.hetu.home.HomeDialogConfirm
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeEmptyState
+import io.github.xgl34222220.hetu.home.HomeFormField
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeLargeTitleDims
+import io.github.xgl34222220.hetu.home.HomeMenuDivider
+import io.github.xgl34222220.hetu.home.HomeMenuItem
+import io.github.xgl34222220.hetu.home.HomeMenuTitle
+import io.github.xgl34222220.hetu.home.HomeMotion
+import io.github.xgl34222220.hetu.home.HomeNotice
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomePop
+import io.github.xgl34222220.hetu.home.HomeProgressBar
+import io.github.xgl34222220.hetu.home.HomeRefreshBox
+import io.github.xgl34222220.hetu.home.HomeRollingText
+import io.github.xgl34222220.hetu.home.HomeRowDims
+import io.github.xgl34222220.hetu.home.HomeRowDivider
+import io.github.xgl34222220.hetu.home.HomeRowLayout
+import io.github.xgl34222220.hetu.home.HomeSearchField
+import io.github.xgl34222220.hetu.home.HomeSegmentStyle
+import io.github.xgl34222220.hetu.home.HomeSegmented
+import io.github.xgl34222220.hetu.home.HomeSpinner
+import io.github.xgl34222220.hetu.home.HomeStatusDot
+import io.github.xgl34222220.hetu.home.HomeSwitch
+import io.github.xgl34222220.hetu.home.HomeSwitchRow
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeBarProgressive
+import io.github.xgl34222220.hetu.home.LocalHomeBlur
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.badText
+import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.homeGlassSource
+import io.github.xgl34222220.hetu.home.homeRowHighlight
+import io.github.xgl34222220.hetu.home.homeTap
+import io.github.xgl34222220.hetu.home.rememberHomeBarGlass
+import io.github.xgl34222220.hetu.home.rememberHomeStagger
+import io.github.xgl34222220.hetu.ui.HetuStaggerState
+import io.github.xgl34222220.hetu.ui.ht
+import kotlinx.coroutines.launch
+
+/*
+ * The component names the 设置 pages and the tool pages outside the tools module are written
+ * against. Every one of them is now drawn with the home design kit (tokens, rows, switches,
+ * dialogs, menus, motion), so these pages look and move like 首页, 面板 and 工具. Parameters
+ * that only nudged a single page's pixels are still accepted, and ignored.
+ *
+ * Text: titles of pages, sheets, cards and rows are drawn as given, because any of them may be
+ * a name the user chose; callers pass UI text through `ht`. Only what can never be data is
+ * translated here: button labels, field labels and hints, and the words of a dialog.
+ */
 
 /* ------------------------------------------------------------------ */
 /*  Page scaffold                                                      */
 /* ------------------------------------------------------------------ */
 
-internal val HxTopBarHeight = 52.dp
+internal val HxTopBarHeight = HomeDims.barHeight
+
+/** Where the large title of a pushed page starts; it lines up with the back chevron above it. */
+private val HxSubPageTitleInset = 22.dp
+
+/** Hands the blocks of one page their place in its entrance, in the order they are composed. */
+internal class HxEntrance(val stagger: HetuStaggerState) {
+    private var next = 0
+    fun claim(): Int = next++
+}
+
+internal val LocalHxEntrance = staticCompositionLocalOf<HxEntrance?> { null }
 
 /**
- * Every screen uses this. A large left-aligned title scrolls with the content; once it
- * leaves the viewport the same title appears centred in the pinned bar. Title position
- * never animates sideways, so there is no half-way "slightly left" state.
+ * Page entrance of a block inside an [HxPage]: the blocks composed as the page opens rise and
+ * fade in one after another; a block that scrolls in later is simply there. Draw-phase only.
  */
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalHazeMaterialsApi::class)
+@Composable
+internal fun Modifier.hxPageEnter(): Modifier {
+    val entrance = LocalHxEntrance.current ?: return this
+    val index = remember(entrance) { entrance.claim() }
+    return homeEnter(entrance.stagger, index)
+}
+
+/**
+ * Every Hx screen uses this: a lazy list that scrolls under a glass bar.
+ *
+ * - Tab root (no [onBack], [largeTitle]): the 36 sp title sits at the left of the first rows
+ *   with the page's actions pinned at the right. As the list scrolls the title leaves with it
+ *   and a compact title fades into the bar.
+ * - Pushed page with [largeTitle]: back and actions in the bar, the large title under it.
+ * - Pushed page without it: the title is centred in the bar, [subtitle] hanging below.
+ *
+ * [title] and [subtitle] are drawn as given: a page may be named after a file or a node, so the
+ * caller resolves UI text through `ht` itself.
+ */
 @Composable
 internal fun HxPage(
     title: String,
@@ -178,15 +218,15 @@ internal fun HxPage(
     scrollToTopSignal: Int = 0,
     showScrollTop: Boolean = true,
     largeTitle: Boolean = true,
-    largeTitleStartPadding: Dp = Hx.gutter,
-    largeTitleTopPadding: Dp = 0.dp,
-    largeTitleFontSizeSp: Float? = null,
-    compactTitleFontSizeSp: Float = 18f,
-    largeTitleBottomPadding: Dp = 10.dp,
+    @Suppress("UNUSED_PARAMETER") largeTitleStartPadding: Dp = Hx.gutter,
+    @Suppress("UNUSED_PARAMETER") largeTitleTopPadding: Dp = 0.dp,
+    @Suppress("UNUSED_PARAMETER") largeTitleFontSizeSp: Float? = null,
+    @Suppress("UNUSED_PARAMETER") compactTitleFontSizeSp: Float = 20f,
+    @Suppress("UNUSED_PARAMETER") largeTitleBottomPadding: Dp = 10.dp,
     canvasColor: Color? = null,
-    flatCanvas: Boolean = false,
-    referenceTopBar: Boolean = false,
-    referenceLabel: String? = null,
+    @Suppress("UNUSED_PARAMETER") flatCanvas: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") referenceTopBar: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") referenceLabel: String? = null,
     content: LazyListScope.() -> Unit,
 ) {
     val embed = LocalHxEmbed.current
@@ -199,226 +239,174 @@ internal fun HxPage(
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal != initialSignal) listState.animateScrollToItem(0)
     }
-    val c = Hx.colors
-    val pageCanvas = canvasColor ?: c.canvas
+    val c = LocalHomeColors.current
     val density = LocalDensity.current
+    val context = LocalContext.current
+    val shownTitle = title
+    val shownSubtitle = subtitle?.takeIf { it.isNotBlank() }
+    val root = onBack == null
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val thresholdPx = with(density) { 38.dp.toPx() }
-    val collapsed by remember(listState) {
-        derivedStateOf { listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > thresholdPx }
-    }
-    // 0 → large title fully visible, 1 → scrolled away. Read only inside graphicsLayer so
-    // scrolling never recomposes the page.
-    val headerProgress = remember(listState) {
+    val titlePx = with(density) { HomeLargeTitleDims.title.toPx() }
+    // 0 → large title in place, 1 → scrolled away. Read only in draw, so scrolling never recomposes.
+    val headerProgress = remember(listState, titlePx) {
         derivedStateOf {
-            if (listState.firstVisibleItemIndex > 0) 1f
-            else (listState.firstVisibleItemScrollOffset / (thresholdPx * 1.25f)).coerceIn(0f, 1f)
+            if (listState.firstVisibleItemIndex > 0) 1f else (listState.firstVisibleItemScrollOffset / titlePx).coerceIn(0f, 1f)
+        }
+    }
+    val lifted by remember(listState, titlePx, largeTitle) {
+        derivedStateOf {
+            listState.firstVisibleItemIndex > 0 || listState.firstVisibleItemScrollOffset > (if (largeTitle) titlePx * .6f else 6f)
         }
     }
     val scrollTopWanted by remember(listState) { derivedStateOf { listState.firstVisibleItemIndex > 7 } }
-    val barAlpha by animateFloatAsState(if (!largeTitle || collapsed) 1f else 0f, tween(HxMotion.Short), label = "barAlpha")
     val listBottom = (if (bottomPadding > 0.dp) bottomPadding else navInset) + 24.dp
-
-    val pageHaze = rememberHazeState()
-    val pageBrush = if (c.dark || flatCanvas) {
-        Brush.verticalGradient(listOf(pageCanvas, pageCanvas))
-    } else {
-        Brush.verticalGradient(
-            listOf(
-                Color(0xFFF0F2FD),
-                Color(0xFFECEFFB),
-                Color(0xFFE9ECF9),
-            ),
-        )
+    val rowHeight = if (root && largeTitle) HomeLargeTitleDims.bar else HomeDims.barHeight
+    val barHeight = rowHeight + if (!largeTitle && shownSubtitle != null) 14.dp else 0.dp
+    val listTop = statusTop + when {
+        !largeTitle -> barHeight + 6.dp
+        root -> HomeLargeTitleDims.titleTop
+        else -> barHeight
     }
-    Box(Modifier.fillMaxSize().background(pageBrush)) {
-        val list: @Composable () -> Unit = {
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.fillMaxSize().hazeSource(pageHaze),
-                contentPadding = PaddingValues(
-                    top = statusTop + HxTopBarHeight,
-                    bottom = listBottom,
-                ),
-            ) {
-                if (largeTitle) item(key = "hx-page-header") {
-                    Row(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(start = largeTitleStartPadding, end = Hx.gutter + 2.dp, top = largeTitleTopPadding, bottom = largeTitleBottomPadding)
-                            .graphicsLayer {
-                                val p = headerProgress.value
-                                alpha = 1f - p * .92f
-                                val scale = 1f - .05f * p
-                                scaleX = scale
-                                scaleY = scale
-                                transformOrigin = androidx.compose.ui.graphics.TransformOrigin(0f, 1f)
-                                translationY = p * 10.dp.toPx()
-                            },
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                title,
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontSize = largeTitleFontSizeSp?.sp ?: MaterialTheme.typography.headlineMedium.fontSize,
-                                    lineHeight = largeTitleFontSizeSp?.let { (it + 8f).sp } ?: MaterialTheme.typography.headlineMedium.lineHeight,
-                                    letterSpacing = (-0.35).sp,
-                                ),
-                                color = c.text,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                            )
-                            if (!subtitle.isNullOrBlank()) {
-                                Spacer(Modifier.height(2.dp))
-                                Text(subtitle, style = MaterialTheme.typography.bodyMedium, color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            }
-                        }
-                        if (!referenceLabel.isNullOrBlank()) {
-                            Text(
-                                referenceLabel,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = c.textFaint,
-                                maxLines = 1,
-                            )
-                        }
-                        if (!collapsed && onBack == null) {
-                            Row(verticalAlignment = Alignment.CenterVertically, content = actions)
+    // Read on every composition: it is a memory lookup, and the page that changes it sees it at once.
+    val progressive = context.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive") != "gaussian"
+
+    val stagger = rememberHomeStagger()
+    val entrance = remember(stagger) { HxEntrance(stagger) }
+
+    CompositionLocalProvider(LocalHomeBlur provides LocalHxBlur.current, LocalHomeBarProgressive provides progressive, LocalHxEntrance provides entrance) {
+        val glass = rememberHomeBarGlass(lifted)
+        Box(Modifier.fillMaxSize().background(canvasColor ?: c.bg)) {
+            val list: @Composable () -> Unit = {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.fillMaxSize().homeGlassSource(glass),
+                    contentPadding = PaddingValues(top = listTop, bottom = listBottom),
+                ) {
+                    if (largeTitle) item(key = "hx-page-header") {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(start = if (root) HomeLargeTitleDims.inset else HxSubPageTitleInset, end = if (root) 72.dp else HxSubPageTitleInset, bottom = 14.dp)
+                                .graphicsLayer {
+                                    val p = headerProgress.value
+                                    alpha = (1f - p * 1.6f).coerceIn(0f, 1f)
+                                    val scale = 1f - .06f * p
+                                    scaleX = scale
+                                    scaleY = scale
+                                    transformOrigin = TransformOrigin(0f, 1f)
+                                },
+                        ) {
+                            Text(shownTitle, Modifier.semantics { heading() }, color = c.t1, style = HomeType.largeTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                            if (shownSubtitle != null) Text(shownSubtitle, Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note.copy(fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
                         }
                     }
-                } else if (!subtitle.isNullOrBlank()) item(key = "hx-page-compact-subtitle") {
+                    content()
+                }
+            }
+            if (onRefresh != null) {
+                HomeRefreshBox(refreshing, onRefresh, ht("刷新"), Modifier.fillMaxSize(), indicatorPadding = PaddingValues(top = statusTop + barHeight)) { list() }
+            } else {
+                list()
+            }
+
+            HomeBarBackdrop(glass, Modifier.fillMaxWidth().height(statusTop + barHeight))
+            Box(Modifier.fillMaxWidth().windowInsetsPadding(WindowInsets.statusBars).heightIn(min = barHeight)) {
+                val twoLine = !largeTitle && shownSubtitle != null
+                HxBarRow(
+                    Modifier.fillMaxWidth().height(rowHeight).padding(horizontal = 6.dp),
+                    start = {
+                        if (onBack != null) HomeIconButton(HomeIcons.ChevronLeft, "返回", onBack, glyph = 26.dp)
+                        leadingActions()
+                    },
+                    end = actions,
+                ) {
+                    // With a large title below it this one is only for the eye: it fades in as
+                    // the large one leaves and is not announced a second time.
                     Text(
-                        subtitle,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 8.dp, bottom = 10.dp),
+                        shownTitle,
+                        (if (largeTitle) Modifier.clearAndSetSemantics { } else Modifier.semantics { heading() })
+                            .padding(start = 8.dp, end = 8.dp, bottom = if (twoLine) 10.dp else 0.dp)
+                            .graphicsLayer {
+                                if (largeTitle) {
+                                    val p = ((headerProgress.value - .55f) / .45f).coerceIn(0f, 1f)
+                                    alpha = p
+                                    translationY = (1f - p) * 8.dp.toPx()
+                                }
+                            },
+                        color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                     )
                 }
-                content()
-            }
-        }
-        if (onRefresh != null) {
-            val pullState = rememberPullToRefreshState()
-            PullToRefreshBox(
-                isRefreshing = refreshing,
-                onRefresh = { if (!refreshing) onRefresh() },
-                modifier = Modifier.fillMaxSize(),
-                state = pullState,
-                indicator = {
-                    PullToRefreshDefaults.Indicator(
-                        state = pullState,
-                        isRefreshing = refreshing,
-                        modifier = Modifier.align(Alignment.TopCenter).padding(top = statusTop + HxTopBarHeight - 8.dp),
-                        containerColor = c.surface,
-                        color = c.accent,
-                    )
-                },
-            ) { list() }
-        } else {
-            list()
-        }
-
-        // Pinned bar: frosted glass over the scrolling content once the large title is gone.
-        val blur = LocalHxBlur.current
-        val topBarStyle = LocalContext.current.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive").orEmpty()
-        val progressiveBar = topBarStyle != "gaussian"
-        Box(Modifier.fillMaxWidth().align(Alignment.TopCenter).height(statusTop + HxTopBarHeight)) {
-            // Progressive blur stays denser near the status bar and dissolves into content.
-            Box(
-                Modifier
-                    .matchParentSize()
-                    .graphicsLayer { alpha = barAlpha }
-                    .then(
-                        if (blur) Modifier.hazeEffect(state = pageHaze, style = HazeMaterials.ultraThin()) {
-                            blurRadius = if (progressiveBar) 28.dp else 22.dp
-                            noiseFactor = .008f
-                        } else Modifier,
-                    )
-                    .then(
-                        if (blur && progressiveBar) Modifier.background(
-                            Brush.verticalGradient(listOf(pageCanvas.copy(alpha = .38f), pageCanvas.copy(alpha = .20f), pageCanvas.copy(alpha = .035f)))
-                        ) else Modifier.background(pageCanvas.copy(alpha = if (blur) .24f else 1f))
-                    ),
-            )
-            // Collapsed title sits dead centre in the bar; back and actions float on either side.
-            Box(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = statusTop, start = 4.dp, end = 4.dp)
-                    .height(HxTopBarHeight),
-            ) {
-                Text(
-                    title,
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .padding(horizontal = 96.dp)
-                        .graphicsLayer {
-                            alpha = barAlpha
-                            translationY = (1f - barAlpha) * 8.dp.toPx()
-                            val s = .94f + .06f * barAlpha
-                            scaleX = s
-                            scaleY = s
-                        },
-                    style = MaterialTheme.typography.titleMedium.copy(fontSize = compactTitleFontSizeSp.sp, fontWeight = if (referenceTopBar) FontWeight.Bold else FontWeight.SemiBold),
-                    color = c.text,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
-                )
-                if (onBack != null) {
-                    IconButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterStart)) {
-                        Icon(if (referenceTopBar) io.github.xgl34222220.hetu.home.HomeIcons.ChevronLeft else Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = ht("返回"), tint = c.text)
-                    }
-                }
-                if (!largeTitle || collapsed || onBack != null) {
-                    Row(
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                        verticalAlignment = Alignment.CenterVertically,
-                        content = actions,
+                if (twoLine) {
+                    Text(
+                        shownSubtitle.orEmpty(), Modifier.align(Alignment.TopCenter).padding(top = rowHeight - 22.dp, start = 28.dp, end = 28.dp),
+                        color = c.t2, style = HomeType.barSubtitle, maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center,
                     )
                 }
             }
-            if (c.dark) HorizontalDivider(Modifier.align(Alignment.BottomCenter), color = c.line.copy(alpha = barAlpha * .28f), thickness = 0.5.dp)
-        }
 
-        // Long lists get a small glass "back to top" button once the user is deep in them.
-        val scrollScope = rememberCoroutineScope()
-        AnimatedVisibility(
-            visible = showScrollTop && scrollTopWanted,
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = listBottom - 8.dp),
-            enter = fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .6f),
-            exit = fadeOut(tween(HxMotion.Short)) + scaleOut(tween(HxMotion.Short), targetScale = .6f),
-        ) {
-            HxScrollTopButton { scrollScope.launch { listState.animateScrollToItem(0) } }
+            // Long lists get a small "back to top" button once the user is deep in them.
+            val scrollScope = rememberCoroutineScope()
+            HomePop(showScrollTop && scrollTopWanted, Modifier.align(Alignment.BottomEnd).padding(end = 18.dp, bottom = listBottom - 6.dp)) {
+                HxScrollTopButton { scrollScope.launch { listState.animateScrollToItem(0) } }
+            }
+            overlay()
         }
-        overlay()
+    }
+}
+
+/**
+ * The row of a top bar: buttons at both ends and the title between them. The title sits on the
+ * bar's centre line whenever it fits there; when one side holds more buttons than the other
+ * leaves room for, it centres in the space that is left instead of sliding under them.
+ */
+@Composable
+private fun HxBarRow(
+    modifier: Modifier,
+    start: @Composable RowScope.() -> Unit,
+    end: @Composable RowScope.() -> Unit,
+    title: @Composable () -> Unit,
+) {
+    Layout(
+        content = {
+            Row(verticalAlignment = Alignment.CenterVertically, content = start)
+            Row(verticalAlignment = Alignment.CenterVertically, content = end)
+            Box(contentAlignment = Alignment.Center) { title() }
+        },
+        modifier = modifier,
+    ) { measurables, constraints ->
+        val loose = constraints.copy(minWidth = 0, minHeight = 0)
+        val leading = measurables[0].measure(loose)
+        val trailing = measurables[1].measure(loose.copy(maxWidth = (constraints.maxWidth - leading.width).coerceAtLeast(0)))
+        val free = (constraints.maxWidth - leading.width - trailing.width).coerceAtLeast(0)
+        val label = measurables[2].measure(loose.copy(maxWidth = free))
+        val centredRoom = constraints.maxWidth - 2 * maxOf(leading.width, trailing.width)
+        val x = if (label.width <= centredRoom) (constraints.maxWidth - label.width) / 2 else leading.width + (free - label.width) / 2
+        val height = if (constraints.hasBoundedHeight) constraints.maxHeight else maxOf(leading.height, trailing.height, label.height)
+        layout(constraints.maxWidth, height) {
+            leading.place(0, (height - leading.height) / 2)
+            trailing.place(constraints.maxWidth - trailing.width, (height - trailing.height) / 2)
+            label.place(x, (height - label.height) / 2)
+        }
     }
 }
 
 @Composable
 private fun HxScrollTopButton(onClick: () -> Unit) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val source = remember { MutableInteractionSource() }
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val label = ht("回到顶部")
     Box(
         Modifier
-            .hxPressScale(source, .9f)
-            .size(42.dp)
-            .hxSoftShadow(CircleShape, 10.dp)
+            .size(46.dp)
+            .homeTap(onClickLabel = label) { haptics(HomeHaptic.Tick); onClick() }
+            .shadow(12.dp, CircleShape, ambientColor = Color.Black.copy(alpha = .08f), spotColor = Color.Black.copy(alpha = .18f))
             .clip(CircleShape)
-            .background(c.surface.copy(alpha = .96f))
-            .border(0.5.dp, c.line, CircleShape)
-            .clickable(interactionSource = source, indication = LocalIndication.current) {
-                haptics.perform(HetuHaptic.Tick)
-                onClick()
-            },
+            .background(c.raised)
+            .let { if (c.dark) it.border(1.dp, c.line, CircleShape) else it }
+            .semantics { contentDescription = label },
         contentAlignment = Alignment.Center,
-    ) {
-        Icon(Icons.Rounded.KeyboardArrowUp, contentDescription = ht("回到顶部"), tint = c.text, modifier = Modifier.size(22.dp))
-    }
+    ) { Icon(HomeIcons.ArrowUp, null, Modifier.size(22.dp), tint = c.t1) }
 }
 
 /**
@@ -426,7 +414,6 @@ private fun HxScrollTopButton(onClick: () -> Unit) {
  * subtitle are handed to the host page through stable wrappers, so they update in place
  * without the host and the section recomposing each other in a loop.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun HxEmbeddedPage(
     embed: HxEmbed,
@@ -438,7 +425,6 @@ private fun HxEmbeddedPage(
     overlay: @Composable BoxScope.() -> Unit,
     content: LazyListScope.() -> Unit,
 ) {
-    val c = Hx.colors
     val currentLeadingActions by rememberUpdatedState(leadingActions)
     val currentActions by rememberUpdatedState(actions)
     val currentOverlay by rememberUpdatedState(overlay)
@@ -466,22 +452,7 @@ private fun HxEmbeddedPage(
         ) { content() }
     }
     if (onRefresh != null) {
-        val pullState = rememberPullToRefreshState()
-        PullToRefreshBox(
-            isRefreshing = refreshing,
-            onRefresh = { if (!refreshing) onRefresh() },
-            modifier = Modifier.fillMaxSize(),
-            state = pullState,
-            indicator = {
-                PullToRefreshDefaults.Indicator(
-                    state = pullState,
-                    isRefreshing = refreshing,
-                    modifier = Modifier.align(Alignment.TopCenter).padding(top = (embed.top - 6.dp).coerceAtLeast(0.dp)),
-                    containerColor = c.surface.copy(alpha = .90f),
-                    color = c.accent,
-                )
-            },
-        ) { list() }
+        HomeRefreshBox(refreshing, onRefresh, ht("刷新"), Modifier.fillMaxSize(), indicatorPadding = PaddingValues(top = (embed.top - 6.dp).coerceAtLeast(0.dp))) { list() }
     } else {
         list()
     }
@@ -491,42 +462,33 @@ private fun HxEmbeddedPage(
 /*  Surfaces                                                            */
 /* ------------------------------------------------------------------ */
 
-/** Press feedback shared by every tappable surface: a small, quick scale. */
+/** Press feedback for bespoke tappable surfaces: a small, quick scale. */
 @Composable
 internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HxMotion.press(), label = "press")
+    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HomeMotion.glide(LocalHomeMotionEnabled.current), label = "press")
     return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
+/** Card on the canvas: 24 dp continuous corners, no border, no resting shadow. */
 @Composable
 internal fun HxCard(
     modifier: Modifier = Modifier,
     onClick: (() -> Unit)? = null,
-    color: Color = Hx.colors.surface,
-    padding: PaddingValues = PaddingValues(14.dp),
-    brush: androidx.compose.ui.graphics.Brush? = null,
+    color: Color = LocalHomeColors.current.surface,
+    padding: PaddingValues = PaddingValues(HomeDims.cardPadding),
+    brush: Brush? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val source = remember { MutableInteractionSource() }
-    val c = Hx.colors
-    Surface(
-        modifier = modifier.then(if (onClick != null) Modifier.hxPressScale(source) else Modifier).hxSoftShadow(Hx.cardShape),
-        shape = Hx.cardShape,
-        color = color,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line) else null,
-    ) {
-        Column(
-            Modifier
-                .then(if (brush != null) Modifier.background(brush) else Modifier)
-                .then(if (onClick != null) Modifier.clickable(interactionSource = source, indication = LocalIndication.current, onClick = onClick) else Modifier)
-                .padding(padding),
-            content = content,
-        )
-    }
+    val haptics = LocalHomeHaptics.current
+    val tappable = if (onClick == null) modifier else modifier.homeTap { haptics(HomeHaptic.Tap); onClick() }
+    Column(
+        tappable.clip(HomeDims.cardShape).background(color).let { if (brush != null) it.background(brush) else it }.padding(padding),
+        content = content,
+    )
 }
 
-/** A titled group of rows. */
+/** A titled block of content with the page gutters. */
 @Composable
 internal fun HxSection(
     title: String? = null,
@@ -534,18 +496,10 @@ internal fun HxSection(
     trailing: @Composable (RowScope.() -> Unit)? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    Column(modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) {
+    Column(modifier.fillMaxWidth().hxPageEnter().padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) {
         if (title != null || trailing != null) {
-            Row(
-                Modifier.fillMaxWidth().padding(start = 4.dp, end = 2.dp, bottom = 6.dp).heightIn(min = 20.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    title.orEmpty(),
-                    style = MaterialTheme.typography.labelMedium.copy(fontSize = 12.sp, letterSpacing = 0.18.sp),
-                    color = Hx.colors.textMuted,
-                    modifier = Modifier.weight(1f),
-                )
+            Row(Modifier.fillMaxWidth().padding(start = 16.dp, end = 6.dp, bottom = 8.dp).heightIn(min = 24.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(title.orEmpty(), Modifier.weight(1f).semantics { heading() }, color = LocalHomeColors.current.t2, style = HomeType.noteStrong)
                 if (trailing != null) trailing()
             }
         }
@@ -553,123 +507,89 @@ internal fun HxSection(
     }
 }
 
-/** Rows stacked in one card with inset hairlines. */
+/** Rows stacked in one card. Rows that come and go resize the card smoothly. */
 @Composable
 internal fun HxGroup(modifier: Modifier = Modifier, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
-    val c = Hx.colors
-    Surface(
-        modifier = modifier.fillMaxWidth(),
-        shape = Hx.cardShape,
-        color = c.surface,
-        border = if (c.dark) BorderStroke(0.5.dp, c.line.copy(alpha = .72f)) else null,
-        shadowElevation = 0.dp,
-        tonalElevation = 0.dp,
+    val c = LocalHomeColors.current
+    Column(
+        modifier.fillMaxWidth().semantics { isTraversalGroup = true }.clip(HomeDims.cardShape).background(c.surface)
+            .animateContentSize(HomeMotion.glide(LocalHomeMotionEnabled.current)).padding(top = if (title == null) 4.dp else 0.dp, bottom = 4.dp),
     ) {
-        // Rows that appear/disappear (expanded options, loaded lists) resize the card smoothly.
-        Column(Modifier.animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized)).padding(vertical = 2.dp)) {
-            if (title != null) {
-                Text(
-                    title,
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = Hx.colors.text,
-                    modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 2.dp),
-                )
-            }
-            content()
-        }
+        if (title != null) HomeCardTitle(title)
+        content()
     }
 }
 
+/** Hairline between two rows of a card, starting under the text column. */
 @Composable
-internal fun HxDivider(inset: Dp = 50.dp) {
-    // Rows inside a card are separated by rhythm, not rules; a faint hairline remains in dark mode.
-    if (Hx.colors.dark) HorizontalDivider(Modifier.padding(start = inset), thickness = 0.5.dp, color = Hx.colors.line.copy(alpha = .35f))
+internal fun HxDivider(inset: Dp = HomeRowDims.textStart) {
+    HomeRowDivider(start = if (inset > 0.dp) HomeRowDims.textStart else HomeRowDims.start)
 }
 
 @Composable
-internal fun HxIconBadge(icon: ImageVector, tint: Color = Hx.colors.accent, size: Dp = 27.dp) {
-    val c = Hx.colors
-    val foreground = if (tint == c.bad) c.bad else c.textMuted
-    Box(Modifier.size(size), contentAlignment = Alignment.Center) {
-        Icon(icon, contentDescription = null, tint = foreground, modifier = Modifier.size(19.dp))
-    }
+internal fun HxIconBadge(icon: ImageVector, tint: Color = LocalHomeColors.current.t1, size: Dp = HomeRowDims.icon) {
+    Icon(hxLineIcon(icon), contentDescription = null, tint = tint, modifier = Modifier.size(size))
 }
 
 /**
- * The single list-row primitive. Title, optional supporting line, optional trailing
- * slot; whole row tappable when [onClick] is set.
+ * The single list-row primitive. Title, optional supporting line, optional trailing slot; the
+ * whole row is tappable when [onClick] is set, and remembers where it was touched so a menu
+ * opened from it can grow out of it. [selected] keeps the row marked while that menu is open.
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 internal fun HxRow(
     title: String,
     modifier: Modifier = Modifier,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
+    @Suppress("UNUSED_PARAMETER") iconTint: Color = LocalHomeColors.current.t1,
     enabled: Boolean = true,
     danger: Boolean = false,
-    referenceRow: Boolean = false,
-    referenceTextSizeSp: Float = 16f,
-    minimumHeight: Dp = 50.dp,
+    @Suppress("UNUSED_PARAMETER") referenceRow: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") referenceTextSizeSp: Float = 18f,
+    minimumHeight: Dp = 0.dp,
     onClick: (() -> Unit)? = null,
     onLongClick: (() -> Unit)? = null,
+    selected: Boolean = false,
     trailing: @Composable (RowScope.() -> Unit)? = null,
 ) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val contentAlpha by animateFloatAsState(if (enabled) 1f else .45f, tween(HxMotion.Medium), label = "rowAlpha")
-    Row(
-        modifier
-            .fillMaxWidth()
-            .hxAnchorSource()
-            .then(
-                if ((onClick != null || onLongClick != null) && enabled) Modifier.hxCombinedClick(
-                    onClick = onClick ?: {},
-                    onLongClick = onLongClick?.let { long -> { haptics.perform(HetuHaptic.LongPress); long() } },
-                ) else Modifier,
-            )
-            .heightIn(min = minimumHeight)
-            .padding(horizontal = if (referenceRow) (if (referenceTextSizeSp >= 18f) 21.dp else 18.dp) else 14.dp, vertical = 8.dp)
-            .graphicsLayer { alpha = contentAlpha },
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (icon != null) {
-            if (referenceRow) Icon(settingsLineIcon(icon), null, tint = if (danger) c.bad else c.text, modifier = Modifier.size(24.dp))
-            else HxIconBadge(icon, if (danger) c.bad else iconTint)
-            Spacer(Modifier.width(if (referenceRow) (if (referenceTextSizeSp >= 18f) 24.dp else 16.dp) else 9.dp))
-        }
-        Column(Modifier.weight(1f)) {
-            Text(
-                title,
-                style = if (referenceRow) MaterialTheme.typography.bodyLarge.copy(fontSize = referenceTextSizeSp.sp, lineHeight = (referenceTextSizeSp + 5f).sp) else MaterialTheme.typography.bodyLarge,
-                fontWeight = if (referenceRow) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (danger) c.bad else c.text,
-                maxLines = 2,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!subtitle.isNullOrBlank()) {
-                Text(subtitle, style = if (referenceRow) MaterialTheme.typography.bodySmall.copy(fontSize = 12.5.sp, lineHeight = 17.sp) else MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 3, overflow = TextOverflow.Ellipsis)
-            }
-        }
-        if (trailing != null) {
-            Spacer(Modifier.width(8.dp))
-            trailing()
-        }
-    }
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val source = remember { MutableInteractionSource() }
+    val line = subtitle?.takeIf { it.isNotBlank() }
+    val standard = if (line == null) HomeRowDims.oneLine else HomeRowDims.twoLine
+    val interactive = if ((onClick != null || onLongClick != null) && enabled) Modifier.combinedClickable(
+        interactionSource = source,
+        indication = null,
+        onLongClick = onLongClick?.let { long -> { haptics(HomeHaptic.Confirm); long() } },
+        onClick = { if (onClick != null) { haptics(HomeHaptic.Tap); onClick() } },
+    ) else Modifier
+    HomeRowLayout(
+        title = AnnotatedString(title),
+        modifier = modifier.hxAnchorSource().homeRowHighlight(source, selected).then(interactive),
+        subtitle = line,
+        icon = icon?.let(::hxLineIcon),
+        iconTint = if (danger) c.bad else c.t1,
+        titleColor = if (danger) c.badText else c.t1,
+        titleMaxLines = 2,
+        subtitleMaxLines = 3,
+        enabled = enabled,
+        minHeight = if (minimumHeight > standard) minimumHeight else standard,
+        trailing = trailing,
+    )
 }
 
 @Composable
-internal fun HxChevron() {
-    Icon(Icons.Rounded.ChevronRight, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(18.dp))
-}
+internal fun HxChevron() = HomeChevron()
 
+/** A row that leads somewhere, or opens a picker when [dropdown]; [value] is the current choice. */
 @Composable
 internal fun HxNavRow(
     title: String,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
+    iconTint: Color = LocalHomeColors.current.t1,
     value: String? = null,
     enabled: Boolean = true,
     danger: Boolean = false,
@@ -677,28 +597,21 @@ internal fun HxNavRow(
     onClick: () -> Unit,
 ) {
     HxRow(title, subtitle = subtitle, icon = icon, iconTint = iconTint, enabled = enabled, danger = danger, onClick = onClick) {
-        if (!value.isNullOrBlank()) {
-            AnimatedContent(
-                targetState = value,
-                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
-                label = "navValue",
-            ) { v ->
-                Text(
-                    v,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = Hx.colors.textMuted,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.widthIn(max = 150.dp),
-                )
-            }
-            Spacer(Modifier.width(2.dp))
-        }
-        if (dropdown) Icon(Icons.Rounded.UnfoldMore, contentDescription = null, tint = Hx.colors.textFaint, modifier = Modifier.size(18.dp))
-        else HxChevron()
+        HxRowValue(value, dropdown)
     }
 }
 
+/** The current value at the end of a row, then the chevron that says what a tap does. */
+@Composable
+internal fun RowScope.HxRowValue(value: String?, dropdown: Boolean = false) {
+    val c = LocalHomeColors.current
+    if (!value.isNullOrBlank()) {
+        HomeRollingText(value, c.t2, HomeType.label.copy(fontWeight = FontWeight.Medium), Modifier.widthIn(max = 150.dp), alignment = Alignment.CenterEnd)
+    }
+    HomeChevron(dropdown = dropdown)
+}
+
+/** One labelled switch: the whole row toggles and is announced once. */
 @Composable
 internal fun HxSwitchRow(
     title: String,
@@ -706,35 +619,29 @@ internal fun HxSwitchRow(
     onChange: (Boolean) -> Unit,
     subtitle: String? = null,
     icon: ImageVector? = null,
-    iconTint: Color = Hx.colors.accent,
+    @Suppress("UNUSED_PARAMETER") iconTint: Color = LocalHomeColors.current.t1,
     enabled: Boolean = true,
 ) {
-    val haptics = rememberHetuHaptics()
-    HxRow(title, subtitle = subtitle, icon = icon, iconTint = iconTint, enabled = enabled, onClick = {
-        haptics.perform(if (!checked) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
-        onChange(!checked)
-    }) {
-        HxSwitch(checked = checked, onChange = onChange, enabled = enabled)
-    }
+    HomeSwitchRow(
+        title = AnnotatedString(title), checked = checked, onCheckedChange = onChange,
+        subtitle = subtitle?.takeIf { it.isNotBlank() }, icon = icon?.let(::hxLineIcon), enabled = enabled,
+    )
 }
 
+/** A switch that stands on its own, outside a row. */
 @Composable
 internal fun HxSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Boolean = true) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val thumbOffset by animateDpAsState(if (checked) 25.dp else 3.dp, tween(HxMotion.Short), label = "switchThumb")
-    val track by animateColorAsState(if (checked) c.accent else c.line, tween(HxMotion.Short), label = "switchTrack")
+    val haptics = LocalHomeHaptics.current
+    val source = remember { MutableInteractionSource() }
     Box(
-        Modifier.size(width = 50.dp, height = 48.dp)
-            .toggleable(value = checked, enabled = enabled, role = Role.Switch) { on ->
-                haptics.perform(if (on) HetuHaptic.ToggleOn else HetuHaptic.ToggleOff)
+        Modifier
+            .size(width = 50.dp, height = 48.dp)
+            .toggleable(value = checked, interactionSource = source, indication = null, enabled = enabled, role = Role.Switch) { on ->
+                haptics(HomeHaptic.Tick)
                 onChange(on)
-            }.graphicsLayer { alpha = if (enabled) 1f else .4f },
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Box(Modifier.fillMaxWidth().height(28.dp).clip(Hx.pillShape).background(track))
-        Box(Modifier.offset(x = thumbOffset).size(22.dp).clip(Hx.pillShape).background(c.onAccent))
-    }
+            },
+        contentAlignment = Alignment.Center,
+    ) { HomeSwitch(checked, enabled = enabled) }
 }
 
 /* ------------------------------------------------------------------ */
@@ -743,51 +650,46 @@ internal fun HxSwitch(checked: Boolean, onChange: (Boolean) -> Unit, enabled: Bo
 
 internal enum class HxTone { Neutral, Accent, Good, Warn, Bad }
 
-@Composable
-internal fun HxTone.fg(): Color = when (this) {
-    HxTone.Neutral -> Hx.colors.textMuted
-    HxTone.Accent -> Hx.colors.accent
-    HxTone.Good -> Hx.colors.good
-    HxTone.Warn -> Hx.colors.warn
-    HxTone.Bad -> Hx.colors.bad
+internal fun HxTone.home(): HomeTone = when (this) {
+    HxTone.Neutral -> HomeTone.Neutral
+    HxTone.Accent -> HomeTone.Accent
+    HxTone.Good -> HomeTone.Good
+    HxTone.Warn -> HomeTone.Warn
+    HxTone.Bad -> HomeTone.Bad
 }
 
 @Composable
-internal fun HxTone.bg(): Color = when (this) {
-    HxTone.Neutral -> Hx.colors.surfaceMuted
-    HxTone.Accent -> Hx.colors.accentSoft
-    HxTone.Good -> Hx.colors.goodSoft
-    HxTone.Warn -> Hx.colors.warnSoft
-    HxTone.Bad -> Hx.colors.badSoft
-}
-
-@Composable
-internal fun HxPill(text: String, tone: HxTone = HxTone.Neutral, modifier: Modifier = Modifier) {
-    val bg by animateColorAsState(tone.bg(), tween(HxMotion.Medium), label = "pillBg")
-    val fg by animateColorAsState(tone.fg(), tween(HxMotion.Medium), label = "pillFg")
-    Box(
-        modifier
-            .clip(Hx.pillShape)
-            .background(bg)
-            .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
-            .padding(horizontal = 8.dp, vertical = 3.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, style = MaterialTheme.typography.labelSmall, color = fg, maxLines = 1)
+internal fun HxTone.fg(): Color = LocalHomeColors.current.let { c ->
+    when (this) {
+        HxTone.Neutral -> c.t2
+        HxTone.Accent -> c.accent
+        HxTone.Good -> c.good
+        HxTone.Warn -> c.warn
+        HxTone.Bad -> c.bad
     }
 }
 
 @Composable
-internal fun HxDot(color: Color, size: Dp = 8.dp) {
-    Box(Modifier.size(size).clip(CircleShape).background(color))
+internal fun HxTone.bg(): Color = LocalHomeColors.current.let { c ->
+    when (this) {
+        HxTone.Neutral -> c.sunken
+        HxTone.Accent -> c.accentSoft
+        HxTone.Good -> c.goodSoft
+        HxTone.Warn -> c.warnSoft
+        HxTone.Bad -> c.badSoft
+    }
 }
 
 @Composable
-internal fun HxSpinner(size: Dp = 18.dp, color: Color = Hx.colors.accent) {
-    CircularProgressIndicator(modifier = Modifier.size(size), color = color, strokeWidth = 2.dp)
-}
+internal fun HxPill(text: String, tone: HxTone = HxTone.Neutral, modifier: Modifier = Modifier) = HomePill(text, modifier, tone.home())
 
-/** Inline status message with optional action. */
+@Composable
+internal fun HxDot(color: Color, size: Dp = 8.dp) = HomeStatusDot(color, size = size)
+
+@Composable
+internal fun HxSpinner(size: Dp = 18.dp, color: Color = LocalHomeColors.current.accent) = HomeSpinner(size = size, color = color)
+
+/** Inline status message with an optional action. */
 @Composable
 internal fun HxBanner(
     text: String,
@@ -795,97 +697,24 @@ internal fun HxBanner(
     modifier: Modifier = Modifier,
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
-    referenceCompact: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") referenceCompact: Boolean = false,
 ) {
-    val bg by animateColorAsState(tone.bg(), tween(HxMotion.Medium), label = "bannerBg")
-    if (referenceCompact) {
-        Row(modifier.fillMaxWidth().clip(Hx.rowShape).background(bg)
-            .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
-            .heightIn(min = 46.dp).padding(horizontal = 12.dp, vertical = 7.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(18.dp), contentAlignment = Alignment.Center) {
-                Icon(if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.Error else Icons.Rounded.Info,
-                    null, tint = tone.fg(), modifier = Modifier.requiredSize(if (tone == HxTone.Bad || tone == HxTone.Warn) 23.dp else 18.dp))
-            }
-            Spacer(Modifier.width(8.dp))
-            Text(text, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 11.5.sp, lineHeight = 14.sp,
-                fontWeight = FontWeight.SemiBold), color = tone.fg(), modifier = Modifier.weight(1f))
-            if (actionLabel != null && onAction != null) {
-                Box(Modifier.heightIn(min = 32.dp).clickable(role = Role.Button, onClick = onAction)
-                    .padding(horizontal = 6.dp), contentAlignment = Alignment.Center) {
-                    Text(actionLabel, color = Hx.colors.accent, fontSize = 12.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        }
-        return
+    val icon = when (tone) {
+        HxTone.Bad -> HomeIcons.CircleAlert
+        HxTone.Warn -> HomeIcons.TriangleAlert
+        HxTone.Good -> HomeIcons.CircleCheck
+        else -> HomeIcons.Info
     }
-    Row(
-        modifier
-            .fillMaxWidth()
-            .clip(Hx.rowShape)
-            .background(bg)
-            .animateContentSize(tween(HxMotion.Medium, easing = HxMotion.Emphasized))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(
-            if (tone == HxTone.Bad || tone == HxTone.Warn) Icons.Rounded.ErrorOutline else Icons.Rounded.Info,
-            contentDescription = null,
-            tint = tone.fg(),
-            modifier = Modifier.size(18.dp),
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(text, style = MaterialTheme.typography.bodyMedium, color = Hx.colors.text, modifier = Modifier.weight(1f))
-        if (actionLabel != null && onAction != null) {
-            TextButton(onClick = onAction) { Text(actionLabel, color = tone.fg(), fontWeight = FontWeight.SemiBold) }
-        }
-    }
+    HomeNotice(text, icon, modifier, tone = tone.home(), actionLabel = actionLabel, onAction = onAction)
 }
 
+/** [title] is UI text; [description] is drawn as given (often an error from the host). */
 @Composable
 internal fun HxEmpty(icon: ImageVector, title: String, description: String? = null, action: (@Composable () -> Unit)? = null) {
-    val c = Hx.colors
-    // Settles in once instead of popping: the empty state is often the first thing seen.
-    val appear = remember { androidx.compose.animation.core.Animatable(0f) }
-    LaunchedEffect(Unit) { appear.animateTo(1f, tween(HxMotion.Long, easing = HxMotion.Emphasized)) }
-    Column(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 32.dp, vertical = 36.dp)
-            .graphicsLayer {
-                alpha = appear.value
-                translationY = (1f - appear.value) * 12.dp.toPx()
-            },
-        horizontalAlignment = Alignment.CenterHorizontally,
-    ) {
-        Box(
-            Modifier
-                .size(64.dp)
-                .graphicsLayer {
-                    val s = .82f + .18f * appear.value
-                    scaleX = s
-                    scaleY = s
-                }
-                .clip(CircleShape)
-                .background(c.surfaceMuted),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(icon, null, tint = c.textMuted, modifier = Modifier.size(28.dp))
-        }
-        Spacer(Modifier.height(14.dp))
-        Text(title, style = MaterialTheme.typography.titleSmall, color = c.text, textAlign = TextAlign.Center)
-        if (!description.isNullOrBlank()) {
-            Spacer(Modifier.height(4.dp))
-            Text(description, style = MaterialTheme.typography.bodySmall, color = c.textMuted, textAlign = TextAlign.Center)
-        }
-        if (action != null) {
-            Spacer(Modifier.height(14.dp))
-            action()
-        }
-    }
+    HomeEmptyState(hxLineIcon(icon), title, description.orEmpty(), topPadding = 44.dp, verbatimSubtitle = true, action = action)
 }
 
-/** Pill-shaped segmented control with a sliding indicator. */
+/** Segmented control with a thumb that slides between segments. */
 @Composable
 internal fun HxSegmented(
     options: List<Pair<String, String>>,
@@ -893,73 +722,10 @@ internal fun HxSegmented(
     onSelect: (String) -> Unit,
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
-    selectionColor: Color = Hx.colors.surface,
-    selectedTextColor: Color = Hx.colors.text,
+    @Suppress("UNUSED_PARAMETER") selectionColor: Color = LocalHomeColors.current.surface,
+    @Suppress("UNUSED_PARAMETER") selectedTextColor: Color = LocalHomeColors.current.t1,
 ) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    var widthPx by remember { mutableStateOf(0) }
-    val index = options.indexOfFirst { it.first == selected }.coerceAtLeast(0)
-    val density = LocalDensity.current
-    val segment = if (options.isEmpty()) 0.dp else with(density) { (widthPx / options.size).toDp() }
-    // Liquid indicator: the leading edge moves first and the trailing edge catches up, so
-    // the thumb stretches toward its destination and settles back to one segment.
-    val forward = rememberHxDirection(index)
-    val fast = androidx.compose.animation.core.spring<Dp>(dampingRatio = .82f, stiffness = 700f)
-    val slow = androidx.compose.animation.core.spring<Dp>(dampingRatio = .86f, stiffness = 260f)
-    val left by animateDpAsState(segment * index, if (forward) slow else fast, label = "segLeft")
-    val right by animateDpAsState(segment * (index + 1), if (forward) fast else slow, label = "segRight")
-    val contentAlpha by animateFloatAsState(if (enabled) 1f else .5f, tween(HxMotion.Medium), label = "segEnabled")
-    Box(
-        modifier
-            .fillMaxWidth()
-            .height(36.dp)
-            .graphicsLayer { alpha = contentAlpha }
-            .clip(Hx.pillShape)
-            .background(c.surfaceMuted)
-            .padding(2.dp)
-            .onSizeChanged { widthPx = it.width },
-    ) {
-        if (widthPx > 0 && options.isNotEmpty()) {
-            Box(
-                Modifier
-                    .offset(x = left)
-                    .width((right - left).coerceAtLeast(0.dp))
-                    .height(32.dp)
-                    .hxSoftShadow(Hx.pillShape, 3.dp)
-                    .clip(Hx.pillShape)
-                    .background(selectionColor)
-                    .then(if (c.dark) Modifier.border(0.5.dp, c.line, Hx.pillShape) else Modifier),
-            )
-        }
-        Row(Modifier.fillMaxSize()) {
-            options.forEachIndexed { i, (id, label) ->
-                val active = i == index
-                val color by animateColorAsState(if (active) selectedTextColor else c.textMuted, tween(HxMotion.Short), label = "segText")
-                val source = remember { MutableInteractionSource() }
-                Box(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxSize()
-                        .hxPressScale(source, .94f)
-                        .clip(Hx.pillShape)
-                        .clickable(interactionSource = source, indication = null, enabled = enabled && !active) {
-                            haptics.perform(HetuHaptic.Tick)
-                            onSelect(id)
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        label,
-                        style = MaterialTheme.typography.labelLarge,
-                        fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                        color = color,
-                        maxLines = 1,
-                    )
-                }
-            }
-        }
-    }
+    HomeSegmented(options, selected, onSelect, modifier, enabled, style = HomeSegmentStyle.Raised, height = 44.dp, corner = 14.dp)
 }
 
 @Composable
@@ -969,66 +735,23 @@ internal fun HxSearchField(
     placeholder: String,
     modifier: Modifier = Modifier,
     autoFocus: Boolean = false,
-) {
-    val c = Hx.colors
-    val focus = remember { FocusRequester() }
-    if (autoFocus) {
-        LaunchedEffect(Unit) {
-            // Wait one frame so the field is attached before asking for focus + keyboard.
-            kotlinx.coroutines.delay(60)
-            runCatching { focus.requestFocus() }
-        }
-    }
-    androidx.compose.foundation.text.BasicTextField(
-        value = value,
-        onValueChange = onChange,
-        modifier = modifier.fillMaxWidth().heightIn(min = 44.dp).focusRequester(focus)
-            .clip(Hx.pillShape).background(c.surface),
-        singleLine = true,
-        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = 18.sp, lineHeight = 24.sp),
-        cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-        decorationBox = { input ->
-            Row(Modifier.padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Rounded.Search, null, tint = c.textMuted, modifier = Modifier.size(22.dp))
-                Spacer(Modifier.width(8.dp))
-                Box(Modifier.weight(1f).padding(vertical = 10.dp)) {
-                    if (value.isEmpty()) Text(placeholder, color = c.textFaint, fontSize = 18.sp, lineHeight = 24.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    input()
-                }
-                if (value.isNotEmpty()) {
-                    IconButton(onClick = { onChange("") }, modifier = Modifier.size(44.dp)) {
-                        Icon(Icons.Rounded.Cancel, ht("清除"), tint = c.textFaint, modifier = Modifier.size(22.dp))
-                    }
-                } else Spacer(Modifier.width(12.dp))
-            }
-        },
-    )
-}
+) = HomeSearchField(value, onChange, placeholder, modifier, autoFocus)
 
 /** A metric with a small caption. */
 @Composable
-internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = Hx.colors.text) {
-    Column(modifier) {
-        Text(label, style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted, maxLines = 1)
-        Spacer(Modifier.height(2.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                value,
-                style = MaterialTheme.typography.titleMedium.merge(HxNumberStyle),
-                color = valueColor,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!unit.isNullOrBlank()) {
-                Spacer(Modifier.width(3.dp))
-                Text(unit, style = MaterialTheme.typography.labelSmall, color = Hx.colors.textMuted, modifier = Modifier.padding(bottom = 2.dp))
-            }
+internal fun HxMetric(label: String, value: String, modifier: Modifier = Modifier, unit: String? = null, valueColor: Color = LocalHomeColors.current.t1) {
+    val c = LocalHomeColors.current
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Text(label, style = HomeType.caption, color = c.t2, maxLines = 1)
+        Row(verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(value, style = HomeType.value, color = valueColor, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (!unit.isNullOrBlank()) Text(unit, Modifier.padding(bottom = 2.dp), style = HomeType.badge, color = c.t2)
         }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sheets and dialogs                                                  */
+/*  Sheets                                                              */
 /* ------------------------------------------------------------------ */
 
 internal fun hxCopy(context: Context, label: String, text: String) {
@@ -1037,16 +760,17 @@ internal fun hxCopy(context: Context, label: String, text: String) {
     Toast.makeText(context, "已复制", Toast.LENGTH_SHORT).show()
 }
 
+/** Bottom sheet dressed with the home tokens: 28 dp top corners, a grab handle, an optional title row. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun HxSheet(
     onDismiss: () -> Unit,
     title: String? = null,
     showClose: Boolean = false,
-    containerColor: Color = Hx.colors.surface,
+    containerColor: Color = LocalHomeColors.current.surface,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scope = rememberCoroutineScope()
     // Actions inside a sheet close it with the slide-down animation first, then run —
@@ -1066,27 +790,22 @@ internal fun HxSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = containerColor,
-        contentColor = c.text,
-        scrimColor = Color.Black.copy(alpha = if (c.dark) .52f else .32f),
-        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        contentColor = c.t1,
+        scrimColor = c.scrim,
+        shape = HomeDims.sheetShape,
         dragHandle = {
-            Box(
-                Modifier
-                    .padding(top = 10.dp, bottom = 12.dp)
-                    .size(width = 36.dp, height = 4.dp)
-                    .clip(Hx.pillShape)
-                    .background(c.textFaint.copy(alpha = .45f)),
-            )
+            Box(Modifier.padding(top = 10.dp, bottom = 8.dp).size(width = 40.dp, height = 5.dp).background(if (c.dark) c.line2 else Color(0xFFC9CCDA), HomeDims.pillShape))
         },
     ) {
         CompositionLocalProvider(LocalHxSheetClose provides close) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
+            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
                 if (title != null) {
-                    Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = if (showClose) 8.dp else 22.dp).padding(bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(title, style = MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
-                        if (showClose) IconButton(onClick = { close(onDismiss) }) {
-                            Icon(Icons.Rounded.Close, ht("关闭详情"), tint = c.textMuted)
-                        }
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 20.dp, end = if (showClose) 8.dp else 20.dp).padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(title, Modifier.weight(1f).semantics { heading() }, color = c.t1, style = HomeType.sheetTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                        if (showClose) HomeIconButton(HomeIcons.X, "关闭详情", { close(onDismiss) })
                     }
                 }
                 content()
@@ -1101,47 +820,73 @@ internal fun HxSheet(
  */
 internal val LocalHxSheetClose = staticCompositionLocalOf<(() -> Unit) -> Unit> { { after -> after() } }
 
-/** Monospace text viewer (logs, diagnostics, generated config). */
+/**
+ * Text viewer (logs, diagnostics, generated config, licences).
+ *
+ * @param wrapLines prose that wraps, in the UI font; otherwise monospace lines that scroll sideways.
+ * @param referenceDocument a long legal text: monospace, but wrapped.
+ */
 @Composable
-internal fun HxTextSheet(title: String, text: String, onDismiss: () -> Unit, onRefresh: (() -> Unit)? = null, wrapLines: Boolean = false, showCopyLabel: Boolean = false, referenceDocument: Boolean = false) {
+internal fun HxTextSheet(
+    title: String,
+    text: String,
+    onDismiss: () -> Unit,
+    onRefresh: (() -> Unit)? = null,
+    wrapLines: Boolean = false,
+    showCopyLabel: Boolean = false,
+    referenceDocument: Boolean = false,
+) {
     val context = LocalContext.current
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     HxSheet(onDismiss = onDismiss) {
-        Row(Modifier.fillMaxWidth().padding(start = 22.dp, end = 10.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(title, style = if (referenceDocument) MaterialTheme.typography.titleLarge.copy(fontSize = if (title == "AdGuard") 30.sp else 24.sp, fontWeight = FontWeight.Bold) else if (wrapLines) MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, fontWeight = FontWeight.Bold) else MaterialTheme.typography.titleLarge, color = c.text, modifier = Modifier.weight(1f))
-            if (onRefresh != null) TextButton(onClick = onRefresh) { Text(ht("刷新")) }
-            if (showCopyLabel) TextButton(onClick = { hxCopy(context, title, text) }) {
-                Icon(Icons.Rounded.ContentCopy, null, tint = c.accent, modifier = Modifier.size(15.dp))
-                Spacer(Modifier.width(5.dp)); Text(ht("复制"), color = c.accent, fontSize = 12.sp)
-            } else IconButton(onClick = { hxCopy(context, title, text) }) { Icon(Icons.Rounded.ContentCopy, ht("复制"), tint = c.textMuted) }
+        Row(Modifier.fillMaxWidth().padding(start = 20.dp, end = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text(title, Modifier.weight(1f).semantics { heading() }, color = c.t1, style = HomeType.sheetTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (onRefresh != null) HomeIconButton(HomeIcons.RefreshCw, "刷新", onRefresh)
+            if (showCopyLabel) HomeButton("复制", { hxCopy(context, title, text) }, kind = HomeButtonKind.Soft, icon = HomeIcons.Copy, height = 44.dp, tinted = true)
+            else HomeIconButton(HomeIcons.Copy, "复制", { hxCopy(context, title, text) })
         }
         Box(
             Modifier
                 .fillMaxWidth()
-                .heightIn(max = if (wrapLines) (LocalConfiguration.current.screenHeightDp * .49f).dp else 520.dp)
-                .padding(horizontal = if (referenceDocument) 10.5.dp else 16.dp)
-                .clip(Hx.rowShape)
-                .background(c.surfaceMuted)
+                .heightIn(max = (LocalConfiguration.current.screenHeightDp * .62f).dp)
+                .padding(horizontal = 14.dp)
+                .clip(HomeDims.innerShape)
+                .background(if (c.dark) c.sunken else c.bg)
                 .verticalScroll(rememberScrollState())
                 .then(if (wrapLines) Modifier else Modifier.horizontalScroll(rememberScrollState()))
-                .padding(14.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
         ) {
             Text(
-                text.ifBlank { "（空）" },
-                fontFamily = if (wrapLines && !referenceDocument) FontFamily.Default else FontFamily.Monospace,
-                fontSize = if (referenceDocument) 10.sp else 11.5.sp,
-                lineHeight = if (referenceDocument) 14.sp else 16.sp,
-                letterSpacing = if (referenceDocument) 0.sp else androidx.compose.ui.unit.TextUnit.Unspecified,
-                color = c.text,
+                text.ifBlank { ht("（空）") },
+                color = c.t1,
+                style = when {
+                    referenceDocument -> HxMonoStyle.copy(fontSize = 12.sp, lineHeight = 18.sp)
+                    wrapLines -> HomeType.body.copy(fontSize = 15.sp, lineHeight = 23.sp)
+                    else -> HxMonoStyle
+                },
             )
         }
     }
 }
 
+internal val HxMonoStyle = TextStyle(fontSize = 13.sp, lineHeight = 20.sp, fontFamily = FontFamily.Monospace)
+
+/* ------------------------------------------------------------------ */
+/*  Choices                                                             */
+/* ------------------------------------------------------------------ */
+
 internal enum class HxChoicePresentation { Standard, Settings, Language, Scale, Notification }
 
 internal data class HxChoice(val id: String, val label: String, val description: String? = null, val enabled: Boolean = true)
 
+/**
+ * Pick one of [choices]. Opened from a row that was just touched it is a menu growing out of
+ * that row, with the current choice ticked; otherwise (keyboard, accessibility) it is a bottom
+ * sheet with the same rows.
+ *
+ * @param maxVisibleChoices cap the menu at this many rows; the rest scroll.
+ * @param referenceRadios show [title] at the top of the menu (the pickers of 网络匹配).
+ */
 @Composable
 internal fun HxChoiceSheet(
     title: String,
@@ -1153,131 +898,46 @@ internal fun HxChoiceSheet(
     dimBehind: Boolean = true,
     referenceRadios: Boolean = false,
     trailingReferenceRadios: Boolean = false,
-    presentation: HxChoicePresentation = HxChoicePresentation.Standard,
-    menuWidthOverride: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") presentation: HxChoicePresentation = HxChoicePresentation.Standard,
+    @Suppress("UNUSED_PARAMETER") menuWidthOverride: Dp? = null,
     maxVisibleChoices: Int? = null,
-    menuItemVerticalPadding: Dp? = null,
-    menuItemMinimumHeight: Dp? = null,
-    menuItemFontSizeSp: Float? = null,
-    menuAnchorEndInset: Dp? = null,
-    menuContentTopPadding: Dp? = null,
-    menuContentBottomPadding: Dp? = null,
-    menuRowPresentation: HxChoicePresentation? = null,
-    menuDividers: Boolean? = null,
-    menuSelectedHorizontalPadding: Dp? = null,
-    menuSelectedTextColor: Color? = null,
-    menuSelectedVerticalVisualInset: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuItemVerticalPadding: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuItemMinimumHeight: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuItemFontSizeSp: Float? = null,
+    @Suppress("UNUSED_PARAMETER") menuAnchorEndInset: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuContentTopPadding: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuContentBottomPadding: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuRowPresentation: HxChoicePresentation? = null,
+    @Suppress("UNUSED_PARAMETER") menuDividers: Boolean? = null,
+    @Suppress("UNUSED_PARAMETER") menuSelectedHorizontalPadding: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") menuSelectedTextColor: Color? = null,
+    @Suppress("UNUSED_PARAMETER") menuSelectedVerticalVisualInset: Dp? = null,
 ) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
     // Opened from a row: show a dropdown right next to it (the row stays visible).
     val anchor = remember { HxAnchor.take() }
     if (anchor != null) {
-        val referenceSettings = presentation != HxChoicePresentation.Standard
-        val menuWidth = when (presentation) {
-            HxChoicePresentation.Settings -> 116.dp
-            HxChoicePresentation.Language -> 130.dp
-            HxChoicePresentation.Scale -> 154.dp
-            HxChoicePresentation.Notification -> 148.dp
-            else -> if (trailingReferenceRadios) 200.dp else if (referenceRadios) 232.dp else if (dimBehind) 152.dp else 128.dp
-        }
-        val scopedNotification = presentation == HxChoicePresentation.Notification && !referenceRadios && !trailingReferenceRadios &&
-            (menuItemVerticalPadding != null || menuItemMinimumHeight != null || menuItemFontSizeSp != null || menuAnchorEndInset != null ||
-                menuContentTopPadding != null || menuContentBottomPadding != null || menuRowPresentation != null || menuDividers != null || menuSelectedHorizontalPadding != null ||
-                menuSelectedTextColor != null || menuSelectedVerticalVisualInset != null)
-        val scopedOuterPadding = scopedNotification && (menuContentTopPadding != null || menuContentBottomPadding != null)
-        HxAnchoredMenu(anchor, onDismiss, dimBehind = !referenceSettings && (dimBehind || referenceRadios), minWidth = menuWidthOverride ?: menuWidth,
-            anchorEndInset = if (scopedNotification) menuAnchorEndInset ?: 14.dp else 14.dp,
-            verticalPadding = if (scopedOuterPadding) 0.dp else 6.dp) { close ->
-            @Composable fun notificationMenuItem(choice: HxChoice) {
-                @Composable fun item() {
-                    HxMenuItem(
-                        choice.label,
-                        onClick = { close { onPick(choice.id) } },
-                        description = choice.description,
-                        selected = choice.id == selected,
-                        selectedTextColor = menuSelectedTextColor ?: if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
-                        enabled = choice.enabled,
-                        choicePresentation = if (menuSelectedVerticalVisualInset != null && choice.id == selected) HxChoicePresentation.Settings else menuRowPresentation ?: presentation,
-                        compact = menuItemVerticalPadding != null,
-                        compactVerticalPadding = menuItemVerticalPadding ?: 6.dp,
-                        minimumHeight = menuItemMinimumHeight ?: 0.dp,
-                        labelFontSizeSp = menuItemFontSizeSp,
+        HxAnchoredMenu(anchor, onDismiss, dimBehind = dimBehind && (referenceRadios || trailingReferenceRadios), minWidth = 196.dp) { close ->
+            if (referenceRadios || trailingReferenceRadios) {
+                HomeMenuTitle(title)
+                HomeMenuDivider()
+            }
+            val rows: @Composable () -> Unit = {
+                choices.forEach { choice ->
+                    HomeMenuItem(
+                        choice.label, { close { onPick(choice.id) } },
+                        description = choice.description, enabled = choice.enabled, checked = choice.id == selected,
                     )
                 }
-                if (menuSelectedVerticalVisualInset != null && choice.id == selected) {
-                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding ?: 0.dp).clip(Hx.pillShape).drawBehind {
-                        val inset = menuSelectedVerticalVisualInset.toPx().coerceIn(0f, size.height / 2f)
-                        val visualHeight = size.height - 2f * inset
-                        drawRoundRect(color = c.surfaceMuted, topLeft = Offset(0f, inset), size = Size(size.width, visualHeight), cornerRadius = CornerRadius(visualHeight / 2f))
-                    }) { item() }
-                } else if (menuSelectedHorizontalPadding != null && choice.id == selected) {
-                    Box(Modifier.fillMaxWidth().padding(horizontal = menuSelectedHorizontalPadding).clip(Hx.pillShape)) { item() }
-                } else item()
             }
-            if (scopedOuterPadding) Spacer(Modifier.height(menuContentTopPadding ?: 6.dp))
-            if (referenceRadios) {
-                Text(title, modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
-                    textAlign = if (trailingReferenceRadios) TextAlign.Start else TextAlign.Center, fontSize = if (trailingReferenceRadios) 15.sp else 18.sp, fontWeight = FontWeight.Bold, color = c.text)
-                Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(if (trailingReferenceRadios) 0.dp else 6.dp)) {
-                    choices.forEachIndexed { index, choice ->
-                        val active = choice.id == selected
-                        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                            .background(if (trailingReferenceRadios) Color.Transparent else if (active) c.accentSoft else if (c.dark) c.surfaceMuted else Color.White)
-                            .selectable(selected = active, enabled = choice.enabled, role = Role.RadioButton) { haptics.perform(HetuHaptic.Tick); close { onPick(choice.id) } }
-                            .padding(horizontal = if (trailingReferenceRadios) 2.dp else 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                            @Composable fun radio() { Box(Modifier.size(20.dp).clip(CircleShape)
-                                .background(if (active) c.accent else Color.Transparent)
-                                .then(if (active) Modifier else Modifier.border(1.5.dp, c.textFaint, CircleShape)), contentAlignment = Alignment.Center) {
-                                if (active) Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
-                            }
-                            }
-                            if (!trailingReferenceRadios) { radio(); Spacer(Modifier.width(14.dp)) }
-                            Text(choice.label, Modifier.weight(1f), color = if (active && !trailingReferenceRadios) c.accent else c.text, fontSize = 14.sp, fontWeight = FontWeight.Medium)
-                            if (trailingReferenceRadios) { Spacer(Modifier.width(10.dp)); radio() }
-                        }
-                        if (trailingReferenceRadios && index < choices.lastIndex) HorizontalDivider(thickness = .5.dp, color = c.line)
-                    }
-                }
-            } else if (maxVisibleChoices != null) {
-                val density = LocalDensity.current
-                var visibleRowsHeight by remember(maxVisibleChoices, choices) { mutableStateOf<Int?>(null) }
-                @Composable fun choiceRow(index: Int, choice: HxChoice) {
-                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
-                    choice.label,
-                    onClick = { close { onPick(choice.id) } },
-                    description = choice.description,
-                    selected = choice.id == selected,
-                    selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
-                    enabled = choice.enabled,
-                    choicePresentation = presentation,
-                )
-                if (!scopedNotification || menuDividers != false)
-                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
-                }
-                Column(Modifier.fillMaxWidth().heightIn(max = visibleRowsHeight?.let { with(density) { it.toDp() } } ?: (maxVisibleChoices * 48.5f).dp).verticalScroll(rememberScrollState())) {
-                    Column(Modifier.onSizeChanged { visibleRowsHeight = it.height }) {
-                        choices.take(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index, choice) }
-                    }
-                    choices.drop(maxVisibleChoices).forEachIndexed { index, choice -> choiceRow(index + maxVisibleChoices, choice) }
-                }
-            } else choices.forEachIndexed { index, choice ->
-                if (scopedNotification) notificationMenuItem(choice) else HxMenuItem(
-                    choice.label,
-                    onClick = { close { onPick(choice.id) } },
-                    description = choice.description,
-                    selected = choice.id == selected,
-                    selectedTextColor = if (presentation == HxChoicePresentation.Scale || !referenceSettings && dimBehind) c.accent else c.text,
-                    enabled = choice.enabled,
-                    choicePresentation = presentation,
-                )
-                if (!scopedNotification || menuDividers != false)
-                if (referenceSettings && index < choices.lastIndex) HorizontalDivider(Modifier.padding(horizontal = 12.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
-            }
+            // Half a row peeks out below the cap, so it is plain that the list goes on.
+            if (maxVisibleChoices != null && choices.size > maxVisibleChoices) {
+                Column(Modifier.fillMaxWidth().heightIn(max = HxMenuRowHeight * maxVisibleChoices + HxMenuRowHeight / 2).verticalScroll(rememberScrollState())) { rows() }
+            } else rows()
             if (!footer.isNullOrBlank()) {
-                Text(footer, style = if (presentation == HxChoicePresentation.Scale) MaterialTheme.typography.labelSmall.copy(fontSize = 8.5.sp) else MaterialTheme.typography.labelSmall, color = c.textFaint, modifier = Modifier.padding(horizontal = 18.dp, vertical = 8.dp))
+                Text(footer, Modifier.padding(start = 12.dp, end = 12.dp, top = 6.dp, bottom = 8.dp), color = c.t2, style = HomeType.caption)
             }
-            if (scopedOuterPadding) Spacer(Modifier.height(menuContentBottomPadding ?: 6.dp))
         }
         return
     }
@@ -1286,57 +946,35 @@ internal fun HxChoiceSheet(
     var closing by remember { mutableStateOf(false) }
     HxSheet(onDismiss = onDismiss, title = title) {
         val close = LocalHxSheetClose.current
-        Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Column(Modifier.padding(horizontal = 8.dp).verticalScroll(rememberScrollState())) {
             choices.forEach { choice ->
-                val active = choice.id == picked
-                val bg by animateColorAsState(if (active) c.accentSoft else Color.Transparent, tween(HxMotion.Medium), label = "choiceBg")
-                val checkScale by animateFloatAsState(if (active) 1f else 0f, HxMotion.pop(), label = "choiceCheck")
-                Row(
-                    Modifier
-                        .fillMaxWidth()
-                        .clip(Hx.rowShape)
-                        .background(bg)
-                        .clickable(enabled = choice.enabled) {
-                            if (!closing) {
-                                closing = true
-                                haptics.perform(HetuHaptic.Tick)
-                                picked = choice.id
-                                close { onPick(choice.id) }
-                            }
+                HomeMenuItem(
+                    choice.label,
+                    onClick = {
+                        if (!closing) {
+                            closing = true
+                            haptics(HomeHaptic.Tick)
+                            picked = choice.id
+                            close { onPick(choice.id) }
                         }
-                        .padding(horizontal = 14.dp, vertical = 12.dp)
-                        .graphicsLayer { alpha = if (choice.enabled) 1f else .4f },
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(Modifier.weight(1f)) {
-                        Text(
-                            choice.label,
-                            style = MaterialTheme.typography.bodyLarge,
-                            fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium,
-                            color = if (active) c.accent else c.text,
-                        )
-                        if (!choice.description.isNullOrBlank()) {
-                            Text(choice.description, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                        }
-                    }
-                    Icon(
-                        Icons.Rounded.Check,
-                        null,
-                        tint = c.accent,
-                        modifier = Modifier.size(20.dp).graphicsLayer {
-                            scaleX = checkScale
-                            scaleY = checkScale
-                            alpha = checkScale.coerceIn(0f, 1f)
-                        },
-                    )
-                }
+                    },
+                    Modifier.heightIn(min = 54.dp),
+                    description = choice.description, enabled = choice.enabled, checked = choice.id == picked,
+                )
             }
             if (!footer.isNullOrBlank()) {
-                Text(footer, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.padding(14.dp))
+                Text(footer, Modifier.padding(horizontal = 12.dp, vertical = 12.dp), color = c.t2, style = HomeType.note)
             }
         }
     }
 }
+
+/** Height of one menu row at font scale 1; used to size capped menus. */
+internal val HxMenuRowHeight = 46.dp
+
+/* ------------------------------------------------------------------ */
+/*  Dialogs                                                             */
+/* ------------------------------------------------------------------ */
 
 internal data class HxField(
     val label: String,
@@ -1346,111 +984,79 @@ internal data class HxField(
     val number: Boolean = false,
 )
 
-/** Generic form dialog: returns the entered values in field order. */
+/**
+ * Form dialog: returns the entered values in field order. A failed [validate] unfolds its
+ * message under the field it belongs to ([errorField], or the last field) and gives the card a
+ * short shake.
+ *
+ * @param messageBelowFields show [message] under the fields as a hint rather than above them.
+ */
 @Composable
 internal fun HxFormDialog(
     title: String,
     fields: List<HxField>,
     confirmLabel: String = "保存",
     message: String? = null,
-    configFooter: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") configFooter: Boolean = false,
     messageBelowFields: Boolean = false,
     errorField: (String) -> Int? = { null },
-    widthFraction: Float? = null,
-    errorWidthFraction: Float? = null,
-    titleFontSize: androidx.compose.ui.unit.TextUnit = 20.sp,
-    titleLineHeight: androidx.compose.ui.unit.TextUnit = 26.sp,
-    titleTextAlign: TextAlign = TextAlign.Center,
-    centerTitleOnError: Boolean = false,
-    hideMessageOnError: Boolean = false,
-    highlightError: Boolean = true,
-    fieldOutlineColor: Color? = null,
-    errorFieldOutlineColor: Color? = null,
-    labelFontWeight: FontWeight? = null,
-    inputFontWeight: FontWeight? = null,
-    confirmColorOverride: Color? = null,
-    normalPlainFieldHeight: Dp? = null,
-    normalPlainFieldVerticalPadding: Dp? = null,
-    plainFields: Boolean = false,
-    compactPills: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") widthFraction: Float? = null,
+    @Suppress("UNUSED_PARAMETER") errorWidthFraction: Float? = null,
+    @Suppress("UNUSED_PARAMETER") titleFontSize: TextUnit = 22.sp,
+    @Suppress("UNUSED_PARAMETER") titleLineHeight: TextUnit = 28.sp,
+    @Suppress("UNUSED_PARAMETER") titleTextAlign: TextAlign = TextAlign.Center,
+    @Suppress("UNUSED_PARAMETER") centerTitleOnError: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") hideMessageOnError: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") highlightError: Boolean = true,
+    @Suppress("UNUSED_PARAMETER") fieldOutlineColor: Color? = null,
+    @Suppress("UNUSED_PARAMETER") errorFieldOutlineColor: Color? = null,
+    @Suppress("UNUSED_PARAMETER") labelFontWeight: FontWeight? = null,
+    @Suppress("UNUSED_PARAMETER") inputFontWeight: FontWeight? = null,
+    @Suppress("UNUSED_PARAMETER") confirmColorOverride: Color? = null,
+    @Suppress("UNUSED_PARAMETER") normalPlainFieldHeight: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") normalPlainFieldVerticalPadding: Dp? = null,
+    @Suppress("UNUSED_PARAMETER") plainFields: Boolean = false,
+    @Suppress("UNUSED_PARAMETER") compactPills: Boolean = false,
     validate: (List<String>) -> String? = { null },
     onConfirm: (List<String>) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val c = Hx.colors
+    val haptics = LocalHomeHaptics.current
+    val motion = LocalHomeMotionEnabled.current
     val values = remember { fields.map { mutableStateOf(it.initial) } }
     var error by remember { mutableStateOf<String?>(null) }
-    val haptics = rememberHetuHaptics()
     // Invalid input: a short horizontal shake plus a reject haptic, like a wrong passcode.
     var shakeTick by remember { mutableIntStateOf(0) }
-    val shake = remember { androidx.compose.animation.core.Animatable(0f) }
+    val shake = remember { Animatable(0f) }
     LaunchedEffect(shakeTick) {
         if (shakeTick > 0) {
-            haptics.perform(HetuHaptic.Reject)
-            for (x in listOf(12f, -9f, 6f, -3f, 0f)) shake.animateTo(x, tween(48))
+            haptics(HomeHaptic.Reject)
+            if (motion) for (x in listOf(12f, -9f, 6f, -3f, 0f)) shake.animateTo(x, tween(48))
         }
     }
     val submit: () -> Unit = {
         val result = values.map { it.value.trim() }
         val problem = validate(result)
-        if (problem != null) { error = problem; shakeTick++ }
-        else { haptics.perform(HetuHaptic.Confirm); onConfirm(result) }
+        if (problem != null) { error = problem; shakeTick++ } else onConfirm(result)
     }
-    HxReferenceDialog(onDismiss, widthFraction = (if (error != null) errorWidthFraction else null) ?: widthFraction ?: if (configFooter) .74f else .76f, contentPadding = 0.dp) {
-        Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState())) {
-            Column(Modifier.padding(horizontal = if (compactPills) 16.dp else if (configFooter) 20.dp else 22.dp, vertical = if (compactPills) 16.dp else if (configFooter) 20.dp else 18.dp)
-                .graphicsLayer { translationX = shake.value * density }) {
-                Text(title, fontSize = titleFontSize, lineHeight = titleLineHeight, fontWeight = FontWeight.Bold, color = c.text,
-                    textAlign = if (centerTitleOnError && error != null) TextAlign.Center else titleTextAlign, modifier = Modifier.fillMaxWidth())
-                Spacer(Modifier.height(if (compactPills) 10.dp else if (configFooter) 18.dp else 14.dp))
-                if (!message.isNullOrBlank() && !messageBelowFields && !(hideMessageOnError && error != null)) {
-                    Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                    Spacer(Modifier.height(12.dp))
-                }
+    val errorIndex = error?.let { errorField(it) ?: fields.lastIndex }
+    HomeDialog(onDismiss) {
+        HomeDialogCard(
+            title = ht(title), confirmLabel = confirmLabel, onConfirm = submit, onCancel = onDismiss,
+            modifier = Modifier.graphicsLayer { translationX = shake.value * density },
+            text = message?.takeIf { it.isNotBlank() && !messageBelowFields }?.let { ht(it) },
+        ) {
+            Column(Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 fields.forEachIndexed { index, field ->
-                    if (index > 0) Spacer(Modifier.height(12.dp))
-                    Text(field.label, color = c.textMuted, fontSize = if (plainFields) 15.sp else 13.sp, lineHeight = if (plainFields) 20.sp else 18.sp, fontWeight = labelFontWeight ?: FontWeight.Medium)
-                    Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp))
-                    androidx.compose.foundation.text.BasicTextField(
+                    HomeFormField(
+                        label = field.label,
                         value = values[index].value,
                         onValueChange = { values[index].value = it; error = null },
-                        singleLine = field.singleLine,
-                        maxLines = if (field.singleLine) 1 else 6,
-                        keyboardOptions = if (field.number) KeyboardOptions(keyboardType = KeyboardType.Number) else KeyboardOptions.Default,
-                        textStyle = MaterialTheme.typography.bodyLarge.copy(color = c.text, fontSize = if (plainFields) 16.sp else 15.sp, lineHeight = 20.sp, fontWeight = inputFontWeight ?: MaterialTheme.typography.bodyLarge.fontWeight),
-                        cursorBrush = androidx.compose.ui.graphics.SolidColor(c.accent),
-                        modifier = Modifier.fillMaxWidth().heightIn(min = (if (error == null && plainFields) normalPlainFieldHeight else null) ?: if (compactPills) 36.dp else if (configFooter) 42.dp else if (plainFields) 40.dp else 38.dp).clip(RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                            .background(if (plainFields) c.surface else c.surfaceMuted).border(.7.dp, if (highlightError && error != null && (errorField(error.orEmpty()) == null || errorField(error.orEmpty()) == index)) c.bad else if (compactPills) Color.Transparent else ((if (error != null) errorFieldOutlineColor else null) ?: fieldOutlineColor ?: c.line), RoundedCornerShape(if (compactPills) 24.dp else 10.dp))
-                            .padding(horizontal = 12.dp, vertical = (if (error == null && plainFields) normalPlainFieldVerticalPadding else null) ?: if (compactPills) 7.dp else if (configFooter) 10.dp else 9.dp),
-                        decorationBox = { input -> Box {
-                            if (values[index].value.isBlank() && field.placeholder.isNotBlank()) Text(field.placeholder, color = c.textFaint, fontSize = 15.sp)
-                            input()
-                        } },
+                        placeholder = field.placeholder,
+                        error = if (errorIndex == index) error else null,
+                        hint = if (messageBelowFields && index == fields.lastIndex) message?.takeIf { it.isNotBlank() } else null,
+                        keyboardType = if (field.number) KeyboardType.Number else KeyboardType.Text,
                     )
-                    if (error != null && errorField(error.orEmpty()) == index) Text(error.orEmpty(), color = c.bad,
-                        style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
-                }
-                if (!message.isNullOrBlank() && messageBelowFields && !(hideMessageOnError && error != null)) {
-                    Spacer(Modifier.height(if (compactPills) 3.dp else 6.dp)); Text(message, color = c.textMuted, fontSize = 12.sp, lineHeight = 16.sp)
-                }
-                AnimatedVisibility(error != null && errorField(error.orEmpty()) == null, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
-                    Text(error.orEmpty(), color = c.bad, style = MaterialTheme.typography.bodySmall, modifier = Modifier.padding(top = 6.dp))
-                }
-                if (!configFooter) {
-                    Spacer(Modifier.height(14.dp))
-                    HxDialogButtons(confirmLabel, confirmColorOverride ?: c.accent, referenceCorners = !compactPills, buttonHeight = if (compactPills) 36.dp else 46.dp, onDismiss = onDismiss, onConfirm = submit)
-                }
-            }
-            if (configFooter) {
-                HorizontalDivider(thickness = .5.dp, color = c.line)
-                Row(Modifier.fillMaxWidth().height(58.dp)) {
-                    Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                        Text(ht("取消"), color = c.textMuted, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                    Box(Modifier.width(.5.dp).fillMaxHeight().background(c.line))
-                    Box(Modifier.weight(1f).fillMaxHeight().clickable(onClick = submit), contentAlignment = Alignment.Center) {
-                        Text(confirmLabel, color = c.accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
-                    }
                 }
             }
         }
@@ -1459,65 +1065,60 @@ internal fun HxFormDialog(
 
 internal enum class HxConfirmStyle { Filled, Text, SoftRow, SoftStack, DestructiveStack }
 
+/** One question, two answers. [danger] turns the confirming button red and adds a warning mark. */
 @Composable
 internal fun HxConfirmDialog(
     title: String,
     message: String,
     confirmLabel: String = "确定",
     danger: Boolean = false,
-    presentation: HxConfirmStyle = HxConfirmStyle.Filled,
+    @Suppress("UNUSED_PARAMETER") presentation: HxConfirmStyle = HxConfirmStyle.Filled,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val c = Hx.colors
-    HxReferenceDialog(onDismiss = onDismiss, widthFraction = .75f) {
-        Text(title, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold,
-            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(12.dp))
-        Text(message, style = MaterialTheme.typography.bodyMedium, color = c.textMuted,
-            textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
-        Spacer(Modifier.height(18.dp))
-        if (presentation == HxConfirmStyle.Filled) {
-            HxDialogButtons(confirmLabel, if (danger) Color(0xFFFF3B30) else c.accent, referenceCorners = true, onDismiss = onDismiss, onConfirm = onConfirm)
-        } else {
-            val stacked = presentation == HxConfirmStyle.SoftStack || presentation == HxConfirmStyle.DestructiveStack
-            @Composable fun action(label: String, destructive: Boolean, modifier: Modifier, click: () -> Unit) {
-                val strong = destructive && presentation == HxConfirmStyle.DestructiveStack
-                val tint = if (destructive && danger) Color(0xFFFF3B30) else c.accent
-                Box(modifier.height(44.dp).clip(RoundedCornerShape(12.dp))
-                    .background(when { presentation == HxConfirmStyle.Text -> Color.Transparent; strong -> tint; destructive && danger -> tint.copy(alpha = .09f); else -> c.accentSoft.copy(alpha = .65f) })
-                    .clickable(onClick = click), contentAlignment = Alignment.Center) {
-                    Text(label, color = if (strong) Color.White else tint, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-            if (stacked) Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                action(ht("取消"), false, Modifier.fillMaxWidth(), onDismiss)
-                action(confirmLabel, true, Modifier.fillMaxWidth(), onConfirm)
-            } else Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                action(ht("取消"), false, Modifier.weight(1f), onDismiss)
-                action(confirmLabel, true, Modifier.weight(1f), onConfirm)
-            }
-        }
+    HomeDialog(onDismiss) {
+        HomeDialogCard(
+            title = ht(title), confirmLabel = confirmLabel, onConfirm = onConfirm, onCancel = onDismiss,
+            text = message.takeIf { it.isNotBlank() }?.let { ht(it) },
+            icon = if (danger) HomeIcons.TriangleAlert else null, iconTone = HomeTone.Bad,
+            confirm = if (danger) HomeDialogConfirm.Danger else HomeDialogConfirm.Primary,
+        )
     }
 }
 
+/** A dialog card with free content, for the few dialogs that are neither a form nor a question. */
 @Composable
-internal fun HxReferenceDialog(onDismiss: () -> Unit, widthFraction: Float = .84f, contentPadding: Dp = 16.dp, content: @Composable ColumnScope.() -> Unit) {
-    androidx.compose.ui.window.Dialog(onDismissRequest = onDismiss,
-        properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false)) {
-        val view = LocalView.current
-        SideEffect { (view.parent as? DialogWindowProvider)?.window?.setDimAmount(.5f) }
-        Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-            // Dismissal is a sibling behind the card, never a clickable ancestor of
-            // its heading/inputs (which would make accessibility activation dismiss).
-            Box(Modifier.matchParentSize().clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss))
-            Column(Modifier.fillMaxWidth(widthFraction).clip(RoundedCornerShape(22.dp)).background(Hx.colors.surface)
-                .pointerInput(Unit) { detectTapGestures(onTap = {}) }.padding(contentPadding), content = content)
-        }
+internal fun HxReferenceDialog(
+    onDismiss: () -> Unit,
+    @Suppress("UNUSED_PARAMETER") widthFraction: Float = .84f,
+    contentPadding: Dp = 20.dp,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    val c = LocalHomeColors.current
+    val shape = RoundedCornerShape(26.dp)
+    HomeDialog(onDismiss) {
+        Column(
+            Modifier
+                .widthIn(max = 340.dp)
+                .fillMaxWidth()
+                .shadow(28.dp, shape, ambientColor = Color.Black.copy(alpha = .10f), spotColor = Color.Black.copy(alpha = .22f))
+                .clip(shape)
+                .background(c.raised)
+                .let { if (c.dark) it.border(1.dp, c.line, shape) else it }
+                .padding(start = contentPadding, end = contentPadding, top = if (contentPadding > 0.dp) 24.dp else 0.dp, bottom = if (contentPadding > 0.dp) 18.dp else 0.dp),
+            content = content,
+        )
     }
 }
 
-/** Primary filled button in the app's pill shape. */
+/* ------------------------------------------------------------------ */
+/*  Buttons, bars, progress, fields                                     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Button. [filled] = solid, [outlined] = hairline in the tone's colour, neither = the tone's
+ * soft tint. [busy] swaps the icon for a spinner and holds the button.
+ */
 @Composable
 internal fun HxButton(
     text: String,
@@ -1530,72 +1131,31 @@ internal fun HxButton(
     filled: Boolean = true,
     outlined: Boolean = false,
 ) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val source = remember { MutableInteractionSource() }
-    val rawBg = if (outlined) c.surface else if (filled) tone.fg() else tone.bg()
-    val rawFg = if (outlined) tone.fg() else if (filled) (if (tone == HxTone.Accent) c.onAccent else Color.White) else tone.fg()
-    val bg by animateColorAsState(if (enabled) rawBg else c.surfaceMuted, tween(HxMotion.Medium), label = "btnBg")
-    val fg by animateColorAsState(if (enabled) rawFg else c.textFaint, tween(HxMotion.Medium), label = "btnFg")
-    Row(
-        modifier
-            .hxPressScale(source, .97f)
-            .heightIn(min = 44.dp)
-            .clip(RoundedCornerShape(12.dp))
-            .background(bg)
-            .then(if (outlined) Modifier.border(1.dp, fg, RoundedCornerShape(12.dp)) else Modifier)
-            .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy, onClick = { haptics.perform(HetuHaptic.Tap); onClick() })
-            .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.Center,
-    ) {
-        if (busy) {
-            HxSpinner(16.dp, fg)
-            Spacer(Modifier.width(8.dp))
-        } else if (icon != null) {
-            Icon(icon, null, tint = fg, modifier = Modifier.size(18.dp))
-            Spacer(Modifier.width(6.dp))
-        }
-        Text(text, style = MaterialTheme.typography.labelLarge, color = fg, maxLines = 1)
-    }
-}
-
-/** Small circular icon action used in top bars. */
-@Composable
-internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true, anchorMenu: Boolean = false) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val tint by animateColorAsState(if (enabled) c.text else c.textFaint, tween(HxMotion.Medium), label = "barTint")
-    IconButton(onClick = { haptics.perform(HetuHaptic.Tap); onClick() }, enabled = enabled && !busy,
-        modifier = Modifier.size(44.dp).then(if (anchorMenu) Modifier.hxAnchorSource() else Modifier)) {
-        // Icon swaps (search ↔ close search, idle ↔ busy) rotate/scale through instead of blinking.
-        AnimatedContent(
-            targetState = if (busy) null else icon,
-            transitionSpec = {
-                (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f))
-                    .togetherWith(fadeOut(tween(90)) + scaleOut(tween(HxMotion.Short), targetScale = .5f))
-            },
-            contentAlignment = Alignment.Center,
-            label = "barAction",
-        ) { target ->
-            if (target == null) HxSpinner(18.dp) else Icon(target, description, tint = tint)
-        }
-    }
-}
-
-/** Thin rounded progress bar with an animated fill. */
-@Composable
-internal fun HxProgressBar(ratio: Float, color: Color = Hx.colors.accent, modifier: Modifier = Modifier, height: Dp = 6.dp) {
-    val animated by animateFloatAsState(ratio.coerceIn(0f, 1f), tween(HxMotion.Long, easing = HxMotion.Emphasized), label = "progress")
-    Box(modifier.fillMaxWidth().height(height).clip(Hx.pillShape).background(Hx.colors.surfaceMuted)) {
-        Box(Modifier.fillMaxWidth(animated).height(height).clip(Hx.pillShape).background(color))
-    }
+    HomeButton(
+        text, onClick, modifier,
+        kind = when { outlined -> HomeButtonKind.Secondary; filled -> HomeButtonKind.Primary; else -> HomeButtonKind.Soft },
+        icon = icon?.let(::hxLineIcon), enabled = enabled, loading = busy,
+        danger = tone == HxTone.Bad, tinted = tone != HxTone.Neutral,
+    )
 }
 
 /**
- * Filled input used in dialogs and sheets: a soft tinted well, no underline, and an accent
- * ring that fades in while focused.
+ * Icon action of a top bar. With [anchorMenu] it remembers where it was touched, so the menu it
+ * opens grows out of it.
+ */
+@Composable
+internal fun HxBarAction(icon: ImageVector, description: String, onClick: () -> Unit, busy: Boolean = false, enabled: Boolean = true, anchorMenu: Boolean = false) {
+    HomeIconButton(hxLineIcon(icon), description, onClick, if (anchorMenu) Modifier.hxAnchorSource() else Modifier, enabled = enabled, loading = busy)
+}
+
+/** Thin rounded progress bar with an eased fill. */
+@Composable
+internal fun HxProgressBar(ratio: Float, color: Color = LocalHomeColors.current.accent, modifier: Modifier = Modifier, height: Dp = 6.dp) =
+    HomeProgressBar(ratio, modifier, color = color, track = color.copy(alpha = .16f), height = height)
+
+/**
+ * Free-standing input for sheets: a 52 dp outlined field whose outline turns accent while
+ * focused. [label] and [placeholder] are slots because their callers already build them.
  */
 @Composable
 internal fun HxTextField(
@@ -1609,67 +1169,39 @@ internal fun HxTextField(
     keyboardOptions: KeyboardOptions = KeyboardOptions.Default,
     @Suppress("UNUSED_PARAMETER") shape: androidx.compose.ui.graphics.Shape? = null,
 ) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     val source = remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    val ring by animateColorAsState(if (focused) c.accent else Color.Transparent, tween(HxMotion.Medium), label = "fieldRing")
-    val fieldShape = RoundedCornerShape(16.dp)
-    androidx.compose.material3.TextField(
-        value = value,
-        onValueChange = onValueChange,
-        modifier = modifier.border(1.5.dp, ring, fieldShape),
-        label = label,
-        placeholder = placeholder,
-        singleLine = singleLine,
-        maxLines = maxLines,
-        keyboardOptions = keyboardOptions,
-        interactionSource = source,
-        shape = fieldShape,
-        colors = androidx.compose.material3.TextFieldDefaults.colors(
-            focusedContainerColor = c.surfaceMuted,
-            unfocusedContainerColor = c.surfaceMuted,
-            disabledContainerColor = c.surfaceMuted,
-            focusedIndicatorColor = Color.Transparent,
-            unfocusedIndicatorColor = Color.Transparent,
-            disabledIndicatorColor = Color.Transparent,
-            focusedLabelColor = c.accent,
-            unfocusedLabelColor = c.textMuted,
-            cursorColor = c.accent,
-        ),
-    )
-}
-
-
-/** Dialog footer: two equal pills — a quiet cancel and a solid confirm. */
-@Composable
-private fun HxDialogButtons(confirmLabel: String, confirmColor: Color, referenceCorners: Boolean = false, buttonHeight: Dp = 46.dp, onDismiss: () -> Unit, onConfirm: () -> Unit) {
-    val c = Hx.colors
-    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-        val cancelSource = remember { MutableInteractionSource() }
-        Box(
-            Modifier
-                .weight(1f)
-                .hxPressScale(cancelSource, .96f)
-                .height(buttonHeight)
-                .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
-                .background(c.surfaceMuted)
-                .clickable(interactionSource = cancelSource, indication = LocalIndication.current, onClick = onDismiss),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(ht("取消"), style = MaterialTheme.typography.labelLarge, color = c.text)
-        }
-        val okSource = remember { MutableInteractionSource() }
-        Box(
-            Modifier
-                .weight(1f)
-                .hxPressScale(okSource, .96f)
-                .height(buttonHeight)
-                .clip(if (referenceCorners) RoundedCornerShape(14.dp) else Hx.pillShape)
-                .background(confirmColor)
-                .clickable(interactionSource = okSource, indication = LocalIndication.current, onClick = onConfirm),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text(confirmLabel, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold, color = if (confirmColor == c.accent) c.onAccent else Color.White)
-        }
+    val outline by androidx.compose.animation.animateColorAsState(if (focused) c.accent else c.line2, HomeMotion.fade(LocalHomeMotionEnabled.current), label = "hx-field-outline")
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (label != null) CompositionLocalProvider(androidx.compose.material3.LocalTextStyle provides HomeType.cardLabel.copy(color = c.t1)) { label() }
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.fillMaxWidth(),
+            textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium),
+            singleLine = singleLine,
+            maxLines = maxLines,
+            keyboardOptions = keyboardOptions,
+            interactionSource = source,
+            cursorBrush = SolidColor(c.accent),
+            decorationBox = { inner ->
+                Box(
+                    Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = 52.dp)
+                        .clip(HomeDims.controlShape)
+                        .background(c.surface)
+                        .border(if (focused) 1.5.dp else 1.dp, outline, HomeDims.controlShape)
+                        .padding(horizontal = 14.dp, vertical = 12.dp),
+                    contentAlignment = if (singleLine) Alignment.CenterStart else Alignment.TopStart,
+                ) {
+                    if (value.isEmpty() && placeholder != null) {
+                        CompositionLocalProvider(androidx.compose.material3.LocalTextStyle provides HomeType.body.copy(color = c.t3)) { placeholder() }
+                    }
+                    inner()
+                }
+            },
+        )
     }
 }

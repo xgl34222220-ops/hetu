@@ -182,6 +182,12 @@ internal val LocalHomeColors = staticCompositionLocalOf { homeColors() }
  */
 internal val LocalHomeBlur = staticCompositionLocalOf { false }
 
+/**
+ * The user's「顶栏模糊样式」: true = the blurred bar dissolves into the content below it,
+ * false = an even frosted pane with a hairline. Only matters while [LocalHomeBlur] is on.
+ */
+internal val LocalHomeBarProgressive = staticCompositionLocalOf { false }
+
 /** Spacing rhythm and radii measured from the concept: 14 dp gutters and gaps, 24 dp cards. */
 internal object HomeDims {
     val gutter = 14.dp

@@ -1,5 +1,14 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.ui.text.AnnotatedString
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeRowLayout
+import io.github.xgl34222220.hetu.home.HomeStatusDot
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.panel.PanelIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.ui.ht
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -7,8 +16,6 @@ import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -31,7 +38,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.ui.HetuTheme
 import io.github.xgl34222220.hetu.ui.LocalHetuTokens
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -327,7 +333,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = vm.prefs
     val scope = rememberCoroutineScope()
-    val c = Hx.colors
+    val home = LocalHomeColors.current
     var revision by remember { mutableIntStateOf(0) }
     var actionKey by remember { mutableStateOf<String?>(null) }
     val enabled = remember(revision) { prefs.getBoolean("networkMatchEnabled", false) }
@@ -384,42 +390,34 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         evaluate()
     }
 
-    HxPage(flatCanvas = true, referenceTopBar = true,
-        title = "网络匹配",
+    HxPage(
+        title = ht("网络匹配"),
         largeTitle = false,
-        compactTitleFontSizeSp = 20f,
-        subtitle = "按当前网络环境自动启停代理",
+        subtitle = ht("按当前网络环境自动启停代理"),
         onBack = onBack,
         onRefresh = { requestWifiPermissions() },
         actions = {
-            HxBarAction(Icons.Rounded.Refresh, "刷新当前网络", onClick = { requestWifiPermissions() })
-            HxBarAction(Icons.Rounded.Check, "保存", onClick = ::save, enabled = dirty)
+            HxBarAction(HomeIcons.RefreshCw, "刷新当前网络", onClick = { requestWifiPermissions() })
+            HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty)
         },
     ) {
         item(key = "env") {
             SettingsSection {
-                HxCard(padding = PaddingValues(16.dp)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Box(Modifier.size(28.dp), contentAlignment = Alignment.Center) {
-                            Icon(
-                                if (environment.startsWith("Wi")) Icons.Rounded.Wifi else if (environment.contains("移动")) Icons.Rounded.SignalCellularAlt else Icons.Rounded.Public,
-                                null,
-                                tint = c.accent,
-                            )
-                        }
-                        Spacer(Modifier.width(24.dp))
-                        Column(Modifier.weight(1f)) {
-                            Text("当前环境", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = c.text)
-                            Text(environment, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp), color = c.textMuted, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                        }
-                    }
+                // What the phone is on right now: the thing every rule below is matched against.
+                SettingsGroup {
+                    HomeRowLayout(
+                        AnnotatedString(ht("当前环境")), subtitle = environment,
+                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) HxIcons.Signal else PanelIcons.Globe,
+                        iconTint = home.accent,
+                        trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
+                    )
                 }
             }
         }
         item(key = "master") {
             SettingsSection {
                 SettingsGroup {
-                    SettingsSwitchRow("自动网络匹配", enabled, { value ->
+                    SettingsSwitchRow(ht("自动网络匹配"), enabled, { value ->
                         if (value) {
                             prefs.edit().putBoolean("networkMatchEnabled", true).apply()
                             service("START")
@@ -430,24 +428,24 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                             context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
                             refresh()
                         }
-                    }, subtitle = if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理", icon = Icons.Rounded.Sensors, iconTint = c.textMuted)
+                    }, subtitle = ht(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理"), icon = HxIcons.Radio)
                     SettingsDivider()
-                    SettingsSwitchRow("移动数据", mobile, {
+                    SettingsSwitchRow(ht("移动数据"), mobile, {
                         prefs.edit().putBoolean("networkMatchMobile", it).apply()
                         refresh()
                         evaluate()
-                    }, subtitle = "使用蜂窝网络时视为匹配", icon = Icons.Rounded.CellTower, iconTint = c.textMuted)
+                    }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
                 }
             }
         }
         item(key = "actions") {
             SettingsSection {
-                SettingsGroup(title = "自动动作") {
-                    SettingsNavRow("匹配成功", compact = true, icon = Icons.Rounded.PlayCircleOutline, iconTint = c.textMuted, value = actionLabel("networkMatchAction", "start"), dropdown = true) {
+                SettingsGroup(title = ht("自动动作")) {
+                    SettingsNavRow(ht("匹配成功"), compact = true, icon = HxIcons.CirclePlay, value = ht(actionLabel("networkMatchAction", "start")), dropdown = true) {
                         actionKey = "networkMatchAction"
                     }
                     SettingsDivider()
-                    SettingsNavRow("条件失配", compact = true, icon = Icons.Rounded.StopCircle, iconTint = c.textMuted, value = actionLabel("networkUnmatchAction", "none"), dropdown = true) {
+                    SettingsNavRow(ht("条件失配"), compact = true, icon = HxIcons.CircleStop, value = ht(actionLabel("networkUnmatchAction", "none")), dropdown = true) {
                         actionKey = "networkUnmatchAction"
                     }
                 }
@@ -461,19 +459,19 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
         item(key = "note") {
             HxBanner(
-                "部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。",
+                ht("部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。"),
                 tone = HxTone.Neutral,
-                modifier = Modifier.padding(horizontal = Hx.gutter),
+                modifier = Modifier.padding(horizontal = HomeDims.gutter),
             )
         }
     }
 
     actionKey?.let { key ->
         HxChoiceSheet(
-            title = if (key == "networkMatchAction") "匹配成功动作" else "失配动作",
+            title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
             referenceRadios = true,
             trailingReferenceRadios = key == "networkUnmatchAction",
-            choices = listOf(HxChoice("none", "不操作"), HxChoice("start", "启动 Root 代理"), HxChoice("stop", "停止 Root 代理")),
+            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理"))),
             selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
             onPick = { value ->
                 prefs.edit().putString(key, value).apply()

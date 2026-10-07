@@ -1,79 +1,41 @@
 package io.github.xgl34222220.hetu
 
 import android.content.Context
-import android.content.Intent
 import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.expandVertically
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.shrinkVertically
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.automirrored.rounded.Redo
-import androidx.compose.material.icons.automirrored.rounded.FormatListBulleted
-import androidx.compose.material.icons.automirrored.rounded.Undo
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Add
-import androidx.compose.material.icons.rounded.Refresh
-import androidx.compose.material.icons.rounded.CheckCircleOutline
-import androidx.compose.material.icons.rounded.ErrorOutline
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.FileDownload
-import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.IosShare
-import androidx.compose.material.icons.rounded.DriveFileRenameOutline
-import androidx.compose.material.icons.rounded.Description
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.CloudSync
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Edit
-import androidx.compose.material.icons.rounded.FactCheck
-import androidx.compose.material.icons.rounded.FileOpen
-import androidx.compose.material.icons.rounded.Link
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Save
-import androidx.compose.material.icons.rounded.Sync
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
-import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -85,11 +47,17 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -100,6 +68,34 @@ import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
 import io.github.rosemoe.sora.widget.subscribeAlways
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCardTitle
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeEmptyState
+import io.github.xgl34222220.hetu.home.HomeFormField
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeMotion
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomePop
+import io.github.xgl34222220.hetu.home.HomeReveal
+import io.github.xgl34222220.hetu.home.HomeRowLayout
+import io.github.xgl34222220.hetu.home.HomeRowSubStyle
+import io.github.xgl34222220.hetu.home.HomeSegmentStyle
+import io.github.xgl34222220.hetu.home.HomeSegmented
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.badText
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.home.warnText
+import io.github.xgl34222220.hetu.panel.PanelIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.ui.ht
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -117,7 +113,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     var revision by remember { mutableIntStateOf(0) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     var subscriptions by remember { mutableStateOf<List<ProxySubscriptionUi>>(emptyList()) }
@@ -201,93 +197,64 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     }
 
     HxPage(
-        title = "配置与订阅",
+        title = ht("配置与订阅"),
         largeTitle = false,
-        compactTitleFontSizeSp = 20f,
-        subtitle = "管理源配置与当前配置中的订阅链接。",
+        subtitle = ht("管理源配置与当前配置中的订阅链接。"),
         onBack = { nav.pop() },
-        actions = {
-            if (busy) Box(Modifier.padding(12.dp)) { HxSpinner(18.dp) }
-            else HxBarAction(Icons.Rounded.Add, "导入配置", onClick = { form = "import" })
-        },
+        actions = { HxBarAction(ToolsIcons.Plus, "导入配置", onClick = { form = "import" }, busy = busy) },
     ) {
         item(key = "configs") {
             HxSection {
-                HxGroup {
-                    HxRow("配置管理", icon = Icons.Rounded.FolderOpen, referenceRow = true)
+                HxGroup(title = ht("配置管理")) {
                     if (loading && configs.isEmpty()) {
-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
+                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
                     }
                     configs.forEach { config ->
-                        Row(
-                            Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 2.dp)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (config.selected) c.accentSoft else Color.Transparent)
-                                .hxAnchorSource()
-                                .hxCombinedClick(
-                                    enabled = !busy,
-                                    onLongClick = { haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.LongPress); menuFor = config },
-                                    onClick = {
-                                        if (!config.selected) perform("已切换到 ${config.name}", true) { vm.controller.selectConfig(config.name) }
-                                    },
-                                ).padding(start = 14.dp, end = 2.dp),
-                            verticalAlignment = Alignment.CenterVertically,
+                        // Tap to make it the current config; hold, or use ···, for everything else.
+                        HxRow(
+                            config.name,
+                            subtitle = ht(when {
+                                config.selected -> "当前配置"
+                                config.bundled -> "本地配置 / 内置模板 · 需要填写订阅"
+                                else -> "本地配置"
+                            }),
+                            icon = if (config.bundled) ToolsIcons.FileCog else ToolsIcons.FileText,
+                            selected = config.selected,
+                            onClick = { if (!config.selected) perform("已切换到 ${config.name}", true) { vm.controller.selectConfig(config.name) } },
+                            onLongClick = { if (!busy) menuFor = config },
                         ) {
-                            Icon(settingsLineIcon(Icons.Rounded.Description), null, tint = c.text, modifier = Modifier.size(24.dp))
-                            Spacer(Modifier.width(16.dp))
-                            Column(Modifier.weight(1f).padding(vertical = 9.dp)) {
-                                Text(config.name, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
-                                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                                Text(when {
-                                    config.selected -> "当前配置"
-                                    config.bundled -> "本地配置 / 内置模板 · 需要填写订阅"
-                                    else -> "本地配置"
-                                }, style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                            }
-                            if (config.selected) Icon(Icons.Rounded.CheckCircle, "当前配置", tint = c.accent, modifier = Modifier.size(22.dp))
-                            IconButton(onClick = { menuFor = config }, enabled = !busy, modifier = Modifier.hxAnchorSource()) {
-                                Icon(Icons.Rounded.MoreHoriz, "更多", tint = c.text)
-                            }
+                            HomePop(config.selected) { Icon(HomeIcons.CircleCheck, ht("当前配置"), Modifier.size(22.dp), tint = c.accent) }
+                            HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { menuFor = config }, enabled = !busy, anchorMenu = true)
                         }
                     }
-                    HorizontalDivider(Modifier.padding(horizontal = 14.dp, vertical = 4.dp), thickness = .5.dp, color = c.line.copy(alpha = .4f))
-                    Row(Modifier.fillMaxWidth().clickable { nav.push(HxRoute.ConfigEditor) }
-                        .padding(horizontal = 20.dp, vertical = 15.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Edit, null, tint = c.accent, modifier = Modifier.size(24.dp))
-                        Spacer(Modifier.width(20.dp))
-                        Text("编辑当前 YAML", style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 21.sp),
-                            fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.accent)
-                    }
+                    HxDivider()
+                    HxNavRow(ht("编辑当前 YAML"), icon = HxIcons.SquarePen, onClick = { nav.push(HxRoute.ConfigEditor) })
                 }
             }
         }
         item(key = "subs") {
             HxSection {
                 HxGroup {
-                    HxRow("订阅管理", subtitle = "当前配置的 proxy-providers。", icon = Icons.Rounded.Link, referenceRow = true) {
-                        IconButton(onClick = { editSub = null; form = "subscription" }, enabled = !busy) {
-                            Icon(Icons.Rounded.Add, "添加订阅", tint = c.text)
-                        }
+                    HomeCardTitle(ht("订阅管理")) {
+                        HomeIconButton(ToolsIcons.Plus, "添加订阅", { editSub = null; form = "subscription" }, enabled = !busy)
                     }
+                    Text(ht("当前配置的 proxy-providers。"), Modifier.padding(start = 18.dp, end = 18.dp, bottom = 6.dp), color = c.t2, style = HomeRowSubStyle)
                     if (subscriptions.isEmpty() && !loading) {
-                        HxRow("当前配置没有订阅段", subtitle = "完整的 YAML 配置无需订阅；如需添加，请在编辑器中加入 proxy-providers", icon = Icons.Rounded.CloudSync)
+                        HxRow(ht("当前配置没有订阅段"), subtitle = ht("完整的 YAML 配置无需订阅；如需添加，请在编辑器中加入 proxy-providers"), icon = PanelIcons.Unlink)
                     }
-                    subscriptions.forEach { sub ->
-                        HxRow(sub.name,
-                            referenceRow = true,                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp).clip(RoundedCornerShape(12.dp)).background(c.surface),
-                            subtitle = if (sub.placeholder) "尚未填写订阅链接" else maskUrl(sub.url),
-                            icon = Icons.Rounded.Link,
+                    subscriptions.forEachIndexed { index, sub ->
+                        if (index > 0) HxDivider()
+                        HxRow(
+                            sub.name,
+                            subtitle = if (sub.placeholder) ht("尚未填写订阅链接") else maskUrl(sub.url),
+                            icon = ToolsIcons.Link,
                             onClick = { editSub = sub; form = "subscription" },
                         ) {
                             HxChevron()
-                            IconButton(onClick = { deleteSub = sub }, enabled = !busy) {
-                                Icon(Icons.Rounded.DeleteOutline, "删除订阅", tint = c.bad, modifier = Modifier.size(22.dp))
-                            }
+                            HomeIconButton(ToolsIcons.Trash2, "删除订阅", { deleteSub = sub }, enabled = !busy, tint = c.bad, glyph = 22.dp)
                         }
                     }
-                    Text("配置切换后将应用到当前运行状态。", style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted, modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp))
+                    Text(ht("配置切换后将应用到当前运行状态。"), Modifier.padding(start = 18.dp, end = 18.dp, top = 8.dp, bottom = 12.dp), color = c.t3, style = HomeType.caption)
                 }
             }
         }
@@ -297,16 +264,16 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         HxActionMenu(
             title = config.name,
             referenceFileMenu = true,
-            anchorEndInset = 2.dp,
+            headerIcon = if (config.bundled) ToolsIcons.FileCog else ToolsIcons.FileText,
             actions = buildList {
-                if (!config.selected) add(HxMenuAction("设为当前配置", Icons.Rounded.CheckCircle) {
+                if (!config.selected) add(HxMenuAction(ht("设为当前配置"), HomeIcons.CircleCheck) {
                     menuFor = null
                     perform("已切换到 ${config.name}", true) { vm.controller.selectConfig(config.name) }
                 })
-                add(HxMenuAction("导出配置", Icons.Rounded.IosShare) { menuFor = null; exportFor = config; launchDocumentPicker(vm::toast) { exporter.launch(config.name) } })
+                add(HxMenuAction(ht("导出配置"), ToolsIcons.Share) { menuFor = null; exportFor = config; launchDocumentPicker(vm::toast) { exporter.launch(config.name) } })
                 if (!config.bundled) {
-                    add(HxMenuAction("重命名", Icons.Rounded.DriveFileRenameOutline) { menuFor = null; renameFor = config })
-                    add(HxMenuAction("删除配置", Icons.Rounded.DeleteOutline, danger = true) { menuFor = null; confirmDelete = config })
+                    add(HxMenuAction(ht("重命名"), HxIcons.TextCursorInput) { menuFor = null; renameFor = config })
+                    add(HxMenuAction(ht("删除配置"), ToolsIcons.Trash2, danger = true) { menuFor = null; confirmDelete = config })
                 }
             },
             onDismiss = { menuFor = null },
@@ -314,7 +281,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     }
     renameFor?.let { config ->
         HxFormDialog(
-            title = "重命名配置", configFooter = true, fields = listOf(HxField("名称", config.name)),
+            title = "重命名配置", fields = listOf(HxField("名称", config.name)), confirmLabel = "重命名",
             validate = { values ->
                 val name = values[0]
                 when {
@@ -343,7 +310,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         HxConfirmDialog(
             title = "删除配置？",
             message = "「${config.name}」将被永久删除。" + if (config.selected) "删除后会切换回内置模板。" else "",
-            confirmLabel = "删除", danger = true, presentation = HxConfirmStyle.Text,
+            confirmLabel = "删除", danger = true,
             onConfirm = {
                 confirmDelete = null
                 perform("已删除", applyToRuntime = config.selected) { vm.controller.deleteConfig(config.name) }
@@ -354,7 +321,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     deleteSub?.let { sub ->
         HxConfirmDialog(
             title = "删除订阅？", message = "从当前配置中移除「${sub.name}」及其在策略组中的引用。",
-            confirmLabel = "删除", danger = true, presentation = HxConfirmStyle.SoftRow,
+            confirmLabel = "删除", danger = true,
             onConfirm = { deleteSub = null; perform("订阅已删除", true) { vm.controller.deleteSubscription(sub.name) } },
             onDismiss = { deleteSub = null },
         )
@@ -364,7 +331,6 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
 /** Forms are their own pages in the reference, so drafts can be reviewed before applying. */
 @Composable
 private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscriptionUi?, onBack: () -> Unit, onSaved: () -> Unit) {
-    val c = Hx.colors
     val scope = rememberCoroutineScope()
     val initialUrl = subscription?.takeUnless { it.placeholder }?.url.orEmpty()
     var name by remember(subscription?.name) { mutableStateOf(subscription?.name.orEmpty()) }
@@ -391,39 +357,38 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
         }
     }
     BackHandler { leave() }
-    HxPage(title = if (subscription == null) "添加订阅" else "编辑订阅", largeTitle = false, onBack = ::leave) {
+    HxPage(title = if (subscription == null) ht("添加订阅") else ht("编辑订阅"), largeTitle = false, onBack = ::leave) {
         item("form") {
             HxSection {
-                HxCard(padding = androidx.compose.foundation.layout.PaddingValues(15.dp)) {
-                    if (subscription == null) ConfigFormField("订阅名称", name, { name = it; problem = null }, "例如 主订阅",
-                        if (attempted && name.isBlank()) "名称不能为空" else null)
-                    else {
-                        Text("订阅名称", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
-                        Text(subscription.name, style = MaterialTheme.typography.titleMedium, color = c.text, modifier = Modifier.padding(top = 4.dp))
-                        Text("名称用于引用订阅，可在 YAML 编辑器中统一修改。", style = MaterialTheme.typography.bodySmall,
-                            color = c.textMuted, modifier = Modifier.padding(top = 6.dp))
-                    }
-                    Spacer(Modifier.height(28.dp))
-                    ConfigFormField("订阅链接", url, { url = it; problem = null }, "https://example.com/subscription",
-                        if (attempted && !hxConfigHttpUrl(url)) "请输入有效的 http/https 链接" else null)
-                    Text("保存到当前配置，运行时会尝试应用。", style = MaterialTheme.typography.bodySmall,
-                        color = c.textMuted, modifier = Modifier.padding(top = 10.dp))
-                    if (problem != null) HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 10.dp))
-                    Spacer(Modifier.height(48.dp))
-                    HxButton("保存", ::save, Modifier.fillMaxWidth(), icon = Icons.Rounded.Save, busy = busy)
+                HxCard {
+                    HomeFormField(
+                        "订阅名称", name, { name = it; problem = null }, placeholder = "例如 主订阅",
+                        error = if (attempted && name.isBlank()) ht("名称不能为空") else null,
+                        hint = if (subscription == null) null else "名称用于引用订阅，可在 YAML 编辑器中统一修改。",
+                        readOnly = subscription != null, enabled = !busy,
+                    )
+                    Spacer(Modifier.height(22.dp))
+                    HomeFormField(
+                        "订阅链接", url, { url = it; problem = null }, placeholder = "https://example.com/subscription",
+                        error = if (attempted && !hxConfigHttpUrl(url)) ht("请输入有效的 http/https 链接") else null,
+                        hint = "保存到当前配置，运行时会尝试应用。", enabled = !busy, clearable = true, keyboardType = KeyboardType.Uri,
+                    )
+                    HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
+                    Spacer(Modifier.height(26.dp))
+                    HxButton("保存", ::save, Modifier.fillMaxWidth(), icon = HomeIcons.Save, busy = busy)
                     ConfigCancelButton(::leave, !busy)
                 }
             }
         }
     }
-    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true, presentation = HxConfirmStyle.DestructiveStack,
+    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true,
         onConfirm = { discard = false; onBack() }, onDismiss = { discard = false })
 }
 
 @Composable
 private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: () -> Unit) {
     val context = LocalContext.current
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     val scope = rememberCoroutineScope()
     var mode by remember { mutableStateOf("file") }
     var uri by remember { mutableStateOf<Uri?>(null) }
@@ -455,84 +420,80 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: 
         }
     }
     BackHandler { leave() }
-    HxPage(title = "导入配置", largeTitle = false, onBack = ::leave) {
+    HxPage(title = ht("导入配置"), largeTitle = false, onBack = ::leave) {
         item("mode") {
             HxSection {
-                HxCard(padding = androidx.compose.foundation.layout.PaddingValues(6.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                        listOf("file" to "从文件导入", "link" to "从链接导入").forEach { (id, label) ->
-                            Row(Modifier.weight(1f).height(44.dp).clip(RoundedCornerShape(18.dp))
-                                .background(if (id == mode) c.accentSoft else Color.Transparent)
-                                .clickable(enabled = !busy) { mode = id; attempted = false; problem = null },
-                                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
-                                Icon(settingsLineIcon(if (id == "file") Icons.Rounded.Description else Icons.Rounded.Link), null,
-                                    tint = if (id == mode) c.accent else c.text, modifier = Modifier.size(22.dp))
-                                Spacer(Modifier.width(10.dp))
-                                Text(label, color = if (id == mode) c.accent else c.text, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-                            }
-                        }
-                    }
-                }
+                HomeSegmented(
+                    listOf("file" to ht("从文件导入"), "link" to ht("从链接导入")), mode,
+                    { mode = it; attempted = false; problem = null },
+                    Modifier.fillMaxWidth(), enabled = !busy, style = HomeSegmentStyle.Soft, track = c.surface, height = 56.dp, corner = 20.dp,
+                    textStyle = HomeType.button, icons = mapOf("file" to ToolsIcons.FileText, "link" to ToolsIcons.Link), inset = 5.dp,
+                )
             }
         }
         item("form") {
             HxSection {
-                HxCard(padding = androidx.compose.foundation.layout.PaddingValues(18.dp)) {
+                HxCard {
                     if (mode == "link") {
-                        ConfigFormField("配置链接", url, { url = it; problem = null }, "https://example.com/config.yaml",
-                            if (attempted && !hxConfigHttpUrl(url)) "请输入有效的 http/https 链接" else null)
-                        Spacer(Modifier.height(28.dp))
-                        ConfigFormField("配置名称（可选）", name, { name = it; problem = null }, "例如 旅行.yaml")
+                        HomeFormField(
+                            "配置链接", url, { url = it; problem = null }, placeholder = "https://example.com/config.yaml",
+                            error = if (attempted && !hxConfigHttpUrl(url)) ht("请输入有效的 http/https 链接") else null,
+                            enabled = !busy, clearable = true, keyboardType = KeyboardType.Uri,
+                        )
+                        Spacer(Modifier.height(22.dp))
+                        HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 旅行.yaml", enabled = !busy)
                     } else {
-                        Text("配置文件", style = MaterialTheme.typography.titleSmall, color = c.text)
-                        if (uri != null) HxRow(fileName, icon = Icons.Rounded.Description)
-                        HxNavRow(if (uri == null) "选择配置文件" else "重新选择文件", icon = Icons.Rounded.FolderOpen) {
-                            if (!busy) launchDocumentPicker(vm::toast) { chooser.launch(arrayOf("*/*")) }
+                        Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
+                        Spacer(Modifier.height(8.dp))
+                        // The chosen file, or an invitation to choose one: the whole well is the button.
+                        val source = remember { MutableInteractionSource() }
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(HomeDims.controlShape).background(if (uri == null) c.sunken else c.accentSoft)
+                                .homeRowPressTint(source)
+                                .clickable(interactionSource = source, indication = null, enabled = !busy, role = Role.Button) {
+                                    launchDocumentPicker(vm::toast) { chooser.launch(arrayOf("*/*")) }
+                                }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(if (uri == null) HxIcons.FolderOpen else ToolsIcons.FileText, null, Modifier.size(24.dp), tint = if (uri == null) c.t2 else c.accent)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                if (uri != null) Text(fileName, color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(ht(if (uri == null) "选择配置文件" else "重新选择文件"), color = if (uri == null) c.t1 else c.accent,
+                                    style = if (uri == null) HomeType.cardLabel else HomeType.caption.copy(fontWeight = FontWeight.SemiBold))
+                            }
+                            HxChevron()
                         }
-                        if (attempted && uri == null) Text("请选择配置文件", style = MaterialTheme.typography.bodySmall, color = c.bad)
+                        HomeReveal(attempted && uri == null) {
+                            Row(Modifier.padding(start = 2.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(HomeIcons.CircleAlert, null, Modifier.size(16.dp), tint = c.bad)
+                                Text(ht("请选择配置文件"), color = c.badText, style = HomeType.note.copy(fontWeight = FontWeight.Medium))
+                            }
+                        }
                     }
-                    Row(Modifier.padding(top = 16.dp), verticalAlignment = Alignment.Top) {
-                        Icon(Icons.Rounded.Info, null, tint = c.textMuted, modifier = Modifier.size(18.dp))
-                        Spacer(Modifier.width(10.dp))
-                        Text("导入后设为当前配置。支持 UTF-8，最大 4 MiB。" + if (mode == "link") "链接需直接返回 YAML 文件。" else "",
-                            style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.t3)
+                        Text(ht("导入后设为当前配置。支持 UTF-8，最大 4 MiB。") + if (mode == "link") ht("链接需直接返回 YAML 文件。") else "", color = c.t2, style = HomeType.note)
                     }
-                    if (problem != null) HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 10.dp))
+                    HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
                 }
             }
         }
         item("submit") {
             HxSection {
-                HxButton("导入配置", ::import, Modifier.fillMaxWidth(), busy = busy,
-                    icon = if (mode == "file") Icons.Rounded.FileDownload else null)
+                HxButton("导入配置", ::import, Modifier.fillMaxWidth(), busy = busy, icon = if (mode == "file") ToolsIcons.Download else null)
                 ConfigCancelButton(::leave, !busy)
             }
         }
     }
-    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true, presentation = HxConfirmStyle.DestructiveStack,
+    if (discard) HxConfirmDialog("放弃填写？", "已填写的内容尚未保存，返回后将丢失这些修改。", "放弃", danger = true,
         onConfirm = { discard = false; onBack() }, onDismiss = { discard = false })
 }
 
 @Composable
-private fun ConfigFormField(label: String, value: String, onValueChange: (String) -> Unit, placeholder: String, error: String? = null) {
-    val c = Hx.colors
-    Text(label, style = MaterialTheme.typography.titleSmall, color = c.text)
-    Spacer(Modifier.height(8.dp))
-    HxTextField(value, onValueChange, Modifier.fillMaxWidth(), placeholder = { Text(placeholder, color = c.textFaint) }, singleLine = true)
-    if (error != null) {
-        Row(Modifier.padding(top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.ErrorOutline, null, tint = c.bad, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(4.dp))
-            Text(error, style = MaterialTheme.typography.bodySmall, color = c.bad)
-        }
-    }
-}
-
-@Composable
 private fun ConfigCancelButton(onClick: () -> Unit, enabled: Boolean) {
-    Box(Modifier.fillMaxWidth().height(52.dp).clickable(enabled = enabled, onClick = onClick), contentAlignment = Alignment.Center) {
-        Text("取消", style = MaterialTheme.typography.labelLarge, color = Hx.colors.accent)
-    }
+    HomeButton("取消", onClick, Modifier.fillMaxWidth().padding(top = 6.dp), kind = HomeButtonKind.Ghost, enabled = enabled)
 }
 
 internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
@@ -619,13 +580,13 @@ internal fun ProvidersScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     LaunchedEffect(Unit) { vm.loadProviders() }
     HxPage(
-        title = "订阅流量",
+        title = ht("订阅流量"),
         largeTitle = false,
-        subtitle = if (vm.state.running) "来自运行中 Mihomo 的 proxy-providers" else "代理未运行",
+        subtitle = if (vm.state.running) ht("来自运行中 Mihomo 的 proxy-providers") else ht("代理未运行"),
         onBack = { nav.pop() },
     ) {
         if (!vm.state.running) {
-            item(key = "stopped") { HxEmpty(Icons.Rounded.CloudSync, "代理未运行", "启动后可查看订阅流量并更新节点") }
+            item(key = "stopped") { HxEmpty(HxIcons.CloudDownload, "代理未运行", "启动后可查看订阅流量并更新节点") }
         } else {
             providerListItems(vm)
         }
@@ -687,7 +648,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     val nav = if (onBackOverride == null) LocalNav.current else null
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     var source by remember { mutableStateOf<HxConfigSource?>(null) }
     var editor by remember { mutableStateOf<CodeEditor?>(null) }
     var loadRevision by remember { mutableIntStateOf(0) }
@@ -799,56 +760,49 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         }
     }
 
-    Column(Modifier.fillMaxSize().background(c.canvas).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Box(Modifier.fillMaxWidth().height(HxTopBarHeight)) {
-            IconButton(onClick = ::leave, modifier = Modifier.align(Alignment.CenterStart)) {
-                Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回", tint = c.text)
-            }
-            Text("编辑配置", style = MaterialTheme.typography.titleMedium.copy(fontSize = 20.sp, lineHeight = 26.sp), color = c.text, modifier = Modifier.align(Alignment.Center))
-            IconButton(onClick = ::save, enabled = dirty && !saving && !validating,
-                modifier = Modifier.align(Alignment.CenterEnd)) {
-                if (saving) HxSpinner() else Icon(Icons.Rounded.Save, "保存", tint = if (dirty) c.accent else c.textFaint)
-            }
+    val ready = source != null && !loading && !saving
+    Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding()) {
+        Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
+            HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
+            Text(ht("编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
+            HomeIconButton(
+                HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
+                enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
+            )
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 4.dp)
-            .clip(HomeContinuousShape(24.dp)).background(c.surface).padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Description, null, tint = if (source == null) c.textFaint else c.text, modifier = Modifier.size(28.dp))
-            Spacer(Modifier.width(16.dp))
-            Column(Modifier.weight(1f)) {
-                Text(source?.name ?: "读取配置", style = MaterialTheme.typography.titleMedium.copy(fontSize = 18.sp, lineHeight = 24.sp), color = c.text,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis)
-                Text(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" },
-                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 14.sp, lineHeight = 20.sp), color = if (dirty) c.warn else c.textMuted)
-            }
+        // Which file this is, and whether what is on screen has been written to it.
+        Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
+            HomeRowLayout(
+                AnnotatedString(source?.name ?: ht("读取配置")),
+                subtitle = ht(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" }),
+                icon = ToolsIcons.FileCog,
+                iconTint = if (source == null) c.t3 else c.t1,
+                subtitleColor = if (dirty) c.warnText else c.t2,
+                trailing = { HomePop(dirty) { HomePill(ht("未保存"), tone = HomeTone.Warn) } },
+            )
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter, vertical = 10.dp)
-            .clip(HomeContinuousShape(24.dp)).background(c.surface), verticalAlignment = Alignment.CenterVertically) {
-            val enabled = source != null && !loading && !saving
-            ConfigEditorAction(Icons.AutoMirrored.Rounded.Undo, "撤销", Modifier.weight(1f), enabled) { editor?.let { if (it.canUndo()) it.undo() } }
-            ConfigEditorAction(Icons.AutoMirrored.Rounded.Redo, "重做", Modifier.weight(1f), enabled) { editor?.let { if (it.canRedo()) it.redo() } }
-            Box(Modifier.width(.5.dp).height(26.dp).background(c.line))
-            ConfigEditorAction(Icons.AutoMirrored.Rounded.FormatListBulleted, "语法大纲", Modifier.weight(1.3f), enabled) { showOutline = true }
-            Box(Modifier.width(.5.dp).height(26.dp).background(c.line))
-            ConfigEditorAction(Icons.Rounded.CheckCircleOutline, "校验", Modifier.weight(1.2f), enabled && !validating, validating, ::validate)
+        Row(
+            Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready) { editor?.let { if (it.canUndo()) it.undo() } }
+            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready) { editor?.let { if (it.canRedo()) it.redo() } }
+            ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
+            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
         }
-        AnimatedVisibility(visible = problem != null) {
+        HomeReveal(problem != null) {
             HxBanner(problem.orEmpty(), tone = HxTone.Bad,
-                modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 8.dp),
+                modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp),
                 actionLabel = "关闭提示", onAction = { problem = null })
         }
-        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = Hx.gutter)
-            .clip(HomeContinuousShape(24.dp)).background(c.surface)) {
+        Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
             val initial = source
             when {
                 loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
-                loadFailure != null -> Column(Modifier.align(Alignment.Center).padding(24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(Icons.Rounded.ErrorOutline, null, tint = c.textFaint, modifier = Modifier.size(48.dp))
-                    Spacer(Modifier.height(14.dp))
-                    Text("配置读取失败", style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
-                    Text(loadFailure.orEmpty(), style = MaterialTheme.typography.bodySmall, color = c.textFaint,
-                        modifier = Modifier.padding(top = 6.dp, bottom = 16.dp))
-                    HxButton("重新读取", { loadRevision++ }, icon = Icons.Rounded.Refresh)
+                loadFailure != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    HomeEmptyState(HomeIcons.CircleAlert, "配置读取失败", loadFailure.orEmpty(), topPadding = 0.dp, verbatimSubtitle = true) {
+                        HxButton("重新读取", { loadRevision++ }, icon = HomeIcons.RefreshCw)
+                    }
                 }
                 initial != null -> androidx.compose.runtime.key(loadRevision) {
                     AndroidView(
@@ -880,17 +834,19 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 }
             }
         }
-        Row(Modifier.fillMaxWidth().padding(horizontal = Hx.gutter, vertical = 8.dp)
-            .clip(HomeContinuousShape(24.dp)).background(c.surface)
-            .horizontalScroll(rememberScrollState()).padding(7.dp), horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+        // The characters YAML needs and a phone keyboard hides, one tap each.
+        Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
+            .clip(HomeDims.cardShape).background(c.surface)
+            .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HxYamlSymbols.forEach { symbol ->
-                Box(Modifier.size(44.dp).clip(RoundedCornerShape(12.dp)).background(c.surfaceMuted)
-                    .clickable(enabled = source != null && !loading && !saving) {
+                val keySource = remember { MutableInteractionSource() }
+                Box(Modifier.heightIn(min = 44.dp).widthIn(min = 44.dp).clip(RoundedCornerShape(13.dp)).background(c.sunken)
+                    .homeRowPressTint(keySource)
+                    .clickable(interactionSource = keySource, indication = null, enabled = ready, role = Role.Button) {
                         haptics.perform(io.github.xgl34222220.hetu.ui.HetuHaptic.Tick)
                         editor?.let { hxApplyYamlSymbol(it, symbol) }
-                    }, contentAlignment = Alignment.Center) {
-                    Text(symbol, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.labelLarge,
-                        color = if (source == null) c.textFaint else c.text)
+                    }.padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                    Text(symbol, color = if (source == null) c.t3 else c.t1, style = HomeType.mono.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold))
                 }
             }
         }
@@ -899,76 +855,92 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     if (showOutline) {
         val current = editor?.text?.toString().orEmpty()
         val outline = remember(current) { hxYamlOutline(current) }
-        HxSheet(onDismiss = { showOutline = false }, title = "语法大纲") {
+        HxSheet(onDismiss = { showOutline = false }, title = ht("语法大纲")) {
             val close = LocalHxSheetClose.current
-            if (outline.isEmpty()) Text("没有识别到顶层字段", style = MaterialTheme.typography.bodyMedium, color = c.textMuted,
-                modifier = Modifier.padding(horizontal = 22.dp, vertical = 12.dp))
-            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp)) {
+            if (outline.isEmpty()) Text(ht("没有识别到顶层字段"), Modifier.padding(horizontal = 20.dp, vertical = 12.dp), color = c.t2, style = HomeType.body)
+            androidx.compose.foundation.lazy.LazyColumn(Modifier.fillMaxWidth().heightIn(max = 520.dp).padding(horizontal = 8.dp)) {
                 items(outline.size) { index ->
                     val entry = outline[index]
-                    Row(Modifier.fillMaxWidth().clickable {
-                        close {
-                            showOutline = false
-                            editor?.let { native -> runCatching { native.setSelection(entry.line, 0); native.ensureSelectionVisible(); native.requestFocus() } }
-                        }
-                    }.padding(start = if (entry.level == 0) 22.dp else 40.dp, end = 22.dp, top = 9.dp, bottom = 9.dp),
+                    val rowSource = remember { MutableInteractionSource() }
+                    // Top-level keys read as headings; the entries under them are indented.
+                    Row(Modifier.fillMaxWidth().heightIn(min = if (entry.level == 0) 48.dp else 42.dp).clip(RoundedCornerShape(14.dp)).homeRowPressTint(rowSource)
+                        .clickable(interactionSource = rowSource, indication = null, role = Role.Button) {
+                            close {
+                                showOutline = false
+                                editor?.let { native -> runCatching { native.setSelection(entry.line, 0); native.ensureSelectionVisible(); native.requestFocus() } }
+                            }
+                        }.padding(start = if (entry.level == 0) 12.dp else 30.dp, end = 10.dp),
                         verticalAlignment = Alignment.CenterVertically) {
-                        Text(entry.label, style = MaterialTheme.typography.bodyMedium, color = if (entry.level == 0) c.accent else c.textMuted,
-                            maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text("${entry.line + 1}", style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textFaint)
-                        Spacer(Modifier.width(10.dp)); HxChevron()
+                        Text(entry.label, Modifier.weight(1f), color = if (entry.level == 0) c.t1 else c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            style = if (entry.level == 0) HomeType.cardLabel else HomeType.note.copy(fontSize = 15.sp))
+                        Text("${entry.line + 1}", color = c.t3, style = HomeType.mono.copy(fontSize = 12.sp))
+                        Spacer(Modifier.width(8.dp)); HxChevron()
                     }
                 }
             }
         }
     }
     conflict?.let { changed ->
-        HxSheet(onDismiss = { conflict = null }, title = if (changed.selectionChanged) "保存遇到冲突" else "文件已在其他位置修改") {
-            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(if (changed.selectionChanged) "当前配置已发生变化，无法保存。" else "源文件已发生变化，无法保存。",
-                    style = MaterialTheme.typography.bodyMedium, color = c.textMuted)
+        HxSheet(onDismiss = { conflict = null }, title = if (changed.selectionChanged) ht("保存遇到冲突") else ht("文件已在其他位置修改")) {
+            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(ht(if (changed.selectionChanged) "当前配置已发生变化，无法保存。" else "源文件已发生变化，无法保存。"), color = c.t1, style = HomeType.body)
                 Text(if (changed.selectionChanged) "当前选择为「${changed.selectedName}」。你仍可保留草稿，重新读取会打开当前配置。"
-                    else "你的草稿仍保留。可以继续编辑，或确认放弃草稿后读取最新内容。", style = MaterialTheme.typography.bodySmall, color = c.textMuted)
+                    else ht("你的草稿仍保留。可以继续编辑，或确认放弃草稿后读取最新内容。"), color = c.t2, style = HomeType.note)
+                Spacer(Modifier.height(6.dp))
                 HxButton("保留草稿", { conflict = null }, Modifier.fillMaxWidth(), filled = false)
-                HxButton("重新读取", ::reload, Modifier.fillMaxWidth(), icon = Icons.Rounded.Refresh)
+                HxButton("重新读取", ::reload, Modifier.fillMaxWidth(), icon = HomeIcons.RefreshCw)
             }
         }
     }
     if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
-        "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true, presentation = HxConfirmStyle.SoftStack,
+        "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
         onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
-    if (confirmLeave) HxConfirmDialog("放弃修改？", "编辑的修改没有保存。", "放弃", danger = true, presentation = HxConfirmStyle.SoftStack,
+    if (confirmLeave) HxConfirmDialog("放弃修改？", "编辑的修改没有保存。", "放弃", danger = true,
         onConfirm = { confirmLeave = false; dirty = false; if (onBackOverride != null) onBackOverride() else nav?.pop() },
         onDismiss = { confirmLeave = false })
 }
 
+/** One tool of the editor: a glyph over its name; a spinner takes the glyph's place while it works. */
 @Composable
 private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier,
     enabled: Boolean, busy: Boolean = false, onClick: () -> Unit) {
-    IconButton(onClick = onClick, enabled = enabled && !busy, modifier = modifier.height(52.dp)) {
-        if (busy) HxSpinner() else Icon(icon, label, tint = if (enabled) Hx.colors.text else Hx.colors.textFaint, modifier = Modifier.size(24.dp))
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val source = remember { MutableInteractionSource() }
+    Column(
+        modifier.heightIn(min = 62.dp).padding(vertical = 4.dp).clip(RoundedCornerShape(16.dp)).homeRowPressTint(source)
+            .clickable(interactionSource = source, indication = null, enabled = enabled && !busy, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .alpha(if (enabled || busy) 1f else .4f)
+            .padding(vertical = 7.dp),
+        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
+    ) {
+        Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
+            if (busy) HxSpinner(20.dp) else Icon(icon, null, Modifier.size(22.dp), tint = c.t1)
+        }
+        Text(ht(label), color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1)
     }
 }
 
 /** Selection mark for single-choice lists: a ring that fills with a check. */
 @Composable
 internal fun HxSelectMark(selected: Boolean, modifier: Modifier = Modifier) {
-    val c = Hx.colors
-    val fill by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f, HxMotion.pop(), label = "selectMark")
-    val ring by androidx.compose.animation.animateColorAsState(if (selected) c.accent else c.textFaint.copy(alpha = .6f), tween(HxMotion.Medium), label = "selectRing")
+    val c = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
+    val fill by androidx.compose.animation.core.animateFloatAsState(if (selected) 1f else 0f, HomeMotion.pop(motion), label = "selectMark")
+    val ring by androidx.compose.animation.animateColorAsState(if (selected) c.accent else c.t3, HomeMotion.fade(motion), label = "selectRing")
     Box(
-        modifier.size(22.dp).clip(CircleShape).border(1.6.dp, ring, CircleShape),
+        modifier.size(24.dp).clip(CircleShape).border(1.8.dp, ring, CircleShape),
         contentAlignment = Alignment.Center,
     ) {
         Box(
             Modifier
-                .size(22.dp)
+                .size(24.dp)
                 .graphicsLayer { scaleX = fill; scaleY = fill; alpha = fill.coerceIn(0f, 1f) }
                 .clip(CircleShape)
                 .background(c.accent),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.Rounded.Check, null, tint = c.onAccent, modifier = Modifier.size(14.dp))
+            Icon(HomeIcons.Check, null, Modifier.size(15.dp), tint = c.onAccent)
         }
     }
 }

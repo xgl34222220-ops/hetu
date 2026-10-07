@@ -206,33 +206,30 @@ internal fun rememberHxShimmer(): Brush {
     )
 }
 
-/** Placeholder rows that mirror the shape of the content being loaded (one grouped card). */
+/**
+ * Placeholder for a card of rows while its content loads: the card itself with a slow light
+ * sweeping across it, and quiet bars where the icons and the two lines of each row will be.
+ */
 @Composable
 internal fun HxSkeletonRows(count: Int = 5, modifier: Modifier = Modifier) {
-    val brush = rememberHxShimmer()
-    val c = Hx.colors
-    Column(
-        modifier
-            .fillMaxWidth()
-            .padding(horizontal = Hx.gutter)
-            .clip(RoundedCornerShape(22.dp))
-            .background(c.surface),
-    ) {
-        repeat(count) { i ->
-            if (i > 0) Box(Modifier.padding(start = 58.dp).fillMaxWidth().height(0.5.dp).background(c.line.copy(alpha = .5f)))
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.size(32.dp).clip(RoundedCornerShape(10.dp)).background(brush))
-                Spacer(Modifier.width(12.dp))
-                Column(Modifier.weight(1f)) {
-                    Box(Modifier.fillMaxWidth(if (i % 3 == 0) .62f else if (i % 3 == 1) .5f else .7f).height(11.dp).clip(Hx.pillShape).background(brush))
-                    Spacer(Modifier.height(8.dp))
-                    Box(Modifier.fillMaxWidth(if (i % 2 == 0) .34f else .42f).height(9.dp).clip(Hx.pillShape).background(brush))
+    val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
+    val bar = if (c.dark) Color.White.copy(alpha = .07f) else c.sunken
+    Box(modifier.fillMaxWidth().padding(horizontal = io.github.xgl34222220.hetu.home.HomeDims.gutter).padding(bottom = io.github.xgl34222220.hetu.home.HomeDims.gap)) {
+        io.github.xgl34222220.hetu.home.HomeSkeleton(Modifier.matchParentSize(), io.github.xgl34222220.hetu.home.HomeDims.cardShape)
+        Column(Modifier.fillMaxWidth().padding(vertical = 4.dp)) {
+            repeat(count) { i ->
+                Row(
+                    Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 18.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Box(Modifier.size(26.dp).clip(RoundedCornerShape(8.dp)).background(bar))
+                    Spacer(Modifier.width(24.dp))
+                    Column(Modifier.weight(1f)) {
+                        Box(Modifier.fillMaxWidth(if (i % 3 == 0) .62f else if (i % 3 == 1) .5f else .7f).height(13.dp).clip(Hx.pillShape).background(bar))
+                        Spacer(Modifier.height(9.dp))
+                        Box(Modifier.fillMaxWidth(if (i % 2 == 0) .34f else .42f).height(10.dp).clip(Hx.pillShape).background(bar))
+                    }
                 }
-                Spacer(Modifier.width(12.dp))
-                Box(Modifier.size(width = 44.dp, height = 20.dp).clip(RoundedCornerShape(7.dp)).background(brush))
             }
         }
     }

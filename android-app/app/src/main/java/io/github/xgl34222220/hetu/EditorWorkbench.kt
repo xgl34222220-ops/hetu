@@ -6,7 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.*
@@ -17,17 +16,26 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.EditorSearcher
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.graphics.SolidColor
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.panel.PanelIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.*
 import kotlinx.coroutines.delay
 
@@ -102,61 +110,46 @@ internal fun YamlWorkbenchAccessory(
     onRedo: () -> Unit = {},
     onSymbol: (String) -> Unit,
 ) {
-    val primary = MaterialTheme.colorScheme.primary
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
     val keys = listOf(":", "-", "[", "]", "{", "}", "#") + yamlWorkbenchSymbols.filter { it !in setOf(":", "-", "[", "]", "{", "}", "#") }
-    val c = Hx.colors
     Row(
-        Modifier.fillMaxWidth().height(48.dp).testTag("yaml-accessory")
-            .background(c.canvas)
+        Modifier.fillMaxWidth().heightIn(min = 60.dp).testTag("yaml-accessory")
             .horizontalScroll(rememberScrollState())
-            .padding(horizontal = 18.dp, vertical = 5.dp),
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
+            .padding(horizontal = HomeDims.gutter, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         keys.forEach { symbol ->
+            // Tab is the one key that does more than type itself, so it is the one in the accent.
             val highlighted = symbol == "Tab"
+            val source = remember { MutableInteractionSource() }
             Box(
-                Modifier.height(38.dp).widthIn(min = 46.dp)
+                Modifier.heightIn(min = 44.dp).widthIn(min = 46.dp)
                     .testTag("yaml-symbol:$symbol")
-                    .clip(RoundedCornerShape(9.dp))
-                    .background(if (highlighted) primary else c.surface)
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(if (highlighted) c.accent else c.surface)
+                    .homeRowPressTint(source)
                     .clickable(
+                        interactionSource = source, indication = null,
                         enabled = enabled,
                         role = Role.Button,
                         onClickLabel = if (symbol == "Tab") "缩进两个空格" else "输入 $symbol",
-                    ) { onSymbol(symbol) }
-                    .padding(horizontal = if (symbol.length > 4) 7.dp else 9.dp),
+                    ) { haptics(HomeHaptic.Tick); onSymbol(symbol) }
+                    .padding(horizontal = if (symbol.length > 4) 9.dp else 11.dp),
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
                     symbol,
-                    color = if (!enabled) c.textFaint else if (highlighted) c.onAccent else c.text,
-                    fontSize = 12.sp,
-                    lineHeight = 16.sp,
-                    fontFamily = io.github.xgl34222220.hetu.ui.HetuSystemFontFamily,
-                    fontWeight = FontWeight.Bold,
+                    color = if (!enabled) c.t3 else if (highlighted) c.onAccent else c.t1,
+                    style = HomeType.mono.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
                 )
             }
         }
-        Box(Modifier.width(1.dp).height(20.dp).background(c.line))
-        listOf(
-            Triple("撤销", Icons.Rounded.Undo, canUndo),
-            Triple("重做", Icons.Rounded.Redo, canRedo),
-        ).forEach { (label, icon, available) ->
-            Box(
-                Modifier.size(32.dp).clip(RoundedCornerShape(9.dp))
-                    .clickable(enabled = enabled && available, role = Role.Button) {
-                        if (label == "撤销") onUndo() else onRedo()
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    icon,
-                    label,
-                    Modifier.size(16.dp),
-                    tint = if (enabled && available) c.text else c.textFaint,
-                )
-            }
+        if (canUndo || canRedo) {
+            Box(Modifier.width(1.dp).height(22.dp).background(c.line2))
+            HomeIconButton(ToolsIcons.Undo2, "撤销", onUndo, enabled = enabled && canUndo, glyph = 20.dp)
+            HomeIconButton(ToolsIcons.Redo2, "重做", onRedo, enabled = enabled && canRedo, glyph = 20.dp)
         }
     }
 }
@@ -178,12 +171,13 @@ internal fun YamlCursorStatus(line: Int, column: Int, lines: Int, modifier: Modi
     }
 }
 
+/** Find in the open file: the query, how many places match, and the way from one to the next. */
 @Composable
 internal fun YamlWorkbenchSearch(editor: CodeEditor?, matches: Int, onClose: () -> Unit) {
     var query by remember { mutableStateOf("") }
     var pending by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
-    val t = LocalHetuTokens.current
+    val c = LocalHomeColors.current
     LaunchedEffect(Unit) { focus.requestFocus() }
     LaunchedEffect(query, editor) {
         if (query.isEmpty()) { editor?.searcher?.stopSearch(); pending = false }
@@ -195,35 +189,27 @@ internal fun YamlWorkbenchSearch(editor: CodeEditor?, matches: Int, onClose: () 
         }
     }
     DisposableEffect(editor) { onDispose { editor?.searcher?.stopSearch() } }
-    Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp).clip(RoundedCornerShape(18.dp))
-        .background(t.cardBackground).padding(horizontal = 8.dp, vertical = 7.dp).testTag("yaml-search"),
+    Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape)
+        .background(c.surface).padding(start = 8.dp, end = 2.dp, top = 6.dp, bottom = 6.dp).testTag("yaml-search"),
         verticalAlignment = Alignment.CenterVertically) {
-        Row(Modifier.weight(1f).clip(RoundedCornerShape(16.dp)).background(t.pageBackground)
-            .heightIn(min = 36.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Search, null, Modifier.size(19.dp), tint = t.textPrimary)
+        Row(Modifier.weight(1f).clip(HomeDims.controlShape).background(c.sunken)
+            .heightIn(min = 44.dp).padding(start = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(ToolsIcons.Search, null, Modifier.size(20.dp), tint = c.t2)
             Spacer(Modifier.width(8.dp))
             BasicTextField(query, { query = it }, Modifier.weight(1f).focusRequester(focus).testTag("yaml-search-query"),
-                singleLine = true, textStyle = LocalTextStyle.current.copy(fontSize = 14.sp, color = t.textPrimary),
-                decorationBox = { field -> Box { if (query.isEmpty()) Text("搜索配置文本", color = t.textMuted, fontSize = 13.sp); field() } })
-            if (query.isNotEmpty()) IconButton(onClick = { query = "" }, modifier = Modifier.size(34.dp)) {
-                Icon(Icons.Rounded.Cancel, "清空搜索", Modifier.size(16.dp), tint = t.textMuted)
-            }
+                singleLine = true, textStyle = HomeType.body.copy(color = c.t1, fontWeight = FontWeight.Medium),
+                cursorBrush = SolidColor(c.accent),
+                decorationBox = { field -> Box { if (query.isEmpty()) Text(ht("搜索配置文本"), color = c.t3, style = HomeType.body); field() } })
+            if (query.isNotEmpty()) HomeIconButton(HomeIcons.X, "清空搜索", { query = "" }, Modifier.size(40.dp), tint = c.t2, glyph = 18.dp)
         }
-        Text(if (query.isEmpty()) "0 个匹配" else if (pending) "搜索中…" else "$matches 个匹配",
-            Modifier.padding(horizontal = 10.dp), color = t.textSecondary, fontSize = 11.sp)
-        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
+        Text(if (query.isEmpty()) "0 个匹配" else if (pending) ht("搜索中…") else "$matches 个匹配",
+            Modifier.padding(start = 10.dp, end = 4.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium), maxLines = 1)
         val canNavigate = !pending && query.isNotEmpty() && matches > 0
-        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() },
-            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Rounded.KeyboardArrowUp, "上一个匹配", Modifier.size(19.dp))
-        }
-        IconButton(onClick = { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() },
-            enabled = canNavigate, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Rounded.KeyboardArrowDown, "下一个匹配", Modifier.size(19.dp))
-        }
-        VerticalDivider(Modifier.height(24.dp), color = t.textMuted.copy(alpha = .18f))
-        IconButton(onClick = onClose, modifier = Modifier.size(32.dp)) {
-            Icon(Icons.Rounded.Close, "关闭搜索", Modifier.size(19.dp))
-        }
+        HomeIconButton(PanelIcons.ChevronUp, "上一个匹配", { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoPrevious() },
+            Modifier.size(40.dp), enabled = canNavigate, glyph = 22.dp)
+        HomeIconButton(PanelIcons.ChevronDown, "下一个匹配", { if (editor?.searcher?.hasQuery() == true) editor.searcher.gotoNext() },
+            Modifier.size(40.dp), enabled = canNavigate, glyph = 22.dp)
+        Box(Modifier.padding(horizontal = 2.dp).width(1.dp).height(22.dp).background(c.line2))
+        HomeIconButton(HomeIcons.X, "关闭搜索", onClose, Modifier.size(40.dp), glyph = 20.dp)
     }
 }

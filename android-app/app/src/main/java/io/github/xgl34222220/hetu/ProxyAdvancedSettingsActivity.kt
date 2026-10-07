@@ -2,40 +2,50 @@ package io.github.xgl34222220.hetu
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.semantics.heading
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.StrokeCap
-import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.PathParser
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import io.github.xgl34222220.hetu.ui.HetuTheme
-import io.github.xgl34222220.hetu.ui.LocalHetuTokens
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeRadio
+import io.github.xgl34222220.hetu.home.HomeRowDims
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.tools.ToolsIcons
-import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
+import io.github.xgl34222220.hetu.ui.ht
 
 class ProxyAdvancedSettingsActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,138 +57,140 @@ class ProxyAdvancedSettingsActivity : ComponentActivity() {
 
 private data class OtherChoice(val label: String, val value: String)
 
+/** 高级代理配置: what the proxy carries, how DNS is captured, and the limits the core runs under. */
 @Composable
 private fun OtherProxySettingsPage(onBack: () -> Unit) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", 0) }
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
-    val card = Hx.colors.surface
 
     fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
     fun putString(key: String, value: String) { prefs.edit().putString(key, value).apply(); changed(key) }
 
-    HxPage(flatCanvas = true, referenceTopBar = true, title = "高级代理配置", largeTitle = false, compactTitleFontSizeSp = 20f, onBack = onBack) {
-        item {
-            OtherCard(card) {
-                OtherLabel("代理能力")
-                OtherSwitch("性能模式", prefs.getBoolean("proxyPerformanceMode", false)) { putBool("proxyPerformanceMode", it) }
-                OtherSwitch("QUIC", !profile.quicBlocked) { putBool("proxyQuicBlocked", !it) }
-                OtherSwitch("Mihomo DNS 转发", prefs.getBoolean("proxyMihomoDnsForward", true)) { putBool("proxyMihomoDnsForward", it) }
-                OtherSwitch("代理 TCP", profile.tcp) { putBool("proxyTcp", it) }
-                OtherSwitch("代理 UDP", profile.udp) { putBool("proxyUdp", it) }
+    HxPage(title = ht("高级代理配置"), largeTitle = false, onBack = onBack) {
+        item(key = "abilities") {
+            SettingsSection {
+                SettingsGroup(title = ht("代理能力")) {
+                    OtherSwitch("性能模式", prefs.getBoolean("proxyPerformanceMode", false), icon = PanelIcons.Gauge) { putBool("proxyPerformanceMode", it) }
+                    SettingsDivider()
+                    OtherSwitch("QUIC", !profile.quicBlocked, icon = PanelIcons.Zap) { putBool("proxyQuicBlocked", !it) }
+                    SettingsDivider()
+                    OtherSwitch("Mihomo DNS 转发", prefs.getBoolean("proxyMihomoDnsForward", true), icon = HomeIcons.Server) { putBool("proxyMihomoDnsForward", it) }
+                    SettingsDivider()
+                    OtherSwitch("代理 TCP", profile.tcp, icon = HxIcons.ArrowLeftRight) { putBool("proxyTcp", it) }
+                    SettingsDivider()
+                    OtherSwitch("代理 UDP", profile.udp, icon = HxIcons.Radio) { putBool("proxyUdp", it) }
+                }
             }
         }
 
-        item {
-            OtherCard(card) {
-                OtherLabel("DNS 劫持")
-                val dnsEnabled = prefs.getBoolean("proxyMihomoDnsForward", true) && profile.dnsHijack != ProxyRuntimeProfile.DnsHijack.OFF
-                val protocolControl = profile.mode != ProxyRuntimeProfile.Mode.TUN && profile.mode != ProxyRuntimeProfile.Mode.EBPF
-                OtherSwitch("DNS 劫持 TCP", prefs.getBoolean("proxyDnsHijackTcp", true), enabled = dnsEnabled && protocolControl) { putBool("proxyDnsHijackTcp", it) }
-                OtherSwitch("DNS 劫持 UDP", prefs.getBoolean("proxyDnsHijackUdp", true), enabled = dnsEnabled && protocolControl) { putBool("proxyDnsHijackUdp", it) }
-                OtherChoiceRow("DNS 劫持策略", when (profile.dnsHijack) {
-                    ProxyRuntimeProfile.DnsHijack.REDIRECT -> "REDIRECT"
-                    ProxyRuntimeProfile.DnsHijack.OFF -> "关闭"
-                    else -> "TPROXY"
-                }, icon = ToolsFeatureIcons.Globe) { choice = "dns" }
+        item(key = "dns") {
+            SettingsSection {
+                SettingsGroup(title = ht("DNS 劫持")) {
+                    val dnsEnabled = prefs.getBoolean("proxyMihomoDnsForward", true) && profile.dnsHijack != ProxyRuntimeProfile.DnsHijack.OFF
+                    val protocolControl = profile.mode != ProxyRuntimeProfile.Mode.TUN && profile.mode != ProxyRuntimeProfile.Mode.EBPF
+                    OtherSwitch("DNS 劫持 TCP", prefs.getBoolean("proxyDnsHijackTcp", true), enabled = dnsEnabled && protocolControl, icon = HxIcons.ArrowLeftRight) { putBool("proxyDnsHijackTcp", it) }
+                    SettingsDivider()
+                    OtherSwitch("DNS 劫持 UDP", prefs.getBoolean("proxyDnsHijackUdp", true), enabled = dnsEnabled && protocolControl, icon = HxIcons.Radio) { putBool("proxyDnsHijackUdp", it) }
+                    SettingsDivider()
+                    SettingsNavRow(ht("DNS 劫持策略"), value = when (profile.dnsHijack) {
+                        ProxyRuntimeProfile.DnsHijack.REDIRECT -> "REDIRECT"
+                        ProxyRuntimeProfile.DnsHijack.OFF -> ht("关闭")
+                        else -> "TPROXY"
+                    }, dropdown = true, compact = true, icon = PanelIcons.Globe) { choice = "dns" }
+                }
             }
         }
 
-        item {
-            OtherCard(card) {
-                OtherLabel("资源限制")
-                ResourceSetting(
-                    title = "CPU 核心分配",
-                    icon = ToolsIcons.Cpu,
-                    enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
-                    value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
-                    hint = "0-7",
-                    keyboardType = KeyboardType.Ascii,
-                    onEnabled = { putBool("proxyCpuAffinityEnabled", it) },
-                    onValue = { putString("proxyCpuAffinity", it) },
-                )
-                ResourceSetting(
-                    title = "内存限制",
-                    icon = AdvancedSettingsResourceIcons.Ram,
-                    enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
-                    value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
-                    hint = "100M",
-                    keyboardType = KeyboardType.Ascii,
-                    onEnabled = { putBool("proxyMemoryLimitEnabled", it) },
-                    onValue = { putString("proxyMemoryLimit", it) },
-                )
-                ResourceSetting(
-                    title = "磁盘 I/O 权重",
-                    icon = AdvancedSettingsResourceIcons.Drive,
-                    enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
-                    value = prefs.getString("proxyIoWeight", "4").orEmpty(),
-                    hint = "0-7",
-                    keyboardType = KeyboardType.Number,
-                    onEnabled = { putBool("proxyIoWeightEnabled", it) },
-                    onValue = { putString("proxyIoWeight", it) },
-                )
+        item(key = "limits") {
+            SettingsSection {
+                SettingsGroup(title = ht("资源限制")) {
+                    ResourceSetting(
+                        title = "CPU 核心分配",
+                        icon = ToolsIcons.Cpu,
+                        enabled = prefs.getBoolean("proxyCpuAffinityEnabled", false),
+                        value = prefs.getString("proxyCpuAffinity", "0-7").orEmpty(),
+                        hint = "0-7",
+                        keyboardType = KeyboardType.Ascii,
+                        onEnabled = { putBool("proxyCpuAffinityEnabled", it) },
+                        onValue = { putString("proxyCpuAffinity", it) },
+                    )
+                    ResourceSetting(
+                        title = "内存限制",
+                        icon = HxIcons.MemoryStick,
+                        enabled = prefs.getBoolean("proxyMemoryLimitEnabled", false),
+                        value = prefs.getString("proxyMemoryLimit", "100M").orEmpty(),
+                        hint = "100M",
+                        keyboardType = KeyboardType.Ascii,
+                        onEnabled = { putBool("proxyMemoryLimitEnabled", it) },
+                        onValue = { putString("proxyMemoryLimit", it) },
+                    )
+                    ResourceSetting(
+                        title = "磁盘 I/O 权重",
+                        icon = HxIcons.HardDrive,
+                        enabled = prefs.getBoolean("proxyIoWeightEnabled", false),
+                        value = prefs.getString("proxyIoWeight", "4").orEmpty(),
+                        hint = "0-7",
+                        keyboardType = KeyboardType.Number,
+                        onEnabled = { putBool("proxyIoWeightEnabled", it) },
+                        onValue = { putString("proxyIoWeight", it) },
+                    )
+                }
             }
         }
 
-        item {
-            OtherCard(card) {
-                OtherLabel("厂商防火墙")
-                OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = AdvancedSettingsResourceIcons.VendorShield) { putBool("proxyVendorFirewallCleanup", it) }
+        item(key = "vendor") {
+            SettingsSection {
+                SettingsGroup(title = ht("厂商防火墙")) {
+                    OtherSwitch("启动时清理", prefs.getBoolean("proxyVendorFirewallCleanup", false), icon = HxIcons.BrushCleaning) { putBool("proxyVendorFirewallCleanup", it) }
+                }
             }
         }
     }
 
     if (choice == "dns") {
-        HxReferenceDialog(onDismiss = { choice = null }, widthFraction = .65f, contentPadding = 24.dp) {
-            Text("DNS 劫持策略", modifier = Modifier.fillMaxWidth(),
-                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                fontSize = 22.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold)
-            Spacer(Modifier.height(6.dp))
+        // Three ways to capture DNS, answered in a dialog: the choice changes two settings at once.
+        HxReferenceDialog(onDismiss = { choice = null }) {
+            Text(ht("DNS 劫持策略"), Modifier.fillMaxWidth().semantics { heading() }, color = c.t1, style = HomeType.sheetTitle, textAlign = TextAlign.Center)
+            Spacer(Modifier.height(12.dp))
             Column(Modifier.selectableGroup()) {
-            listOf(OtherChoice("TPROXY", "tproxy"), OtherChoice("REDIRECT", "redirect"), OtherChoice("关闭", "off")).forEach { item ->
-                Row(Modifier.fillMaxWidth().heightIn(min = 48.dp).selectable(selected = profile.dnsHijack.id == item.value, role = Role.RadioButton) {
-                    putString("proxyDnsHijack", item.value)
-                    prefs.edit().putBoolean("proxyMihomoDnsForward", item.value != "off").apply()
-                    revision++
-                    choice = null
-                }, verticalAlignment = Alignment.CenterVertically) {
-                    Text(item.label, modifier = Modifier.weight(1f), color = Hx.colors.text, fontSize = 19.sp)
-                    RadioButton(selected = profile.dnsHijack.id == item.value, onClick = null,
-                        modifier = Modifier.size(24.dp))
+                listOf(OtherChoice("TPROXY", "tproxy"), OtherChoice("REDIRECT", "redirect"), OtherChoice("关闭", "off")).forEach { item ->
+                    val on = profile.dnsHijack.id == item.value
+                    val source = remember { MutableInteractionSource() }
+                    Row(
+                        Modifier.fillMaxWidth().heightIn(min = 54.dp).clip(RoundedCornerShape(16.dp)).homeRowPressTint(source)
+                            .selectable(selected = on, interactionSource = source, indication = null, role = Role.RadioButton) {
+                                haptics(HomeHaptic.Tick)
+                                putString("proxyDnsHijack", item.value)
+                                prefs.edit().putBoolean("proxyMihomoDnsForward", item.value != "off").apply()
+                                revision++
+                                choice = null
+                            }
+                            .padding(horizontal = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Text(ht(item.label), Modifier.weight(1f), color = if (on) c.accent else c.t1, style = HomeType.label.copy(fontWeight = if (on) FontWeight.Bold else FontWeight.Medium))
+                        HomeRadio(on)
+                    }
                 }
             }
-            }
-            Spacer(Modifier.height(6.dp))
-            Text("取消", color = Hx.colors.accent, fontSize = 18.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.align(Alignment.End).heightIn(min = 48.dp).clickable { choice = null }.padding(vertical = 12.dp))
+            Spacer(Modifier.height(14.dp))
+            HomeButton("取消", { choice = null }, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft)
         }
     }
 }
 
 @Composable
-private fun OtherCard(color: Color, content: @Composable ColumnScope.() -> Unit) {
-    SettingsSection { SettingsGroup(content = content) }
-}
-
-@Composable
-private fun OtherLabel(text: String) {
-    Text(text, color = Hx.colors.text, fontSize = 21.sp, lineHeight = 28.sp,
-        fontWeight = FontWeight.Bold, modifier = Modifier.semantics { heading() }.padding(start = 16.dp, end = 16.dp, top = 12.dp, bottom = 6.dp))
-}
-
-@Composable
 private fun OtherSwitch(title: String, checked: Boolean, enabled: Boolean = true, icon: ImageVector? = null, onChange: (Boolean) -> Unit) {
-    SettingsSwitchRow(title, checked, onChange, enabled = enabled, compact = true, icon = icon)
+    SettingsSwitchRow(ht(title), checked, onChange, enabled = enabled, compact = true, icon = icon)
 }
 
-@Composable
-private fun OtherChoiceRow(title: String, value: String, icon: ImageVector? = null, onClick: () -> Unit) {
-    SettingsNavRow(title, value = value, dropdown = true, compact = true, onClick = onClick, icon = icon)
-}
-
+/** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
 @Composable
 private fun ResourceSetting(
     title: String,
@@ -191,38 +203,11 @@ private fun ResourceSetting(
     onValue: (String) -> Unit,
 ) {
     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
-        SettingsSwitchRow(title, enabled, onEnabled, compact = true, icon = icon)
+        SettingsSwitchRow(ht(title), enabled, onEnabled, compact = true, icon = icon)
         SettingsInput(
             value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.padding(start = if (icon != null) 66.dp else 16.dp, end = 16.dp),
+            modifier = Modifier.padding(start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start, end = HomeRowDims.end + 2.dp),
         )
     }
-}
-
-/** Resource glyphs drawn from the detailed supplied PDF04/05; names bypass unrelated global icon mappings. */
-private object AdvancedSettingsResourceIcons {
-    private fun lineVector(name: String, vararg paths: String): ImageVector = ImageVector.Builder(
-        name = "HetuAdvancedPdf04.$name", defaultWidth = 24.dp, defaultHeight = 24.dp,
-        viewportWidth = 24f, viewportHeight = 24f,
-    ).apply {
-        paths.forEach {
-            addPath(PathParser().parsePathString(it).toNodes(), fill = null, stroke = SolidColor(Color.Black),
-                strokeLineWidth = 1.8f, strokeLineCap = StrokeCap.Round, strokeLineJoin = StrokeJoin.Round)
-        }
-    }.build()
-
-    val Ram: ImageVector = lineVector("ResourceRam",
-        "M4 4h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z",
-        "M6 7v8", "M10 7v8", "M14 7v8", "M18 7v8",
-        "M6 18v3", "M10 18v3", "M14 18v3", "M18 18v3",
-    )
-    val Drive: ImageVector = lineVector("ResourceDrive",
-        "M5.6 3.5h12.8a2 2 0 0 1 1.94 1.5L22 13v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7l1.66-8a2 2 0 0 1 1.94-1.5Z",
-        "M2 13h20", "M18.6 17.5a.6.6 0 1 1-1.2 0a.6.6 0 1 1 1.2 0Z",
-    )
-    val VendorShield: ImageVector = lineVector("VendorShieldCircle",
-        "M12 2 3 5v7c0 6 9 11 9 11s9-5 9-11V5l-9-3Z",
-        "M15 10a3 3 0 1 1-6 0a3 3 0 1 1 6 0Z",
-    )
 }

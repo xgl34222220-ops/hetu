@@ -81,7 +81,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
-import io.github.xgl34222220.hetu.home.HomeCheckMark
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeEmptyState
 import io.github.xgl34222220.hetu.home.HomeHaptic

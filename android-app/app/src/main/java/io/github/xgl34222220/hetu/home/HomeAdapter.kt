@@ -361,7 +361,7 @@ private fun copyToClipboard(context: Context, label: String, text: String) {
 internal fun HetuHomeThemeFromPrefs(prefs: SharedPreferences, content: @Composable () -> Unit) {
     var revision by remember { mutableIntStateOf(0) }
     DisposableEffect(prefs) {
-        val watched = setOf("appearance", "pureBlackDark", "accentHex", "enableMonet")
+        val watched = setOf("appearance", "pureBlackDark", "accentHex", "enableMonet", "topBarBlurStyle")
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, key -> if (key in watched) revision++ }
         prefs.registerOnSharedPreferenceChangeListener(listener)
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
@@ -381,8 +381,37 @@ internal fun HetuHomeThemeFromPrefs(prefs: SharedPreferences, content: @Composab
         ThemeChoice(isDark, isDark && prefs.getBoolean("pureBlackDark", false), presetAccent ?: HomeAccent.Default, customAccent)
     }
     HetuHomeTheme(dark = dark, accent = preset, pureBlack = pureBlack, customAccent = custom) {
-        // Pinned bars blur only when the user's「模糊效果」switch allows it.
-        CompositionLocalProvider(LocalHomeBlur provides LocalHxBlur.current, content = content)
+        // Pinned bars blur only when the user's「模糊效果」switch allows it, in the style they chose.
+        CompositionLocalProvider(
+            LocalHomeBlur provides LocalHxBlur.current,
+            LocalHomeBarProgressive provides remember(revision) { prefs.getString("topBarBlurStyle", "progressive") != "gaussian" },
+            content = content,
+        )
+    }
+}
+
+/**
+ * The whole kit for a host that has nothing but the preferences: palette and bar style from
+ * [HetuHomeThemeFromPrefs], plus haptics. HetuTheme wraps its content in this.
+ */
+@Composable
+internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Unit) {
+    val hetuHaptics = rememberHetuHaptics()
+    val haptics = remember(hetuHaptics) {
+        { kind: HomeHaptic ->
+            hetuHaptics.perform(
+                when (kind) {
+                    HomeHaptic.Tap -> HetuHaptic.Tap
+                    HomeHaptic.Tick -> HetuHaptic.Tick
+                    HomeHaptic.Confirm -> HetuHaptic.Confirm
+                    HomeHaptic.Reject -> HetuHaptic.Reject
+                },
+            )
+        }
+    }
+    // The user's「模糊效果」switch, for hosts that have no view model to read it from.
+    CompositionLocalProvider(LocalHxBlur provides prefs.getBoolean("enableBlur", true)) {
+        HetuHomeThemeFromPrefs(prefs) { CompositionLocalProvider(LocalHomeHaptics provides haptics, content = content) }
     }
 }
 

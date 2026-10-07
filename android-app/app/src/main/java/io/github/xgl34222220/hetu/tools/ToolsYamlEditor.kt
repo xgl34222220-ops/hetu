@@ -256,17 +256,16 @@ private class ToolsYamlHighlight(private val palette: ToolsYamlPalette, private 
 /* ------------------------------------------------------------------ */
 
 internal object ToolsEditorType {
-    /** Every line is exactly 17 sp tall (no first/last line trimming), so the gutter and line tints line up. */
+    /** Every line is exactly 21 sp tall (no first/last line trimming), so the gutter and line tints line up. */
     val code: TextStyle = HomeType.mono.copy(
-        fontSize = 13.sp,
-        lineHeight = 17.sp,
-        letterSpacing = (-0.35).sp,
+        fontSize = 14.sp,
+        lineHeight = 21.sp,
         lineHeightStyle = LineHeightStyle(LineHeightStyle.Alignment.Center, LineHeightStyle.Trim.None),
     )
 }
 
-private val GutterWidth = 55.dp
-private val EditorPadding = 12.dp
+private val GutterWidth = 54.dp
+private val EditorPadding = 14.dp
 
 /**
  * Code area of the config editor: line-number gutter, no soft wrap (long lines scroll sideways),
@@ -318,7 +317,7 @@ internal fun ToolsYamlEditor(
                 }
                 .padding(vertical = EditorPadding),
         ) {
-            Text(gutter, Modifier.width(GutterWidth).padding(end = 24.dp), color = c.t3, style = ToolsEditorType.code, textAlign = TextAlign.End)
+            Text(gutter, Modifier.width(GutterWidth).padding(end = 16.dp), color = c.t3, style = ToolsEditorType.code, textAlign = TextAlign.End)
             Box(Modifier.weight(1f).horizontalScroll(horizontal)) {
                 BasicTextField(
                     value = state.value,

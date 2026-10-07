@@ -283,6 +283,30 @@ def main():
                                 'versionName': homepanel['versionName'],
                                 'protectedRuntimeUnchanged': True,
                                 'reproducedSourceMatchesCheckout': True}
+        ui88_report = None
+        ui88_inputs = ROOT / 'updates/v2088-ui-refactor/inputs.json'
+        if ui88_inputs.exists():
+            from ui88_source_scope import validate_layer as validate_ui88_layer
+            assert homepanel_report is not None, 'UI unification requires the verified home/panel layer'
+            ui88 = json.loads(ui88_inputs.read_text())
+            validate_ui88_layer(ui88, final_files)
+            ui88_patch = ui88_inputs.with_name('ui.patch')
+            assert digest(ui88_patch) == ui88['patchSha256'], \
+                'UI unification patch changed without input update'
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'UI unification baseline mismatch: ' + name
+            apply(ui88_patch, work)
+            for name, sha in ui88['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'UI unification source mismatch: ' + name
+                assert sha != final_files.get(name), 'Unchanged input recorded as a delta: ' + name
+            final_files.update(ui88['changedOrAddedFiles'])
+            ui88_report = {'baseCommit': ui88['baseCommit'],
+                           'patchSha256': ui88['patchSha256'],
+                           'changedOrAddedFiles': len(ui88['changedOrAddedFiles']),
+                           'versionCode': ui88['versionCode'],
+                           'versionName': ui88['versionName'],
+                           'protectedRuntimeUnchanged': True,
+                           'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)

@@ -1,9 +1,5 @@
 package io.github.xgl34222220.hetu
 
-import io.github.xgl34222220.hetu.ui.ReferenceButton as Button
-
-import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomSheet
-
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.graphics.Typeface
@@ -14,39 +10,87 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.rounded.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.rosemoe.sora.event.ContentChangeEvent
-import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.event.PublishSearchResultEvent
+import io.github.rosemoe.sora.event.SelectionChangeEvent
 import io.github.rosemoe.sora.widget.CodeEditor
-import io.github.rosemoe.sora.widget.subscribeAlways
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
-import io.github.xgl34222220.hetu.ui.*
+import io.github.rosemoe.sora.widget.subscribeAlways
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeEmptyState
+import io.github.xgl34222220.hetu.home.HomeFormField
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomeMenuDivider
+import io.github.xgl34222220.hetu.home.HomeReveal
+import io.github.xgl34222220.hetu.home.HomeRowDivider
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.home.homeTap
+import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.ui.HetuTheme
+import io.github.xgl34222220.hetu.ui.ht
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -65,20 +109,23 @@ class RuntimeFileEditorActivity : ComponentActivity() {
         val path = intent.getStringExtra(EXTRA_RUNTIME_PATH).orEmpty()
         setContent {
             val prefs = remember { getSharedPreferences("hetu", 0) }
-            HetuTheme { HetuAppTheme(prefs.getString("appearance", "system").orEmpty(), prefs.getBoolean("hetuDynamicColor", false)) {
+            HetuTheme { HetuAppTheme(
+                prefs.getString("appearance", "system").orEmpty(), prefs.getBoolean("hetuDynamicColor", prefs.getBoolean("enableMonet", false)),
+                accentHex = hxStoredAccent(prefs), pureBlack = prefs.getBoolean("pureBlackDark", false),
+            ) {
                 RuntimeFileEditorScreen(path, model) { finish() }
             } }
         }
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, onBack: () -> Unit) {
     val context = LocalContext.current
-    val t = LocalHetuTokens.current
-    val dark = MaterialTheme.colorScheme.background.luminance() < .5f
-    val editorSurface = Hx.colors.surface
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val dark = c.dark
+    val editorSurface = c.surface
     val editorColors = remember(dark, editorSurface) {
         HetuYamlLanguage.colors(if (dark) SchemeDarcula() else SchemeGitHub(), dark).apply {
             val background = editorSurface.toArgb()
@@ -160,47 +207,54 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
             finally { working = false }
         }
     }
-    Column(Modifier.fillMaxSize().background(Hx.colors.canvas).statusBarsPadding().navigationBarsPadding().imePadding().testTag("runtime-editor")) {
-        Row(
-            Modifier.fillMaxWidth().height(52.dp).padding(horizontal = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            IconButton(onClick = ::back, enabled = !working) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, "返回") }
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                Text(
-                    File(path).name.ifBlank { "文件编辑" },
-                    color = t.textPrimary,
-                    fontSize = 16.5.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    maxLines = 1,
-                )
-            }
-            IconButton(onClick = ::save, enabled = editable && !working) {
-                Icon(Icons.Rounded.CheckCircle, "保存", tint = if (editable && !working) MaterialTheme.colorScheme.primary else t.textSecondary)
+    // A finished action says so for a moment and then steps aside; a failure stays until the next action.
+    LaunchedEffect(message, failure, working) {
+        if (!failure && !working && message.isNotBlank()) { kotlinx.coroutines.delay(2200); message = "" }
+    }
+    val fileName = File(path).name.ifBlank { ht("文件编辑") }
+    val canSave = editable && !working
+    Column(Modifier.fillMaxSize().background(c.bg).statusBarsPadding().navigationBarsPadding().imePadding().testTag("runtime-editor")) {
+        Row(Modifier.fillMaxWidth().height(HomeDims.barHeight).padding(horizontal = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+            HomeIconButton(HomeIcons.ChevronLeft, "返回", ::back, enabled = !working, glyph = 26.dp)
+            Text(
+                fileName, Modifier.weight(1f).padding(horizontal = 8.dp).semantics { heading() },
+                color = c.t1, style = HomeType.barTitle, maxLines = 1, overflow = TextOverflow.MiddleEllipsis, textAlign = TextAlign.Center,
+            )
+            // Save is the page's one main action: a filled disc while there is something to save.
+            val saveLabel = ht("保存")
+            Box(
+                Modifier.size(48.dp).alpha(if (canSave) 1f else .4f)
+                    .homeTap(enabled = canSave) { haptics(HomeHaptic.Confirm); save() }
+                    .semantics { contentDescription = saveLabel },
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(34.dp).background(if (dirty && canSave) c.accent else c.accentSoft, CircleShape), contentAlignment = Alignment.Center) {
+                    Icon(HomeIcons.Check, null, Modifier.size(20.dp), tint = if (dirty && canSave) c.onAccent else c.accent)
+                }
             }
             Box {
-                IconButton(onClick = { moreMenu = true }, modifier = Modifier.hxAnchorSource()) { Icon(Icons.Rounded.MoreHoriz, "更多") }
+                HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { moreMenu = true }, anchorMenu = true)
                 RuntimeEditorReferenceMenu(expanded = moreMenu, onDismiss = { moreMenu = false }) {
-                    HxMenuItem(label = "搜索", icon = Icons.Rounded.Search, onClick = {
+                    HxMenuItem(label = ht("搜索"), icon = ToolsIcons.Search, onClick = {
                         moreMenu = false; search = !search
                     })
-                    HxMenuItem(label = "跳转到行", icon = Icons.Rounded.FormatListNumbered, onClick = {
+                    HxMenuItem(label = ht("跳转到行"), icon = ToolsFeatureIcons.ArrowUpDown, onClick = {
                         moreMenu = false; jumpLine = cursorLine.toString(); jump = true
                     })
-                    HxMenuItem(label = if (wrap) "关闭自动换行" else "自动换行", icon = Icons.Rounded.WrapText, onClick = {
+                    HxMenuItem(label = ht(if (wrap) "关闭自动换行" else "自动换行"), icon = HxIcons.TextWrap, selected = wrap, onClick = {
                         moreMenu = false; wrap = !wrap; editor?.setWordwrap(wrap)
                     })
-                    HxMenuItem(label = "语法校验", icon = Icons.Rounded.FactCheck, enabled = editable && !working, onClick = {
+                    HxMenuItem(label = ht("语法校验"), icon = ToolsFeatureIcons.ShieldCheck, enabled = editable && !working, onClick = {
                         moreMenu = false; validate()
                     })
-                    HxMenuItem(label = "复制全部", icon = Icons.Rounded.ContentCopy, onClick = {
+                    HxMenuItem(label = ht("复制全部"), icon = HomeIcons.Copy, onClick = {
                         moreMenu = false
                         context.getSystemService(ClipboardManager::class.java).setPrimaryClip(ClipData.newPlainText(File(path).name, current()))
                         message = "已复制"; failure = false
                     })
                     if (path.endsWith(".json", true)) {
-                        androidx.compose.material3.HorizontalDivider()
-                        HxMenuItem(label = "sing-box Schema 校验", icon = Icons.Rounded.Rule, onClick = {
+                        HomeMenuDivider()
+                        HxMenuItem(label = ht("sing-box Schema 校验"), icon = HxIcons.ListChecks, onClick = {
                             moreMenu = false
                             val text = current(); working = true; failure = false
                             scope.launch {
@@ -210,7 +264,7 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
                                 finally { working = false }
                             }
                         })
-                        HxMenuItem(label = "更新官方 Schema", icon = Icons.Rounded.CloudDownload, onClick = {
+                        HxMenuItem(label = ht("更新官方 Schema"), icon = HxIcons.CloudDownload, onClick = {
                             moreMenu = false; working = true; failure = false; message = "正在更新 sing-box 官方 Schema…"
                             scope.launch {
                                 try { RuntimeSchemaRepository.update(context); message = "官方 Schema 已更新" }
@@ -223,85 +277,108 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
                 }
             }
         }
-        Spacer(Modifier.height(16.dp))
-        if (failure || working) HetuTaskFeedback(message, failure, working, Modifier.padding(horizontal = 12.dp))
+        HomeReveal(failure || working || message.isNotBlank()) {
+            HetuTaskFeedback(message, failure, working, Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp))
+        }
         revision
-        if (search) YamlWorkbenchSearch(editor, matches) { search = false }
-        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { HetuBusyIndicator() }
+        HomeReveal(search) {
+            Box(Modifier.padding(bottom = 10.dp)) { YamlWorkbenchSearch(editor, matches) { search = false } }
+        }
+        if (loading) Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
         else if (editable) {
-            AndroidView(factory = { viewContext ->
-                CodeEditor(viewContext).apply {
-                    setEditorLanguage(if (path.endsWith(".yaml", true) || path.endsWith(".yml", true)) HetuYamlLanguage() else HetuCodeLanguage(File(path).extension))
-                    setText(model.draft ?: model.content!!.text)
-                    typefaceText = Typeface.MONOSPACE; setTextSize(14f); setLineNumberEnabled(true)
-                    setLineSpacingMultiplier(1.4f)
-                    setLineNumberMarginLeft(18f * resources.displayMetrics.density)
-                    setDividerMargin(8f * resources.displayMetrics.density, 14f * resources.displayMetrics.density)
-                    setDividerWidth(0f)
-                    setPadding(0, (10f * resources.displayMetrics.density).toInt(), 0, 0)
-                    setWordwrap(wrap); setTabWidth(2); setHighlightCurrentLine(true)
-                    colorScheme = editorColors
-                    subscribeAlways<ContentChangeEvent> {
-                        dirty = true; revision++
+            // The text and its tools are one card: the editor on top, the tool row closing it.
+            Column(Modifier.fillMaxWidth().weight(1f).padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
+                AndroidView(factory = { viewContext ->
+                    CodeEditor(viewContext).apply {
+                        setEditorLanguage(if (path.endsWith(".yaml", true) || path.endsWith(".yml", true)) HetuYamlLanguage() else HetuCodeLanguage(File(path).extension))
+                        setText(model.draft ?: model.content!!.text)
+                        typefaceText = Typeface.MONOSPACE; setTextSize(14f); setLineNumberEnabled(true)
+                        setLineSpacingMultiplier(1.4f)
+                        setLineNumberMarginLeft(18f * resources.displayMetrics.density)
+                        setDividerMargin(8f * resources.displayMetrics.density, 14f * resources.displayMetrics.density)
+                        setDividerWidth(0f)
+                        setPadding(0, (10f * resources.displayMetrics.density).toInt(), 0, 0)
+                        setWordwrap(wrap); setTabWidth(2); setHighlightCurrentLine(true)
+                        colorScheme = editorColors
+                        subscribeAlways<ContentChangeEvent> {
+                            dirty = true; revision++
+                        }
+                        subscribeAlways<SelectionChangeEvent> { cursorLine = cursor.rightLine + 1; cursorColumn = cursor.rightColumn + 1 }
+                        subscribeAlways<PublishSearchResultEvent> { matches = if (searcher.hasQuery()) searcher.matchedPositionCount else 0 }
+                        editor = this
                     }
-                    subscribeAlways<SelectionChangeEvent> { cursorLine = cursor.rightLine + 1; cursorColumn = cursor.rightColumn + 1 }
-                    subscribeAlways<PublishSearchResultEvent> { matches = if (searcher.hasQuery()) searcher.matchedPositionCount else 0 }
-                    editor = this
-                }
-            }, modifier = Modifier.fillMaxWidth().weight(1f).padding(horizontal = 12.dp).clip(RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp)), update = { native ->
-                if (native.colorScheme !== editorColors) native.colorScheme = editorColors
-            }, onRelease = { native ->
-                model.draft = native.text.toString(); if (editor === native) editor = null; native.release()
-            })
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 12.dp).height(56.dp).clip(RoundedCornerShape(bottomStart = 20.dp, bottomEnd = 20.dp)).background(Hx.colors.surface).horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                @Composable fun CompactAction(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector, available: Boolean = true, click: () -> Unit) {
-                    Column(Modifier.width(46.dp).height(52.dp).clickable(enabled = available && !working, onClick = click),
-                        verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(icon, label, Modifier.size(19.dp), tint = if (available && !working) t.textPrimary else t.textSecondary.copy(alpha = .45f))
-                        Spacer(Modifier.height(3.dp))
-                        Text(when (label) { "跳转到行" -> "跳行"; "自动换行" -> "换行"; "语法校验" -> "校验"; else -> label },
-                            fontSize = 9.sp, color = if (available && !working) t.textPrimary else t.textSecondary.copy(alpha = .45f))
+                }, modifier = Modifier.fillMaxWidth().weight(1f), update = { native ->
+                    if (native.colorScheme !== editorColors) native.colorScheme = editorColors
+                }, onRelease = { native ->
+                    model.draft = native.text.toString(); if (editor === native) editor = null; native.release()
+                })
+                HomeRowDivider(start = 0.dp, end = 0.dp)
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 62.dp).horizontalScroll(rememberScrollState()).padding(horizontal = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    RuntimeEditorTool("撤销", "撤销", ToolsIcons.Undo2, editor?.canUndo() == true && !working) { editor?.undo() }
+                    RuntimeEditorTool("重做", "重做", ToolsIcons.Redo2, editor?.canRedo() == true && !working) { editor?.redo() }
+                    RuntimeEditorTool("搜索", "搜索", ToolsIcons.Search, !working, active = search) { search = !search }
+                    RuntimeEditorTool("跳转到行", "跳行", ToolsFeatureIcons.ArrowUpDown, !working) { jumpLine = cursorLine.toString(); jump = true }
+                    RuntimeEditorTool("自动换行", "换行", HxIcons.TextWrap, !working, active = wrap) { wrap = !wrap; editor?.setWordwrap(wrap) }
+                    RuntimeEditorTool("语法校验", "校验", ToolsFeatureIcons.ShieldCheck, editable && !working) { validate() }
+                    Spacer(Modifier.width(10.dp))
+                    Column(Modifier.padding(end = 12.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text("Ln $cursorLine · Col $cursorColumn", color = c.t2, style = HomeType.mono.copy(fontSize = 11.sp, lineHeight = 15.sp), maxLines = 1)
+                        Text("${editor?.text?.lineCount ?: 1} 行", color = c.t3, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1)
                     }
-                }
-                CompactAction("撤销", Icons.Rounded.Undo, editor?.canUndo() == true) { editor?.undo() }
-                CompactAction("重做", Icons.Rounded.Redo, editor?.canRedo() == true) { editor?.redo() }
-                CompactAction("搜索", Icons.Rounded.Search) { search = !search }
-                CompactAction("跳转到行", Icons.Rounded.FormatListNumbered) { jumpLine = cursorLine.toString(); jump = true }
-                CompactAction("自动换行", Icons.Rounded.WrapText) { wrap = !wrap; editor?.setWordwrap(wrap) }
-                CompactAction("语法校验", Icons.Rounded.FactCheck, editable) { validate() }
-                Spacer(Modifier.width(8.dp))
-                Column(horizontalAlignment = Alignment.End, modifier = Modifier.padding(end = 10.dp)) {
-                    Text("Ln $cursorLine · Col $cursorColumn", color = t.textSecondary, fontSize = 9.sp)
-                    Text("${editor?.text?.lineCount ?: 1} 行", color = t.textSecondary, fontSize = 9.sp)
                 }
             }
             if (!search) YamlWorkbenchAccessory(enabled = !working) { symbol -> editor?.let { applyYamlAccessory(it, symbol) } }
+            else Spacer(Modifier.height(10.dp))
         } else {
             Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
-                Text("当前文件类型暂不支持编辑", color = t.textSecondary, fontSize = 13.sp)
+                HomeEmptyState(ToolsIcons.FileWarning, "当前文件类型暂不支持编辑", message, topPadding = 0.dp, verbatimSubtitle = true)
             }
         }
     }
     if (discard || jump) HxSheet(onDismiss = { discard = false; jump = false }) {
-        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 8.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-            Text(if (discard) "放弃未保存修改？" else "跳转到行", modifier = if (discard) Modifier.fillMaxWidth() else Modifier, textAlign = if (discard) TextAlign.Center else TextAlign.Start, color = t.textPrimary, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-            if (discard) Text("当前修改尚未保存。", Modifier.fillMaxWidth(), textAlign = TextAlign.Center, color = t.textSecondary)
-            else Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("行号", color = t.textSecondary, fontSize = 13.sp, modifier = Modifier.padding(horizontal = 4.dp))
-                LiquidGlassTextField(jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) }, "", Modifier.fillMaxWidth(), supportingText = "共 ${editor?.text?.lineCount ?: 1} 行")
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(onClick = { discard = false; jump = false }, modifier = Modifier.weight(1f),
-                    shape = RoundedCornerShape(16.dp), colors = ButtonDefaults.buttonColors(containerColor = Hx.colors.surfaceMuted, contentColor = if (discard) Hx.colors.text else Hx.colors.accent)) { Text("继续编辑") }
-                Button(onClick = {
+        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 4.dp)) {
+            Text(
+                ht(if (discard) "放弃未保存修改？" else "跳转到行"), Modifier.fillMaxWidth().semantics { heading() },
+                color = c.t1, style = HomeType.sheetTitle, textAlign = if (discard) TextAlign.Center else TextAlign.Start,
+            )
+            if (discard) Text(ht("当前修改尚未保存。"), Modifier.fillMaxWidth().padding(top = 8.dp), color = c.t2, style = HomeType.body, textAlign = TextAlign.Center)
+            else HomeFormField(
+                "行号", jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) }, Modifier.padding(top = 16.dp),
+                hint = "共 ${editor?.text?.lineCount ?: 1} 行", keyboardType = KeyboardType.Number,
+            )
+            Spacer(Modifier.height(22.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HomeButton("继续编辑", { discard = false; jump = false }, Modifier.weight(1f), kind = HomeButtonKind.Soft)
+                HomeButton(if (discard) "放弃修改" else "前往", {
                     if (discard) { model.draft = null; discard = false; onBack() }
                     else { editor?.let { it.setSelection((jumpLine.toIntOrNull() ?: 1).coerceIn(1, it.text.lineCount) - 1, 0); it.ensureSelectionVisible() }; jump = false }
-                }, modifier = Modifier.weight(1f)) { Text(if (discard) "放弃修改" else "前往") }
+                }, Modifier.weight(1f), kind = HomeButtonKind.Primary, danger = discard)
             }
         }
+    }
+}
+
+/** One tool under the editor: a glyph over a two-character name. [label] is what it is called aloud. */
+@Composable
+private fun RuntimeEditorTool(label: String, short: String, icon: ImageVector, available: Boolean, active: Boolean = false, onClick: () -> Unit) {
+    val c = LocalHomeColors.current
+    val haptics = LocalHomeHaptics.current
+    val source = remember { MutableInteractionSource() }
+    val spoken = ht(label)
+    Column(
+        Modifier.widthIn(min = 50.dp).heightIn(min = 52.dp).clip(RoundedCornerShape(14.dp))
+            .background(if (active) c.accentSoft else androidx.compose.ui.graphics.Color.Transparent)
+            .homeRowPressTint(source)
+            .clickable(interactionSource = source, indication = null, enabled = available, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+            .alpha(if (available) 1f else .38f)
+            .padding(horizontal = 6.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically), horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, spoken, Modifier.size(22.dp), tint = if (active) c.accent else c.t1)
+        Text(ht(short), color = if (active) c.accent else c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1)
     }
 }
 
@@ -309,6 +386,6 @@ internal fun RuntimeFileEditorScreen(path: String, model: RuntimeEditorModel, on
 private fun RuntimeEditorReferenceMenu(expanded: Boolean, onDismiss: () -> Unit, content: @Composable ColumnScope.() -> Unit) {
     if (!expanded) return
     val anchor = remember { HxAnchor.take() }
-    if (anchor != null) HxAnchoredMenu(anchor, onDismiss) { _ -> content() }
-    else HxSheet(onDismiss, title = "更多") { content() }
+    if (anchor != null) HxAnchoredMenu(anchor, onDismiss, anchorEndInset = 0.dp) { _ -> content() }
+    else HxSheet(onDismiss, title = ht("更多")) { Column(Modifier.padding(horizontal = 8.dp), content = content) }
 }

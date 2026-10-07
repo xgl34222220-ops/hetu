@@ -16,7 +16,6 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -439,7 +438,10 @@ internal fun HomeSwitch(checked: Boolean, modifier: Modifier = Modifier, enabled
  */
 internal enum class HomeButtonKind { Primary, Secondary, Soft, Ghost }
 
-/** 50 dp button with 16 dp corners. [danger] swaps the accent for red in every kind. */
+/**
+ * 50 dp button with 16 dp corners. [danger] swaps the accent for red in every kind;
+ * [tinted] gives the Soft kind the accent tint (下载, 导入) instead of the neutral one.
+ */
 @Composable
 internal fun HomeButton(
     text: String,
@@ -451,6 +453,7 @@ internal fun HomeButton(
     loading: Boolean = false,
     danger: Boolean = false,
     height: Dp = 50.dp,
+    tinted: Boolean = false,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -460,7 +463,11 @@ internal fun HomeButton(
     val (fill, content) = when (kind) {
         HomeButtonKind.Primary -> lead to onLead
         HomeButtonKind.Secondary -> c.surface to leadText
-        HomeButtonKind.Soft -> (if (danger) c.badSoft else c.sunken) to (if (danger) c.badText else c.t1)
+        HomeButtonKind.Soft -> when {
+            danger -> c.badSoft to c.badText
+            tinted -> c.accentSoft to c.accent
+            else -> c.sunken to c.t1
+        }
         HomeButtonKind.Ghost -> Color.Transparent to leadText
     }
     val shape = HomeDims.controlShape
@@ -526,6 +533,9 @@ internal enum class HomeSegmentStyle { Soft, Solid, Raised }
 /**
  * Segmented control whose thumb slides between segments on a spring instead of cross-fading.
  * The thumb and the separators are drawn behind the labels, so only the draw phase animates.
+ *
+ * @param icons optional glyph in front of a segment's label (the two import sources).
+ * @param inset gap between the track's edge and the thumb.
  */
 @Composable
 internal fun <T> HomeSegmented(
@@ -539,6 +549,8 @@ internal fun <T> HomeSegmented(
     height: Dp = 40.dp,
     corner: Dp = 12.dp,
     textStyle: TextStyle = HomeType.buttonSmall,
+    icons: Map<T, ImageVector> = emptyMap(),
+    inset: Dp = 3.dp,
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -561,21 +573,21 @@ internal fun <T> HomeSegmented(
             .background(track)
             .drawBehind {
                 if (count == 0) return@drawBehind
-                val inset = 3.dp.toPx()
-                val cell = (size.width - inset * 2f) / count
+                val edgeInset = inset.toPx()
+                val cell = (size.width - edgeInset * 2f) / count
                 val at = position.value
-                val radius = (corner.toPx() - inset).coerceAtLeast(0f)
+                val radius = (corner.toPx() - edgeInset).coerceAtLeast(0f)
                 // Separators only between two resting segments; they fade as the thumb passes.
                 for (edge in 1 until count) {
                     val distance = min(abs(edge - at), abs(edge - 1f - at)).coerceIn(0f, 1f)
                     if (distance > 0f) {
-                        val x = inset + cell * edge
+                        val x = edgeInset + cell * edge
                         drawLine(separator.copy(alpha = separator.alpha * distance), Offset(x, size.height * .30f), Offset(x, size.height * .70f), 1.dp.toPx())
                     }
                 }
-                drawRoundRect(thumb, Offset(inset + cell * at, inset), Size(cell, size.height - inset * 2f), CornerRadius(radius, radius))
+                drawRoundRect(thumb, Offset(edgeInset + cell * at, edgeInset), Size(cell, size.height - edgeInset * 2f), CornerRadius(radius, radius))
             }
-            .padding(3.dp)
+            .padding(inset)
             .selectableGroup(),
     ) {
         options.forEach { (value, label) ->
@@ -593,17 +605,20 @@ internal fun <T> HomeSegmented(
             Box(
                 Modifier
                     .weight(1f)
-                    .heightIn(min = height - 6.dp)
+                    .heightIn(min = height - inset * 2)
                     .selectable(selected = active, interactionSource = source, indication = null, enabled = enabled, role = Role.RadioButton) {
                         if (!active) { haptics(HomeHaptic.Tick); onSelect(value) }
                     },
                 contentAlignment = Alignment.Center,
             ) {
-                Text(
-                    ht(label), color = color,
-                    style = if (active) textStyle.copy(fontWeight = FontWeight.Bold) else textStyle,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    icons[value]?.let { Icon(it, null, Modifier.size(20.dp), tint = color) }
+                    Text(
+                        ht(label), color = color,
+                        style = if (active) textStyle.copy(fontWeight = FontWeight.Bold) else textStyle,
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
         }
     }
@@ -733,19 +748,24 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
     val c = LocalHomeColors.current
     val line = c.line
     val haze = glass.haze
+    val progressive = haze != null && LocalHomeBarProgressive.current
     val surface = if (haze != null) {
         Modifier
             .hazeEffect(state = haze, style = HazeMaterials.ultraThin()) {
-                blurRadius = 26.dp
+                blurRadius = if (progressive) 30.dp else 26.dp
                 noiseFactor = .008f
             }
-            .background(Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))))
+            .background(
+                if (progressive) Brush.verticalGradient(listOf(c.bg.copy(alpha = .56f), c.bg.copy(alpha = .30f), c.bg.copy(alpha = .06f)))
+                else Brush.verticalGradient(listOf(c.bg.copy(alpha = .52f), c.bg.copy(alpha = .30f))),
+            )
     } else Modifier.background(c.bg.copy(alpha = .965f))
     Box(
         modifier
             .graphicsLayer { alpha = glass.shown }
             .then(surface)
-            .drawBehind { drawLine(line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx()) },
+            // The progressive style has no lower edge to underline.
+            .drawBehind { if (!progressive) drawLine(line, Offset(0f, size.height), Offset(size.width, size.height), 1.dp.toPx()) },
     )
 }
 

@@ -13,21 +13,17 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
 import android.webkit.CookieManager
-import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebStorage
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.border
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -35,10 +31,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -46,17 +40,31 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
-import io.github.rosemoe.sora.widget.CodeEditor
-import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
-import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.KeyboardType
+import io.github.xgl34222220.hetu.home.HomeButton
+import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeFormField
+import io.github.xgl34222220.hetu.home.HomeIconButton
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomeRadio
+import io.github.xgl34222220.hetu.home.HomeRowLayout
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.*
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -64,7 +72,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.File
 
 private const val EXTRA_PANEL_NAME = "panel_name"
 private const val EXTRA_PANEL_URL = "panel_url"
@@ -189,34 +196,15 @@ class ProxyWebPanelsActivity : ComponentActivity() {
     }
 }
 
-@Composable
-private fun WebPanelRow(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, subtitle: String,
-    modifier: Modifier = Modifier, value: String? = null, badge: Boolean = false, onClick: () -> Unit) {
-    val c = Hx.colors
-    Row(modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 78.dp).padding(horizontal = 18.dp, vertical = 18.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = c.text, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.width(25.dp))
-        Column(Modifier.weight(1f)) {
-            Text(title, color = c.text, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-            Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium)
-        }
-        if (!value.isNullOrBlank()) {
-            Spacer(Modifier.width(8.dp))
-            if (badge) Text(value, color = c.accent, fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                modifier = Modifier.background(c.accentSoft, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp))
-            else Text(value, color = c.textMuted, fontSize = 16.sp, fontWeight = FontWeight.SemiBold)
-        }
-        Spacer(Modifier.width(5.dp))
-        Icon(Icons.Rounded.ChevronRight, null, tint = c.textMuted, modifier = Modifier.size(20.dp))
-    }
-}
-
+/**
+ * Web 面板: the built-in local panel and how it is chosen, the user's own HTTPS panels, and the
+ * upkeep of what is stored on the device.
+ */
 @Composable
 internal fun ProxyWebPanelsScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val prefs = remember { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     var revision by remember { mutableIntStateOf(0) }
     val panels = remember(revision) { HetuWebPanels.list(context) }
     val selected = remember(revision) { HetuWebPanels.selected(context) }
@@ -231,90 +219,71 @@ internal fun ProxyWebPanelsScreen(onBack: () -> Unit) {
     var feedback by remember { mutableStateOf("") }
     var panelUpdating by remember { mutableStateOf(false) }
     val panelScope = rememberCoroutineScope()
-    WebToolPage("Web面板", "本地控制台与自定义 HTTPS 面板", onBack) {
-        LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 13.dp, end = 13.dp, top = 9.dp, bottom = 24.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            item {
-                WebToolCard {
-                    WebPanelRow(WebToolIcons.Window, "河图本地面板", "直接连接 127.0.0.1 Mihomo 控制器，不向局域网暴露接口",
-                        value = if (selected == "local") "默认" else null, badge = true, modifier = Modifier.heightIn(min = 94.dp)) {
+    HxPage(title = ht("Web面板"), subtitle = ht("本地控制台与自定义 HTTPS 面板"), onBack = onBack, largeTitle = false) {
+        item(key = "local") {
+            SettingsSection {
+                SettingsGroup {
+                    SettingsRow(ht("河图本地面板"), subtitle = ht("直接连接 127.0.0.1 Mihomo 控制器，不向局域网暴露接口"), icon = WebToolIcons.Window, onClick = {
                         HetuWebPanels.select(context, "local"); revision++
                         context.startActivity(Intent(context, ProxyLocalWebUiActivity::class.java))
+                    }) {
+                        if (selected == "local") HomePill(ht("默认"))
+                        HxChevron()
                     }
+                    SettingsDivider()
+                    SettingsNavRow(ht("本地面板模式"), subtitle = ht("河图内置 / 本地 Zashboard"), icon = WebToolIcons.Tune,
+                        value = when (localMode) { "builtin" -> ht("内置"); "zashboard" -> "Zashboard"; else -> ht("自动") }, dropdown = true) { modePicker = true }
                 }
             }
-            item {
-                WebToolCard {
-                    WebPanelRow(WebToolIcons.Tune, "本地面板模式", "河图内置 / 本地 Zashboard",
-                        value = when (localMode) { "builtin" -> "内置"; "zashboard" -> "Zashboard"; else -> "自动" }) { modePicker = true }
+        }
+        item(key = "custom-title") {
+            Row(Modifier.fillMaxWidth().hxPageEnter().padding(start = HomeDims.gutter + 16.dp, end = HomeDims.gutter).padding(top = 6.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text(ht("自定义面板"), Modifier.weight(1f).semantics { heading() }, color = c.t1, style = HomeType.section)
+                HomeButton("添加", { editingPanel = null; adding = true; error = ""; panelName = ""; panelUrl = "" },
+                    kind = HomeButtonKind.Soft, icon = ToolsIcons.Plus, height = 42.dp, tinted = true)
+            }
+        }
+        if (panels.isEmpty()) item(key = "custom-empty") {
+            Text(ht("还没有自定义面板。只接受 HTTPS 地址；自定义面板是否兼容当前控制器由面板自身决定。"),
+                Modifier.padding(horizontal = HomeDims.gutter + 16.dp).padding(bottom = HomeDims.gap), color = c.t2, style = HomeType.note)
+        }
+        items(panels, key = { it.id }) { panel ->
+            Column(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap).clip(HomeDims.cardShape).background(c.surface)) {
+                HomeRowLayout(
+                    AnnotatedString(panel.name), subtitle = panel.url, icon = WebToolIcons.Link, subtitleMaxLines = 1,
+                    trailing = if (selected == panel.id) ({ HomePill(ht("默认")) }) else null,
+                )
+                Row(Modifier.padding(start = 14.dp, end = 8.dp, bottom = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    WebToolAction("打开", {
+                        HetuWebPanels.select(context, panel.id); revision++
+                        context.startActivity(Intent(context, ProxyWebPanelViewerActivity::class.java)
+                            .putExtra(EXTRA_PANEL_NAME, panel.name).putExtra(EXTRA_PANEL_URL, panel.url))
+                    }, Modifier.weight(1f), WebToolIcons.External)
+                    HomeIconButton(WebToolIcons.Edit, "编辑 ${panel.name}", { editingPanel = panel; panelName = panel.name; panelUrl = panel.url; adding = true; error = "" }, glyph = 22.dp)
+                    HomeIconButton(WebToolIcons.Trash, "删除 ${panel.name}", { deletingPanel = panel }, tint = c.t2, glyph = 22.dp)
                 }
             }
-            item {
-                Row(Modifier.fillMaxWidth().padding(start = 10.dp, top = 16.dp, bottom = 0.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text("自定义面板", color = c.text, fontSize = 21.sp, lineHeight = 28.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    Row(Modifier.clip(RoundedCornerShape(50)).background(c.accentSoft).clickable {
-                        editingPanel = null; adding = true; error = ""; panelName = ""; panelUrl = ""
-                    }.padding(horizontal = 15.dp, vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Icon(Icons.Rounded.Add, null, tint = c.accent, modifier = Modifier.size(23.dp))
-                        Spacer(Modifier.width(5.dp)); Text("添加", color = c.accent, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
-                    }
-                }
-            }
-            if (panels.isEmpty()) item {
-                Text("还没有自定义面板。只接受 HTTPS 地址；自定义面板是否兼容当前控制器由面板自身决定。",
-                    color = c.textMuted, fontSize = 12.5.sp, lineHeight = 18.sp, modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp))
-            }
-            items(panels, key = { it.id }) { panel ->
-                WebToolCard {
-                    Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-                        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                            Icon(WebToolIcons.Link, null, tint = c.text, modifier = Modifier.size(26.dp))
-                            Spacer(Modifier.width(25.dp))
-                            Column(Modifier.weight(1f)) {
-                                Text(panel.name, color = c.text, fontSize = 18.sp, lineHeight = 23.sp, fontWeight = FontWeight.Bold)
-                                Text(panel.url, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 16.sp, fontWeight = FontWeight.Medium, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        }
+        if (feedback.isNotBlank()) item(key = "feedback") {
+            HxBanner(feedback, tone = HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
+        }
+        item(key = "upkeep") {
+            SettingsSection {
+                SettingsGroup(title = ht("维护")) {
+                    SettingsRow(ht(if (panelUpdating) "正在更新 Zashboard…" else "安装 / 更新本地 Zashboard"),
+                        subtitle = ht("从官方 GitHub 获取，资源保存在本机；失败时保留原版本"), icon = WebToolIcons.Download, onClick = {
+                            if (!panelUpdating) {
+                                panelUpdating = true
+                                panelScope.launch {
+                                    try { WebPanelAssets.update(context); feedback = "Zashboard 已更新，重新打开本地面板即可使用" }
+                                    catch (cancel: CancellationException) { throw cancel }
+                                    catch (failure: Exception) { feedback = failure.message ?: "面板更新失败" }
+                                    finally { panelUpdating = false }
+                                }
                             }
-                            if (selected == panel.id) Text("默认", color = c.accent, fontSize = 10.sp,
-                                modifier = Modifier.background(c.accentSoft, RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp))
-                        }
-                        Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                            WebToolAction("打开", {
-                                HetuWebPanels.select(context, panel.id); revision++
-                                context.startActivity(Intent(context, ProxyWebPanelViewerActivity::class.java)
-                                    .putExtra(EXTRA_PANEL_NAME, panel.name).putExtra(EXTRA_PANEL_URL, panel.url))
-                            }, Modifier.weight(1f).height(40.dp), WebToolIcons.External)
-                            IconButton(onClick = { editingPanel = panel; panelName = panel.name; panelUrl = panel.url; adding = true; error = "" },
-                                modifier = Modifier.size(width = 50.dp, height = 40.dp).background(c.surfaceMuted, RoundedCornerShape(13.dp))) {
-                                Icon(WebToolIcons.Edit, "编辑 ${panel.name}", tint = c.text, modifier = Modifier.size(21.dp))
-                            }
-                            IconButton(onClick = { deletingPanel = panel },
-                                modifier = Modifier.size(width = 50.dp, height = 40.dp).background(c.surfaceMuted, RoundedCornerShape(13.dp))) {
-                                Icon(WebToolIcons.Trash, "删除 ${panel.name}", tint = c.text, modifier = Modifier.size(21.dp))
-                            }
-                        }
-                    }
-                }
-            }
-            item {
-                WebToolCard {
-                    WebPanelRow(WebToolIcons.Download, if (panelUpdating) "正在更新 Zashboard…" else "安装 / 更新本地 Zashboard",
-                        "从官方 GitHub 获取，资源保存在本机；失败时保留原版本", modifier = Modifier.heightIn(min = 96.dp)) {
-                        if (!panelUpdating) {
-                            panelUpdating = true
-                            panelScope.launch {
-                                try { WebPanelAssets.update(context); feedback = "Zashboard 已更新，重新打开本地面板即可使用" }
-                                catch (cancel: CancellationException) { throw cancel }
-                                catch (failure: Exception) { feedback = failure.message ?: "面板更新失败" }
-                                finally { panelUpdating = false }
-                            }
-                        }
-                    }
-                }
-            }
-            if (feedback.isNotBlank()) item { Text(feedback, color = c.textMuted, fontSize = 13.sp, lineHeight = 18.sp, modifier = Modifier.padding(8.dp)) }
-            item {
-                WebToolCard {
-                    WebPanelRow(WebToolIcons.Brush, "清除 Web 缓存", "清理 WebView 缓存、Cookie 与本地 WebStorage") {
+                        }) { if (panelUpdating) HxSpinner(18.dp) else HxChevron() }
+                    SettingsDivider()
+                    SettingsNavRow(ht("清除 Web 缓存"), subtitle = ht("清理 WebView 缓存、Cookie 与本地 WebStorage"), icon = WebToolIcons.Brush) {
                         runCatching {
                             WebView(context).apply { clearCache(true); clearHistory(); destroy() }
                             CookieManager.getInstance().removeAllCookies(null)
@@ -327,27 +296,24 @@ internal fun ProxyWebPanelsScreen(onBack: () -> Unit) {
         }
     }
     deletingPanel?.let { panel ->
-        HxSheet(onDismiss = { deletingPanel = null }) {
+        WebToolSheet("删除面板 ${panel.name}？", { deletingPanel = null }) {
             val close = LocalHxSheetClose.current
-            Row(Modifier.fillMaxWidth().padding(start = 18.dp, end = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("删除面板 ${panel.name}？", color = c.text, fontSize = 16.sp, lineHeight = 22.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                IconButton(onClick = { close { deletingPanel = null } }, modifier = Modifier.size(40.dp)) { Icon(Icons.Rounded.Close, "关闭", tint = c.textMuted) }
-            }
-            Text("仅移除面板入口，远端服务不受影响。", color = c.textMuted, fontSize = 12.sp, lineHeight = 18.sp,
-                modifier = Modifier.padding(horizontal = 18.dp).padding(bottom = 12.dp))
+            Text(ht("仅移除面板入口，远端服务不受影响。"), color = c.t2, style = HomeType.body.copy(fontSize = 15.sp))
             WebToolAction("删除", {
                 close {
                     HetuWebPanels.save(context, panels.filterNot { it.id == panel.id })
                     if (selected == panel.id) HetuWebPanels.select(context, "local")
                     deletingPanel = null; revision++
                 }
-            }, Modifier.fillMaxWidth().padding(horizontal = 13.dp), WebToolIcons.Trash, danger = true)
+            }, Modifier.fillMaxWidth(), WebToolIcons.Trash, danger = true)
         }
     }
-    if (adding) WebToolSheet(if (editingPanel == null) "添加 Web 面板" else "编辑 Web 面板", { adding = false }) {
-        WebToolField(panelName, { panelName = it.take(40); error = "" }, "名称")
-        WebToolField(panelUrl, { panelUrl = it.take(500); error = "" }, "HTTPS 地址")
-        if (error.isNotBlank()) Text(error, color = c.bad, fontSize = 12.sp)
+    if (adding) WebToolSheet(if (editingPanel == null) ht("添加 Web 面板") else ht("编辑 Web 面板"), { adding = false }) {
+        // The message belongs to the field it is about: the name, or the address.
+        val nameProblem = error == "请输入面板名称"
+        HomeFormField("名称", panelName, { panelName = it.take(40); error = "" }, error = if (nameProblem) ht(error) else null)
+        HomeFormField("HTTPS 地址", panelUrl, { panelUrl = it.take(500); error = "" }, placeholder = "https://",
+            error = if (error.isNotBlank() && !nameProblem) ht(error) else null, keyboardType = KeyboardType.Uri)
         val close = LocalHxSheetClose.current
         WebToolAction("保存", {
             val name = panelName.trim(); val url = panelUrl.trim()
@@ -363,32 +329,37 @@ internal fun ProxyWebPanelsScreen(onBack: () -> Unit) {
             }
         }, Modifier.fillMaxWidth())
     }
-    if (modePicker) WebToolSheet("本地面板模式", { modePicker = false }, separatedChoices = true) {
+    if (modePicker) WebToolSheet(ht("本地面板模式"), { modePicker = false }, separatedChoices = true) {
         val close = LocalHxSheetClose.current
-        listOf(Triple("auto", "自动：优先本地 Zashboard", "已安装 Zashboard 时打开本地面板，否则使用河图内置面板"),
-            Triple("builtin", "河图内置面板", "始终使用河图内置面板"),
-            Triple("zashboard", "本地 Zashboard", "未安装时回退河图内置面板")).forEach { (id, title, subtitle) ->
-            val chosen = localMode == id
-            Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(if (chosen) c.accentSoft.copy(alpha = .45f) else if (c.dark) c.surfaceMuted else Color.White.copy(alpha = .68f))
-                .then(if (chosen) Modifier.border(.8.dp, c.accentSoft, RoundedCornerShape(18.dp)) else Modifier)
-                .clickable { close { localMode = id; prefs.edit().putString("proxyWebPanelLocalMode", id).apply(); modePicker = false } }
-                .padding(horizontal = 18.dp, vertical = 17.dp), verticalAlignment = Alignment.CenterVertically) {
-                Icon(when (id) { "auto" -> WebToolIcons.Tune; "builtin" -> WebToolIcons.Window; else -> WebToolIcons.Terminal }, null,
-                    tint = if (chosen) c.accent else c.text, modifier = Modifier.size(27.dp))
-                Spacer(Modifier.width(25.dp))
-                Column(Modifier.weight(1f)) {
-                    Text(title, color = c.text, fontSize = 17.sp, lineHeight = 23.sp, fontWeight = FontWeight.SemiBold)
-                    Text(subtitle, color = c.textMuted, fontSize = 12.5.sp, lineHeight = 17.sp, fontWeight = FontWeight.Medium)
+        val chosenLabel = ht("已选择")
+        val idleLabel = ht("未选择")
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            listOf(Triple("auto", "自动：优先本地 Zashboard", "已安装 Zashboard 时打开本地面板，否则使用河图内置面板"),
+                Triple("builtin", "河图内置面板", "始终使用河图内置面板"),
+                Triple("zashboard", "本地 Zashboard", "未安装时回退河图内置面板")).forEach { (id, title, subtitle) ->
+                val chosen = localMode == id
+                val source = remember { MutableInteractionSource() }
+                Row(Modifier.fillMaxWidth().clip(HomeDims.innerShape).background(if (chosen) c.accentSoft else c.sunken)
+                    .homeRowPressTint(source)
+                    .clickable(interactionSource = source, indication = null, role = Role.RadioButton) {
+                        close { localMode = id; prefs.edit().putString("proxyWebPanelLocalMode", id).apply(); modePicker = false }
+                    }
+                    .padding(horizontal = 16.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(when (id) { "auto" -> WebToolIcons.Tune; "builtin" -> WebToolIcons.Window; else -> WebToolIcons.Terminal }, null,
+                        Modifier.size(26.dp), tint = if (chosen) c.accent else c.t1)
+                    Spacer(Modifier.width(18.dp))
+                    Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        Text(ht(title), color = c.t1, style = HomeType.cardLabel)
+                        Text(ht(subtitle), color = c.t2, style = HomeType.caption)
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    HomeRadio(chosen, Modifier.semantics { contentDescription = if (chosen) chosenLabel else idleLabel })
                 }
-                Spacer(Modifier.width(10.dp))
-                Icon(if (chosen) Icons.Rounded.CheckCircle else Icons.Rounded.RadioButtonUnchecked, if (chosen) "已选择" else "未选择",
-                    tint = if (chosen) c.accent else c.textFaint, modifier = Modifier.size(23.dp))
             }
         }
-        Row(Modifier.padding(horizontal = 4.dp, vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Rounded.Info, null, tint = c.textFaint, modifier = Modifier.size(19.dp))
-            Spacer(Modifier.width(12.dp))
-            Text("自动模式在未安装 Zashboard 时打开内置面板。", color = c.textMuted, fontSize = 12.sp, lineHeight = 17.sp)
+        Row(Modifier.padding(horizontal = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(HomeIcons.Info, null, Modifier.size(18.dp), tint = c.t3)
+            Text(ht("自动模式在未安装 Zashboard 时打开内置面板。"), color = c.t2, style = HomeType.caption)
         }
     }
 }

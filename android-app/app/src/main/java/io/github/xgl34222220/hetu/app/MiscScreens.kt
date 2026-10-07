@@ -6,8 +6,6 @@ import android.graphics.Bitmap
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.Image
 import androidx.compose.ui.graphics.Color
@@ -36,22 +34,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.rounded.Apps
 import androidx.compose.material.icons.rounded.CloudDownload
 import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.Description
 import androidx.compose.material.icons.rounded.FileOpen
-import androidx.compose.material.icons.rounded.Memory
 import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.SearchOff
-import androidx.compose.material.icons.rounded.Sort
-import androidx.compose.material.icons.rounded.MoreHoriz
-import androidx.compose.material.icons.rounded.Check
-import androidx.compose.material3.Checkbox
-import androidx.compose.material3.CheckboxDefaults
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -66,8 +53,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.layout.onGloballyPositioned
-import androidx.compose.ui.layout.boundsInWindow
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
@@ -77,6 +62,24 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import io.github.xgl34222220.hetu.home.HomeDims
+import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomeTone
+import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.homeFloat
+import io.github.xgl34222220.hetu.home.homeRowPressTint
+import io.github.xgl34222220.hetu.home.rememberHomeReveal
+import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
+import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.tools.ToolsMenuOption
+import io.github.xgl34222220.hetu.tools.ToolsMenuPopup
+import io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard
 import io.github.xgl34222220.hetu.ui.AppItem
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -92,7 +95,7 @@ internal fun AppListScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val prefs = vm.prefs
-    val c = Hx.colors
+    val home = LocalHomeColors.current
     var reload by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var apps by remember { mutableStateOf(vm.filters.cachedApps()) }
@@ -106,9 +109,6 @@ internal fun AppListScreen(vm: HetuViewModel) {
     var descending by rememberSaveable { mutableStateOf(false) }
     var sortMenu by remember { mutableStateOf(false) }
     var moreMenu by remember { mutableStateOf(false) }
-    var sortAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    var moreAnchor by remember { mutableStateOf<androidx.compose.ui.geometry.Rect?>(null) }
-    val menuOffset = with(androidx.compose.ui.platform.LocalDensity.current) { 44.dp.roundToPx() }
 
     LaunchedEffect(reload) {
         loading = true
@@ -151,68 +151,61 @@ internal fun AppListScreen(vm: HetuViewModel) {
         if (descending) sorted.asReversed() else sorted
     }
 
-    HxPage(flatCanvas = true, referenceTopBar = true,
+    HxPage(
         title = ht("应用管理"),
         onBack = { nav.pop() },
-        largeTitle = false, compactTitleFontSizeSp = 20f,
-        bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 64.dp,
+        largeTitle = false,
+        bottomPadding = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 72.dp,
         overlay = {
+            // What the list means, pinned to the bottom edge whatever the list scrolls to.
             Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().navigationBarsPadding()
-                .padding(horizontal = Hx.gutter, vertical = 8.dp)) {
+                .padding(horizontal = HomeDims.gutter, vertical = 8.dp)) {
                 Text(buildAnnotatedString {
                     if (scope == "core") append("核心模式不按 Android UID 区分；名单会保留但暂不生效")
                     else {
-                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append("已选 ") }
-                        withStyle(SpanStyle(color = c.accent, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, fontSize = 12.sp)) { append(selected.size.toString()) }
-                        withStyle(SpanStyle(color = c.text, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, fontSize = 12.sp)) { append(" 个") }
+                        withStyle(SpanStyle(color = home.t1, fontWeight = FontWeight.SemiBold)) { append("已选 ") }
+                        withStyle(SpanStyle(color = home.accent, fontWeight = FontWeight.Bold)) { append(selected.size.toString()) }
+                        withStyle(SpanStyle(color = home.t1, fontWeight = FontWeight.SemiBold)) { append(" 个") }
                         append(if (scope == "blacklist") " · 名单内应用直连，其余应用由配置规则决定" else " · 仅名单内应用进入代理")
                     }
-                }, fontSize = 10.5.sp, lineHeight = 15.sp, color = c.textMuted,
-                    modifier = Modifier.fillMaxWidth().testTag("app-routing-summary").clip(RoundedCornerShape(12.dp))
-                        .background(c.surface).heightIn(min = 40.dp).padding(horizontal = 12.dp, vertical = 10.dp))
+                }, color = home.t2, style = HomeType.caption,
+                    modifier = Modifier.fillMaxWidth().testTag("app-routing-summary")
+                        .shadow(14.dp, HomeDims.controlShape, ambientColor = Color.Black.copy(alpha = .06f), spotColor = Color.Black.copy(alpha = .12f))
+                        .clip(HomeDims.controlShape).background(home.raised).heightIn(min = 48.dp).padding(horizontal = 16.dp, vertical = 14.dp))
             }
         },
         actions = {
-            AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsIcons.Search, "搜索", onClick = {
+            HxBarAction(ToolsIcons.Search, "搜索", onClick = {
                 searching = !searching
                 if (!searching) query = ""
             })
             Box {
-                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.ArrowUpDown, "排序",
-                    modifier = Modifier.onGloballyPositioned { sortAnchor = it.boundsInWindow() }, onClick = { sortMenu = true })
-                if (sortMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
-                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { sortMenu = false }, offsetY = menuOffset,
-                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(sortAnchor, 20.dp, .43f)) {
-                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按名称", checked = sortMode == "name") { sortMode = "name"; sortMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按 UID", checked = sortMode == "uid") { sortMode = "uid"; sortMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("按包名", checked = sortMode == "package") { sortMode = "package"; sortMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (descending) "改为升序" else "改为降序", dividerBefore = true) { descending = !descending; sortMenu = false },
-                        ), referenceWidth = 130.dp)
-                    }
+                HxBarAction(ToolsFeatureIcons.ArrowUpDown, "排序", onClick = { sortMenu = true })
+                if (sortMenu) ToolsMenuPopup(onDismiss = { sortMenu = false }) {
+                    ToolsOptionMenuCard(listOf(
+                        ToolsMenuOption("按名称", checked = sortMode == "name") { sortMode = "name"; sortMenu = false },
+                        ToolsMenuOption("按 UID", checked = sortMode == "uid") { sortMode = "uid"; sortMenu = false },
+                        ToolsMenuOption("按包名", checked = sortMode == "package") { sortMode = "package"; sortMenu = false },
+                        ToolsMenuOption(if (descending) "改为升序" else "改为降序", dividerBefore = true) { descending = !descending; sortMenu = false },
+                    ))
                 }
             }
-            AppListBarAction(io.github.xgl34222220.hetu.home.HomeIcons.CircleCheck, "仅看已选", onClick = { onlySelected = !onlySelected })
+            HxBarAction(if (onlySelected) HomeIcons.CircleCheck else ToolsFeatureIcons.CheckCheck, "仅看已选", onClick = { onlySelected = !onlySelected })
             Box {
-                AppListBarAction(io.github.xgl34222220.hetu.tools.ToolsFeatureIcons.EllipsisVertical, "更多",
-                    modifier = Modifier.onGloballyPositioned { moreAnchor = it.boundsInWindow() }, onClick = { moreMenu = true })
-                if (moreMenu) io.github.xgl34222220.hetu.tools.ToolsConceptTheme {
-                    io.github.xgl34222220.hetu.tools.ToolsMenuPopup(onDismiss = { moreMenu = false }, offsetY = menuOffset,
-                        reference = io.github.xgl34222220.hetu.tools.ToolsAppsMenuReference(moreAnchor, 10.dp, .45f)) {
-                        io.github.xgl34222220.hetu.tools.ToolsOptionMenuCard(listOf(
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption(if (showSystem) "隐藏系统应用" else "显示系统应用", checked = showSystem) { showSystem = !showSystem; moreMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("全选当前结果") { commit(selected + visible.map { it.selectionKey }); moreMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("清空名单") { commit(emptySet()); moreMenu = false },
-                            io.github.xgl34222220.hetu.tools.ToolsMenuOption("刷新应用") { reload++; moreMenu = false },
-                        ), referenceWidth = 120.dp)
-                    }
+                HxBarAction(ToolsFeatureIcons.EllipsisVertical, "更多", onClick = { moreMenu = true })
+                if (moreMenu) ToolsMenuPopup(onDismiss = { moreMenu = false }) {
+                    ToolsOptionMenuCard(listOf(
+                        ToolsMenuOption(if (showSystem) "隐藏系统应用" else "显示系统应用", checked = showSystem) { showSystem = !showSystem; moreMenu = false },
+                        ToolsMenuOption("全选当前结果") { commit(selected + visible.map { it.selectionKey }); moreMenu = false },
+                        ToolsMenuOption("清空名单") { commit(emptySet()); moreMenu = false },
+                        ToolsMenuOption("刷新应用") { reload++; moreMenu = false },
+                    ))
                 }
             }
-            Spacer(Modifier.width(4.dp))
         },
     ) {
         item(key = "mode-tabs") {
-            Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp)) {
+            Column(Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) {
                 if (searching) {
                     HxSearchField(query, { query = it }, "搜索应用名称、包名或 UID", autoFocus = true)
                     Spacer(Modifier.height(10.dp))
@@ -221,14 +214,13 @@ internal fun AppListScreen(vm: HetuViewModel) {
                     options = listOf("blacklist" to "黑名单", "whitelist" to "白名单", "core" to "核心"),
                     selected = scope,
                     onSelect = ::setScope,
-                    selectedTextColor = c.accent,
                 )
             }
         }
         if (loading && apps.isEmpty()) {
             item(key = "loading") { HxSkeletonRows(9) }
         } else if (visible.isEmpty()) {
-            item(key = "empty") { HxEmpty(Icons.Rounded.Apps, "没有匹配的应用") }
+            item(key = "empty") { HxEmpty(ToolsIcons.LayoutGrid, "没有匹配的应用") }
         }
         items(visible, key = { it.selectionKey }) { app ->
             val key = app.selectionKey
@@ -242,49 +234,43 @@ internal fun AppListScreen(vm: HetuViewModel) {
 
 @Composable
 private fun TargetAppRow(vm: HetuViewModel, app: AppItem, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     val icon by produceState<Bitmap?>(app.icon, app.packageName) {
         if (value == null) value = vm.filters.appIcon(app.packageName)
     }
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+    val source = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
     Row(
         Modifier
             .fillMaxWidth()
-            .padding(horizontal = Hx.gutter)
+            .padding(horizontal = HomeDims.gutter)
             .padding(bottom = 8.dp)
-            .clip(RoundedCornerShape(18.dp))
+            .clip(HomeDims.innerShape)
             .background(c.surface)
-            .clickable(enabled = enabled) {
+            .homeRowPressTint(source)
+            .clickable(interactionSource = source, indication = null, enabled = enabled) {
                 haptics.perform(if (checked) io.github.xgl34222220.hetu.ui.HetuHaptic.ToggleOff else io.github.xgl34222220.hetu.ui.HetuHaptic.ToggleOn)
                 onChange(!checked)
             }
-            .padding(horizontal = 14.dp, vertical = 15.dp),
+            .heightIn(min = 72.dp)
+            .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         val bitmap = icon
         if (bitmap != null) {
-            Image(bitmap.asImageBitmap(), null, Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)))
+            Image(bitmap.asImageBitmap(), null, Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)))
         } else {
-            Box(Modifier.size(42.dp).clip(RoundedCornerShape(13.dp)).background(c.surfaceMuted))
+            Box(Modifier.size(44.dp).clip(RoundedCornerShape(13.dp)).background(c.sunken))
         }
-        Spacer(Modifier.width(12.dp))
-        Column(Modifier.weight(1f)) {
-            Text(app.label, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 18.sp, lineHeight = 24.sp), fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold, color = c.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(app.packageName, style = MaterialTheme.typography.bodySmall, color = c.textMuted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Spacer(Modifier.width(14.dp))
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(app.label, style = HomeType.rowTitle, color = c.t1, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(app.packageName, style = HomeType.caption, color = c.t2, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
         Spacer(Modifier.width(8.dp))
-        Text("#${app.uid}", style = MaterialTheme.typography.labelMedium, color = c.accent)
-        Spacer(Modifier.width(10.dp))
+        Text("#${app.uid}", style = HomeType.badge, color = c.accent)
+        Spacer(Modifier.width(12.dp))
         HxSelectMark(checked && enabled)
-
-    }
-}
-
-@Composable
-private fun AppListBarAction(icon: androidx.compose.ui.graphics.vector.ImageVector, description: String, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    // Compact visual spacing from 03A/028. Material keeps its expanded minimum touch bounds.
-    androidx.compose.material3.IconButton(onClick = onClick, modifier = modifier.width(32.dp).height(48.dp)) {
-        androidx.compose.material3.Icon(icon, description, tint = Hx.colors.text, modifier = Modifier.size(20.dp))
     }
 }
 
@@ -350,7 +336,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
         }
     }
 
-    HxPage(flatCanvas = true, referenceTopBar = true,
+    HxPage(
         title = ht("核心管理"),
         largeTitle = false,
         onBack = { onBackOverride?.invoke() ?: nav?.pop() },
@@ -390,11 +376,11 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                                     style = MaterialTheme.typography.titleMedium.copy(fontSize = 22.sp, fontWeight = FontWeight.Bold), color = c.text)
                                 if (status.updateAvailable) {
                                     Spacer(Modifier.width(8.dp))
-                                    HxPill("有更新", HxTone.Accent)
+                                    HxPill(ht("有更新"), HxTone.Accent)
                                 }
                                 if (!status.runtimeReady) {
                                     Spacer(Modifier.width(8.dp))
-                                    HxPill("仅下载管理", HxTone.Neutral)
+                                    HxPill(ht("仅下载管理"), HxTone.Neutral)
                                 }
                             }
                             Text(
@@ -504,7 +490,7 @@ internal fun AboutScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val c = Hx.colors
+    val c = LocalHomeColors.current
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
     val revision = remember {
         runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
@@ -520,64 +506,78 @@ internal fun AboutScreen(vm: HetuViewModel) {
     }
 
     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
-    HxPage(flatCanvas = true, referenceTopBar = true, title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false, compactTitleFontSizeSp = 20f) {
+    val arrive = rememberHomeReveal(Unit, 620)
+    HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
         item(key = "brand") {
-            val wash = androidx.compose.ui.graphics.Brush.verticalGradient(
-                listOf(c.accentSoft, androidx.compose.ui.graphics.lerp(c.accentSoft, Color(0xFFF7D9E8), if (c.dark) .15f else .55f), c.canvas),
-            )
-            // Hero drifts up slower than the list and fades out, handing over to the bar title.
-            Box(
+            // The mark arrives with a small rise; scrolling lets it drift up slower than the
+            // list and fade, handing the page over to the bar title.
+            val glow = c.accent
+            Column(
                 Modifier
                     .fillMaxWidth()
-                    .height(264.dp)
                     .graphicsLayer {
                         val offset = if (aboutList.firstVisibleItemIndex == 0) aboutList.firstVisibleItemScrollOffset.toFloat() else size.height
                         translationY = offset * .45f
                         alpha = (1f - offset / (size.height * .8f)).coerceIn(0f, 1f)
                     }
-                    .background(wash),
-                contentAlignment = Alignment.Center,
+                    .drawBehind {
+                        // A soft light of the accent behind the mark, with no edge to it.
+                        val centre = Offset(size.width / 2f, 78.dp.toPx())
+                        drawCircle(
+                            Brush.radialGradient(listOf(glow.copy(alpha = if (c.dark) .26f else .20f), glow.copy(alpha = 0f)), centre, 190.dp.toPx()),
+                            190.dp.toPx(), centre,
+                        )
+                    }
+                    .padding(top = 18.dp, bottom = 26.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Image(
-                        painterResource(R.drawable.ic_hetu_concept),
-                        null,
-                        Modifier
-                            .size(108.dp)
-                            .clip(RoundedCornerShape(26.dp)),
-                    )
-                    Spacer(Modifier.height(10.dp))
-                    Text("河图", fontSize = 32.sp, lineHeight = 40.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, color = c.accent)
-                    Text("${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", fontSize = 14.sp, lineHeight = 20.sp, color = c.textMuted)
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Root 透明代理与广告过滤，基于 Mihomo。",
-                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold),
-                        color = c.textMuted,
-                        textAlign = TextAlign.Center,
-                        modifier = Modifier.padding(horizontal = 32.dp),
-                    )
-                }
+                Image(
+                    painterResource(R.drawable.ic_hetu_concept),
+                    null,
+                    Modifier
+                        .graphicsLayer {
+                            val p = arrive()
+                            val scale = .86f + .14f * p
+                            scaleX = scale
+                            scaleY = scale
+                            alpha = p
+                        }
+                        .homeFloat(3.dp)
+                        .size(112.dp)
+                        .shadow(22.dp, RoundedCornerShape(28.dp), ambientColor = glow.copy(alpha = .30f), spotColor = glow.copy(alpha = .45f))
+                        .clip(RoundedCornerShape(28.dp)),
+                )
+                Spacer(Modifier.height(16.dp))
+                Text("河图", color = c.accent, style = HomeType.largeTitle.copy(fontSize = 32.sp, lineHeight = 40.sp))
+                Spacer(Modifier.height(8.dp))
+                HomePill("${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）", tone = HomeTone.Neutral, height = 26.dp)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    ht("Root 透明代理与广告过滤，基于 Mihomo。"),
+                    Modifier.padding(horizontal = 32.dp),
+                    color = c.t2, style = HomeType.body.copy(fontSize = 15.sp, fontWeight = FontWeight.Medium), textAlign = TextAlign.Center,
+                )
             }
-            Spacer(Modifier.height(8.dp))
         }
         item(key = "info") {
-            SettingsSection() {
-                SettingsGroup(title = "信息") {
-                    SettingsRow("内置核心", subtitle = "Mihomo", icon = Icons.Rounded.Memory)
+            SettingsSection {
+                SettingsGroup(title = ht("信息")) {
+                    SettingsRow(ht("内置核心"), subtitle = "Mihomo", icon = ToolsIcons.Cpu) {
+                        if (revision.isNotBlank()) Text(revision.take(12), color = c.t3, style = HomeType.mono.copy(fontSize = 12.sp), maxLines = 1)
+                    }
                     SettingsDivider()
-                    SettingsRow("运行目录", subtitle = "/data/adb/hetu", icon = Icons.Rounded.Description, iconTint = c.textMuted)
+                    SettingsRow(ht("运行目录"), subtitle = "/data/adb/hetu", icon = ToolsIcons.Folder)
                 }
             }
         }
         item(key = "licenses") {
-            SettingsSection() {
-                SettingsGroup(title = "开源许可") {
-                    SettingsNavRow("Mihomo", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Mihomo", "MIHOMO-LICENSE") }
+            SettingsSection {
+                SettingsGroup(title = ht("开源许可")) {
+                    SettingsNavRow("Mihomo", subtitle = "GPL-3.0", icon = HxIcons.Scale) { openAsset("Mihomo", "MIHOMO-LICENSE") }
                     SettingsDivider()
-                    SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("AdGuard", "ADGUARD-LICENSE") }
+                    SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = HxIcons.Scale) { openAsset("AdGuard", "ADGUARD-LICENSE") }
                     SettingsDivider()
-                    SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = Icons.Rounded.Description, iconTint = c.textMuted) { openAsset("Lucide", "licenses/lucide.txt") }
+                    SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = HxIcons.Scale) { openAsset("Lucide", "licenses/lucide.txt") }
                 }
             }
         }

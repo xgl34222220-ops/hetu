@@ -42,6 +42,16 @@ def predecessor_view(root, destination):
             'Home/panel patch changed without input update'
         final = {**final, **homepanel['changedOrAddedFiles']}
         reverse_patches.insert(0, homepanel_patch)
+    ui88_inputs = root / 'updates/v2088-ui-refactor/inputs.json'
+    if ui88_inputs.exists():
+        from ui88_source_scope import validate_layer as validate_ui88_layer
+        ui88 = json.loads(ui88_inputs.read_text())
+        validate_ui88_layer(ui88, final)
+        ui88_patch = ui88_inputs.with_name('ui.patch')
+        assert digest(ui88_patch) == ui88['patchSha256'], \
+            'UI unification patch changed without input update'
+        final = {**final, **ui88['changedOrAddedFiles']}
+        reverse_patches.insert(0, ui88_patch)
     # Every available current byte must match the recorded final map before
     # copying/reversing; this never hides unknown production changes.
     available_final = {name: sha for name, sha in final.items() if name not in missing}

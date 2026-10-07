@@ -1,38 +1,36 @@
 package io.github.xgl34222220.hetu.tools
 
-import io.github.xgl34222220.hetu.ui.ht
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
-import io.github.xgl34222220.hetu.home.HomeBanner
-import io.github.xgl34222220.hetu.tools.ToolsButton as HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
-import io.github.xgl34222220.hetu.tools.ToolsSurfaceCard as HomeCard
-import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
-import io.github.xgl34222220.hetu.tools.ToolsHairline as HomeDivider
+import io.github.xgl34222220.hetu.home.HomeCard
 import io.github.xgl34222220.hetu.home.HomeIcons
-import io.github.xgl34222220.hetu.tools.ToolsSheetContent as HomeSheetContent
+import io.github.xgl34222220.hetu.home.HomeNotice
+import io.github.xgl34222220.hetu.home.HomeReveal
+import io.github.xgl34222220.hetu.home.HomeRowDims
+import io.github.xgl34222220.hetu.home.HomeRowDivider
 import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeTone
-import io.github.xgl34222220.hetu.tools.ToolsTypography as HomeType
+import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.homeEnter
+import io.github.xgl34222220.hetu.home.rememberHomeStagger
+import io.github.xgl34222220.hetu.ui.ht
 
 /**
  * 诊断与维护 (工具 › 诊断工具). Stateless.
  *
- * - Page 40: 运行预检 (the result stays in the card as a green or red strip), 查看, 紧急.
- * - Pages 41 and 43 (sheets) and 42 (dialog) are hosted by the route; their contents are below.
+ * Preflight (its result unfolds under the row), the two read-only views, the event journal of
+ * the host when it has one, and the emergency restore. The two sheets and the restore dialog
+ * are hosted by the route; their contents are below.
  */
 @Composable
 internal fun ToolsDiagScreen(
@@ -47,66 +45,75 @@ internal fun ToolsDiagScreen(
 ) {
     val c = LocalHomeColors.current
     val checking = state.preflight is ToolsPreflight.Running
+    val stagger = rememberHomeStagger()
     ToolsPage(title = "诊断与维护", onBack = onBack, modifier = modifier, subtitle = "预检、运行副本、诊断信息与紧急恢复") {
-        Column(verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
-            HomeCard(Modifier.fillMaxWidth()) {
-                ToolsCardTitle("运行预检")
-                ToolsRow(
-                    AnnotatedString(ht("开始预检")), icon = ToolsFeatureIcons.ShieldPlus, iconTint = c.t1,
-                    subtitle = ht("验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用"),
-                    enabled = !checking, onClick = onPreflight,
-                    trailing = { if (checking) HomeSpinner(size = 16.dp, color = c.accent) else ToolsChevron() },
-                )
-                when (val result = state.preflight) {
-                    is ToolsPreflight.Passed -> HomeBanner(result.message, HomeIcons.CircleCheck, Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp), tone = HomeTone.Good)
-                    is ToolsPreflight.Failed -> HomeBanner(result.message, HomeIcons.CircleAlert, Modifier.padding(start = 8.dp, end = 8.dp, bottom = 8.dp), tone = HomeTone.Bad)
-                    ToolsPreflight.Idle, ToolsPreflight.Running -> Unit
+        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 0)) {
+            ToolsCardTitle("运行预检")
+            ToolsRow(
+                AnnotatedString(ht("开始预检")), icon = ToolsFeatureIcons.ShieldPlus,
+                subtitle = ht("验证 Root / TPROXY / UID / IPv6 / 绕过规则是否可用"),
+                enabled = !checking, onClick = onPreflight,
+                trailing = { if (checking) HomeSpinner(size = 20.dp, color = c.accent) else ToolsChevron() },
+            )
+            val result = state.preflight
+            HomeReveal(result is ToolsPreflight.Passed || result is ToolsPreflight.Failed) {
+                val passed = result is ToolsPreflight.Passed
+                val message = when (result) {
+                    is ToolsPreflight.Passed -> result.message
+                    is ToolsPreflight.Failed -> result.message
+                    else -> ""
                 }
-            }
-            HomeCard(Modifier.fillMaxWidth()) {
-                ToolsCardTitle("查看")
-                ToolsRow(
-                    AnnotatedString(ht("启动配置")), icon = ToolsIcons.FileText, iconTint = c.t1,
-                    subtitle = ht("最终生成的运行副本，不修改源配置"), onClick = onStartupConfig, trailing = { ToolsChevron() },
-                )
-                HomeDivider(Modifier.padding(horizontal = 16.dp))
-                ToolsRow(
-                    AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router, iconTint = c.t1,
-                    subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+                HomeNotice(
+                    message, if (passed) HomeIcons.CircleCheck else HomeIcons.CircleAlert,
+                    Modifier.padding(start = 10.dp, end = 10.dp, bottom = 10.dp), tone = if (passed) HomeTone.Good else HomeTone.Bad,
                 )
             }
-            if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth()) {
-                ToolsCardTitle("运行记录")
-                ToolsRow(AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.FileText,
-                    subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
-                    onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() })
-            }
-            HomeCard(Modifier.fillMaxWidth()) {
-                ToolsCardTitle("紧急")
-                ToolsRow(
-                    AnnotatedString(ht("恢复网络")), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
-                    subtitle = ht("停止代理并回滚河图添加的 iptables / 路由规则"), onClick = onRestore, trailing = { ToolsChevron() },
-                )
-            }
+        }
+        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 1)) {
+            ToolsCardTitle("查看")
+            ToolsRow(
+                AnnotatedString(ht("启动配置")), icon = ToolsIcons.FileText,
+                subtitle = ht("最终生成的运行副本，不修改源配置"), onClick = onStartupConfig, trailing = { ToolsChevron() },
+            )
+            HomeRowDivider(start = HomeRowDims.textStart)
+            ToolsRow(
+                AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
+                subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+            )
+        }
+        if (onOpenDiagnosticsDetails != null) HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
+            ToolsCardTitle("运行记录")
+            ToolsRow(
+                AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
+                subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
+                onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() },
+            )
+        }
+        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
+            ToolsCardTitle("紧急")
+            ToolsRow(
+                AnnotatedString(ht("恢复网络")), icon = ToolsFeatureIcons.Siren, iconTint = c.bad,
+                subtitle = ht("停止代理并回滚河图添加的 iptables / 路由规则"), onClick = onRestore, trailing = { ToolsChevron() },
+            )
         }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Sheets (pages 41, 43)                                               */
+/*  Sheets                                                              */
 /* ------------------------------------------------------------------ */
 
-/** Page 41: the generated startup copy, YAML-coloured, with 复制. */
+/** The generated startup copy, YAML-coloured, with 复制. */
 @Composable
 internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
-    val palette = remember(c) { ToolsYamlPalette(key = c.t2, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
+    val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
     DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier.heightIn(min = (LocalConfiguration.current.screenHeightDp * .60f).dp)) { text ->
         remember(text, palette) { toolsYamlAnnotated(text, palette) }
     }
 }
 
-/** Page 43: the plain-text report, with 复制. */
+/** The plain-text report, with 复制. */
 @Composable
 internal fun ToolsReportSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
     DiagTextSheet("消息与网络诊断", "不采集聊天内容；密钥与完整 URL 已脱敏", content, onCopy, modifier) { AnnotatedString(it) }
@@ -123,21 +130,21 @@ private fun DiagTextSheet(
 ) {
     val c = LocalHomeColors.current
     val copyable = !content.loading && content.error == null && content.text.isNotBlank()
-    HomeSheetContent(
+    ToolsSheetContent(
         title = title, modifier = modifier, subtitle = subtitle,
-        trailing = { HomeButton("复制", { onCopy(content.text) }, kind = HomeButtonKind.Soft, icon = HomeIcons.Copy, enabled = copyable) },
+        trailing = { ToolsButton("复制", { onCopy(content.text) }, kind = HomeButtonKind.Soft, icon = HomeIcons.Copy, enabled = copyable, height = 44.dp) },
     ) {
         when {
-            content.loading -> ToolsLoading()
-            content.error != null -> HomeBanner(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
-            content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 4.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
-            else -> ToolsCodeBox(styled(content.text), plain = title == "消息与网络诊断")
+            content.loading -> ToolsLoading(cards = 2)
+            content.error != null -> HomeNotice(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
+            content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 6.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
+            else -> ToolsCodeBox(styled(content.text))
         }
     }
 }
 
 /* ------------------------------------------------------------------ */
-/*  Dialog (page 42)                                                    */
+/*  Dialog                                                              */
 /* ------------------------------------------------------------------ */
 
 @Composable
@@ -145,7 +152,8 @@ internal fun ToolsRestoreNetworkDialogCard(onConfirm: () -> Unit, onCancel: () -
     ToolsDialogCard(
         title = "恢复网络？",
         text = "将停止代理，并回滚河图添加的 iptables / 路由规则。用于网络异常时的紧急恢复。",
-        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading, neutralCancel = true,
+        confirmLabel = "恢复", confirmKind = ToolsConfirmKind.Danger, confirmLoading = loading,
+        icon = ToolsFeatureIcons.Siren, iconTone = HomeTone.Bad,
         onConfirm = onConfirm, onCancel = onCancel, modifier = modifier,
     )
 }

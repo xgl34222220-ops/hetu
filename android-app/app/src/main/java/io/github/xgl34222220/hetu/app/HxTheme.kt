@@ -4,6 +4,15 @@ import android.app.Activity
 import android.os.Build
 import io.github.xgl34222220.hetu.ui.LocalHetuLanguage
 import io.github.xgl34222220.hetu.ui.rememberHetuLanguage
+import io.github.xgl34222220.hetu.ui.HetuHaptic
+import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+import io.github.xgl34222220.hetu.home.HomeHaptic
+import io.github.xgl34222220.hetu.home.LocalHomeColors
+import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+import io.github.xgl34222220.hetu.home.homeColors
+import io.github.xgl34222220.hetu.home.homeMotionEnabled
+import androidx.compose.runtime.remember
 import androidx.compose.animation.core.CubicBezierEasing
 import androidx.compose.animation.core.FiniteAnimationSpec
 import androidx.compose.animation.core.Spring
@@ -219,6 +228,14 @@ private fun schemeFrom(c: HxColors): ColorScheme = if (c.dark) darkColorScheme(
 )
 
 /**
+ * The custom accent as stored, blank for the default blues. For the few pages that are their
+ * own activity and read the theme from preferences instead of the view model.
+ */
+internal fun hxStoredAccent(prefs: android.content.SharedPreferences): String = (prefs.getString("accentHex", "") ?: "")
+    .takeUnless { it.equals("#2563EB", true) || it.equals("#3B82F6", true) || it.equals("#2A62E8", true) || it.equals("#7EA6FF", true) }
+    .orEmpty()
+
+/**
  * @param appearance "system" | "light" | "dark"
  * @param dynamic use the wallpaper accent (Android 12+) instead of jade.
  */
@@ -261,9 +278,43 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
     }
 
     val language = rememberHetuLanguage()
-    CompositionLocalProvider(LocalHx provides colors, LocalHetuLanguage provides language) {
+    // The home design kit draws every page of the four tabs, so its palette, haptics and motion
+    // switch are provided here once, derived from the same appearance and accent as [LocalHx].
+    val palette = remember(colors.accent, dark, pureBlack) { homeColors(dark = dark, accent = colors.accent, pureBlack = dark && pureBlack) }
+    // One palette for both vocabularies: whatever is still drawn with [Hx.colors] gets the very
+    // colours the home kit uses. Lines stay opaque here because callers thin them with alpha.
+    val unified = remember(palette) {
+        colors.copy(
+            canvas = palette.bg, surface = palette.surface, surfaceMuted = palette.sunken,
+            line = androidx.compose.ui.graphics.lerp(palette.surface, palette.t1, if (dark) .11f else .09f),
+            text = palette.t1, textMuted = palette.t2, textFaint = palette.t3,
+            accentSoft = palette.accentSoft, onAccent = palette.onAccent,
+            good = palette.good, goodSoft = palette.goodSoft, warn = palette.warn, warnSoft = palette.warnSoft,
+            bad = palette.bad, badSoft = palette.badSoft,
+        )
+    }
+    val hetuHaptics = rememberHetuHaptics()
+    val homeHaptics = remember(hetuHaptics) {
+        { kind: HomeHaptic ->
+            hetuHaptics.perform(
+                when (kind) {
+                    HomeHaptic.Tap -> HetuHaptic.Tap
+                    HomeHaptic.Tick -> HetuHaptic.Tick
+                    HomeHaptic.Confirm -> HetuHaptic.Confirm
+                    HomeHaptic.Reject -> HetuHaptic.Reject
+                },
+            )
+        }
+    }
+    CompositionLocalProvider(
+        LocalHx provides unified,
+        LocalHetuLanguage provides language,
+        LocalHomeColors provides palette,
+        LocalHomeHaptics provides homeHaptics,
+        LocalHomeMotionEnabled provides homeMotionEnabled(),
+    ) {
         MaterialTheme(
-            colorScheme = schemeFrom(colors),
+            colorScheme = schemeFrom(unified),
             typography = hxTypography(),
             shapes = HxShapes,
             content = content,

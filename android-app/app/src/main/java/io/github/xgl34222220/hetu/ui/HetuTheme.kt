@@ -224,7 +224,9 @@ fun HetuTheme(content: @Composable () -> Unit) {
             LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
             LocalHetuMotionEnabled provides motionEnabled,
             LocalDensity provides scaledDensity,
-            content = { io.github.xgl34222220.hetu.ImmersiveUiHost { inner() } },
+            // Every host of this theme also gets the home design kit (palette, bar style, motion
+            // switch, haptics), so a page drawn with it looks the same in any activity.
+            content = { io.github.xgl34222220.hetu.home.HetuHomeKit(prefs) { io.github.xgl34222220.hetu.ImmersiveUiHost { inner() } } },
         )
     }
 
