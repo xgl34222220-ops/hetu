@@ -50,7 +50,7 @@ class ConceptParity57Test {
     @Test fun offlineHomeResourcesRemainReachableAndBackReturnsHome() {
         content { HetuRoot(vm) }
         rule.onNodeWithText("资源占用").performScrollTo().performClick()
-        rule.onAllNodesWithText("等待连接进行采样").assertCountEquals(2)
+        rule.onAllNodesWithText("等待连续运行采样").assertCountEquals(2)
         screenshot("resources-waiting")
         rule.onNodeWithContentDescription("返回").performClick()
         rule.onNodeWithText("本机直测").assertExists()
