@@ -7146,6 +7146,19 @@ index 4c33cfd..6140997 100644
  
  fun translateHetuText(source: String, language: String): String {
      val index = when { language.startsWith("en") -> 0; language.startsWith("zh-TW") || language.startsWith("zh-HK") || language.contains("Hant") -> 1; language.startsWith("ru") -> 2; else -> return source }
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
+index a6c57c6..1e034c5 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt
+@@ -50,7 +50,7 @@ class ConceptParity57Test {
+     @Test fun offlineHomeResourcesRemainReachableAndBackReturnsHome() {
+         content { HetuRoot(vm) }
+         rule.onNodeWithText("资源占用").performScrollTo().performClick()
+-        rule.onAllNodesWithText("等待连接进行采样").assertCountEquals(2)
++        rule.onAllNodesWithText("等待连续运行采样").assertCountEquals(2)
+         screenshot("resources-waiting")
+         rule.onNodeWithContentDescription("返回").performClick()
+         rule.onNodeWithText("本机直测").assertExists()
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt
 index 13c126d..f8d36e9 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt

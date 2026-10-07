@@ -4,7 +4,7 @@
  "baseRun": 37486758158,
  "previousInputsSha256": "796e5f8f7039ae934b8fb5f00e4656a30d5ad533a17aa66d7b3ee2e7b7e92a22",
  "previousPatchSha256": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
- "patchSha256": "abfecae5ddcf9a46a2007c41d68ad38ebc69791660d36ba2fb12f08f111219a2",
+ "patchSha256": "94b7cd170204072f7b1ca76cde5280575fd82fd0bf6e33446c5362160445bcf2",
  "versionCode": 2086,
  "versionName": "0.12.16-v20-fix",
  "changedOrAddedFiles": {
@@ -33,6 +33,7 @@
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt": "a5ea8d2881af69fa30d79cf92234b0138fa5687ec26815c7a39cff9f8abc08ed",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "8d8246f2510af971552b38c28176c7433333a5f232f4e4ea6841dc7dd6d0e837",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "d4564dcfea3cd664e40cb2d9f246c1ccece980702744589860602aae4c57e01d",
+  "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptParity57Test.kt": "6eb0992c35daa10779179ab8feb6a70716c1492b4f426f0ce7389b5fc19f28e7",
   "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "98941c27cfb0aa8949591615e1f13e7152af0e907d2519f4126bb4648d0691d0",
   "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt": "910854ad971abba4ff571c28f5647e3a7b49dd7195f6882cfa4009dc575e6a37"
  },
