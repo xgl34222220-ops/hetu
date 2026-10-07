@@ -44,6 +44,7 @@
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureComponents.kt": "58d10d41491d49cc3cbd3f8580fb4c724dd524b280a4f6b57a139c20b48ff0c2",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsImportScreen.kt": "6576a0de7ad22955c88603cb238e0e9cdfda634312ec383ba9247f7570449e1f",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt": "46ef0dbe794a4aec2526fa88777fb521af76b653996d1065dc5edbc429a56b9f",
+  "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt": "f8ee539092a18853ec214dc654d9b8656555c4404c96935069e68a4251773e32",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "5193e55eea80b979f0127a3c22e5caea8fc225a92ca95702f5c2a0e6d8a0ec00",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsSubscriptionScreen.kt": "213d1795ed51d69d1d53dec4510a2773e6e1b50e18cd0eb179aa67eed36a7f46",
   "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsYamlEditor.kt": "027196b6588ec79ddd83f48bef8f13b13275b7e8299aab791238ffb720e9fec9",
@@ -52,7 +53,7 @@
   "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptRemainingCoverageTest.kt": "ff9ac2f963129ef08775c4d5f86747d0fc94ddcac479c29ac22e29941cf64c0b",
   "android-app/app/src/test/java/io/github/xgl34222220/hetu/LargeTitleParity59Test.kt": "211533f26ee06591e96938440ffdc9dfac89738ed562350752ba5b1686538edb"
  },
- "patchSha256": "5fcf47b7b6316aabe653426404f73816a9820735bae7e0ce5e42201d47bbc782",
+ "patchSha256": "136cbafa5f79d072d502679696882aff2e616a94321cd28b9f713a9f792689ef",
  "previousInputsSha256": "f96112d1dc79eec1bbf4973f5e557eaf58639c5c2e7b339d2d2e3267545a86e9",
  "previousPatchSha256": "94b7cd170204072f7b1ca76cde5280575fd82fd0bf6e33446c5362160445bcf2",
  "protectedRuntimeUnchanged": true,

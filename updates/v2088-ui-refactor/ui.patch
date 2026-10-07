@@ -16005,6 +16005,19 @@ index 1860567..4bdee7e 100644
          }
      }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
+index 7967521..a9378df 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
+@@ -361,6 +361,8 @@ internal fun ToolsRoute(
+                     if (entry == ToolsEntry.Configs) {
+                         refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
+                         push(ToolsDestination.Configs)
++                    } else if (entry == ToolsEntry.Diag) {
++                        push(ToolsDestination.Diag)
+                     } else if (feature != null && features?.hosts(entry) == true) {
+                         push(feature)
+                     } else {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
 index e0545b4..73bdd31 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
