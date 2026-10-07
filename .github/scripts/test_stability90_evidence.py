@@ -13,6 +13,7 @@ from verify_stability90_test_results import verify
 from verify_stability90_delivery import (
     verify_glass_previews, REQUIRED_GLASS_PREVIEWS,
     verify_apk_signature_report, PINNED_CERTIFICATE_SHA256,
+    verify_observed_navigation_frame,
 )
 from verify_stability90_supplemental import verify as verify_supplemental, expected_methods as supplemental_methods
 
@@ -77,6 +78,99 @@ class ApkSignatureReportTests(unittest.TestCase):
                       'Number of signers: 2\n'):
             with self.subTest(extra=extra), self.assertRaises(AssertionError):
                 verify_apk_signature_report(self.SDK37_REPORT + extra)
+
+
+class NavigationWindowEvidenceTests(unittest.TestCase):
+    VIEWPORT = (0, 0, 394, 852)
+    FRAME = (0, 804, 394, 852)
+    INSET = 'InsetsSource: {2 mType=navigationBars mFrame=[0,804][394,852] mVisible=true mFlags=[]}'
+
+    def fixtures(self):
+        return [Path(__file__).with_name('fixtures').joinpath(f'panel-footer-window-api{api}.txt').read_text()
+                for api in (35, 36)]
+
+    def taskbar(self, raw):
+        import re
+        blocks = re.split(r'(?=^  Window #\d+ Window\{)', raw, flags=re.MULTILINE)
+        matches = [block for block in blocks if re.search(r'\bty=NAVIGATION_BAR\b', block)]
+        self.assertEqual(len(matches), 1)
+        return matches[0]
+
+    def test_actual_api35_and_api36_current_window_frames_are_bound(self):
+        for raw in self.fixtures():
+            with self.subTest(api_dump_sha256=__import__('hashlib').sha256(raw.encode()).hexdigest()):
+                verify_observed_navigation_frame(raw, self.VIEWPORT, self.FRAME)
+
+    def test_missing_hidden_other_display_or_unready_windows_never_substitute(self):
+        for raw in self.fixtures():
+            nav = self.taskbar(raw)
+            for old, new in (('isVisible=true', 'isVisible=false'), ('mDisplayId=0', 'mDisplayId=1'),
+                             ('mViewVisibility=0x0', 'mViewVisibility=0x4'), ('mHaveFrame=true', 'mHaveFrame=false'),
+                             ('mHasSurface=true', 'mHasSurface=false'), ('isReadyForDisplay()=true', 'isReadyForDisplay()=false'),
+                             ('isOnScreen=true', 'isOnScreen=false'), ('ty=NAVIGATION_BAR ', 'ty=NAVIGATION_BAR_PANEL ')):
+                with self.subTest(old=old), self.assertRaises(AssertionError):
+                    verify_observed_navigation_frame(raw.replace(nav, nav.replace(old, new)), self.VIEWPORT, self.FRAME)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw.replace(nav, ''), self.VIEWPORT, self.FRAME)
+
+    def test_parent_display_last_or_configured_insets_cannot_supply_current_frame(self):
+        for raw in self.fixtures():
+            nav = self.taskbar(raw)
+            for changed in (nav.replace(' frame=[0,804][394,852]', ''),
+                            nav.replace(' frame=[0,804][394,852]', ' frame=[0,790][394,852]'),
+                            nav.replace(' frame=[0,804][394,852]', ' frame=[0,804][200,852]'),
+                            nav.replace(' frame=[0,804][394,852]', ' frame=[0,804][394,850]')):
+                with self.assertRaises(AssertionError):
+                    verify_observed_navigation_frame(raw.replace(nav, changed), self.VIEWPORT, self.FRAME)
+            providers = '\n'.join(line for line in raw.splitlines() if 'InsetsFrameProvider:' in line)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(providers, self.VIEWPORT, self.FRAME)
+
+    def test_insets_and_window_observations_must_agree(self):
+        for raw in self.fixtures():
+            verify_observed_navigation_frame(raw + '\n' + self.INSET, self.VIEWPORT, self.FRAME)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw + '\n' + self.INSET.replace('804', '790'), self.VIEWPORT, self.FRAME)
+
+    def test_same_line_insets_and_rect_formats_preserve_visible_type_scope(self):
+        status = 'InsetsSource: {1 mType=statusBars mFrame=[0,0][394,24] mVisible=true}, '
+        verify_observed_navigation_frame(status + self.INSET, self.VIEWPORT, self.FRAME)
+        verify_observed_navigation_frame(self.INSET.replace('[0,804][394,852]', 'Rect(0, 804 - 394, 852)'), self.VIEWPORT, self.FRAME)
+        for raw in ('', self.INSET.replace('mVisible=true', 'mVisible=false'),
+                    status + self.INSET.replace('mVisible=true', 'mVisible=false')):
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw, self.VIEWPORT, self.FRAME)
+
+    def test_other_window_frame_cannot_leak_into_navigation_scope(self):
+        for raw in self.fixtures():
+            nav = self.taskbar(raw)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw.replace(nav, nav.replace(' frame=[0,804][394,852]', '')),
+                                                 self.VIEWPORT, self.FRAME)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw, self.VIEWPORT, (0, 790, 394, 852))
+
+    def test_current_attrs_type_and_unique_window_are_required(self):
+        import re
+        for raw in self.fixtures():
+            nav = self.taskbar(raw)
+            # Rotation configurations still mention NAVIGATION_BAR. They do
+            # not make an active NAVIGATION_BAR_PANEL window a navigation bar.
+            changed = re.sub(r'(^\s+mAttrs=\{[^\n]*\bty=)NAVIGATION_BAR\b',
+                             r'\1NAVIGATION_BAR_PANEL', nav, count=1, flags=re.MULTILINE)
+            self.assertNotEqual(nav, changed)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw.replace(nav, changed), self.VIEWPORT, self.FRAME)
+            with self.assertRaises(AssertionError):
+                verify_observed_navigation_frame(raw + '\n' + nav, self.VIEWPORT, self.FRAME)
+
+    def test_hidden_navigation_observations_cannot_be_masked_by_other_sources(self):
+        for raw in self.fixtures():
+            nav = self.taskbar(raw)
+            for changed in (raw.replace(nav, nav.replace('isVisible=true', 'isVisible=false')) + '\n' + self.INSET,
+                            raw + '\n' + self.INSET.replace('mVisible=true', 'mVisible=false')):
+                with self.assertRaises(AssertionError):
+                    verify_observed_navigation_frame(changed, self.VIEWPORT, self.FRAME)
 
 
 class Stability90EvidenceTests(unittest.TestCase):

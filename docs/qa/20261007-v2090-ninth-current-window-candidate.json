@@ -1,0 +1,78 @@
+{
+  "schema": "hetu-v2090-ninth-current-window-candidate-v1",
+  "recordedUtc": "2026-10-07T23:40:41.890856+00:00",
+  "parentCommit": "9f3cb3f06d2dfa330af1c68ffe7c14d695e956c2",
+  "previousRun": 37698551419,
+  "previousRunConclusion": "failure",
+  "previousNativeState": "NOT_STARTED",
+  "previousNativeExecutedSamples": 0,
+  "previousApkNotDelivered": true,
+  "productionChanged": false,
+  "compilationInputs": 403,
+  "unitTests": 631,
+  "unitXmlSuites": 64,
+  "original545Preserved": true,
+  "independent36Unchanged": true,
+  "productionPatchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
+  "sourceStop": true,
+  "sourceSha256": {
+    ".github/scripts/smoke_hetu_apk.py": "42cf012d06c6bbb895ad210168d617cad280fc869e1a71816d42ab629610904f",
+    ".github/scripts/test_panel_auth_smoke.py": "452ded32247beddb6c25279bbb8f51948e4ac45f67f1e1055e668d7b92699159",
+    ".github/scripts/verify_stability90_delivery.py": "703ce2f6b8ad660b558bd09c000de113d501a80d3bc626592aa06439745ba498",
+    ".github/scripts/test_stability90_evidence.py": "926f232e9a14b7ea1bd71b0b218e0a7583f8bb3dff644621457b837cf5127da4",
+    ".github/scripts/fixtures/panel-footer-window-api35.txt": "d35dd5fd5068e74ece371f6825919c8f15c43926ee2c54a4f56ce23d9db662e6",
+    ".github/scripts/fixtures/panel-footer-window-api36.txt": "d815f8e8d7516d1339378e99c164c1cc8130c31ba9dcdcf717a42130e4e5dfbe"
+  },
+  "nativeSourcesSha256": {
+    "tools/qa/run_mihomo_soak90.py": "96b0855425500576cfe3b3fbe94311108b7f2c5b073665cdba2dc255b08332e4",
+    "tools/qa/test_mihomo_soak90.py": "6d6d493db0df4d7136b6f236958df292bf09595e82860e4da14979a42b15c895"
+  },
+  "producerHostTests": 30,
+  "originalProducerHostMethodsPreserved": 24,
+  "additionalScrollBoundsTests": 13,
+  "additionalControllerFixtureTests": 5,
+  "independentEvidenceHostTests": 24,
+  "originalIndependentEvidenceMethodsPreserved": 16,
+  "producerSourceStopRecordSha256": "1a97f2d971f7bd9d866d7a4cbd8d005df56777d94b7c4b9c9e624d05da7a5a9f",
+  "independentSourceStopRecordSha256": "380781cfee9027addb12421635c55cf6680ff928721326cf77900acf391fd7e0",
+  "independentHostActualSeconds": 0.4097407090011984,
+  "navigationContract": {
+    "currentWindowAttrsType": "NAVIGATION_BAR",
+    "display": 0,
+    "observedFrame": "Same actual visible window current Frames: frame, no parent/display/last substitution",
+    "observedVisibility": "View0x0, HaveFrame, HasSurface, isOnScreen and isVisible true",
+    "liveInsetsSourceRetained": true,
+    "multipleOrConflictingObservationsRejected": true,
+    "configuredInsetSizeNotAcceptedAsObserved": true,
+    "guessedNavigationHeight": false,
+    "rootMutationActions": 0,
+    "expectedInstalledChecksEachApi": 65,
+    "realSwipesMaximum": 3,
+    "expectedReturnedCounters": {
+      "策略": 12,
+      "规则": 3,
+      "当前连接": 18
+    },
+    "entireFinalRowUnobscuredRequired": true
+  },
+  "nativeContract": {
+    "finalUid": 2000,
+    "finalGid": 2000,
+    "finalMode": "700",
+    "digestAndFileTypeRequired": true,
+    "stageExecuted": false,
+    "stageAllowedModes": [
+      "700",
+      "777"
+    ],
+    "guestPermissionsMutated": false,
+    "durationSecondsMinimum": 900,
+    "requiredActualSamplesMinimum": 240,
+    "resourcePidCleanupAssertionsUnchanged": true
+  },
+  "acceptance": "PENDING_NEW_EXACT_SHA_FULL_CI_AND_PHYSICAL_ARTIFACTS",
+  "previousFailuresRetained": true,
+  "oldCisCancelled": false,
+  "mainMergeReleaseDeployDeviceOperations": false,
+  "limitations": "Host replays of actual failed-artifact windows prove parsing only. Native long-run, new real swipes, whole65, strict delivery and external producer binding require this new exactSHA CI. AOSP shell native/host models do not establish phone Root routing, OEM background, radio switching or Google authentication."
+}

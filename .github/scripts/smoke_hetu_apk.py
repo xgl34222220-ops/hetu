@@ -441,15 +441,37 @@ def panel_box(node):
 
 def panel_navigation_frame(raw,viewport):
  # Read actual WindowManager insets, not an assumed navigation-bar height.
- frames=set()
- for source in re.findall(r'(?:mType|type)=navigationBars\b[^}\n]*',raw):
-  if not re.search(r'(?:mVisible|visible)=true\b',source):continue
+ source_frames=set()
+ for observed in re.finditer(r'(?:mType|type)=navigationBars\b[^}\n]*',raw):
+  source=observed.group()
+  prefix=raw[max(raw.rfind('\n',0,observed.start()),raw.rfind('}',0,observed.start()))+1:observed.start()]
+  # InsetsFrameProvider is configuration, not a live visible InsetsSource.
+  live=source.startswith('mType=') or 'InsetsSource' in prefix or re.search(r'(?:mFrame|frame|mVisible|visible)=',source)
+  if not live:continue
+  assert re.search(r'(?:mVisible|visible)=true\b',source),('Missing/hidden live navigation source',source)
   match=re.search(r'(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]',source)
   if match is None:match=re.search(r'(?:mFrame|frame)=Rect\((-?\d+),\s*(-?\d+)\s*-\s*(-?\d+),\s*(-?\d+)\)',source)
-  if match is not None:
-   frame=tuple(map(int,match.groups()))
-   if frame[0]<=viewport[0] and frame[2]>=viewport[2] and viewport[1]<frame[1]<frame[3]==viewport[3]:frames.add(frame)
- assert len(frames)==1,('Expected one observed visible navigation-bar frame',sorted(frames))
+  assert match is not None,('Missing live navigation frame',source)
+  frame=tuple(map(int,match.groups()))
+  assert frame[0]==viewport[0] and frame[2]==viewport[2] and viewport[1]<frame[1]<frame[3]==viewport[3],('Live navigation frame does not match viewport',frame,viewport)
+  source_frames.add(frame)
+ assert len(source_frames)<=1,('Conflicting live navigation sources',sorted(source_frames))
+ window_frames=[]
+ for block in re.findall(r'(?ms)^  Window #\d+ Window\{.*?(?=^  Window #|\Z)',raw):
+  if not re.search(r'^\s+mAttrs=\{[^\n]*\bty=NAVIGATION_BAR\b',block,re.M):continue
+  assert re.search(r'\bmDisplayId=0\b',block), 'Navigation window is not on display0'
+  for required in (r'\bmHaveFrame=true\b',r'\bmViewVisibility=0x0\b',r'\bmHasSurface=true\b',r'^\s+isOnScreen=true\s*$',r'^\s+isVisible=true\s*$'):
+   assert re.search(required,block,re.M),('Missing visible navigation window observation',required)
+  lines=re.findall(r'^\s+Frames:([^\n]*)$',block,re.M)
+  assert len(lines)==1,('Expected one current navigation Frames line',len(lines))
+  match=re.search(r'\bframe=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]',lines[0])
+  assert match is not None,('Missing current navigation window frame',lines[0])
+  frame=tuple(map(int,match.groups()))
+  assert frame[0]==viewport[0] and frame[2]==viewport[2] and viewport[1]<frame[1]<frame[3]==viewport[3],('Navigation window frame does not match viewport',frame,viewport)
+  window_frames.append(frame)
+ assert len(window_frames)<=1,('Expected at most one visible navigation window',window_frames)
+ frames=source_frames|set(window_frames)
+ assert len(frames)==1,('Expected one consistent observed visible navigation-bar frame',sorted(frames))
  return next(iter(frames))
 
 def panel_footer_geometry(root,nav_top):

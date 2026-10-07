@@ -68,6 +68,50 @@ def locate(folder, suffix):
     return matches[0]
 
 
+def verify_observed_navigation_frame(raw, viewport, reported):
+    """Independently bind navigation bounds to actual WindowManager records.
+
+    `windows` dumps on these AOSP APIs retain visible NAVIGATION_BAR windows,
+    not InsetsSource state. InsetsFrameProvider sizes are configuration and
+    cannot substitute for an observed current frame. Accept either actual
+    source representation, and require agreement when both are retained.
+    """
+    actual = set()
+
+    def observed_frame(record, label):
+        bracket = re.search(r'\b(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]', record)
+        rect = re.search(r'\b(?:mFrame|frame)=Rect\((-?\d+),\s*(-?\d+)\s*-\s*(-?\d+),\s*(-?\d+)\)', record)
+        match = bracket or rect
+        assert match is not None, ('Visible navigation observation lacks current frame', label)
+        frame = tuple(map(int, match.groups()))
+        assert frame[0] <= viewport[0] and frame[2] >= viewport[2] and viewport[1] < frame[1] < frame[3] == viewport[3], (
+            'Observed navigation frame does not cover this bottom viewport', label, frame, viewport)
+        actual.add(frame)
+
+    for source in re.split(r'(?=InsetsSource(?:\s*:|\s*\{))', raw):
+        line = source.split('\n', 1)[0]
+        if re.search(r'(?:mType|type)=navigationBars\b', line):
+            assert re.search(r'(?:mVisible|visible)=true\b', line), 'Navigation source is not visibly observed'
+            observed_frame(line, 'InsetsSource')
+
+    # Keep each Window's type, visibility and frame together; another window's
+    # visible flag or a parent/display/last frame must never satisfy this check.
+    nav_windows = 0
+    for window in re.findall(r'^\s{2}Window #\d+ Window\{[^\n]+\n(?:(?!^\s{2}Window #\d+ Window\{)[\s\S])*', raw, re.MULTILINE):
+        if not re.search(r'^\s+mAttrs=\{[^\n]*\bty=NAVIGATION_BAR\b', window, re.MULTILINE):
+            continue
+        nav_windows += 1
+        assert nav_windows == 1, 'Multiple navigation window observations are ambiguous'
+        assert re.search(r'\bmDisplayId=0\b', window), 'Navigation window belongs to another display'
+        for marker in (r'\bmViewVisibility=0x0\b', r'\bmHaveFrame=true\b', r'\bmHasSurface=true\b',
+                       r'\bisReadyForDisplay\(\)=true\b', r'^\s+isOnScreen=true\s*$', r'^\s+isVisible=true\s*$'):
+            assert re.search(marker, window, re.MULTILINE), ('Navigation window is not actually displayed', marker)
+        frames = re.findall(r'^\s+Frames:[^\n]+', window, re.MULTILINE)
+        assert len(frames) == 1, 'Navigation window lacks one actual Frames record'
+        observed_frame(frames[0], 'NAVIGATION_BAR Window')
+    assert actual == {tuple(reported)}, ('Retained navigation observations differ from reported frame', sorted(actual), reported)
+
+
 def verify_panel_footer_scroll(folder):
     """Bind real bounded input to retained native XML, PNG and window insets."""
     proof = json.loads(locate(folder, 'panel-controller-200-footer-scroll.json').read_text())
@@ -87,20 +131,7 @@ def verify_panel_footer_scroll(folder):
     frame = proof['navigationFrame']
     raw = locate(folder, 'panel-controller-200-footer-insets.txt').read_text()
     assert raw and len(frame) == 4 and frame[0] >= 0 and frame[2] > frame[0] and frame[3] > frame[1]
-    actual_frames = set()
-    for source in re.split(r'(?=InsetsSource(?:\s*:|\s*\{))', raw):
-        line = source.split('\n', 1)[0]
-        if not re.search(r'(?:mType|type)=navigationBars\b', line) or not re.search(r'(?:mVisible|visible)=true\b', line):
-            continue
-        match = re.search(r'(?:mFrame|frame)=\[(-?\d+),(-?\d+)\]\[(-?\d+),(-?\d+)\]', line)
-        if match is None:
-            match = re.search(r'(?:mFrame|frame)=Rect\((-?\d+),\s*(-?\d+)\s*-\s*(-?\d+),\s*(-?\d+)\)', line)
-        assert match is not None, 'Visible navigation source lacks actual frame'
-        candidate = tuple(map(int, match.groups()))
-        view = observations[0]['viewport']
-        if candidate[0] <= view[0] and candidate[2] >= view[2] and view[1] < candidate[1] < candidate[3] == view[3]:
-            actual_frames.add(candidate)
-    assert actual_frames == {tuple(frame)}, 'Retained navigation insets differ from reported frame'
+    verify_observed_navigation_frame(raw, observations[0]['viewport'], frame)
     # WindowManager and app XML are independently retained; re-read actual
     # bounds rather than accepting the smoke runner's geometry result alone.
     from native_scroll_bounds import _dock_top, _node_bounds, scroll_swipe

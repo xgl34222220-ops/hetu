@@ -1,0 +1,151 @@
+{
+  "schema": "hetu-v2090-eighth-installed-footer-failure-v1",
+  "recordedUtc": "2026-10-07T23:38:28.957144+00:00",
+  "commit": "9f3cb3f06d2dfa330af1c68ffe7c14d695e956c2",
+  "run": 37698551419,
+  "conclusion": "failure",
+  "build": {
+    "actualTests": 631,
+    "xmlSuites": 64,
+    "original545Retained": true,
+    "independent36Tests": 36,
+    "independentXmlSuites": 3,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "lintErrorsFatal": 0,
+    "hostActualSeconds": 900.2533956049999,
+    "hostExecutedCycles": 300,
+    "hostFailures": 0
+  },
+  "apis": {
+    "35": {
+      "jobId": 113065972195,
+      "artifactId": 11518940111,
+      "physicalZipBytes": 12479421,
+      "physicalZipSha256": "aa6a61286af6555277de13740111aabb05bff82465c0756f8ebeddf12b78463d",
+      "producerHead": "9f3cb3f06d2dfa330af1c68ffe7c14d695e956c2",
+      "authResult": "FAIL",
+      "completedAuthChecks": [
+        {
+          "name": "panel-controller-401-first-read",
+          "result": "passed",
+          "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+        },
+        {
+          "name": "panel-controller-401-api-settings",
+          "result": "passed",
+          "evidence": "actual NativeCompose ApiSheet opened by native tap"
+        },
+        {
+          "name": "panel-controller-401-retry",
+          "result": "passed",
+          "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+        },
+        {
+          "name": "panel-controller-200-recovered",
+          "result": "passed",
+          "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+        }
+      ],
+      "observedNativeCounts": {
+        "策略": 12,
+        "规则": 3,
+        "当前连接": 18
+      },
+      "footerScroll": {
+        "result": "FAIL",
+        "inputs": [],
+        "observations": [],
+        "rootMutationActions": 0
+      },
+      "continuityServiceObserved": false,
+      "rootMutationActions": 0,
+      "navigationAggregateGenerated": false,
+      "rawWindowsSha256": "d35dd5fd5068e74ece371f6825919c8f15c43926ee2c54a4f56ce23d9db662e6",
+      "actualNavigationWindowFrame": [
+        0,
+        804,
+        394,
+        852
+      ],
+      "originalPreferencesRestored": true,
+      "adbReverseRestored": true,
+      "launcherReaped": true,
+      "emulatorReaped": true,
+      "kvmBeforeAfterEqual": true,
+      "limits": "Four recorded auth checks and successful cleanup facts do not equal final64/65 PASS. No swipe or native continuous samples generated."
+    },
+    "36": {
+      "jobId": 113065972257,
+      "artifactId": 11518745921,
+      "physicalZipBytes": 14478360,
+      "physicalZipSha256": "ab28faeaa311fd552e5e378a7ac42e05854251aa0ee3ee14567714d5ef5193cf",
+      "producerHead": "9f3cb3f06d2dfa330af1c68ffe7c14d695e956c2",
+      "authResult": "FAIL",
+      "completedAuthChecks": [
+        {
+          "name": "panel-controller-401-first-read",
+          "result": "passed",
+          "evidence": "actual NativeCompose UI/XML + loopback HTTP401"
+        },
+        {
+          "name": "panel-controller-401-api-settings",
+          "result": "passed",
+          "evidence": "actual NativeCompose ApiSheet opened by native tap"
+        },
+        {
+          "name": "panel-controller-401-retry",
+          "result": "passed",
+          "evidence": "native retry input while fixture remained401; subsequent HTTP401 and explicit error UI"
+        },
+        {
+          "name": "panel-controller-200-recovered",
+          "result": "passed",
+          "evidence": "actual NativeCompose12 strategies/3 rules/18 connections + complete loopback HTTP200 request log"
+        }
+      ],
+      "observedNativeCounts": {
+        "策略": 12,
+        "规则": 3,
+        "当前连接": 18
+      },
+      "footerScroll": {
+        "result": "FAIL",
+        "inputs": [],
+        "observations": [],
+        "rootMutationActions": 0
+      },
+      "continuityServiceObserved": false,
+      "rootMutationActions": 0,
+      "navigationAggregateGenerated": false,
+      "rawWindowsSha256": "d815f8e8d7516d1339378e99c164c1cc8130c31ba9dcdcf717a42130e4e5dfbe",
+      "actualNavigationWindowFrame": [
+        0,
+        804,
+        394,
+        852
+      ],
+      "originalPreferencesRestored": true,
+      "adbReverseRestored": true,
+      "launcherReaped": true,
+      "emulatorReaped": true,
+      "kvmBeforeAfterEqual": true,
+      "limits": "Four recorded auth checks and successful cleanup facts do not equal final64/65 PASS. No swipe or native continuous samples generated."
+    }
+  },
+  "native": {
+    "state": "NOT_STARTED",
+    "executedSamples": 0,
+    "actualSeconds": null,
+    "guestHashUidModeObservations": null,
+    "reason": "smoke panel_navigation_frame assertion before first footer swipe and before run_soak entry"
+  },
+  "observedFailure": "Expected one observed visible navigation-bar frame: []",
+  "observedFormat": "WindowManager windows dumps contain current visible NAVIGATION_BAR Taskbar frames, no InsetsSource records",
+  "nextRepair": "Read actual current visible typeNAVIGATION_BAR Window records as well as actual InsetsSource, require unique matching current bottom frame; retain independent parser and all existing footer/swipe/native gates",
+  "productionInputsChanged": false,
+  "ciCancelled": false,
+  "mainMerged": false,
+  "packageDelivered": false
+}

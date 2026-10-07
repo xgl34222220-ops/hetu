@@ -210,5 +210,51 @@ class PanelAuthSmokeTests(unittest.TestCase):
   report=json.loads((self.output/'panel-controller-auth-fixture.json').read_text())
   self.assertEqual('FAIL',report['result']);self.assertTrue(report['originalPreferencesRestored']);self.assertTrue(report['adbReverseRestored'])
   self.assertEqual([],self.module.checks)
+ def observed_window_fixture(self,api=35):
+  return (Path(__file__).with_name('fixtures')/f'panel-footer-window-api{api}.txt').read_text()
+ def observed_navigation_window(self,raw):
+  blocks=self.module.re.findall(r'(?ms)^  Window #\d+ Window\{.*?(?=^  Window #|\Z)',raw)
+  matches=[block for block in blocks if self.module.re.search(r'\bty=NAVIGATION_BAR\b',block)]
+  self.assertEqual(1,len(matches));return matches[0]
+ def test_actual_api35_and_api36_window_dumps_observe_taskbar_geometry(self):
+  for api in (35,36):
+   raw=self.observed_window_fixture(api);block=self.observed_navigation_window(raw)
+   self.assertIn('package=com.android.launcher3',block)
+   self.assertEqual((0,804,394,852),self.module.panel_navigation_frame(raw,(0,0,394,852)))
+ def test_navigation_window_requires_every_real_visibility_and_display_observation(self):
+  for api in (35,36):
+   raw=self.observed_window_fixture(api);block=self.observed_navigation_window(raw)
+   for field,replacement in [('mDisplayId=0','mDisplayId=1'),('mHaveFrame=true','mHaveFrame=false'),('mViewVisibility=0x0','mViewVisibility=0x4'),('mHasSurface=true','mHasSurface=false'),('isOnScreen=true','isOnScreen=false'),('isVisible=true','isVisible=false'),('mHaveFrame=true',''),('isVisible=true','')]:
+    self.assertIn(field,block)
+    with self.subTest(api=api,field=field,replacement=replacement),self.assertRaises(AssertionError):
+     self.module.panel_navigation_frame(raw.replace(block,block.replace(field,replacement)),(0,0,394,852))
+ def test_navigation_window_uses_only_current_frame_and_rejects_missing_or_wrong_geometry(self):
+  raw=self.observed_window_fixture();block=self.observed_navigation_window(raw)
+  for replacement in ['frame=[0,0][394,852]','frame=[0,804][200,852]','frame=[0,804][394,850]','']:
+   altered=self.module.re.sub(r'(?m)(Frames:[^\n]*?\b)frame=\[0,804\]\[394,852\]',lambda m:m.group(1)+replacement,block)
+   self.assertNotEqual(block,altered)
+   with self.subTest(replacement=replacement),self.assertRaises(AssertionError):
+    self.module.panel_navigation_frame(raw.replace(block,altered),(0,0,394,852))
+ def test_navigation_panel_and_untyped_windows_are_not_navigation_bar_evidence(self):
+  raw=self.observed_window_fixture();block=self.observed_navigation_window(raw)
+  for replacement in ('ty=NAVIGATION_BAR_PANEL','ty=STATUS_BAR',''):
+   altered=self.module.re.sub(r'\bty=NAVIGATION_BAR\b',replacement,block)
+   with self.subTest(replacement=replacement),self.assertRaises(AssertionError):
+    self.module.panel_navigation_frame(raw.replace(block,altered),(0,0,394,852))
+  # Other rotations keep NAVIGATION_BAR configuration; only current mAttrs is authoritative.
+  altered=block.replace('ty=NAVIGATION_BAR','ty=NAVIGATION_BAR_PANEL',1)
+  self.assertIn('ty=NAVIGATION_BAR ',altered)
+  with self.assertRaises(AssertionError):self.module.panel_navigation_frame(raw.replace(block,altered),(0,0,394,852))
+ def test_live_insets_and_current_window_must_agree_without_accepting_partial_sources(self):
+  raw=self.observed_window_fixture()
+  self.assertEqual((0,804,394,852),self.module.panel_navigation_frame(self.nav()+'\n'+raw,(0,0,394,852)))
+  for source in [self.nav().replace('804','790'),self.nav().replace('mVisible=true','mVisible=false'),self.nav().replace('mFrame=[0,804][394,852]',''),self.nav().replace('mVisible=true','')]:
+   with self.subTest(source=source),self.assertRaises(AssertionError):
+    self.module.panel_navigation_frame(source+'\n'+raw,(0,0,394,852))
+ def test_multiple_current_navigation_windows_are_rejected_even_when_frames_match(self):
+  raw=self.observed_window_fixture();block=self.observed_navigation_window(raw)
+  duplicate=block.replace('Window #2 ','Window #90 ',1)
+  for extra in [duplicate,duplicate.replace('frame=[0,804][394,852]','frame=[0,790][394,852]')]:
+   with self.assertRaises(AssertionError):self.module.panel_navigation_frame(raw+'\n'+extra,(0,0,394,852))
 
 if __name__=='__main__':unittest.main()
