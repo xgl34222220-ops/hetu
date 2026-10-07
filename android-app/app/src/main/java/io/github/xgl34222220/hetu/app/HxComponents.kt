@@ -76,6 +76,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.graphicsLayer
@@ -788,8 +789,7 @@ internal fun HxSheet(
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
-        modifier = Modifier.homeGlassPanel(HomeDims.sheetShape, containerColor, raised = true),
-        containerColor = Color.Transparent,
+        containerColor = containerColor,
         contentColor = c.t1,
         scrimColor = c.scrim,
         shape = HomeDims.sheetShape,
@@ -798,7 +798,8 @@ internal fun HxSheet(
         },
     ) {
         CompositionLocalProvider(LocalHxSheetClose provides close) {
-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
+            // Keep material inside the sheet's anchored layout so clipping follows its offset.
+            Column(Modifier.fillMaxWidth().homeGlassPanel(RectangleShape, containerColor, raised = true).navigationBarsPadding().padding(bottom = 14.dp)) {
                 if (title != null) {
                     Row(
                         Modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 20.dp, end = if (showClose) 8.dp else 20.dp).padding(bottom = 8.dp),

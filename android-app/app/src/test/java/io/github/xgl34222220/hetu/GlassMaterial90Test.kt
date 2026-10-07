@@ -231,7 +231,11 @@ class GlassMaterial90Test {
             dataPlaneHealthy = false, healthObserved = false)
         actualState(unobserved)
         rule.setContent {
-            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
+            CompositionLocalProvider(
+                LocalHetuMotionEnabled provides false,
+                LocalNav provides remember { HxNav() },
+                LocalHxBlur provides vm.blurEnabled,
+            ) {
                 HetuAppTheme("dark", false) { NewUiHome(vm, 16.dp) {} }
             }
         }

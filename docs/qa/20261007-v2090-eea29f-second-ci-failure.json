@@ -1,0 +1,49 @@
+{
+  "schema": 1,
+  "commit": "eea29f25599029c07ec0670e58c8cd62fe41a32e",
+  "run": 37673797766,
+  "buildJob": 112971972902,
+  "stage": "testDebugUnitTest",
+  "actualXmlFiles": 63,
+  "actualCounts": {
+    "tests": 603,
+    "failures": 3,
+    "errors": 0,
+    "skipped": 0
+  },
+  "failedCases": [
+    {
+      "class": "io.github.xgl34222220.hetu.GlassMaterial90Test",
+      "method": "localTakeoverChecksNeverBecomeAnInternetHealthClaim",
+      "diagnostic": "java.lang.IllegalStateException: HxNav not provided"
+    },
+    {
+      "class": "io.github.xgl34222220.hetu.PanelControllerErrorTest",
+      "method": "launcherErrorOpensTheActualApiSettingsSheetWithoutStartingProxy",
+      "diagnostic": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains '\u6d4b\u901f\u4e0e API' (ignoreCase: false) is not displayed!"
+    },
+    {
+      "class": "io.github.xgl34222220.hetu.tools.ToolsDiagIntakeTest",
+      "method": "lateReportFailureCannotReplaceAReopenedPendingRequest",
+      "diagnostic": "java.lang.AssertionError: Assert failed: The component with Text + InputText + EditableText contains 'current-diagnostics' (ignoreCase: false) is not displayed!"
+    }
+  ],
+  "neverExecuted": [
+    "Android lint",
+    "supplemental36",
+    "host900 for this commit",
+    "installed candidate on API35/API36",
+    "native900 for this commit"
+  ],
+  "uiArtifact": {
+    "id": 11506366875,
+    "outerZipBytes": 34484688,
+    "outerZipSha256": "66d0043cbd452a3364370d0b98453169fd395e02a87b6b5b113c9deccdc70bdd"
+  },
+  "sourceArtifact": {
+    "id": 11507080682,
+    "outerZipSha256": "d60ee0a6a7c69c05d74940be3678e9e6d5f1f39e50075ba4464e8a279b84c0d4",
+    "tarSha256": "fb88c4a3a7c9b6b9e5f5f0dc516513b1b8f4d33997d733422166cb194a827242"
+  },
+  "runUrl": "https://github.com/xgl34222220-ops/hetu/actions/runs/37673797766"
+}

@@ -1137,7 +1137,7 @@ index c2dfa9e..8479d03 100644
                  providerTasks[name] = HxTask(ok = true, message = "已更新")
                  refreshNow()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index f4e3762..ced5660 100644
+index f4e3762..e337597 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -1,5 +1,7 @@
@@ -1148,7 +1148,15 @@ index f4e3762..ced5660 100644
  import android.content.ClipData
  import android.content.ClipboardManager
  import android.content.Context
-@@ -276,7 +278,7 @@ internal fun HxPage(
+@@ -74,6 +76,7 @@ import androidx.compose.ui.draw.clip
+ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.RectangleShape
+ import androidx.compose.ui.graphics.SolidColor
+ import androidx.compose.ui.graphics.TransformOrigin
+ import androidx.compose.ui.graphics.graphicsLayer
+@@ -276,7 +279,7 @@ internal fun HxPage(
 
      CompositionLocalProvider(LocalHomeBlur provides LocalHxBlur.current, LocalHomeBarProgressive provides progressive, LocalHxEntrance provides entrance) {
          val glass = rememberHomeBarGlass(lifted)
@@ -1157,7 +1165,7 @@ index f4e3762..ced5660 100644
              val list: @Composable () -> Unit = {
                  LazyColumn(
                      state = listState,
-@@ -400,10 +402,7 @@ private fun HxScrollTopButton(onClick: () -> Unit) {
+@@ -400,10 +403,7 @@ private fun HxScrollTopButton(onClick: () -> Unit) {
          Modifier
              .size(46.dp)
              .homeTap(onClickLabel = label) { haptics(HomeHaptic.Tick); onClick() }
@@ -1169,7 +1177,7 @@ index f4e3762..ced5660 100644
              .semantics { contentDescription = label },
          contentAlignment = Alignment.Center,
      ) { Icon(HomeIcons.ArrowUp, null, Modifier.size(22.dp), tint = c.t1) }
-@@ -470,7 +469,7 @@ internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScal
+@@ -470,7 +470,7 @@ internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScal
      return this.graphicsLayer { scaleX = scale; scaleY = scale }
  }
 
@@ -1178,7 +1186,7 @@ index f4e3762..ced5660 100644
  @Composable
  internal fun HxCard(
      modifier: Modifier = Modifier,
-@@ -483,7 +482,7 @@ internal fun HxCard(
+@@ -483,7 +483,7 @@ internal fun HxCard(
      val haptics = LocalHomeHaptics.current
      val tappable = if (onClick == null) modifier else modifier.homeTap { haptics(HomeHaptic.Tap); onClick() }
      Column(
@@ -1187,7 +1195,7 @@ index f4e3762..ced5660 100644
          content = content,
      )
  }
-@@ -512,7 +511,7 @@ internal fun HxSection(
+@@ -512,7 +512,7 @@ internal fun HxSection(
  internal fun HxGroup(modifier: Modifier = Modifier, title: String? = null, content: @Composable ColumnScope.() -> Unit) {
      val c = LocalHomeColors.current
      Column(
@@ -1196,17 +1204,17 @@ index f4e3762..ced5660 100644
              .animateContentSize(HomeMotion.glide(LocalHomeMotionEnabled.current)).padding(top = if (title == null) 4.dp else 0.dp, bottom = 4.dp),
      ) {
          if (title != null) HomeCardTitle(title)
-@@ -789,7 +788,8 @@ internal fun HxSheet(
-     ModalBottomSheet(
-         onDismissRequest = onDismiss,
-         sheetState = sheetState,
--        containerColor = containerColor,
-+        modifier = Modifier.homeGlassPanel(HomeDims.sheetShape, containerColor, raised = true),
-+        containerColor = Color.Transparent,
-         contentColor = c.t1,
-         scrimColor = c.scrim,
-         shape = HomeDims.sheetShape,
-@@ -1101,10 +1101,7 @@ internal fun HxReferenceDialog(
+@@ -798,7 +798,8 @@ internal fun HxSheet(
+         },
+     ) {
+         CompositionLocalProvider(LocalHxSheetClose provides close) {
+-            Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 14.dp)) {
++            // Keep material inside the sheet's anchored layout so clipping follows its offset.
++            Column(Modifier.fillMaxWidth().homeGlassPanel(RectangleShape, containerColor, raised = true).navigationBarsPadding().padding(bottom = 14.dp)) {
+                 if (title != null) {
+                     Row(
+                         Modifier.fillMaxWidth().heightIn(min = HomeDims.touch).padding(start = 20.dp, end = if (showClose) 8.dp else 20.dp).padding(bottom = 8.dp),
+@@ -1101,10 +1102,7 @@ internal fun HxReferenceDialog(
              Modifier
                  .widthIn(max = 340.dp)
                  .fillMaxWidth()
@@ -1543,25 +1551,15 @@ index 9dc611e..2300626 100644
          ) { sheet() }
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
-index e82f9c1..4f85001 100644
+index e82f9c1..a6f5728 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
-@@ -24,6 +24,7 @@ import androidx.compose.runtime.remember
- import androidx.compose.runtime.saveable.rememberSaveable
- import androidx.compose.runtime.setValue
- import androidx.compose.ui.Modifier
-+import androidx.compose.ui.graphics.Color
-
- /** Pages inside the home tab. Sub-pages cover the whole screen, so the host should hide the dock. */
- internal enum class HomeDestination { Main, IpDetail, Targets, Resource }
-@@ -163,8 +164,9 @@ internal fun HomeModalSheet(onDismiss: () -> Unit, content: @Composable () -> Un
-     ModalBottomSheet(
+@@ -164,7 +164,7 @@ internal fun HomeModalSheet(onDismiss: () -> Unit, content: @Composable () -> Un
          onDismissRequest = onDismiss,
          sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-+        modifier = Modifier.homeGlassPanel(HomeDims.sheetShape, c.raised, raised = true),
          shape = HomeDims.sheetShape,
 -        containerColor = c.surface,
-+        containerColor = Color.Transparent,
++        containerColor = c.raised,
          scrimColor = c.scrim,
          dragHandle = null,
      ) { content() }
@@ -2427,10 +2425,10 @@ index 0000000..a19945f
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
 new file mode 100644
-index 0000000..fc7e6cf
+index 0000000..c0094b9
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassMaterial90Test.kt
-@@ -0,0 +1,252 @@
+@@ -0,0 +1,256 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -2664,7 +2662,11 @@ index 0000000..fc7e6cf
 +            dataPlaneHealthy = false, healthObserved = false)
 +        actualState(unobserved)
 +        rule.setContent {
-+            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++            CompositionLocalProvider(
++                LocalHetuMotionEnabled provides false,
++                LocalNav provides remember { HxNav() },
++                LocalHxBlur provides vm.blurEnabled,
++            ) {
 +                HetuAppTheme("dark", false) { NewUiHome(vm, 16.dp) {} }
 +            }
 +        }

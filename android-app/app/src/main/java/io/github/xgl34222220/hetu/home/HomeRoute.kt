@@ -24,7 +24,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 
 /** Pages inside the home tab. Sub-pages cover the whole screen, so the host should hide the dock. */
 internal enum class HomeDestination { Main, IpDetail, Targets, Resource }
@@ -164,9 +163,8 @@ internal fun HomeModalSheet(onDismiss: () -> Unit, content: @Composable () -> Un
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        modifier = Modifier.homeGlassPanel(HomeDims.sheetShape, c.raised, raised = true),
         shape = HomeDims.sheetShape,
-        containerColor = Color.Transparent,
+        containerColor = c.raised,
         scrimColor = c.scrim,
         dragHandle = null,
     ) { content() }
