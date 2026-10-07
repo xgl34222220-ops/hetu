@@ -361,8 +361,6 @@ internal fun ToolsRoute(
                     if (entry == ToolsEntry.Configs) {
                         refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
                         push(ToolsDestination.Configs)
-                    } else if (entry == ToolsEntry.Diag) {
-                        push(ToolsDestination.Diag)
                     } else if (feature != null && features?.hosts(entry) == true) {
                         push(feature)
                     } else {
