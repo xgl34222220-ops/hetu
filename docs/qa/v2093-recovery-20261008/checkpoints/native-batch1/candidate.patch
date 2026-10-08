@@ -1,0 +1,178 @@
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -103,6 +103,24 @@
+     N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
+   done
+   printf '%s\n' "$$" > "$LOCK_DIR/pid"; LOCK_HELD=1
++}
++
++# Shared by app recovery and service.d under the same native transaction lock.
++# The boot identifier comes from the queued request; an old request cannot create
++# a ledger for a newer boot or erase an exhausted count.
++recovery_claim(){
++  RC_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
++  [ -n "$RC_BOOT" ] && [ "$1" = "$RC_BOOT" ] || return 1
++  [ "$RC_BOOT" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || return 1
++  mkdir -p "$BASE/boot" || return 1
++  RC_COUNT=0
++  if [ -f "$BASE/boot/recovery-budget" ]; then
++    read -r RC_SAVED RC_COUNT < "$BASE/boot/recovery-budget" || return 1
++    if [ "$RC_SAVED" != "$RC_BOOT" ]; then RC_COUNT=0; fi
++  fi
++  case "$RC_COUNT" in 0|1|2) ;; *) return 1;; esac
++  printf '%s %s\n' "$RC_BOOT" "$((RC_COUNT+1))" > "$BASE/boot/recovery-budget.new.$$" &&
++    mv -f "$BASE/boot/recovery-budget.new.$$" "$BASE/boot/recovery-budget"
+ }
+ 
+ state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
+@@ -1242,7 +1260,14 @@
+       [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
+     # A manual/app start may have won while the boot worker waited for this lock.
+     BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
+-    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
++    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then
++      health_collect
++      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
++    fi
++    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
++  fi
++  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
++    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
+   fi
+   : > "$START_TIMING"
+   rm -f "$START_ERROR"; start_stage "preflight"
+diff --git a/android-app/app/src/main/assets/hetu-autostart.sh b/android-app/app/src/main/assets/hetu-autostart.sh
+--- a/android-app/app/src/main/assets/hetu-autostart.sh
++++ b/android-app/app/src/main/assets/hetu-autostart.sh
+@@ -19,6 +19,8 @@
+ if ! mkdir "$LOCK" 2>/dev/null; then
+   OWNER_BOOT=$(cat "$LOCK/boot-id" 2>/dev/null)
+   OWNER_PID=$(cat "$LOCK/pid" 2>/dev/null)
++  # An absent owner is an initializing worker, never a stale lock.
++  [ -n "$OWNER_BOOT" ] || exit 0
+   if [ "$OWNER_BOOT" = "$BOOT_ID" ]; then
+     case "$OWNER_PID" in ''|*[!0-9]*) exit 0;; esac
+     OWNER_CMD=$(tr '\000' ' ' < "/proc/$OWNER_PID/cmdline" 2>/dev/null)
+@@ -43,6 +45,12 @@
+   EXE=$(readlink "/proc/$PID/exe" 2>/dev/null)
+   [ "$EXE" = "$BASE/bin/core" ] || [ "$EXE" = "$BASE/bin/core (deleted)" ]
+ }
++healthy(){
++  alive || return 1
++  HEALTH=$(/system/bin/sh "$BASE/hetu-root.sh" network-health 2>/dev/null) || return 1
++  printf '%s\n' "$HEALTH" | grep -q '"networkIntegrity":"healthy"' &&
++    printf '%s\n' "$HEALTH" | grep -q '"dataPlaneHealthy":true'
++}
+ notify_app(){
+   # The native proxy is already running; app/service restrictions cannot undo it.
+   am start-foreground-service --user 0 -n io.github.xgl34222220.hetu/.ProxyNetworkMatchService \
+@@ -57,22 +65,24 @@
+ done
+ # Native state/config is in /data/adb and needs no app launch or credential storage.
+ # Wait for a route rather than assuming network exists at BOOT_COMPLETED.
+-N=0
++N=0; ATTEMPTS=0
+ while allowed; do
+-  if alive; then state running; notify_app; exit 0; fi
++  if healthy; then state running; notify_app; exit 0; fi
+   ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
+   if ! printf '%s\n' "$ROUTE" | grep -q ' dev '; then
+     state waiting-network
+   elif [ ! -r "$BOOT/start.sh" ]; then
+     state missing-plan; exit 1
+   else
++    [ "$ATTEMPTS" -lt 3 ] || { state restore-timeout; exit 1; }
++    ATTEMPTS=$((ATTEMPTS+1))
+     state restoring
+     export HETU_BOOT_RESTORE_ID="$BOOT_ID"
+     /system/bin/sh "$BOOT/start.sh" >> "$BOOT/restore.log" 2>&1
+     RC=$?
+     # Bound logs even when a provider/network failure keeps the core unready.
+     tail -c 16384 "$BOOT/restore.log" > "$BOOT/restore.log.new.$$" && mv -f "$BOOT/restore.log.new.$$" "$BOOT/restore.log"
+-    if [ "$RC" = 0 ] && alive; then state running; notify_app; exit 0; fi
++    if [ "$RC" = 0 ] && healthy; then state running; notify_app; exit 0; fi
+     state retrying
+   fi
+   N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
+diff --git a/tools/qa/test_root_autostart.py b/tools/qa/test_root_autostart.py
+--- a/tools/qa/test_root_autostart.py
++++ b/tools/qa/test_root_autostart.py
+@@ -31,6 +31,9 @@
+         self.write_command('sleep', '''t=$(cat "$HETU_TEST/ticks" 2>/dev/null || echo 0); t=$((t+1)); printf '%s\n' "$t" > "$HETU_TEST/ticks"
+ if [ "$t" = "${STOP_AT:--1}" ]; then cat "$HETU_TEST/boot-id" > "$HETU_TEST/hetu/boot/stopped-boot"; fi
+ if [ "$t" = "${DISABLE_AT:--1}" ]; then rm -f "$HETU_TEST/hetu/boot/enabled"; fi''')
++        (self.base/'hetu-root.sh').write_text("""#!/bin/sh
++printf '%s\\n' '{"ok":true,"networkIntegrity":"healthy","dataPlaneHealthy":true}'
++""")
+         (self.boot/'start.sh').write_text('''n=$(cat "$HETU_TEST/starts" 2>/dev/null || echo 0); n=$((n+1)); printf '%s\n' "$n" > "$HETU_TEST/starts"
+ [ "$n" -gt "${FAIL_STARTS:-0}" ] || exit 1
+ printf '%s\n' "$HETU_CORE_PID" > "$HETU_TEST/hetu/run/core.pid"
+@@ -87,6 +90,7 @@
+         at=source.rindex('case "${1:-status}" in')
+         stubs='''root(){ :; }; acquire_lock(){ :; }; release_lock(){ :; }
+ pidcore(){ [ "${FAKE_ALIVE:-0}" = 1 ]; }
++health_collect(){ H_STATE=healthy; }
+ preflight(){ printf 'UNEXPECTED-PREFLIGHT\n' > "$HETU_TEST/preflight-hit"; exit 96; }
+ '''
+         p=self.dir/'root.sh';p.write_text(source[:at]+stubs+source[at:])
+diff --git a/tools/qa/test_root_safety93.py b/tools/qa/test_root_safety93.py
+new file mode 100644
+--- /dev/null
++++ b/tools/qa/test_root_safety93.py
+@@ -0,0 +1,55 @@
++#!/usr/bin/env python3
++"""Reimplemented safety regression fixtures; no real network/firewall operations."""
++import importlib.util
++from pathlib import Path
++import subprocess
++import unittest
++
++spec = importlib.util.spec_from_file_location('autostart_fixture', Path(__file__).with_name('test_root_autostart.py'))
++fixture = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(fixture)
++
++class BootSafety93(fixture.BootWorker):
++    def test_pid_without_health_never_reports_running(self):
++        (self.base/'run/core.pid').write_text(str(self.core.pid))
++        (self.base/'hetu-root.sh').write_text('exit 1\n')
++        self.assertEqual(1, self.run_worker().returncode)
++        self.assertEqual(3, self.starts())
++        self.assertNotEqual('running', self.state())
++        self.assertFalse((self.dir/'notified').exists())
++
++    def test_permanent_failure_starts_only_three_times(self):
++        self.assertEqual(1, self.run_worker(FAIL_STARTS=999).returncode)
++        self.assertEqual(3, self.starts())
++        self.assertEqual('restore-timeout', self.state())
++
++    def test_initializing_lock_cannot_be_stolen(self):
++        lock=self.boot/'restore.lock'; lock.mkdir()
++        self.assertEqual(0, self.run_worker().returncode)
++        self.assertEqual(0, self.starts())
++        self.assertTrue(lock.exists())
++
++    def claim(self, requested='current-boot'):
++        source=self.isolate((fixture.ASSETS/'hetu-root.sh').read_text()).rsplit('\ncase "${1:-status}" in',1)[0]
++        script=self.dir/'claim.sh'
++        script.write_text(source+'\nacquire_lock || exit 2\nrecovery_claim "$1"\n')
++        return subprocess.run(['sh',str(script),requested],env=self.env,capture_output=True,text=True,timeout=5)
++
++    def test_shared_budget_persists_and_old_boot_cannot_reset(self):
++        for count in range(1,4):
++            self.assertEqual(0,self.claim().returncode)
++            self.assertEqual(f'current-boot {count}\n',(self.boot/'recovery-budget').read_text())
++        self.assertEqual(1,self.claim().returncode)
++        self.assertEqual(1,self.claim('previous-boot').returncode)
++        self.assertEqual('current-boot 3\n',(self.boot/'recovery-budget').read_text())
++
++    def test_shared_budget_rejects_cancelled_boot(self):
++        (self.boot/'stopped-boot').write_text('current-boot\n')
++        self.assertEqual(1,self.claim().returncode)
++        self.assertFalse((self.boot/'recovery-budget').exists())
++
++for name in fixture.BootWorker.__dict__:
++    if name.startswith('test_'):
++        setattr(BootSafety93,name,None)
++
++if __name__=='__main__': unittest.main(verbosity=2)

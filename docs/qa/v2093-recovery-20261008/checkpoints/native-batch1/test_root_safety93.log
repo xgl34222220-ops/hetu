@@ -1,0 +1,10 @@
+test_initializing_lock_cannot_be_stolen (__main__.BootSafety93.test_initializing_lock_cannot_be_stolen) ... ok
+test_permanent_failure_starts_only_three_times (__main__.BootSafety93.test_permanent_failure_starts_only_three_times) ... ok
+test_pid_without_health_never_reports_running (__main__.BootSafety93.test_pid_without_health_never_reports_running) ... ok
+test_shared_budget_persists_and_old_boot_cannot_reset (__main__.BootSafety93.test_shared_budget_persists_and_old_boot_cannot_reset) ... ok
+test_shared_budget_rejects_cancelled_boot (__main__.BootSafety93.test_shared_budget_rejects_cancelled_boot) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.238s
+
+OK

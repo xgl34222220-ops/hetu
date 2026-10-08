@@ -1,0 +1,107 @@
+{
+  "schema": 1,
+  "verifiedAt": "2026-10-08T18:26:32.928228+00:00",
+  "baseCommit": "5af355d19fc41c3ae09902ca45fa1d70562ac402",
+  "scope": "Apply the exact archived startup viewer candidate; no changes to archived original bytes",
+  "productionFilesApplied": true,
+  "restoredProductionFiles": 4,
+  "restoredTestFiles": 1,
+  "files": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt",
+      "archive": "docs/qa/v2093-recovery-20261008/originals/startup/StartupConfigViewer.kt",
+      "sha256": "262d71d3ad0928276157d179a40eb4b431bff441997c79a3347e9596a96a60bb",
+      "bytes": 6772,
+      "matchesSealedWholeFile": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+      "archive": "docs/qa/v2093-recovery-20261008/originals/startup/SettingsStartupConfigScreen.kt",
+      "sha256": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc",
+      "bytes": 6022,
+      "matchesSealedWholeFile": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt",
+      "archive": "docs/qa/v2093-recovery-20261008/originals/startup/ToolsDiagScreen.kt",
+      "sha256": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c",
+      "bytes": 9053,
+      "matchesSealedWholeFile": true
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt",
+      "archive": "docs/qa/v2093-recovery-20261008/originals/startup/ToolsFeatureAdapter.kt",
+      "sha256": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7",
+      "bytes": 19407,
+      "matchesSealedWholeFile": true
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
+      "archive": "docs/qa/v2093-recovery-20261008/originals/startup/StartupConfigViewerFeedbackTest.kt",
+      "sha256": "75653c50194e20f79711e9c6d4b78f7d954a976109ce2cc467279ebccf95cdfd",
+      "bytes": 29571,
+      "matchesSealedWholeFile": true
+    }
+  ],
+  "restoredTests": [
+    "realSettingsEntryCreatesThemedActivityAndPreservesShortCopyExport",
+    "realSettingsEntryReadsLargeValidYamlAndPreservesAllBytes",
+    "realSettingsEntryReadsLongUnicodeLineAndPreservesEof",
+    "realSettingsEntryShowsMissingStartupWithoutRegeneration",
+    "realSettingsEntryShowsReadIOExceptionWithoutFalseSuccess",
+    "actualToolsDiagClickReadsLargeStartupAndCopiesOriginal",
+    "boundedViewerCanShowRealEofAndReturnToStartAcrossSettingsAndTools",
+    "boundedViewerMeasuresOnlySmallUnicodeParagraphsAndShowsLongLineEnd",
+    "actualSettingsClipboardRejectionAndMissingServiceStayVisibleAndKeepAllBytes",
+    "actualToolsClipboardRejectionAndMissingServiceNeverClaimSuccess"
+  ],
+  "sourceReview": {
+    "existingDependencies": [
+      "Compose foundation lazy list/selection/text",
+      "HomeButton and HomeIcons",
+      "homeGlassPanel",
+      "ToolsYamlPalette and toolsYamlAnnotated",
+      "RootProxyManager.startupConfig",
+      "launchDocumentPicker"
+    ],
+    "newDependencyOrPermissionRequired": false,
+    "toolsOnCopyCallers": "Both callers are Startup/Report DiagTextSheet, which now catches clipboard exceptions; no unguarded additional onCopy callers found",
+    "protectedBytes": "Copies/exports still use the original complete String; bounded chunks are display only",
+    "readOnlyOpening": "Opening Settings/Tools startup viewer only reads startupConfig; prepare() remains explicit regenerate action"
+  },
+  "checks": [
+    {
+      "name": "all five application files match sealed SHA-256",
+      "status": "PASS"
+    },
+    {
+      "name": "git diff --check",
+      "status": "PASS"
+    },
+    {
+      "name": "restored @Test inventory",
+      "status": "PASS",
+      "testCount": 10
+    },
+    {
+      "name": "local compile + StartupConfigViewerFeedbackTest",
+      "status": "BLOCKED",
+      "exitCode": 127,
+      "message": "/bin/bash: line 1: gradle: command not found",
+      "testsExecuted": 0,
+      "command": "gradle --no-daemon --max-workers=2 :app:compileDebugKotlin :app:compileDebugUnitTestKotlin :app:testDebugUnitTest --tests '*StartupConfigViewerFeedbackTest' --stacktrace"
+    }
+  ],
+  "androidTestsRerun": false,
+  "hostBehaviorTestsRerun": false,
+  "renderedScreenshotsReviewed": false,
+  "apkProduced": false,
+  "nativeSafetyAcceptanceComplete": false,
+  "phoneCauseEstablished": false,
+  "limitations": [
+    "Exact source recovery is not behavior verification.",
+    "The restored ten tests and the existing full suite require new same-source Android execution.",
+    "Actual phone startup-config crash is not proved reproduced or fixed.",
+    "No device access, main merge, release, deployment, or permission expansion."
+  ]
+}

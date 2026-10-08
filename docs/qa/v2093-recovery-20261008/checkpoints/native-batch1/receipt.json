@@ -1,0 +1,23 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "branch": "test/v20.76-new-ui",
+  "kind": "newly reimplemented native safety batch 1, durable candidate checkpoint",
+  "productionDelivery": false,
+  "fullSafetyAcceptance": false,
+  "androidBuildAndTests": "not run",
+  "hostTests": {
+    "originalAutostart": 17,
+    "newSafety": 5,
+    "failed": 0
+  },
+  "originalRecoveryArchiveUntouched": true,
+  "patchSha256": "f5b5d1036f3c4beee69513c1c8d485e2c6bb988070d06d6d92999410f443eca2",
+  "remaining": [
+    "stop failure truthfulness and retained records",
+    "watchdog generation isolation",
+    "startup timeout transaction rollback",
+    "KILL=1 bootstrap exception revocation on rollback failure",
+    "shared App integration and Android validation"
+  ],
+  "incidentAttribution": "The original workspace was observed missing with a cleaning marker. The responsible actor or mechanism was not independently established."
+}
