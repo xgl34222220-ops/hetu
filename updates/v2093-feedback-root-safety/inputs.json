@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "3d74fe093133c4ea35d1ecdbae38af84468e3ec75c180703def1b05e4fd9a2e3",
+  "patchSha256": "e6adba67d6af0c64cf5eca0daeaf94ce13ff0a229013b5d62b8623fb50817166",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -264,8 +264,8 @@
     "android-app/app/build.gradle.kts": "5b9cc72bc82c12bdccb2cc6f20d68bf9b0f11c0dedb30163ab3196ea8f637bac",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
     "android-app/app/src/main/assets/hetu-root.sh": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "55a45e7c79cb440b92f214b2cf1d93827b1deaf5cb8598e942a13c3915f37172",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "79e125e5eee7c8bcd188a7aad3ca3cfbf9c2a2c70df08886010d1b1555c06b6a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "6069c72b75a4568ec31d74b6c82f3fb3f04fcc7176219afff38a1983d840ebad",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "831ffb77ffcd26abaa88f414947b8dbfc33d4003f9a02bc39d79810c015882e6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "437d34d506bf50b75e986f4cf43c8466f507de09bd412ce3fa570c929628eea9",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "2131efd0a57375f299f23e333548bed86f3d302c4e2075fa282e0ed3530f27d0",
@@ -298,7 +298,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java": "e87ae72a46563ccba7e36ac3b0a5293abad93a8dd70ef92248ca2d1323629a6a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt": "323b7f7bbf1c91401be08b2446f9918b6bda38331945af62ab4aedc8e76b0721",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt": "c906754a2eceb61b3270e2bedaaea6e6c43bf4738e2dd7534da63387835dece8",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "6318835b396b4432e74238c7d352a23e26bf6ac3a13d34573337a39944ddc540",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt": "675096999660fe3849184ef6b402d4775b9bcd1ac97abdde120493c5172d7b7c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt": "3ea8cdc7eafe32ccb69a773c1549daec49e818380db07c198fde59ee263d8382",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootRecoveryDeadline93Test.kt": "5d747fe61b120db30a23f356315ff6f3886aeeb1082fda1ffe92fdda4dc057bd",

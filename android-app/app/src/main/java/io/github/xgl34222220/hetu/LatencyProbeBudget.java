@@ -33,7 +33,10 @@ final class LatencyProbeBudget implements AutoCloseable {
     }
     int remainingMillis() throws IOException {
         check();
-        return (int)Math.max(1, Math.min(Integer.MAX_VALUE, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
+        // Round up: truncation can fire SO_TIMEOUT just before the shared deadline,
+        // incorrectly exposing a generic socket error instead of the terminal budget outcome.
+        long nanos = Math.max(1, deadline - System.nanoTime());
+        return (int)Math.min(Integer.MAX_VALUE, Math.max(1, (nanos + 999_999) / 1_000_000));
     }
     void acquire(Semaphore slots) throws Exception {
         while (true) {

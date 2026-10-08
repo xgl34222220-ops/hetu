@@ -230,6 +230,10 @@ class LatencyProbeDeadline94Test {
     }
 
     @Test fun realDefaultDeadlineEndsBusyAndTheNextGroupProbeCanRun() {
+        // Three URLs keep the 7-second inactivity fallback path alive past the
+        // actual 20-second operation budget; two URLs legitimately finish earlier.
+        vm.prefs.edit().putBoolean("proxyCustomDelayUrlEnabled", true)
+            .putString("proxyCustomDelayUrl", "https://fixture.invalid/204").commit()
         response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
             MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) else normalResponse(req) }
         val started = System.nanoTime()

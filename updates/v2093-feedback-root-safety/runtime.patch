@@ -780,10 +780,10 @@ index ae832da..6925c5a 100755
  esac
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
-index 0000000..8916da2
+index 0000000..c777ce0
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
-@@ -0,0 +1,69 @@
+@@ -0,0 +1,72 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
@@ -819,7 +819,10 @@ index 0000000..8916da2
 +    }
 +    int remainingMillis() throws IOException {
 +        check();
-+        return (int)Math.max(1, Math.min(Integer.MAX_VALUE, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
++        // Round up: truncation can fire SO_TIMEOUT just before the shared deadline,
++        // incorrectly exposing a generic socket error instead of the terminal budget outcome.
++        long nanos = Math.max(1, deadline - System.nanoTime());
++        return (int)Math.min(Integer.MAX_VALUE, Math.max(1, (nanos + 999_999) / 1_000_000));
 +    }
 +    void acquire(Semaphore slots) throws Exception {
 +        while (true) {
@@ -855,10 +858,10 @@ index 0000000..8916da2
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
 new file mode 100644
-index 0000000..6208593
+index 0000000..27d9768
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
-@@ -0,0 +1,44 @@
+@@ -0,0 +1,49 @@
 +package io.github.xgl34222220.hetu
 +
 +import kotlinx.coroutines.CoroutineStart
@@ -901,6 +904,11 @@ index 0000000..6208593
 +                } finally { cancellation.cancel() }
 +            }
 +        }
++    } catch (error: Exception) {
++        // Closing a cancelled request wakes blocking socket IO with IOException.
++        // Preserve coroutine cancellation before any ViewModel error reporting.
++        currentCoroutineContext().ensureActive()
++        throw error
 +    } finally { budget.close() }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
@@ -5160,10 +5168,10 @@ index 0000000..c19d0eb
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt
 new file mode 100644
-index 0000000..9f0d8a6
+index 0000000..4499405
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt
-@@ -0,0 +1,275 @@
+@@ -0,0 +1,279 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -5396,6 +5404,10 @@ index 0000000..9f0d8a6
 +    }
 +
 +    @Test fun realDefaultDeadlineEndsBusyAndTheNextGroupProbeCanRun() {
++        // Three URLs keep the 7-second inactivity fallback path alive past the
++        // actual 20-second operation budget; two URLs legitimately finish earlier.
++        vm.prefs.edit().putBoolean("proxyCustomDelayUrlEnabled", true)
++            .putString("proxyCustomDelayUrl", "https://fixture.invalid/204").commit()
 +        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
 +            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) else normalResponse(req) }
 +        val started = System.nanoTime()

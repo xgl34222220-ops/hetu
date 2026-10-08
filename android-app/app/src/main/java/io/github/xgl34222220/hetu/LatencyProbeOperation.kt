@@ -40,5 +40,10 @@ internal suspend fun <T> latencyProbeOperation(
                 } finally { cancellation.cancel() }
             }
         }
+    } catch (error: Exception) {
+        // Closing a cancelled request wakes blocking socket IO with IOException.
+        // Preserve coroutine cancellation before any ViewModel error reporting.
+        currentCoroutineContext().ensureActive()
+        throw error
     } finally { budget.close() }
 }
