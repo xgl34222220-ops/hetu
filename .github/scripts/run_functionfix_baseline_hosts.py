@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import tempfile
 
+from fetch_predecessor_objects import fetch_predecessor_objects
+
 from functionfix_source_scope import ROOT, previous_files, validate_layer, validate_source_transforms, digest
 from tools_intake_source_scope import EXTERNAL_PAYLOAD_FILES, compilation_inputs, validate_checkout_matches_generated
 
@@ -40,8 +42,7 @@ def predecessor_view(root, destination):
     shutil.copytree(root / 'updates', destination / 'updates')
     shutil.copyfile(root / 'UI92_RUNTIME146_INPUTS.json', destination / 'UI92_RUNTIME146_INPUTS.json')
     subprocess.run(['git', 'init', '-q'], cwd=destination, check=True)
-    for commit in BASE_OBJECTS:
-        subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1', str(root), commit], cwd=destination, check=True)
+    fetch_predecessor_objects(root, destination, BASE_OBJECTS)
     subprocess.run(['git', 'apply', '--check', '-R', str(patch)], cwd=destination, check=True)
     subprocess.run(['git', 'apply', '-R', str(patch)], cwd=destination, check=True)
     validate_source_transforms(destination, root)

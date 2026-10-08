@@ -24,6 +24,8 @@ jobs:
         python3 .github/scripts/test_install_hetu_ci_sdk.py -v 2>&1 | tee out/verification/sdk-installer-host-tests.txt
 
         '
+    - name: Regress isolated predecessor object fetches
+      run: python3 .github/scripts/test_fetch_predecessor_objects.py -v
     - name: Load current layer and fetch exact predecessor objects
       run: 'set -euo pipefail
 

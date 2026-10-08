@@ -7,6 +7,8 @@ import shutil
 import subprocess
 import tempfile
 
+from fetch_predecessor_objects import fetch_predecessor_objects
+
 from stability90_source_scope import ROOT, predecessor_layers, validate_checkout, digest
 from tools_intake_source_scope import compilation_inputs, EXTERNAL_PAYLOAD_FILES
 
@@ -29,8 +31,7 @@ def predecessor_view(root, destination):
     shutil.copytree(root / 'updates', destination / 'updates')
     shutil.copyfile(root / 'UI92_RUNTIME146_INPUTS.json', destination / 'UI92_RUNTIME146_INPUTS.json')
     subprocess.run(['git', 'init', '-q'], cwd=destination, check=True)
-    for commit in OBJECTS:
-        subprocess.run(['git', 'fetch', '--quiet', '--no-tags', '--depth=1', str(root), commit], cwd=destination, check=True)
+    fetch_predecessor_objects(root, destination, OBJECTS)
     latest = root / 'updates/v2090-stability-glass/inputs.json'
     layer = json.loads(latest.read_text())
     patches = [(latest.with_name('runtime.patch'), {**layers[-1][3]})]
