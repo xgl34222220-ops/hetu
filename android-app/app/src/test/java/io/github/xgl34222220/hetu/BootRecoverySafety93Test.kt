@@ -188,6 +188,36 @@ class BootRecoverySafety93Test {
         } finally { executor.shutdownNow() }
     }
 
+    // The archived assertion used "start.sh", which also matched the read-only
+    // cmdline identity literal "hetu-autostart.sh --worker". Match the actual
+    // launch templates and complete executable tokens without treating that
+    // owner-inspection literal as a launch.
+    private fun containsRecoveryStartCommand(command: String): Boolean {
+        val entry = RootAutostart.ENTRY
+        val padded = "$command "
+        return command.contains("'start'") || command.contains(RootAutostart.BASE + "/start.sh") ||
+            command.contains(RootBridge.quote(entry)) || command.contains("\"$entry\"") ||
+            padded.startsWith("$entry ") || padded.contains("exec $entry ") || padded.contains("sh $entry ")
+    }
+
+    @Test fun readOnlyOwnerInspectionIsDistinctFromEveryKnownRecoveryLaunchTemplate() {
+        offMain { RootAutostart.restoreState(app) }
+        val ownerRead = BootRecoverySafety93BridgeShadow.commands.last { it.contains("printf ACTIVE") }
+        assertTrue("The real owner-inspection command reproduces the old substring false positive", ownerRead.contains("start.sh"))
+        assertFalse("Reading the worker cmdline must not be classified as starting it", containsRecoveryStartCommand(ownerRead))
+        val launches = listOf(
+            "exec '/data/adb/hetu/hetu-root.sh' 'start' '/data/adb/hetu/bin/core'",
+            "/system/bin/sh '${RootAutostart.BASE}/start.sh'",
+            "exec '${RootAutostart.ENTRY}' --worker",
+            "/system/bin/sh '${RootAutostart.ENTRY}' --worker",
+            "exec \"${RootAutostart.ENTRY}\" --worker",
+            "/system/bin/sh ${RootAutostart.ENTRY} --worker",
+            "exec ${RootAutostart.ENTRY} --worker"
+        )
+        launches.forEach { assertTrue("Actual recovery launch remains forbidden: $it", containsRecoveryStartCommand(it)) }
+        assertEquals(0, BootRecoverySafety93ManagerShadow.starts)
+    }
+
     @Test fun confirmedDeadRecoveryBudgetSurvivesObserverRecreation() {
         maintain(); assertEquals(1, BootRecoverySafety93ManagerShadow.starts)
         val originalDeadline = prefs.getLong("proxyRecoveryDeadlineElapsed", 0L)
@@ -369,7 +399,7 @@ class BootRecoverySafety93Test {
         assertEquals("reattach and queued callbacks cannot reopen the exhausted native episode", commandsAfterReattach,
             BootRecoverySafety93BridgeShadow.commands.size)
         assertTrue(pending.isEmpty()); assertEquals(0, BootRecoverySafety93ManagerShadow.starts)
-        assertTrue(BootRecoverySafety93BridgeShadow.commands.none { it.contains("'start'") || it.contains("start.sh") })
+        assertTrue(BootRecoverySafety93BridgeShadow.commands.none { containsRecoveryStartCommand(it) })
         prefs.edit().putBoolean("proxyRootWanted", false).commit()
         val commandsAfterStop = BootRecoverySafety93BridgeShadow.commands.size
         destroy(); attach(); ready(); foregroundReattach(); maintain()

@@ -134,9 +134,15 @@ class GlassDockFeedback93Test {
         val power = app.getSystemService(Context.POWER_SERVICE) as PowerManager
         Shadows.shadowOf(power).setIsPowerSaveMode(false)
         rule.setContent {
-            HetuAppTheme("light", false) {
-                val bar = rememberHomeBarGlass(lifted = true)
-                Text("motion=${LocalHomeMotionEnabled.current};glass=${rememberHetuGlassEnabled()};bar=${bar.haze != null}")
+            // Match the launcher -> home adapter bridge. LocalHomeBlur intentionally defaults
+            // to false for isolated previews; HetuAppTheme alone does not enable a page bar.
+            CompositionLocalProvider(LocalHxBlur provides prefs.getBoolean("enableBlur", true)) {
+                HetuAppTheme("light", false) {
+                    HetuHomeThemeFromPrefs(prefs) {
+                        val bar = rememberHomeBarGlass(lifted = true)
+                        Text("motion=${LocalHomeMotionEnabled.current};glass=${rememberHetuGlassEnabled()};bar=${bar.haze != null}")
+                    }
+                }
             }
         }
         rule.onNodeWithText("motion=true;glass=true;bar=true").assertExists()

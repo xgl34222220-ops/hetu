@@ -20,11 +20,14 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.TextLayoutResult
@@ -32,6 +35,8 @@ import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.home.HomeIcons
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
@@ -51,20 +56,34 @@ internal fun StartupConfigViewer(
         val headScroll = rememberScrollState()
         val tailScroll = rememberScrollState()
         var tailEndX by remember { mutableFloatStateOf(0f) }
-        var tailTextWidth by remember { mutableIntStateOf(0) }
+        var tailViewportWidth by remember { mutableIntStateOf(0) }
+        var navigationJob by remember { mutableStateOf<Job?>(null) }
         val scope = rememberCoroutineScope()
         Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             if (chunks.size > 1) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                HomeButton("回到开头", { scope.launch { state.scrollToItem(0); headScroll.scrollTo(0) } },
+                HomeButton("回到开头", {
+                    navigationJob?.cancel()
+                    navigationJob = scope.launch { state.scrollToItem(0); headScroll.scrollTo(0) }
+                },
                     kind = HomeButtonKind.Soft, icon = HomeIcons.ArrowUp, height = 44.dp)
-                HomeButton("查看末尾", { scope.launch {
-                    // The final paragraph can exceed the viewport height. An end
-                    // anchor exposes its bottom; then reveal the end of a long line.
-                    state.scrollToItem(chunks.size)
-                    val viewportWidth = tailTextWidth - tailScroll.maxValue
-                    val endOffset = (tailEndX - viewportWidth).roundToInt().coerceIn(0, tailScroll.maxValue)
-                    tailScroll.scrollTo(endOffset)
-                } },
+                HomeButton("查看末尾", {
+                    navigationJob?.cancel()
+                    navigationJob = scope.launch {
+                        // The final paragraph can exceed the viewport height. An end
+                        // anchor exposes its bottom; then reveal the end of a long line.
+                        state.scrollToItem(chunks.size)
+                        // Lazy placement and text measurement can finish after the vertical
+                        // scroll request. Await the real viewport and glyph measurement,
+                        // rather than deriving an offset from their initial zero values.
+                        val (endX, viewportWidth, maxScroll) = snapshotFlow {
+                            Triple(tailEndX, tailViewportWidth, tailScroll.maxValue)
+                        }.first { (endX, viewportWidth, maxScroll) ->
+                            endX > 0f && viewportWidth > 0 && maxScroll != Int.MAX_VALUE
+                        }
+                        val endOffset = (endX - viewportWidth).roundToInt().coerceIn(0, maxScroll)
+                        tailScroll.scrollTo(endOffset)
+                    }
+                },
                     kind = HomeButtonKind.Soft, icon = HomeIcons.ArrowDown, height = 44.dp)
             }
             // A bounded paragraph, including very long single lines, is measured only
@@ -73,7 +92,11 @@ internal fun StartupConfigViewer(
                 itemsIndexed(chunks, key = { index, _ -> index }) { index, range ->
                     val part = remember(text, range) { text.substring(range.start, range.end).ifEmpty { " " } }
                     SelectionContainer {
-                        val scroll = Modifier.horizontalScroll(when (index) {
+                        // The outer modifier measures the clipped horizontal viewport,
+                        // while TextLayoutResult measures the full paragraph inside it.
+                        val scroll = Modifier.onSizeChanged {
+                            if (index == chunks.lastIndex) tailViewportWidth = it.width
+                        }.horizontalScroll(when (index) {
                             chunks.lastIndex -> tailScroll
                             0 -> headScroll
                             else -> rememberScrollState()
@@ -82,7 +105,6 @@ internal fun StartupConfigViewer(
                             if (index == chunks.lastIndex) {
                                 val end = part.indexOfLast { it != '\n' && it != '\r' }.coerceAtLeast(0)
                                 tailEndX = layout.getBoundingBox(end).right
-                                tailTextWidth = layout.size.width
                             }
                         }
                         if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)

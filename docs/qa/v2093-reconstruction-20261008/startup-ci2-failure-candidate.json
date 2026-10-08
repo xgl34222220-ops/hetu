@@ -1,0 +1,73 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-08T19:35:46.509099+00:00",
+  "failedCommit": "b2c06e11428cf778226da5bf7c4bdd45a7149b57",
+  "failedRun": 37829980900,
+  "failedMainSuite": {
+    "tests": 706,
+    "failed": 7
+  },
+  "scope": "Startup only: new candidate fixes after exact archive recovery; not original recovered bytes",
+  "sourceEvidence": "docs/qa/v2093-reconstruction-20261008/ci/b2c06e11-build-without-png-chunks.log",
+  "xmlAvailable": false,
+  "observedStartupFailures": [
+    {
+      "method": "actualSettingsClipboardRejectionAndMissingServiceStayVisibleAndKeepAllBytes",
+      "line": 428,
+      "type": "IllegalStateException"
+    },
+    {
+      "method": "actualToolsClipboardRejectionAndMissingServiceNeverClaimSuccess",
+      "line": 454,
+      "type": "IllegalStateException"
+    },
+    {
+      "method": "boundedViewerMeasuresOnlySmallUnicodeParagraphsAndShowsLongLineEnd",
+      "line": 358,
+      "type": "AssertionError",
+      "assertion": "EOF glyph must be visible horizontally; +/- 1px threshold unchanged"
+    }
+  ],
+  "analysis": {
+    "clipboard": "Both failing locations compose an ActivityResult launcher after overriding LocalContext with a ContextWrapper(Application). That wrapper cannot expose the real activity owner. The fixture now wraps rule.activity and keeps applicationContext=this, preserving clipboard-service fault injection. No production clipboard change.",
+    "eof": "The original tail-navigation coroutine computed its horizontal offset immediately after the lazy vertical scroll request, using mutable glyph/text sizes and maxValue with initial values. Candidate waits for actual glyph and viewport measurement and initialized max scroll, then calculates/clamps the offset. It also cancels superseded first/last navigation jobs. Exact failing glyph bounds are not yet available because XML/that failing frame were not recovered; same-source rerun is required."
+  },
+  "changedFiles": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt",
+      "sha256": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
+      "sha256": "a4a7e97f53859d8413a50561cccc0bf4ab5231f95b861af111182bd4ac8e4714"
+    }
+  ],
+  "checks": {
+    "gitDiffCheck": "PASS",
+    "allArchivedStartupHashesStillMatch": true,
+    "testCountBefore": 10,
+    "testCountAfter": 10,
+    "testChangesBeyondTwoWrapperBases": "comments only",
+    "originalAssertionExpressionsAndThresholdsUnchanged": true
+  },
+  "actualPixelsReviewed": [
+    {
+      "path": "settings-visible-eof.png",
+      "sha256": "4d55f8b372cec5a522761278ec438074c0e3c3abba61bfaf63f2ac006be7c2f1",
+      "finding": "Normal multiline EOF is visibly within the settings viewer."
+    },
+    {
+      "path": "tools-actual-large-entry.png",
+      "sha256": "61a225373fce2fd3b940bd80ed8c8f78c527f1419464f27f8c6544b585d5450c",
+      "finding": "Actual tool sheet shows bounded YAML paragraphs and copy/start/end controls."
+    }
+  ],
+  "candidateTestsExecutedLocally": 0,
+  "candidateAndroidPassed": false,
+  "candidateScreenshotsProduced": false,
+  "limits": [
+    "No failing long-line frame or XML stack has been viewed.",
+    "Pixel review belongs to failed b2c06e11, not to this candidate.",
+    "No APK delivery, device operation, main merge, or release."
+  ]
+}

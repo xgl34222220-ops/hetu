@@ -2161,10 +2161,10 @@ index 9cd82da..d32fc87 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt
 new file mode 100644
-index 0000000..0cdff70
+index 0000000..07fab10
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt
-@@ -0,0 +1,134 @@
+@@ -0,0 +1,156 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.foundation.horizontalScroll
@@ -2187,11 +2187,14 @@ index 0000000..0cdff70
 +import androidx.compose.runtime.key
 +import androidx.compose.runtime.mutableFloatStateOf
 +import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
 +import androidx.compose.runtime.remember
 +import androidx.compose.runtime.rememberCoroutineScope
 +import androidx.compose.runtime.setValue
++import androidx.compose.runtime.snapshotFlow
 +import androidx.compose.ui.Modifier
 +import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.layout.onSizeChanged
 +import androidx.compose.ui.text.AnnotatedString
 +import androidx.compose.ui.text.TextStyle
 +import androidx.compose.ui.text.TextLayoutResult
@@ -2199,6 +2202,8 @@ index 0000000..0cdff70
 +import io.github.xgl34222220.hetu.home.HomeButton
 +import io.github.xgl34222220.hetu.home.HomeButtonKind
 +import io.github.xgl34222220.hetu.home.HomeIcons
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.flow.first
 +import kotlinx.coroutines.launch
 +import kotlin.math.roundToInt
 +
@@ -2218,20 +2223,34 @@ index 0000000..0cdff70
 +        val headScroll = rememberScrollState()
 +        val tailScroll = rememberScrollState()
 +        var tailEndX by remember { mutableFloatStateOf(0f) }
-+        var tailTextWidth by remember { mutableIntStateOf(0) }
++        var tailViewportWidth by remember { mutableIntStateOf(0) }
++        var navigationJob by remember { mutableStateOf<Job?>(null) }
 +        val scope = rememberCoroutineScope()
 +        Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
 +            if (chunks.size > 1) FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-+                HomeButton("回到开头", { scope.launch { state.scrollToItem(0); headScroll.scrollTo(0) } },
++                HomeButton("回到开头", {
++                    navigationJob?.cancel()
++                    navigationJob = scope.launch { state.scrollToItem(0); headScroll.scrollTo(0) }
++                },
 +                    kind = HomeButtonKind.Soft, icon = HomeIcons.ArrowUp, height = 44.dp)
-+                HomeButton("查看末尾", { scope.launch {
-+                    // The final paragraph can exceed the viewport height. An end
-+                    // anchor exposes its bottom; then reveal the end of a long line.
-+                    state.scrollToItem(chunks.size)
-+                    val viewportWidth = tailTextWidth - tailScroll.maxValue
-+                    val endOffset = (tailEndX - viewportWidth).roundToInt().coerceIn(0, tailScroll.maxValue)
-+                    tailScroll.scrollTo(endOffset)
-+                } },
++                HomeButton("查看末尾", {
++                    navigationJob?.cancel()
++                    navigationJob = scope.launch {
++                        // The final paragraph can exceed the viewport height. An end
++                        // anchor exposes its bottom; then reveal the end of a long line.
++                        state.scrollToItem(chunks.size)
++                        // Lazy placement and text measurement can finish after the vertical
++                        // scroll request. Await the real viewport and glyph measurement,
++                        // rather than deriving an offset from their initial zero values.
++                        val (endX, viewportWidth, maxScroll) = snapshotFlow {
++                            Triple(tailEndX, tailViewportWidth, tailScroll.maxValue)
++                        }.first { (endX, viewportWidth, maxScroll) ->
++                            endX > 0f && viewportWidth > 0 && maxScroll != Int.MAX_VALUE
++                        }
++                        val endOffset = (endX - viewportWidth).roundToInt().coerceIn(0, maxScroll)
++                        tailScroll.scrollTo(endOffset)
++                    }
++                },
 +                    kind = HomeButtonKind.Soft, icon = HomeIcons.ArrowDown, height = 44.dp)
 +            }
 +            // A bounded paragraph, including very long single lines, is measured only
@@ -2240,7 +2259,11 @@ index 0000000..0cdff70
 +                itemsIndexed(chunks, key = { index, _ -> index }) { index, range ->
 +                    val part = remember(text, range) { text.substring(range.start, range.end).ifEmpty { " " } }
 +                    SelectionContainer {
-+                        val scroll = Modifier.horizontalScroll(when (index) {
++                        // The outer modifier measures the clipped horizontal viewport,
++                        // while TextLayoutResult measures the full paragraph inside it.
++                        val scroll = Modifier.onSizeChanged {
++                            if (index == chunks.lastIndex) tailViewportWidth = it.width
++                        }.horizontalScroll(when (index) {
 +                            chunks.lastIndex -> tailScroll
 +                            0 -> headScroll
 +                            else -> rememberScrollState()
@@ -2249,7 +2272,6 @@ index 0000000..0cdff70
 +                            if (index == chunks.lastIndex) {
 +                                val end = part.indexOfLast { it != '\n' && it != '\r' }.coerceAtLeast(0)
 +                                tailEndX = layout.getBoundingBox(end).right
-+                                tailTextWidth = layout.size.width
 +                            }
 +                        }
 +                        if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)
@@ -2994,18 +3016,40 @@ index b187a2f..fd88764 100644
      ) { capsule() }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-index c95890c..944918f 100644
+index c95890c..06a89b0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
+@@ -26,21 +26,29 @@ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.lerp
++import androidx.compose.ui.layout.onSizeChanged
++import androidx.compose.ui.platform.LocalConfiguration
 +import androidx.compose.ui.platform.LocalDensity
  import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.selected
-@@ -54,6 +55,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+ import androidx.compose.ui.semantics.semantics
+ import androidx.compose.ui.semantics.stateDescription
+ import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.rememberTextMeasurer
+ import androidx.compose.ui.unit.dp
+ import io.github.xgl34222220.hetu.home.HomeCheckMark
+ import io.github.xgl34222220.hetu.home.HomeFlag
++import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.home.HomeHaptic
+ import io.github.xgl34222220.hetu.home.HomeMotion
+ import io.github.xgl34222220.hetu.home.HomePop
+@@ -54,6 +62,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
  import io.github.xgl34222220.hetu.home.fill
  import io.github.xgl34222220.hetu.home.homeEnter
  import io.github.xgl34222220.hetu.home.homeTap
@@ -3013,7 +3057,7 @@ index c95890c..944918f 100644
  import io.github.xgl34222220.hetu.ui.HetuStaggerState
  import io.github.xgl34222220.hetu.ui.hetuPressScale
  import io.github.xgl34222220.hetu.ui.ht
-@@ -112,6 +114,7 @@ internal fun LazyListScope.panelGroupsTab(
+@@ -112,6 +121,7 @@ internal fun LazyListScope.panelGroupsTab(
                          GroupCard(
                              group = group, data = data, view = view, wide = columns == 1,
                              modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onToggleGroup(group.name) },
@@ -3021,7 +3065,7 @@ index c95890c..944918f 100644
                          )
                      }
                      repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
-@@ -152,11 +155,13 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
+@@ -152,51 +162,91 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
  /* ------------------------------------------------------------------ */
 
  @Composable
@@ -3031,12 +3075,43 @@ index c95890c..944918f 100644
      val haptics = LocalHomeHaptics.current
      val expanded = group.name in view.expandedGroups
      val compact = view.layout.compactGroups
-+    val separateCurrent = !wide || LocalDensity.current.fontScale > 1.3f
 +    val testing = group.name in data.testingGroups || data.testingAll
++    val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
++    val pending = data.switching[group.name]
++    val leaf = data.leafOf(group.now)
++    val currentName = HomeRegions.withoutFlag(group.now)
++    val region = HomeRegions.codeOf(leaf)
++    val density = LocalDensity.current
++    val textMeasurer = rememberTextMeasurer()
++    var measuredWidth by remember { mutableIntStateOf(0) }
++    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
++    val estimatedWidth = if (wide) screenWidth - HomeDims.gutter * 2 else (screenWidth - HomeDims.gutter * 2 - PanelDims.gap) / 2
++    val availableWidth = with(density) { (if (measuredWidth > 0) measuredWidth.toDp() else estimatedWidth) - 25.dp }
++    val nameWidth = with(density) { textMeasurer.measure(currentName, PanelType.groupNow, softWrap = false, maxLines = 1).size.width.toDp() }
++    val delayCaption = when (delay) {
++        PanelDelay.Unknown -> ht("未知")
++        PanelDelay.Testing -> ht("测速中")
++        PanelDelay.Timeout -> ht("超时")
++        PanelDelay.Failed -> ht("失败")
++        is PanelDelay.Ms -> "${delay.value} ms"
++        null -> ""
++    }
++    val delayWidth = if (pending != null) 16.dp else if (delay == null) 0.dp else with(density) {
++        maxOf(56.dp, textMeasurer.measure(delayCaption, HomeType.delay.copy(fontWeight = FontWeight.Bold), softWrap = false, maxLines = 1).size.width.toDp() + 20.dp + if (testing) 18.dp else 0.dp)
++    }
++    val flagWidth = if (region.isBlank()) 0.dp else 16.dp * 1.42f + 7.dp
++    // Keep short names and their independent 40 dp touch target on one line when they fit.
++    // The measured card width also covers embedded/narrow hosts; large type and long names
++    // retain a separate result row instead of being squeezed beside the capsule.
++    val separateCurrent = density.fontScale > 1.3f || (!wide && nameWidth + flagWidth + delayWidth + 7.dp > availableWidth)
++    val compactInline = compact && !wide && !separateCurrent
      val motion = LocalHomeMotionEnabled.current
      val fill by animateColorAsState(if (expanded) lerp(c.surface, c.accent, if (c.dark) .14f else .055f) else c.surface, HomeMotion.fade(motion), label = "groupFill")
      val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
-@@ -166,30 +171,40 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
+     val opened = ht("已展开")
+     val closed = ht("已收起")
+     val shell = modifier
++        .onSizeChanged { measuredWidth = it.width }
          .testTag("panel-group:${group.name}")
          .semantics { stateDescription = if (expanded) opened else closed }
          .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
@@ -3044,7 +3119,10 @@ index c95890c..944918f 100644
 -        .background(fill)
 +        .homeGlassPanel(PanelDims.groupShape, fill)
          .border(1.5.dp, outline, PanelDims.groupShape)
-         .padding(start = 13.dp, end = 12.dp, top = if (compact) 13.dp else 17.dp, bottom = if (compact) 10.dp else 14.dp)
+-        .padding(start = 13.dp, end = 12.dp, top = if (compact) 13.dp else 17.dp, bottom = if (compact) 10.dp else 14.dp)
++        .padding(start = 13.dp, end = 12.dp,
++            top = if (compactInline) 8.dp else if (compact) 13.dp else 17.dp,
++            bottom = if (compactInline) 5.dp else if (compact) 10.dp else 14.dp)
      val title: @Composable (Modifier) -> Unit = { m ->
          Column(m) {
 -            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -3053,8 +3131,8 @@ index c95890c..944918f 100644
          }
      }
      val current: @Composable (Modifier) -> Unit = { m ->
-         val leaf = data.leafOf(group.now)
-         val pending = data.switching[group.name]
+-        val leaf = data.leafOf(group.now)
+-        val pending = data.switching[group.name]
 -        Row(m.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
 -            HomeFlag(HomeRegions.codeOf(leaf), height = 16.dp)
 -            Text(
@@ -3063,12 +3141,11 @@ index c95890c..944918f 100644
 -            )
 -            if (pending != null) HomeSpinner(size = 16.dp)
 -            else PanelDelayLabel(data.delayOf(group.now), onCard = true)
-+        val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
 +        val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
 +            Row(nameModifier.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-+                HomeFlag(HomeRegions.codeOf(leaf), height = 16.dp)
++                HomeFlag(region, height = 16.dp)
 +                Text(
-+                    panelHighlight(HomeRegions.withoutFlag(group.now), view.needle), Modifier.weight(1f, fill = separateCurrent),
++                    panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
 +                    color = c.t1, style = PanelType.groupNow, maxLines = if (separateCurrent) 2 else 1, overflow = TextOverflow.Ellipsis,
 +                )
 +                if (pending != null) HomeSpinner(size = 16.dp)
@@ -3089,7 +3166,15 @@ index c95890c..944918f 100644
          Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
              GroupTile(group)
              title(Modifier.weight(1f))
-@@ -300,7 +315,7 @@ private fun NodeCard(
+             current(Modifier.weight(1f, fill = false))
+         }
+     } else {
+-        Column(shell, verticalArrangement = Arrangement.spacedBy(if (compact) 6.dp else 12.dp)) {
++        Column(shell, verticalArrangement = Arrangement.spacedBy(if (compactInline) 4.dp else if (compact) 6.dp else 12.dp)) {
+             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                 title(Modifier.weight(1f))
+                 GroupTile(group)
+@@ -300,7 +350,7 @@ private fun NodeCard(
      )
      val info = ht("节点信息")
      val shell = modifier
@@ -3098,7 +3183,7 @@ index c95890c..944918f 100644
          .testTag("panel-node:${node.name}")
          .semantics { this.selected = selected }
          .hetuPressScale(source, pressedScale = .975f, motion = motion)
-@@ -320,16 +335,16 @@ private fun NodeCard(
+@@ -320,16 +370,16 @@ private fun NodeCard(
          Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              Text(
                  node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
@@ -3509,10 +3594,10 @@ index e5b66e9..828a077 100644
  @Composable
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt
 new file mode 100644
-index 0000000..915bc98
+index 0000000..0921695
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt
-@@ -0,0 +1,450 @@
+@@ -0,0 +1,480 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -3703,6 +3788,36 @@ index 0000000..915bc98
 +        } finally { executor.shutdownNow() }
 +    }
 +
++    // The archived assertion used "start.sh", which also matched the read-only
++    // cmdline identity literal "hetu-autostart.sh --worker". Match the actual
++    // launch templates and complete executable tokens without treating that
++    // owner-inspection literal as a launch.
++    private fun containsRecoveryStartCommand(command: String): Boolean {
++        val entry = RootAutostart.ENTRY
++        val padded = "$command "
++        return command.contains("'start'") || command.contains(RootAutostart.BASE + "/start.sh") ||
++            command.contains(RootBridge.quote(entry)) || command.contains("\"$entry\"") ||
++            padded.startsWith("$entry ") || padded.contains("exec $entry ") || padded.contains("sh $entry ")
++    }
++
++    @Test fun readOnlyOwnerInspectionIsDistinctFromEveryKnownRecoveryLaunchTemplate() {
++        offMain { RootAutostart.restoreState(app) }
++        val ownerRead = BootRecoverySafety93BridgeShadow.commands.last { it.contains("printf ACTIVE") }
++        assertTrue("The real owner-inspection command reproduces the old substring false positive", ownerRead.contains("start.sh"))
++        assertFalse("Reading the worker cmdline must not be classified as starting it", containsRecoveryStartCommand(ownerRead))
++        val launches = listOf(
++            "exec '/data/adb/hetu/hetu-root.sh' 'start' '/data/adb/hetu/bin/core'",
++            "/system/bin/sh '${RootAutostart.BASE}/start.sh'",
++            "exec '${RootAutostart.ENTRY}' --worker",
++            "/system/bin/sh '${RootAutostart.ENTRY}' --worker",
++            "exec \"${RootAutostart.ENTRY}\" --worker",
++            "/system/bin/sh ${RootAutostart.ENTRY} --worker",
++            "exec ${RootAutostart.ENTRY} --worker"
++        )
++        launches.forEach { assertTrue("Actual recovery launch remains forbidden: $it", containsRecoveryStartCommand(it)) }
++        assertEquals(0, BootRecoverySafety93ManagerShadow.starts)
++    }
++
 +    @Test fun confirmedDeadRecoveryBudgetSurvivesObserverRecreation() {
 +        maintain(); assertEquals(1, BootRecoverySafety93ManagerShadow.starts)
 +        val originalDeadline = prefs.getLong("proxyRecoveryDeadlineElapsed", 0L)
@@ -3884,7 +3999,7 @@ index 0000000..915bc98
 +        assertEquals("reattach and queued callbacks cannot reopen the exhausted native episode", commandsAfterReattach,
 +            BootRecoverySafety93BridgeShadow.commands.size)
 +        assertTrue(pending.isEmpty()); assertEquals(0, BootRecoverySafety93ManagerShadow.starts)
-+        assertTrue(BootRecoverySafety93BridgeShadow.commands.none { it.contains("'start'") || it.contains("start.sh") })
++        assertTrue(BootRecoverySafety93BridgeShadow.commands.none { containsRecoveryStartCommand(it) })
 +        prefs.edit().putBoolean("proxyRootWanted", false).commit()
 +        val commandsAfterStop = BootRecoverySafety93BridgeShadow.commands.size
 +        destroy(); attach(); ready(); foregroundReattach(); maintain()
@@ -3965,10 +4080,10 @@ index 0000000..915bc98
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt
 new file mode 100644
-index 0000000..415b7c2
+index 0000000..305bd55
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,174 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -4105,9 +4220,15 @@ index 0000000..415b7c2
 +        val power = app.getSystemService(Context.POWER_SERVICE) as PowerManager
 +        Shadows.shadowOf(power).setIsPowerSaveMode(false)
 +        rule.setContent {
-+            HetuAppTheme("light", false) {
-+                val bar = rememberHomeBarGlass(lifted = true)
-+                Text("motion=${LocalHomeMotionEnabled.current};glass=${rememberHetuGlassEnabled()};bar=${bar.haze != null}")
++            // Match the launcher -> home adapter bridge. LocalHomeBlur intentionally defaults
++            // to false for isolated previews; HetuAppTheme alone does not enable a page bar.
++            CompositionLocalProvider(LocalHxBlur provides prefs.getBoolean("enableBlur", true)) {
++                HetuAppTheme("light", false) {
++                    HetuHomeThemeFromPrefs(prefs) {
++                        val bar = rememberHomeBarGlass(lifted = true)
++                        Text("motion=${LocalHomeMotionEnabled.current};glass=${rememberHetuGlassEnabled()};bar=${bar.haze != null}")
++                    }
++                }
 +            }
 +        }
 +        rule.onNodeWithText("motion=true;glass=true;bar=true").assertExists()
@@ -4367,10 +4488,10 @@ index 0000000..59c1789
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt
 new file mode 100644
-index 0000000..399f921
+index 0000000..35af1e2
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt
-@@ -0,0 +1,243 @@
+@@ -0,0 +1,245 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -4476,7 +4597,9 @@ index 0000000..399f921
 +        assertTrue("$reason; requests=${paths()}, busy=${vm.testingNodes}", predicate())
 +    }
 +    private fun awaitActions() = eventually("ViewModel requests completed") {
-+        vm.viewModelScope.coroutineContext[Job]!!.children.none { it.isActive }
++        // Cancellation makes isActive false immediately; held HTTP and finally
++        // cleanup can still be running. Wait for completion before checking owners.
++        vm.viewModelScope.coroutineContext[Job]!!.children.all { it.isCompleted }
 +    }
 +    private fun normalResponse(req: RecordedRequest): MockResponse = when (req.requestUrl!!.encodedPath) {
 +        "/proxies" -> body("""{"proxies":{"Route":{"type":"Selector","now":"node","all":["node","other"]},"node":{"type":"Shadowsocks","history":[{"delay":999}]},"other":{"type":"Shadowsocks"}}}""")
@@ -5526,10 +5649,10 @@ index 19743ed..459997f 100644
          assertFalse(ProxyRuntimeSettings.runtimeUpgradePending(true, 492, true))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt
 new file mode 100644
-index 0000000..58a1a11
+index 0000000..00ed230
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt
-@@ -0,0 +1,541 @@
+@@ -0,0 +1,543 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Activity
@@ -5956,7 +6079,9 @@ index 0000000..58a1a11
 +        eventually("A later successful copy replaces the error") { has("启动配置已复制") && !has("复制失败，剪贴板暂不可用；可改用导出") }
 +        closeActivity()
 +
-+        val missing = StartupFeedbackClipboardContext(app)
++        // Keep the real ActivityResultRegistryOwner discoverable by the production
++        // document picker while this wrapper intercepts only the clipboard service.
++        val missing = StartupFeedbackClipboardContext(rule.activity)
 +        show { CompositionLocalProvider(LocalContext provides missing) { SettingsStartupConfigScreen {} } }
 +        eventually("The actual settings screen reads without clipboard access") { has("复制") && contains(text) }
 +        val previousAttempts = StartupFeedbackClipboardShadow.attempts.get()
@@ -5980,7 +6105,7 @@ index 0000000..58a1a11
 +        clipboard.setPrimaryClip(ClipData.newPlainText("existing", "existing clipboard"))
 +        StartupFeedbackClipboardShadow.resetFaults()
 +        StartupFeedbackClipboardShadow.reject = true
-+        val context = StartupFeedbackClipboardContext(app).apply { unavailable = false }
++        val context = StartupFeedbackClipboardContext(rule.activity).apply { unavailable = false }
 +        show {
 +            CompositionLocalProvider(LocalContext provides context) {
 +                val production = rememberToolsFeatureHost()

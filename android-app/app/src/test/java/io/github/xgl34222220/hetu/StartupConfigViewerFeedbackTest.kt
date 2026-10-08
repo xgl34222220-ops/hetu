@@ -424,7 +424,9 @@ class StartupConfigViewerFeedbackTest {
         eventually("A later successful copy replaces the error") { has("启动配置已复制") && !has("复制失败，剪贴板暂不可用；可改用导出") }
         closeActivity()
 
-        val missing = StartupFeedbackClipboardContext(app)
+        // Keep the real ActivityResultRegistryOwner discoverable by the production
+        // document picker while this wrapper intercepts only the clipboard service.
+        val missing = StartupFeedbackClipboardContext(rule.activity)
         show { CompositionLocalProvider(LocalContext provides missing) { SettingsStartupConfigScreen {} } }
         eventually("The actual settings screen reads without clipboard access") { has("复制") && contains(text) }
         val previousAttempts = StartupFeedbackClipboardShadow.attempts.get()
@@ -448,7 +450,7 @@ class StartupConfigViewerFeedbackTest {
         clipboard.setPrimaryClip(ClipData.newPlainText("existing", "existing clipboard"))
         StartupFeedbackClipboardShadow.resetFaults()
         StartupFeedbackClipboardShadow.reject = true
-        val context = StartupFeedbackClipboardContext(app).apply { unavailable = false }
+        val context = StartupFeedbackClipboardContext(rule.activity).apply { unavailable = false }
         show {
             CompositionLocalProvider(LocalContext provides context) {
                 val production = rememberToolsFeatureHost()

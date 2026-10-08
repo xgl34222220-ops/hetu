@@ -101,6 +101,7 @@ class Continuity93EvidenceTests(unittest.TestCase):
                       'verify_packaged_runtime.py', 'verify_materialkolor_abi.py', 'verify_hetu_icons.py',
                       ':app:assembleDebug', ':app:lintDebug', ':app:testDebugUnitTest',
                       'verify_continuity93_test_results.py', 'continuity93_ci_config.py junit-filters',
+                      'transport_continuity93_failures.py',
                       'run_continuity93_baseline_hosts.py --historical-before-output',
                       '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad',
                       'Reproduce V20.74 custom palette crash on API 36'):

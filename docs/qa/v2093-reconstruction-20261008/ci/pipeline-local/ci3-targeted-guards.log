@@ -1,0 +1,7 @@
+test_all_current_source_inputs_and_original644_assertions_are_bound (__main__.Continuity93EvidenceTests.test_all_current_source_inputs_and_original644_assertions_are_bound) ... ok
+test_workflow_keeps_old_assertions_sustained_runs_and_no_cancel (__main__.Continuity93EvidenceTests.test_workflow_keeps_old_assertions_sustained_runs_and_no_cancel) ... ok
+
+----------------------------------------------------------------------
+Ran 2 tests in 19.168s
+
+OK

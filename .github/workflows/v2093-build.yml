@@ -302,6 +302,9 @@ jobs:
         python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
 
         '
+    - name: Preserve bounded exact current JUnit failure details in job logs
+      if: always()
+      run: python3 .github/scripts/transport_continuity93_failures.py
     - name: Transport fixed current fixture PNG bytes for original pixel review
       if: always()
       run: python3 .github/scripts/transport_ui93_pngs.py --group host

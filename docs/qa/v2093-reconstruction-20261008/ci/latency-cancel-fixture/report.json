@@ -1,0 +1,26 @@
+{
+  "atUtc": "2026-10-08T19:33:18.461806+00:00",
+  "failedCommit": "b2c06e11428cf778226da5bf7c4bdd45a7149b57",
+  "failedRun": 37829980900,
+  "failure": "LatencyFeedbackRecovery93Test.cancelledGroupCannotPublishLateResultsAndReleasesEveryBusyOwner:177",
+  "change": "New test helper waits for Job completion, including finally cleanup, instead of inactive/cancelling jobs. No production change. All 8 @Test method bodies unchanged.",
+  "beforeSha256": "0059beaddc1bc9ff968da183f6c2e8b6f939febea563465cd99d474fbf56eb83",
+  "afterSha256": "323b7f7bbf1c91401be08b2446f9918b6bda38331945af62ab4aedc8e76b0721",
+  "host": {
+    "compileExit": 0,
+    "runExit": 0,
+    "coroutinesVersion": "1.9.0 from existing read-only local toolchain",
+    "source": "CancelledOwnerWitness.kt",
+    "sourceSha256": "212e71150cd289971f5271545f818be4ed79ff775276875963684b6cfbe095d5",
+    "log": "result.log",
+    "scope": "Independent real coroutine Job cancellation witness. Not Android or ViewModel execution."
+  },
+  "androidRerun": false,
+  "preservedAssertions": [
+    "old reading remains 44",
+    "testingGroups empty",
+    "testingNodes empty",
+    "messages empty"
+  ],
+  "timeoutSeconds": 6
+}

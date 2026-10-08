@@ -1,0 +1,9 @@
+{
+  "diagnosticOnly": true,
+  "fixtureXmlSha256": "94cbc36d0d9f432cd2d3b41c6489c2c354b44bec9a841640380ce4f6a7e7a18c",
+  "stackTruncationExplicit": true,
+  "orderedStackChunks": 16,
+  "forbiddenStdoutAndNonwhitePathAbsent": true,
+  "missingSupplementalFiles": 3,
+  "logBytes": 45913
+}

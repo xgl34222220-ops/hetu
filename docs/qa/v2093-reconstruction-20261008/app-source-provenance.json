@@ -24,9 +24,11 @@
     },
     {
       "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt",
-      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
-      "junitAnnotations": 5,
-      "provenance": "exact archived whole file"
+      "sha256": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
+      "junitAnnotations": 6,
+      "provenance": "archived original + one command-classification semantic correction and one known-template regression; original archived bytes unchanged",
+      "originalArchivedSha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+      "correctionEvidence": "docs/qa/v2093-reconstruction-20261008/boot-command-classification-correction.json"
     },
     {
       "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartIntentSafety93Test.kt",

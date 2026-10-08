@@ -1,0 +1,2 @@
+cancelled while transport held: isActive=false, isCompleted=false, busy=true, oldHelperPremature=true
+transport released and cancellation completed: isCompleted=true, busy=false, latePublished=false, newHelperReady=true

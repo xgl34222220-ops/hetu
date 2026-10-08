@@ -1,0 +1,62 @@
+{
+  "commit": "b2c06e11428cf778226da5bf7c4bdd45a7149b57",
+  "runId": 37829980900,
+  "buildJobId": 113492501785,
+  "apkCompilation": "passed",
+  "packagedRuntimeAbiIcons": "passed",
+  "currentAndroidMainSuite": {
+    "executed": 706,
+    "failed": 7,
+    "fullAcceptance": false,
+    "perCaseXmlVerification": "not reached; this records the Gradle console total and failure count"
+  },
+  "lintSupplementalSoaksAndCurrentAosp": "not reached after main suite failure",
+  "screenshots": {
+    "producer": "Robolectric native rendering, not a device",
+    "decodedShaVerified": 23,
+    "viewedAcrossReviewers": 23,
+    "filesSha256": {
+      "android-app/app/build/outputs/concept-state-coverage/04-009-theme-motion.png": "184eee6585a2006f8213b20a62405b44f5a408f7f44c8cb3fff52914be320305",
+      "android-app/app/build/outputs/concept-state-coverage/04-029-mirror-dialog.png": "0fc83b46b835e7cae44299b26051973722ae38a727e5ad48e93625084dae09a9",
+      "android-app/app/build/outputs/glass90/dark-home.png": "f3bce820822c0a95cc48244ad5202ef32dd9440360a76ce411b5201abcaa2b45",
+      "android-app/app/build/outputs/glass90/dark-panel.png": "318e30ba0ec8c3a0c1eab771711c2bf4a376e889a3fda83f4781eac3208bb516",
+      "android-app/app/build/outputs/glass90/dark-settings.png": "38c133a08bed03494b812ac6c4ddb8cd8f6b435af3996be6b1729d77cd888521",
+      "android-app/app/build/outputs/glass90/dark-tools.png": "b5bf3a7b1b3bfdd498e573a245ca3104dbf1f606e34a6540a8616a0c3af35d11",
+      "android-app/app/build/outputs/glass90/light-home.png": "492a48a28252f0311af3ae698dc54ade39cfd0e36dd643d737d40c36c312e592",
+      "android-app/app/build/outputs/glass90/light-panel.png": "4b75d721de1356476b6019153edcd3466fc207ff283751224483e108ebb917f9",
+      "android-app/app/build/outputs/glass90/light-settings.png": "b91417cd6bdcb59bd114919f89f09dbf569a94605418f8ff9eb60d401c0166fb",
+      "android-app/app/build/outputs/glass90/light-tools.png": "f21239b47ac2e13bc7517f922dd23136dca2a18f5ec16bcd7734badb892b1812",
+      "android-app/app/build/outputs/glass91/dark-settings-group.png": "e2c09c3aba0a50be39a5dafa10fe89f4bbbcc94b9656d3a2e465a9ce2af45400",
+      "android-app/app/build/outputs/startup-config-feedback/settings-actual-large-entry.png": "5a05f264561ad231cad2a28cc22ce30ad0e42468949eb43df17e2b32388edcdf",
+      "android-app/app/build/outputs/startup-config-feedback/settings-actual-read-error.png": "e5f37e3f730581b3e20d881e7ab7ec26af0aeb0a6bbea553dd8c27f9a8f43ce7",
+      "android-app/app/build/outputs/startup-config-feedback/settings-visible-eof.png": "4d55f8b372cec5a522761278ec438074c0e3c3abba61bfaf63f2ac006be7c2f1",
+      "android-app/app/build/outputs/startup-config-feedback/tools-actual-large-entry.png": "61a225373fce2fd3b940bd80ed8c8f78c527f1419464f27f8c6544b585d5450c",
+      "android-app/app/build/outputs/ui93/compact-large-font-node.png": "d733be5983e848db85179cbfc55e54c852d71dadbb269d182f2d9a1ec137a711",
+      "android-app/app/build/outputs/ui93/delay-result-settled.png": "c760a46d7e9a535053d8f0954586840583ac4a1c93c6eb3abe27702f85004eb9",
+      "android-app/app/build/outputs/ui93/dock-attached.png": "62979a0033b2b018f50fd0c7290c16f9fe07dfbf452f170b9d0a7839a377bfa7",
+      "android-app/app/build/outputs/ui93/dock-large-font-2x.png": "65b3bf71913349815d26c803e2b0510cd2cb12620017416065c3cd4bd78bef7f",
+      "android-app/app/build/outputs/ui93/dock-motion-off-after-2s.png": "59da7722dc2d9abbd53a2d956501f765c782bbd07d1ec7b6c5f0df0a072e39de",
+      "android-app/app/build/outputs/ui93/dock-repeated-taps-settled.png": "59da7722dc2d9abbd53a2d956501f765c782bbd07d1ec7b6c5f0df0a072e39de",
+      "android-app/app/build/outputs/ui93/group-collapsed-measuring.png": "ab9241487ce4611186545f64456e4c554cdf447208915506620e5e7d111df9b2",
+      "android-app/app/build/outputs/ui93/node-measurement-failed.png": "8763d92493f483888ff3c4be2fd542d04f127a1b0d63c21aeaa477013183f2ad"
+    },
+    "findings": [
+      "Low-saturation diffuse surfaces, shared typography and icon alignment are visible across light/dark main screens.",
+      "Short-name two-column group cards have excessive vertical occupation; unchanged expansion geometry test detected a real regression.",
+      "Two-times-font dock labels and explicit measuring/failed states are visible in the saved frames.",
+      "Ordinary multiline configuration EOF is visible; the failed long-line frame was not part of this transported set.",
+      "Long home/tools pages still require actual AOSP scroll/footer clearance checks; static first frames are insufficient."
+    ],
+    "notEstablished": [
+      "full UI acceptance",
+      "failed long-line regression closure",
+      "dark variants of every secondary page/dialog",
+      "HyperOS or ColorOS behavior",
+      "real Google connectivity",
+      "phone boot or heat cause"
+    ]
+  },
+  "logFile": "b2c06e11-build-without-png-chunks.log",
+  "logOmission": "Only the 1214 base64 PNG chunk lines were omitted from the committed console copy; transport metadata and all test/build diagnostics remain. Exact PNG bytes remain in the original CI job log and artifact.",
+  "originalUserScreenshots": "Their separate download remained HTTP403; not inspected."
+}

@@ -103,7 +103,9 @@ class LatencyFeedbackRecovery93Test {
         assertTrue("$reason; requests=${paths()}, busy=${vm.testingNodes}", predicate())
     }
     private fun awaitActions() = eventually("ViewModel requests completed") {
-        vm.viewModelScope.coroutineContext[Job]!!.children.none { it.isActive }
+        // Cancellation makes isActive false immediately; held HTTP and finally
+        // cleanup can still be running. Wait for completion before checking owners.
+        vm.viewModelScope.coroutineContext[Job]!!.children.all { it.isCompleted }
     }
     private fun normalResponse(req: RecordedRequest): MockResponse = when (req.requestUrl!!.encodedPath) {
         "/proxies" -> body("""{"proxies":{"Route":{"type":"Selector","now":"node","all":["node","other"]},"node":{"type":"Shadowsocks","history":[{"delay":999}]},"other":{"type":"Shadowsocks"}}}""")

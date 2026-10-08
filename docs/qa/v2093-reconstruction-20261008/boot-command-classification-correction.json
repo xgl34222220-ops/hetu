@@ -1,0 +1,51 @@
+{
+  "ciFailure": {
+    "commit": "b2c06e11",
+    "run": 37829980900,
+    "class": "BootRecoverySafety93Test",
+    "method": "nativeRestoreOwnsTheOnlyTaskAndAppWaitingHasATotalDeadline",
+    "originalLine": 372
+  },
+  "cause": "substring start.sh also matches the literal hetu-autostart.sh --worker in the read-only process-owner observation; not evidence of a dispatched start",
+  "capturedProductionMethod": "RootAutostart.restoreState",
+  "productionSourceSha256": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
+  "capturedCommand": "b=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || exit 1; [ -n \"$b\" ] || exit 1; test -d '/data/adb/hetu/boot' || { printf IDLE; exit 0; }; s=$(cat '/data/adb/hetu/boot/stopped-boot' 2>/dev/null || true); [ \"$s\" != \"$b\" ] || { printf STOPPED; exit 0; }; [ -f '/data/adb/hetu/boot/enabled' ] || { printf IDLE; exit 0; }; if [ -f '/data/adb/hetu/boot/restore.owner' ]; then read -r ob p < '/data/adb/hetu/boot/restore.owner' || exit 1; if [ \"$ob\" = \"$b\" ]; then case \"$p\" in ''|*[!0-9]*) exit 1;; esac; if kill -0 \"$p\" 2>/dev/null; then c=$(tr '\\000' ' ' < \"/proc/$p/cmdline\" 2>/dev/null) || exit 1; case \"$c\" in *'/data/adb/service.d/hetu-autostart.sh --worker'*) printf ACTIVE; exit 0;; *) exit 1;; esac; fi; fi; fi; if [ -f '/data/adb/hetu/boot/status' ]; then read -r sb st < '/data/adb/hetu/boot/status' || exit 1; if [ \"$sb\" = \"$b\" ]; then case \"$st\" in cancelled) printf STOPPED;; running) printf IDLE;; restore-timeout|system-timeout|missing-plan|executor-missing|clock-unavailable|network-unhealthy) printf TERMINAL;; waiting-system|waiting-network|restoring|retrying|verifying) printf UNKNOWN;; *) printf UNKNOWN;; esac; exit 0; fi; fi; printf PENDING",
+  "oldPredicateFlagsReadOnlyCommand": true,
+  "correctedKnownTemplatePredicateFlagsReadOnlyCommand": false,
+  "knownActualLaunchTemplates": [
+    {
+      "command": "exec '/data/adb/hetu/hetu-root.sh' 'start' '/data/adb/hetu/bin/core'",
+      "forbidden": true
+    },
+    {
+      "command": "/system/bin/sh '/data/adb/hetu/boot/start.sh'",
+      "forbidden": true
+    },
+    {
+      "command": "exec '/data/adb/service.d/hetu-autostart.sh' --worker",
+      "forbidden": true
+    },
+    {
+      "command": "/system/bin/sh '/data/adb/service.d/hetu-autostart.sh' --worker",
+      "forbidden": true
+    },
+    {
+      "command": "exec \"/data/adb/service.d/hetu-autostart.sh\" --worker",
+      "forbidden": true
+    },
+    {
+      "command": "/system/bin/sh /data/adb/service.d/hetu-autostart.sh --worker",
+      "forbidden": true
+    },
+    {
+      "command": "exec /data/adb/service.d/hetu-autostart.sh --worker",
+      "forbidden": true
+    }
+  ],
+  "originalArchivedTestSha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+  "correctedProductionTestSha256": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
+  "junitMethods": 6,
+  "productionModified": false,
+  "androidExecutedForCorrection": false,
+  "hostScope": "exact Java restoreState method executed with Context/RootBridge transport shims; generated command recorded; predicate sanity check in Python is not execution of the new Kotlin test"
+}

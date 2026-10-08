@@ -153,6 +153,7 @@ def evidence_sources(root=ROOT):
                   '.github/workflows/v2092-build.yml', HOST_FIXTURE, HEALTH_FIXTURE, STRESS_FIXTURE, HOST_NEW_TEST))
     names.update(ADDITIONAL_HOST_FIXTURES)
     names.add('.github/scripts/transport_ui93_pngs.py')
+    names.add('.github/scripts/transport_continuity93_failures.py')
     names.update(str(p.relative_to(root)) for p in (root / 'tools/qa').glob('*93*.py'))
     return {name: digest(root / name) for name in sorted(names)}
 
