@@ -1,0 +1,75 @@
+{
+  "type": "V20.93 native safety reimplementation from cffeff08, not exact recovery",
+  "files": {
+    "android-app/app/src/main/assets/hetu-root.sh": {
+      "sha256": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
+      "bytes": 133810
+    },
+    "android-app/app/src/main/assets/hetu-autostart.sh": {
+      "sha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
+      "bytes": 4954
+    },
+    "tools/qa/test_root_autostart.py": {
+      "sha256": "ceb85df4182eff2385db3c55447f21ffd12b3c95f4319c92577d00a84b9da44d",
+      "bytes": 8765
+    },
+    "tools/qa/test_root_health.py": {
+      "sha256": "85be8d096212d55952ec7d495eff6c9bbab416094422868fc0032f19fce5a06d",
+      "bytes": 21454
+    },
+    "tools/qa/test_root_safety93.py": {
+      "sha256": "25d1d3232aa4cc482b208a4424d18d6f3eac31bbf9efa53b4d5640431aefa496",
+      "bytes": 15705
+    },
+    "tools/qa/test_google_firewall.py": {
+      "sha256": "e32b2f79b982462458e7cca5cc5f47ad03f962208f873c5341c0c790bcc8a57f",
+      "bytes": 11719
+    }
+  },
+  "tests": {
+    "test_root_safety93": {
+      "tests": 26,
+      "returncode": 0,
+      "seconds": 5.117,
+      "logSha256": "1a79ff8788de8b791e30d78df2afbce02f028394e89527984608fc06184c0f8e"
+    },
+    "test_root_health": {
+      "tests": 26,
+      "returncode": 0,
+      "seconds": 16.127,
+      "logSha256": "8f1866a1c52106c026d5e635f57532d1642c52943eef7adf669cc6a23fd8cd56"
+    },
+    "test_root_autostart": {
+      "tests": 17,
+      "returncode": 0,
+      "seconds": 2.813,
+      "logSha256": "c0f6eadad8dcd2d8d1b89383249788caeb84e091ee7f3e4aa95425d84419c33c"
+    },
+    "test_google_firewall": {
+      "tests": 17,
+      "returncode": 0,
+      "seconds": 4.543,
+      "logSha256": "5e3529d3daff1e199aa86bdb62af0788dbc02dc079a53384803cd4548c54504c"
+    }
+  },
+  "originalBodies": {
+    "tools/qa/test_root_autostart.py": {
+      "preserved": true,
+      "count": 17
+    },
+    "tools/qa/test_root_health.py": {
+      "preserved": true,
+      "count": 26
+    },
+    "tools/qa/test_google_firewall.py": {
+      "preserved": true,
+      "count": 17
+    }
+  },
+  "limitations": [
+    "Only isolated host fixture behavior was tested; no device, real firewall, GMS or thermal cause is established.",
+    "Native automatic budget is conservative per boot: a new manual start does not reset an exhausted native automatic ledger.",
+    "Boot/system/network waiting precedes the shared 300-second start-attempt ledger.",
+    "tools/test_root_controller.py legacy dispatcher rejects an existing conntrack rule on exact cffeff08 too; separate failure evidence retained."
+  ]
+}

@@ -3,6 +3,10 @@ package io.github.xgl34222220.hetu
 import android.app.Activity
 import android.os.Build
 import io.github.xgl34222220.hetu.ui.LocalHetuLanguage
+import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
+import io.github.xgl34222220.hetu.ui.LocalHetuGlassEffectsEnabled
+import io.github.xgl34222220.hetu.ui.rememberHetuMotionEnabled
+import io.github.xgl34222220.hetu.ui.rememberHetuPowerConstrained
 import io.github.xgl34222220.hetu.ui.rememberHetuLanguage
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -278,6 +282,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
     }
 
     val language = rememberHetuLanguage()
+    val constrained = rememberHetuPowerConstrained()
+    val motion = LocalHetuMotionEnabled.current && rememberHetuMotionEnabled() && !constrained
+    val glass = LocalHetuGlassEffectsEnabled.current && !constrained
     // The home design kit draws every page of the four tabs, so its palette, haptics and motion
     // switch are provided here once, derived from the same appearance and accent as [LocalHx].
     val palette = remember(colors.accent, dark, pureBlack) { homeColors(dark = dark, accent = colors.accent, pureBlack = dark && pureBlack) }
@@ -311,7 +318,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
         LocalHetuLanguage provides language,
         LocalHomeColors provides palette,
         LocalHomeHaptics provides homeHaptics,
-        LocalHomeMotionEnabled provides homeMotionEnabled(),
+        LocalHetuMotionEnabled provides motion,
+        LocalHomeMotionEnabled provides motion,
+        LocalHetuGlassEffectsEnabled provides glass,
     ) {
         MaterialTheme(
             colorScheme = schemeFrom(unified),

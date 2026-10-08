@@ -225,7 +225,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
             onCopy = { label, text ->
                 val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                clipboard?.setPrimaryClip(ClipData.newPlainText(label, text))
+                    ?: error("剪贴板暂不可用")
+                clipboard.setPrimaryClip(ClipData.newPlainText(label, text))
                 toast("已复制$label")
             },
 

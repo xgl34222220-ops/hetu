@@ -138,7 +138,8 @@ fun HetuTheme(content: @Composable () -> Unit) {
         onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
     }
     themeRevision
-    val motionEnabled = rememberHetuMotionEnabled()
+    val constrained = rememberHetuPowerConstrained()
+    val motionEnabled = LocalHetuMotionEnabled.current && rememberHetuMotionEnabled() && !constrained
     val appearance = prefs.getString("appearance", "system") ?: "system"
     val dark = appearance == "dark" || (appearance == "system" && isSystemInDarkTheme())
     val pureBlack = dark && prefs.getBoolean("pureBlackDark", false)
@@ -207,6 +208,7 @@ fun HetuTheme(content: @Composable () -> Unit) {
             LocalHetuTokens provides tokens,
             LocalHetuLanguage provides prefs.getString("appLanguage", "system").orEmpty(),
             LocalHetuMotionEnabled provides motionEnabled,
+            LocalHetuGlassEffectsEnabled provides (LocalHetuGlassEffectsEnabled.current && !constrained),
             LocalDensity provides scaledDensity,
             // Every host of this theme also gets the home design kit (palette, bar style, motion
             // switch, haptics), so a page drawn with it looks the same in any activity.

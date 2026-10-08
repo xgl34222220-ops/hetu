@@ -1,17 +1,25 @@
 package io.github.xgl34222220.hetu.tools
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import io.github.xgl34222220.hetu.StartupConfigViewer
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.home.HomeCard
+import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeNotice
 import io.github.xgl34222220.hetu.home.HomeReveal
@@ -24,6 +32,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.ui.ht
+import kotlinx.coroutines.CancellationException
 
 /**
  * 诊断与维护 (工具 › 诊断工具). Stateless.
@@ -108,9 +117,13 @@ internal fun ToolsDiagScreen(
 internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
-    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy, modifier.heightIn(min = (LocalConfiguration.current.screenHeightDp * .60f).dp)) { text ->
-        remember(text, palette) { toolsYamlAnnotated(text, palette) }
-    }
+    val annotate = remember(palette) { { text: String -> toolsYamlAnnotated(text, palette) } }
+    DiagTextSheet("启动配置", "河图生成的最终 Mihomo 运行副本", content, onCopy,
+        modifier.heightIn(min = (LocalConfiguration.current.screenHeightDp * .60f).dp),
+        body = { text -> StartupConfigViewer(text, ToolsEditorType.code.copy(fontSize = 14.sp, lineHeight = 21.sp), c.t1,
+            Modifier.clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg).padding(horizontal = 16.dp, vertical = 14.dp),
+            annotated = annotate) },
+    ) { AnnotatedString(it) }
 }
 
 /** The plain-text report, with 复制. */
@@ -126,19 +139,29 @@ private fun DiagTextSheet(
     content: ToolsDiagText,
     onCopy: (String) -> Unit,
     modifier: Modifier,
+    body: (@Composable (String) -> Unit)? = null,
     styled: @Composable (String) -> AnnotatedString,
 ) {
     val c = LocalHomeColors.current
     val copyable = !content.loading && content.error == null && content.text.isNotBlank()
+    var copyError by remember(content) { mutableStateOf(false) }
+    fun copy() {
+        try {
+            onCopy(content.text)
+            copyError = false
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { copyError = true }
+    }
     ToolsSheetContent(
         title = title, modifier = modifier, subtitle = subtitle,
-        trailing = { ToolsButton("复制", { onCopy(content.text) }, kind = HomeButtonKind.Soft, icon = HomeIcons.Copy, enabled = copyable, height = 44.dp) },
+        trailing = { ToolsButton("复制", ::copy, kind = HomeButtonKind.Soft, icon = HomeIcons.Copy, enabled = copyable, height = 44.dp) },
     ) {
+        if (copyError) HomeNotice("复制失败，剪贴板暂不可用", HomeIcons.CircleAlert, tone = HomeTone.Bad)
         when {
             content.loading -> ToolsLoading(cards = 2)
             content.error != null -> HomeNotice(content.error, HomeIcons.CircleAlert, tone = HomeTone.Bad)
             content.text.isBlank() -> Text(ht("暂无内容。"), Modifier.padding(horizontal = 6.dp, vertical = 8.dp), color = c.t2, style = HomeType.note)
-            else -> ToolsCodeBox(styled(content.text))
+            else -> if (body != null) body(content.text) else ToolsCodeBox(styled(content.text))
         }
     }
 }

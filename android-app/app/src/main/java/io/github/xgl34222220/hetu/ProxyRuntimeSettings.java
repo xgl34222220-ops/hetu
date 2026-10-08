@@ -9,7 +9,7 @@ import java.util.*;
 final class ProxyRuntimeSettings {
     static final String DIRTY_KEY = "proxyRootSettingsDirty";
     // Bump only when deployed Root scripts/core behavior changes, never for UI-only APKs.
-    static final int RUNTIME_REVISION = 153;
+    static final int RUNTIME_REVISION = 154;
     static final String APPLIED_RUNTIME_REVISION_KEY = "proxyRootAppliedRuntimeRevision";
     private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
             "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",

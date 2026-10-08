@@ -1,0 +1,2 @@
+Exact cffeff08 source supplied to unmodified fixture main()
+AssertionError: ['-p', 'tcp', '-m', 'conntrack', '--ctstate', 'ESTABLISHED', '-m', 'connmark', '!', '--mark', '0x200000/0x200000', '-j', 'RETURN']

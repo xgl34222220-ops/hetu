@@ -45,8 +45,20 @@ public final class ProxyNetworkMatchService extends Service {
     // wall timestamps remain diagnostic history only.
     private long lastAutoRecoveryElapsed=-1L;
     private volatile long lastAdblockMetricPoll;
-    private volatile int bootRestoreAttempts;
+    // Boot callbacks and the periodic guardian share one episode. The deadline
+    // and start count survive observer recreation; its local throttle does not.
+    private static final int MAX_RECOVERY_STARTS=6;
+    private static final long RECOVERY_DEADLINE_MS=300000L;
+    private static final long RECOVERY_BACKOFF_MS=30000L;
+    // Native start now keeps 145s for its own bounded transaction/rollback;
+    // retain another 20s for a result revoked after native success. Preparation
+    // calls share this reserve within the same persisted deadline;
+    // this admission guard is not an outer process-kill timeout.
+    private static final long RECOVERY_START_RESERVE_MS=165000L;
+    private long nextBootRecoveryElapsed=-1L;
+    private int bootRestoreAttempts;
     private ProxyRestoreScheduler bootRestores;
+    private boolean bootRuntimeReattachRequested;
 
     @Override public void onCreate(){
         super.onCreate();
@@ -82,6 +94,7 @@ public final class ProxyNetworkMatchService extends Service {
                     .putString("proxyPolicyEgressState","unverified").putLong("proxyPolicyEgressCheckedAt",0L)
                     .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false))
                     .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","service-recreated")
+                    .putBoolean("proxyNetworkDataPlaneHealthy",false)
                     .putLong("proxyNetworkCheckedAt",0L)
                     .remove("proxyNetworkHealthTraceId").remove("proxyPolicyEgressTraceId")
                     .remove("proxyRootEgressVerifiedAt").apply();
@@ -97,12 +110,20 @@ public final class ProxyNetworkMatchService extends Service {
 
     @Override public int onStartCommand(Intent i,int f,int id){
         String action=i==null?"":i.getAction();
-        if(RootAutostart.ACTION_RUNNING.equals(action)&&prefs.getBoolean("proxyRootAutoStart",false)){
+        if(RootAutostart.ACTION_RUNNING.equals(action)&&bootAutoEnabled()){
             // Validate native boot state on the worker before publishing recovery intent.
             worker.execute(()->{
-                if(destroyed||!prefs.getBoolean("proxyRootAutoStart",false))return;
+                if(destroyed||!bootAutoEnabled())return;
                 try{
-                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime())evaluate();
+                    if(!networkSessionId.equals(prefs.getString("proxyNetworkSessionId",""))
+                            ||RootAutostart.restoreState(getApplicationContext())!=RootAutostart.BootRestoreState.IDLE)return;
+                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime()){
+                        // Native can finish after this observer's bounded wait.
+                        // Its notification starts no new core and must retain
+                        // the already exhausted App admission/start budget.
+                        synchronized(ProxyNetworkMatchService.this){confirmRecoveryHealth(true,true);}
+                        evaluate();
+                    }
                     else if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false))stopSelf();
                 }catch(Exception error){prefs.edit().putString("proxyRootBootError","开机运行状态同步失败："+error.getClass().getSimpleName()).apply();}
             });
@@ -114,7 +135,7 @@ public final class ProxyNetworkMatchService extends Service {
         if(ACTION_BOOT_RESTORE.equals(action)){
             prefs.edit().putLong("proxyRootBootServiceAt",System.currentTimeMillis()).apply();
             scheduleBootRestore(350L);
-        }
+        }else if(bootAutoEnabled()&&currentRecoveryIntent())scheduleBootRuntimeReattach();
         evaluate();
         return START_STICKY;
     }
@@ -123,55 +144,258 @@ public final class ProxyNetworkMatchService extends Service {
         bootRestores.request(delayMs);
     }
 
-    private long restoreWantedProxyAfterBoot(){
-        if(!prefs.getBoolean("proxyRootAutoStart",false)||!prefs.getBoolean("proxyRootWanted",false))return 0L;
+    private synchronized void scheduleBootRuntimeReattach(){
+        if(bootRuntimeReattachRequested||!currentRecoveryIntent()||!bootAutoEnabled())return;
+        bootRuntimeReattachRequested=true;
+        // One read-only check on an observer reattach event, never a new timer.
+        // Native may have completed after our deadline and lost its notification.
+        try{worker.execute(()->{
+            synchronized(ProxyNetworkMatchService.this){
+                if(!currentRecoveryIntent()||!bootAutoEnabled())return;
+                try{
+                    if(RootAutostart.restoreState(getApplicationContext())!=RootAutostart.BootRestoreState.IDLE)return;
+                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime())
+                        confirmRecoveryHealth(true,true);
+                }catch(Exception error){publishRecoveryError(true,"开机运行状态同步失败："+error.getClass().getSimpleName());}
+            }
+        });}catch(RejectedExecutionException stopped){}
+    }
+
+    private synchronized long restoreWantedProxyAfterBoot(){
+        if(!currentRecoveryIntent()||!bootAutoEnabled())return 0L;
+        // An explicit later manual runtime belongs to its own intent, never to
+        // the stopped native boot task or its queued restore callbacks.
+        if(explicitManualRecoveryIntent())return 0L;
+        prepareRecoveryEpisode();
+        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false)
+                &&!prefs.getBoolean("proxyRecoveryCompletedAfterBudget",false))beginRecoveryEpisode(prefs.edit());
+        if(!recoveryWindowOpen(true))return 0L;
+        long now=SystemClock.elapsedRealtime();
+        if(nextBootRecoveryElapsed>now)return Math.min(nextBootRecoveryElapsed-now,remainingRecoveryTime());
         // A persisted running flag belongs to the previous boot. Only a live
         // process observation can confirm restore success; Root may be unready.
         ProxyContinuity.ProcessState bootState=probeCoreState();
         if(bootState==ProxyContinuity.ProcessState.UNKNOWN){
-            prefs.edit().putString("proxyRootBootError","等待 Root 运行状态可确认…").apply();
-            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+            return deferBootRecovery("等待 Root 运行状态可确认…");
         }
+        RootAutostart.BootRestoreState nativeState=RootAutostart.restoreState(getApplicationContext());
+        if(!nativeRecoveryAllowsStart(nativeState,true))
+            return nativeRecoveryPending(nativeState)
+                    ?deferBootRecovery(nativeState==RootAutostart.BootRestoreState.ACTIVE
+                    ?"Root 开机脚本正在恢复，App 等待原任务完成…":"Root 开机恢复所有者尚未确认…"):0L;
         if(bootState==ProxyContinuity.ProcessState.ALIVE){
-            prefs.edit()
-                    .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
-                    .remove("proxyRootBootError")
-                    .apply();
-            return 0L;
-        }
-        if(RootAutostart.restoreInProgress(getApplicationContext())){
-            prefs.edit().putString("proxyRootBootError","Root 开机脚本正在等待或恢复…").apply();
-            return 5000L;
+            if(confirmRecoveryHealth(true))return 0L;
+            return deferBootRecovery("核心存活，开机网络接管尚未完整验证；已保留当前核心");
         }
         final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
         if(route.network==null){
-            prefs.edit().putString("proxyRootBootError","等待开机网络就绪…").apply();
-            return Math.min(30000L,1000L+Math.min(++bootRestoreAttempts,29)*1000L);
+            return deferBootRecovery("等待开机网络就绪…");
         }
+        if(!reserveRecoveryStart(true))return recoveryWindowOpen(true)?deferBootRecovery("等待代理恢复退避间隔…"):0L;
+        final long manualGeneration=prefs.getLong("proxyRootManualStartGeneration",0L);
         try{
-            JSONObject result=new RootProxyManager(getApplicationContext()).startIfWanted(ProxyRuntimeProfile.load(prefs),
-                    ()->!destroyed&&networkEvents.isCurrent(route));
-            if(result.optBoolean("cancelled",false))
-                return "control-busy".equals(result.optString("reason"))?1000L:
-                        "network-changed".equals(result.optString("reason"))?1000L:0L;
+            JSONObject result=startWithRecoveryBudget(ProxyRuntimeProfile.load(prefs),
+                    ()->recoveryStartCurrent(route,manualGeneration));
+            if(!currentRecoveryIntent()||manualGeneration!=prefs.getLong("proxyRootManualStartGeneration",0L))return 0L;
+            if(result.optBoolean("cancelled",false)){
+                return "control-busy".equals(result.optString("reason"))||"network-changed".equals(result.optString("reason"))
+                        ?deferBootRecovery("新的控制操作或网络变化已替代此次恢复…"):0L;
+            }
             if(result.optBoolean("ok",false)||result.optBoolean("running",false)){
-                bootRestoreAttempts=0;
-                prefs.edit()
-                        .putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis())
-                        .remove("proxyRootBootError")
-                        .apply();
-                return 0L;
+                if(networkEvents.isCurrent(route)&&probeCoreState()==ProxyContinuity.ProcessState.ALIVE&&confirmRecoveryHealth(true))return 0L;
+                return deferBootRecovery("启动请求已返回，开机网络接管仍未完整验证");
             }
             throw new IllegalStateException(result.optString("message","开机恢复未完成"));
         }catch(Exception error){
             String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
             if(detail.length()>260)detail=detail.substring(0,260)+"…";
-            prefs.edit()
-                    .putString("proxyRootBootError","Root 代理开机恢复失败："+detail)
-                    .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis())
-                    .apply();
-            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
+            return deferBootRecovery("Root 代理开机恢复失败："+detail);
         }
+    }
+
+    private boolean bootAutoEnabled(){
+        return prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartRevoked",false);
+    }
+
+    private boolean explicitManualRecoveryIntent(){
+        long manual=prefs.getLong("proxyRootManualStartGeneration",0L);
+        if(manual<=0L||manual!=prefs.getLong("proxyRootManualStartSucceededGeneration",-1L)
+                ||manual<=prefs.getLong("proxyRootStoppedManualGeneration",0L)
+                ||!"manual".equals(prefs.getString("proxyRootSessionOwner","")))return false;
+        int boot=currentBootCount();
+        return boot>=0&&boot==prefs.getInt("proxyRootManualStartSucceededBootCount",-1);
+    }
+
+    private int currentBootCount(){
+        try{return android.provider.Settings.Global.getInt(getContentResolver(),android.provider.Settings.Global.BOOT_COUNT,-1);}
+        catch(Exception unavailable){return -1;}
+    }
+
+    private boolean currentRecoveryIntent(){
+        return !destroyed&&prefs.getBoolean("proxyRootWanted",false)
+                &&networkSessionId.equals(prefs.getString("proxyNetworkSessionId",""));
+    }
+
+    private void prepareRecoveryEpisode(){
+        int bootCount=currentBootCount();
+        synchronized(SERVICE_SESSION_LOCK){synchronized(RootProxyManager.RECOVERY_BUDGET_LOCK){
+            if(!currentRecoveryIntent())return;
+            long now=SystemClock.elapsedRealtime();
+            long manual=prefs.getLong("proxyRootManualStartGeneration",0L);
+            if(!prefs.contains("proxyRecoveryBootCount")||bootCount!=prefs.getInt("proxyRecoveryBootCount",-1)
+                    ||manual!=prefs.getLong("proxyRecoveryManualGeneration",0L)
+                    ||now<prefs.getLong("proxyRecoveryStartedElapsed",0L)){
+                beginRecoveryEpisode(prefs.edit().putInt("proxyRecoveryBootCount",bootCount)
+                        .putLong("proxyRecoveryManualGeneration",manual));
+                lastAutoRecoveryElapsed=-1L;
+            }
+        }
+    }
+    }
+
+    private void beginRecoveryEpisode(SharedPreferences.Editor edit){
+        synchronized(SERVICE_SESSION_LOCK){synchronized(RootProxyManager.RECOVERY_BUDGET_LOCK){
+        if(!currentRecoveryIntent())return;
+        long now=SystemClock.elapsedRealtime();
+        if(!edit.putLong("proxyRecoveryManualGeneration",prefs.getLong("proxyRootManualStartGeneration",0L))
+                .putLong("proxyRecoveryStartedElapsed",now).putLong("proxyRecoveryDeadlineElapsed",now+RECOVERY_DEADLINE_MS)
+                .putInt("proxyRecoveryStarts",0).putBoolean("proxyRecoveryEpisodeComplete",false)
+                .remove("proxyRecoveryTerminalReason").remove("proxyRecoveryCompletedAfterBudget").commit())
+            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
+        nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;
+        }
+    }
+    }
+
+    private long remainingRecoveryTime(){
+        return Math.max(0L,prefs.getLong("proxyRecoveryDeadlineElapsed",0L)-SystemClock.elapsedRealtime());
+    }
+
+    private boolean recoveryBudgetExhausted(){
+        return prefs.getBoolean("proxyRecoveryCompletedAfterBudget",false)
+                ||prefs.contains("proxyRecoveryStartedElapsed")&&!prefs.getBoolean("proxyRecoveryEpisodeComplete",false)
+                &&(remainingRecoveryTime()==0L||prefs.getInt("proxyRecoveryStarts",0)>=MAX_RECOVERY_STARTS
+                ||!prefs.getString("proxyRecoveryTerminalReason","").isEmpty());
+    }
+
+    private boolean recoveryWindowOpen(boolean boot){
+        synchronized(SERVICE_SESSION_LOCK){synchronized(RootProxyManager.RECOVERY_BUDGET_LOCK){
+        if(!currentRecoveryIntent()||prefs.getLong("proxyRecoveryManualGeneration",0L)
+                !=prefs.getLong("proxyRootManualStartGeneration",0L))return false;
+        if(prefs.getBoolean("proxyRecoveryCompletedAfterBudget",false))return false;
+        String terminal=prefs.getString("proxyRecoveryTerminalReason","");
+        if(terminal.isEmpty()&&!prefs.getBoolean("proxyRecoveryEpisodeComplete",false)){
+            if(remainingRecoveryTime()==0L)terminal="恢复已达到 5 分钟总期限，请检查后手动启动";
+            else if(prefs.getInt("proxyRecoveryStarts",0)>=MAX_RECOVERY_STARTS)terminal="自动恢复已达到 6 次上限，请检查后手动启动";
+        }
+        if(terminal.isEmpty())return true;
+        prefs.edit().putString("proxyRecoveryTerminalReason",terminal).apply();
+        publishRecoveryError(boot,terminal);
+        return false;
+        }
+    }
+    }
+
+    private boolean nativeRecoveryAllowsStart(RootAutostart.BootRestoreState state,boolean boot){
+        synchronized(SERVICE_SESSION_LOCK){
+        if(!currentRecoveryIntent()||prefs.getLong("proxyRecoveryManualGeneration",0L)
+                !=prefs.getLong("proxyRootManualStartGeneration",0L))return false;
+        if(state==RootAutostart.BootRestoreState.IDLE)return true;
+        if(state==RootAutostart.BootRestoreState.STOPPED||state==RootAutostart.BootRestoreState.TERMINAL){
+            if(!boot&&explicitManualRecoveryIntent())return true;
+            String reason=state==RootAutostart.BootRestoreState.STOPPED?"本次开机恢复已明确停止，App 不再自动启动"
+                    :"Root 开机恢复已结束且未通过验证，App 不追加重试；请检查后手动启动";
+            prefs.edit().putString("proxyRecoveryTerminalReason",reason).apply();
+            publishRecoveryError(boot,reason);
+        }
+        return false;
+        }
+    }
+
+    private boolean nativeRecoveryPending(RootAutostart.BootRestoreState state){
+        return state==RootAutostart.BootRestoreState.ACTIVE||state==RootAutostart.BootRestoreState.PENDING
+                ||state==RootAutostart.BootRestoreState.UNKNOWN;
+    }
+
+    private void publishRecoveryError(boolean boot,String detail){
+        final long ticket=RootProxyManager.observationTicket();
+        publishServiceObservation(ticket,()->{
+            if(!currentRecoveryIntent())return;
+            SharedPreferences.Editor edit=prefs.edit().putString("proxyAutoRecoveryError",detail);
+            if(boot)edit.putString("proxyRootBootError",detail);
+            edit.apply();
+        });
+    }
+
+    private long deferBootRecovery(String message){
+        if(!recoveryWindowOpen(true))return 0L;
+        publishRecoveryError(true,message);
+        long delay=Math.min(RECOVERY_BACKOFF_MS<<Math.min(bootRestoreAttempts++,2),remainingRecoveryTime());
+        nextBootRecoveryElapsed=SystemClock.elapsedRealtime()+delay;
+        return delay;
+    }
+
+    private boolean reserveRecoveryStart(boolean boot){
+        synchronized(SERVICE_SESSION_LOCK){synchronized(RootProxyManager.RECOVERY_BUDGET_LOCK){
+        if(!recoveryWindowOpen(boot))return false;
+        long now=SystemClock.elapsedRealtime();
+        int starts=prefs.getInt("proxyRecoveryStarts",0);
+        long delay=RECOVERY_BACKOFF_MS<<Math.min(Math.max(0,starts-1),2);
+        if(lastAutoRecoveryElapsed>=0L&&now-lastAutoRecoveryElapsed<delay)return false;
+        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false)){beginRecoveryEpisode(prefs.edit());starts=0;}
+        if(!recoveryWindowOpen(boot))return false;
+        if(remainingRecoveryTime()<RECOVERY_START_RESERVE_MS){
+            String reason="剩余恢复时间不足以保留启动及回滚预算，已停止追加自动尝试；请检查后手动启动";
+            prefs.edit().putString("proxyRecoveryTerminalReason",reason).apply();
+            publishRecoveryError(boot,reason);
+            return false;
+        }
+        lastAutoRecoveryElapsed=now;
+        if(!prefs.edit().putInt("proxyRecoveryStarts",starts+1).putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis())
+                .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis()).commit()){
+            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
+            publishRecoveryError(boot,"恢复预算未能保存，已停止自动尝试，请手动检查");
+            return false;
+        }
+        return true;
+        }
+    }
+    }
+
+    // Recovery93 additive change: preparation and native start consume this same
+    // persisted episode deadline; the original restored method bodies stay archived.
+    private JSONObject startWithRecoveryBudget(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier current)throws Exception{
+        RootProxyManager.beginAutomaticRecoveryScope(prefs.getLong("proxyRecoveryDeadlineElapsed",0L));
+        try{return new RootProxyManager(getApplicationContext()).startIfWanted(profile,current);}
+        finally{RootProxyManager.endAutomaticRecoveryScope();}
+    }
+
+    private boolean recoveryStartCurrent(NetworkEpoch.Snapshot<Network> route,long manualGeneration){
+        return currentRecoveryIntent()&&networkEvents.isCurrent(route)
+                &&manualGeneration==prefs.getLong("proxyRootManualStartGeneration",0L)&&remainingRecoveryTime()>0L
+                &&!(prefs.getBoolean("proxyRootAutoStart",false)&&prefs.getBoolean("proxyRootAutoStartRevoked",false))
+                &&(!bootAutoEnabled()||nativeRecoveryIntentCurrent());
+    }
+
+    private boolean nativeRecoveryIntentCurrent(){
+        RootAutostart.BootRestoreState state=RootAutostart.restoreState(getApplicationContext());
+        return state==RootAutostart.BootRestoreState.IDLE||explicitManualRecoveryIntent()
+                &&(state==RootAutostart.BootRestoreState.STOPPED||state==RootAutostart.BootRestoreState.TERMINAL);
+    }
+
+    private boolean confirmRecoveryHealth(boolean boot){return confirmRecoveryHealth(boot,false);}
+
+    private boolean confirmRecoveryHealth(boolean boot,boolean retainExhaustedBudget){
+        return observeLiveNetworkIntegrity(()->{
+            SharedPreferences.Editor complete=prefs.edit().putBoolean("proxyRecoveryEpisodeComplete",true)
+                    .putLong("proxyAutoRecoverySuccess",System.currentTimeMillis()).remove("proxyAutoRecoveryError");
+            if((retainExhaustedBudget||remainingRecoveryTime()==0L)&&recoveryBudgetExhausted())
+                complete.putBoolean("proxyRecoveryCompletedAfterBudget",true);
+            else complete.putInt("proxyRecoveryStarts",0).remove("proxyRecoveryTerminalReason");
+            complete.apply();
+            if(boot)prefs.edit().putLong("proxyRootBootRestoreSuccessAt",System.currentTimeMillis()).remove("proxyRootBootError").apply();
+            nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;lastAutoRecoveryElapsed=-1L;
+        });
     }
 
     @Override public void onDestroy(){
@@ -243,7 +467,8 @@ public final class ProxyNetworkMatchService extends Service {
             if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
             pendingRecoveryRoute=null;
             if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
-                if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
+                if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartRevoked",false)
+                        &&!prefs.contains("proxyRootBootRestoreSuccessAt"))scheduleBootRestore(250L);
                 try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
                         2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
             }
@@ -482,16 +707,31 @@ public final class ProxyNetworkMatchService extends Service {
         }
     }
 
-    private void maintainProxyRuntime(){
+    private synchronized void maintainProxyRuntime(){
         try{
-            if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||RootProxyManager.observationTicket()<0L)return;
+            if(!currentRecoveryIntent()||(prefs.getBoolean("proxyRootAutoStart",false)
+                    &&prefs.getBoolean("proxyRootAutoStartRevoked",false)&&!explicitManualRecoveryIntent())
+                    ||RootProxyManager.observationTicket()<0L)return;
+            prepareRecoveryEpisode();
+            if(!recoveryWindowOpen(false))return;
+            boolean boot=bootAutoEnabled();
+            if(boot&&nextBootRecoveryElapsed>SystemClock.elapsedRealtime())return;
             ProxyContinuity.ProcessState state=probeCoreState();
             if(state==ProxyContinuity.ProcessState.UNKNOWN){
                 prefs.edit().putLong("proxyLastUnknownProcessProbeAt",System.currentTimeMillis()).apply();
                 return;
             }
+            if(boot){
+                RootAutostart.BootRestoreState nativeState=RootAutostart.restoreState(getApplicationContext());
+                if(!nativeRecoveryAllowsStart(nativeState,false)){
+                    if(nativeRecoveryPending(nativeState))
+                        deferBootRecovery(nativeState==RootAutostart.BootRestoreState.ACTIVE
+                                ?"Root 开机脚本正在恢复，App 等待原任务完成…":"Root 开机恢复所有者尚未确认…");
+                    return;
+                }
+            }
             if(state==ProxyContinuity.ProcessState.ALIVE){
-                checkLiveNetworkIntegrity();
+                confirmRecoveryHealth(false);
                 probeEgressIfPending();
                 return;
             }
@@ -500,53 +740,60 @@ public final class ProxyNetworkMatchService extends Service {
                 prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                 return;
             }
-            long nowElapsed=SystemClock.elapsedRealtime();
-            if(lastAutoRecoveryElapsed>=0L&&nowElapsed-lastAutoRecoveryElapsed<30000L)return;
-            lastAutoRecoveryElapsed=nowElapsed;
-            prefs.edit().putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis()).apply();
-            RootProxyManager root=new RootProxyManager(getApplicationContext());
-            JSONObject result=root.startIfWanted(ProxyRuntimeProfile.load(prefs),
-                    ()->!destroyed&&networkEvents.isCurrent(route));
+            if(!reserveRecoveryStart(false))return;
+            final long manualGeneration=prefs.getLong("proxyRootManualStartGeneration",0L);
+            JSONObject result=startWithRecoveryBudget(ProxyRuntimeProfile.load(prefs),
+                    ()->recoveryStartCurrent(route,manualGeneration));
+            if(!currentRecoveryIntent()||manualGeneration!=prefs.getLong("proxyRootManualStartGeneration",0L))return;
             if(result.optBoolean("cancelled",false))return;
             if(result.optBoolean("running",false)||result.optBoolean("ok",false)){
-                prefs.edit()
-                        .putLong("proxyAutoRecoverySuccess",System.currentTimeMillis())
-                        .remove("proxyAutoRecoveryError")
-                        .apply();
+                if(!networkEvents.isCurrent(route)||probeCoreState()!=ProxyContinuity.ProcessState.ALIVE||!confirmRecoveryHealth(false))
+                    publishRecoveryError(false,"启动请求已返回，网络接管仍未完整验证；已保留当前核心");
             }else{
-                prefs.edit().putString("proxyAutoRecoveryError",result.optString("message","代理自动恢复未完成")).apply();
+                publishRecoveryError(false,result.optString("message","代理自动恢复未完成"));
             }
         }catch(Exception error){
             String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
             if(detail.length()>300)detail=detail.substring(0,300)+"…";
-            prefs.edit().putString("proxyAutoRecoveryError",detail).apply();
+            publishRecoveryError(false,detail);
         }
     }
 
-    private void checkLiveNetworkIntegrity(){
-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
+    private void checkLiveNetworkIntegrity(){observeLiveNetworkIntegrity(null);}
+
+    private boolean observeLiveNetworkIntegrity(Runnable healthyRuntime){
+        if(!currentRecoveryIntent())return false;
         final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
         final long ticket=RootProxyManager.observationTicket();
-        if(ticket<0L)return;
+        if(ticket<0L)return false;
         try{
             JSONObject health=new RootProxyManager(getApplicationContext()).networkHealth();
             String integrity=health.optString("networkIntegrity","unknown");
+            boolean healthy="healthy".equals(integrity)&&health.optBoolean("dataPlaneHealthy",false);
             String id=recordHealth(route,integrity,health.optString("networkFault",""),null);
             SharedPreferences.Editor editor=prefs.edit().putString("proxyNetworkHealthTraceId",id)
                     .putString("proxyNetworkIntegrity",integrity)
+                    .putBoolean("proxyNetworkDataPlaneHealthy",healthy)
                     .putString("proxyNetworkFault",health.optString("networkFault",""))
                     .putLong("proxyNetworkCheckedAt",System.currentTimeMillis());
             editor.remove("proxyNetworkHealthReadError");
-            if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
-            else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
+            if(healthy)editor.remove("proxyAutoRecoveryError");
+            else if("degraded".equals(integrity)||"healthy".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
             // Unknown/old-script observations are never treated as proof of failure.
-            if(!publishNetworkObservation(route,ticket,editor::apply))staleResult(route,id);
+            boolean current=publishNetworkObservation(route,ticket,()->{
+                editor.apply();
+                if(healthy&&healthyRuntime!=null)healthyRuntime.run();
+            });
+            if(!current)staleResult(route,id);
+            return current&&healthy;
         }catch(Exception failure){
             String id=recordHealth(route,"unknown","health-read-failed",failure);
             if(!publishNetworkObservation(route,ticket,()->prefs.edit()
                     .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","health-read-failed")
+                    .putBoolean("proxyNetworkDataPlaneHealthy",false)
                     .putLong("proxyNetworkCheckedAt",System.currentTimeMillis()).putString("proxyNetworkHealthTraceId",id)
                     .putString("proxyNetworkHealthReadError",failure.getClass().getSimpleName()).apply()))staleResult(route,id);
+            return false;
         }
     }
 

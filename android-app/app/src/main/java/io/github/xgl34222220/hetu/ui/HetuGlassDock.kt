@@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.layout.onPlaced
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import kotlinx.coroutines.launch
 import androidx.compose.ui.semantics.contentDescription
@@ -42,6 +44,7 @@ import androidx.compose.animation.core.snap
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.sp
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.hazeEffect
@@ -60,6 +63,14 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
+/** Font scaling adds room for labels; navigation insets are owned by the outer dock once. */
+@Composable
+internal fun hetuDockBodyHeight(): Dp = maxOf(64.dp, 45.dp + with(LocalDensity.current) { 14.sp.toDp() })
+
+@Composable
+internal fun hetuDockOuterHeight(floating: Boolean): Dp = hetuDockBodyHeight() +
+    WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + if (floating) 8.dp else 0.dp
+
 /**
  * V20.45: real MIUIX drawBackdrop liquid dock. Uses miuix-blur drawBackdrop/blur/highlight
  * plus the runtime refraction lens instead of an opaque Card/textureBlur shell.
@@ -77,23 +88,22 @@ fun HetuGlassDock(
     hazeState: HazeState,
     backdrop: LayerBackdrop?,
     modifier: Modifier = Modifier,
+    onHeightChanged: (Dp) -> Unit = {},
 ) {
     if (items.isEmpty()) return
     val scheme = MaterialTheme.colorScheme
     val tokens = LocalHetuTokens.current
     val dark = scheme.background.luminance() < .5f
     val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    val density = LocalDensity.current
+    val bodyHeight = hetuDockBodyHeight()
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     var floating by remember { mutableStateOf(prefs.getBoolean("floatingBottomBar", true)) }
-    var enableBlur by remember { mutableStateOf(prefs.getBoolean("enableBlur", true)) }
-    var activeGlass by remember { mutableStateOf(prefs.getBoolean("liquidGlass", true)) }
     DisposableEffect(prefs) {
         val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
             when (key) {
                 "floatingBottomBar" -> floating = shared.getBoolean(key, true)
-                "enableBlur" -> enableBlur = shared.getBoolean(key, true)
-                "liquidGlass" -> activeGlass = shared.getBoolean(key, true)
             }
         }
         prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -102,7 +112,7 @@ fun HetuGlassDock(
     val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
-    val renderGlass = activeGlass && enableBlur
+    val renderGlass = rememberHetuGlassEnabled()
     val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = renderGlass && !runtimeLiquid
     val dockSurfaceBackdrop = rememberLayerBackdrop()
@@ -134,7 +144,7 @@ fun HetuGlassDock(
                 colorControls(
                     brightness = if (dark) -.015f else .025f,
                     contrast = 1.05f,
-                    saturation = 1.15f,
+                    saturation = 1.04f,
                 )
                 blur(26.dp.toPx(), 26.dp.toPx())
                 liquidGlassLens(
@@ -185,21 +195,15 @@ fun HetuGlassDock(
 
     Box(
         modifier = modifier
+            .onSizeChanged { onHeightChanged(with(density) { it.height.toDp() }) }
             .background(Color.Transparent)
             .then(if (floating) Modifier.padding(horizontal = 24.dp).padding(bottom = bottomInset + 8.dp) else Modifier)
             .fillMaxWidth()
-            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
+            .height(bodyHeight + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .shadow(
-                    if (floating) 7.dp else 3.dp,
-                    shape,
-                    clip = false,
-                    ambientColor = Color(0xFF12161A).copy(alpha = if (dark) .12f else .035f),
-                    spotColor = Color(0xFF12161A).copy(alpha = if (dark) .16f else .075f),
-                )
                 .clip(shape)
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier),
@@ -209,7 +213,7 @@ fun HetuGlassDock(
             items = items,
             selected = selected,
             onSelect = onSelect,
-            itemHeight = 56.dp,
+            itemHeight = bodyHeight - 8.dp,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = if (floating) 4.dp else bottomInset + 4.dp),
@@ -288,7 +292,8 @@ private fun DockItems(
                     if (motion) tween(200) else snap(), label = "dock-tint-$index")
                 val iconPop = remember { Animatable(1f) }
                 var wasActive by remember { mutableStateOf(active) }
-                LaunchedEffect(active) {
+                LaunchedEffect(active, motion) {
+                    if (!motion || !active) iconPop.snapTo(1f)
                     if (active && !wasActive && motion) {
                         iconPop.snapTo(1f)
                         iconPop.animateTo(1.14f, tween(120, easing = HetuMotion.Standard))
@@ -298,6 +303,7 @@ private fun DockItems(
                 }
                 // Pressing the active slot squeezes the lens itself (tactile "glass" feel).
                 LaunchedEffect(interaction, active, motion) {
+                    lensPress.snapTo(1f)
                     if (!active || !motion) return@LaunchedEffect
                     interaction.interactions.collect { event ->
                         when (event) {
@@ -325,7 +331,7 @@ private fun DockItems(
                         scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                     }, tint = color)
                     Spacer(Modifier.height(1.dp))
-                    Text(item.label, if (active) Modifier.testTag("dock-active-label") else Modifier,
+                    Text(item.label, (if (active) Modifier.testTag("dock-active-label") else Modifier).padding(horizontal = 2.dp),
                         color = color, fontSize = 12.sp, lineHeight = 14.sp,
                         fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                 }

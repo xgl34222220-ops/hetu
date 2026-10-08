@@ -724,7 +724,7 @@ internal class HomeBarGlass internal constructor(
 
 @Composable
 internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
-    val haze = if (LocalHomeBlur.current) rememberHazeState() else null
+    val haze = if (LocalHomeBlur.current && io.github.xgl34222220.hetu.ui.LocalHetuGlassEffectsEnabled.current) rememberHazeState() else null
     val progress = animateFloatAsState(if (lifted) 1f else 0f, HomeMotion.fade(LocalHomeMotionEnabled.current, 220), label = "home-bar-glass")
     val active = remember(lifted) { derivedStateOf { lifted || progress.value > .01f } }
     return remember(haze, progress, active) { HomeBarGlass(haze, progress, active) }

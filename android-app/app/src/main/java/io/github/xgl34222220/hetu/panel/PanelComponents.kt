@@ -1,9 +1,18 @@
 package io.github.xgl34222220.hetu.panel
 
 import io.github.xgl34222220.hetu.home.homeGlassPanel
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.core.updateTransition
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -67,6 +76,8 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.disabled
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.TextStyle
@@ -411,41 +422,67 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
  * only and gets a comfortable touch box that grows up and to the left of it.
  */
 @Composable
-internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false) {
+internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速") {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val motion = LocalHomeMotionEnabled.current
     if (delay == null) return
-    // label, text colour, colour the capsule fill is mixed from
-    val look: Triple<String, Color, Color> = when (delay) {
-        PanelDelay.Unknown -> Triple(ht("未知"), c.t2, c.t3)
-        PanelDelay.Testing -> Triple(ht("测速中"), c.accent, c.accent)
-        PanelDelay.Timeout -> Triple(ht("超时"), c.badText, c.bad)
+    // Text colour and the colour the capsule fill is mixed from.
+    val look: Pair<Color, Color> = when (delay) {
+        PanelDelay.Unknown -> c.t2 to c.t3
+        PanelDelay.Testing -> c.accent to c.accent
+        PanelDelay.Timeout -> c.badText to c.bad
+        PanelDelay.Failed -> c.badText to c.bad
         is PanelDelay.Ms -> when {
-            delay.value < 300L -> Triple("${delay.value} ms", c.accent, c.accent)
-            delay.value < 800L -> Triple("${delay.value} ms", c.warnText, c.warn)
-            else -> Triple("${delay.value} ms", c.badText, c.bad)
+            delay.value < 300L -> c.accent to c.accent
+            delay.value < 800L -> c.warnText to c.warn
+            else -> c.badText to c.bad
         }
     }
-    val text = look.first
-    val content = look.second
-    val base = look.third
+    val content = look.first
+    val base = look.second
     val tint by animateColorAsState(content, HomeMotion.fade(motion), label = "panel-delay-text")
     val fill by animateColorAsState(base.copy(alpha = if (c.dark) .22f else if (onCard) .15f else .17f), HomeMotion.fade(motion), label = "panel-delay-fill")
+    val transition = updateTransition(delay, label = "panel-delay-result")
+    val changing = motion && (transition.currentState != transition.targetState || transition.isRunning)
+    val caption: @Composable (PanelDelay) -> Unit = { shown ->
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+            if (shown == PanelDelay.Testing) HomeSpinner(size = 13.dp, color = tint, strokeWidth = 1.8.dp)
+            val text = when (shown) {
+                PanelDelay.Unknown -> ht("未知")
+                PanelDelay.Testing -> ht("测速中")
+                PanelDelay.Timeout -> ht("超时")
+                PanelDelay.Failed -> ht("失败")
+                is PanelDelay.Ms -> "${shown.value} ms"
+            }
+            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+        }
+    }
     val capsule: @Composable () -> Unit = {
         Row(
             Modifier.heightIn(min = 24.dp).clip(HomeDims.pillShape).background(fill).padding(horizontal = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(5.dp),
         ) {
-            if (delay == PanelDelay.Testing) HomeSpinner(size = 13.dp, color = tint, strokeWidth = 1.8.dp)
-            Text(text, color = tint, style = HomeType.delay.copy(fontWeight = FontWeight.Bold), maxLines = 1)
+            if (motion) transition.AnimatedContent(
+                transitionSpec = {
+                    (fadeIn(tween(160)) + slideInVertically(tween(160)) { it / 5 })
+                        .togetherWith(fadeOut(tween(100)) + slideOutVertically(tween(100)) { -it / 5 })
+                        .using(SizeTransform(clip = false) { _, _ -> tween(160) })
+                },
+            ) { shown -> caption(shown) }
+            else caption(delay)
         }
     }
     if (onClick == null) Box(modifier) { capsule() }
     else Box(
         modifier.sizeIn(minWidth = 56.dp, minHeight = 40.dp)
-            .homeTap(enabled = delay != PanelDelay.Testing, onClickLabel = ht("测速"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() },
+            // Keep ownership of a busy capsule's physical touch: it must never
+            // fall through to the enclosing group's expand or node's select.
+            .homeTap(onClickLabel = ht(onClickLabel), role = Role.Button) {
+                if (delay != PanelDelay.Testing && !changing) { haptics(HomeHaptic.Tap); onClick() }
+            }
+            .semantics { if (delay == PanelDelay.Testing || changing) disabled() },
         contentAlignment = Alignment.BottomEnd,
     ) { capsule() }
 }

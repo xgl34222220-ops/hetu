@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
@@ -54,6 +55,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.homeTap
+import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.ui.HetuStaggerState
 import io.github.xgl34222220.hetu.ui.hetuPressScale
 import io.github.xgl34222220.hetu.ui.ht
@@ -112,6 +114,7 @@ internal fun LazyListScope.panelGroupsTab(
                         GroupCard(
                             group = group, data = data, view = view, wide = columns == 1,
                             modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onToggleGroup(group.name) },
+                            onTest = { onTestGroup(group.name) },
                         )
                     }
                     repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
@@ -152,11 +155,13 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
 /* ------------------------------------------------------------------ */
 
 @Composable
-private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, wide: Boolean, modifier: Modifier, onClick: () -> Unit) {
+private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, wide: Boolean, modifier: Modifier, onClick: () -> Unit, onTest: () -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val expanded = group.name in view.expandedGroups
     val compact = view.layout.compactGroups
+    val separateCurrent = !wide || LocalDensity.current.fontScale > 1.3f
+    val testing = group.name in data.testingGroups || data.testingAll
     val motion = LocalHomeMotionEnabled.current
     val fill by animateColorAsState(if (expanded) lerp(c.surface, c.accent, if (c.dark) .14f else .055f) else c.surface, HomeMotion.fade(motion), label = "groupFill")
     val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
@@ -166,30 +171,40 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
         .testTag("panel-group:${group.name}")
         .semantics { stateDescription = if (expanded) opened else closed }
         .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-        .clip(PanelDims.groupShape)
-        .background(fill)
+        .homeGlassPanel(PanelDims.groupShape, fill)
         .border(1.5.dp, outline, PanelDims.groupShape)
         .padding(start = 13.dp, end = 12.dp, top = if (compact) 13.dp else 17.dp, bottom = if (compact) 10.dp else 14.dp)
     val title: @Composable (Modifier) -> Unit = { m ->
         Column(m) {
-            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (wide) 1 else 2, overflow = TextOverflow.Ellipsis)
             Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
     val current: @Composable (Modifier) -> Unit = { m ->
         val leaf = data.leafOf(group.now)
         val pending = data.switching[group.name]
-        Row(m.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-            HomeFlag(HomeRegions.codeOf(leaf), height = 16.dp)
-            Text(
-                panelHighlight(HomeRegions.withoutFlag(group.now), view.needle), Modifier.weight(1f, fill = !wide),
-                color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (pending != null) HomeSpinner(size = 16.dp)
-            else PanelDelayLabel(data.delayOf(group.now), onCard = true)
+        val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
+        val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
+            Row(nameModifier.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                HomeFlag(HomeRegions.codeOf(leaf), height = 16.dp)
+                Text(
+                    panelHighlight(HomeRegions.withoutFlag(group.now), view.needle), Modifier.weight(1f, fill = separateCurrent),
+                    color = c.t1, style = PanelType.groupNow, maxLines = if (separateCurrent) 2 else 1, overflow = TextOverflow.Ellipsis,
+                )
+                if (pending != null) HomeSpinner(size = 16.dp)
+                else if (!separateCurrent) PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
+            }
+        }
+        if (separateCurrent) {
+            Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                nodeName(Modifier.fillMaxWidth())
+                if (pending == null) PanelDelayLabel(delay, Modifier.align(Alignment.End), onClick = onTest, onCard = true, onClickLabel = "测速本组")
+            }
+        } else {
+            nodeName(m)
         }
     }
-    if (wide) {
+    if (wide && !separateCurrent) {
         Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             GroupTile(group)
             title(Modifier.weight(1f))
@@ -300,7 +315,7 @@ private fun NodeCard(
     )
     val info = ht("节点信息")
     val shell = modifier
-        .heightIn(min = if (compact) 64.dp else 92.dp)
+        .heightIn(min = if (compact) 80.dp else 92.dp)
         .testTag("panel-node:${node.name}")
         .semantics { this.selected = selected }
         .hetuPressScale(source, pressedScale = .975f, motion = motion)
@@ -320,16 +335,16 @@ private fun NodeCard(
         Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
                 node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
-                maxLines = if (view.layout.wrapNames) 3 else if (compact) 1 else 2, overflow = TextOverflow.Ellipsis,
+                maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis,
             )
             if (switching) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)
             else HomePop(selected, Modifier.padding(end = 2.dp)) { HomeCheckMark(true, size = 20.dp) }
         }
     }
     if (compact) {
-        Row(shell, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            name(Modifier.weight(1f))
-            PanelDelayLabel(delay, onClick = onTest)
+        Column(shell, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            name(Modifier.fillMaxWidth())
+            PanelDelayLabel(delay, Modifier.align(Alignment.End), onClick = onTest)
         }
     } else {
         Column(shell) {

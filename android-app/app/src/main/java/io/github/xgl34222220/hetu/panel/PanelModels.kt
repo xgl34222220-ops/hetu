@@ -38,7 +38,15 @@ internal sealed interface PanelDelay {
     data object Unknown : PanelDelay
     data object Testing : PanelDelay
     data object Timeout : PanelDelay
+    data object Failed : PanelDelay
     data class Ms(val value: Long) : PanelDelay
+}
+
+internal fun panelDelayOf(ms: Long?): PanelDelay = when {
+    ms == null -> PanelDelay.Unknown
+    ms > 0L -> PanelDelay.Ms(ms)
+    ms == -2L -> PanelDelay.Failed
+    else -> PanelDelay.Timeout
 }
 
 internal enum class PanelNodeKind { Proxy, Group, Direct }
@@ -221,6 +229,9 @@ internal data class PanelData(
     /** Latency to show next to [node]; null when a figure makes no sense (DIRECT). */
     fun delayOf(node: String): PanelDelay? {
         if (node.equals("DIRECT", ignoreCase = true) || node.equals("REJECT", ignoreCase = true)) return null
+        // An alias/group can own its own request while displaying a selected leaf.
+        // Preserve that busy state instead of hiding it behind the leaf's old result.
+        if (delays[node] == PanelDelay.Testing) return PanelDelay.Testing
         return delays[leafOf(node)] ?: PanelDelay.Unknown
     }
 }

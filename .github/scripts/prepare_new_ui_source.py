@@ -419,6 +419,40 @@ def main():
                                    'expectedTestXmlFiles': continuity92['expectedTestXmlFiles'],
                                    'allPredecessor639TestcaseIdentitiesPreserved': True,
                                    'reproducedSourceMatchesCheckout': True}
+        continuity93_report = None
+        continuity93_inputs = ROOT / 'updates/v2093-feedback-root-safety/inputs.json'
+        if continuity93_inputs.exists():
+            from continuity93_source_scope import validate_layer as validate_continuity93_layer, validate_version as validate_continuity93_version, validate_revision as validate_continuity93_revision, validate_revision_test as validate_continuity93_revision_test, REVISION_FILE, REVISION_TEST
+            assert continuity92_report is not None, 'V20.93 requires the complete pinned V20.92 source'
+            continuity93 = json.loads(continuity93_inputs.read_text())
+            validate_continuity93_layer(continuity93, final_files)
+            continuity93_patch = continuity93_inputs.with_name('runtime.patch')
+            assert digest(continuity93_patch) == continuity93['patchSha256']
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'V20.93 baseline mismatch: ' + name
+            before_build = (work / 'android-app/app/build.gradle.kts').read_text()
+            before_revision = (work / REVISION_FILE).read_text()
+            before_revision_test = (work / REVISION_TEST).read_text()
+            apply(continuity93_patch, work)
+            validate_continuity93_version(before_build, (work / 'android-app/app/build.gradle.kts').read_text())
+            validate_continuity93_revision(before_revision, (work / REVISION_FILE).read_text())
+            validate_continuity93_revision_test(before_revision_test, (work / REVISION_TEST).read_text())
+            for name, sha in continuity93['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'V20.93 generated source mismatch: ' + name
+            for name, sha in continuity93['frozenFiles'].items():
+                assert digest(work / name) == sha, 'V20.93 changed a frozen input: ' + name
+            final_files.update(continuity93['changedOrAddedFiles'])
+            continuity93_report = {'baseCommit': continuity93['baseCommit'],
+                                   'patchSha256': continuity93['patchSha256'],
+                                   'changedOrAddedFiles': len(continuity93['changedOrAddedFiles']),
+                                   'frozenInputs': len(continuity93['frozenFiles']),
+                                   'versionCode': continuity93['versionCode'],
+                                   'versionName': continuity93['versionName'],
+                                   'expectedUnitTests': continuity93['expectedUnitTests'],
+                                   'expectedTestXmlFiles': continuity93['expectedTestXmlFiles'],
+                                   'allPredecessor644TestcaseIdentitiesPreserved': True,
+                                   'recoveryPipelineProvenance': continuity93['recoveryPipelineProvenance'],
+                                   'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)
@@ -450,6 +484,8 @@ def main():
             report['continuity91Layer'] = continuity91_report
         if continuity92_report is not None:
             report['continuity92Layer'] = continuity92_report
+        if continuity93_report is not None:
+            report['continuity93Layer'] = continuity93_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

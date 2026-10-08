@@ -31,6 +31,9 @@ class BootWorker(unittest.TestCase):
         self.write_command('sleep', '''t=$(cat "$HETU_TEST/ticks" 2>/dev/null || echo 0); t=$((t+1)); printf '%s\n' "$t" > "$HETU_TEST/ticks"
 if [ "$t" = "${STOP_AT:--1}" ]; then cat "$HETU_TEST/boot-id" > "$HETU_TEST/hetu/boot/stopped-boot"; fi
 if [ "$t" = "${DISABLE_AT:--1}" ]; then rm -f "$HETU_TEST/hetu/boot/enabled"; fi''')
+        (self.base/'hetu-root.sh').write_text("""#!/bin/sh
+printf '%s\\n' '{"ok":true,"networkIntegrity":"healthy","dataPlaneHealthy":true}'
+""")
         (self.boot/'start.sh').write_text('''n=$(cat "$HETU_TEST/starts" 2>/dev/null || echo 0); n=$((n+1)); printf '%s\n' "$n" > "$HETU_TEST/starts"
 [ "$n" -gt "${FAIL_STARTS:-0}" ] || exit 1
 printf '%s\n' "$HETU_CORE_PID" > "$HETU_TEST/hetu/run/core.pid"
@@ -87,6 +90,8 @@ class NativeStartGuard(BootWorker):
         at=source.rindex('case "${1:-status}" in')
         stubs='''root(){ :; }; acquire_lock(){ :; }; release_lock(){ :; }
 pidcore(){ [ "${FAKE_ALIVE:-0}" = 1 ]; }
+health_collect(){ H_STATE=healthy; }
+transaction_begin(){ :; }
 preflight(){ printf 'UNEXPECTED-PREFLIGHT\n' > "$HETU_TEST/preflight-hit"; exit 96; }
 '''
         p=self.dir/'root.sh';p.write_text(source[:at]+stubs+source[at:])

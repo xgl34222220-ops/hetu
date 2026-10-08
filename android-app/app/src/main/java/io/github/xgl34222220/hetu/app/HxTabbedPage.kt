@@ -209,13 +209,13 @@ internal fun HxTabbedPage(
     val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
     val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + (if (panelReferenceStyle) 12.dp else 2.dp)
     val pageCanvas = c.canvas
-    val blur = LocalHxBlur.current
+    val blur = LocalHxBlur.current && io.github.xgl34222220.hetu.ui.LocalHetuGlassEffectsEnabled.current
     val pageHaze = rememberHazeState()
 
     Box(Modifier.fillMaxSize().background(pageCanvas)) {
         // Full-screen scrolling source. Content insets track the collapsing header, so
         // after collapse the list naturally passes underneath the pinned glass chrome.
-        Box(Modifier.fillMaxSize().hazeSource(pageHaze)) {
+        Box(Modifier.fillMaxSize().then(if (blur) Modifier.hazeSource(pageHaze) else Modifier)) {
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.fillMaxSize().nestedScroll(foldConnection),

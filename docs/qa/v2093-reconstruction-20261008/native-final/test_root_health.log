@@ -1,0 +1,31 @@
+test_core_birth_change_during_validation_refuses_publication (__main__.RootHealth.test_core_birth_change_during_validation_refuses_publication) ... ok
+test_core_identity_failure_is_degraded_despite_reachable_listener_fixture (__main__.RootHealth.test_core_identity_failure_is_degraded_despite_reachable_listener_fixture) ... ok
+test_corrupt_legacy_snapshot_is_never_accepted (__main__.RootHealth.test_corrupt_legacy_snapshot_is_never_accepted) ... ok
+test_failed_metadata_publish_restores_original_manifest (__main__.RootHealth.test_failed_metadata_publish_restores_original_manifest) ... ok
+test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules (__main__.RootHealth.test_known_upgrade_repairs_only_metadata_preserving_core_and_saved_rules) ... ok
+test_missing_listener_stays_degraded_and_is_not_hidden (__main__.RootHealth.test_missing_listener_stays_degraded_and_is_not_hidden) ... ok
+test_missing_manifest_is_not_reconstructed_from_reachable_sockets (__main__.RootHealth.test_missing_manifest_is_not_reconstructed_from_reachable_sockets) ... ok
+test_missing_owned_chain_and_duplicate_hook_are_repaired (__main__.RootHealth.test_missing_owned_chain_and_duplicate_hook_are_repaired) ... ok
+test_missing_route_and_policy_rule_are_detected_and_repaired (__main__.RootHealth.test_missing_route_and_policy_rule_are_detected_and_repaired) ... ok
+test_other_owner_at_priority_does_not_get_overwritten (__main__.RootHealth.test_other_owner_at_priority_does_not_get_overwritten) ... ok
+test_other_session_difference_is_not_a_known_tail_migration (__main__.RootHealth.test_other_session_difference_is_not_a_known_tail_migration) ... ok
+test_pid_tampering_still_invalidates_manifest (__main__.RootHealth.test_pid_tampering_still_invalidates_manifest) ... ok
+test_previous_ordering_reproduces_reported_metadata_fault (__main__.RootHealth.test_previous_ordering_reproduces_reported_metadata_fault) ... ok
+test_production_entry_refuses_an_unauthorized_root_identity (__main__.RootHealth.test_production_entry_refuses_an_unauthorized_root_identity) ... ok
+test_real_start_google_disabled_has_complete_healthy_baseline (__main__.RootHealth.test_real_start_google_disabled_has_complete_healthy_baseline) ... ok
+test_real_start_google_enabled_keeps_baseline_and_runs_cleanup (__main__.RootHealth.test_real_start_google_enabled_keeps_baseline_and_runs_cleanup) ... ok
+test_reused_shell_pid_cannot_overwrite_an_older_repair_backup (__main__.RootHealth.test_reused_shell_pid_cannot_overwrite_an_older_repair_backup) ... ok
+test_session_tampering_still_invalidates_manifest (__main__.RootHealth.test_session_tampering_still_invalidates_manifest) ... ok
+test_snapshot_tampering_still_invalidates_checksum (__main__.RootHealth.test_snapshot_tampering_still_invalidates_checksum) ... ok
+test_transaction_in_progress_is_unknown_and_read_only (__main__.RootHealth.test_transaction_in_progress_is_unknown_and_read_only) ... ok
+test_unknown_table_read_does_not_mutate_network (__main__.RootHealth.test_unknown_table_read_does_not_mutate_network) ... ok
+test_upgrade_with_missing_dns_listener_cannot_become_healthy (__main__.RootHealth.test_upgrade_with_missing_dns_listener_cannot_become_healthy) ... ok
+test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining (__main__.RootHealth.test_upgrade_with_missing_route_is_reported_and_refuses_rebaselining) ... ok
+test_upgrade_with_unknown_read_refuses_metadata_and_network_changes (__main__.RootHealth.test_upgrade_with_unknown_read_refuses_metadata_and_network_changes) ... ok
+test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair (__main__.RootHealth.test_watchdog_missing_is_degraded_and_does_not_trigger_network_repair) ... ok
+test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted (__main__.RootHealth.test_watchdog_pid_for_an_unrelated_live_process_is_not_accepted) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 16.075s
+
+OK

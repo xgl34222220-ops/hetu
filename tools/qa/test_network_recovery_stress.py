@@ -42,6 +42,7 @@ final class RecoveryStressHost {
  static final class Network {final int id; Network(int id){this.id=id;}}
  static final class Prefs {
   final Map<String,Object> values=new HashMap<>();
+  boolean contains(String k){return values.containsKey(k);}
   boolean getBoolean(String k,boolean d){return (boolean)values.getOrDefault(k,d);}
   Editor edit(){return new Editor();}
   final class Editor {

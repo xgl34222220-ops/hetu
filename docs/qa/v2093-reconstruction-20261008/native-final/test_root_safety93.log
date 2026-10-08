@@ -1,0 +1,32 @@
+{"test": "foreground_term_boundary", "elapsedSeconds": 4.015, "termSentAfterSeconds": 0.15, "commandTimeoutSeconds": 3, "killGraceSeconds": 1, "rollbackCompleted": true}
+test_atomic_bootstrap_guard_allows_only_verified_lane (__main__.BootSafety93.test_atomic_bootstrap_guard_allows_only_verified_lane) ... ok
+test_atomic_guard_failure_keeps_exact_old_rules (__main__.BootSafety93.test_atomic_guard_failure_keeps_exact_old_rules) ... ok
+test_cancel_generation_interrupts_future_deadline (__main__.BootSafety93.test_cancel_generation_interrupts_future_deadline) ... ok
+test_cleanup_residual_rule_is_not_successful_stop (__main__.BootSafety93.test_cleanup_residual_rule_is_not_successful_stop) ... ok
+test_cleanup_unknown_snapshot_is_not_successful_stop (__main__.BootSafety93.test_cleanup_unknown_snapshot_is_not_successful_stop) ... ok
+test_core_identity_requires_all_four_uid_gid_fields (__main__.BootSafety93.test_core_identity_requires_all_four_uid_gid_fields) ... ok
+test_explicit_empty_cancel_ticket_is_not_latest_token (__main__.BootSafety93.test_explicit_empty_cancel_ticket_is_not_latest_token) ... ok
+test_failed_stop_retains_session_for_retry (__main__.BootSafety93.test_failed_stop_retains_session_for_retry) ... ok
+test_failed_strict_restore_physically_revokes_bootstrap_lane (__main__.BootSafety93.test_failed_strict_restore_physically_revokes_bootstrap_lane) ... ok
+test_frontend_term_during_blocked_xtables_is_bounded_before_rollback (__main__.BootSafety93.test_frontend_term_during_blocked_xtables_is_bounded_before_rollback) ... ok
+test_initializing_lock_cannot_be_stolen (__main__.BootSafety93.test_initializing_lock_cannot_be_stolen) ... ok
+test_old_deadline_birth_cannot_signal_reused_pid (__main__.BootSafety93.test_old_deadline_birth_cannot_signal_reused_pid) ... ok
+test_old_lock_owner_cannot_release_replacement_lock (__main__.BootSafety93.test_old_lock_owner_cannot_release_replacement_lock) ... ok
+test_old_watchdog_cannot_publish_or_delete_new_pid (__main__.BootSafety93.test_old_watchdog_cannot_publish_or_delete_new_pid) ... ok
+test_permanent_failure_starts_only_three_times (__main__.BootSafety93.test_permanent_failure_starts_only_three_times) ... ok
+test_pid_without_health_never_reports_running (__main__.BootSafety93.test_pid_without_health_never_reports_running) ... ok
+test_queued_manual_native_start_rejects_stop_before_entry (__main__.BootSafety93.test_queued_manual_native_start_rejects_stop_before_entry) ... ok
+test_real_deadline_signals_only_owned_birth (__main__.BootSafety93.test_real_deadline_signals_only_owned_birth) ... ok
+test_shared_budget_cannot_reset_expired_deadline (__main__.BootSafety93.test_shared_budget_cannot_reset_expired_deadline) ... ok
+test_shared_budget_persists_and_old_boot_cannot_reset (__main__.BootSafety93.test_shared_budget_persists_and_old_boot_cannot_reset) ... ok
+test_shared_budget_rejects_cancelled_boot (__main__.BootSafety93.test_shared_budget_rejects_cancelled_boot) ... ok
+test_stopping_inactive_helper_does_not_publish_start_failure (__main__.BootSafety93.test_stopping_inactive_helper_does_not_publish_start_failure) ... ok
+test_interrupt_after_core_launch_rolls_back (__main__.StartRollbackSafety93.test_interrupt_after_core_launch_rolls_back) ... ok
+test_interrupt_after_network_hooks_rolls_back (__main__.StartRollbackSafety93.test_interrupt_after_network_hooks_rolls_back) ... ok
+test_interrupt_before_watchdog_ready_rolls_back (__main__.StartRollbackSafety93.test_interrupt_before_watchdog_ready_rolls_back) ... ok
+test_kill_requested_without_verified_runner_preserves_old_runtime (__main__.StartRollbackSafety93.test_kill_requested_without_verified_runner_preserves_old_runtime) ... ok
+
+----------------------------------------------------------------------
+Ran 26 tests in 5.058s
+
+OK

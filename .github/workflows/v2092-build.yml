@@ -623,23 +623,4 @@ jobs:
         - 36
     name: Reproduce V20.74 custom palette crash on API 36
 'on':
-  push:
-    branches:
-    - test/v20.76-new-ui
-    paths:
-    - android-app/**
-    - updates/v2082-new-ui/**
-    - updates/v2083-ui-polish/**
-    - updates/v2084-controller-auth/**
-    - updates/v2085-pdf-tools-settings/**
-    - updates/v2085-tools-intake/**
-    - updates/v2085-pdf-final-geometry/**
-    - updates/v2086-functionfix/**
-    - updates/v2087-home-panel-refactor/**
-    - updates/v2088-ui-refactor/**
-    - updates/v2089-runtime153/**
-    - .github/scripts/**
-    - tools/qa/**
-    - updates/v2092-rule-mode-continuity/**
-    - .github/workflows/v2092-build.yml
   workflow_dispatch: null

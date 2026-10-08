@@ -17,6 +17,7 @@ final class ProxyControlEpoch {
         long ticket = generation.get();
         return gate.isLocked() ? -1 : ticket;
     }
+    void invalidateObservations() { generation.incrementAndGet(); }
     boolean publish(long ticket, Runnable action) {
         if (ticket < 0 || !gate.tryLock()) return false;
         try {

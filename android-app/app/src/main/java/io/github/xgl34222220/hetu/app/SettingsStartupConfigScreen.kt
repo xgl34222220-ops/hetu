@@ -1,19 +1,17 @@
 package io.github.xgl34222220.hetu
 
 import io.github.xgl34222220.hetu.home.homeGlassPanel
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,11 +45,27 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
     var text by remember { mutableStateOf("") }
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
+    var copyFailed by remember { mutableStateOf(false) }
     val c = LocalHomeColors.current
+
+    fun copy() {
+        try {
+            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                ?: error("剪贴板暂不可用")
+            clipboard.setPrimaryClip(ClipData.newPlainText("启动配置", text))
+            copyFailed = false
+            message = "启动配置已复制"
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) {
+            copyFailed = true
+            message = "复制失败，剪贴板暂不可用；可改用导出"
+        }
+    }
 
     fun load(regenerate: Boolean) {
         if (busy) return
         busy = true
+        copyFailed = false
         scope.launch {
             try {
                 text = withContext(Dispatchers.IO) {
@@ -67,6 +81,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) { load(false) }
     val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/yaml")) { uri ->
         if (uri != null) scope.launch {
+            copyFailed = false
             try {
                 withContext(Dispatchers.IO) {
                     context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
@@ -87,26 +102,23 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                                 if (busy) HxSpinner(18.dp)
                             }
                         }
-                        HomeIconButton(HomeIcons.Copy, "复制", { hxCopy(context, "启动配置", text) }, enabled = text.isNotBlank())
-                        HomeIconButton(ToolsIcons.Share, "导出", { launchDocumentPicker({ message = it }) { exporter.launch("hetu-startup-config.yaml") } }, enabled = text.isNotBlank())
+                        HomeIconButton(HomeIcons.Copy, "复制", ::copy, enabled = text.isNotBlank())
+                        HomeIconButton(ToolsIcons.Share, "导出", { launchDocumentPicker({ copyFailed = false; message = it }) { exporter.launch("hetu-startup-config.yaml") } }, enabled = text.isNotBlank())
                     }
                 }
             }
         }
         // What the last action did, where it can be seen without scrolling past the whole file.
         if (message.isNotBlank()) item(key = "message") {
-            HxBanner(message, tone = HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
+            HxBanner(message, tone = if (copyFailed) HxTone.Bad else HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
         }
         item(key = "config") {
             SettingsSection {
                 Box(Modifier.fillMaxWidth().heightIn(min = 320.dp).homeGlassPanel().padding(horizontal = 18.dp, vertical = 16.dp)) {
-                    SelectionContainer {
-                        Text(
-                            if (busy && text.isBlank()) ht("正在读取启动配置…") else text.ifBlank { ht("暂无启动配置") },
-                            Modifier.horizontalScroll(rememberScrollState()),
-                            color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono,
-                        )
-                    }
+                    StartupConfigViewer(
+                        if (busy && text.isBlank()) ht("正在读取启动配置…") else text.ifBlank { ht("暂无启动配置") },
+                        color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono,
+                    )
                 }
             }
         }

@@ -101,6 +101,7 @@ class RootHealth(unittest.TestCase):
                       'ss(){ cat "$HEALTH_FIXTURE/sockets"; }\n'
                       'pidcore(){ [ ! -f "$HEALTH_FIXTURE/core-identity-failed" ] && [ "$1" = "$(cat "$PIDFILE")" ]; }\n'
                       'monotonic_seconds(){ MONO_SECONDS=100; }\n'
+                      'transaction_begin(){ START_ACTIVE=1; START_CANCEL_TOKEN=""; read -r tb rest < /proc/uptime; TXN_DEADLINE=$((${tb%%.*}+110)); }\n'
                       'select_dns6_policy(){ START_DNS6=off; }\n'
                       'markused(){ return 1; }\n'
                       'allocnet(){ MARK=0x200000; MASK=0x200000; TABLE=20260; PREF=14500; savenet; }\n'

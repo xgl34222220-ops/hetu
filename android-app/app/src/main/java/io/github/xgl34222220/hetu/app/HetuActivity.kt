@@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.ht
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
+import io.github.xgl34222220.hetu.ui.hetuDockOuterHeight
+import io.github.xgl34222220.hetu.ui.rememberHetuGlassEnabled
 import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,6 +33,10 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.EnterExitState
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.SizeTransform
+import androidx.compose.animation.core.snap
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.ui.draw.drawWithContent
@@ -89,6 +96,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
@@ -232,6 +240,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
     val routeHolder = rememberSaveableStateHolder()
     val scope = rememberCoroutineScope()
     val c = Hx.colors
+    val motion = LocalHetuMotionEnabled.current
+    var dockOccupiedHeight by remember { mutableStateOf(0.dp) }
     LaunchedEffect(startRoute) {
         if (startRoute != null) {
             nav.openRequested(startRoute)
@@ -243,11 +253,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
     // Predictive back: the page follows the finger (shrinks toward the swipe edge with
     // rounded corners); releasing completes the normal return transition from there.
     val settingsRevision = vm.settingsRevision
-    val predictiveBackEnabled = remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackAnimation", true) }
+    val predictiveBackEnabled = motion && remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackAnimation", true) }
     val predictiveBackFollowEdge = remember(settingsRevision) { vm.prefs.getBoolean("predictiveBackFollowEdge", true) }
     val backProgress = remember { Animatable(0f) }
+    val currentMotion by rememberUpdatedState(motion)
+    var backRecovery by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
     var gestureRoute by remember { mutableStateOf<HxRoute?>(null) }
     var edgeLeft by remember { mutableStateOf(true) }
+    LaunchedEffect(motion) {
+        if (!motion) {
+            backRecovery?.cancel()
+            backProgress.snapTo(0f)
+            gestureRoute = null
+        }
+    }
     LaunchedEffect(nav.current) {
         if (nav.forward) {
             gestureRoute = null
@@ -255,6 +274,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
         }
     }
     PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
+        backRecovery?.cancel()
         gestureRoute = nav.current
         try {
             events.collect { event ->
@@ -263,8 +283,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
             }
             nav.pop()
         } catch (cancel: CancellationException) {
-            scope.launch {
-                backProgress.animateTo(0f, spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow))
+            backRecovery?.cancel()
+            backRecovery = scope.launch {
+                if (currentMotion) backProgress.animateTo(0f, spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow))
+                else backProgress.snapTo(0f)
                 gestureRoute = null
             }
             throw cancel
@@ -277,13 +299,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
         Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
             AnimatedContent(
                 targetState = nav.current,
-                transitionSpec = { routeTransition(nav.forward) },
+                transitionSpec = { routeTransition(nav.forward, motion) },
                 label = "route",
             ) { route ->
                 val density = LocalDensity.current
                 // The page underneath dims while the new one slides over it (and brightens on return).
                 val dim by transition.animateFloat(
-                    transitionSpec = { tween(HxMotion.Route, easing = HxMotion.Emphasized) },
+                    transitionSpec = { if (motion) tween(HxMotion.Route, easing = HxMotion.Emphasized) else snap() },
                     label = "routeDim",
                 ) { phase ->
                     when (phase) {
@@ -300,7 +322,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                         }
                         .then(
-                            if (route == gestureRoute) Modifier.graphicsLayer {
+                            if (motion && route == gestureRoute) Modifier.graphicsLayer {
                                 val p = backProgress.value
                                 val scale = 1f - .1f * p
                                 scaleX = scale
@@ -313,7 +335,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                 ) {
                     routeHolder.SaveableStateProvider(route.key) {
                         when (route) {
-                            HxRoute.Main -> MainTabs(vm)
+                            HxRoute.Main -> MainTabs(vm) { dockOccupiedHeight = it }
                             HxRoute.Configs -> ConfigsScreen(vm)
                             HxRoute.ConfigEditor -> ConfigEditorScreen(vm)
                             HxRoute.Providers -> ProvidersScreen(vm)
@@ -342,7 +364,9 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
             }
 
             // Toast floats just above the dock (or the bottom edge on sub-pages).
-            HxToastHost(vm, extraBottom = if (nav.stack.size == 1) HxDockHeight + 22.dp else 24.dp)
+            val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+            HxToastHost(vm, extraBottom = if (nav.stack.size == 1 && dockOccupiedHeight > 0.dp)
+                (dockOccupiedHeight - navBottom).coerceAtLeast(0.dp) + 12.dp else 24.dp)
         }
 
         vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
@@ -351,7 +375,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
     }
 }
 
-private fun routeTransition(forward: Boolean): ContentTransform {
+private fun routeTransition(forward: Boolean, motion: Boolean): ContentTransform {
+    if (!motion) return EnterTransition.None.togetherWith(ExitTransition.None)
     val duration = HxMotion.Route
     val ease = HxMotion.Emphasized
     // Card-stack navigation: the new page covers the old one from the right edge; the old
@@ -372,12 +397,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
 }
 
 @Composable
-private fun MainTabs(vm: HetuViewModel) {
+private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
     val c = Hx.colors
+    val motion = LocalHetuMotionEnabled.current
     val tabHolder = rememberSaveableStateHolder()
     val dockHaze = rememberHazeState()
     val liquidBackdrop = rememberLayerBackdrop()
-    val runtimeLiquid = isRuntimeShaderSupported()
+    val glassEnabled = rememberHetuGlassEnabled()
+    val runtimeLiquid = glassEnabled && isRuntimeShaderSupported()
     val settingsTick = vm.settingsRevision
     val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
     val dockTabs = remember(settingsTick, vm.tab) {
@@ -398,8 +425,11 @@ private fun MainTabs(vm: HetuViewModel) {
             HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
         }
     }
-    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
-    val bottom = HxDockHeight + 10.dp + navInset + 14.dp
+    val floatingDock = remember(settingsTick) { vm.prefs.getBoolean("floatingBottomBar", true) }
+    val fallbackDockHeight = hetuDockOuterHeight(floatingDock)
+    var measuredDockHeight by remember { mutableStateOf(0.dp) }
+    val dockHeight = maxOf(measuredDockHeight, fallbackDockHeight)
+    val bottom = dockHeight + 12.dp
     // The concept's collapsed Tools/Settings pages retain their root navigation.
     // Other root pages keep their existing scroll behavior; child routes own no dock.
     var dockVisible by remember { mutableStateOf(true) }
@@ -420,13 +450,17 @@ private fun MainTabs(vm: HetuViewModel) {
     Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (!runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
+                .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
                 .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
                 .nestedScroll(dockScroll),
         ) {
             AnimatedContent(
                 targetState = page,
                 transitionSpec = {
+                    if (!motion) {
+                        EnterTransition.None.togetherWith(ExitTransition.None)
+                            .using(SizeTransform(clip = false) { _, _ -> snap() })
+                    } else {
                     val order = listOf("Home", "Panel", "Tools", "Settings")
                     val forward = order.indexOf(targetState) > order.indexOf(initialState)
                     (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
@@ -435,6 +469,7 @@ private fun MainTabs(vm: HetuViewModel) {
                             fadeOut(tween(110)) +
                                 slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                         )
+                    }
                 },
                 label = "tab",
             ) { tab ->
@@ -450,11 +485,12 @@ private fun MainTabs(vm: HetuViewModel) {
         }
         val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
         val dockShift by animateDpAsState(
-            if (dockVisible) 0.dp else 92.dp,
-            spring(dampingRatio = .88f, stiffness = 420f),
+            if (dockVisible) 0.dp else dockHeight + 16.dp,
+            if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(),
             label = "dockShift",
         )
         val detailVisible = (vm.tab == HxTab.Home && homeDetail) || (vm.tab == HxTab.Tools && toolsDetail)
+        androidx.compose.runtime.SideEffect { onDockOccupancyChanged(if (detailVisible || !dockVisible) 0.dp else dockHeight) }
         if (!detailVisible) HetuGlassDock(
             items = items,
             selected = selectedIndex,
@@ -465,6 +501,7 @@ private fun MainTabs(vm: HetuViewModel) {
             hazeState = dockHaze,
             backdrop = liquidBackdrop.takeIf { runtimeLiquid },
             modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
+            onHeightChanged = { measuredDockHeight = it },
         )
     }
 }
@@ -472,6 +509,7 @@ private fun MainTabs(vm: HetuViewModel) {
 /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
 @Composable
 internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+    val motion = LocalHetuMotionEnabled.current
     var floatingMessage by remember { mutableStateOf<String?>(null) }
     var shownMessage by remember { mutableStateOf("") }
     val haptics = rememberHetuHaptics()
@@ -489,12 +527,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
     AnimatedVisibility(
         visible = floatingMessage != null,
         modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
-        enter = slideInVertically(spring(dampingRatio = .72f, stiffness = 480f)) { it / 2 } +
+        enter = if (motion) slideInVertically(spring(dampingRatio = .72f, stiffness = 480f)) { it / 2 } +
             fadeIn(tween(160)) +
-            scaleIn(spring(dampingRatio = .66f, stiffness = 480f), initialScale = .82f),
-        exit = slideOutVertically(tween(180, easing = HxMotion.Exit)) { it / 3 } +
+            scaleIn(spring(dampingRatio = .66f, stiffness = 480f), initialScale = .82f) else EnterTransition.None,
+        exit = if (motion) slideOutVertically(tween(180, easing = HxMotion.Exit)) { it / 3 } +
             fadeOut(tween(150)) +
-            scaleOut(tween(180), targetScale = .9f),
+            scaleOut(tween(180), targetScale = .9f) else ExitTransition.None,
     ) {
         HxToast(shownMessage, onDismiss = { floatingMessage = null })
     }

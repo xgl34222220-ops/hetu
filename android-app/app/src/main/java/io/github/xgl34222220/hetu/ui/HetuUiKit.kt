@@ -1,9 +1,16 @@
 package io.github.xgl34222220.hetu.ui
 
 import android.animation.ValueAnimator
+import android.app.ActivityManager
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.database.ContentObserver
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -57,11 +64,51 @@ import androidx.compose.ui.unit.sp
 /** Actual outer dock height, including its own already-applied navigation inset. */
 val LocalHetuDockHeight = staticCompositionLocalOf { 0.dp }
 val LocalHetuMotionEnabled = staticCompositionLocalOf { true }
+/** One policy for the dock's renderer and its backdrop producer. */
+internal val LocalHetuGlassEffectsEnabled = staticCompositionLocalOf { true }
+
+@Composable
+internal fun rememberHetuGlassEnabled(): Boolean {
+    val context = LocalContext.current
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    fun readPreference() = prefs.getBoolean("enableBlur", true) && prefs.getBoolean("liquidGlass", true)
+    var enabled by remember(prefs) { mutableStateOf(readPreference()) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "enableBlur" || key == "liquidGlass") enabled = readPreference()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return enabled && LocalHetuGlassEffectsEnabled.current
+}
+
+/** Low-memory and battery-saver devices keep the static material without offscreen glass. */
+@Composable
+internal fun rememberHetuPowerConstrained(): Boolean {
+    val context = LocalContext.current
+    val power = remember(context) { context.getSystemService(Context.POWER_SERVICE) as? PowerManager }
+    val lowMemory = remember(context) { (context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager)?.isLowRamDevice == true }
+    var saving by remember(power) { mutableStateOf(power?.isPowerSaveMode == true) }
+    DisposableEffect(context, power) {
+        val receiver = object : BroadcastReceiver() {
+            override fun onReceive(context: Context?, intent: Intent?) { saving = power?.isPowerSaveMode == true }
+        }
+        val filter = IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+        if (Build.VERSION.SDK_INT >= 33) context.registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        else @Suppress("DEPRECATION") context.registerReceiver(receiver, filter)
+        onDispose { context.unregisterReceiver(receiver) }
+    }
+    return lowMemory || saving
+}
 
 @Composable
 fun rememberHetuMotionEnabled(): Boolean {
-    val resolver = LocalContext.current.contentResolver
+    val context = LocalContext.current
+    val resolver = context.contentResolver
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
     var enabled by remember { mutableStateOf(ValueAnimator.areAnimatorsEnabled()) }
+    var preference by remember(prefs) { mutableStateOf(prefs.getBoolean("enableAnimations", true)) }
     DisposableEffect(resolver) {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) { enabled = ValueAnimator.areAnimatorsEnabled() }
@@ -69,7 +116,14 @@ fun rememberHetuMotionEnabled(): Boolean {
         resolver.registerContentObserver(Settings.Global.getUriFor(Settings.Global.ANIMATOR_DURATION_SCALE), false, observer)
         onDispose { resolver.unregisterContentObserver(observer) }
     }
-    return enabled
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { shared, key ->
+            if (key == "enableAnimations") preference = shared.getBoolean(key, true)
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return enabled && preference
 }
 
 @Composable

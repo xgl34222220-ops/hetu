@@ -83,10 +83,11 @@ internal fun resolvedCoreLatency(proxies: JSONObject, name: String, preferredUrl
 
 /** A new successful core/WebUI reading must replace an old locally cached failure. */
 internal fun syncCoreLatencyResults(groups: List<ProxyGroupUi>, delays: MutableMap<String, Long>,
-    measuredAt: Map<String, Long> = emptyMap(), snapshotStartedAt: Long = Long.MAX_VALUE) {
+    measuredAt: Map<String, Long> = emptyMap(), snapshotStartedAt: Long = Long.MAX_VALUE,
+    protectedNodes: Set<String> = emptySet()) {
     val nodes = groups.flatMap { it.nodes }.groupBy { it.name }
     nodes.forEach { (name, copies) ->
-        if ((measuredAt[name] ?: Long.MIN_VALUE) > snapshotStartedAt) return@forEach
+        if (name in protectedNodes || (measuredAt[name] ?: Long.MIN_VALUE) > snapshotStartedAt) return@forEach
         copies.filter { it.lastDelay != null }.maxByOrNull { it.lastDelayAt }?.lastDelay?.let { delays[name] = it }
     }
     if (groups.isNotEmpty()) delays.keys.toList().filter { it !in nodes }.forEach(delays::remove)

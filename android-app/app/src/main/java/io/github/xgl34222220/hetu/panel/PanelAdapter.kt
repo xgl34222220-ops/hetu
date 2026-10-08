@@ -322,12 +322,6 @@ private fun groupType(raw: String): String = when (raw.lowercase(Locale.ROOT)) {
     else -> raw.ifBlank { "Group" }
 }
 
-private fun delayOf(ms: Long?): PanelDelay = when {
-    ms == null -> PanelDelay.Unknown
-    ms > 0L -> PanelDelay.Ms(ms)
-    else -> PanelDelay.Timeout
-}
-
 private fun buildPanelData(
     state: ProxyComposeState,
     starting: Boolean,
@@ -367,8 +361,8 @@ private fun buildPanelData(
         )
     }
     val nodeDelays = HashMap<String, PanelDelay>()
-    state.groups.forEach { g -> g.nodes.forEach { n -> if (n.name !in groupNames && n.lastDelay != null) nodeDelays[n.name] = delayOf(n.lastDelay) } }
-    delays.forEach { (name, ms) -> nodeDelays[name] = delayOf(ms) }
+    state.groups.forEach { g -> g.nodes.forEach { n -> if (n.name !in groupNames && n.lastDelay != null) nodeDelays[n.name] = panelDelayOf(n.lastDelay) } }
+    delays.forEach { (name, ms) -> nodeDelays[name] = panelDelayOf(ms) }
     testing.keys.forEach { nodeDelays[it] = PanelDelay.Testing }
 
     val rates = sampler.connectionRates

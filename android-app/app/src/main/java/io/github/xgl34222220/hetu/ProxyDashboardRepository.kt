@@ -58,11 +58,14 @@ internal class ProxyDashboardRepository(context: Context) {
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
-    internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
+    internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long,
+        private val mutationEpoch: Long, private val delaySettings: Map<String, Any?>) {
         val stable: Boolean get() = runtimeEpoch >= 0L
         override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
-            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch
-        override fun hashCode(): Int = 31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) + mutationEpoch.hashCode()
+            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch &&
+                delaySettings == other.delaySettings
+        override fun hashCode(): Int = 31 * (31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) +
+            mutationEpoch.hashCode()) + delaySettings.hashCode()
         fun sameOrigin(other: ProbeIdentity): Boolean = settings == other.settings && runtimeEpoch == other.runtimeEpoch
     }
     internal class SelectionTicket internal constructor(private val settings: Map<String, Any?>, internal val identity: ProbeIdentity) {
@@ -91,7 +94,10 @@ internal class ProxyDashboardRepository(context: Context) {
                 ProxyConfigLibrary.BUNDLED_NAME else ""
         }
         // Ordinary status/health reads do not change this nonblocking control epoch.
-        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get())
+        // A new test target invalidates measurements, but must not revoke an
+        // unrelated node-selection/refresh transaction on this same controller.
+        val delaySettings = values.filterKeys { it == "proxyCustomDelayUrlEnabled" || it == "proxyCustomDelayUrl" }
+        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get(), delaySettings)
     }
 
     private fun requireCurrentProbe(identity: ProbeIdentity) {

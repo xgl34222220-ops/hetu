@@ -21,6 +21,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.isActive
@@ -449,12 +450,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
     suspend fun refreshNow(): ProxyComposeState? {
+        val refreshContext = kotlin.coroutines.coroutineContext
         val observedForeground = foregroundGeneration
         var expectedState = state
         var expectedRequest = captureRuntimeRequest()
         val operationBefore = operation
-        fun superseded() = state !== expectedState || operation != operationBefore ||
-            !currentRuntimeRequest(expectedRequest, requireRunning = false)
+        fun superseded(): Boolean {
+            refreshContext.ensureActive()
+            return state !== expectedState || operation != operationBefore ||
+                !currentRuntimeRequest(expectedRequest, requireRunning = false)
+        }
         try {
             val startedAt = SystemClock.elapsedRealtime()
             val next = repo.state()
@@ -509,7 +514,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 rateHistory.clear()
                 upHistory.clear()
             }
-            if (controllerSampleValid) syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt)
+            if (controllerSampleValid) syncCoreLatencyResults(next.groups, delays, measuredAt, startedAt, testingNodes.keys.toSet())
+
+            // Publish the current controller observation before optional /proc,
+            // provider and version reads. A slow auxiliary response must not keep
+            // the first screen on a cached state or hide its current controls.
+            // This publication becomes this request's expected state: a stop,
+            // configuration change or newer refresh still revokes every later
+            // auxiliary write through the existing superseded checks below.
+            if (superseded()) return null
+            val displayed = next.copy(continuityRootObserved = false, continuityAutomationOnly = false,
+                continuityObservationTicket = -1L, continuityObservationSession = "",
+                continuityObservationNetworkEpoch = 0L)
+            state = if (next.running && !next.panelReady) {
+                displayed.copy(groups = state.groups, connections = state.connections,
+                    downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
+                    memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
+            } else displayed
+            expectedState = state
+            loadedOnce = true
+            if (next.running) startupError = null
 
             var sampleValid = next.running
             val sampled = if (next.running) {
@@ -560,17 +584,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             }
 
             if (superseded()) return null
-            // Authority belongs to this worker result, never to retained UI state.
-            val displayed = next.copy(continuityRootObserved = false, continuityAutomationOnly = false,
-                continuityObservationTicket = -1L, continuityObservationSession = "",
-                continuityObservationNetworkEpoch = 0L)
-            state = if (next.running && !next.panelReady) {
-                displayed.copy(groups = state.groups, connections = state.connections,
-                    downloadTotal = state.downloadTotal, uploadTotal = state.uploadTotal,
-                    memoryBytes = state.memoryBytes, trafficMode = state.trafficMode)
-            } else displayed
-            expectedState = state
-            if (next.running) startupError = null
             if (controllerSampleValid) {
                 lastAt = now
                 lastUp = next.uploadTotal
@@ -579,7 +592,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                 if (superseded()) return null
             }
-            loadedOnce = true
             persistSnapshot(next, sampled)
             return next
         } catch (cancel: CancellationException) {
@@ -827,8 +839,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
         } catch (cancel: CancellationException) {
             throw cancel
-        } catch (_: Exception) {
-            // Transport error: keep the previous measurement.
+        } catch (error: Exception) {
+            // A failed controller request is not a node timeout. Keep the last
+            // measurement, but explain why the real spinner ended without a result.
+            if (currentRuntimeRequest(request) && latestNodeProbe[node] == owner)
+                toast(errorText(error, "节点测速请求失败"))
         }
     }
 
@@ -856,6 +871,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 // Selector groups retain the parallel core endpoint. Automatic groups use
                 // bounded leaf probes because that endpoint silently clears their fixed choice.
                 val result = repo.groupDelay(group, targets)
+                if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
+                    toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                 val stamp = SystemClock.elapsedRealtime()
                 targets.forEach { node ->
                     // Missing/invalid entries are not authoritative timeouts. Keep old readings.
@@ -893,7 +910,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val stamp = SystemClock.elapsedRealtime()
                 result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                 val ok = result.values.count { it > 0L }
-                if (currentRuntimeRequest(request)) toast("测速完成：$ok / ${result.size} 个节点可用")
+                if (currentRuntimeRequest(request)) {
+                    if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
+                    else toast("测速完成：$ok / ${result.size} 个节点可用")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

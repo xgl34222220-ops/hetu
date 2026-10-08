@@ -1,0 +1,22 @@
+test_active_duplicate_worker_cannot_remove_its_lock (__main__.BootWorker.test_active_duplicate_worker_cannot_remove_its_lock) ... ok
+test_app_launch_denial_does_not_undo_native_start (__main__.BootWorker.test_app_launch_denial_does_not_undo_native_start) ... ok
+test_delayed_system_and_network_still_restore_once (__main__.BootWorker.test_delayed_system_and_network_still_restore_once) ... ok
+test_disable_during_wait_cancels (__main__.BootWorker.test_disable_during_wait_cancels) ... ok
+test_disabled_never_starts (__main__.BootWorker.test_disabled_never_starts) ... ok
+test_existing_core_is_adopted_without_restart (__main__.BootWorker.test_existing_core_is_adopted_without_restart) ... ok
+test_failed_start_retries_then_succeeds (__main__.BootWorker.test_failed_start_retries_then_succeeds) ... ok
+test_missing_plan_reports_failure (__main__.BootWorker.test_missing_plan_reports_failure) ... ok
+test_network_wait_has_a_bound (__main__.BootWorker.test_network_wait_has_a_bound) ... ok
+test_previous_boot_stop_does_not_block_new_boot (__main__.BootWorker.test_previous_boot_stop_does_not_block_new_boot) ... ok
+test_stale_previous_boot_lock_does_not_block_restore (__main__.BootWorker.test_stale_previous_boot_lock_does_not_block_restore) ... ok
+test_stop_during_network_wait_cancels_this_boot (__main__.BootWorker.test_stop_during_network_wait_cancels_this_boot) ... ok
+test_native_guard_does_not_restart_a_winning_manual_start (__main__.NativeStartGuard.test_native_guard_does_not_restart_a_winning_manual_start) ... ok
+test_native_guard_rechecks_disabled_setting (__main__.NativeStartGuard.test_native_guard_rechecks_disabled_setting) ... ok
+test_native_guard_rechecks_explicit_stop_after_lock (__main__.NativeStartGuard.test_native_guard_rechecks_explicit_stop_after_lock) ... ok
+test_native_guard_rejects_wrong_boot (__main__.NativeStartGuard.test_native_guard_rejects_wrong_boot) ... ok
+test_normal_manual_start_is_not_subject_to_boot_guard (__main__.NativeStartGuard.test_normal_manual_start_is_not_subject_to_boot_guard) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 2.762s
+
+OK

@@ -1,5 +1,5 @@
 #!/system/bin/sh
-# Hetu Root transparent proxy controller v3 (runtime revision 153). JSON only on stdout.
+# Hetu Root transparent proxy controller v3 (runtime revision 154). JSON only on stdout.
 set -u
 umask 077
 
@@ -34,6 +34,16 @@ MARK=""
 MASK=""
 TABLE=""
 PREF=""
+read -r ENTRY_UPTIME ENTRY_UNUSED < /proc/uptime || ENTRY_UPTIME=0
+ENTRY_UPTIME=${ENTRY_UPTIME%%.*}
+START_ACTIVE=0
+START_MUTATED=0
+ENTRY_CANCEL_TOKEN=${HETU_START_CANCEL_TOKEN-$(cat "$RUN/start-cancel-generation" 2>/dev/null || true)}
+START_ROLLBACK=0
+START_BOOTSTRAP=0
+PRESERVE_KILL=0
+TXN_DEADLINE=0
+TXN_TIMER=""
 LOCK_HELD=0
 # xt_owner sees the credentials of the process that created a socket. Android resolves
 # names in netd, which is root, so "root sockets are the core" also exempts the system
@@ -70,14 +80,20 @@ KOUT=HETU_KOUT
 KFWD=HETU_KFWD
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
-start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
+start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
 root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
 # Serialize with Android netd/other root firewalls on /system/etc/xtables.lock.
 # iptables itself owns the lock; -w avoids racy fail/rollback while preserving atomic rules.
-xt4(){ command iptables -w 15 "$@"; }
-xt6(){ command ip6tables -w 15 "$@"; }
+xt4(){
+  transaction_current || return 1
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 iptables -w 2 "$@"; else command iptables -w 15 "$@"; fi
+}
+xt6(){
+  transaction_current || return 1
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 ip6tables -w 2 "$@"; else command ip6tables -w 15 "$@"; fi
+}
 # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
 xt4q(){ command iptables -w 1 "$@"; }
 xt6q(){ command ip6tables -w 1 "$@"; }
@@ -89,9 +105,91 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
 bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
 release_lock(){
-  if [ "$LOCK_HELD" = 1 ]; then rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; LOCK_HELD=0; fi
+  if [ "$LOCK_HELD" = 1 ]; then
+    [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" != "$$" ] || rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+    LOCK_HELD=0
+  fi
 }
-trap 'release_lock' EXIT
+trap 'finish_transaction' EXIT
+trap 'if [ "$START_ACTIVE" = 1 ]; then fail "启动事务已超时或被撤销"; else exit 0; fi' TERM INT HUP
+
+transaction_current(){
+  [ "$START_ACTIVE" = 1 ] || return 0
+  if [ "$START_ROLLBACK" = 1 ]; then
+    read -r TC_UP TC_UNUSED < /proc/uptime || return 1
+    TC_UP=${TC_UP%%.*}; [ "$TC_UP" -lt "${ROLLBACK_DEADLINE:-0}" ]; return
+  fi
+  [ "$(cat "$RUN/start-cancel-generation" 2>/dev/null || true)" = "$START_CANCEL_TOKEN" ] || return 1
+  read -r TC_UP TC_UNUSED < /proc/uptime || return 1
+  TC_UP=${TC_UP%%.*}
+  [ "$TC_UP" -lt "$TXN_DEADLINE" ]
+}
+transaction_begin(){
+  read -r TB_UP TB_UNUSED < /proc/uptime || return 1
+  TB_UP=${TB_UP%%.*}; TXN_DEADLINE=$((ENTRY_UPTIME+110))
+  has timeout || return 1
+  if [ -n "${RECOVERY_DEADLINE:-}" ] && [ "$TXN_DEADLINE" -gt $((RECOVERY_DEADLINE-20)) ]; then TXN_DEADLINE=$((RECOVERY_DEADLINE-20)); fi
+  START_CANCEL_TOKEN="$ENTRY_CANCEL_TOKEN"
+  START_ACTIVE=1
+  transaction_current || return 1
+  TB_BIRTH=$(health_core_birth "$$"); [ -n "$TB_BIRTH" ] || return 1
+  "$0" txn-deadline "$$" "$TB_BIRTH" "$TXN_DEADLINE" "$START_CANCEL_TOKEN" >/dev/null 2>&1 &
+  TXN_TIMER=$!
+  TXN_TIMER_BIRTH=$(health_core_birth "$TXN_TIMER")
+  TB_WAIT=0
+  while [ "$(cat "$RUN/start-timer.$$" 2>/dev/null || true)" != "$TB_BIRTH" ]; do
+    kill -0 "$TXN_TIMER" 2>/dev/null || return 1
+    TB_WAIT=$((TB_WAIT+1)); [ "$TB_WAIT" -lt 40 ] || return 1; sleep 0.025
+  done
+}
+transaction_deadline(){
+  TD_PID="$1"; TD_BIRTH="$2"; TD_LIMIT="$3"; TD_CANCEL="$4"
+  case "$TD_PID:$TD_BIRTH:$TD_LIMIT" in *[!0-9:]*|::*|:*|*:) exit 1;; esac
+  [ "$(health_core_birth "$TD_PID")" = "$TD_BIRTH" ] || return 0
+  printf '%s\n' "$TD_BIRTH" > "$RUN/start-timer.$TD_PID" || return 1
+  while [ "$(health_core_birth "$TD_PID")" = "$TD_BIRTH" ] && kill -0 "$TD_PID" 2>/dev/null; do
+    read -r TD_UP TD_UNUSED < /proc/uptime || exit 1
+    TD_UP=${TD_UP%%.*}
+    if [ "$TD_UP" -ge "$TD_LIMIT" ] || [ "$(cat "$RUN/start-cancel-generation" 2>/dev/null || true)" != "$TD_CANCEL" ]; then
+      # Recheck the kernel birth immediately before signalling the owned shell.
+      [ "$(health_core_birth "$TD_PID")" != "$TD_BIRTH" ] || kill -TERM "$TD_PID" 2>/dev/null
+      exit 0
+    fi
+    sleep 0.25
+  done
+}
+finish_transaction(){
+  if [ "$START_ACTIVE" = 1 ]; then rollback_start; fi
+  if [ -n "$TXN_TIMER" ] && [ -n "${TXN_TIMER_BIRTH:-}" ] && [ "$TXN_TIMER_BIRTH" = "$(health_core_birth "$TXN_TIMER")" ]; then kill "$TXN_TIMER" 2>/dev/null || true; wait "$TXN_TIMER" 2>/dev/null || true; fi
+  rm -f "$RUN/start-timer.$$"
+  release_lock
+}
+rollback_start(){
+  trap '' TERM INT HUP
+  START_ROLLBACK=1; RB_FAILED=0
+  read -r RB_NOW RB_UNUSED < /proc/uptime || RB_NOW=0
+  RB_NOW=${RB_NOW%%.*}; ROLLBACK_DEADLINE=$((RB_NOW+20))
+  if [ "$START_MUTATED" != 1 ]; then START_ACTIVE=0; return 0; fi
+  # Remove the physical finite startup exception before any atomic restoration.
+  # An atomic restore failure must not leave a verified-core bypass behind.
+  revoke_bootstrap || RB_FAILED=1
+  stopwatchdog
+  stopcore || RB_FAILED=1
+  if [ "$START_KILL" = 1 ]; then
+    PRESERVE_KILL=1
+    atomic_kill_guard 4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || RB_FAILED=1
+    atomic_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || RB_FAILED=1
+    # Capture routes stay intact if a strict guard cannot be confirmed.
+    [ "$RB_FAILED" != 0 ] || cleanup
+  else
+    cleanup_confirmed || RB_FAILED=1
+  fi
+  restorev6 || RB_FAILED=1
+  if [ "$RB_FAILED" = 0 ]; then rm -f "$SESSION"; else
+    printf '%s\n' 'rollback-incomplete' > "$RUN/rollback-state"
+  fi
+  START_ACTIVE=0
+}
 
 acquire_lock(){
   [ "$LOCK_HELD" != 1 ] || return 0
@@ -99,10 +197,38 @@ acquire_lock(){
   N=0
   while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
     OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
-    case "$OWNER" in ''|*[!0-9]*) ;; *) if ! kill -0 "$OWNER" >/dev/null 2>&1; then rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; continue; fi;; esac
+    case "$OWNER" in ''|*[!0-9]*) ;; *)
+      if ! kill -0 "$OWNER" >/dev/null 2>&1 && mkdir "$RUN/.txn.reap" 2>/dev/null; then
+        OWNER_NOW=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+        if [ "$OWNER_NOW" = "$OWNER" ] && ! kill -0 "$OWNER_NOW" 2>/dev/null; then rm -rf "$LOCK_DIR"; fi
+        rmdir "$RUN/.txn.reap" 2>/dev/null || true
+        continue
+      fi;; esac
     N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
   done
   printf '%s\n' "$$" > "$LOCK_DIR/pid"; LOCK_HELD=1
+}
+
+# Shared by app recovery and service.d under the same native transaction lock.
+# The boot identifier comes from the queued request; an old request cannot create
+# a ledger for a newer boot or erase an exhausted count.
+recovery_claim(){
+  RC_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
+  [ -n "$RC_BOOT" ] && [ "$1" = "$RC_BOOT" ] || return 1
+  [ "$RC_BOOT" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || return 1
+  mkdir -p "$BASE/boot" || return 1
+  read -r RC_NOW RC_UNUSED < /proc/uptime || return 1
+  RC_NOW=${RC_NOW%%.*}; RC_START="$RC_NOW"; RC_END=$((RC_NOW+300)); RC_COUNT=0
+  if [ -f "$BASE/boot/recovery-budget" ]; then
+    read -r RC_SAVED RC_COUNT RC_START RC_END < "$BASE/boot/recovery-budget" || return 1
+    if [ "$RC_SAVED" != "$RC_BOOT" ]; then RC_COUNT=0; RC_START="$RC_NOW"; RC_END=$((RC_NOW+300)); fi
+  fi
+  case "$RC_COUNT" in 0|1|2) ;; *) return 1;; esac
+  case "$RC_START:$RC_END" in *[!0-9:]*|:*|*:) return 1;; esac
+  [ "$RC_NOW" -ge "$RC_START" ] && [ $((RC_END-RC_NOW)) -ge 145 ] || return 1
+  RECOVERY_DEADLINE="$RC_END"
+  printf '%s %s %s %s\n' "$RC_BOOT" "$((RC_COUNT+1))" "$RC_START" "$RC_END" > "$BASE/boot/recovery-budget.new.$$" &&
+    mv -f "$BASE/boot/recovery-budget.new.$$" "$BASE/boot/recovery-budget"
 }
 
 state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
@@ -188,15 +314,19 @@ $CLEAN_LOOKUP
 -N $3
 "*) return 1;; *) return 0;; esac
 }
+legacy_command(){
+  transaction_current || return 1
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 2 "$@"; else "$@"; fi
+}
 legacy_unhook(){
   B="$1"; T="$2"; BASECHAIN="$3"; CHAIN="$4"; N=0
   cleanup_chain_absent "$B" "$T" "$CHAIN" && return 0
-  while "$B" -w 1 -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do
-    "$B" -w 1 -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break
+  while legacy_command "$B" -w 1 -t "$T" -C "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1; do
+    legacy_command "$B" -w 1 -t "$T" -D "$BASECHAIN" -j "$CHAIN" >/dev/null 2>&1 || break
     N=$((N+1)); [ "$N" -lt 8 ] || break
   done
-  "$B" -w 1 -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true
-  "$B" -w 1 -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
+  legacy_command "$B" -w 1 -t "$T" -F "$CHAIN" >/dev/null 2>&1 || true
+  legacy_command "$B" -w 1 -t "$T" -X "$CHAIN" >/dev/null 2>&1 || true
 }
 cleanlegacy(){
   ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
@@ -233,7 +363,7 @@ cleanup4(){
   unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
   unhook xt4 filter OUTPUT "$DOTOUT"
   unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
-  unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
+  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; fi
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -248,13 +378,68 @@ cleanup6(){
   unhook xt6 filter OUTPUT "$DOTOUT"
   unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
   unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
-  unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"
+  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
   fi
 }
 cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+
+cleanup_verify(){
+  for CC_BIN in xt4 xt6; do
+    if [ "$CC_BIN" = xt6 ] && ! has ip6tables; then continue; fi
+    for CC_TABLE in mangle nat filter; do
+      CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_TABLE") || return 1
+      if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j )(HETU_|BICHEN_)'; then return 1; fi
+    done
+  done
+  if [ -n "$CC_MARK" ] && [ -n "$CC_TABLE" ] && [ -n "$CC_PREF" ]; then
+    for CC_FAMILY in 4 6; do
+      CC_RULES=$(ip -"$CC_FAMILY" rule show 2>/dev/null) || return 1
+      if printf '%s\n' "$CC_RULES" | grep -E "^[[:space:]]*$CC_PREF:.*fwmark $CC_MARK/$CC_MASK.*(lookup|table) $CC_TABLE([[:space:]]|$)" >/dev/null; then return 1; fi
+      CC_ROUTES=$(ip -"$CC_FAMILY" route show table "$CC_TABLE" 2>&1); CC_RC=$?
+      if [ "$CC_RC" != 0 ]; then
+        case "$CC_ROUTES" in *'FIB table does not exist'*|*'No such file'*) CC_ROUTES='';; *) return 1;; esac
+      fi
+      if printf '%s\n' "$CC_ROUTES" | grep -Eq '^local (default|0.0.0.0/0|::/0).*dev lo'; then return 1; fi
+    done
+  fi
+}
+cleanup_confirmed(){
+  CC_MARK=$(state_value MARK || true); CC_MASK=$(state_value MASK || true)
+  CC_TABLE=$(state_value TABLE || true); CC_PREF=$(state_value PREF || true)
+  CC_SAVED_NET=$(cat "$NET_STATE" 2>/dev/null || true)
+  cleanup
+  if ! cleanup_verify; then
+    [ -z "$CC_SAVED_NET" ] || printf '%s\n' "$CC_SAVED_NET" > "$NET_STATE"
+    return 1
+  fi
+}
+
+stop_transaction(){
+  # Revoke before waiting for the lock, including a start whose watchdog has not
+  # yet appeared. A stopped receipt is not a successful-cleanup receipt.
+  cancel_boot || return 1
+  acquire_lock || return 1
+  printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
+  stopwatchdog
+  SC_FAILED=0
+  stopcore || SC_FAILED=1
+  cleanup_confirmed || SC_FAILED=1
+  restorev6 || SC_FAILED=1
+  [ "$SC_FAILED" = 0 ] || return 1
+  rm -f "$SESSION"
+}
+cancel_boot(){
+  CB_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
+  [ -n "$CB_BOOT" ] || return 1
+  mkdir -p "$BASE/boot" || return 1
+  printf '%s\n' "$CB_BOOT" > "$BASE/boot/stopped-boot" || return 1
+  mkdir -p "$RUN" || return 1
+  printf '%s-%s\n' "$$" "$(health_core_birth "$$")" > "$RUN/start-cancel-generation.new.$$" &&
+    mv -f "$RUN/start-cancel-generation.new.$$" "$RUN/start-cancel-generation"
+}
 
 # Cheap built-in prefilter: do not fork readlink for every Android process.
 # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
@@ -286,8 +471,19 @@ findcorepid(){
 }
 stopwatchdog(){
   [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
-  case "$W" in ''|*[!0-9]*) ;; *) if [ "$W" != "$$" ] && kill -0 "$W" >/dev/null 2>&1; then kill "$W" >/dev/null 2>&1 || true; fi;; esac
+  case "$W" in ''|*[!0-9]*) ;; *)
+    if [ "$W" != "$$" ] && kill -0 "$W" >/dev/null 2>&1; then
+      W_CMD=$(tr '\000' '\n' < "/proc/$W/cmdline" 2>/dev/null || true)
+      if printf '%s\n' "$W_CMD" | awk -v s="$BASE/hetu-root.sh" '$0==s {if(getline>0 && $0=="watchdog") found=1} END {exit !found}'; then
+        kill "$W" >/dev/null 2>&1 || true
+      fi
+    fi;; esac
   rm -f "$WATCHDOG_PID"
+}
+process_exited(){
+  kill -0 "$1" 2>/dev/null || return 0
+  PE_STATE=$(sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $1}')
+  [ "$PE_STATE" = Z ]
 }
 stopcore(){
   # Terminate every Hetu-private core in parallel. Older revisions waited up to
@@ -296,6 +492,8 @@ stopcore(){
   STOP_PIDS=""
   if [ -f "$PIDFILE" ]; then
     P=$(cat "$PIDFILE" 2>/dev/null || true)
+    pidcore "$P"; STOP_ID=$?
+    if [ "$STOP_ID" = 2 ] && ! process_exited "$P"; then return 1; fi
     case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
   fi
   # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
@@ -320,6 +518,14 @@ stopcore(){
   for P in $STOP_PIDS; do
     if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
   done
+  STOP_WAIT=0
+  while [ "$STOP_WAIT" -lt 10 ]; do
+    STOP_REMAIN=0
+    for P in $STOP_PIDS; do if ! process_exited "$P"; then STOP_REMAIN=1; fi; done
+    [ "$STOP_REMAIN" = 1 ] || break
+    STOP_WAIT=$((STOP_WAIT+1)); sleep 0.05
+  done
+  [ "$STOP_REMAIN" = 0 ] || return 1
   rm -f "$PIDFILE" "$MODEFILE"
 }
 
@@ -921,16 +1127,76 @@ v6_disable_guard_ready(){
   fi
 }
 
+startup_core_return(){
+  [ "$START_BOOTSTRAP" = 1 ] && [ "$START_ROLLBACK" != 1 ] && [ -n "$CORE_RUNNER" ] || return 0
+  "$1" -t filter -A "$KOUT" -m owner --uid-owner 0 --gid-owner "$CORE_GROUP_ID" -j RETURN
+}
+revoke_bootstrap(){
+  [ "$START_BOOTSTRAP" = 1 ] || return 0
+  RV_FAILED=0
+  for RV_BIN in xt4 xt6; do
+    if [ "$RV_BIN" = xt6 ] && ! v6supported; then continue; fi
+    "$RV_BIN" -t filter -S "$KOUT" >/dev/null 2>&1 || { RV_FAILED=1; continue; }
+    while "$RV_BIN" -t filter -C "$KOUT" -m owner --uid-owner 0 --gid-owner "$CORE_GROUP_ID" -j RETURN >/dev/null 2>&1; do
+      "$RV_BIN" -t filter -D "$KOUT" -m owner --uid-owner 0 --gid-owner "$CORE_GROUP_ID" -j RETURN || { RV_FAILED=1; break; }
+    done
+    RV_RULES=$("$RV_BIN" -t filter -S "$KOUT") || { RV_FAILED=1; continue; }
+    if printf '%s\n' "$RV_RULES" | grep -F -- "--gid-owner $CORE_GROUP_ID -j RETURN" >/dev/null; then RV_FAILED=1; fi
+  done
+  [ "$RV_FAILED" = 0 ] || return 1
+  START_BOOTSTRAP=0
+}
+# Build the already validated scoped rules without touching the live table,
+# then let xtables commit the entire guard atomically. Never flush a live guard.
+atomic_kill_guard(){ (
+  KG_FAMILY="$1"; shift
+  if [ "$KG_FAMILY" = 6 ] && ! v6supported; then exit 0; fi
+  KG_BIN=xt4; KG_RESTORE=iptables-restore
+  if [ "$KG_FAMILY" = 6 ]; then KG_BIN=xt6; KG_RESTORE=ip6tables-restore; fi
+  KG_RULES=$("$KG_BIN" -t filter -S) || exit 1
+  has "$KG_RESTORE" || exit 1
+  KG_BATCH="$RUN/kill-$KG_FAMILY.new.$$"
+  printf '*filter\n' > "$KG_BATCH" || exit 1
+  guard_record(){
+    [ "$1" = -t ] && [ "$2" = filter ] || return 1; shift 2
+    if [ "$1" = -N ] && printf '%s\n' "$KG_RULES" | grep -Fx -- "-N $2" >/dev/null; then return 0; fi
+    if [ "$1" = -I ]; then
+      KG_CHAIN="$2"; shift 3
+      if printf '%s\n' "$KG_RULES" | grep -Fx -- "-A $KG_CHAIN $*" >/dev/null; then return 0; fi
+      set -- -I "$KG_CHAIN" 1 "$@"
+    fi
+    printf '%s ' "$@" >> "$KG_BATCH"; printf '\n' >> "$KG_BATCH"
+  }
+  xt4(){ guard_record "$@"; }; xt6(){ guard_record "$@"; }
+  if [ "$KG_FAMILY" = 4 ]; then install_kill4 "$@"; else install_kill6 "$@"; fi || exit 1
+  printf 'COMMIT\n' >> "$KG_BATCH" || exit 1
+  if [ "$START_ACTIVE" = 1 ]; then
+    transaction_current || exit 1
+    timeout -s TERM -k 1 3 "$KG_RESTORE" -w 2 --noflush < "$KG_BATCH"; KG_RC=$?
+  else "$KG_RESTORE" -w 2 --noflush < "$KG_BATCH"; KG_RC=$?; fi
+  rm -f "$KG_BATCH"
+  exit "$KG_RC"
+); }
+
 install_kill4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt4 || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
   if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 install_kill6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt6 || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
   if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 
-validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
+validatecfg(){
+  BIN="$1"; CFG="$2"; : > "$CHECKLOG"
+  if [ "$START_ACTIVE" = 1 ]; then
+    transaction_current || return 1
+    read -r VC_NOW VC_UNUSED < /proc/uptime || return 1
+    VC_NOW=${VC_NOW%%.*}; VC_LEFT=$((TXN_DEADLINE-VC_NOW))
+    [ "$VC_LEFT" -gt 0 ] || return 1
+    timeout -s TERM -k 1 "$VC_LEFT" "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1
+  else "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; fi
+}
 hexport(){ printf '%04X' "$1" 2>/dev/null; }
 # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
 LISTEN_SNAPSHOT_VALID=0
@@ -1020,19 +1286,54 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
     printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
 watchdog(){
-  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
+  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
+  [ -n "$WD_GENERATION" ] && [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+  WD_N=0
+  while [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ]; do
+    WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || exit 0; sleep 0.025
+  done
   load_session_fake_ip_policy || exit 0
-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
+  printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
+  MISS=0; H_TICK=0
+  while [ "$MISS" -lt 3 ]; do
+    [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+    if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
+      MISS=0; H_TICK=$((H_TICK+1))
+      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi
+      sleep 2
+    else MISS=$((MISS+1)); sleep 0.20; fi
+  done
+  acquire_lock || exit 0
+  [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
-    cleanup; restorev6; rm -f "$PIDFILE"
-    RESULT="network-restored"
-    if [ "$KILL" = 1 ]; then if install_kill4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && install_kill6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi; else rm -f "$MODEFILE" "$SESSION"; fi
-    date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true; printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
+    RESULT="network-restore-failed"
+    if [ "$KILL" = 1 ]; then
+      # Install guards before removing capture. Failure retains the old rules.
+      if atomic_kill_guard 4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && atomic_kill_guard 6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi
+    elif cleanup_confirmed && restorev6; then
+      RESULT="network-restored"; rm -f "$MODEFILE" "$SESSION"
+    fi
+    rm -f "$PIDFILE"
+    date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true
+    printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
   fi
-  rm -f "$WATCHDOG_PID"
+  [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ] || rm -f "$WATCHDOG_PID"
+  rm -f "$RUN/watchdog.ready.$$"
 }
-start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
+start_watchdog(){
+  stopwatchdog
+  WD_GENERATION="$$-$(health_core_birth "$$")"
+  printf '%s\n' "$WD_GENERATION" > "$RUN/generation" || return 1
+  "$0" watchdog "$@" "$WD_GENERATION" >/dev/null 2>&1 &
+  WD_CHILD=$!
+  printf '%s\n' "$WD_CHILD" > "$WATCHDOG_PID" || return 1
+  WD_N=0
+  while [ "$(cat "$RUN/watchdog.ready.$WD_CHILD" 2>/dev/null)" != "$WD_GENERATION" ]; do
+    kill -0 "$WD_CHILD" 2>/dev/null || return 1
+    WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || return 1; sleep 0.025
+  done
+}
 
 # The combined owner match must exist before the core is started under the new identity.
 probe_core_owner(){
@@ -1058,7 +1359,7 @@ core_identity_prepare(){
   done
   [ -n "$CORE_RUNNER" ] || return 0
   if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
-  if [ "$START_V6" != bypass ] && v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
+  if v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
   return 0
 }
 core_launch(){
@@ -1079,8 +1380,9 @@ core_launch(){
 core_identity_confirm(){
   CORE_GID=""; SYSTEM_DNS=exempt
   [ -n "$CORE_RUNNER" ] || return 0
-  CI_GID=$(awk '$1=="Gid:" {print $2; exit}' "/proc/$1/status" 2>/dev/null)
-  [ "$CI_GID" = "$CORE_GROUP_ID" ] || return 0
+  pidcore "$1" || return 1
+  CI_IDS=$(awk -v gid="$CORE_GROUP_ID" '$1=="Uid:" {u=($2==0 && $3==0 && $4==0 && $5==0)} $1=="Gid:" {g=($2==gid && $3==gid && $4==gid && $5==gid)} END {if(u && g) print "verified"}' "/proc/$1/status" 2>/dev/null)
+  [ "$CI_IDS" = verified ] || return 1
   CORE_GID="$CORE_GROUP_ID"
   [ "$START_DNS" != off ] || return 0
   case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
@@ -1242,8 +1544,16 @@ start(){
       [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
     # A manual/app start may have won while the boot worker waited for this lock.
     BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
-    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
+    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then
+      health_collect
+      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
+    fi
+    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
   fi
+  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
+    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
+  fi
+  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
   : > "$START_TIMING"
   rm -f "$START_ERROR"; start_stage "preflight"
   if [ "$START_FAST_CAPS" != 1 ]; then
@@ -1256,68 +1566,77 @@ start(){
   [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi
   load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
+  start_stage "core-identity"
+  core_identity_prepare
+  if [ "$START_KILL" = 1 ] && [ -z "$CORE_RUNNER" ]; then
+    fail "Kill Switch 启动缺少可验证的隔离核心身份，保留已有网络接管"
+  fi
+  START_MUTATED=1
+  if [ "$START_KILL" = 1 ]; then
+    START_BOOTSTRAP=1; PRESERVE_KILL=1
+    atomic_kill_guard 4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv4 启动保护安装失败"
+    atomic_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv6 启动保护安装失败"
+  fi
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   start_stage "stop-old-core"
-  stopcore; rm -f "$CRASH_STATE" "$SESSION"
+  stopcore || fail "旧核心未确认退出"; rm -f "$CRASH_STATE" "$SESSION"
   start_stage "check-ports"
   check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
   NEED_TP=0; case "$START_MODE" in tproxy) if [ "$START_TCP" = 1 ] || [ "$START_UDP" = 1 ]; then NEED_TP=1; fi;; enhance) [ "$START_UDP" = 1 ] && NEED_TP=1;; esac; if [ "$START_DNS" = tproxy ] && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ]; then NEED_TP=1; fi
-  if [ "$NEED_TP" = 1 ]; then allocnet || { cleanup; fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
+  if [ "$NEED_TP" = 1 ]; then allocnet || { fail "找不到安全的 fwmark/路由表/规则优先级，已保持直连"; }; fi
   if [ "$START_V6" = disable ] && v6supported; then
-    install_v6_disable "$START_SHARE" || { cleanup; fail "IPv6 禁用保护安装失败，未启动代理"; }
+    install_v6_disable "$START_SHARE" || { fail "IPv6 禁用保护安装失败，未启动代理"; }
     # No all/default/rmnet sysctl writes: netd owns the physical network.
   fi
 
-  mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
-  start_stage "core-identity"
-  core_identity_prepare
+  mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG"; core_launch; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+  : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
+  core_identity_confirm "$START_PID" || fail "核心隔离身份验证失败"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
     if [ "$READY_RC" -eq 2 ]; then READY_MSG="Mihomo 启动后提前退出，请查看核心日志"; else READY_MSG="Mihomo 初始化超过 90 秒，代理入站/DNS/API 监听仍未就绪；首次加载大量远程订阅或规则时请检查网络与核心日志"; fi
-    stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "$READY_MSG"
+    fail "$READY_MSG"
   fi
 
   if [ "$START_MODE" = ebpf ]; then
     sleep 0.25
     if grep -Ei '(^|[^a-z])(e?bpf|bpf)([^a-z]|$)' "$LOG" 2>/dev/null | tail -n 20 | grep -Eqi 'error|failed|failure|not supported|operation not permitted|permission denied|attach.*fail'; then
-      stopcore; cleanup; restorev6; rm -f "$SESSION"; fail "eBPF attach 失败；当前内核/接口不兼容，请改用 TUN 或 TPROXY"
+      fail "eBPF attach 失败；当前内核/接口不兼容，请改用 TUN 或 TPROXY"
     fi
   fi
 
-  core_identity_confirm "$START_PID"
   core_tune "$START_PID"
   start_stage "install-ipv4-tproxy"
-  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 TPROXY 规则安装失败，已回滚"; }
+  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
   start_stage "install-ipv4-redirect"
-  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 Redirect 规则安装失败，已回滚"; }
+  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
   start_stage "install-ipv4-dns"
-  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 DNS 劫持安装失败，已回滚"; }; fi
+  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv4 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
   start_stage "install-udp-leak-guard"
   if [ "$START_UDP" = 1 ]; then
     case "$START_MODE" in
       tproxy|enhance)
-        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 UDP 防裸连规则安装失败，已回滚"; }
-        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 UDP 防裸连规则安装失败，已回滚"; }; fi
+        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }
+        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }; fi
         ;;
     esac
   fi
   start_stage "install-ipv4-quic"
-  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv4 QUIC 策略安装失败，已回滚"; }
+  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
   start_stage "install-ipv6"
   if [ "$START_V6" = enable ]; then
-    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 TPROXY 规则安装失败，已回滚"; }
-    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 Redirect 规则安装失败，已回滚"; }
-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 DNS 劫持安装失败，已回滚"; }; fi
-    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 QUIC 策略安装失败，已回滚"; }
-  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "严格 IPv4 防泄漏规则安装失败，已回滚"; }; fi
+    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
+    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
+    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv6 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
+    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
+  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "严格 IPv4 防泄漏规则安装失败，启动未完成，请检查停止状态"; }; fi
 
   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
-    install_disabled_dns6 || { cleanup; stopcore; rm -f "$SESSION"; fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
+    install_disabled_dns6 || { fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
   fi
   start_stage "install-dot-guard"
   if [ "$SYSTEM_DNS" = captured ]; then
@@ -1333,15 +1652,29 @@ start(){
   fi
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
-  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 DNS 接管状态，已停止本次启动"; }
-  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
+  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
+  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
+  transaction_current || fail "启动事务已撤销"
+  if [ "$START_KILL" = 1 ]; then
+    revoke_bootstrap || fail "无法撤销临时核心启动例外"
+    unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
+    if has ip6tables; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
+    for GUARD_BIN in xt4 xt6; do
+      if [ "$GUARD_BIN" = xt6 ] && ! has ip6tables; then continue; fi
+      GUARD_RULES=$("$GUARD_BIN" -t filter -S) || fail "启动保护清理状态未知"
+      if printf '%s\n' "$GUARD_RULES" | grep -Eq '(HETU_KOUT|HETU_KFWD)'; then fail "启动保护未完全撤销"; fi
+    done
+    PRESERVE_KILL=0
+  fi
   # Record exactly what this session installed, not mutable app preferences.
-  health_record || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录网络完整性基线，已停止本次启动"; }
+  health_record || { fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
   rm -f "$RUN/google-firewall-at"
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
-  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
+  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
+  transaction_current || fail "启动事务已撤销"
   rm -f "$START_ERROR"; start_stage "running"
+  START_ACTIVE=0
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
@@ -1774,10 +2107,12 @@ case "${1:-status}" in
       *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
     esac
     root; shift; start "$@";;
-  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; if [ -f "$BASE/boot/enabled" ]; then BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true); [ -z "$BOOT_NOW" ] || printf '%s\n' "$BOOT_NOW" > "$BASE/boot/stopped-boot"; fi; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
+  txn-deadline) [ "$#" = 5 ] || exit 1; root; transaction_deadline "$2" "$3" "$4" "$5";;
+  cancel-boot) root; cancel_boot || fail "无法撤销本次自动恢复"; ok "自动恢复已撤销";;
+  stop) root; stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
-  watchdog) { [ "$#" = 10 ] || [ "$#" = 11 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}";;
+  watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
   *) fail "未知 Root 代理操作";;
 esac
