@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/workspace/hetu-recovery-20261008/baseline-complete/tools/test_root_controller.py", line 258, in <module>
+    main()
+  File "/workspace/hetu-recovery-20261008/baseline-complete/tools/test_root_controller.py", line 194, in main
+    assert dispatch(rules, address=remote, interface='lo', mark=0x200000,
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/hetu-recovery-20261008/baseline-complete/tools/test_root_controller.py", line 114, in dispatch
+    raise AssertionError(rule)
+AssertionError: ['-p', 'tcp', '-m', 'conntrack', '--ctstate', 'ESTABLISHED', '-m', 'connmark', '!', '--mark', '0x200000/0x200000', '-j', 'RETURN']

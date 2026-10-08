@@ -1,0 +1,376 @@
+diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
+--- a/android-app/app/src/main/assets/hetu-root.sh
++++ b/android-app/app/src/main/assets/hetu-root.sh
+@@ -1,5 +1,5 @@
+ #!/system/bin/sh
+-# Hetu Root transparent proxy controller v3 (runtime revision 153). JSON only on stdout.
++# Hetu Root transparent proxy controller v3 (runtime revision 154). JSON only on stdout.
+ set -u
+ umask 077
+ 
+@@ -89,7 +89,10 @@
+ bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
+ 
+ release_lock(){
+-  if [ "$LOCK_HELD" = 1 ]; then rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; LOCK_HELD=0; fi
++  if [ "$LOCK_HELD" = 1 ]; then
++    [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" != "$$" ] || rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
++    LOCK_HELD=0
++  fi
+ }
+ trap 'release_lock' EXIT
+ 
+@@ -103,6 +106,24 @@
+     N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
+   done
+   printf '%s\n' "$$" > "$LOCK_DIR/pid"; LOCK_HELD=1
++}
++
++# Shared by app recovery and service.d under the same native transaction lock.
++# The boot identifier comes from the queued request; an old request cannot create
++# a ledger for a newer boot or erase an exhausted count.
++recovery_claim(){
++  RC_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
++  [ -n "$RC_BOOT" ] && [ "$1" = "$RC_BOOT" ] || return 1
++  [ "$RC_BOOT" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || return 1
++  mkdir -p "$BASE/boot" || return 1
++  RC_COUNT=0
++  if [ -f "$BASE/boot/recovery-budget" ]; then
++    read -r RC_SAVED RC_COUNT < "$BASE/boot/recovery-budget" || return 1
++    if [ "$RC_SAVED" != "$RC_BOOT" ]; then RC_COUNT=0; fi
++  fi
++  case "$RC_COUNT" in 0|1|2) ;; *) return 1;; esac
++  printf '%s %s\n' "$RC_BOOT" "$((RC_COUNT+1))" > "$BASE/boot/recovery-budget.new.$$" &&
++    mv -f "$BASE/boot/recovery-budget.new.$$" "$BASE/boot/recovery-budget"
+ }
+ 
+ state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
+@@ -256,6 +277,37 @@
+ }
+ cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+ 
++cleanup_confirmed(){
++  cleanup
++  for CC_BIN in xt4 xt6; do
++    if [ "$CC_BIN" = xt6 ] && ! has ip6tables; then continue; fi
++    for CC_TABLE in mangle nat filter; do
++      CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_TABLE") || return 1
++      if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j )(HETU_|BICHEN_)'; then return 1; fi
++    done
++  done
++}
++stop_transaction(){
++  # Revoke before waiting for the lock, including a start whose watchdog has not
++  # yet appeared. A stopped receipt is not a successful-cleanup receipt.
++  cancel_boot || return 1
++  acquire_lock || return 1
++  printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
++  stopwatchdog
++  SC_FAILED=0
++  cleanup_confirmed || SC_FAILED=1
++  stopcore || SC_FAILED=1
++  restorev6 || SC_FAILED=1
++  [ "$SC_FAILED" = 0 ] || return 1
++  rm -f "$SESSION"
++}
++cancel_boot(){
++  CB_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
++  [ -n "$CB_BOOT" ] || return 1
++  mkdir -p "$BASE/boot" || return 1
++  printf '%s\n' "$CB_BOOT" > "$BASE/boot/stopped-boot"
++}
++
+ # Cheap built-in prefilter: do not fork readlink for every Android process.
+ # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
+ core_candidate(){
+@@ -319,6 +371,9 @@
+   done
+   for P in $STOP_PIDS; do
+     if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
++  done
++  for P in $STOP_PIDS; do
++    if core_maybe_alive "$P" && kill -0 "$P" >/dev/null 2>&1; then return 1; fi
+   done
+   rm -f "$PIDFILE" "$MODEFILE"
+ }
+@@ -1020,19 +1075,54 @@
+     printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
+   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
+ watchdog(){
+-  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
++  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
++  [ -n "$WD_GENERATION" ] && [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
++  WD_N=0
++  while [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ]; do
++    WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || exit 0; sleep 0.025
++  done
+   load_session_fake_ip_policy || exit 0
+-  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
++  printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
++  MISS=0; H_TICK=0
++  while [ "$MISS" -lt 3 ]; do
++    [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
++    if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
++      MISS=0; H_TICK=$((H_TICK+1))
++      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi
++      sleep 2
++    else MISS=$((MISS+1)); sleep 0.20; fi
++  done
++  acquire_lock || exit 0
++  [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+   REC=$(cat "$PIDFILE" 2>/dev/null || true)
+   if [ "$REC" = "$COREPID" ]; then
+-    cleanup; restorev6; rm -f "$PIDFILE"
+-    RESULT="network-restored"
+-    if [ "$KILL" = 1 ]; then if install_kill4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && install_kill6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi; else rm -f "$MODEFILE" "$SESSION"; fi
+-    date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true; printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
+-  fi
+-  rm -f "$WATCHDOG_PID"
+-}
+-start_watchdog(){ COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; stopwatchdog; "$0" watchdog "$COREPID" "$KILL" "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" >/dev/null 2>&1 & }
++    RESULT="network-restore-failed"
++    if [ "$KILL" = 1 ]; then
++      # Install guards before removing capture. Failure retains the old rules.
++      if install_kill4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && install_kill6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi
++    elif cleanup_confirmed && restorev6; then
++      RESULT="network-restored"; rm -f "$MODEFILE" "$SESSION"
++    fi
++    rm -f "$PIDFILE"
++    date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true
++    printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
++  fi
++  [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ] || rm -f "$WATCHDOG_PID"
++  rm -f "$RUN/watchdog.ready.$$"
++}
++start_watchdog(){
++  stopwatchdog
++  WD_GENERATION="$$-$(health_core_birth "$$")"
++  printf '%s\n' "$WD_GENERATION" > "$RUN/generation" || return 1
++  "$0" watchdog "$@" "$WD_GENERATION" >/dev/null 2>&1 &
++  WD_CHILD=$!
++  printf '%s\n' "$WD_CHILD" > "$WATCHDOG_PID" || return 1
++  WD_N=0
++  while [ "$(cat "$RUN/watchdog.ready.$WD_CHILD" 2>/dev/null)" != "$WD_GENERATION" ]; do
++    kill -0 "$WD_CHILD" 2>/dev/null || return 1
++    WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || return 1; sleep 0.025
++  done
++}
+ 
+ # The combined owner match must exist before the core is started under the new identity.
+ probe_core_owner(){
+@@ -1242,7 +1332,14 @@
+       [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
+     # A manual/app start may have won while the boot worker waited for this lock.
+     BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
+-    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then ok "Root 代理已在运行"; return 0; fi
++    if pidcore "$BOOT_PID" && kill -0 "$BOOT_PID" 2>/dev/null; then
++      health_collect
++      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
++    fi
++    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
++  fi
++  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
++    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
+   fi
+   : > "$START_TIMING"
+   rm -f "$START_ERROR"; start_stage "preflight"
+@@ -1340,7 +1437,7 @@
+   start_stage "start-watchdog"
+   rm -f "$RUN/google-firewall-at"
+   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
+-  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
++  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { stopcore; cleanup; fail "运行守护未确认就绪，已中止启动"; }
+   rm -f "$START_ERROR"; start_stage "running"
+   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
+   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
+@@ -1774,10 +1871,11 @@
+       *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
+     esac
+     root; shift; start "$@";;
+-  stop) root; acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"; if [ -f "$BASE/boot/enabled" ]; then BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true); [ -z "$BOOT_NOW" ] || printf '%s\n' "$BOOT_NOW" > "$BASE/boot/stopped-boot"; fi; stopwatchdog; cleanup; stopcore; restorev6 || fail "核心已停止，但 IPv6 原状态恢复失败，请重试停止"; rm -f "$SESSION"; ok "Root 代理已停止并恢复网络状态";;
++  cancel-boot) root; cancel_boot || fail "无法撤销本次自动恢复"; ok "自动恢复已撤销";;
++  stop) root; stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
+   status) status;;
+   network-health) health_json;;
+   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
+-  watchdog) { [ "$#" = 10 ] || [ "$#" = 11 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}";;
++  watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
+   *) fail "未知 Root 代理操作";;
+ esac
+diff --git a/android-app/app/src/main/assets/hetu-autostart.sh b/android-app/app/src/main/assets/hetu-autostart.sh
+--- a/android-app/app/src/main/assets/hetu-autostart.sh
++++ b/android-app/app/src/main/assets/hetu-autostart.sh
+@@ -19,6 +19,8 @@
+ if ! mkdir "$LOCK" 2>/dev/null; then
+   OWNER_BOOT=$(cat "$LOCK/boot-id" 2>/dev/null)
+   OWNER_PID=$(cat "$LOCK/pid" 2>/dev/null)
++  # An absent owner is an initializing worker, never a stale lock.
++  [ -n "$OWNER_BOOT" ] || exit 0
+   if [ "$OWNER_BOOT" = "$BOOT_ID" ]; then
+     case "$OWNER_PID" in ''|*[!0-9]*) exit 0;; esac
+     OWNER_CMD=$(tr '\000' ' ' < "/proc/$OWNER_PID/cmdline" 2>/dev/null)
+@@ -43,6 +45,12 @@
+   EXE=$(readlink "/proc/$PID/exe" 2>/dev/null)
+   [ "$EXE" = "$BASE/bin/core" ] || [ "$EXE" = "$BASE/bin/core (deleted)" ]
+ }
++healthy(){
++  alive || return 1
++  HEALTH=$(/system/bin/sh "$BASE/hetu-root.sh" network-health 2>/dev/null) || return 1
++  printf '%s\n' "$HEALTH" | grep -q '"networkIntegrity":"healthy"' &&
++    printf '%s\n' "$HEALTH" | grep -q '"dataPlaneHealthy":true'
++}
+ notify_app(){
+   # The native proxy is already running; app/service restrictions cannot undo it.
+   am start-foreground-service --user 0 -n io.github.xgl34222220.hetu/.ProxyNetworkMatchService \
+@@ -57,22 +65,24 @@
+ done
+ # Native state/config is in /data/adb and needs no app launch or credential storage.
+ # Wait for a route rather than assuming network exists at BOOT_COMPLETED.
+-N=0
++N=0; ATTEMPTS=0
+ while allowed; do
+-  if alive; then state running; notify_app; exit 0; fi
++  if healthy; then state running; notify_app; exit 0; fi
+   ROUTE=$(ip -4 route get 1.1.1.1 2>/dev/null; ip -6 route get 2606:4700:4700::1111 2>/dev/null)
+   if ! printf '%s\n' "$ROUTE" | grep -q ' dev '; then
+     state waiting-network
+   elif [ ! -r "$BOOT/start.sh" ]; then
+     state missing-plan; exit 1
+   else
++    [ "$ATTEMPTS" -lt 3 ] || { state restore-timeout; exit 1; }
++    ATTEMPTS=$((ATTEMPTS+1))
+     state restoring
+     export HETU_BOOT_RESTORE_ID="$BOOT_ID"
+     /system/bin/sh "$BOOT/start.sh" >> "$BOOT/restore.log" 2>&1
+     RC=$?
+     # Bound logs even when a provider/network failure keeps the core unready.
+     tail -c 16384 "$BOOT/restore.log" > "$BOOT/restore.log.new.$$" && mv -f "$BOOT/restore.log.new.$$" "$BOOT/restore.log"
+-    if [ "$RC" = 0 ] && alive; then state running; notify_app; exit 0; fi
++    if [ "$RC" = 0 ] && healthy; then state running; notify_app; exit 0; fi
+     state retrying
+   fi
+   N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
+diff --git a/tools/qa/test_root_autostart.py b/tools/qa/test_root_autostart.py
+--- a/tools/qa/test_root_autostart.py
++++ b/tools/qa/test_root_autostart.py
+@@ -31,6 +31,9 @@
+         self.write_command('sleep', '''t=$(cat "$HETU_TEST/ticks" 2>/dev/null || echo 0); t=$((t+1)); printf '%s\n' "$t" > "$HETU_TEST/ticks"
+ if [ "$t" = "${STOP_AT:--1}" ]; then cat "$HETU_TEST/boot-id" > "$HETU_TEST/hetu/boot/stopped-boot"; fi
+ if [ "$t" = "${DISABLE_AT:--1}" ]; then rm -f "$HETU_TEST/hetu/boot/enabled"; fi''')
++        (self.base/'hetu-root.sh').write_text("""#!/bin/sh
++printf '%s\\n' '{"ok":true,"networkIntegrity":"healthy","dataPlaneHealthy":true}'
++""")
+         (self.boot/'start.sh').write_text('''n=$(cat "$HETU_TEST/starts" 2>/dev/null || echo 0); n=$((n+1)); printf '%s\n' "$n" > "$HETU_TEST/starts"
+ [ "$n" -gt "${FAIL_STARTS:-0}" ] || exit 1
+ printf '%s\n' "$HETU_CORE_PID" > "$HETU_TEST/hetu/run/core.pid"
+@@ -87,6 +90,7 @@
+         at=source.rindex('case "${1:-status}" in')
+         stubs='''root(){ :; }; acquire_lock(){ :; }; release_lock(){ :; }
+ pidcore(){ [ "${FAKE_ALIVE:-0}" = 1 ]; }
++health_collect(){ H_STATE=healthy; }
+ preflight(){ printf 'UNEXPECTED-PREFLIGHT\n' > "$HETU_TEST/preflight-hit"; exit 96; }
+ '''
+         p=self.dir/'root.sh';p.write_text(source[:at]+stubs+source[at:])
+diff --git a/tools/qa/test_root_safety93.py b/tools/qa/test_root_safety93.py
+new file mode 100644
+--- /dev/null
++++ b/tools/qa/test_root_safety93.py
+@@ -0,0 +1,98 @@
++#!/usr/bin/env python3
++"""Reimplemented safety regression fixtures; no real network/firewall operations."""
++import importlib.util
++from pathlib import Path
++import subprocess
++import unittest
++
++spec = importlib.util.spec_from_file_location('autostart_fixture', Path(__file__).with_name('test_root_autostart.py'))
++fixture = importlib.util.module_from_spec(spec)
++spec.loader.exec_module(fixture)
++
++class BootSafety93(fixture.BootWorker):
++    def test_pid_without_health_never_reports_running(self):
++        (self.base/'run/core.pid').write_text(str(self.core.pid))
++        (self.base/'hetu-root.sh').write_text('exit 1\n')
++        self.assertEqual(1, self.run_worker().returncode)
++        self.assertEqual(3, self.starts())
++        self.assertNotEqual('running', self.state())
++        self.assertFalse((self.dir/'notified').exists())
++
++    def test_permanent_failure_starts_only_three_times(self):
++        self.assertEqual(1, self.run_worker(FAIL_STARTS=999).returncode)
++        self.assertEqual(3, self.starts())
++        self.assertEqual('restore-timeout', self.state())
++
++    def test_initializing_lock_cannot_be_stolen(self):
++        lock=self.boot/'restore.lock'; lock.mkdir()
++        self.assertEqual(0, self.run_worker().returncode)
++        self.assertEqual(0, self.starts())
++        self.assertTrue(lock.exists())
++
++    def claim(self, requested='current-boot'):
++        source=self.isolate((fixture.ASSETS/'hetu-root.sh').read_text()).rsplit('\ncase "${1:-status}" in',1)[0]
++        script=self.dir/'claim.sh'
++        script.write_text(source+'\nacquire_lock || exit 2\nrecovery_claim "$1"\n')
++        return subprocess.run(['sh',str(script),requested],env=self.env,capture_output=True,text=True,timeout=5)
++
++    def test_shared_budget_persists_and_old_boot_cannot_reset(self):
++        for count in range(1,4):
++            self.assertEqual(0,self.claim().returncode)
++            self.assertEqual(f'current-boot {count}\n',(self.boot/'recovery-budget').read_text())
++        self.assertEqual(1,self.claim().returncode)
++        self.assertEqual(1,self.claim('previous-boot').returncode)
++        self.assertEqual('current-boot 3\n',(self.boot/'recovery-budget').read_text())
++
++    def test_shared_budget_rejects_cancelled_boot(self):
++        (self.boot/'stopped-boot').write_text('current-boot\n')
++        self.assertEqual(1,self.claim().returncode)
++        self.assertFalse((self.boot/'recovery-budget').exists())
++
++    def root_body(self, body):
++        source=self.isolate((fixture.ASSETS/'hetu-root.sh').read_text()).rsplit('\ncase "${1:-status}" in',1)[0]
++        script=self.dir/'root-body.sh';script.write_text(source+'\n'+body+'\n')
++        return subprocess.run(['sh',str(script)],env=self.env,capture_output=True,text=True,timeout=5)
++
++    def test_cleanup_residual_rule_is_not_successful_stop(self):
++        result=self.root_body('''cleanup(){ :; }
++cleanup_snapshot_read(){ printf '%s\\n' '-N HETU_KOUT'; }
++has(){ return 1; }
++cleanup_confirmed
++''')
++        self.assertEqual(1,result.returncode,result.stderr)
++
++    def test_cleanup_unknown_snapshot_is_not_successful_stop(self):
++        result=self.root_body('''cleanup(){ :; }
++cleanup_snapshot_read(){ return 1; }
++cleanup_confirmed
++''')
++        self.assertEqual(1,result.returncode,result.stderr)
++
++    def test_failed_stop_retains_session_for_retry(self):
++        (self.base/'run/session.state').write_text('evidence')
++        result=self.root_body('''stopwatchdog(){ :; }; cleanup_confirmed(){ return 1; }
++stopcore(){ :; }; restorev6(){ :; }
++stop_transaction
++''')
++        self.assertEqual(1,result.returncode,result.stderr)
++        self.assertEqual('evidence',(self.base/'run/session.state').read_text())
++        self.assertEqual('current-boot\n',(self.boot/'stopped-boot').read_text())
++
++    def test_old_watchdog_cannot_publish_or_delete_new_pid(self):
++        (self.base/'run/generation').write_text('new-generation\n')
++        (self.base/'run/watchdog.pid').write_text('77123\n')
++        result=self.root_body('''watchdog 77121 0 core '' 0 '' '' '' '' '' old-generation''')
++        self.assertEqual(0,result.returncode,result.stderr)
++        self.assertEqual('77123\n',(self.base/'run/watchdog.pid').read_text())
++
++    def test_old_lock_owner_cannot_release_replacement_lock(self):
++        lock=self.base/'run/.txn.lock';lock.mkdir();(lock/'pid').write_text('77123\n')
++        result=self.root_body('LOCK_HELD=1; release_lock')
++        self.assertEqual(0,result.returncode,result.stderr)
++        self.assertEqual('77123\n',(lock/'pid').read_text())
++
++for name in fixture.BootWorker.__dict__:
++    if name.startswith('test_'):
++        setattr(BootSafety93,name,None)
++
++if __name__=='__main__': unittest.main(verbosity=2)

@@ -1,0 +1,13 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "kind": "new native safety cumulative batch 2 checkpoint",
+  "sourceIntegration": "working tree in progress, this commit stores reproducible candidate patch only",
+  "fullSafetyAcceptance": false,
+  "androidTestsRerun": false,
+  "remaining": [
+    "startup timeout/cancel transaction rollback",
+    "KILL1 atomic strict guard and temporary bootstrap exception removal",
+    "App/native integration and full same-source tests"
+  ],
+  "testBoundary": "See original raw logs; not all host gates have completed on one final source. legacy controller failure preserved independently."
+}

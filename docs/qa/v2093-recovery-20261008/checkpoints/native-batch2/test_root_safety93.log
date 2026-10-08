@@ -1,0 +1,15 @@
+test_cleanup_residual_rule_is_not_successful_stop (__main__.BootSafety93.test_cleanup_residual_rule_is_not_successful_stop) ... ok
+test_cleanup_unknown_snapshot_is_not_successful_stop (__main__.BootSafety93.test_cleanup_unknown_snapshot_is_not_successful_stop) ... ok
+test_failed_stop_retains_session_for_retry (__main__.BootSafety93.test_failed_stop_retains_session_for_retry) ... ok
+test_initializing_lock_cannot_be_stolen (__main__.BootSafety93.test_initializing_lock_cannot_be_stolen) ... ok
+test_old_lock_owner_cannot_release_replacement_lock (__main__.BootSafety93.test_old_lock_owner_cannot_release_replacement_lock) ... ok
+test_old_watchdog_cannot_publish_or_delete_new_pid (__main__.BootSafety93.test_old_watchdog_cannot_publish_or_delete_new_pid) ... ok
+test_permanent_failure_starts_only_three_times (__main__.BootSafety93.test_permanent_failure_starts_only_three_times) ... ok
+test_pid_without_health_never_reports_running (__main__.BootSafety93.test_pid_without_health_never_reports_running) ... ok
+test_shared_budget_persists_and_old_boot_cannot_reset (__main__.BootSafety93.test_shared_budget_persists_and_old_boot_cannot_reset) ... ok
+test_shared_budget_rejects_cancelled_boot (__main__.BootSafety93.test_shared_budget_rejects_cancelled_boot) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.383s
+
+OK

@@ -1,0 +1,6 @@
+{
+  "android-app/app/src/main/assets/hetu-root.sh": "9a96faf9510129ecee135eb5deb631c4ee618e781c21c2613d1e4f8d47ef074c",
+  "android-app/app/src/main/assets/hetu-autostart.sh": "5a78bc1c480e2b0d6d37ec624ab232be74c26033bf36330bb12af3e2651f63b7",
+  "tools/qa/test_root_autostart.py": "3dcd0a5a5447e5546cded4d819cfe8beb8859a2b0da004e8e086f441fcd8a857",
+  "tools/qa/test_root_safety93.py": "aff5ebc7d0915fc7db137608e6dd70a9937f571c32a506969157da8915cec2e1"
+}

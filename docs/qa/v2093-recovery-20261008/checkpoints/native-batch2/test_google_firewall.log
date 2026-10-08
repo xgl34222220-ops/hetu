@@ -1,0 +1,22 @@
+test_both_families_google_reject_and_drop_removed_by_exact_spec (__main__.GoogleFirewall.test_both_families_google_reject_and_drop_removed_by_exact_spec) ... ok
+test_changed_core_pid_never_changes_firewall (__main__.GoogleFirewall.test_changed_core_pid_never_changes_firewall) ... ok
+test_current_uid_resolution_includes_work_profile_and_exact_package_names (__main__.GoogleFirewall.test_current_uid_resolution_includes_work_profile_and_exact_package_names) ... ok
+test_disabled_session_never_enters_maintenance (__main__.GoogleFirewall.test_disabled_session_never_enters_maintenance) ... ok
+test_failed_exact_delete_is_reported_without_flush_fallback (__main__.GoogleFirewall.test_failed_exact_delete_is_reported_without_flush_fallback) ... ok
+test_failed_transaction_lock_never_changes_firewall (__main__.GoogleFirewall.test_failed_transaction_lock_never_changes_firewall) ... ok
+test_globbing_state_and_wildcard_interface_are_preserved (__main__.GoogleFirewall.test_globbing_state_and_wildcard_interface_are_preserved) ... ok
+test_healthy_hetu_rules_still_check_oem_google_rules (__main__.GoogleFirewall.test_healthy_hetu_rules_still_check_oem_google_rules) ... ok
+test_no_google_packages_no_firewall_operation (__main__.GoogleFirewall.test_no_google_packages_no_firewall_operation) ... ok
+test_older_oem_package_tool_fallback (__main__.GoogleFirewall.test_older_oem_package_tool_fallback) ... ok
+test_repeated_cleanup_is_idempotent (__main__.GoogleFirewall.test_repeated_cleanup_is_idempotent) ... ok
+test_sixty_second_rate_limit_and_oem_rule_reinsertion (__main__.GoogleFirewall.test_sixty_second_rate_limit_and_oem_rule_reinsertion) ... ok
+test_start_protocol_accepts_legacy_and_supported_google_flag (__main__.GoogleFirewall.test_start_protocol_accepts_legacy_and_supported_google_flag) ... ok
+test_start_protocol_rejects_invalid_flags_and_accepts_extended_controls (__main__.GoogleFirewall.test_start_protocol_rejects_invalid_flags_and_accepts_extended_controls) ... ok
+test_uid_is_resolved_again_after_package_reinstall (__main__.GoogleFirewall.test_uid_is_resolved_again_after_package_reinstall) ... ok
+test_unavailable_ipv6_is_nonfatal (__main__.GoogleFirewall.test_unavailable_ipv6_is_nonfatal) ... ok
+test_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved (__main__.GoogleFirewall.test_unrelated_uid_accept_inverted_range_and_quoted_rules_preserved) ... ok
+
+----------------------------------------------------------------------
+Ran 17 tests in 4.692s
+
+OK
