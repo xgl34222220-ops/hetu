@@ -6,7 +6,7 @@
   "expectedUnitTests": 724,
   "expectedXmlFiles": 79,
   "supplementalTestsUnchanged": 36,
-  "patchSha256": "7d0ee1400d0ce4dcbd93271603489ab4d6ab0af9f80773074c32b6557b689d77",
+  "patchSha256": "3d74fe093133c4ea35d1ecdbae38af84468e3ec75c180703def1b05e4fd9a2e3",
   "forwardReverseByteProof": true,
   "androidTestsRunLocally": false,
   "changedExisting": [

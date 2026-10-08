@@ -1,0 +1,15 @@
+{
+  "commit": "718e286e553c1563cf492f6aba215679ae9ca175",
+  "run": 37856727994,
+  "buildJob": 113582579510,
+  "productionApkCompiled": true,
+  "failureTask": ":app:compileDebugUnitTestKotlin",
+  "failureFile": "PanelCompactAlignment94Test.kt",
+  "failureLines": [80, 106],
+  "cause": "New fixture used an unavailable DpRect.height property.",
+  "correction": "Read bottom - top; retain the original equal-height and <=110dp assertions.",
+  "androidTestsExecuted": false,
+  "lintExecuted": false,
+  "currentApi35Api36Executed": false,
+  "productionSourceChangedForCorrection": false
+}

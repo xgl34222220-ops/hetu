@@ -77,7 +77,7 @@ class PanelCompactAlignment94Test {
             (hasText("44 ms") or hasText("测速中")))
 
     private fun assertEqualCards() {
-        val sizes = groups.map { card(it.name).getUnclippedBoundsInRoot().height }
+        val sizes = groups.map { card(it.name).getUnclippedBoundsInRoot().let { bounds -> bounds.bottom - bounds.top } }
         sizes.forEach { assertEquals("All rows, titles and selected-node lengths use the same density", sizes.first(), it) }
         groups.forEach {
             val bounds = card(it.name).getUnclippedBoundsInRoot()
@@ -103,7 +103,7 @@ class PanelCompactAlignment94Test {
         cards()
         assertEqualCards()
         val before = groups.map { card(it.name).getUnclippedBoundsInRoot() }
-        assertTrue("Use the small card rather than stretching every card to the old long-name variant", before.first().height <= 110.dp)
+        assertTrue("Use the small card rather than stretching every card to the old long-name variant", before.first().bottom - before.first().top <= 110.dp)
         // Ellipsis affects painting only: the complete original node name is still accessible.
         rule.onNodeWithText(longNode, useUnmergedTree = true).assertExists()
         capture("compact-idle")
