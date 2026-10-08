@@ -1,0 +1,59 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "recoveryCheckpoint": "5af355d19fc41c3ae09902ca45fa1d70562ac402",
+  "files": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java",
+      "sha256": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
+      "provenance": "exact archived whole file"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java",
+      "sha256": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
+      "provenance": "exact archived whole file"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
+      "sha256": "43018298725f0163e59d61eec00d2dc6d8fdb8af0f4d92417d8d175b7cfd3adf",
+      "provenance": "exact archived service + new shared-budget integration"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+      "sha256": "f47dfc708e5560821a8f38c4fde51d53edaa6c0582fe6c3583c311f882fdd61c",
+      "provenance": "reimplementation from cffeff08; final lost original not recovered"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt",
+      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+      "junitAnnotations": 5,
+      "provenance": "exact archived whole file"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartIntentSafety93Test.kt",
+      "sha256": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
+      "junitAnnotations": 8,
+      "provenance": "exact archived whole file"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootRecoveryDeadline93Test.kt",
+      "sha256": "5d747fe61b120db30a23f356315ff6f3886aeeb1082fda1ffe92fdda4dc057bd",
+      "junitAnnotations": 4,
+      "provenance": "new reconstruction test"
+    }
+  ],
+  "currentHostChecks": 11,
+  "baselineExpectedFailures": 5,
+  "fullClassAndroidExecuted": false,
+  "completeNewDeploymentHostExecuted": false,
+  "limits": [
+    "Host compiles exact selected entry methods and existing-runtime branch with explicit boundary shims; new deployment branch is deliberately omitted.",
+    "New full start transaction Robolectric tests are separate and require the current CI.",
+    "No AOSP or HyperOS/ColorOS phone execution performed in this App subtask.",
+    "Native ledger, App total deadline and manual-generation semantics require full combined safety CI.",
+    "Native automatic budget conservatively remains exhausted within a boot after a fresh manual success; automatic budget reset for a new explicit manual generation is not implemented."
+  ],
+  "nativeStartTimeoutMs": 145000,
+  "automaticPreparationReserveMs": 165000,
+  "automaticPostStartRollbackReserveMs": 20000,
+  "rootTransportMinTimeoutMs": 1000
+}

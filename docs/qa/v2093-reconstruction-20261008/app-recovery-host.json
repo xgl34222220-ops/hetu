@@ -1,0 +1,34 @@
+{
+  "baseline": {
+    "sourceSha256": "2a1079749b9e5b21084e04c2b3c746f077193a3d8fce1727072ce04d9040b638",
+    "checks": [
+      "supplier-stop FAIL AssertionError:stop revived wanted",
+      "late-network FAIL AssertionError:old network accepted",
+      "adoption-data-plane FAIL AssertionError:PID-only adoption",
+      "cleanup-failure FAIL AssertionError:false cleanup reported success",
+      "queued-manual FAIL AssertionError:queued manual resurrected intent",
+      "healthy-existing PASS"
+    ],
+    "exit": 0,
+    "stderr": ""
+  },
+  "current": {
+    "sourceSha256": "f47dfc708e5560821a8f38c4fde51d53edaa6c0582fe6c3583c311f882fdd61c",
+    "checks": [
+      "supplier-stop PASS",
+      "late-network PASS",
+      "adoption-data-plane PASS",
+      "cleanup-failure PASS",
+      "queued-manual PASS",
+      "healthy-existing PASS",
+      "durable-stop-failure PASS",
+      "unpublished-start-cleanup PASS",
+      "shared-deadline-phases PASS",
+      "matching-exhausted-admission PASS",
+      "matching-persisted-reservation PASS"
+    ],
+    "exit": 0,
+    "stderr": ""
+  },
+  "scope": "exact entry methods and literal existing-runtime branch; deployment path omitted; Android/root are shims; not Android, AOSP or phone execution"
+}

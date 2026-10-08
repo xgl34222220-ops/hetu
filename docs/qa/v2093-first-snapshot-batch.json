@@ -1,0 +1,36 @@
+{
+  "type": "New first-snapshot readiness implementation candidate; not recovered original Readiness test",
+  "changes": [
+    "Publish an identity-checked current controller snapshot and loadedOnce before optional process/provider/version reads.",
+    "Retain state identity, operation and request-generation checks after each suspension; explicit coroutine cancellation check is part of the same guard.",
+    "Do not launch duplicate background jobs: existing foreground/pull/selection caller retains structured ownership of its auxiliary work.",
+    "Restore predictive-back progress when animation is disabled or performance constraints activate; cancel stale return animation and remove its drawing transform."
+  ],
+  "evidence": {
+    "firstDrawConstructor": "ViewModel construction precedes setContent. It has preference/directory operations but no synchronous Root/HTTP was found; no real-device timing claim.",
+    "delayedPublication": "Before candidate, refreshNow awaited inspector.sample, repo.providers, repo.coreVersion before publishing state/loadedOnce.",
+    "newTests": 5,
+    "newTestsExecuted": false,
+    "androidCompile": "pending same-SHA CI",
+    "diffCheck": "passed",
+    "phoneBootHeatGoogle": "not tested"
+  },
+  "files": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt",
+      "sha256": "7f52f60202cfa1a60f83e7b54691ccd0a747b2481fb77987ee88b48f74c4a64e"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt",
+      "sha256": "79a392068f209b1690f7507849ebbd2ee4b249b398a2a281b9b0eb6bfa1bd593"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt",
+      "sha256": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java",
+      "sha256": "e87ae72a46563ccba7e36ac3b0a5293abad93a8dd70ef92248ca2d1323629a6a"
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "kind": "App reconstruction and CI candidate durable source checkpoint",
+  "fullBuildOrAndroidAcceptance": false,
+  "nativeDeadlineBoundary": "Further native foreground-command deadline check in progress; earlier batch3 not final",
+  "hostMethods": "11 current checks passed, 5 specified cff failures; complete deployment omitted by that host projection; full transaction Android tests authored separately",
+  "files": 22
+}
