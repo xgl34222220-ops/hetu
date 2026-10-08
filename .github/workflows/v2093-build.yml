@@ -11,6 +11,13 @@ jobs:
     timeout-minutes: 75
     env:
       HETU_TEST_KEYSTORE: /home/runner/.android/hetu-ui10-debug.jks
+      # Keep sequential and nested shallow fetches free of background Git writers.
+      # Command-scoped environment only; historical drivers remain byte-identical.
+      GIT_CONFIG_COUNT: '2'
+      GIT_CONFIG_KEY_0: gc.auto
+      GIT_CONFIG_VALUE_0: '0'
+      GIT_CONFIG_KEY_1: maintenance.auto
+      GIT_CONFIG_VALUE_1: 'false'
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -24,8 +31,8 @@ jobs:
         python3 .github/scripts/test_install_hetu_ci_sdk.py -v 2>&1 | tee out/verification/sdk-installer-host-tests.txt
 
         '
-    - name: Regress isolated predecessor object fetches
-      run: python3 .github/scripts/test_fetch_predecessor_objects.py -v
+    - name: Regress inherited Git configuration and nested shallow fetches
+      run: python3 .github/scripts/test_predecessor_git_environment.py -v
     - name: Load current layer and fetch exact predecessor objects
       run: 'set -euo pipefail
 
