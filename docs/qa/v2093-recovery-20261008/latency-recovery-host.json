@@ -1,0 +1,40 @@
+{
+  "type": "host JVM pure-model evidence, not Android/device",
+  "atUtc": "2026-10-08T18:30:52.959342+00:00",
+  "compileExit": 0,
+  "testExit": 0,
+  "testCount": 4,
+  "sources": [
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRegions.kt",
+      "sha256": "d9328b31e8d78f9fdd4fe1af9dc530f17e315f68b9b7602c01b8eb1059936b4a"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt",
+      "sha256": "ea97f906f635149b7269768983ad6d8abb4705f4da9ac8cb6a615225f1903224"
+    },
+    {
+      "path": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt",
+      "sha256": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286"
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt",
+      "sha256": "c906754a2eceb61b3270e2bedaaea6e6c43bf4738e2dd7534da63387835dece8"
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/latency-host/LatenciesHostCompileFixtures.kt",
+      "sha256": "4ca00e348868c235b3357500aeeb4565e6f936bd1774f7f3a1e3ba105427f4f6"
+    }
+  ],
+  "compileFixtureScope": "ProxyNodeUi and ProxyGroupUi declarations extracted unchanged from production; MihomoControllerClient only IPv6 URL literal for linkage; full History/Models/HomeRegions and new JUnit source are production bytes. No VM/HTTP/Android execution claimed.",
+  "baselineWitness": {
+    "commit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+    "sourceSha256": "13ca470d0664088f3e16e3d135d47f6b092c90be6e8c91b1d198550457d04546",
+    "projectedSha256": "a2a8f5c18caa8799b80d89c3384f60e12a1c6af56f6134abfcecc8f4565277d5",
+    "projection": "Adds unused protectedNodes parameter only to baseline history signature for compilation; baseline function body unchanged. Other production/model files remain recovery candidate. Not exact whole baseline application.",
+    "compileExit": 0,
+    "testExit": 1,
+    "expectedFailure": "activeProbeRejectsOldCoreHistoryButUnrelatedNodeCanRefresh",
+    "result": "JUnit version 4.13.2\n..E..\nTime: 0.029\nThere was 1 failure:\n1) activeProbeRejectsOldCoreHistoryButUnrelatedNodeCanRefresh(io.github.xgl34222220.hetu.LatencyPresentationRecovery93Test)\njava.lang.AssertionError: expected:<{busy=44, idle=72}> but was:<{busy=900, idle=72}>\n\tat org.junit.Assert.fail(Assert.java:89)\n\tat org.junit.Assert.failNotEquals(Assert.java:835)\n\tat org.junit.Assert.assertEquals(Assert.java:120)\n\tat org.junit.Assert.assertEquals(Assert.java:146)\n\tat io.github.xgl34222220.hetu.LatencyPresentationRecovery93Test.activeProbeRejectsOldCoreHistoryButUnrelatedNodeCanRefresh(LatencyPresentationRecovery93Test.kt:33)\n\nFAILURES!!!\nTests run: 4,  Failures: 1\n\n"
+  }
+}

@@ -1,0 +1,6 @@
+android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt:57:56: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'CoreLatencySample'.
+        if (newest == null || sample.timestamp > newest!!.timestamp) newest = sample
+                                                       ^^
+android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt:60:78: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'CoreLatencySample'.
+    if (preferred != null && (newest == null || preferred.timestamp >= newest!!.timestamp)) return preferred
+                                                                             ^^

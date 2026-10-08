@@ -1,0 +1,70 @@
+{
+  "type": "UI restored-source plus new implementation candidate; no runtime acceptance yet",
+  "productionBaseCommit": "5af355d19fc41c3ae09902ca45fa1d70562ac402",
+  "restoredFiles": [
+    {
+      "originalPath": "docs/qa/v2093-recovery-20261008/originals/ui-audit/PanelGroupsTab.kt",
+      "sealedSha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b",
+      "archiveUnmodified": true,
+      "application": "Exact original applied first; production then changed in a separately documented new recovery batch."
+    },
+    {
+      "originalPath": "docs/qa/v2093-recovery-20261008/originals/ui-audit/PanelComponents.kt",
+      "sealedSha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a",
+      "archiveUnmodified": true,
+      "application": "Exact original applied first; production then changed in a separately documented new recovery batch."
+    }
+  ],
+  "modifiedProductionFiles": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt"
+  ],
+  "newTests": [
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt",
+      "testAnnotations": 6,
+      "sha256": "3ea8cdc7eafe32ccb69a773c1549daec49e818380db07c198fde59ee263d8382",
+      "provenance": "New implementation; missing original touch/motion tests were not recovered.",
+      "executed": false
+    },
+    {
+      "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt",
+      "testAnnotations": 5,
+      "sha256": "d6ec3053b7935ba1d976209c869930af23d403befd8ae7f7a36c1edc70d8e396",
+      "provenance": "New implementation; missing original touch/motion tests were not recovered.",
+      "executed": false
+    }
+  ],
+  "changes": [
+    "Physical group and node delay touch ownership retained while busy and while a real result transition runs; group test callback restored.",
+    "Long group/node names receive independent delay rows and larger compact targets. Failed and Timeout remain separate domain states.",
+    "Existing shared cached diffuse/glass material retained across home, tools, settings, secondary pages and overlays; group cards now use same material and dock uses low saturation without a resting shadow.",
+    "Actual dock outer measurement feeds root content clearance and toast placement, including navigation inset once. Body grows with font scale.",
+    "Launcher route/tab/toast transitions honor real global and preference motion controls. Dock press state returns to rest on deactivation or motion disable.",
+    "Low-memory or battery-saver constraints disable offscreen dock/header glass and motion without modifying user preferences; static readable materials remain. Backdrop producer and consumer obey same gate."
+  ],
+  "validation": {
+    "diffCheck": "passed",
+    "sourceArchiveHashes": "passed",
+    "androidCompile": "not executed locally: no Gradle/JDK compiler/SDK",
+    "newAndroidTests": "not executed; CI must run 11 new tests and all preserved tests",
+    "newScreenshots": "not generated yet; tests write build/outputs/ui93",
+    "originalUserImages": "prepare_materialize succeeded for IDs but both current transfer helper downloads returned HTTP403; no pixel inspection claim",
+    "hostSynthetic": "not a proxy/runtime test",
+    "aosp": "not yet executed",
+    "hyperosColoros": "not executed; no user device access"
+  },
+  "remaining": [
+    "Same-SHA full build, preserved/new Android tests, lint, AOSP navigation and native rendered captures need actual execution.",
+    "True device GPU blur/refraction, frame pacing, Google connection, boot time and heat remain unverified.",
+    "No claim of PDF pixel parity or reconstruction of missing original Touch/Motion suites."
+  ]
+}

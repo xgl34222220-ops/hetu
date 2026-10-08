@@ -1,0 +1,6 @@
+/workspace/hetu-recovery-20261008/latency-host/BaselineProxyLatencyHistory.kt:57:56: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'CoreLatencySample'.
+        if (newest == null || sample.timestamp > newest!!.timestamp) newest = sample
+                                                       ^^
+/workspace/hetu-recovery-20261008/latency-host/BaselineProxyLatencyHistory.kt:60:78: warning: unnecessary non-null assertion (!!) on a non-null receiver of type 'CoreLatencySample'.
+    if (preferred != null && (newest == null || preferred.timestamp >= newest!!.timestamp)) return preferred
+                                                                             ^^

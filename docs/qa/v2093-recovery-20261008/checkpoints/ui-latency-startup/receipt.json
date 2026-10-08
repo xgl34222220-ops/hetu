@@ -1,0 +1,11 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "type": "Durable source checkpoint, full Android compilation/validation pending",
+  "files": 24,
+  "testsAuthored": 33,
+  "testsBoundary": "startup10 + latency12 + UI11; only latency4 host executed, not Android",
+  "restorationBoundary": "startup5 and history exact originals; UI two originals restored then separately modified; missing VM and UI Touch/Motion tests newly implemented",
+  "fullSafetyAcceptance": false,
+  "apkIssued": false,
+  "originalUserImagePixelsAvailable": false
+}
