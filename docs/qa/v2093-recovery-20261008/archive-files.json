@@ -1,0 +1,471 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "kind": "recovery records only; no production application or acceptance",
+  "files": [
+    {
+      "path": "README.md",
+      "bytes": 3673,
+      "sha256": "b90f6e3f44bb13f8f6c82777294afb24e452aeeb671be843507ea61ac7f90813"
+    },
+    {
+      "path": "exact-recovery-verification.json",
+      "bytes": 7257,
+      "sha256": "9e4bca6a676198d1650385c0cdc5bb133cd8d5044a4efbf7db8f31e77129f181"
+    },
+    {
+      "path": "originals/app/BootRecoverySafety93Test.kt",
+      "bytes": 26662,
+      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e"
+    },
+    {
+      "path": "originals/app/ProxyNetworkMatchService.java",
+      "bytes": 57022,
+      "sha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933"
+    },
+    {
+      "path": "originals/app/Service-verified-original-methods-complete.json",
+      "bytes": 25152,
+      "sha256": "4e8bc5ce84e03ababee9fcdb9c0869665178b3430806cdb85b54cc95561d7571"
+    },
+    {
+      "path": "originals/app/Service-verified-original-methods.json",
+      "bytes": 24077,
+      "sha256": "2a388bf4a0c0542a12da539f780c1e60b61d752c52b78453b474b48a8a3d43cb"
+    },
+    {
+      "path": "originals/app/app-host-result.json",
+      "bytes": 5383,
+      "sha256": "6d82f72a0f7505d6d0ac12ba16af66e18d318eb41af8c3431ed10cc80d49c5ca"
+    },
+    {
+      "path": "originals/app/exact-restoration-manifest.json",
+      "bytes": 3249,
+      "sha256": "8052227b4666fb296e924a5add79732eb1c4d511ca0b7875ac2ce6afd3a13473"
+    },
+    {
+      "path": "originals/app/recovery-manifest.json",
+      "bytes": 3252,
+      "sha256": "be3a597aa4c3e0bca41b941d3a37aee30a68ae2fb3f8ee530c94601d1fe47c6f"
+    },
+    {
+      "path": "originals/app/service-replay/ProxyNetworkMatchService.java",
+      "bytes": 57022,
+      "sha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933"
+    },
+    {
+      "path": "originals/app-old/ProxyNetworkMatchService-after-006.java",
+      "bytes": 50821,
+      "sha256": "e279f7b6b189bafe03eca5033518b9a28eeb2866d1d85dcb771f824ebd0c82d7"
+    },
+    {
+      "path": "originals/app-old/ProxyNetworkMatchService-after-009.java",
+      "bytes": 51889,
+      "sha256": "8592824920562c61ad81191ae445acd62055b205e2b2e35eeb42ff04f374b779"
+    },
+    {
+      "path": "originals/app-old/cff-ProxyNetworkMatchService.java",
+      "bytes": 42484,
+      "sha256": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024"
+    },
+    {
+      "path": "originals/app-old/patches/001-constants.patch",
+      "bytes": 704,
+      "sha256": "a7f77d5698cda504d2f2f356bcede08871baff5423103205ba76930823e50f6f"
+    },
+    {
+      "path": "originals/app-old/patches/002-restore-budget-helpers.patch",
+      "bytes": 11477,
+      "sha256": "63371e8d10143e7c4d6f6af92296d73aadebe8950ed227c99cfb614d52e7d34e"
+    },
+    {
+      "path": "originals/app-old/patches/003-atomic-health-and-network-request.patch",
+      "bytes": 789,
+      "sha256": "a44ea2ed626217ed43bd4f07d5a840074b07657c341dff1327e626745563c4dc"
+    },
+    {
+      "path": "originals/app-old/patches/004-maintain-shared-budget.patch",
+      "bytes": 3129,
+      "sha256": "0598890dad02ac1e68cee42e09212ba0f2a4379391fc522bce396a8af34d6707"
+    },
+    {
+      "path": "originals/app-old/patches/005-complete-health-observation.patch",
+      "bytes": 2172,
+      "sha256": "e965d3fce302e7ce4be29d9dd85b952238339f7f0e151f46fe92ca2ecf623307"
+    },
+    {
+      "path": "originals/app-old/patches/006-native-running-notification.patch",
+      "bytes": 779,
+      "sha256": "3ffab7de71d1fa2e0742e1d335e922e56f50defcaa1815080598ecc4fe28f221"
+    },
+    {
+      "path": "originals/app-old/patches/007-unique-original-health-entry.patch",
+      "bytes": 610,
+      "sha256": "7d48703e4e4f7443a1a8031c9556d9906c2a671ce2d789e62e6ec90089cf933a"
+    },
+    {
+      "path": "originals/app-old/patches/008-durable-budget-manual-native-gates.patch",
+      "bytes": 3899,
+      "sha256": "e97086f451caa12ead6c444d7c737e773721aac0e8b682a68bdca8fda4b1998c"
+    },
+    {
+      "path": "originals/app-old/patches/009-native-gate-before-alive.patch",
+      "bytes": 1726,
+      "sha256": "e7afe80e1fae773880f1bfa5988232d3408c18db36f1e977e1bac99e5c8d4420"
+    },
+    {
+      "path": "originals/app-old/patches/recovery-manifest.json",
+      "bytes": 3779,
+      "sha256": "8189ca0c18674b11febd30921b5a056295930825db19e183fe98f75e39adf947"
+    },
+    {
+      "path": "originals/app-old/probe-core-recovery-receipt.json",
+      "bytes": 703,
+      "sha256": "b835cf7d94e3e9aa41deef88c2c5d5ab577d8b5c1d26a15a7e6746ef8432be35"
+    },
+    {
+      "path": "originals/app-old/probeCoreState-original-exact.txt",
+      "bytes": 980,
+      "sha256": "33716c558389eb40f06dfc7ac24a7c97e3886d8baaa3180b3f7e6935d963de27"
+    },
+    {
+      "path": "originals/app-old/source-recovery-receipt.json",
+      "bytes": 1725,
+      "sha256": "dd3ccd3a19d4470f25261001d649355b38945f119b8673391c15bb1935203286"
+    },
+    {
+      "path": "originals/latency/ProxyLatencyHistory.kt",
+      "bytes": 5032,
+      "sha256": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286"
+    },
+    {
+      "path": "originals/latency/manifest.json",
+      "bytes": 1372,
+      "sha256": "c3b9aa9a3dbc75e8858b256fd9ed1c0277266d0d77cfdd0c9bbfcdcfdff707c4"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/audit-recovery-manifest.json",
+      "bytes": 7633,
+      "sha256": "9e69e71d3b0408bfd4044f65c32b70cacf3ec2a3a0c39a5266ccbfe508899547"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-api-adapter-isolated-grep-lines.json",
+      "bytes": 873,
+      "sha256": "88f53ecf909d12521adaf19d0fa931cd859b183cde97a884cf7d755915304b76"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-before-import.line17.py.txt",
+      "bytes": 117,
+      "sha256": "ba4c8e52bd364ff6bd1be0cb81f2f0652e83a479a9373c8402f5f6ec3004fc7e"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-before-production_sources.lines102-121.py.txt",
+      "bytes": 1137,
+      "sha256": "d6606ef1e5027935de095176368081dd071fdd22b208c1d8889bbeabadc75bfe"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-delivery-api-adapter-consumer.lines327-335.py.txt",
+      "bytes": 715,
+      "sha256": "64ea9dab8e0c8b7551547df65e97235a95430997853357ef2c9cc463c747f97e"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-source-scope-layer-registration.lines270-271.py.txt",
+      "bytes": 171,
+      "sha256": "8f8559be02330cbf1e223289023bb4f43055f96aa43f4e5d75713e1e746d5ab7"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/fragments/latest-test-api-adapter-guards.lines253-268.py.txt",
+      "bytes": 1213,
+      "sha256": "f39c6e7cdb03be8d8258808bf509bd9536799698e9a13ccfcfd160d7763c43b0"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/historical-source/continuity93_source_scope.pre-api-adapter.py",
+      "bytes": 17416,
+      "sha256": "32cdb502c3654e6401fe326dcf32ac3486b4f7b8a1524ab27f768c9f6bd2a6d8"
+    },
+    {
+      "path": "originals/pipeline/audit-recovery/historical-source/run_continuity93_before_comparison.pre-api-adapter.py",
+      "bytes": 20046,
+      "sha256": "e499de0a0b5d4cc7ced59ed52f8da3ec73d2bd45bb5e126f9fe1bd12ed38609c"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/continuity93_ci_config.py",
+      "bytes": 1797,
+      "sha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/continuity93_source_compatibility.py",
+      "bytes": 4887,
+      "sha256": "4879f41711d1279688b0d16f69c0889ad0ef7b1532f12af8fbeacf65cda38189"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/feedback93_original65.json",
+      "bytes": 3009,
+      "sha256": "20fe8bb3dda55af1a98fa36983d6754b236301a28d42093afe369bf16266c4bf"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/generate_continuity93_source_layer.py",
+      "bytes": 5842,
+      "sha256": "a21881d34aadd8bcdba996fe03b12c9f9daf89b70cc33de2b2c97371156f8b20"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_continuity93_baseline_hosts.py",
+      "bytes": 6269,
+      "sha256": "828afbd84faafeabd909dc9ed97961a2c5bf9ba91a84fde3209a0eeb54cfcf87"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_hetu_feedback93_emulator.py",
+      "bytes": 1929,
+      "sha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_hetu_feedback93_smoke.py",
+      "bytes": 862,
+      "sha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_root_safety93_evidence.py",
+      "bytes": 11177,
+      "sha256": "a6c8bb35a0e1e92e4c821f1e369b3d49387e8384bc2b403a01d0a766ed1dc275"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/test_feedback_smoke93.py",
+      "bytes": 19836,
+      "sha256": "59624d5f3b7dcdf95114e901104b8fc3ec2b0d284291cef1e5a0a2207762f07f"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_continuity93_producer.py",
+      "bytes": 7513,
+      "sha256": "0f34a7795657a6c472d3f17f5649cb2fe42e74172d9533a0e76f224125464f62"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_continuity93_test_results.py",
+      "bytes": 3343,
+      "sha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_feedback_smoke93.py",
+      "bytes": 13512,
+      "sha256": "55eebab9c0e7a5ad17266aa7bc12393ae4239ff2eeaef168b76fe77d27d6b5b6"
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_root_safety93.py",
+      "bytes": 7107,
+      "sha256": "a54b99f7ad8ce09d32530d404097ccf940db866a30054a1312e0fa824b709b99"
+    },
+    {
+      "path": "originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/binding.json",
+      "bytes": 2544,
+      "sha256": "77dfdd3e74ee87ce089e960889a996530520bda875c5045fa031e372c0c9abfb"
+    },
+    {
+      "path": "originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "bytes": 33610,
+      "sha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86"
+    },
+    {
+      "path": "originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "bytes": 745,
+      "sha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc"
+    },
+    {
+      "path": "originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "bytes": 100953,
+      "sha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e"
+    },
+    {
+      "path": "originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "bytes": 1216,
+      "sha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b"
+    },
+    {
+      "path": "originals/pipeline/fragments/root-manager-current-timeout-api.java.txt",
+      "bytes": 493,
+      "sha256": "3c5304d68cadd24f3e7ea197f1a4fb555745c2a8bc7c0757afc911724131f091"
+    },
+    {
+      "path": "originals/pipeline/recovery-addendum-01.json",
+      "bytes": 724,
+      "sha256": "840eb2f4475aa7f688cdf4f344a046781de861349d3f0db78089320e4055bfa9"
+    },
+    {
+      "path": "originals/pipeline/recovery-addendum-02.json",
+      "bytes": 815,
+      "sha256": "e6f80ab821087368474407f2d68af16630f56b009f1229969194abfc99d44ec0"
+    },
+    {
+      "path": "originals/pipeline/recovery-addendum-03.json",
+      "bytes": 3944,
+      "sha256": "03e04184e3596b64c8e85ca9e6827a4230cdac129cab67b4b90b03fa34fa4607"
+    },
+    {
+      "path": "originals/pipeline/recovery-final-inventory.json",
+      "bytes": 28620,
+      "sha256": "57d68aa705a4470623336388c11df62302ed61bc44a6976e1fb23dc5a56bc52c"
+    },
+    {
+      "path": "originals/pipeline/recovery-manifest.json",
+      "bytes": 9700,
+      "sha256": "26a71b9b45f80c81ee5c5874514a48581adf6fcecef7e8e9293cef3a6bb05377"
+    },
+    {
+      "path": "originals/root-android-audit/ProxyControlEpoch.java",
+      "bytes": 1165,
+      "sha256": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c"
+    },
+    {
+      "path": "originals/root-android-audit/RootAutostart.java",
+      "bytes": 9135,
+      "sha256": "f520cf8538fe22a65d07078648761a4b7a038b6e2ac2130ceaf44ee1dd2717db"
+    },
+    {
+      "path": "originals/root-android-audit/RootStartIntentSafety93Test.kt",
+      "bytes": 15665,
+      "sha256": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9"
+    },
+    {
+      "path": "originals/root-android-audit/replay-receipt.json",
+      "bytes": 2147,
+      "sha256": "2558ebcaafb0f48ec84f91b240ecbe5ab90924ac4c12663b09aee14519be6272"
+    },
+    {
+      "path": "originals/root-current-history/001-helper-runner-original-command.partial.patch",
+      "bytes": 4069,
+      "sha256": "0bfb011aadcd65e3099903391cfdab9f3ea3f080c277ab9bce13289783a421e6"
+    },
+    {
+      "path": "originals/root-current-history/002-helper-three-bootstrap-methods-original-command.partial.patch",
+      "bytes": 4410,
+      "sha256": "54e1fcfb3b3128a8db213d96758ad299926bdb70f9552fa6612df1af1c74ffa4"
+    },
+    {
+      "path": "originals/root-current-history/003-root-bootstrap-original-command.partial.patch",
+      "bytes": 5749,
+      "sha256": "f45e7d70dd6db0e0ba4fc7d4058460002a6885c6ff81bfd80c3d38629151fa6c"
+    },
+    {
+      "path": "originals/root-current-history/004-root-gid-constant-original-command.partial.patch",
+      "bytes": 555,
+      "sha256": "1a10b1735521ba94044e1c1dce84e538002057f3b5829aa7ed646a81e72fd72e"
+    },
+    {
+      "path": "originals/root-current-history/005-helper-modeled-credentials-original-command.partial.patch",
+      "bytes": 2093,
+      "sha256": "97978045ade75dfdb60e61fc7b216c018b5965f680e53531ed9acd61b33bed90"
+    },
+    {
+      "path": "originals/root-current-history/RootAutostart-00462-exact-timeout-api.patch",
+      "bytes": 651,
+      "sha256": "8b38d03c5a50fce894532441e9dbefd5d5d4f1297fa27e1d5a6cb50de98a87dc"
+    },
+    {
+      "path": "originals/root-current-history/RootAutostart.java",
+      "bytes": 9174,
+      "sha256": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f"
+    },
+    {
+      "path": "originals/root-current-history/bootstrap-before-observation.partial-receipt.txt",
+      "bytes": 1154,
+      "sha256": "1077d974f08115672d95ef83b0fd0a7d2f3df4da1168b81fd269ffe8cc8e4272"
+    },
+    {
+      "path": "originals/root-current-history/early-executor.original.partial.txt",
+      "bytes": 5279,
+      "sha256": "0a31f36154d82aee09bf64c79b26a0d81c0c4ebc34d936b4fbe0b6f26cb9ae5f"
+    },
+    {
+      "path": "originals/root-current-history/pre-recovery-incident-state.json",
+      "bytes": 2587,
+      "sha256": "f4eb231c3ee2a782a10c785e47e6bf93e7b5bc4f561e108896c2f0900cfa7952"
+    },
+    {
+      "path": "originals/root-current-history/recovery-manifest.json",
+      "bytes": 7787,
+      "sha256": "013831677ab2391c4bfbb57c62cbc704180af8ddd00d59f97f114e7c93543d95"
+    },
+    {
+      "path": "originals/startup/SettingsStartupConfigScreen.kt",
+      "bytes": 6022,
+      "sha256": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc"
+    },
+    {
+      "path": "originals/startup/StartupConfigViewer.kt",
+      "bytes": 6772,
+      "sha256": "262d71d3ad0928276157d179a40eb4b431bff441997c79a3347e9596a96a60bb"
+    },
+    {
+      "path": "originals/startup/StartupConfigViewerFeedbackTest.kt",
+      "bytes": 29571,
+      "sha256": "75653c50194e20f79711e9c6d4b78f7d954a976109ce2cc467279ebccf95cdfd"
+    },
+    {
+      "path": "originals/startup/StartupConfigViewerFeedbackTest.pre-clipboard-8.kt",
+      "bytes": 21342,
+      "sha256": "4ede778184d478079b3e096b74b77b805fb195ae5fe63989e8e1b74b9f8103d9"
+    },
+    {
+      "path": "originals/startup/ToolsDiagScreen.kt",
+      "bytes": 9053,
+      "sha256": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c"
+    },
+    {
+      "path": "originals/startup/ToolsFeatureAdapter.kt",
+      "bytes": 19407,
+      "sha256": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7"
+    },
+    {
+      "path": "originals/startup/manifest.json",
+      "bytes": 3326,
+      "sha256": "4e53e123e66e9b9c9162cf10e45f55f0e6db0183760e62109d3935fff7ddb839"
+    },
+    {
+      "path": "originals/ui-audit/PanelComponents.kt",
+      "bytes": 35330,
+      "sha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a"
+    },
+    {
+      "path": "originals/ui-audit/PanelComponents.original-tool.diff",
+      "bytes": 6463,
+      "sha256": "a9b57bb1576271cb2478a7626b3af088dca47e9d5f5715e392b2ed340f3d57c5"
+    },
+    {
+      "path": "originals/ui-audit/PanelGroupsTab.kt",
+      "bytes": 18326,
+      "sha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b"
+    },
+    {
+      "path": "originals/ui-audit/PanelGroupsTab.original-tool.diff",
+      "bytes": 7068,
+      "sha256": "8b1c6f322275c983d07b69df4e13b9b90e9591f4d5f3744755307848430cf7c6"
+    },
+    {
+      "path": "originals/ui-audit/exact-base-apply/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt",
+      "bytes": 35330,
+      "sha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a"
+    },
+    {
+      "path": "originals/ui-audit/exact-base-apply/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt",
+      "bytes": 18326,
+      "sha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b"
+    },
+    {
+      "path": "originals/ui-audit/exact-source-recovery.json",
+      "bytes": 1439,
+      "sha256": "95d80d77ae40a4e4ddb480c2c29e468b78dd13f6b934c060f38c2e9649132ad1"
+    },
+    {
+      "path": "surviving-receipts/hetu-boot93-recovery-state.json",
+      "bytes": 2587,
+      "sha256": "f4eb231c3ee2a782a10c785e47e6bf93e7b5bc4f561e108896c2f0900cfa7952"
+    },
+    {
+      "path": "surviving-receipts/hetu-owned-executor93.txt",
+      "bytes": 5279,
+      "sha256": "0a31f36154d82aee09bf64c79b26a0d81c0c4ebc34d936b4fbe0b6f26cb9ae5f"
+    },
+    {
+      "path": "surviving-receipts/hetu-root72-current5.txt",
+      "bytes": 13825,
+      "sha256": "4d77f47416f5d4944e0d4b5df3ca6c79bb2cd236897e8a64476c28796bb41263"
+    }
+  ]
+}

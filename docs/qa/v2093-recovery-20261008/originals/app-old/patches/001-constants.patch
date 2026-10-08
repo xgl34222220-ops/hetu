@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+-    private volatile int bootRestoreAttempts;
++    // Boot callbacks and the periodic guardian share one episode. The deadline
++    // and start count survive observer recreation; its local throttle does not.
++    private static final int MAX_RECOVERY_STARTS=6;
++    private static final long RECOVERY_DEADLINE_MS=300000L;
++    private static final long RECOVERY_BACKOFF_MS=30000L;
++    private long nextBootRecoveryElapsed=-1L;
++    private int bootRestoreAttempts;
+     private ProxyRestoreScheduler bootRestores;
+*** End Patch

@@ -1,0 +1,70 @@
+{
+  "recordKind": "Exact restored-source recovery receipt; historical original seal remains unavailable",
+  "createdUtc": "2026-10-08T17:35:10.199833+00:00",
+  "originalRepoPath": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "source": {
+    "service": {
+      "relativeRepoPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
+      "recoveredPath": "/workspace/hetu-recovery-20261008/originals/app/ProxyNetworkMatchService.java",
+      "sha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933",
+      "bytes": 57022
+    },
+    "test": {
+      "relativeRepoPath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt",
+      "recoveredPath": "/workspace/hetu-recovery-20261008/originals/app/BootRecoverySafety93Test.kt",
+      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+      "bytes": 26662
+    }
+  },
+  "originalHostResult": {
+    "path": "/workspace/hetu-recovery-20261008/originals/app/app-host-result.json",
+    "sha256": "6d82f72a0f7505d6d0ac12ba16af66e18d318eb41af8c3431ed10cc80d49c5ca",
+    "restoredExact": true,
+    "historicalScenarios": 15,
+    "reExecutedDuringRecovery": false
+  },
+  "completeVerifiedMethods": {
+    "path": "/workspace/hetu-recovery-20261008/originals/app/Service-verified-original-methods-complete.json",
+    "sha256": "4e8bc5ce84e03ababee9fcdb9c0869665178b3430806cdb85b54cc95561d7571",
+    "methodNames": 27,
+    "methodBodies": 28,
+    "allOriginalHashesMatched": true
+  },
+  "replayCheckpoints": [
+    {
+      "source": "Exact cff baseline git show",
+      "sha256": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024"
+    },
+    {
+      "source": "Original old-owner successful records 001..006",
+      "sha256": "e279f7b6b189bafe03eca5033518b9a28eeb2866d1d85dcb771f824ebd0c82d7",
+      "originalObservedCheckpointMatched": true
+    },
+    {
+      "source": "Original old-owner successful records 001..009",
+      "sha256": "8592824920562c61ad81191ae445acd62055b205e2b2e35eeb42ff04f374b779",
+      "independentOldOwnerArchiveMatched": true
+    },
+    {
+      "source": "Original later source reads/method hashes and original inline update record joined after preserved unchanged suffix",
+      "sha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933",
+      "originalSealedWholeFileMatched": true
+    }
+  ],
+  "ServiceFullRecovered": true,
+  "testMethodCount": 5,
+  "originalAppSealSha256": "e077e0d4be77f8afa0717c4a8ff2c4e3dbb3b6b1fe8886a69707c05ba514ff99",
+  "originalAppSealRecovered": false,
+  "originalHostCompilerHelperRecovered": false,
+  "AndroidRerun": false,
+  "fullAndroidClassCompiledDuringRecovery": false,
+  "productionRepoWrittenByAppRecovery": false,
+  "commitOrCIByAppRecovery": false,
+  "limitations": [
+    "Only source byte restoration and integrity verification occurred during recovery",
+    "Historical host report uses Root/native/Android boundary shims and was not rerun",
+    "No proof of all Java local I/O strict 5min wall clock",
+    "Original app-source-seal JSON, host compiler helper and original run/compile log files remain unavailable"
+  ]
+}

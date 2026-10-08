@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "result": "ADDITIONAL_EXACT_RECOVERY",
+  "recordedUtc": "2026-10-08T17:33:31.639202+00:00",
+  "originalRepoPath": ".github/scripts/verify_feedback_smoke93.py",
+  "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_feedback_smoke93.py",
+  "bytes": 13512,
+  "sha256": "55eebab9c0e7a5ad17266aa7bc12393ae4239ff2eeaef168b76fe77d27d6b5b6",
+  "matchesPreCleanupKnownSha256": true,
+  "source": "Complete tool read; no later edits; reconstructed bytes SHA matches actual pre-cleanup report",
+  "resolvesEarlierMissingEntry": ".github/scripts/verify_feedback_smoke93.py",
+  "limits": "Restored original consumer source, not recreated actual Android/device evidence"
+}

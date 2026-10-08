@@ -1,0 +1,16 @@
+        adapters = compatibility_controls(scope.ROOT)
+        for variant, (name, archive, patch) in COMPATIBILITY_CONTROLS.items():
+            sources = production_sources(scope.ROOT, variant)
+            original = scope.committed_bytes(name)
+            current = (scope.ROOT / name).read_bytes()
+            compatible = (scope.ROOT / archive).read_bytes()
+            self.assertEqual(sources, {name: compatible})
+            self.assertNotEqual(compatible, original)
+            self.assertFalse(adapters[variant]['sourceIsByteExactPinnedBaseCommit'])
+            self.assertTrue(adapters[variant]['oldProductionBodiesUnmodified'])
+            validate_projection(original, current, compatible, variant)
+            body_mutation = (compatible.replace('ht("测速")'.encode(), 'ht("改变旧行为")'.encode(), 1)
+                if variant == 'motion-only' else compatible.replace(b'RootBridge.rootShell', b'RootBridge.changedOldBehavior', 1))
+            self.assertNotEqual(body_mutation, compatible)
+            for wrong in (compatible + b'\nchangedOldBody();\n', original, body_mutation):
+                with self.assertRaises(AssertionError): validate_projection(original, current, wrong, variant)

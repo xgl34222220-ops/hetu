@@ -1,0 +1,17 @@
+--- cff/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
++++ compatible/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
+@@ -30,6 +30,14 @@
+     private static final String LEGACY_MODULE="/data/adb/modules/bichen";
+     private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
+     private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
++    private static final ThreadLocal<long[]> AUTOMATIC_START_BUDGET=new ThreadLocal<>();
++    static long automaticRootTimeout(long requested)throws IOException{
++        long[] budget=AUTOMATIC_START_BUDGET.get();
++        if(budget==null)return requested;
++        long remaining=budget[0]-SystemClock.elapsedRealtime()-budget[1];
++        if(remaining<=0L)throw new IOException("自动恢复剩余时限不足，未开始新的 Root 阶段");
++        return Math.min(requested,remaining);
++    }
+     private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
+     static long observationTicket(){return CONTROL_LOCK.observe();}
+     static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}

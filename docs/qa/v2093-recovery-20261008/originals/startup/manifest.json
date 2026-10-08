@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "scope": "Hetu original candidate source recovery, no implementation changes",
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "productionCopied": false,
+  "commitOrCIStarted": false,
+  "missing": [],
+  "files": [
+    {
+      "savedFile": "StartupConfigViewer.kt",
+      "repoRelativePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt",
+      "knownSha256": "262d71d3ad0928276157d179a40eb4b431bff441997c79a3347e9596a96a60bb",
+      "actualSha256": "262d71d3ad0928276157d179a40eb4b431bff441997c79a3347e9596a96a60bb",
+      "source": "Full exact source from this agent's read result, replayed verbatim.",
+      "role": "candidate original",
+      "bytes": 6772
+    },
+    {
+      "savedFile": "SettingsStartupConfigScreen.kt",
+      "repoRelativePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+      "knownSha256": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc",
+      "actualSha256": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc",
+      "source": "Full prior candidate read plus this agent's exact clipboard patches.",
+      "role": "candidate original",
+      "bytes": 6022
+    },
+    {
+      "savedFile": "ToolsDiagScreen.kt",
+      "repoRelativePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt",
+      "knownSha256": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c",
+      "actualSha256": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c",
+      "source": "Full prior candidate read plus this agent's exact clipboard patch.",
+      "role": "candidate original",
+      "bytes": 9053
+    },
+    {
+      "savedFile": "ToolsFeatureAdapter.kt",
+      "repoRelativePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt",
+      "knownSha256": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7",
+      "actualSha256": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7",
+      "source": "Read-only exact cffeff08ee38c7220922bdb36de81b621c935daf remote source, plus original two-line clipboard patch.",
+      "role": "candidate original",
+      "bytes": 19407
+    },
+    {
+      "savedFile": "StartupConfigViewerFeedbackTest.kt",
+      "repoRelativePath": "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
+      "knownSha256": "75653c50194e20f79711e9c6d4b78f7d954a976109ce2cc467279ebccf95cdfd",
+      "actualSha256": "75653c50194e20f79711e9c6d4b78f7d954a976109ce2cc467279ebccf95cdfd",
+      "source": "Full original eight-test read reconstructed and matched 4ede SHA, plus all this agent's exact clipboard patches; ten test methods.",
+      "role": "candidate original",
+      "bytes": 29571
+    },
+    {
+      "savedFile": "StartupConfigViewerFeedbackTest.pre-clipboard-8.kt",
+      "repoRelativePath": null,
+      "knownSha256": "4ede778184d478079b3e096b74b77b805fb195ae5fe63989e8e1b74b9f8103d9",
+      "actualSha256": "4ede778184d478079b3e096b74b77b805fb195ae5fe63989e8e1b74b9f8103d9",
+      "source": "Exact pre-clipboard eight-test source reconstructed from full read; retained as evidence only.",
+      "role": "evidence original only",
+      "bytes": 21342
+    }
+  ]
+}

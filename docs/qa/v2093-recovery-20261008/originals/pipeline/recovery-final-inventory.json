@@ -1,0 +1,505 @@
+{
+  "schema": 1,
+  "recordedUtc": "2026-10-08T17:47:15.389089+00:00",
+  "result": "STABLE_PARTIAL_EXACT_RECOVERY_INVENTORY_NOT_CURRENT_ACCEPTANCE",
+  "recoveryRoot": "/workspace/hetu-recovery-20261008/originals/pipeline",
+  "originalWorkdir": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "baseline": {
+    "path": "/workspace/hetu-recovery-20261008/baseline-complete",
+    "head": "cffeff08ee38c7220922bdb36de81b621c935daf",
+    "cleanAfterReadOnlyVerification": true
+  },
+  "counts": {
+    "recoveredSourceArchiveAndFragmentItems": 27,
+    "wholeCurrentPipelinePythonSources": 12,
+    "wholeHistoricalPreAdapterPythonSources": 2,
+    "original65Catalogs": 1,
+    "exactCFArchiveItems": 5,
+    "fragments": 7,
+    "itemsMatchingSeparatelyRetainedPreCleanupSha256": 13,
+    "wholePythonSyntaxParses": 14
+  },
+  "recordManifests": {
+    "recovery-manifest.json": {
+      "sha256": "26a71b9b45f80c81ee5c5874514a48581adf6fcecef7e8e9293cef3a6bb05377",
+      "bytes": 9700
+    },
+    "recovery-addendum-01.json": {
+      "sha256": "840eb2f4475aa7f688cdf4f344a046781de861349d3f0db78089320e4055bfa9",
+      "bytes": 724
+    },
+    "recovery-addendum-02.json": {
+      "sha256": "e6f80ab821087368474407f2d68af16630f56b009f1229969194abfc99d44ec0",
+      "bytes": 815
+    },
+    "recovery-addendum-03.json": {
+      "sha256": "03e04184e3596b64c8e85ca9e6827a4230cdac129cab67b4b90b03fa34fa4607",
+      "bytes": 3944
+    },
+    "audit-recovery/audit-recovery-manifest.json": {
+      "sha256": "9e69e71d3b0408bfd4044f65c32b70cacf3ec2a3a0c39a5266ccbfe508899547",
+      "bytes": 7633
+    }
+  },
+  "entries": [
+    {
+      "originalRepoPath": ".github/scripts/continuity93_ci_config.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/continuity93_ci_config.py",
+      "bytes": 1797,
+      "sha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
+      "preCleanupKnownSha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_continuity93_test_results.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_continuity93_test_results.py",
+      "bytes": 3343,
+      "sha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290",
+      "preCleanupKnownSha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_hetu_feedback93_emulator.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_hetu_feedback93_emulator.py",
+      "bytes": 1929,
+      "sha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f",
+      "preCleanupKnownSha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_hetu_feedback93_smoke.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_hetu_feedback93_smoke.py",
+      "bytes": 862,
+      "sha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa",
+      "preCleanupKnownSha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_root_safety93.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_root_safety93.py",
+      "bytes": 7107,
+      "sha256": "a54b99f7ad8ce09d32530d404097ccf940db866a30054a1312e0fa824b709b99",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/continuity93_source_compatibility.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/continuity93_source_compatibility.py",
+      "bytes": 4887,
+      "sha256": "4879f41711d1279688b0d16f69c0889ad0ef7b1532f12af8fbeacf65cda38189",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_continuity93_baseline_hosts.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_continuity93_baseline_hosts.py",
+      "bytes": 6269,
+      "sha256": "828afbd84faafeabd909dc9ed97961a2c5bf9ba91a84fde3209a0eeb54cfcf87",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/generate_continuity93_source_layer.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/generate_continuity93_source_layer.py",
+      "bytes": 5842,
+      "sha256": "a21881d34aadd8bcdba996fe03b12c9f9daf89b70cc33de2b2c97371156f8b20",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_root_safety93_evidence.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_root_safety93_evidence.py",
+      "bytes": 11177,
+      "sha256": "a6c8bb35a0e1e92e4c821f1e369b3d49387e8384bc2b403a01d0a766ed1dc275",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_continuity93_producer.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_continuity93_producer.py",
+      "bytes": 7513,
+      "sha256": "0f34a7795657a6c472d3f17f5649cb2fe42e74172d9533a0e76f224125464f62",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete tool read plus exact recorded subsequent patch/generation",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": ".github/scripts/feedback93_original65.json",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/feedback93_original65.json",
+      "bytes": 3009,
+      "sha256": "20fe8bb3dda55af1a98fa36983d6754b236301a28d42093afe369bf16266c4bf",
+      "preCleanupKnownSha256": "20fe8bb3dda55af1a98fa36983d6754b236301a28d42093afe369bf16266c4bf",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance",
+      "recoveryClass": "original65_catalog",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "originalRepoPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/fragments/root-manager-current-timeout-api.java.txt",
+      "bytes": 493,
+      "sha256": "3c5304d68cadd24f3e7ea197f1a4fb555745c2a8bc7c0757afc911724131f091",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Exact displayed API method and dependency field; fragment hash matched prior compatibility binding",
+      "completeFile": false,
+      "limitations": "Only 493-byte compatibility fragment; not restored production Root Manager",
+      "recoveryClass": "exact_current_api_fragment_only",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "schema": 1,
+      "result": "ADDITIONAL_EXACT_RECOVERY",
+      "recordedUtc": "2026-10-08T17:33:31.639202+00:00",
+      "originalRepoPath": ".github/scripts/verify_feedback_smoke93.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_feedback_smoke93.py",
+      "bytes": 13512,
+      "sha256": "55eebab9c0e7a5ad17266aa7bc12393ae4239ff2eeaef168b76fe77d27d6b5b6",
+      "matchesPreCleanupKnownSha256": true,
+      "source": "Complete tool read; no later edits; reconstructed bytes SHA matches actual pre-cleanup report",
+      "resolvesEarlierMissingEntry": ".github/scripts/verify_feedback_smoke93.py",
+      "limits": "Restored original consumer source, not recreated actual Android/device evidence",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "schema": 1,
+      "result": "ADDITIONAL_EXACT_RECOVERY",
+      "recordedUtc": "2026-10-08T17:36:26.467848+00:00",
+      "originalRepoPath": ".github/scripts/test_feedback_smoke93.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/test_feedback_smoke93.py",
+      "bytes": 19836,
+      "sha256": "59624d5f3b7dcdf95114e901104b8fc3ec2b0d284291cef1e5a0a2207762f07f",
+      "matchesPreCleanupKnownSha256": true,
+      "source": "Complete tool read through EOF; exact 16-method test source SHA matches pre-cleanup actual16-host guard record",
+      "testMethods": 16,
+      "testBodiesNotEdited": true,
+      "resolvesEarlierMissingEntry": ".github/scripts/test_feedback_smoke93.py",
+      "limits": "Restored original synthetic host test source; original raw test execution log not fabricated or regenerated",
+      "recoveryClass": "whole_current_pipeline_source",
+      "currentHashAndSizeMatchRecoveryRecord": true,
+      "pythonSyntaxParsedWithoutImportOrExecution": true
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "bytes": 33610,
+      "sha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86",
+      "preCleanupKnownSha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash",
+      "recoveryClass": "exact_archival_c_f_compatibility_control",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "bytes": 745,
+      "sha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc",
+      "preCleanupKnownSha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash",
+      "recoveryClass": "exact_archival_c_f_compatibility_control",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "bytes": 100953,
+      "sha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e",
+      "preCleanupKnownSha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash",
+      "recoveryClass": "exact_archival_c_f_compatibility_control",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "bytes": 1216,
+      "sha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b",
+      "preCleanupKnownSha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash",
+      "recoveryClass": "exact_archival_c_f_compatibility_control",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/binding.json",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/binding.json",
+      "bytes": 2544,
+      "sha256": "77dfdd3e74ee87ce089e960889a996530520bda875c5045fa031e372c0c9abfb",
+      "preCleanupKnownSha256": "77dfdd3e74ee87ce089e960889a996530520bda875c5045fa031e372c0c9abfb",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Exact displayed original binding structure; whole JSON byte hash matches pre-cleanup binding",
+      "recoveryClass": "exact_archival_c_f_compatibility_control",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-api-adapter-isolated-grep-lines.json",
+      "bytes": 873,
+      "sha256": "88f53ecf909d12521adaf19d0fa931cd859b183cde97a884cf7d755915304b76",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-api-adapter-isolated-grep-lines.json",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-import.line17.py.txt",
+      "bytes": 117,
+      "sha256": "ba4c8e52bd364ff6bd1be0cb81f2f0652e83a479a9373c8402f5f6ec3004fc7e",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-import.line17.py.txt",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-production_sources.lines102-121.py.txt",
+      "bytes": 1137,
+      "sha256": "d6606ef1e5027935de095176368081dd071fdd22b208c1d8889bbeabadc75bfe",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-production_sources.lines102-121.py.txt",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-delivery-api-adapter-consumer.lines327-335.py.txt",
+      "bytes": 715,
+      "sha256": "64ea9dab8e0c8b7551547df65e97235a95430997853357ef2c9cc463c747f97e",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-delivery-api-adapter-consumer.lines327-335.py.txt",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-source-scope-layer-registration.lines270-271.py.txt",
+      "bytes": 171,
+      "sha256": "8f8559be02330cbf1e223289023bb4f43055f96aa43f4e5d75713e1e746d5ab7",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-source-scope-layer-registration.lines270-271.py.txt",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-test-api-adapter-guards.lines253-268.py.txt",
+      "bytes": 1213,
+      "sha256": "f39c6e7cdb03be8d8258808bf509bd9536799698e9a13ccfcfd160d7763c43b0",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-test-api-adapter-guards.lines253-268.py.txt",
+      "recoveryClass": "partial_latest_original_tool_fragment",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/continuity93_source_scope.pre-api-adapter.py",
+      "bytes": 17416,
+      "sha256": "32cdb502c3654e6401fe326dcf32ac3486b4f7b8a1524ab27f768c9f6bd2a6d8",
+      "snapshot": "PRE_C_F_API_ADAPTER_HISTORICAL_ONLY",
+      "wholeOriginalSource": true,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "pythonSyntaxParsedWithoutImportOrExecution": true,
+      "lines": 302,
+      "recordedTopLevelDefinitions": {
+        "validate_revision": 70,
+        "validate_revision_test": 76,
+        "host_test_bodies": 82,
+        "host_process_timeouts": 89,
+        "validate_host_fixture": 96,
+        "validate_stress_fixture": 108,
+        "host_fixture_deltas": 116,
+        "candidate_test_method_bodies": 121,
+        "validate_candidate_test_methods": 139,
+        "evidence_sources": 149,
+        "other_payloads": 178,
+        "committed_bytes": 187,
+        "predecessor_layer": 191,
+        "previous_files": 203,
+        "historical_files": 207,
+        "allowed_change": 221,
+        "validate_version": 225,
+        "selected_tests": 232,
+        "validate_layer": 239,
+        "validate_checkout": 286
+      },
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/continuity93_source_scope.pre-api-adapter.py",
+      "recoveryClass": "whole_historical_pre_adapter_source",
+      "originalRepoPath": ".github/scripts/continuity93_source_scope.py",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/run_continuity93_before_comparison.pre-api-adapter.py",
+      "bytes": 20046,
+      "sha256": "e499de0a0b5d4cc7ced59ed52f8da3ec73d2bd45bb5e126f9fe1bd12ed38609c",
+      "snapshot": "PRE_C_F_API_ADAPTER_HISTORICAL_ONLY",
+      "wholeOriginalSource": true,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "pythonSyntaxParsedWithoutImportOrExecution": true,
+      "lines": 291,
+      "recordedTopLevelDefinitions": {
+        "production_sources": 101,
+        "suite_results": 122,
+        "specifications": 156,
+        "verify_variant": 184,
+        "run_variant": 206,
+        "run": 271
+      },
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/run_continuity93_before_comparison.pre-api-adapter.py",
+      "recoveryClass": "whole_historical_pre_adapter_source",
+      "originalRepoPath": ".github/scripts/run_continuity93_before_comparison.py",
+      "currentHashAndSizeMatchRecoveryRecord": true
+    }
+  ],
+  "latestOrRawMissing": [
+    {
+      "path": ".github/scripts/continuity93_source_scope.py",
+      "state": "LATEST_WHOLE_SOURCE_MISSING",
+      "available": "Complete pre-adapter historical source and exact partial latest lines; missing intervening latest lines were not inferred"
+    },
+    {
+      "path": ".github/scripts/run_continuity93_before_comparison.py",
+      "state": "LATEST_WHOLE_SOURCE_MISSING",
+      "available": "Complete pre-adapter historical source and exact partial latest import/function/grep lines; incomplete adapter metadata patch not inferred"
+    },
+    {
+      "path": ".github/scripts/test_continuity93_evidence.py",
+      "state": "WHOLE_SOURCE_MISSING",
+      "available": "Exact latest API guard fragment only"
+    },
+    {
+      "path": ".github/scripts/verify_continuity93_delivery.py",
+      "state": "WHOLE_SOURCE_MISSING",
+      "available": "Exact latest adapter consumer fragment only"
+    },
+    {
+      "path": ".github/scripts/feedback_smoke93.py",
+      "state": "WHOLE_SOURCE_MISSING",
+      "available": "Only partial original tool read; absent dependency prevents rerunning restored 16-host suite"
+    },
+    {
+      "path": ".github/scripts/prepare_new_ui_source.py",
+      "state": "LATEST_WHOLE_SOURCE_MISSING",
+      "available": "Accurate tracked cff baseline remains available, current candidate delta is not recovered here"
+    },
+    {
+      "path": ".github/workflows/v2093-build.yml",
+      "state": "WHOLE_SOURCE_MISSING",
+      "available": "Only step-name table and partial prior reads; workflow not recreated from summary"
+    },
+    {
+      "path": "updates/v2093-feedback-root-safety/inputs.json",
+      "state": "NEVER_GENERATED_BEFORE_CLEANUP"
+    },
+    {
+      "path": "updates/v2093-feedback-root-safety/runtime.patch",
+      "state": "NEVER_GENERATED_BEFORE_CLEANUP"
+    },
+    {
+      "path": "most original raw preseal logs / historical114 current-run logs",
+      "state": "RAW_FILES_UNAVAILABLE",
+      "available": "Retained conversation receipts/counts/hashes are not fabricated file reconstructions"
+    }
+  ],
+  "recoveryMethods": "Complete recorded tool reads and exact recorded subsequent edits; precise C/F archive projections rebuilt from clean pinned cff plus retained API fragment and matched original full SHA. Historical two sources retain their older snapshot status. Partial latest excerpts stay partial.",
+  "checksActuallyRun": [
+    "Every restored item re-read and matched its recovery-record SHA256 and byte length",
+    "14 complete Python sources parsed with ast.parse without importing or executing",
+    "Pinned baseline HEAD and clean git status checked"
+  ],
+  "notPerformed": [
+    "Production source reconstruction from fragments",
+    "New layer generation",
+    "Git stage/commit/ref/push",
+    "Any CI execution or cancellation",
+    "Rerunning host16 with missing feedback_smoke93 dependency",
+    "Android compile / emulator / physical-device acceptance",
+    "Device operations or package delivery",
+    "Fabricating unavailable original logs"
+  ],
+  "limitations": [
+    "Six full current pipeline Python sources have complete original reads/edits but no separately retained latest whole-file pre-cleanup SHA; newly computed identity is not a production seal",
+    "The two historical whole Python sources have no separately retained pre-cleanup whole-file SHA and are not latest adapter candidates",
+    "C/F archives are cff behavior plus explicitly registered API-only adapters, not current production Manager or whole byte-exact cff sources",
+    "Source syntax and hash recovery prove neither root recovery correctness nor Android/mobile safety",
+    "Current Root bootstrap final candidate and complete batch acceptance remain unsealed; prior successes remain historical receipts only"
+  ]
+}

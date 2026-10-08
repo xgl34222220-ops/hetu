@@ -1,0 +1,29 @@
+{
+  "schema": 1,
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "baseSourceGitBlob": "56b04c207806c441a88b7a74ad52b971e85b46f0",
+  "relativeSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
+  "originalRecordsManifest": "patches/recovery-manifest.json",
+  "originalRecordsManifestSha256": "8189ca0c18674b11febd30921b5a056295930825db19e183fe98f75e39adf947",
+  "files": {
+    "cff-ProxyNetworkMatchService.java": {
+      "bytes": 42484,
+      "sha256": "8afa325e918d87f9ad13bf15a4823e1f318f70edd943e600ad1325521a46b024"
+    },
+    "ProxyNetworkMatchService-after-006.java": {
+      "bytes": 50821,
+      "sha256": "e279f7b6b189bafe03eca5033518b9a28eeb2866d1d85dcb771f824ebd0c82d7"
+    },
+    "ProxyNetworkMatchService-after-009.java": {
+      "bytes": 51889,
+      "sha256": "8592824920562c61ad81191ae445acd62055b205e2b2e35eeb42ff04f374b779"
+    }
+  },
+  "oldObservedCheckpointMatches": true,
+  "recoveredSourceOrigin": "Exact pinned git-show source plus nine saved original apply_patch input records, changing only archival target path; no semantic editing or unrecorded patch.",
+  "after006Origin": "Old-owner original sha256sum output e279 matched after six original records.",
+  "after009Origin": "Only the last three original tool records applied to the verified original after006 bytes. This is an earlier owner candidate; no claim it equals later d976 sealed source.",
+  "productionCheckoutEdited": false,
+  "gitCommitOrCiRun": false,
+  "gap": "Later current-owner changes between original after009 and sealed d976 are outside these nine complete original records; current owner must reconcile its exact full-method reads/body hashes and final full SHA."
+}

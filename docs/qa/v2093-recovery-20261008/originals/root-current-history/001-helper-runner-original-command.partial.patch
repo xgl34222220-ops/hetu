@@ -1,0 +1,72 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/tools/qa/test_root_boot_safety93.py
+@@
+-                        ('/proc/$1/cmdline',str(proc)+'/$1/cmdline'),('/proc/$DS_CHILD/stat',str(proc)+'/$DS_CHILD/stat'),('/proc/$H_WD/cmdline',str(proc)+'/$H_WD/cmdline'),
++                        ('/proc/$1/cmdline',str(proc)+'/$1/cmdline'),('/proc/$1/status',str(proc)+'/$1/status'),('/proc/$DS_CHILD/stat',str(proc)+'/$DS_CHILD/stat'),('/proc/$H_WD/cmdline',str(proc)+'/$H_WD/cmdline'),
+@@
+ #include <stdlib.h>
+ #include <string.h>
++#include <sys/wait.h>
+@@
+   snprintf(p,sizeof(p),"%s/new-core",base);f=fopen(p,"w"); if(!f)return 93;fprintf(f,"%ld %ld\n",(long)getpid(),real);fclose(f);
++  if(getenv("CORE_REMOTE_BOOTSTRAP")){
++    snprintf(p,sizeof(p),"%s/bootstrap.py",base);
++    pid_t child=fork();if(child<0)return 94;
++    if(child==0){execl("/usr/bin/python3","python3",p,(char *)0);_exit(95);}
++    int result=0;if(waitpid(child,&result,0)<0||!WIFEXITED(result)||WEXITSTATUS(result))return 96;
++  }
+   for(;;)pause();
+ }''')
+@@
+-        policy=self.base/'policy';policy.mkdir();(policy/'system-dns-direct').touch()
++        policy=self.base/'policy';policy.mkdir()
++        # The production runner is selected through its existing Magisk path.
++        # This private native applet changes only the owned child credentials;
++        # both its probes and the launched core expose real kernel UID/GID.
++        manager=self.directory/'root-manager';busybox=manager/'.magisk/busybox';busybox.parent.mkdir(parents=True)
++        runner=self.directory/'runner.c'
++        runner.write_text(r'''#include <unistd.h>
++#include <stdlib.h>
++#include <string.h>
++int main(int argc,char **argv){
++  if(argc>3&&!strcmp(argv[1],"setuidgid")){
++    if(strcmp(argv[2],"root:net_admin")&&strcmp(argv[2],"0:3005"))return 71;
++    int changed=getenv("DROP_CORE_IDENTITY")&&strstr(argv[3],"/bin/core");
++    if(setgid(changed?0:3005))return 72;
++    execv(argv[3],argv+3);return 73;
++  }
++  if(argc>1&&!strcmp(argv[1],"id")){execv("/usr/bin/id",argv+1);return 74;}
++  return 75;
++}''')
++        subprocess.run([compiler,'-O0','-o',str(busybox),str(runner)],check=True,capture_output=True,text=True,timeout=15)
++        self.command('magisk','[ "$1" = --path ] || exit 1; printf "%s/root-manager\\n" "$HETU_FIXTURE"')
++        (self.directory/'bootstrap.py').write_text(r'''import ipaddress,json,os,pathlib,sys
++p=pathlib.Path(os.environ['HETU_FIXTURE'])
++uid,gid=os.getuid(),os.getgid()
++def verdict(rules,flow_uid,flow_gid,family):
++    address=ipaddress.ip_address('93.184.216.34' if family=='4' else '2001:db8::1')
++    for rule in rules:
++        if rule[1]!='HETU_KOUT':continue
++        if '-o' in rule and rule[rule.index('-o')+1]!='fixture0':continue
++        if '-d' in rule and address not in ipaddress.ip_network(rule[rule.index('-d')+1]):continue
++        if '--uid-owner' in rule:
++            value=rule[rule.index('--uid-owner')+1];lo,_,hi=value.partition('-')
++            if not int(lo)<=flow_uid<=int(hi or lo):continue
++        if '--gid-owner' in rule and int(rule[rule.index('--gid-owner')+1])!=flow_gid:continue
++        return rule[rule.index('-j')+1]
++    return 'UNPROTECTED'
++results={}
++for family in ['4']+(['6'] if os.environ.get('FIXTURE_IPV6')=='1' else []):
++    name='table-filter' if family=='4' else 'table6-filter'
++    table=json.loads((p/name).read_text());(p/('bootstrap-'+name)).write_text(json.dumps(table))
++    results[family]={'core':verdict(table['rules'],uid,gid,family),
++                     'app':verdict(table['rules'],10100,10100,family),
++                     'otherRoot':verdict(table['rules'],0,0,family)}
++(p/'bootstrap-verdicts').write_text(json.dumps({'uid':uid,'gid':gid,'families':results}))
++if uid!=0 or gid!=3005 or any(v!={'core':'RETURN','app':'REJECT','otherRoot':'REJECT'} for v in results.values()):sys.exit(97)
++(p/'bootstrap-ready').touch()
++''')
+@@
+ [ "$state" != Z ] || exit 0
++[ -z "${CORE_REMOTE_BOOTSTRAP:-}" ] || [ -f "$HETU_FIXTURE/bootstrap-ready" ] || exit 0
+*** End Patch

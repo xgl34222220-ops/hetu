@@ -1,0 +1,17 @@
+    private ProxyContinuity.ProcessState probeCoreState(){
+        final long ticket=RootProxyManager.observationTicket();
+        if(ticket<0L)return ProxyContinuity.ProcessState.UNKNOWN;
+        try{
+            String command=ProxyContinuity.coreProbeCommand("/data/adb/hetu/run/core.pid","/data/adb/hetu/bin/core");
+            RootBridge.Result result=RootBridge.rootShell(getApplicationContext(),command,3500L);
+            ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
+            if(state!=ProxyContinuity.ProcessState.UNKNOWN){
+                if(!publishServiceObservation(ticket,()->prefs.edit()
+                        .putBoolean("proxyRootRuntimeRunning",state==ProxyContinuity.ProcessState.ALIVE).apply()))
+                    return ProxyContinuity.ProcessState.UNKNOWN;
+            }
+            return state;
+        }catch(Exception ignored){
+            return ProxyContinuity.ProcessState.UNKNOWN;
+        }
+    }

@@ -1,0 +1,20 @@
+def production_sources(root, variant):
+    if variant in COMPATIBILITY_CONTROLS:
+        control = compatibility_controls(root)[variant]
+        return {control['productionSource']: (Path(root) / control['archive']).read_bytes()}
+    if variant == 'direct-node-order':
+        result = {}
+        for name, (archive, expected) in DIRECT_NODE_CONTROL_SOURCES.items():
+            path = Path(root) / archive
+            assert digest(path) == expected, 'Direct-node pre-repair candidate source control changed'
+            result[name] = path.read_bytes()
+        return result
+    if variant == 'snapshot-alias-order':
+        path = Path(root) / ALIAS_CONTROL_SOURCE
+        assert digest(path) == ALIAS_CONTROL_SHA256, 'Pre-repair candidate source control changed'
+        return {VM_FILES[0]: path.read_bytes()}
+    if variant == 'app-boot-safety':
+        return {name: committed_bytes(name, root) for name in APP_BOOT_FILES}
+    assert variant in ('ui-and-startup', 'vm-and-alias')
+    changed = UI_FILES + VIEWER_FILES if variant == 'ui-and-startup' else VM_FILES
+    return {name: committed_bytes(name, root) for name in changed}

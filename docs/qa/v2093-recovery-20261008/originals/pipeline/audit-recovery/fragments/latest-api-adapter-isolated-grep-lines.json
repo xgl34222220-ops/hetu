@@ -1,0 +1,12 @@
+{
+  "source_scope": {
+    "168": "    compatibility = 'docs/qa/20261008-feedback93-before-api-compatibility/'",
+    "169": "    names.update(compatibility + name for name in ('binding.json',"
+  },
+  "before_driver": {
+    "225": "    report['sourceSubstitutionBoundary'] = 'Only listed production sources are from cff; all other candidate sources, including Root154, remain current.'",
+    "227": "        report['sourceCompatibilityAdapter'] = compatibility_controls(root)[variant]",
+    "228": "        report['sourceSubstitutionBoundary'] = 'Listed source preserves exact cff production behavior with only the archived, registered API shape adapter. It is not byte-exact cff; all other production inputs remain current.'"
+  },
+  "limitations": "Observed individual grep lines only. Unobserved intervening lines are intentionally absent; this is not a complete patch."
+}

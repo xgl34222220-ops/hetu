@@ -1,0 +1,191 @@
+{
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "type": "partial source recovery verification",
+  "productionFilesApplied": false,
+  "behaviorTestsRerun": false,
+  "androidTestsRerun": false,
+  "nativeSafetyAcceptanceComplete": false,
+  "phoneCauseEstablished": false,
+  "sealedFiles": [
+    {
+      "recoveredPath": "originals/app/ProxyNetworkMatchService.java",
+      "bytes": 57022,
+      "sha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/app/BootRecoverySafety93Test.kt",
+      "bytes": 26662,
+      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": 5
+    },
+    {
+      "recoveredPath": "originals/root-current-history/RootAutostart.java",
+      "bytes": 9174,
+      "sha256": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/root-android-audit/ProxyControlEpoch.java",
+      "bytes": 1165,
+      "sha256": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/root-android-audit/RootStartIntentSafety93Test.kt",
+      "bytes": 15665,
+      "sha256": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": 8
+    },
+    {
+      "recoveredPath": "originals/ui-audit/PanelGroupsTab.kt",
+      "bytes": 18326,
+      "sha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/ui-audit/PanelComponents.kt",
+      "bytes": 35330,
+      "sha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/startup/StartupConfigViewer.kt",
+      "bytes": 6772,
+      "sha256": "262d71d3ad0928276157d179a40eb4b431bff441997c79a3347e9596a96a60bb",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/startup/SettingsStartupConfigScreen.kt",
+      "bytes": 6022,
+      "sha256": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/startup/ToolsDiagScreen.kt",
+      "bytes": 9053,
+      "sha256": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/startup/ToolsFeatureAdapter.kt",
+      "bytes": 19407,
+      "sha256": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    },
+    {
+      "recoveredPath": "originals/startup/StartupConfigViewerFeedbackTest.kt",
+      "bytes": 29571,
+      "sha256": "75653c50194e20f79711e9c6d4b78f7d954a976109ce2cc467279ebccf95cdfd",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": 10
+    },
+    {
+      "recoveredPath": "originals/latency/ProxyLatencyHistory.kt",
+      "bytes": 5032,
+      "sha256": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286",
+      "sealedWholeFileMatched": true,
+      "junitTestAnnotations": null
+    }
+  ],
+  "pythonSyntax": [
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_root_safety93.py",
+      "bytes": 7107,
+      "sha256": "a54b99f7ad8ce09d32530d404097ccf940db866a30054a1312e0fa824b709b99",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_continuity93_baseline_hosts.py",
+      "bytes": 6269,
+      "sha256": "828afbd84faafeabd909dc9ed97961a2c5bf9ba91a84fde3209a0eeb54cfcf87",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/generate_continuity93_source_layer.py",
+      "bytes": 5842,
+      "sha256": "a21881d34aadd8bcdba996fe03b12c9f9daf89b70cc33de2b2c97371156f8b20",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_root_safety93_evidence.py",
+      "bytes": 11177,
+      "sha256": "a6c8bb35a0e1e92e4c821f1e369b3d49387e8384bc2b403a01d0a766ed1dc275",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/continuity93_source_compatibility.py",
+      "bytes": 4887,
+      "sha256": "4879f41711d1279688b0d16f69c0889ad0ef7b1532f12af8fbeacf65cda38189",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_continuity93_test_results.py",
+      "bytes": 3343,
+      "sha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_feedback_smoke93.py",
+      "bytes": 13512,
+      "sha256": "55eebab9c0e7a5ad17266aa7bc12393ae4239ff2eeaef168b76fe77d27d6b5b6",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/continuity93_ci_config.py",
+      "bytes": 1797,
+      "sha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_hetu_feedback93_smoke.py",
+      "bytes": 862,
+      "sha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/verify_continuity93_producer.py",
+      "bytes": 7513,
+      "sha256": "0f34a7795657a6c472d3f17f5649cb2fe42e74172d9533a0e76f224125464f62",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/run_hetu_feedback93_emulator.py",
+      "bytes": 1929,
+      "sha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f",
+      "astParses": true
+    },
+    {
+      "path": "originals/pipeline/files/.github/scripts/test_feedback_smoke93.py",
+      "bytes": 19836,
+      "sha256": "59624d5f3b7dcdf95114e901104b8fc3ec2b0d284291cef1e5a0a2207762f07f",
+      "astParses": true
+    }
+  ],
+  "missingCriticalOriginals": [
+    "final hetu-root.sh",
+    "final hetu-autostart.sh",
+    "final RootProxyManager.java",
+    "complete native 93 host fixtures and assertions",
+    "PanelViewModel current and pre-fix originals",
+    "latency Models/Adapter/Probe/current Readiness test",
+    "Touch/Motion full test originals",
+    "latest complete pipeline scope/before/delivery/runner/workflow"
+  ],
+  "limits": [
+    "Whole-file matching is recovery evidence only, not test or phone-safety evidence.",
+    "Historical host intermediate success/failure remains historical; final 32 plus original 60 never completed on the latest source.",
+    "Bootstrap exception cleanup on atomic strict-restore failure remains an unresolved blocker."
+  ]
+}

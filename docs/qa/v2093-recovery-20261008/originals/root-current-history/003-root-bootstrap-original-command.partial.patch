@@ -1,0 +1,60 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/assets/hetu-root.sh
+@@
+ START_ROLLBACK=0
++START_BOOTSTRAP=0
+@@
+ rollback_start(){
+-  START_ROLLBACK=1; TXN_DEADLINE=0; RB_FAILED=0
++  START_ROLLBACK=1; START_BOOTSTRAP=0; TXN_DEADLINE=0; RB_FAILED=0
+@@
+ core_return(){
+@@
+ }
++# Only the verified isolated runner may initialize remote providers while the
++# new core's startup transaction is protected. Crash/abort guards remain strict.
++startup_core_return(){
++  [ "$START_BOOTSTRAP" = 1 ] && [ "$START_ROLLBACK" = 0 ] && [ -n "$CORE_RUNNER" ] || return 0
++  "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GROUP_ID" -j RETURN
++}
+@@
+ install_kill4(){
+-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
++  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt4 filter "$KOUT" || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+@@
+ install_kill6(){
+-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
++  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt6 filter "$KOUT" || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+@@
+-  if [ "$START_V6" != bypass ] && v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
++  if v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
+@@
+ core_identity_confirm(){
+@@
+-  CI_GID=$(awk '$1=="Gid:" {print $2; exit}' "/proc/$1/status" 2>/dev/null)
+-  [ "$CI_GID" = "$CORE_GROUP_ID" ] || return 0
++  pidcore "$1" || return 1
++  CI_IDS=$(awk '$1=="Uid:" {u=($2==0 && $3==0 && $4==0 && $5==0)} $1=="Gid:" {g=($2==3005 && $3==3005 && $4==3005 && $5==3005)} END {if(u && g) print "verified"}' "/proc/$1/status" 2>/dev/null)
++  [ "$CI_IDS" = verified ] || return 1
+@@
+   load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
++  start_stage "core-identity"
++  core_identity_prepare
++  if [ "$START_KILL" = 1 ] && [ -z "$CORE_RUNNER" ]; then
++    fail "Kill Switch 启动缺少可验证的隔离核心身份，未拆除已有接管；system-dns-direct 或当前 Root 执行器不支持安全初始化"
++  fi
+@@
+-  start_stage "core-identity"
+-  core_identity_prepare
++  if [ "$START_KILL" = 1 ]; then
++    START_BOOTSTRAP=1
++    rollback_kill_guard 4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv4 隔离核心初始化保护安装失败"
++    rollback_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv6 隔离核心初始化保护安装失败"
++  fi
+   start_stage "launch-core"
+   : > "$LOG"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心身份"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
++  core_identity_confirm "$START_PID" || fail "实际隔离核心身份与启动执行器不符，已停止本次启动"
+@@
+-  core_identity_confirm "$START_PID"
+   core_tune "$START_PID"
+*** End Patch

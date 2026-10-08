@@ -1,0 +1,12 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+-                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime())evaluate();
++                    if(new RootProxyManager(getApplicationContext()).adoptBootRuntime()){
++                        // Native can finish after this observer's bounded wait.
++                        // Its notification starts no new core; current complete
++                        // health may close the exhausted observer episode.
++                        synchronized(ProxyNetworkMatchService.this){confirmRecoveryHealth(true);}
++                        evaluate();
++                    }
+*** End Patch

@@ -1,0 +1,50 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+-    private void maintainProxyRuntime(){
++    private synchronized void maintainProxyRuntime(){
+         try{
+-            if(destroyed||!prefs.getBoolean("proxyRootWanted",false)||RootProxyManager.observationTicket()<0L)return;
++            if(!currentRecoveryIntent()||RootProxyManager.observationTicket()<0L)return;
++            prepareRecoveryEpisode();
++            if(!recoveryWindowOpen(false))return;
++            boolean boot=prefs.getBoolean("proxyRootAutoStart",false);
++            if(boot&&nextBootRecoveryElapsed>SystemClock.elapsedRealtime())return;
+@@
+             if(state==ProxyContinuity.ProcessState.ALIVE){
+-                checkLiveNetworkIntegrity();
++                confirmRecoveryHealth(false);
+@@
+-            long nowElapsed=SystemClock.elapsedRealtime();
+-            if(lastAutoRecoveryElapsed>=0L&&nowElapsed-lastAutoRecoveryElapsed<30000L)return;
+-            lastAutoRecoveryElapsed=nowElapsed;
+-            prefs.edit().putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis()).apply();
++            if(boot){
++                RootAutostart.BootRestoreState nativeState=RootAutostart.restoreState(getApplicationContext());
++                if(!nativeRecoveryAllowsStart(nativeState,false)){
++                    if(nativeState==RootAutostart.BootRestoreState.ACTIVE||nativeState==RootAutostart.BootRestoreState.UNKNOWN)
++                        deferBootRecovery(nativeState==RootAutostart.BootRestoreState.ACTIVE
++                                ?"Root 开机脚本正在恢复，App 等待原任务完成…":"Root 开机恢复所有者尚未确认…");
++                    return;
++                }
++            }
++            if(!reserveRecoveryStart(false))return;
++            final long manualGeneration=prefs.getLong("proxyRootManualStartGeneration",0L);
+@@
+-                    ()->!destroyed&&networkEvents.isCurrent(route));
++                    ()->recoveryStartCurrent(route,manualGeneration));
++            if(!currentRecoveryIntent()||manualGeneration!=prefs.getLong("proxyRootManualStartGeneration",0L))return;
+@@
+-                prefs.edit()
+-                        .putLong("proxyAutoRecoverySuccess",System.currentTimeMillis())
+-                        .remove("proxyAutoRecoveryError")
+-                        .apply();
++                if(!networkEvents.isCurrent(route)||probeCoreState()!=ProxyContinuity.ProcessState.ALIVE||!confirmRecoveryHealth(false))
++                    publishRecoveryError(false,"启动请求已返回，网络接管仍未完整验证；已保留当前核心");
+             }else{
+-                prefs.edit().putString("proxyAutoRecoveryError",result.optString("message","代理自动恢复未完成")).apply();
++                publishRecoveryError(false,result.optString("message","代理自动恢复未完成"));
+@@
+-            prefs.edit().putString("proxyAutoRecoveryError",detail).apply();
++            publishRecoveryError(false,detail);
+*** End Patch

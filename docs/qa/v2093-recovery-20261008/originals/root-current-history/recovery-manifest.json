@@ -1,0 +1,122 @@
+{
+  "full_recovered": [
+    {
+      "file": "RootAutostart.java",
+      "sha256": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
+      "bytes": 9174,
+      "source_full_file": "../root-android-audit/RootAutostart.java",
+      "source_sha256": "f520cf8538fe22a65d07078648761a4b7a038b6e2ac2130ceaf44ee1dd2717db",
+      "exact_delta": "RootAutostart-00462-exact-timeout-api.patch",
+      "delta_sha256": "8b38d03c5a50fce894532441e9dbefd5d5d4f1297fa27e1d5a6cb50de98a87dc",
+      "verification": "Every other byte retained; matches independently recorded pre-cleanup final source SHA exactly",
+      "delta_origin": "Current parent/pipeline actual pre-cleanup inspection identified RootAutostart.java install line47 automaticRootTimeout coupling; no semantic rewrite",
+      "compile_boundary": "Restoration matches exact final bytes; it is not a compilation result. The corresponding production Manager timeout API must also be restored or explicitly adapted by the pipeline before cff projection can compile."
+    }
+  ],
+  "full_gaps": [
+    {
+      "file": "RootProxyManager.java",
+      "last_recorded_sha256": "7dd7b1e1e8cdba85e7ba84d8c773ded3a87f27c168005ca8b2e8a8b6a477058f",
+      "reason": "Only compacted semantic summary and partial reads survive; the complete precompaction Manager source and exact edit sequence are unavailable"
+    },
+    {
+      "file": "hetu-root.sh",
+      "last_full_before_bootstrap_sha256": "3c8d2ae5eacdbe4f37fa338d5405725df8014308ef5bbf43af045c038b729f22",
+      "reason": "Visible complete bootstrap delta can be archived; required full source before bootstrap and takeover-current transitions unavailable"
+    },
+    {
+      "file": "hetu-autostart.sh",
+      "last_recorded_sha256": "5d20b8f483b2349236344ea9ecb20e6a6ead67db0c9304b20ddf6bba4317924f",
+      "reason": "No full source or exact takeover-current edit sequence in visible postcompaction history"
+    },
+    {
+      "file": "test_root_boot_safety93.py",
+      "last_full_prebootstrap_sha256": "be6a61185acc067e53d651a02bb1e921aa1d0079a8fe844b4b4acbe465c09ce4",
+      "reason": "New32-method bootstrap delta is visible, but original29 full source unavailable; archive delta as partial recovery only"
+    },
+    {
+      "file": "test_root_health.py",
+      "last_recorded_sha256": "2481d3771091b813787953b848504e762e1b6d0bc8491469b95cf99ba1918428",
+      "reason": "Fixture change summary survives, complete exact command/source absent; original26 method bodies must be obtained from baseline"
+    }
+  ],
+  "production_repository_modified": false,
+  "rerun_results_claimed": false,
+  "visible_command_sequence": [
+    {
+      "file": "001-helper-runner-original-command.partial.patch",
+      "sha256": "0bfb011aadcd65e3099903391cfdab9f3ea3f080c277ab9bce13289783a421e6",
+      "bytes": 4069,
+      "origin": "Complete visible apply_patch command text from current postcompaction turn; not a complete production/helper file",
+      "coverage": "Partial source recovery only: required pre-command full source is missing",
+      "applied_to_recovery_repository": false
+    },
+    {
+      "file": "002-helper-three-bootstrap-methods-original-command.partial.patch",
+      "sha256": "54e1fcfb3b3128a8db213d96758ad299926bdb70f9552fa6612df1af1c74ffa4",
+      "bytes": 4410,
+      "origin": "Complete visible apply_patch command text from current postcompaction turn; not a complete production/helper file",
+      "coverage": "Partial source recovery only: required pre-command full source is missing",
+      "applied_to_recovery_repository": false
+    },
+    {
+      "file": "003-root-bootstrap-original-command.partial.patch",
+      "sha256": "f45e7d70dd6db0e0ba4fc7d4058460002a6885c6ff81bfd80c3d38629151fa6c",
+      "bytes": 5749,
+      "origin": "Complete visible apply_patch command text from current postcompaction turn; not a complete production/helper file",
+      "coverage": "Partial source recovery only: required pre-command full source is missing",
+      "applied_to_recovery_repository": false
+    },
+    {
+      "file": "004-root-gid-constant-original-command.partial.patch",
+      "sha256": "1a10b1735521ba94044e1c1dce84e538002057f3b5829aa7ed646a81e72fd72e",
+      "bytes": 555,
+      "origin": "Complete visible apply_patch command text from current postcompaction turn; not a complete production/helper file",
+      "coverage": "Partial source recovery only: required pre-command full source is missing",
+      "applied_to_recovery_repository": false
+    },
+    {
+      "file": "005-helper-modeled-credentials-original-command.partial.patch",
+      "sha256": "97978045ade75dfdb60e61fc7b216c018b5965f680e53531ed9acd61b33bed90",
+      "bytes": 2093,
+      "origin": "Complete visible apply_patch command text from current postcompaction turn; not a complete production/helper file",
+      "coverage": "Partial source recovery only: required pre-command full source is missing",
+      "applied_to_recovery_repository": false
+    }
+  ],
+  "sequence_base_sha256": {
+    "hetu-root.sh": "3c8d2ae5eacdbe4f37fa338d5405725df8014308ef5bbf43af045c038b729f22",
+    "test_root_boot_safety93.py": "be6a61185acc067e53d651a02bb1e921aa1d0079a8fe844b4b4acbe465c09ce4"
+  },
+  "historical_intermediate_helper_sha256_after_001_002": "c3b4911cc9c0418bd2e2ce1d929c526f529736911a1b08d9324ee6c9cf0d27f0",
+  "never_applied_after_last_visible_command": [
+    "stat/status mapping-order correction",
+    "precise removal and verification of bootstrap owner RETURN before failed atomic rollback replacement",
+    "same final source complete32/newplus suite and original60",
+    "final after-bootstrap production source seal"
+  ],
+  "new_bootstrap_method_ids": [
+    "tools.qa.test_root_boot_safety93.IsolatedRoot.test_kill_start_remote_bootstrap_allows_only_verified_core_identity",
+    "tools.qa.test_root_boot_safety93.IsolatedRoot.test_kill_start_without_isolated_runner_preserves_existing_hooks",
+    "tools.qa.test_root_boot_safety93.IsolatedRoot.test_kill_start_rejects_changed_core_identity_before_readiness"
+  ],
+  "fixture_boundary": "Actual owned kernel PID/birth/SID/executable entries; UID/GID proc fields and firewall models explicit. setgid denied, no privilege escalation and no claim that kernel GID3005 or real Android/firewall was verified.",
+  "retained_earlier_partial_source": {
+    "file": "early-executor.original.partial.txt",
+    "sha256": "0a31f36154d82aee09bf64c79b26a0d81c0c4ebc34d936b4fbe0b6f26cb9ae5f",
+    "bytes": 5279,
+    "warning": "Earlier executor fragment; NOT current asset or 129d/64a source; not applied"
+  },
+  "artifact_sha256": {
+    "001-helper-runner-original-command.partial.patch": "0bfb011aadcd65e3099903391cfdab9f3ea3f080c277ab9bce13289783a421e6",
+    "002-helper-three-bootstrap-methods-original-command.partial.patch": "54e1fcfb3b3128a8db213d96758ad299926bdb70f9552fa6612df1af1c74ffa4",
+    "003-root-bootstrap-original-command.partial.patch": "f45e7d70dd6db0e0ba4fc7d4058460002a6885c6ff81bfd80c3d38629151fa6c",
+    "004-root-gid-constant-original-command.partial.patch": "1a10b1735521ba94044e1c1dce84e538002057f3b5829aa7ed646a81e72fd72e",
+    "005-helper-modeled-credentials-original-command.partial.patch": "97978045ade75dfdb60e61fc7b216c018b5965f680e53531ed9acd61b33bed90",
+    "RootAutostart-00462-exact-timeout-api.patch": "8b38d03c5a50fce894532441e9dbefd5d5d4f1297fa27e1d5a6cb50de98a87dc",
+    "RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
+    "bootstrap-before-observation.partial-receipt.txt": "1077d974f08115672d95ef83b0fd0a7d2f3df4da1168b81fd269ffe8cc8e4272",
+    "early-executor.original.partial.txt": "0a31f36154d82aee09bf64c79b26a0d81c0c4ebc34d936b4fbe0b6f26cb9ae5f",
+    "pre-recovery-incident-state.json": "f4eb231c3ee2a782a10c785e47e6bf93e7b5bc4f561e108896c2f0900cfa7952"
+  }
+}

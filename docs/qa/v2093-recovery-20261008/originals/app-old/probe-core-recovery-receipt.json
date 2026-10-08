@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "method": "probeCoreState",
+  "origin": "Complete unmodified original method from exact pinned cff source, carried unchanged through the old owner nine records and verified after009 source.",
+  "originalRecordSource": "ProxyNetworkMatchService-after-009.java",
+  "byteFraming": "Full indented method signature through closing brace, no trailing newline.",
+  "sha256": "33716c558389eb40f06dfc7ac24a7c97e3886d8baaa3180b3f7e6935d963de27",
+  "sealedHostRecordSource": "/tmp/hetu-recovery/app-exact-recovered/app-host-result.json",
+  "sealedHostExpected": [
+    "33716c558389eb40f06dfc7ac24a7c97e3886d8baaa3180b3f7e6935d963de27"
+  ],
+  "match": true,
+  "semanticEditingPerformed": false
+}

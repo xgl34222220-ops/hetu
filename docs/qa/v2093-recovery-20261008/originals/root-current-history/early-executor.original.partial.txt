@@ -1,0 +1,117 @@
+# Temporary commands get a verified private session. The unreaped direct child
+# pins its PID until group cleanup, so cancellation cannot target a reused PID.
+EX_SETSID=''; EX_BB=0; EX_SH=''; EX_SLEEP=''; EX_SEQUENCE=0
+executor_setup(){
+  [ -z "$EX_SETSID" ] || return 0
+  EX_SH=$(command -v sh 2>/dev/null || true)
+  EX_SLEEP=/system/bin/sleep; [ -x "$EX_SLEEP" ] || EX_SLEEP=$(command -v sleep 2>/dev/null || true)
+  EX_SETSID=$(command -v setsid 2>/dev/null || true)
+  if [ -z "$EX_SETSID" ]; then
+    for EX_CANDIDATE in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+      [ -x "$EX_CANDIDATE" ] || continue
+      EX_SETSID="$EX_CANDIDATE"; EX_BB=1; break
+    done
+  fi
+  [ -n "$EX_SETSID" ] && [ -n "$EX_SH" ] && [ -n "$EX_SLEEP" ]
+}
+bounded_publish(){ :; }
+bounded_forget(){ :; }
+bounded_exec(){
+  E_LIMIT="$1"; shift
+  executor_setup || return 127
+  E_LIMIT=$((E_LIMIT-1)); [ "$E_LIMIT" -gt 0 ] || E_LIMIT=1
+  EX_SEQUENCE=$((EX_SEQUENCE+1))
+  E_DIR="$EX_WORK_DIR/.exec.$$.$EX_SEQUENCE"
+  mkdir "$E_DIR" 2>/dev/null || return 125
+  # The command remains behind a private gate until the parent confirms that
+  # setsid did not fork away from its direct, unreaped child.
+  E_CODE='
+    D=$1; L=$2; SLEEP=$3; shift 3
+    exec 8>&- 7>&-
+    read -r ST < /proc/self/stat || exit 126
+    REAL=${ST%% *}; REST=${ST##*) }
+    birth(){ set -- $1; [ "$3" = "$2_REAL" ] && [ "$4" = "$2_REAL" ] || return 1; shift 19; printf "%s" "$1"; }
+    2_REAL=$REAL
+  '
+  # Shell identifiers cannot start with a digit; keep the identity parser in
+  # the same shell as the leader (an external cat would describe another PID).
+  E_CODE='
+    D=$1; L=$2; SLEEP=$3; shift 3
+    exec 8>&- 7>&-
+    read -r ST < /proc/self/stat || exit 126
+    REAL=${ST%% *}; REST=${ST##*) }
+    identity(){ set -- $1; [ "$3" = "$REAL" ] && [ "$4" = "$REAL" ] || return 1; shift 19; BIRTH=$1; }
+    identity "$REST" || exit 126
+    printf "%s %s\n" "$$" "$BIRTH" > "$D/ready" || exit 126
+    (trap "" TERM INT; "$SLEEP" "$L"; kill -TERM -- "-$$" 2>/dev/null; "$SLEEP" 1; kill -KILL -- "-$$" 2>/dev/null) &
+    CANCELLED=0; trap "CANCELLED=1" TERM INT
+    n=0
+    while [ ! -f "$D/go" ]; do n=$((n+1)); [ "$n" -lt 100 ] || exit 126; "$SLEEP" .01; done
+    "$@" & C=$!
+    wait "$C"; RC=$?
+    [ "$CANCELLED" = 0 ] || RC=124
+    printf "%s\n" "$RC" > "$D/done"
+    # Keep the verified leader alive until the parent kills the entire group.
+    trap "" TERM INT
+    while :; do "$SLEEP" .02; done
+  '
+  exec 9<&0
+  if [ "$EX_BB" = 1 ]; then "$EX_SETSID" setsid "$EX_SH" -c "$E_CODE" hetu-executor "$E_DIR" "$E_LIMIT" "$EX_SLEEP" "$@" <&9 9<&- 8>&- 7>&- &
+  else "$EX_SETSID" "$EX_SH" -c "$E_CODE" hetu-executor "$E_DIR" "$E_LIMIT" "$EX_SLEEP" "$@" <&9 9<&- 8>&- 7>&- & fi
+  E_PID=$!; exec 9<&-
+  E_N=0
+  while [ ! -s "$E_DIR/ready" ]; do
+    kill -0 "$E_PID" 2>/dev/null || break
+    E_N=$((E_N+1)); [ "$E_N" -lt 100 ] || break; "$EX_SLEEP" .01
+  done
+  E_OWNER=''; E_BIRTH=''
+  read -r E_OWNER E_BIRTH 2>/dev/null < "$E_DIR/ready" || true
+  if [ "$E_OWNER" != "$E_PID" ]; then
+    # Before the gate no runtime/network command has been permitted.
+    kill -TERM "$E_PID" 2>/dev/null || true; "$EX_SLEEP" .02; kill -KILL "$E_PID" 2>/dev/null || true
+    wait "$E_PID" 2>/dev/null || true; rm -rf "$E_DIR"; return 126
+  fi
+  bounded_publish
+  : > "$E_DIR/go"
+  E_N=0; E_MAX=$(((E_LIMIT+2)*50))
+  while [ ! -s "$E_DIR/done" ]; do
+    kill -0 "$E_PID" 2>/dev/null || break
+    E_N=$((E_N+1)); [ "$E_N" -lt "$E_MAX" ] || break; "$EX_SLEEP" .02
+  done
+  E_RC=124; read -r E_RC 2>/dev/null < "$E_DIR/done" || true
+  case "$E_RC" in ''|*[!0-9]*) E_RC=125;; esac
+  # The parent has not called wait: even an exited leader is still its reserved
+  # child PID. A forked leader was rejected before opening the command gate.
+  kill -TERM -- "-$E_PID" 2>/dev/null || true
+  "$EX_SLEEP" .02
+  kill -KILL -- "-$E_PID" 2>/dev/null || E_RC=125
+  wait "$E_PID" 2>/dev/null || true
+  bounded_forget
+  rm -rf "$E_DIR"
+  return "$E_RC"
+}
+detached_exec(){
+  executor_setup || return 1
+  EX_SEQUENCE=$((EX_SEQUENCE+1)); D_DIR="$EX_WORK_DIR/.detach.$$.$EX_SEQUENCE"
+  mkdir "$D_DIR" || return 1
+  D_CODE='
+    D=$1; SLEEP=$2; shift 2; exec 8>&- 7>&-
+    read -r ST < /proc/self/stat || exit 126
+    REAL=${ST%% *}; REST=${ST##*) }
+    identity(){ set -- $1; [ "$3" = "$REAL" ] && [ "$4" = "$REAL" ]; }
+    identity "$REST" || exit 126
+    printf "%s\n" "$$" > "$D/ready"
+    n=0; while [ ! -f "$D/go" ]; do n=$((n+1)); [ "$n" -lt 100 ] || exit 126; "$SLEEP" .01; done
+    rm -rf "$D"; exec "$@"
+  '
+  if [ "$EX_BB" = 1 ]; then "$EX_SETSID" setsid "$EX_SH" -c "$D_CODE" hetu-detach "$D_DIR" "$EX_SLEEP" "$@" 8>&- 7>&- &
+  else "$EX_SETSID" "$EX_SH" -c "$D_CODE" hetu-detach "$D_DIR" "$EX_SLEEP" "$@" 8>&- 7>&- & fi
+  DETACHED_PID=$!; D_N=0
+  while [ ! -s "$D_DIR/ready" ]; do kill -0 "$DETACHED_PID" 2>/dev/null || break; D_N=$((D_N+1)); [ "$D_N" -lt 100 ] || break; "$EX_SLEEP" .01; done
+  D_OWNER=''; read -r D_OWNER 2>/dev/null < "$D_DIR/ready" || true
+  if [ "$D_OWNER" != "$DETACHED_PID" ]; then
+    kill -TERM "$DETACHED_PID" 2>/dev/null || true; "$EX_SLEEP" .02; kill -KILL "$DETACHED_PID" 2>/dev/null || true
+    wait "$DETACHED_PID" 2>/dev/null || true; rm -rf "$D_DIR"; return 1
+  fi
+  : > "$D_DIR/go"
+}

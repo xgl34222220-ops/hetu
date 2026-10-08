@@ -1,0 +1,53 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+                     .putBoolean("proxyRootEgressPending",prefs.getBoolean("proxyRootWanted",false))
+                     .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","service-recreated")
++                    .putBoolean("proxyNetworkDataPlaneHealthy",false)
+@@
+-        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false))beginRecoveryEpisode();
++        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false))beginRecoveryEpisode(prefs.edit());
+@@
+-                prefs.edit().putInt("proxyRecoveryBootCount",bootCount).putLong("proxyRecoveryManualGeneration",manual).apply();
+-                beginRecoveryEpisode();
++                beginRecoveryEpisode(prefs.edit().putInt("proxyRecoveryBootCount",bootCount)
++                        .putLong("proxyRecoveryManualGeneration",manual));
+@@
+-    private void beginRecoveryEpisode(){
++    private void beginRecoveryEpisode(SharedPreferences.Editor edit){
+         long now=SystemClock.elapsedRealtime();
+-        prefs.edit().putLong("proxyRecoveryStartedElapsed",now).putLong("proxyRecoveryDeadlineElapsed",now+RECOVERY_DEADLINE_MS)
++        if(!edit.putLong("proxyRecoveryStartedElapsed",now).putLong("proxyRecoveryDeadlineElapsed",now+RECOVERY_DEADLINE_MS)
+                 .putInt("proxyRecoveryStarts",0).putBoolean("proxyRecoveryEpisodeComplete",false)
+-                .remove("proxyRecoveryTerminalReason").apply();
++                .remove("proxyRecoveryTerminalReason").commit())
++            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
+@@
+     private boolean recoveryWindowOpen(boolean boot){
+-        if(!currentRecoveryIntent())return false;
++        if(!currentRecoveryIntent()||prefs.getLong("proxyRecoveryManualGeneration",0L)
++                !=prefs.getLong("proxyRootManualStartGeneration",0L))return false;
+@@
+     private boolean nativeRecoveryAllowsStart(RootAutostart.BootRestoreState state,boolean boot){
++        if(!currentRecoveryIntent()||prefs.getLong("proxyRecoveryManualGeneration",0L)
++                !=prefs.getLong("proxyRootManualStartGeneration",0L))return false;
+@@
+-        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false)){beginRecoveryEpisode();starts=0;}
++        if(prefs.getBoolean("proxyRecoveryEpisodeComplete",false)){beginRecoveryEpisode(prefs.edit());starts=0;}
++        if(!recoveryWindowOpen(boot))return false;
+         lastAutoRecoveryElapsed=now;
+-        prefs.edit().putInt("proxyRecoveryStarts",starts+1).putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis())
+-                .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis()).apply();
++        if(!prefs.edit().putInt("proxyRecoveryStarts",starts+1).putLong("proxyAutoRecoveryAttempt",System.currentTimeMillis())
++                .putLong("proxyRootBootRestoreAttemptAt",System.currentTimeMillis()).commit()){
++            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
++            publishRecoveryError(boot,"恢复预算未能保存，已停止自动尝试，请手动检查");
++            return false;
++        }
+@@
+         return currentRecoveryIntent()&&networkEvents.isCurrent(route)
+-                &&manualGeneration==prefs.getLong("proxyRootManualStartGeneration",0L)&&remainingRecoveryTime()>0L;
++                &&manualGeneration==prefs.getLong("proxyRootManualStartGeneration",0L)&&remainingRecoveryTime()>0L
++                &&(!prefs.getBoolean("proxyRootAutoStart",false)
++                ||RootAutostart.restoreState(getApplicationContext())==RootAutostart.BootRestoreState.IDLE);
+*** End Patch

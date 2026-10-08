@@ -1,0 +1,165 @@
+{
+  "schema": 1,
+  "recordedUtc": "2026-10-08T17:30:58.316927+00:00",
+  "result": "PARTIAL_EXACT_RECOVERY",
+  "root": "/workspace/hetu-recovery-20261008/originals/pipeline",
+  "originalWorkdir": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "knownRepositoryCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "wholePythonFiles": 10,
+  "wholeJsonFiles": 1,
+  "entries": [
+    {
+      "originalRepoPath": ".github/scripts/continuity93_ci_config.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/continuity93_ci_config.py",
+      "bytes": 1797,
+      "sha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
+      "preCleanupKnownSha256": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance"
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_continuity93_test_results.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_continuity93_test_results.py",
+      "bytes": 3343,
+      "sha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290",
+      "preCleanupKnownSha256": "60a592dae3d893e0f278c5459ed6966fa595ac0d7266b4c8b9e153b1478c1290",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance"
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_hetu_feedback93_emulator.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_hetu_feedback93_emulator.py",
+      "bytes": 1929,
+      "sha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f",
+      "preCleanupKnownSha256": "4ad0c5135f1dd0567a5e8ed8362d764cd7aed3211ec5baf0803f08f3e49fd50f",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance"
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_hetu_feedback93_smoke.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_hetu_feedback93_smoke.py",
+      "bytes": 862,
+      "sha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa",
+      "preCleanupKnownSha256": "791ded8d5792776b8c5afad05c7fb4264f4f7bd932b878b837865171dafb54aa",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance"
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_root_safety93.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_root_safety93.py",
+      "bytes": 7107,
+      "sha256": "a54b99f7ad8ce09d32530d404097ccf940db866a30054a1312e0fa824b709b99",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/continuity93_source_compatibility.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/continuity93_source_compatibility.py",
+      "bytes": 4887,
+      "sha256": "4879f41711d1279688b0d16f69c0889ad0ef7b1532f12af8fbeacf65cda38189",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_continuity93_baseline_hosts.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_continuity93_baseline_hosts.py",
+      "bytes": 6269,
+      "sha256": "828afbd84faafeabd909dc9ed97961a2c5bf9ba91a84fde3209a0eeb54cfcf87",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/generate_continuity93_source_layer.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/generate_continuity93_source_layer.py",
+      "bytes": 5842,
+      "sha256": "a21881d34aadd8bcdba996fe03b12c9f9daf89b70cc33de2b2c97371156f8b20",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/run_root_safety93_evidence.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/run_root_safety93_evidence.py",
+      "bytes": 11177,
+      "sha256": "a6c8bb35a0e1e92e4c821f1e369b3d49387e8384bc2b403a01d0a766ed1dc275",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/verify_continuity93_producer.py",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/verify_continuity93_producer.py",
+      "bytes": 7513,
+      "sha256": "0f34a7795657a6c472d3f17f5649cb2fe42e74172d9533a0e76f224125464f62",
+      "preCleanupKnownSha256": null,
+      "matchesPreCleanupKnownSha256": null,
+      "provenance": "Complete tool read plus exact recorded subsequent patch/generation",
+      "originalWasProductionSeal": false,
+      "limitations": "No actual Android execution; latest whole-file hash was not separately shown before cleanup"
+    },
+    {
+      "originalRepoPath": ".github/scripts/feedback93_original65.json",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/feedback93_original65.json",
+      "bytes": 3009,
+      "sha256": "20fe8bb3dda55af1a98fa36983d6754b236301a28d42093afe369bf16266c4bf",
+      "preCleanupKnownSha256": "20fe8bb3dda55af1a98fa36983d6754b236301a28d42093afe369bf16266c4bf",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Complete original tool read and exact recorded subsequent patches",
+      "originalWasProductionSeal": false,
+      "limitations": "Exact byte SHA match to retained pre-cleanup pipeline record, not Android/phone acceptance"
+    },
+    {
+      "originalRepoPath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/fragments/root-manager-current-timeout-api.java.txt",
+      "bytes": 493,
+      "sha256": "3c5304d68cadd24f3e7ea197f1a4fb555745c2a8bc7c0757afc911724131f091",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Exact displayed API method and dependency field; fragment hash matched prior compatibility binding",
+      "completeFile": false,
+      "limitations": "Only 493-byte compatibility fragment; not restored production Root Manager"
+    }
+  ],
+  "missingOrNotYetRecovered": [
+    ".github/scripts/continuity93_source_scope.py",
+    ".github/scripts/run_continuity93_before_comparison.py",
+    ".github/scripts/test_continuity93_evidence.py",
+    ".github/scripts/feedback_smoke93.py",
+    ".github/scripts/test_feedback_smoke93.py",
+    ".github/scripts/verify_feedback_smoke93.py",
+    ".github/scripts/verify_continuity93_delivery.py",
+    ".github/scripts/prepare_new_ui_source.py",
+    ".github/workflows/v2093-build.yml",
+    "updates/v2093-feedback-root-safety/inputs.json (never generated)",
+    "updates/v2093-feedback-root-safety/runtime.patch (never generated)",
+    "Most raw preseal logs and historical114 current-run log files; only hashes/counts retained in conversation"
+  ],
+  "prohibitionsObserved": [
+    "No old-workdir write",
+    "No guessed production diff",
+    "No source layer generated",
+    "No Git stage/ref/commit/push or CI cancellation",
+    "No device operation"
+  ],
+  "limits": "Filesystem cleaned by platform. Recovered tool-source originals and explicitly identified fragments only. Prior host successes are historical receipts, not recreated logs or current Android/phone safety."
+}

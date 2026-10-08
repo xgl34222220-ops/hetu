@@ -1,0 +1,30 @@
+{
+  "method": "Recover original git diff from this agent tool history; apply only to exact cffeff base read from git objects; do not write repository",
+  "records": [
+    {
+      "name": "PanelGroupsTab.kt",
+      "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+      "baseSha256": "fb6268bfcbd159c6353a4ec8209988718a6d732e5e94560a2974b11d9ae0aeed",
+      "sha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b",
+      "expectedSha256": "f63dc6154e7952bfe508293230879af5526bbad98af91ddf7416fcb90ac6788b",
+      "status": "exact-source-restored",
+      "bytes": 18326
+    },
+    {
+      "name": "PanelComponents.kt",
+      "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+      "baseSha256": "1817bcbeafb558ce9c336608cc186223487f131594ee5bea97608aa316947d4e",
+      "sha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a",
+      "expectedSha256": "2385fc604b8c333fcf5f23c00a48fb627f94422f8e494a270f5a6686e712992a",
+      "status": "exact-source-restored",
+      "bytes": 35330
+    }
+  ],
+  "gaps": [
+    "PanelLatencyTouchFeedbackTest.kt full source not in this agent history",
+    "PanelDelayMotionFeedbackTest.kt full source not in this agent history",
+    "HetuViewModel.kt b688 full source not in this agent history",
+    "FirstScreenReadinessFeedbackTest.kt 3d641 full source not in this agent history"
+  ],
+  "oldUiOwnerTaskName": "unknown in this agent visible history"
+}

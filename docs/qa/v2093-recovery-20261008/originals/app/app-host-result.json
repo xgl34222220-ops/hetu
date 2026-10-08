@@ -1,0 +1,125 @@
+{
+  "serviceSha256": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933",
+  "compiledMethodNames": [
+    "currentBootCount",
+    "bootAutoEnabled",
+    "explicitManualRecoveryIntent",
+    "nativeRecoveryIntentCurrent",
+    "initializeNetworkSession",
+    "nativeRecoveryPending",
+    "publishServiceObservation",
+    "scheduleBootRestore",
+    "scheduleBootRuntimeReattach",
+    "restoreWantedProxyAfterBoot",
+    "currentRecoveryIntent",
+    "prepareRecoveryEpisode",
+    "beginRecoveryEpisode",
+    "remainingRecoveryTime",
+    "recoveryBudgetExhausted",
+    "recoveryWindowOpen",
+    "nativeRecoveryAllowsStart",
+    "publishRecoveryError",
+    "deferBootRecovery",
+    "reserveRecoveryStart",
+    "recoveryStartCurrent",
+    "confirmRecoveryHealth",
+    "probeCoreState",
+    "maintainProxyRuntime",
+    "checkLiveNetworkIntegrity",
+    "observeLiveNetworkIntegrity",
+    "publishNetworkObservation"
+  ],
+  "verbatimMethodBodiesSha256": {
+    "currentBootCount": [
+      "306d68b67e82e0bcb475e1c933758eceab2ccaffb9222195ba81e3d37559a2c6"
+    ],
+    "bootAutoEnabled": [
+      "a6bb7c1d429292ea68b84262fa783748d38d5e6e8cac0915480a9e44bd3b56e4"
+    ],
+    "explicitManualRecoveryIntent": [
+      "50184711bec27ee5f3248a11644f7e8ff25de5bdc43bae10e28e70c5ae0244f0"
+    ],
+    "nativeRecoveryIntentCurrent": [
+      "7264495aee3dfc08824ad26affabe60c502eab55f2c1ffa0366f1798beb2823b"
+    ],
+    "initializeNetworkSession": [
+      "c01b08dd47f1864e595c5a9c1c9322547acee36ac91da2e31c4979a2b94b1c93"
+    ],
+    "nativeRecoveryPending": [
+      "f37639aa73ef3fb53897f7730777d9be7b9938d5bd5bae313dc6cfa51a36357a"
+    ],
+    "publishServiceObservation": [
+      "43ed5bdfb844a69f0caad68bde46e799062571def9ede3db97eda19d00fcf8b5"
+    ],
+    "scheduleBootRestore": [
+      "f143aa812bbb8b2d3bdc12508cf65de697d0756957693099217c35b01a724042"
+    ],
+    "scheduleBootRuntimeReattach": [
+      "51d8a417463a00c6490f057c81e1fb94e1722a41fb728d05d5c0ebeb5ccff4a7"
+    ],
+    "restoreWantedProxyAfterBoot": [
+      "152e3548b8829889b8af2da3c4c8be743b0c1c39ec99566d2539b912302b0207"
+    ],
+    "currentRecoveryIntent": [
+      "4420aea9f7bd1fda6432612a438376afd9dc1665b06ca97ce1a9289a4b6b7596"
+    ],
+    "prepareRecoveryEpisode": [
+      "136f478c671f83f4c315c8d4b84b0cdcba902828cf046b4643a2b5a3151c8d0f"
+    ],
+    "beginRecoveryEpisode": [
+      "aaae79b4a90984913846095a83beb6244fced997c812c03a324560faf9e0436f"
+    ],
+    "remainingRecoveryTime": [
+      "220ff8cc9bf1addf3385cef8fe07f408cfbac1fde2d743e2fd0a1c5fb84beff5"
+    ],
+    "recoveryBudgetExhausted": [
+      "a994f0ad6ec196aa793751d88c11c86b44d6c3505ffa1277d4f48c644ba12ccc"
+    ],
+    "recoveryWindowOpen": [
+      "9ce80e646b2646b5a658692421fbfb5e4620675667e96c4c7899cd9c0666b313"
+    ],
+    "nativeRecoveryAllowsStart": [
+      "037e9ebd7664ab4e18dca292c35430b05de7c48fab64bbd996d721dcb76769a3"
+    ],
+    "publishRecoveryError": [
+      "165c0bd398e9078e4894ff2d829d3432649f7b9d2c3b62f2f3df41e2a1175c69"
+    ],
+    "deferBootRecovery": [
+      "13da64f1e172e1a65049dd9e65b35206e1ed922b6ca6ce36113424ccff6fd752"
+    ],
+    "reserveRecoveryStart": [
+      "502b760a596f0fde732bf0b7e7317ed7077fa6ab489eb1a7d463cf52a1414b51"
+    ],
+    "recoveryStartCurrent": [
+      "3029ee7d3981aca740c08e88f5cd8c11c8c86094d0111a08ba96962b3ee703f6"
+    ],
+    "confirmRecoveryHealth": [
+      "ae7b9f0b7f9b21a039e2cdcd124d7ef11bc615442aacffceb24df0fa7dccdf8d",
+      "05e3e817e0333397f8ef88c190484675ebea37eeaa41572b10eadf7e93864f4d"
+    ],
+    "probeCoreState": [
+      "33716c558389eb40f06dfc7ac24a7c97e3886d8baaa3180b3f7e6935d963de27"
+    ],
+    "maintainProxyRuntime": [
+      "18232c0347e42cd42e00ddf5392f110731dacff64d04cfe98de8c40567769fc3"
+    ],
+    "checkLiveNetworkIntegrity": [
+      "b4345050aba2692612fc856d947bbefb5685540cd1a9c3adbe11e73a0cbc0db5"
+    ],
+    "observeLiveNetworkIntegrity": [
+      "35cc7961ed1982fb04382cd9afdd7633778d1edf147d8e765135ebe0dee54580"
+    ],
+    "publishNetworkObservation": [
+      "ebebdf7c5d12ac5bef2d34002d4228c3f3d581e331758d93110aa9b02e438c84"
+    ]
+  },
+  "javaCompileExit": 0,
+  "AndroidExecuted": false,
+  "sourceIsFullAndroidClass": false,
+  "javaRunExit": 0,
+  "observed": {
+    "checks": "[persisted max6/deadline/recreation/manual generation, original same observer 30-second throttle, UNKNOWN process defers without native API and stopped intent does no Root, native STOPPED before ALIVE success, complete local network proof required, native ownership total deadline + lost notification one-shot read-only reattach + exhausted budget retention, late health cannot publish after wanted revocation, native enabled unpublished owner has one bounded read-only episode, late Root success retains original count/deadline, reservation/observer handoff atomic and starts never regress, 299s admission rejects new transaction without consuming starts, revoked native auto intent does no Root despite confirmed setting true, new successful explicit manual generation independent of old native STOPPED without clearing token, prior-boot success receipt rejected and same-boot explicit new success allowed, unknown boot identity cannot prove same-boot manual exception]",
+    "passed": 15,
+    "actualScope": "Verbatim production App methods + real pure-Java epochs/scheduler; Android/Root/native boundaries are shims. No Android execution or Root start implementation exercised."
+  }
+}

@@ -1,0 +1,9 @@
+        from continuity93_source_compatibility import controls as compatibility_controls, CONTROLS as COMPATIBILITY_CONTROLS
+        if variant in COMPATIBILITY_CONTROLS:
+            assert recorded['sourceCompatibilityAdapter'] == compatibility_controls(ROOT)[variant]
+            assert layer['beforeSourceCompatibilityAdapters'][variant] == recorded['sourceCompatibilityAdapter']
+        else:
+            assert 'sourceCompatibilityAdapter' not in recorded
+        for name, original in production_sources(ROOT, variant).items():
+            assert recorded['beforeSourceSha256'][name] == hashlib.sha256(original).hexdigest()
+            assert (folder / ('before-' + Path(name).name)).read_bytes() == original

@@ -1,0 +1,56 @@
+{
+  "schema": 1,
+  "result": "EXACT_COMPATIBILITY_ARCHIVE_RECOVERY",
+  "recordedUtc": "2026-10-08T17:40:54.482054+00:00",
+  "baselineRoot": "/workspace/hetu-recovery-20261008/baseline-complete",
+  "baselineCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "baselineCleanBeforeAndAfter": true,
+  "entries": [
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "bytes": 33610,
+      "sha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86",
+      "preCleanupKnownSha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash"
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "bytes": 745,
+      "sha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc",
+      "preCleanupKnownSha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash"
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "bytes": 100953,
+      "sha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e",
+      "preCleanupKnownSha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash"
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "bytes": 1216,
+      "sha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b",
+      "preCleanupKnownSha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Accurate verified cff bytes plus exact recorded sole API-only projection; complete projected output matches pre-cleanup known hash"
+    },
+    {
+      "originalRepoPath": "docs/qa/20261008-feedback93-before-api-compatibility/binding.json",
+      "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/docs/qa/20261008-feedback93-before-api-compatibility/binding.json",
+      "bytes": 2544,
+      "sha256": "77dfdd3e74ee87ce089e960889a996530520bda875c5045fa031e372c0c9abfb",
+      "preCleanupKnownSha256": "77dfdd3e74ee87ce089e960889a996530520bda875c5045fa031e372c0c9abfb",
+      "matchesPreCleanupKnownSha256": true,
+      "provenance": "Exact displayed original binding structure; whole JSON byte hash matches pre-cleanup binding"
+    }
+  ],
+  "limits": "Only accurate archival C/F API-only controls restored, not current production source or Android/phone acceptance."
+}

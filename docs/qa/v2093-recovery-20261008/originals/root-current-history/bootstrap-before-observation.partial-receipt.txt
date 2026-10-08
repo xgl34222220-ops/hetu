@@ -1,0 +1,14 @@
+Source: model-visible functions.exec tool result reading pre-cleanup log, not a recovered raw log file.
+Original path lost: docs/qa/20261008-root-safety93-before-bootstrap-identity.log
+
+Actual run: 3 tests, 3 AssertionErrors, 0 errors, 9.027 seconds.
+1. test_kill_start_remote_bootstrap_allows_only_verified_core_identity
+AssertionError: False is not true : the isolated core cannot finish remote initialization under its startup guard: {"ok":false,"message":"Mihomo 启动后提前退出，请查看核心日志"}
+2. test_kill_start_without_isolated_runner_preserves_existing_hooks
+Recorded assertEqual message: an unavailable isolated runner removed the existing interception
+3. test_kill_start_rejects_changed_core_identity_before_readiness
+AssertionError: True is not false : a core whose actual credentials differ from the verified runner reached runtime success
+
+Before Root SHA: 3c8d2ae5eacdbe4f37fa338d5405725df8014308ef5bbf43af045c038b729f22
+Before helper SHA: c3b4911cc9c0418bd2e2ce1d929c526f529736911a1b08d9324ee6c9cf0d27f0
+Raw stdout/stderr file and full source archive are missing; this receipt must not be presented as recovered raw bytes.

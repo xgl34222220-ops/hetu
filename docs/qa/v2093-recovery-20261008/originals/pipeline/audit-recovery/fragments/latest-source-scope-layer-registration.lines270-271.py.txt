@@ -1,0 +1,2 @@
+    from continuity93_source_compatibility import controls as compatibility_controls
+    assert layer['beforeSourceCompatibilityAdapters'] == compatibility_controls(root)

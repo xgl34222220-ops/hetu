@@ -1,0 +1,6 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/assets/hetu-root.sh
+@@
+-  CI_IDS=$(awk '$1=="Uid:" {u=($2==0 && $3==0 && $4==0 && $5==0)} $1=="Gid:" {g=($2==3005 && $3==3005 && $4==3005 && $5==3005)} END {if(u && g) print "verified"}' "/proc/$1/status" 2>/dev/null)
++  CI_IDS=$(awk -v gid="$CORE_GROUP_ID" '$1=="Uid:" {u=($2==0 && $3==0 && $4==0 && $5==0)} $1=="Gid:" {g=($2==gid && $3==gid && $4==gid && $5==gid)} END {if(u && g) print "verified"}' "/proc/$1/status" 2>/dev/null)
+*** End Patch

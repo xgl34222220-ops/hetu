@@ -1,0 +1,45 @@
+{
+  "writtenAtUtc": "2026-10-08T17:37:26.845201+00:00",
+  "sourceOwner": "root_android_test_review_current",
+  "productionFilesWritten": false,
+  "entries": [
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/root-android-audit/RootStartIntentSafety93Test.kt",
+      "bytes": 15665,
+      "sha256": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
+      "expectedSha256": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
+      "finalSealedBytesMatched": true,
+      "replayBasis": "Exact visible historical tool source text; no implementation rewrite.",
+      "scope": "Latest sealed original."
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/root-android-audit/ProxyControlEpoch.java",
+      "bytes": 1165,
+      "sha256": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
+      "expectedSha256": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
+      "finalSealedBytesMatched": true,
+      "replayBasis": "Exact visible historical tool source text; no implementation rewrite.",
+      "scope": "Latest sealed original."
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/root-android-audit/RootAutostart.java",
+      "bytes": 9135,
+      "sha256": "f520cf8538fe22a65d07078648761a4b7a038b6e2ac2130ceaf44ee1dd2717db",
+      "expectedSha256": null,
+      "finalSealedBytesMatched": false,
+      "replayBasis": "Exact visible historical tool source text; no implementation rewrite.",
+      "scope": "Earlier complete historical read; not the later 00462 final seal."
+    }
+  ],
+  "gaps": [
+    {
+      "source": "RootProxyManager.java",
+      "missing": "No complete historical whole file or complete diff in this agent; only source fragments. Cannot reconstruct b50dc/before7dd7 faithfully."
+    },
+    {
+      "source": "RootAutostart.java",
+      "missing": "Later edits after the complete earlier read; current replay does not match the requested 00462 final hash."
+    }
+  ],
+  "limits": "Byte replay and hash identity only; no new Android compile or Robolectric test execution. No CI or device operations."
+}

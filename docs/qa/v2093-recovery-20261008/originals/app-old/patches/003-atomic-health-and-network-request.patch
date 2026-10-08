@@ -1,0 +1,13 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+     private boolean confirmRecoveryHealth(boolean boot){
+-        if(!checkLiveNetworkIntegrity())return false;
+-        final NetworkEpoch.Snapshot<Network> route=networkEvents.snapshot();
+-        final long ticket=RootProxyManager.observationTicket();
+-        return publishNetworkObservation(route,ticket,()->{
++        return checkLiveNetworkIntegrity(()->{
+@@
+-                if(prefs.getBoolean("proxyRootAutoStart",false))scheduleBootRestore(250L);
++                if(prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.contains("proxyRootBootRestoreSuccessAt"))scheduleBootRestore(250L);
+*** End Patch

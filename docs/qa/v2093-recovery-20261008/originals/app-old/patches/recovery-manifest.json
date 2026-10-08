@@ -1,0 +1,93 @@
+{
+  "schema": 1,
+  "purpose": "Recovered exact successful apply_patch input records from old App owner conversation; no production source was restored or patched by this recovery task.",
+  "sourceOrigin": "Original functions.exec/tools.apply_patch input text visible in this agent conversation, preserving the original no-final-newline input bytes.",
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "originalRepository": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "targetRelativePath": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java",
+  "orderedSuccessfulRecords": [
+    {
+      "order": 1,
+      "file": "001-constants.patch",
+      "bytes": 704,
+      "sha256": "a7f77d5698cda504d2f2f356bcede08871baff5423103205ba76930823e50f6f"
+    },
+    {
+      "order": 2,
+      "file": "002-restore-budget-helpers.patch",
+      "bytes": 11477,
+      "sha256": "63371e8d10143e7c4d6f6af92296d73aadebe8950ed227c99cfb614d52e7d34e"
+    },
+    {
+      "order": 3,
+      "file": "003-atomic-health-and-network-request.patch",
+      "bytes": 789,
+      "sha256": "a44ea2ed626217ed43bd4f07d5a840074b07657c341dff1327e626745563c4dc"
+    },
+    {
+      "order": 4,
+      "file": "004-maintain-shared-budget.patch",
+      "bytes": 3129,
+      "sha256": "0598890dad02ac1e68cee42e09212ba0f2a4379391fc522bce396a8af34d6707"
+    },
+    {
+      "order": 5,
+      "file": "005-complete-health-observation.patch",
+      "bytes": 2172,
+      "sha256": "e965d3fce302e7ce4be29d9dd85b952238339f7f0e151f46fe92ca2ecf623307"
+    },
+    {
+      "order": 6,
+      "file": "006-native-running-notification.patch",
+      "bytes": 779,
+      "sha256": "3ffab7de71d1fa2e0742e1d335e922e56f50defcaa1815080598ecc4fe28f221"
+    },
+    {
+      "order": 7,
+      "file": "007-unique-original-health-entry.patch",
+      "bytes": 610,
+      "sha256": "7d48703e4e4f7443a1a8031c9556d9906c2a671ce2d789e62e6ec90089cf933a"
+    },
+    {
+      "order": 8,
+      "file": "008-durable-budget-manual-native-gates.patch",
+      "bytes": 3899,
+      "sha256": "e97086f451caa12ead6c444d7c737e773721aac0e8b682a68bdca8fda4b1998c"
+    },
+    {
+      "order": 9,
+      "file": "009-native-gate-before-alive.patch",
+      "bytes": 1726,
+      "sha256": "e7afe80e1fae773880f1bfa5988232d3408c18db36f1e977e1bac99e5c8d4420"
+    }
+  ],
+  "observedSourceCheckpoint": {
+    "afterRecord": 6,
+    "sha256": "e279f7b6b189bafe03eca5033518b9a28eeb2866d1d85dcb771f824ebd0c82d7",
+    "origin": "Actual old-owner sha256sum output after records 001 through 006."
+  },
+  "failedAttempt": {
+    "betweenRecords": [
+      2,
+      3
+    ],
+    "mutationApplied": false,
+    "reason": "apply_patch verification failed: expected confirmRecoveryHealth hunk not found in combined ordered patch. The subsequent three successful inputs are records 003, 004 and 005."
+  },
+  "sealedTargetStatus": "No claim these nine records alone reproduce later d976 sealed source; current owner must verify all recovered final source bytes against the recorded sealed hash.",
+  "bootTestGapRecovered": {
+    "file": "/tmp/hetu-recovery/app-exact-recovered/BootRecoverySafety93Test.kt",
+    "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+    "origin": "Current owner joined its exact prior tool-read ranges with original Add File assertion lines supplied by this agent; actual final hash matches recorded cc68."
+  },
+  "workPerformed": [
+    "Saved successful patch-input records and this manifest only",
+    "Read-only verification of current owner BootTest recovered bytes"
+  ],
+  "workNotPerformed": [
+    "No patch application or production source write",
+    "No original cleaned workspace write",
+    "No Git commit or CI operation",
+    "No Android, device or network action"
+  ]
+}

@@ -1,0 +1,54 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/tools/qa/test_root_boot_safety93.py
+@@
+             self.assertTrue(any(x[1]=='HETU_KOUT' and x[-1]=='REJECT' for x in table['rules']),'KILL=1 failure released direct traffic')
++            self.assertFalse(any(x[1]=='HETU_KOUT' and '--uid-owner' in x and '--gid-owner' in x for x in table['rules']),'failed start retained its temporary core bootstrap exception')
+@@
+                 self.assertIn(['-A','HETU_KOUT','-j','REJECT'],six['rules'])
++                self.assertFalse(any(x[1]=='HETU_KOUT' and '--uid-owner' in x and '--gid-owner' in x for x in six['rules']),'IPv6 rollback retained its temporary core bootstrap exception')
+@@
+     def test_successful_kill_switch_start_removes_startup_guards_before_health_manifest(self):
+@@
+         self.assertTrue((self.run/'watchdog.pid').exists(),'successful long-lived guardian did not survive its launcher')
++
++    def test_kill_start_remote_bootstrap_allows_only_verified_core_identity(self):
++        self.env['FIXTURE_IPV6']='1';self.env['CORE_REMOTE_BOOTSTRAP']='1'
++        args=self.transaction_fixture('none')
++        self.command('sleep','exec /bin/sleep "$@"')
++        started=subprocess.run([str(self.commands/'sh'),str(self.base/'hetu-root.sh'),'start',*args],env=self.env,capture_output=True,text=True,timeout=6)
++        self.assertTrue(json.loads(started.stdout)['ok'],'the isolated core cannot finish remote initialization under its startup guard: '+started.stdout+started.stderr)
++        observed=json.loads((self.directory/'bootstrap-verdicts').read_text())
++        self.assertEqual((0,3005),(observed['uid'],observed['gid']))
++        self.assertEqual({'4':{'core':'RETURN','app':'REJECT','otherRoot':'REJECT'},'6':{'core':'RETURN','app':'REJECT','otherRoot':'REJECT'}},observed['families'])
++        lane=['-A','HETU_KOUT','-m','owner','--uid-owner','0','--gid-owner','3005','-j','RETURN']
++        for name in ['bootstrap-table-filter','bootstrap-table6-filter']:
++            rules=json.loads((self.directory/name).read_text())['rules']
++            self.assertIn(lane,rules)
++            self.assertLess(rules.index(lane),rules.index(['-A','HETU_KOUT','-j','REJECT']))
++        self.assertEqual('',started.stderr)
++
++    def test_kill_start_without_isolated_runner_preserves_existing_hooks(self):
++        args=self.transaction_fixture('none')
++        (self.base/'policy/system-dns-direct').touch()
++        previous={'chains':['HETU_NOUT'],'rules':[['-A','OUTPUT','-j','HETU_NOUT'],['-A','HETU_NOUT','-j','REDIRECT','--to-ports','7893']]}
++        (self.directory/'table-nat').write_text(json.dumps(previous))
++        started=subprocess.run([str(self.commands/'sh'),str(self.base/'hetu-root.sh'),'start',*args],env=self.env,capture_output=True,text=True,timeout=6)
++        self.assertEqual(previous,json.loads((self.directory/'table-nat').read_text()),'an unavailable isolated runner removed the existing interception')
++        self.assertFalse(json.loads(started.stdout)['ok'],started.stdout+started.stderr)
++        self.assertIn('隔离核心身份',started.stdout)
++        self.assertFalse((self.directory/'new-core').exists(),'an unsupported protected start launched an unisolated core')
++        self.assertIsNone(self.core.poll(),'an unsupported protected start signalled a foreign/manual core')
++
++    def test_kill_start_rejects_changed_core_identity_before_readiness(self):
++        self.env['FIXTURE_IPV6']='1';self.env['DROP_CORE_IDENTITY']='1'
++        args=self.transaction_fixture('none')
++        started=subprocess.run([str(self.commands/'sh'),str(self.base/'hetu-root.sh'),'start',*args],env=self.env,capture_output=True,text=True,timeout=6)
++        self.assertFalse(json.loads(started.stdout)['ok'],'a core whose actual credentials differ from the verified runner reached runtime success')
++        self.assertIn('隔离核心身份',started.stdout)
++        self.assertFalse((self.run/'watchdog.pid').exists())
++        for name in ['table-filter','table6-filter']:
++            rules=json.loads((self.directory/name).read_text())['rules']
++            self.assertIn(['-A','HETU_KOUT','-j','REJECT'],rules)
++            self.assertFalse(any('--uid-owner' in rule and '--gid-owner' in rule for rule in rules),'identity mismatch left a bootstrap exception')
++        self.assert_all_mapped_processes_drained()
+*** End Patch

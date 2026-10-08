@@ -1,0 +1,8 @@
+    private static final ThreadLocal<long[]> AUTOMATIC_START_BUDGET=new ThreadLocal<>();
+    static long automaticRootTimeout(long requested)throws IOException{
+        long[] budget=AUTOMATIC_START_BUDGET.get();
+        if(budget==null)return requested;
+        long remaining=budget[0]-SystemClock.elapsedRealtime()-budget[1];
+        if(remaining<=0L)throw new IOException("自动恢复剩余时限不足，未开始新的 Root 阶段");
+        return Math.min(requested,remaining);
+    }

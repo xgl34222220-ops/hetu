@@ -1,0 +1,38 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+-    private void checkLiveNetworkIntegrity(){
+-        if(destroyed||!prefs.getBoolean("proxyRootWanted",false))return;
++    private boolean checkLiveNetworkIntegrity(){return checkLiveNetworkIntegrity(null);}
++
++    private boolean checkLiveNetworkIntegrity(Runnable healthyRuntime){
++        if(!currentRecoveryIntent())return false;
+@@
+-        if(ticket<0L)return;
++        if(ticket<0L)return false;
+@@
+             String integrity=health.optString("networkIntegrity","unknown");
++            boolean healthy="healthy".equals(integrity)&&health.optBoolean("dataPlaneHealthy",false);
+@@
+                     .putString("proxyNetworkIntegrity",integrity)
++                    .putBoolean("proxyNetworkDataPlaneHealthy",healthy)
+@@
+-            if("healthy".equals(integrity))editor.remove("proxyAutoRecoveryError");
+-            else if("degraded".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
++            if(healthy)editor.remove("proxyAutoRecoveryError");
++            else if("degraded".equals(integrity)||"healthy".equals(integrity))editor.putString("proxyAutoRecoveryError","核心存活，网络接管不完整："+health.optString("networkFault"));
+@@
+-            if(!publishNetworkObservation(route,ticket,editor::apply))staleResult(route,id);
++            boolean current=publishNetworkObservation(route,ticket,()->{
++                editor.apply();
++                if(healthy&&healthyRuntime!=null)healthyRuntime.run();
++            });
++            if(!current)staleResult(route,id);
++            return current&&healthy;
+@@
+                     .putString("proxyNetworkIntegrity","unknown").putString("proxyNetworkFault","health-read-failed")
++                    .putBoolean("proxyNetworkDataPlaneHealthy",false)
+@@
+                     .putString("proxyNetworkHealthReadError",failure.getClass().getSimpleName()).apply()))staleResult(route,id);
++            return false;
+*** End Patch

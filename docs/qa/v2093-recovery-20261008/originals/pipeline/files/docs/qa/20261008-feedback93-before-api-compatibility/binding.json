@@ -1,0 +1,33 @@
+{
+  "schema": 1,
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "controls": {
+    "motion-only": {
+      "productionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt",
+      "archive": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-cff-with-current-call-signature.kt",
+      "exactDiff": "docs/qa/20261008-feedback93-before-api-compatibility/panel-components-exact-api-diff.patch",
+      "pinnedBehaviorBaseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+      "originalCffSourceSha256": "1817bcbeafb558ce9c336608cc186223487f131594ee5bea97608aa316947d4e",
+      "projectedSourceSha256": "da81855367df3182df1b8f4b9c79c3adf17c082006998ac6a7df91e204b16d86",
+      "apiShapeFragmentSha256": "68f0eb950d646f285a52a740522cc682424a333a8ee14a09e112487f9773f35e",
+      "exactDiffSha256": "16212fa81b6a8626d38afc0c3bf3ca19c9e349a7bef342fbd3099c71c0219efc",
+      "sourceIsByteExactPinnedBaseCommit": false,
+      "oldProductionBodiesUnmodified": true,
+      "adapterBoundary": "Only adds the optional unused onClickLabel parameter; the complete old delay/motion body is byte unchanged."
+    },
+    "root-stop-result": {
+      "productionSource": "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+      "archive": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-cff-with-current-timeout-api.java",
+      "exactDiff": "docs/qa/20261008-feedback93-before-api-compatibility/root-manager-exact-api-diff.patch",
+      "pinnedBehaviorBaseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+      "originalCffSourceSha256": "2a1079749b9e5b21084e04c2b3c746f077193a3d8fce1727072ce04d9040b638",
+      "projectedSourceSha256": "68c31e20c5f0a1d188e0511f4f77a8ba810aaec6056985ee29ea22a4205a020e",
+      "apiShapeFragmentSha256": "3c5304d68cadd24f3e7ea197f1a4fb555745c2a8bc7c0757afc911724131f091",
+      "exactDiffSha256": "8c647aecdee7776e92aa984e07521ca4995dc9284a1ab7947c8751e67fbcbc5b",
+      "sourceIsByteExactPinnedBaseCommit": false,
+      "oldProductionBodiesUnmodified": true,
+      "adapterBoundary": "Only inserts the exact current timeout API and its ThreadLocal field; complete old start/stop bodies and fields are byte unchanged. Old code never sets this new field, so its timeout remains the original requested value."
+    }
+  },
+  "limitations": "Explicit source/API compatibility controls; compilation errors never count as behavioral regressions. Actual same-SHA Android XML must prove the specified defects."
+}

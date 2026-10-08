@@ -1,0 +1,153 @@
+{
+  "schema": 1,
+  "recordedUtc": "2026-10-08T17:45:45.319802+00:00",
+  "result": "TWO_COMPLETE_HISTORICAL_SOURCE_READS_AND_EXPLICIT_PARTIAL_LATEST_FRAGMENTS",
+  "originalWorkdir": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "knownRepositoryHead": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "recoveredWholeSources": 2,
+  "recoveredLatestWholeSources": 0,
+  "entries": [
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-api-adapter-isolated-grep-lines.json",
+      "bytes": 873,
+      "sha256": "88f53ecf909d12521adaf19d0fa931cd859b183cde97a884cf7d755915304b76",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-import.line17.py.txt",
+      "bytes": 117,
+      "sha256": "ba4c8e52bd364ff6bd1be0cb81f2f0652e83a479a9373c8402f5f6ec3004fc7e",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-before-production_sources.lines102-121.py.txt",
+      "bytes": 1137,
+      "sha256": "d6606ef1e5027935de095176368081dd071fdd22b208c1d8889bbeabadc75bfe",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-delivery-api-adapter-consumer.lines327-335.py.txt",
+      "bytes": 715,
+      "sha256": "64ea9dab8e0c8b7551547df65e97235a95430997853357ef2c9cc463c747f97e",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-source-scope-layer-registration.lines270-271.py.txt",
+      "bytes": 171,
+      "sha256": "8f8559be02330cbf1e223289023bb4f43055f96aa43f4e5d75713e1e746d5ab7",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/fragments/latest-test-api-adapter-guards.lines253-268.py.txt",
+      "bytes": 1213,
+      "sha256": "f39c6e7cdb03be8d8258808bf509bd9536799698e9a13ccfcfd160d7763c43b0",
+      "snapshot": "PARTIAL_LATEST_ORIGINAL_TOOL_FRAGMENT",
+      "wholeOriginalSource": false,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/continuity93_source_scope.pre-api-adapter.py",
+      "bytes": 17416,
+      "sha256": "32cdb502c3654e6401fe326dcf32ac3486b4f7b8a1524ab27f768c9f6bd2a6d8",
+      "snapshot": "PRE_C_F_API_ADAPTER_HISTORICAL_ONLY",
+      "wholeOriginalSource": true,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "pythonSyntaxParsedWithoutImportOrExecution": true,
+      "lines": 302,
+      "recordedTopLevelDefinitions": {
+        "validate_revision": 70,
+        "validate_revision_test": 76,
+        "host_test_bodies": 82,
+        "host_process_timeouts": 89,
+        "validate_host_fixture": 96,
+        "validate_stress_fixture": 108,
+        "host_fixture_deltas": 116,
+        "candidate_test_method_bodies": 121,
+        "validate_candidate_test_methods": 139,
+        "evidence_sources": 149,
+        "other_payloads": 178,
+        "committed_bytes": 187,
+        "predecessor_layer": 191,
+        "previous_files": 203,
+        "historical_files": 207,
+        "allowed_change": 221,
+        "validate_version": 225,
+        "selected_tests": 232,
+        "validate_layer": 239,
+        "validate_checkout": 286
+      }
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/pipeline/audit-recovery/historical-source/run_continuity93_before_comparison.pre-api-adapter.py",
+      "bytes": 20046,
+      "sha256": "e499de0a0b5d4cc7ced59ed52f8da3ec73d2bd45bb5e126f9fe1bd12ed38609c",
+      "snapshot": "PRE_C_F_API_ADAPTER_HISTORICAL_ONLY",
+      "wholeOriginalSource": true,
+      "preCleanupKnownWholeFileSha256": null,
+      "matchesPreCleanupKnownWholeFileSha256": null,
+      "pythonSyntaxParsedWithoutImportOrExecution": true,
+      "lines": 291,
+      "recordedTopLevelDefinitions": {
+        "production_sources": 101,
+        "suite_results": 122,
+        "specifications": 156,
+        "verify_variant": 184,
+        "run_variant": 206,
+        "run": 271
+      }
+    }
+  ],
+  "wholeSourceProvenance": {
+    "continuity93_source_scope.pre-api-adapter.py": {
+      "originalRepoPath": ".github/scripts/continuity93_source_scope.py",
+      "toolOriginalReads": [
+        "sed -n 1,180p continuity93_source_scope.py (full displayed block after old health26 and timeout protection were present)",
+        "nl -ba continuity93_source_scope.py | sed -n 166,350p (displayed through final line302)",
+        "source capture overlaps lines166-180; original bodies and comments retained"
+      ],
+      "knownLaterEdits": "C/F compatibility evidence-source registration and beforeSourceCompatibilityAdapters layer validation later added; not present in this historical original",
+      "isLatest": false
+    },
+    "run_continuity93_before_comparison.pre-api-adapter.py": {
+      "originalRepoPath": ".github/scripts/run_continuity93_before_comparison.py",
+      "toolOriginalReads": [
+        "nl -ba run_continuity93_before_comparison.py (full displayed lines1-119 before overall output truncation)",
+        "sed -n 120,390p run_continuity93_before_comparison.py (complete display through EOF)"
+      ],
+      "knownLaterEdits": "C/F compatibility import, production_sources archive substitution and explicit API metadata later added; only actual observed later fragments saved separately",
+      "isLatest": false
+    }
+  },
+  "fragmentProvenance": "Exact later displayed nl/grep source lines; line numbers and ranges are in filenames or JSON. No missing intervening lines or complete patch are inferred.",
+  "notRecoveredHere": [
+    "latest complete continuity93_source_scope.py",
+    "latest complete run_continuity93_before_comparison.py",
+    "complete test_continuity93_evidence.py",
+    "complete verify_continuity93_delivery.py",
+    "complete feedback_smoke93.py",
+    "latest prepare_new_ui_source.py",
+    "complete v2093-build.yml",
+    "raw host test logs or full preseal reports"
+  ],
+  "existingPipelineOriginalsNotOverwritten": true,
+  "c_fFiveArchiveFiles": "Parent already recovered and matched original SHA; not duplicated by this child",
+  "noExplicitPreCleanupFunctionStoreCache": true,
+  "limits": "These full historical source transcriptions have no separately retained known whole-file SHA. Newly calculated SHA is only recovery-file identity, not proof of latest candidate seal. No Git/CI/SDK/device/test execution; ast.parse is syntax-only. Original host successes remain historical receipts; no logs were recreated."
+}

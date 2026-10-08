@@ -1,0 +1,54 @@
+{
+  "task": "/root/boot_safety_current",
+  "workspace": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "incident": "workspace path missing; cleaning marker appeared Oct 9 00:14; no matching deleted open file descriptor found",
+  "last_before_root_sha": "3c8d2ae5eacdbe4f37fa338d5405725df8014308ef5bbf43af045c038b729f22",
+  "last_before_autostart_sha": "5d20b8f483b2349236344ea9ecb20e6a6ead67db0c9304b20ddf6bba4317924f",
+  "last_manager_sha": "7dd7b1e1e8cdba85e7ba84d8c773ded3a87f27c168005ca8b2e8a8b6a477058f",
+  "last_health_fixture_sha": "2481d3771091b813787953b848504e762e1b6d0bc8491469b95cf99ba1918428",
+  "bootstrap_before_observed": {
+    "tests": 3,
+    "failures": 3,
+    "errors": 0,
+    "seconds": 9.027,
+    "helper_sha": "c3b4911cc9c0418bd2e2ce1d929c526f529736911a1b08d9324ee6c9cf0d27f0"
+  },
+  "bootstrap_after_first_observed": {
+    "tests": 6,
+    "failures": 4,
+    "errors": 1,
+    "seconds": 2.069,
+    "cause": "private fixture setgid(3005) denied despite uid0"
+  },
+  "bootstrap_after_second_observed": {
+    "tests": 6,
+    "failures": 4,
+    "errors": 0,
+    "seconds": 11.311,
+    "cause": "mapped_root stat replacement matches status prefix before dedicated identities/status replacement"
+  },
+  "production_delta_applied_before_incident": [
+    "START_BOOTSTRAP global=0; rollback clears it",
+    "startup_core_return permits uid0+gid3005 only during verified-runner transaction",
+    "install_kill4/6 add finite core lane",
+    "prepare identity before destructive cleanup; KILL1 no runner refuses including system-dns-direct",
+    "probe owner6 even bypass when IPv6 available",
+    "confirm pidcore+all four UID0/GID3005 fields immediately before wait_ready"
+  ],
+  "pending": [
+    "restore exact current bytes and all source/evidence archives",
+    "move controlled status replacement before stat prefix",
+    "exactly revoke temporary bootstrap lane before any rollback atomic replacement; case atomic rollback restore fails after lane present",
+    "set START_BOOTSTRAP=0 after successful guard removal",
+    "final new methods suite and original60 on immutable source",
+    "final helper before replay exact initial129d/64a four native defects"
+  ],
+  "not_claimed": [
+    "latest full suite pass",
+    "latest source seal",
+    "Android compile/test run",
+    "phone root credentials or real firewall validation",
+    "phone heat/reboot/Google fault cause"
+  ],
+  "fixture_boundary": "PID/birth/SID/executable are actual owned kernel entries; UID/GID proc fields and firewall are explicitly isolated models; no privilege escalation performed"
+}

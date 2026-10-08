@@ -1,0 +1,11 @@
+--- f520/RootAutostart.java
++++ 00462/RootAutostart.java
+@@ -44,7 +44,7 @@
+                 .append("; test -x ").append(RootBridge.quote(ENTRY))
+                 .append("; test -s ").append(RootBridge.quote(BASE+"/start.sh"))
+                 .append("; test -s ").append(RootBridge.quote(BASE+"/config"));
+-        check(RootBridge.rootShell(context,cmd.toString(),20000L),"开机脚本安装失败");
++        check(RootBridge.rootShell(context,cmd.toString(),RootProxyManager.automaticRootTimeout(20000L)),"开机脚本安装失败");
+     }
+ 
+     private static void copy(StringBuilder cmd,File source,String target,String suffix,String mode){

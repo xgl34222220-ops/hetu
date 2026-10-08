@@ -1,0 +1,15 @@
+{
+  "schema": 1,
+  "result": "ADDITIONAL_EXACT_RECOVERY",
+  "recordedUtc": "2026-10-08T17:36:26.467848+00:00",
+  "originalRepoPath": ".github/scripts/test_feedback_smoke93.py",
+  "restoredPath": "/workspace/hetu-recovery-20261008/originals/pipeline/files/.github/scripts/test_feedback_smoke93.py",
+  "bytes": 19836,
+  "sha256": "59624d5f3b7dcdf95114e901104b8fc3ec2b0d284291cef1e5a0a2207762f07f",
+  "matchesPreCleanupKnownSha256": true,
+  "source": "Complete tool read through EOF; exact 16-method test source SHA matches pre-cleanup actual16-host guard record",
+  "testMethods": 16,
+  "testBodiesNotEdited": true,
+  "resolvesEarlierMissingEntry": ".github/scripts/test_feedback_smoke93.py",
+  "limits": "Restored original synthetic host test source; original raw test execution log not fabricated or regenerated"
+}

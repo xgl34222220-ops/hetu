@@ -1,0 +1,11 @@
+--- cff/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
++++ compatible/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
+@@ -411,7 +411,7 @@
+  * only and gets a comfortable touch box that grows up and to the left of it.
+  */
+ @Composable
+-internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false) {
++internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null, onCard: Boolean = false, onClickLabel: String = "测速") {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+     val motion = LocalHomeMotionEnabled.current

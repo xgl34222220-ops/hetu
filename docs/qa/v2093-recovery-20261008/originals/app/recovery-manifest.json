@@ -1,0 +1,58 @@
+{
+  "recordKind": "New recovery receipt, not the original lost app-source-seal.json",
+  "createdUtc": "2026-10-08T17:30:38.902731+00:00",
+  "originalRepoPath": "/workspace/scratch/0b0eb540860e/hetu-feedback-next",
+  "baseCommit": "cffeff08ee38c7220922bdb36de81b621c935daf",
+  "sourceRepoPaths": {
+    "BootRecoverySafety93Test.kt": "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt",
+    "ProxyNetworkMatchService.java": "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java"
+  },
+  "artifacts": [
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/app/BootRecoverySafety93Test.kt",
+      "sha256": "cc68e8d4adac1b24d6e2aa021b262108bab6296f4bc2dbb74da57dd81737d04e",
+      "bytes": 26662,
+      "sourcePath": "/tmp/hetu-recovery/app-exact-recovered/BootRecoverySafety93Test.kt"
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/app/app-host-result.json",
+      "sha256": "6d82f72a0f7505d6d0ac12ba16af66e18d318eb41af8c3431ed10cc80d49c5ca",
+      "bytes": 5383,
+      "sourcePath": "/tmp/hetu-recovery/app-exact-recovered/app-host-result.json"
+    },
+    {
+      "path": "/workspace/hetu-recovery-20261008/originals/app/Service-verified-original-methods.json",
+      "sha256": "2a388bf4a0c0542a12da539f780c1e60b61d752c52b78453b474b48a8a3d43cb",
+      "bytes": 24077,
+      "sourcePath": "/tmp/hetu-recovery/app-exact-recovered/Service-verified-original-methods.json"
+    }
+  ],
+  "recoveryProvenance": [
+    "BootTest: complete exact original tool reads plus two original AddFile-record assertions supplied by old App owner and the actual executed unknown-boot patch; full sealed SHA re-matched",
+    "host JSON: complete original tool cat output; all 5383 bytes re-matched original SHA",
+    "Service method fragments: 26 method names / 27 bodies copied from exact original read/diff outputs and independently re-matched every original body SHA in recovered host report"
+  ],
+  "ServiceFullSha256Expected": "d976fe05b85b4eacc29073d0ca9ab19df1742c8a2d5d064fd62aa0b8de903933",
+  "ServiceFullRecovered": false,
+  "missingHostMethod": "probeCoreState",
+  "originalAppSealSha256": "e077e0d4be77f8afa0717c4a8ff2c4e3dbb3b6b1fe8886a69707c05ba514ff99",
+  "originalAppSealRecovered": false,
+  "originalHostCompilerHelperRecovered": false,
+  "AndroidRerun": false,
+  "hostReExecutedDuringRecovery": false,
+  "fullAndroidClassCompiledDuringRecovery": false,
+  "productionRepoWrittenByAppRecovery": false,
+  "localLogDatabaseCheck": {
+    "readOnly": true,
+    "logsRows": 1000,
+    "stateThreadsRows": 0,
+    "knownTaskNameRepoPathSourceNameAndShaMatches": 0,
+    "exactToolRecordsRecoveredFromDatabase": 0
+  },
+  "limitations": [
+    "The historical host report confirms only the previously executed production-method host with Android/Root/native boundary shims; it is not a new execution",
+    "No Android/Kotlin execution, phone/device/network/login action, CI or commit performed during recovery",
+    "Full Service recovery requires exact original replay and whole-file d976 hash match before production source may be restored",
+    "The original seal and host helper are unavailable; no recreated receipt is claimed to have their original bytes"
+  ]
+}

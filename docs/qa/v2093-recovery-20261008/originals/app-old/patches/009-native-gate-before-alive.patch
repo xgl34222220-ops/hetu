@@ -1,0 +1,28 @@
+*** Begin Patch
+*** Update File: /workspace/scratch/0b0eb540860e/hetu-feedback-next/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
+@@
+             if(state==ProxyContinuity.ProcessState.UNKNOWN){
+                 prefs.edit().putLong("proxyLastUnknownProcessProbeAt",System.currentTimeMillis()).apply();
+                 return;
+             }
++            if(boot){
++                RootAutostart.BootRestoreState nativeState=RootAutostart.restoreState(getApplicationContext());
++                if(!nativeRecoveryAllowsStart(nativeState,false)){
++                    if(nativeState==RootAutostart.BootRestoreState.ACTIVE||nativeState==RootAutostart.BootRestoreState.UNKNOWN)
++                        deferBootRecovery(nativeState==RootAutostart.BootRestoreState.ACTIVE
++                                ?"Root 开机脚本正在恢复，App 等待原任务完成…":"Root 开机恢复所有者尚未确认…");
++                    return;
++                }
++            }
+             if(state==ProxyContinuity.ProcessState.ALIVE){
+@@
+-            if(boot){
+-                RootAutostart.BootRestoreState nativeState=RootAutostart.restoreState(getApplicationContext());
+-                if(!nativeRecoveryAllowsStart(nativeState,false)){
+-                    if(nativeState==RootAutostart.BootRestoreState.ACTIVE||nativeState==RootAutostart.BootRestoreState.UNKNOWN)
+-                        deferBootRecovery(nativeState==RootAutostart.BootRestoreState.ACTIVE
+-                                ?"Root 开机脚本正在恢复，App 等待原任务完成…":"Root 开机恢复所有者尚未确认…");
+-                    return;
+-                }
+-            }
+*** End Patch
