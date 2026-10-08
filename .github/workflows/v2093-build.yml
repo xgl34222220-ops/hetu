@@ -231,6 +231,26 @@ jobs:
 
         cat ../out/verification/materialkolor-dependency-insight.txt
 
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
+        debugRuntimeClasspath --dependency androidx.compose.ui:ui-android > ../out/verification/compose-ui-dependency-insight.txt
+
+        cat ../out/verification/compose-ui-dependency-insight.txt
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
+        debugRuntimeClasspath --dependency androidx.compose.foundation:foundation-android > ../out/verification/compose-foundation-dependency-insight.txt
+
+        cat ../out/verification/compose-foundation-dependency-insight.txt
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
+        debugUnitTestRuntimeClasspath --dependency androidx.compose.ui:ui-android > ../out/verification/compose-ui-unit-test-dependency-insight.txt
+
+        cat ../out/verification/compose-ui-unit-test-dependency-insight.txt
+
+        gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs=''-Xmx2g -Dfile.encoding=UTF-8'' :app:dependencyInsight --configuration
+        debugUnitTestRuntimeClasspath --dependency androidx.compose.foundation:foundation-android > ../out/verification/compose-foundation-unit-test-dependency-insight.txt
+
+        cat ../out/verification/compose-foundation-unit-test-dependency-insight.txt
+
         '
     - name: Build APK
       run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace

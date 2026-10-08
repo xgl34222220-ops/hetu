@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "createdAt": "2026-10-08T20:12:52.410632+00:00",
+  "failedCommit": "868785ae5cacddcbf4fa2d3cd463ffe131868f29",
+  "failedMainSuite": {
+    "tests": 707,
+    "failures": 1
+  },
+  "failedMethod": "boundedViewerMeasuresOnlySmallUnicodeParagraphsAndShowsLongLineEnd",
+  "failure": "EOF glyph must be visible horizontally: Rect.fromLTRB(1389.9, 628.0, 1397.9, 647.0) within Rect.fromLTRB(32.0, 628.0, 361.0, 647.0)",
+  "scope": "Fixture coordinate correction and adversarial calibration; no production-source changes from failed commit",
+  "coordinateError": {
+    "mechanism": "When Text directly carries horizontalScroll, ScrollNode participates in the same LayoutNode semantics and supplies the outer viewport coordinator. TextLayoutResult glyph bounds are in the internally placed paragraph. Translating glyph bounds by the outer node position alone omits the actual scroll placement.",
+    "projection": "Only if textNode.id == horizontalScrollNode.id: x = (reverseScrolling XOR (layoutDirection == RTL)) ? (scroll - maxScroll) : -scroll. Otherwise x = 0 because the separate child position already includes ancestor placement. Add x to node.positionInWindow before the unchanged glyph containment assertions.",
+    "fourCases": {
+      "LTR normal": "-scroll",
+      "LTR reversed": "scroll - maxScroll",
+      "RTL normal": "scroll - maxScroll",
+      "RTL reversed": "-scroll"
+    },
+    "sourceProvenance": "Official Google Maven ui/foundation 1.12.0-alpha03 source jars independently retrieved by ui_recovery; root strict Material3 1.5.0-alpha22 POM requests this Compose version. Actual final resolution still requires the new CI dependencyInsight output.",
+    "sourceFiles": [
+      {
+        "name": "Scroll.kt",
+        "sha256": "d3e3be2af48946a96a6c4d05b57571bb250048015458dc9124c8f66fcd36b396"
+      },
+      {
+        "name": "Placeable.kt",
+        "sha256": "16ce931bc2db81aeabe5358ac8ebdba0c2eb9962a1c4031892c3a0672433863c"
+      },
+      {
+        "name": "SemanticsNode.kt",
+        "sha256": "a67f468ba80afe0e6dc4c0c1b126f9445822b368e0be4d0088b7ee75c2ba9e6b"
+      }
+    ],
+    "officialReferences": [
+      "https://dl.google.com/dl/android/maven2/androidx/compose/foundation/foundation/1.12.0-alpha03/foundation-1.12.0-alpha03-sources.jar",
+      "https://dl.google.com/dl/android/maven2/androidx/compose/ui/ui/1.12.0-alpha03/ui-1.12.0-alpha03-sources.jar",
+      "https://android.googlesource.com/platform/frameworks/support/+/be018f2daec6fb7b126b8abae29d4cdd82f7e738^!/"
+    ]
+  },
+  "preserved": {
+    "testMethodIdentities": [
+      "realSettingsEntryCreatesThemedActivityAndPreservesShortCopyExport",
+      "realSettingsEntryReadsLargeValidYamlAndPreservesAllBytes",
+      "realSettingsEntryReadsLongUnicodeLineAndPreservesEof",
+      "realSettingsEntryShowsMissingStartupWithoutRegeneration",
+      "realSettingsEntryShowsReadIOExceptionWithoutFalseSuccess",
+      "actualToolsDiagClickReadsLargeStartupAndCopiesOriginal",
+      "boundedViewerCanShowRealEofAndReturnToStartAcrossSettingsAndTools",
+      "boundedViewerMeasuresOnlySmallUnicodeParagraphsAndShowsLongLineEnd",
+      "actualSettingsClipboardRejectionAndMissingServiceStayVisibleAndKeepAllBytes",
+      "actualToolsClipboardRejectionAndMissingServiceNeverClaimSuccess"
+    ],
+    "originalHorizontalTolerancePixels": 1,
+    "originalVerticalTolerancePixels": 1,
+    "allArchivedWholeFileHashesMatch": true
+  },
+  "additionalCalibration": [
+    "Long-line case asserts actual LTR, non-reversed scrolling, a positive scroll range and a nonzero actual scroll.",
+    "Actual scroll must reach the measured last-glyph target within 1px.",
+    "Use the real semantics ScrollBy action to return the paragraph to zero and verify the actual axis value is 0 +/- 0.5px.",
+    "The same glyph helper must then fail the unchanged horizontal 1px assertion; an unscrolled false pass fails the test.",
+    "Click the actual end-navigation control again; the same positive containment and target checks must pass."
+  ],
+  "diagnostics": {
+    "beforeAssertPng": "settings-long-line-end-before-assert.png",
+    "captureAdvancesClock": false,
+    "captureRetriesScroll": false,
+    "failureMessage": "contains node ids, origin, semantic/text layout sizes, actual/max scroll, reversal and applied internal offset"
+  },
+  "candidateFile": {
+    "path": "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
+    "sha256": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040"
+  },
+  "localChecks": {
+    "gitDiffCheck": "PASS",
+    "testMethods": 10,
+    "candidateAndroidExecuted": false
+  },
+  "limitations": [
+    "No new CI pass is claimed.",
+    "The third-run long-line frame was not among recovered PNGs; the new fixed allowlist captures it before the assertion.",
+    "The original first and second startup failure records remain failures.",
+    "This fixture correction is new work after byte-exact recovery and does not alter archive provenance."
+  ]
+}

@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.SemanticsActions
@@ -31,6 +32,7 @@ import androidx.compose.ui.semantics.SemanticsProperties
 import androidx.compose.ui.semantics.getOrNull
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.compose.ui.text.TextLayoutResult
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import io.github.xgl34222220.hetu.tools.ToolsDestination
@@ -64,6 +66,8 @@ import java.io.File
 import java.io.IOException
 import java.time.Duration
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.math.abs
+import kotlin.math.roundToInt
 
 /** Actual settings click, Activity.onCreate/hxHost and DiagHost; no regenerate/Root/network. */
 @RunWith(RobolectricTestRunner::class)
@@ -254,8 +258,8 @@ class StartupConfigViewerFeedbackTest {
     private fun singleLineYaml(): String = "mode: rule\r\nprofile-name: '" + "河图😀".repeat(20_000) +
         "-$eof'\r\nrules: [MATCH,DIRECT]\r\n"
 
-    private fun capture(name: String) {
-        frame()
+    private fun capture(name: String, settle: Boolean = true) {
+        if (settle) frame()
         rule.runOnUiThread {
             val base = activity?.get()?.window?.decorView ?: rule.activity.window.decorView
             assertTrue("Actual native window has a layout", base.width > 0 && base.height > 0)
@@ -340,7 +344,7 @@ class StartupConfigViewerFeedbackTest {
     }
 
     /** Verify glyph coordinates, rather than accepting any intersection of a tall Text. */
-    private fun expectGlyphVisible(marker: String) = rule.runOnUiThread {
+    private fun expectGlyphVisible(marker: String, requireHorizontalScroll: Boolean = false) = rule.runOnUiThread {
         val node = nodes().first { it.config.getOrNull(SemanticsProperties.Text).orEmpty().any { label -> marker in label.text } }
         val layouts = mutableListOf<TextLayoutResult>()
         assertTrue(node.config[SemanticsActions.GetTextLayoutResult].action!!.invoke(layouts))
@@ -349,13 +353,38 @@ class StartupConfigViewerFeedbackTest {
         assertTrue(index >= 0)
         val parents = generateSequence(node) { it.parent }.toList()
         val vertical = parents.first { it.config.getOrNull(SemanticsProperties.VerticalScrollAxisRange) != null }.boundsInWindow
-        val horizontal = parents.first { it.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange) != null }.boundsInWindow
+        val horizontalNode = parents.first { it.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange) != null }
+        val horizontal = horizontalNode.boundsInWindow
+        val horizontalAxis = horizontalNode.config[SemanticsProperties.HorizontalScrollAxisRange]
         val viewport = Rect(maxOf(vertical.left, horizontal.left), maxOf(vertical.top, horizontal.top),
             minOf(vertical.right, horizontal.right), minOf(vertical.bottom, horizontal.bottom))
+        val maxScroll = horizontalAxis.maxValue()
+        val scroll = horizontalAxis.value().coerceIn(0f, maxScroll)
+        // ScrollNode owns the outer semantics coordinator when Text itself carries
+        // horizontalScroll. Its child is placed inside that coordinator with -scroll
+        // (or scroll-max for reversed placement), and placeRelative mirrors this in RTL.
+        // A separate Text child already includes the ancestor placement in its origin.
+        val sameScrollNode = horizontalNode.id == node.id
+        val mirrored = horizontalAxis.reverseScrolling xor (layout.layoutInput.layoutDirection == LayoutDirection.Rtl)
+        val innerOffset = if (!sameScrollNode) 0f else if (mirrored) scroll - maxScroll else -scroll
+        val glyphOrigin = node.positionInWindow + Offset(innerOffset, 0f)
+        if (requireHorizontalScroll) {
+            assertEquals("The long-line calibration uses the actual LTR fixture", LayoutDirection.Ltr, layout.layoutInput.layoutDirection)
+            assertFalse("The long-line fixture uses normal scrolling", horizontalAxis.reverseScrolling)
+            assertTrue("The fixture must require horizontal scrolling", maxScroll > 0f)
+            assertTrue("End navigation must move the real horizontal scroll state", scroll > 0f)
+            val end = layout.layoutInput.text.text.indexOfLast { it != '\n' && it != '\r' }.coerceAtLeast(0)
+            val target = (layout.getBoundingBox(end).right - viewport.width).roundToInt().toFloat().coerceIn(0f, maxScroll)
+            assertTrue("Actual scroll $scroll must reach the measured final-glyph target $target", abs(scroll - target) <= 1f)
+        }
         for (at in index until index + marker.length) {
-            val glyph = layout.getBoundingBox(at).translate(node.positionInWindow)
+            val glyph = layout.getBoundingBox(at).translate(glyphOrigin)
             assertTrue("EOF glyph must be visible vertically: $glyph within $viewport", glyph.top >= viewport.top - 1f && glyph.bottom <= viewport.bottom + 1f)
-            assertTrue("EOF glyph must be visible horizontally: $glyph within $viewport", glyph.left >= viewport.left - 1f && glyph.right <= viewport.right + 1f)
+            assertTrue("EOF glyph must be visible horizontally: $glyph within $viewport; " +
+                "textNode=${node.id} scrollNode=${horizontalNode.id} origin=${node.positionInWindow} " +
+                "semanticSize=${node.size} textLayoutSize=${layout.size} " +
+                "scroll=$scroll maxScroll=$maxScroll reverse=${horizontalAxis.reverseScrolling} innerOffset=$innerOffset",
+                glyph.left >= viewport.left - 1f && glyph.right <= viewport.right + 1f)
         }
     }
 
@@ -392,7 +421,36 @@ class StartupConfigViewerFeedbackTest {
             assertTrue("A split must not begin with an orphan low surrogate", paragraphs.none { it.firstOrNull()?.isLowSurrogate() == true })
             assertTrue("A split must not end with an orphan high surrogate", paragraphs.none { it.lastOrNull()?.isHighSurrogate() == true })
         }
-        click("查看末尾"); expectGlyphVisible(eof); capture("settings-long-line-end")
+        click("查看末尾")
+        // Capture the exact frame before the unchanged visibility assertion, without
+        // advancing the clock or retrying the scroll to conceal a timing failure.
+        capture("settings-long-line-end-before-assert", settle = false)
+        expectGlyphVisible(eof, requireHorizontalScroll = true)
+        // Calibrate the exact same 1px glyph check against a real unscrolled paragraph.
+        // A faulty coordinate transform must not make both positions pass.
+        rule.runOnUiThread {
+            val node = nodes().first { it.config.getOrNull(SemanticsProperties.Text).orEmpty().any { label -> eof in label.text } }
+            val horizontal = generateSequence(node) { it.parent }.first {
+                it.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange) != null
+            }
+            val axis = horizontal.config[SemanticsProperties.HorizontalScrollAxisRange]
+            assertTrue(horizontal.config[SemanticsActions.ScrollBy].action!!.invoke(-axis.value(), 0f))
+        }
+        frame()
+        rule.runOnUiThread {
+            val node = nodes().first { it.config.getOrNull(SemanticsProperties.Text).orEmpty().any { label -> eof in label.text } }
+            val horizontal = generateSequence(node) { it.parent }.first {
+                it.config.getOrNull(SemanticsProperties.HorizontalScrollAxisRange) != null
+            }
+            assertEquals("The negative control really returned horizontal scrolling to zero", 0f,
+                horizontal.config[SemanticsProperties.HorizontalScrollAxisRange].value(), 0.5f)
+        }
+        var unscrolledFailure: String? = null
+        try { expectGlyphVisible(eof) } catch (expected: AssertionError) { unscrolledFailure = expected.message }
+        assertTrue("Unscrolled EOF must fail the same horizontal glyph check", unscrolledFailure?.startsWith("EOF glyph must be visible horizontally:") == true)
+        click("查看末尾")
+        expectGlyphVisible(eof, requireHorizontalScroll = true)
+        capture("settings-long-line-end")
         copyAndVerify(text, bytes)
     }
 

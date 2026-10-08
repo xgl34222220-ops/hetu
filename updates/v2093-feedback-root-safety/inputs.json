@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "3277fa8ce7b3fff478c3c87e2f993d205d6d5b757a094f11e92ae07669c03ebf",
+  "patchSha256": "7b150a70d88d2add03df104e45df167f7d6ca9ecfa57fb7d6eca9f31283451b4",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -293,7 +293,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartIntentSafety93Test.kt": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartTransaction93Test.kt": "b469c64b5a71880fbe5237bf24b243c332fc99984dfe9df90ec78c86e0ac7166",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "9be0ba537081f512a51d7a2833368d5ee1533f91bd12adc61490b826bc343e8b",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "a4a7e97f53859d8413a50561cccc0bf4ab5231f95b861af111182bd4ac8e4714"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040"
   },
   "frozenFiles": {
     "android-app/CONCEPT_PROGRESS.md": "3082d07fed4014ba5a77d4591ab73af3748413457578339eb42e03be0050172b",
@@ -750,10 +750,10 @@
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
     ".github/scripts/test_continuity93_evidence.py": "3f9a300c4e3010784c2e3162062be4611c5ede8deb8c8f947fc4038d64d84c44",
     ".github/scripts/transport_continuity93_failures.py": "5afddef49021db6ed7bc8e8f27a57a078b749e7d9f5dfd13185a3599835fa9a9",
-    ".github/scripts/transport_ui93_pngs.py": "1e0c31bdb3b70edd85f3d719419752645014020d1f0b966f31819ed70ea2348c",
+    ".github/scripts/transport_ui93_pngs.py": "da87843f04dfc90c245fdde3a0a69f988daff47ccf5e2ab33ffde2a2f8849a39",
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
-    ".github/workflows/v2093-build.yml": "f1b30f8aea0ae16ebc953cc7ebe91c27ae2f78b97cf7d9ad0fd210ce570eaae8",
+    ".github/workflows/v2093-build.yml": "f4988acd5b4cb7285c868c35b39d2902ff432ffc67e30f7061cd6da768290893",
     "tools/qa/test_app_recovery93.py": "50b807d008b6bdcb9a24e80ac0f34d2d316f07d32b34e8b5afb5c84acfb18f05",
     "tools/qa/test_core_identity_dns.py": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d",
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",

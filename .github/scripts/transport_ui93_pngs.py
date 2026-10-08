@@ -29,7 +29,8 @@ HOST = tuple(OUT + 'glass90/' + name + '.png' for name in (
     'tools-actual-large-entry')) + (
     OUT + 'glass91/dark-settings-group.png',
     OUT + 'concept-state-coverage/04-009-theme-motion.png',
-    OUT + 'concept-state-coverage/04-029-mirror-dialog.png')
+    OUT + 'concept-state-coverage/04-029-mirror-dialog.png',
+    OUT + 'startup-config-feedback/settings-long-line-end-before-assert.png')
 API36 = tuple('out/android-smoke/' + name + '.png' for name in (
     '01-home-new-ui', '02-panel-stopped', '03-tools', '04-settings',
     'panel-controller-200-footer-before', 'panel-controller-200-footer-after-1',
@@ -37,7 +38,7 @@ API36 = tuple('out/android-smoke/' + name + '.png' for name in (
 OPTIONAL = {'out/android-smoke/panel-controller-200-footer-after-2.png'}
 GROUPS = {'host': HOST, 'api36': API36}
 ALLOWED = frozenset(HOST + API36)
-assert len(HOST) == 23 and len(API36) == 7 and len(ALLOWED) == 30
+assert len(HOST) == 24 and len(API36) == 7 and len(ALLOWED) == 31
 
 
 def png_size(data):
