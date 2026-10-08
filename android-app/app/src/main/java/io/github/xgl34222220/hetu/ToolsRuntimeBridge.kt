@@ -58,11 +58,8 @@ internal object ToolsRuntimeBridge {
     }
 
     /** Traffic rule/global/direct is the controller setting, separate from TPROXY/TUN mode. */
-    suspend fun switchToRuleMode(context: Context) = withContext(Dispatchers.IO) {
-        val client = MihomoControllerClient(context.applicationContext)
-        client.setTrafficMode("rule")
-        if (client.configs().optString("mode", "").lowercase() != "rule") throw IOException("核心尚未确认规则模式，请刷新后重试")
-    }
+    suspend fun switchToRuleMode(context: Context) =
+        ProxyDashboardRepository(context.applicationContext).setRuleModeAndConfirm()
 
     /* ------------------------------ 核心管理 ------------------------------ */
 

@@ -1,3 +1,11 @@
+## 当前接续：V20.92 工具规则模式归属（候选待同 SHA 验收）
+
+本批继续河图原 test/v20.76-new-ui；准确前驱 d7295d1aec1ffb17a0076d4dc9a8a4122d467447。本批工具入口改走冻结 SelectionTicket 的同接口 PATCH/确认 GET：成功 PATCH 立即推进共享观察代际，迟到确认或旧接口错误不能归属到替换后的接口。原 TPROXY/TUN 偏好、Root/autostart、权限、主题 ABI、首页/panel 及前层玻璃保留。
+
+新增原工具入口的五项真实 HTTP 回归；旧 639 项/66 XML 和独立 36 项源码、身份、断言冻结，本批目标 644/67。102 历史 host 门禁及 12 新证据负向门禁、准确原归档重建已通过，不能称作 Android 运行通过。历史91 before 在精确前层视图独立归属；当前92 before 回退两份生产源并须实际出现五个指定缺陷失败。完整 build/lint/XML/双 API 各65/host与native两900/本轮原画面均须绑定本批新 SHA，旧成功不代替。
+
+本批未验同端点并发模式写入的最终确认归属、HyperOS/ColorOS 真机 Root/VPN/切网/后台微信及 Google/GMS 认证；不操作设备账号、不绕验证码、不扩权、不合 main、不发布部署、不删除数据、不取消其他 CI。见 docs/V20.92_RULE_MODE_CONTINUITY.md 与 docs/qa/20261008-v2092-source-host-proof.json。下面保留各阶段原文与失败记录。
+
 ## 当前接续：V20.91 跨页面归属与设置玻璃（新验收待执行）
 
 2026-10-08 用户明确授权本会话接替旧会话，只继续河图原 test/v20.76-new-ui。准确基线9fe4931b6e37a1a7f7f78fd27835069e2b354aa7及原CI37703875494四jobs成功已核；恢复clone初始干净，无旧diff可恢复，不猜其内容。核查时本机无河图构建/模拟器/内核进程，GitHub无活动或排队CI，不据此排除旧会话不可见任务，不取消原CI。三PDF、原631/64XML/17图、准确V20.81原归档和四ignored native已恢复；原2090APK六段实核与用户给摘要一致，无重签。

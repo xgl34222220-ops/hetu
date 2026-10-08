@@ -390,6 +390,35 @@ def main():
                                    'expectedTestXmlFiles': continuity91['expectedTestXmlFiles'],
                                    'allPredecessor631TestcaseIdentitiesPreserved': True,
                                    'reproducedSourceMatchesCheckout': True}
+        continuity92_report = None
+        continuity92_inputs = ROOT / 'updates/v2092-rule-mode-continuity/inputs.json'
+        if continuity92_inputs.exists():
+            from continuity92_source_scope import validate_layer as validate_continuity92_layer, validate_version as validate_continuity92_version
+            assert continuity91_report is not None, 'V20.92 requires the complete pinned V20.91 source'
+            continuity92 = json.loads(continuity92_inputs.read_text())
+            validate_continuity92_layer(continuity92, final_files)
+            continuity92_patch = continuity92_inputs.with_name('runtime.patch')
+            assert digest(continuity92_patch) == continuity92['patchSha256']
+            for name, sha in final_files.items():
+                assert digest(work / name) == sha, 'V20.92 baseline mismatch: ' + name
+            before_build = (work / 'android-app/app/build.gradle.kts').read_text()
+            apply(continuity92_patch, work)
+            validate_continuity92_version(before_build, (work / 'android-app/app/build.gradle.kts').read_text())
+            for name, sha in continuity92['changedOrAddedFiles'].items():
+                assert digest(work / name) == sha, 'V20.92 generated source mismatch: ' + name
+            for name, sha in continuity92['frozenFiles'].items():
+                assert digest(work / name) == sha, 'V20.92 changed a frozen input: ' + name
+            final_files.update(continuity92['changedOrAddedFiles'])
+            continuity92_report = {'baseCommit': continuity92['baseCommit'],
+                                   'patchSha256': continuity92['patchSha256'],
+                                   'changedOrAddedFiles': len(continuity92['changedOrAddedFiles']),
+                                   'frozenInputs': len(continuity92['frozenFiles']),
+                                   'versionCode': continuity92['versionCode'],
+                                   'versionName': continuity92['versionName'],
+                                   'expectedUnitTests': continuity92['expectedUnitTests'],
+                                   'expectedTestXmlFiles': continuity92['expectedTestXmlFiles'],
+                                   'allPredecessor639TestcaseIdentitiesPreserved': True,
+                                   'reproducedSourceMatchesCheckout': True}
         # Every prior frozen input is compared against its precise final SHA.
         # Only recorded, bounded deltas supersede predecessor input hashes.
         validate_checkout_matches_generated(work, ROOT, final_files)
@@ -419,6 +448,8 @@ def main():
             report['stability90Layer'] = stability90_report
         if continuity91_report is not None:
             report['continuity91Layer'] = continuity91_report
+        if continuity92_report is not None:
+            report['continuity92Layer'] = continuity92_report
         (out / 'effective-source-proof.json').write_text(json.dumps(report, indent=2) + '\n')
         print(json.dumps(report))
 

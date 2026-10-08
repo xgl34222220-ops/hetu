@@ -1,9 +1,9 @@
-name: Hetu V20.91 shared continuity and settings glass verification
+name: Hetu V20.92 tool rule mode continuity verification
 permissions:
   contents: read
   actions: read
 concurrency:
-  group: hetu-v2091-${{ github.ref }}-${{ github.sha }}
+  group: hetu-v2092-${{ github.ref }}-${{ github.sha }}
   cancel-in-progress: false
 jobs:
   build:
@@ -39,7 +39,9 @@ jobs:
 
         git fetch --no-tags --depth=1 origin 9fe4931b6e37a1a7f7f78fd27835069e2b354aa7
 
-        python3 .github/scripts/continuity91_ci_config.py export
+        git fetch --no-tags --depth=1 origin d7295d1aec1ffb17a0076d4dc9a8a4122d467447
+
+        python3 .github/scripts/continuity92_ci_config.py export
 
         '
     - name: Regenerate and verify integrated effective source
@@ -52,7 +54,7 @@ jobs:
         with tarfile.open(p) as z:\n for m in z.getmembers():\n  if m.isfile() and (m.name.startswith('android-app/app/src/main/jniLibs/')\
         \ or m.name.startswith('android-app/app/src/main/assets/mihomo-root/') or m.name=='android-app/app/src/main/assets/mihomo-revision.txt'):\n\
         \   q=Path(m.name);q.parent.mkdir(parents=True,exist_ok=True);q.write_bytes(z.extractfile(m).read())\nPYINNER\npython3\
-        \ .github/scripts/prepare_new_ui_source.py \"$ARCHIVE\"\npython3 .github/scripts/continuity91_ci_config.py runtime-snapshot\n\
+        \ .github/scripts/prepare_new_ui_source.py \"$ARCHIVE\"\npython3 .github/scripts/continuity92_ci_config.py runtime-snapshot\n\
         sh -n android-app/app/src/main/assets/hetu-root.sh\nsh -n android-app/app/src/main/assets/hetu-autostart.sh\npython3\
         \ tools/qa/test_root_health.py 2>&1 | tee out/verification/root-health-tests.txt\npython3 tools/qa/test_google_firewall.py\
         \ 2>&1 | tee out/verification/google-firewall-tests.txt\npython3 tools/qa/test_root_autostart.py 2>&1 | tee out/verification/root-autostart-tests.txt\n\
@@ -65,11 +67,11 @@ jobs:
     - name: Verify presentation patch cannot alter runtime or dependency inputs
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_ui_source_scope.py 2>&1 | tee out/verification/ui-source-scope-tests.txt
 
         '
     - name: Verify PDF layer preserves frozen UI and diagnostic boundaries
-      run: python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_pdf85_source_scope.py
+      run: python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_pdf85_source_scope.py
     - name: Verify uploaded tools intake source and additive test boundaries
       run: 'set -euo pipefail
 
@@ -77,7 +79,7 @@ jobs:
 
         git fetch --no-tags --depth=1 origin ec211b9ad81748dee30fec43f0a25849559e4623
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_tools_intake_source_scope.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_tools_intake_source_scope.py
 
         python3 .github/scripts/test_tools_intake_test_results.py
 
@@ -85,13 +87,13 @@ jobs:
     - name: Verify measured final PDF presentation preserves intake and shared defaults
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_pdf85_final_source_scope.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_pdf85_final_source_scope.py
 
         '
     - name: Verify independent authentication source and test-evidence boundaries
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_auth_source_scope.py 2>&1 | tee out/verification/auth-source-scope-tests.txt
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_auth_source_scope.py 2>&1 | tee out/verification/auth-source-scope-tests.txt
 
         python3 .github/scripts/test_auth_test_results.py 2>&1 | tee out/verification/auth-test-evidence-tests.txt
 
@@ -99,11 +101,11 @@ jobs:
     - name: Execute original function gates on their exact historical source
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_functionfix_source_scope.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_functionfix_source_scope.py
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_functionfix_test_results.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_functionfix_test_results.py
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_functionfix_workflow.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_functionfix_workflow.py
 
         python3 tools/qa/test_fake_ip_private_routing.py 2>&1 | tee out/verification/fake-ip-private-routing-tests.txt
 
@@ -111,9 +113,11 @@ jobs:
     - name: Verify current source, testcase identities and workflow ownership
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_baseline_hosts.py --gate test_stability90_evidence.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_stability90_evidence.py
 
-        python3 .github/scripts/test_continuity91_evidence.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --gate test_continuity91_evidence.py
+
+        python3 .github/scripts/test_continuity92_evidence.py
 
         git show 610a523ea524dff521b5d01e7aa78c421399594a:android-app/app/src/main/java/io/github/xgl34222220/hetu/DnsTakeoverProbe.java
         > out/verification/main-DnsTakeoverProbe.java
@@ -187,20 +191,20 @@ jobs:
     - uses: gradle/actions/setup-gradle@v4
       with:
         gradle-version: 9.5.0
-    - name: Export exact V20.91 effective source
+    - name: Export exact V20.92 effective source
       run: 'set -euo pipefail
 
-        tar -czf /tmp/Hetu-V20.91-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
+        tar -czf /tmp/Hetu-V20.92-effective-source.tar.gz android-app UI92_RUNTIME146_INPUTS.json CHANGELOG-V20.md
 
-        sha256sum /tmp/Hetu-V20.91-effective-source.tar.gz
+        sha256sum /tmp/Hetu-V20.92-effective-source.tar.gz
 
         '
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: error
-        name: Hetu-V20.91-effective-source
-        path: /tmp/Hetu-V20.91-effective-source.tar.gz
+        name: Hetu-V20.92-effective-source
+        path: /tmp/Hetu-V20.92-effective-source.tar.gz
     - name: Record resolved MaterialKolor ABI dependencies
       working-directory: android-app
       run: 'set -euo pipefail
@@ -221,14 +225,20 @@ jobs:
         out/verification/materialkolor-abi.json
     - name: Verify packaged launcher and concept icon bytes
       run: python3 .github/scripts/verify_hetu_icons.py apk android-app/app/build/outputs/apk/debug/app-debug.apk
-    - name: Reproduce shared-cache and late-result defects on the exact original instance generation
+    - name: Reproduce historical V20.91 regressions only in its exact predecessor source view
       run: 'set -euo pipefail
 
-        python3 .github/scripts/run_continuity91_before_comparison.py
+        python3 .github/scripts/run_continuity92_baseline_hosts.py --historical-before-output out/verification/historical-before91
+
+        '
+    - name: Reproduce tool rule-mode and late-result defects on the exact pinned production
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/run_continuity92_before_comparison.py
 
         '
     - name: Runtime unit tests
-      run: "set -euo pipefail\npython3 ../.github/scripts/continuity91_ci_config.py junit-filters > ../out/verification/function-junit-filter-args.txt\n\
+      run: "set -euo pipefail\npython3 ../.github/scripts/continuity92_ci_config.py junit-filters > ../out/verification/function-junit-filter-args.txt\n\
         mapfile -t FUNCTION_TEST_FILTERS < ../out/verification/function-junit-filter-args.txt\ngradle --no-daemon --max-workers=2\
         \ -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:testDebugUnitTest \\\n  --tests '*RuntimeYaml15Test' --tests\
         \ '*RuntimeStartup15Test' --tests '*AdblockSnifferTest' \\\n  --tests '*ConceptParity57Test' --tests '*PanelConceptModelTest'\
@@ -252,7 +262,7 @@ jobs:
     - name: Consolidate native and browser state evidence
       run: 'set -euo pipefail
 
-        python3 .github/scripts/verify_continuity91_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
+        python3 .github/scripts/verify_continuity92_test_results.py --results android-app/app/build/test-results/testDebugUnitTest
 
         python3 tools/qa/consolidate_concept_coverage.py --repo . --expected-tests "$HETU_EXPECTED_TESTS" --browser-evidence
         out/verification/webui-browser --browser-commit "$GITHUB_SHA"
@@ -272,7 +282,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.91-supplemental-36-tests
+        name: Hetu-V20.92-supplemental-36-tests
         path: out/supplemental36/
         if-no-files-found: error
     - name: Run sustained synthetic network recovery state-machine regression
@@ -287,7 +297,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: warn
-        name: Hetu-V20.91-UI-verification
+        name: Hetu-V20.92-UI-verification
         path: 'android-app/app/build/test-results/testDebugUnitTest/
 
           android-app/app/build/reports/tests/testDebugUnitTest/
@@ -327,7 +337,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2091'' versionName=''0.12.18-v20-glass''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2092'' versionName=''0.12.19-v20-glass''" out/apk-transfer/apk-metadata.txt
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -354,7 +364,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         if-no-files-found: error
-        name: Hetu-V20.91-APK-manifest
+        name: Hetu-V20.92-APK-manifest
         path: 'out/apk-transfer/manifest.json
 
           out/apk-transfer/apk-metadata.txt
@@ -367,42 +377,42 @@ jobs:
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part00
+        name: Hetu-V20.92-APK-part00
         path: out/apk-transfer/part00.bin
     - name: Upload APK transport part 01
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part01
+        name: Hetu-V20.92-APK-part01
         path: out/apk-transfer/part01.bin
     - name: Upload APK transport part 02
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part02
+        name: Hetu-V20.92-APK-part02
         path: out/apk-transfer/part02.bin
     - name: Upload APK transport part 03
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part03
+        name: Hetu-V20.92-APK-part03
         path: out/apk-transfer/part03.bin
     - name: Upload APK transport part 04
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part04
+        name: Hetu-V20.92-APK-part04
         path: out/apk-transfer/part04.bin
     - name: Upload APK transport part 05
       uses: actions/upload-artifact@v4
       with:
         compression-level: 0
         if-no-files-found: ignore
-        name: Hetu-V20.91-APK-part05
+        name: Hetu-V20.92-APK-part05
         path: out/apk-transfer/part05.bin
   android-ui-smoke:
     needs: build
@@ -470,7 +480,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2091'
+        HETU_EXPECTED_VERSION: '2092'
         HETU_EXPECT_NEW_UI: '1'
         HETU_NATIVE_SOAK90_SECONDS: ${{ matrix.api == 36 && '900' || '' }}
       run: 'set -euo pipefail
@@ -494,7 +504,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: Hetu-V20.91-Android-${{ matrix.api }}-smoke
+        name: Hetu-V20.92-Android-${{ matrix.api }}-smoke
         path: out/android-smoke/
         if-no-files-found: warn
     strategy:
@@ -613,4 +623,23 @@ jobs:
         - 36
     name: Reproduce V20.74 custom palette crash on API 36
 'on':
+  push:
+    branches:
+    - test/v20.76-new-ui
+    paths:
+    - android-app/**
+    - updates/v2082-new-ui/**
+    - updates/v2083-ui-polish/**
+    - updates/v2084-controller-auth/**
+    - updates/v2085-pdf-tools-settings/**
+    - updates/v2085-tools-intake/**
+    - updates/v2085-pdf-final-geometry/**
+    - updates/v2086-functionfix/**
+    - updates/v2087-home-panel-refactor/**
+    - updates/v2088-ui-refactor/**
+    - updates/v2089-runtime153/**
+    - .github/scripts/**
+    - tools/qa/**
+    - updates/v2092-rule-mode-continuity/**
+    - .github/workflows/v2092-build.yml
   workflow_dispatch: null

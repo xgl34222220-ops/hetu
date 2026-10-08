@@ -224,6 +224,29 @@ internal class ProxyDashboardRepository(context: Context) {
         ticket.client(app).setTrafficMode(mode)
         acknowledgeMutation(ticket)
     }
+    /** The tool action confirms its own controller, even if API settings change during IO. */
+    suspend fun setRuleModeAndConfirm(ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+        requireCurrentOrigin(ticket.identity)
+        val operationApi = ticket.client(app)
+        try {
+            operationApi.setTrafficMode("rule")
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) {
+            requireCurrentOrigin(ticket.identity)
+            throw error
+        }
+        // The route changed when PATCH succeeded, before its confirmation read can finish.
+        acknowledgeMutation(ticket)
+        val confirmedMode = try {
+            operationApi.configs().optString("mode", "").lowercase()
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (error: Exception) {
+            requireCurrentOrigin(ticket.identity)
+            throw error
+        }
+        requireCurrentOrigin(ticket.identity)
+        if (confirmedMode != "rule") throw IOException("核心尚未确认规则模式，请刷新后重试")
+    }
     /** V19: "v1.19.x Meta" style label from GET /version; empty when the core is down. */
     suspend fun coreVersion(): String = withContext(Dispatchers.IO) {
         runCatching {

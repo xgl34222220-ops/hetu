@@ -1,0 +1,63 @@
+{
+  "schema": 1,
+  "recordedDateUtc": "2026-10-08",
+  "candidateVersionCode": 2092,
+  "candidateVersionName": "0.12.19-v20-glass",
+  "parentCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447",
+  "sourceLayerPatchSha256": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e",
+  "sourceInputs": {
+    "complete": 406,
+    "frozen": 402,
+    "changedOrAdded": 4,
+    "sourceReproducedExactly": true
+  },
+  "hostHistoricalTestsPassed": 102,
+  "hostCurrentNegativeEvidenceGuardsPassed": 12,
+  "logs": {
+    "continuity92-baseline-hosts.txt": {
+      "sha256": "8bd6a6e3f914daf0665eb2ebb98f616cd125da33ada558eaa7c3e187793011b5",
+      "hostUnittestGroups": [
+        5,
+        6,
+        18,
+        8,
+        10,
+        11,
+        5,
+        4,
+        24,
+        11
+      ]
+    },
+    "continuity92-evidence-host-tests.txt": {
+      "sha256": "0119312d5cd80757afff929b27bce3160a263c8f8e23e17979d3479ab6eb3269",
+      "hostUnittestGroups": [
+        12
+      ]
+    },
+    "continuity92-effective-source-prepare.txt": {
+      "sha256": "0a52dbabf07c554fa6a5c5b55c9b45980953d411964b04208aa53bf66850d005",
+      "hostUnittestGroups": []
+    },
+    "effective-source-proof.json": {
+      "sha256": "8ca38738153f5a214c7656770fbce7b9ccfcb345c6802b0e673a96b7a7478780",
+      "hostUnittestGroups": []
+    }
+  },
+  "androidExecution": {
+    "status": "PENDING_SAME_SHA_CI",
+    "expectedFullJunitTests": 644,
+    "expectedFullXmlFiles": 67,
+    "expectedIndependentSupplementalTests": 36,
+    "expectedInstalledApi35Checks": 65,
+    "expectedInstalledApi36Checks": 65,
+    "requiredHostModelSeconds": 900,
+    "requiredApi36NativeCoreSeconds": 900
+  },
+  "limitations": [
+    "These are host source/evidence guards and exact source reconstruction, not Android execution.",
+    "Synthetic XML used for verifier negative/compatibility checks is not a current runtime pass.",
+    "Historical V20.91 before is attributed separately and cannot serve as current V20.92 acceptance.",
+    "Same-endpoint concurrent mode confirmation, HyperOS/ColorOS phone Root/VPN/radio/background and public Google/GMS certification remain unverified."
+  ]
+}
