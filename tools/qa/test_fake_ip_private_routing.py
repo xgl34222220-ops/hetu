@@ -188,6 +188,9 @@ class FakeIpPrivateRouting(unittest.TestCase):
                      'install_quic4','install_quic6','start_watchdog','health_record'):
             body+=name+'(){ :; }\n'
         body+='cleanup(){ record cleanup; }; select_dns6_policy(){ START_DNS6=redirect; }; markused(){ return 1; }\n'
+        # This harness sources start() and controls its peripherals, so initialize
+        # the real transaction's deadline without dispatching a second harness.
+        body+='transaction_begin(){ START_ACTIVE=1; START_CANCEL_TOKEN=""; read -r tb rest < /proc/uptime; TXN_DEADLINE=$((${tb%%.*}+110)); }\n'
         body+='allocnet(){ :; }\n'
         args=['/bin/true',str(self.config),'tproxy','7893','7892','enable','1','1','redirect','0',
               '1053','29090','core','','1','0','','','','1','1','',MAC]

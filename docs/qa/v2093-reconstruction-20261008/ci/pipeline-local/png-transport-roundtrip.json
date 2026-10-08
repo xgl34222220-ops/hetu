@@ -1,0 +1,10 @@
+{
+  "scope": "synthetic private PNG byte transport only; not a UI screenshot or Android result",
+  "result": "PASS",
+  "bytes": 65752,
+  "chunks": 22,
+  "sha256": "cf09ca9da714691de58403ddc14dfd95068b04936988f28ed654c6ffa5adc4a2",
+  "roundTripByteIdentical": true,
+  "missingAllowlistedFilesReported": 22,
+  "maxLogLineCharacters": 4268
+}

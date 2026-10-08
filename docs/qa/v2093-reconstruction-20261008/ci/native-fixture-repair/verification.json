@@ -1,0 +1,152 @@
+{
+  "base": "f25ef407c7070bd09faf4b1bf406a202df96b946",
+  "productionChanged": false,
+  "firstCiFailurePreserved": "37828470811/113487343621",
+  "fixtures": {
+    "tools/qa/test_core_identity_dns.py": {
+      "sha256": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d",
+      "originalMethodsPreserved": 23,
+      "addedMethods": 2,
+      "beforeSha256": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
+      "originalMethodBodySha256": {
+        "RuleShapes.test_without_the_core_identity_every_root_socket_stays_out_of_dns_takeover": "701df13f4b07e30bca6dc07f53b16e2ea7ca4a9b30596640e53105bf8f4cdc1b",
+        "RuleShapes.test_captured_exempts_only_the_core_and_lets_fake_ip_flows_through": "55475341672060fb174a4075819e689ef4f54eac5d521e582362df7defdb950c",
+        "RuleShapes.test_captured_ipv6_uses_the_ipv6_fake_range": "a0c36917aadbe1451b069685978312ebaf09f2e2bc42c1a845133eb79b79a0ef",
+        "RuleShapes.test_group_exemption_keeps_its_direct_path_for_real_addresses_only": "d7f52c9e227b18d0538e0689ee00288376818c2baf5c64ab3528a32a8f178242",
+        "RuleShapes.test_selected_applications_scope_gets_a_resolver_redirect_and_fake_ip_entries": "b68dddfbfe1f9682faba223d0bbdbae06642067a111951f0278383a47aa5379f",
+        "RuleShapes.test_selected_applications_scope_marks_use_the_script_mark": "af2401753f05cfc79f57c41f89005ed3e54dd47c7320f219b5ef65df9094d39f",
+        "RuleShapes.test_selected_applications_redirect_mode_redirects_fake_ip_tcp": "13390d0f942deb26ce7f1c161189017f62904336d3fe56bc13ba7464a489c2f5",
+        "RuleShapes.test_selected_applications_scope_is_untouched_while_the_resolver_is_exempt": "8243ea80b0aee7409da466a1c94ed129258ba1fcdba356d31cdde0ba10642645",
+        "RuleShapes.test_dns_protocol_switches_select_the_redirected_protocols": "4dbd9baa76fd3a3bbd6e8b9c1c11cf0938c1287be5e4fad80f291e139df2eea1",
+        "RuleShapes.test_dot_guard_refuses_only_the_resolver_probe": "5faf0ba3a5903b9f925fbca2a5bf2aea6582c94adfdf700716d8f2656cf2caea",
+        "RuleShapes.test_dot_guard_chain_is_owned_cleaned_and_recorded": "b553e80768241b92f5af09106278c9625fb6c6b2cc3e278398e670d149c49dc0",
+        "LegacyParity.test_rules_without_the_core_identity_match_runtime_152": "4e05218202ae66fbccfa1b8b65a9bf7338bf89680d946c3a1fe3feaa99f609c9",
+        "CoreIdentity.test_busybox_that_yields_root_net_admin_becomes_the_runner": "0ed53f5af20ed63ab59fa992d63afa2de59428dd55afd1028a72ee65dd265ace",
+        "CoreIdentity.test_numeric_spec_is_the_fallback": "898a4b66d874c5865d69f15773439f4b6d88c1bf3cb51a32c6e4e60802780be9",
+        "CoreIdentity.test_wrong_identity_or_missing_applet_keeps_the_old_start": "953164d457ec5e2139494e84354f66102b308382f48af9107a36bfc390488725",
+        "CoreIdentity.test_opt_out_marker_keeps_the_old_start": "0dfe38f8850e3f2c0eca9bf624992ebb7e4343ea41f7498990c3554cbe41c57d",
+        "CoreIdentity.test_kernel_without_the_combined_owner_match_keeps_the_old_start": "81c703125609f4ebd2a32b0d067032e75911fc2b866abf5f1addd3d8c5229983",
+        "CoreIdentity.test_confirmation_trusts_only_what_the_kernel_reports": "b4f7122f13363bd700bf8f03a823a6fa0181f0d9de96db2ae49940a897bfef91",
+        "CoreIdentity.test_resolver_capture_needs_dns_takeover_and_an_xtables_mode": "33928a43b1631cdee9c21d057b26a6a4d5a5c28f7de325804b20115943fa3731",
+        "Tuning.test_cpu_mask": "1f033e729d9d98e30c82d95825e60280eed0540ea94d9942e693321efc720c21",
+        "Tuning.test_memory_limit_bytes": "7edf085d8f96ae01da55142495eb69484a1e5c3c6fa846fafe0f459807e585cb",
+        "Tuning.test_invalid_values_are_named_before_anything_changes": "1054fd0df73024328f257d31fea73f299326873cfe4f5e8d3c21771f38faedc9",
+        "Tuning.test_tuning_report_names_each_requested_control": "7ff00fb2eec2df26c0d4b19f66d8ee02a250083d7feee7c956c608d92af370d4"
+      },
+      "afterOriginalMethodBodySha256": {
+        "RuleShapes.test_without_the_core_identity_every_root_socket_stays_out_of_dns_takeover": "701df13f4b07e30bca6dc07f53b16e2ea7ca4a9b30596640e53105bf8f4cdc1b",
+        "RuleShapes.test_captured_exempts_only_the_core_and_lets_fake_ip_flows_through": "55475341672060fb174a4075819e689ef4f54eac5d521e582362df7defdb950c",
+        "RuleShapes.test_captured_ipv6_uses_the_ipv6_fake_range": "a0c36917aadbe1451b069685978312ebaf09f2e2bc42c1a845133eb79b79a0ef",
+        "RuleShapes.test_group_exemption_keeps_its_direct_path_for_real_addresses_only": "d7f52c9e227b18d0538e0689ee00288376818c2baf5c64ab3528a32a8f178242",
+        "RuleShapes.test_selected_applications_scope_gets_a_resolver_redirect_and_fake_ip_entries": "b68dddfbfe1f9682faba223d0bbdbae06642067a111951f0278383a47aa5379f",
+        "RuleShapes.test_selected_applications_scope_marks_use_the_script_mark": "af2401753f05cfc79f57c41f89005ed3e54dd47c7320f219b5ef65df9094d39f",
+        "RuleShapes.test_selected_applications_redirect_mode_redirects_fake_ip_tcp": "13390d0f942deb26ce7f1c161189017f62904336d3fe56bc13ba7464a489c2f5",
+        "RuleShapes.test_selected_applications_scope_is_untouched_while_the_resolver_is_exempt": "8243ea80b0aee7409da466a1c94ed129258ba1fcdba356d31cdde0ba10642645",
+        "RuleShapes.test_dns_protocol_switches_select_the_redirected_protocols": "4dbd9baa76fd3a3bbd6e8b9c1c11cf0938c1287be5e4fad80f291e139df2eea1",
+        "RuleShapes.test_dot_guard_refuses_only_the_resolver_probe": "5faf0ba3a5903b9f925fbca2a5bf2aea6582c94adfdf700716d8f2656cf2caea",
+        "RuleShapes.test_dot_guard_chain_is_owned_cleaned_and_recorded": "b553e80768241b92f5af09106278c9625fb6c6b2cc3e278398e670d149c49dc0",
+        "LegacyParity.test_rules_without_the_core_identity_match_runtime_152": "4e05218202ae66fbccfa1b8b65a9bf7338bf89680d946c3a1fe3feaa99f609c9",
+        "CoreIdentity.test_busybox_that_yields_root_net_admin_becomes_the_runner": "0ed53f5af20ed63ab59fa992d63afa2de59428dd55afd1028a72ee65dd265ace",
+        "CoreIdentity.test_numeric_spec_is_the_fallback": "898a4b66d874c5865d69f15773439f4b6d88c1bf3cb51a32c6e4e60802780be9",
+        "CoreIdentity.test_wrong_identity_or_missing_applet_keeps_the_old_start": "953164d457ec5e2139494e84354f66102b308382f48af9107a36bfc390488725",
+        "CoreIdentity.test_opt_out_marker_keeps_the_old_start": "0dfe38f8850e3f2c0eca9bf624992ebb7e4343ea41f7498990c3554cbe41c57d",
+        "CoreIdentity.test_kernel_without_the_combined_owner_match_keeps_the_old_start": "81c703125609f4ebd2a32b0d067032e75911fc2b866abf5f1addd3d8c5229983",
+        "CoreIdentity.test_confirmation_trusts_only_what_the_kernel_reports": "b4f7122f13363bd700bf8f03a823a6fa0181f0d9de96db2ae49940a897bfef91",
+        "CoreIdentity.test_resolver_capture_needs_dns_takeover_and_an_xtables_mode": "33928a43b1631cdee9c21d057b26a6a4d5a5c28f7de325804b20115943fa3731",
+        "Tuning.test_cpu_mask": "1f033e729d9d98e30c82d95825e60280eed0540ea94d9942e693321efc720c21",
+        "Tuning.test_memory_limit_bytes": "7edf085d8f96ae01da55142495eb69484a1e5c3c6fa846fafe0f459807e585cb",
+        "Tuning.test_invalid_values_are_named_before_anything_changes": "1054fd0df73024328f257d31fea73f299326873cfe4f5e8d3c21771f38faedc9",
+        "Tuning.test_tuning_report_names_each_requested_control": "7ff00fb2eec2df26c0d4b19f66d8ee02a250083d7feee7c956c608d92af370d4"
+      }
+    },
+    "tools/qa/test_fake_ip_private_routing.py": {
+      "sha256": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
+      "originalMethodsPreserved": 16,
+      "addedMethods": 0,
+      "beforeSha256": "c69301de4c3fe8aeff65484b3332f0df1eeff91d1427347fb45cc3ac12e46075",
+      "originalMethodBodySha256": {
+        "FakeIpPrivateRouting.test_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain": "5748fbfceb200626217a6933d594b1b55e58687d3cda4aa08f9eedef9f498b71",
+        "FakeIpPrivateRouting.test_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain": "2e42a2df7c300535f1ad3ce087e594c7fdc3c922fd3c3af5d2943eb654caedc0",
+        "FakeIpPrivateRouting.test_explicit_cidr_uid_gid_interface_mac_returns_keep_priority": "aebc36a8c5898f1eee1e9573d1ff469cf316fc6226b1627e8ccd2f228fa14ad3",
+        "FakeIpPrivateRouting.test_udp_quic_and_kill_guards_do_not_return_fake_destinations": "1e1a61185bc7c1e7d4bca8739940033b8ac8bcd8188010d20f9567c5d6e64b3e",
+        "FakeIpPrivateRouting.test_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses": "a08eb617bf9624cc556481ad612830b982f50dc1f4e0adb8953a1cef5b2df577",
+        "FakeIpPrivateRouting.test_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect": "7ed3ce9b6759d97ef0efce9a401429d5abe93c18fcbdc707059bab009326101b",
+        "FakeIpPrivateRouting.test_legacy_config_without_metadata_retains_original_private_returns": "f8bca09c18195ad9e6c59c066f86c0951714ae3fcf947d6410e1bf03e28f38fb",
+        "FakeIpPrivateRouting.test_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block": "9e2ecf0125ddf0972e4f9d6b05324221af978db4b0c7228a887352209a325ee0",
+        "FakeIpPrivateRouting.test_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls": "614b8249ba2355ea45da5b93368f68b74867309fbc16aa3452c2a6a391234569",
+        "FakeIpPrivateRouting.test_literal_cidr_validation_never_resolves_or_executes_metadata": "a31ac4d0d7d6c41e92c7c7bf3a5a5946624272bd606805f489381829cdcdbc48",
+        "FakeIpPrivateRouting.test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml": "47843bf032890d7e2c8dca1c3c3ab71da81115c311b45cee2776d887541a79f5",
+        "FakeIpPrivateRouting.test_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect": "4296c65f0ecf6aaf7f1c60182b97e5f5c3ba9ac56ebb154c803789844e0b9c66",
+        "FakeIpPrivateRouting.test_real_start_rejects_bad_policy_before_cleanup_or_core_launch": "6e0a9b3c14519173fc41e0f9e4a94859fbe52d70451091e9212cb9c472a50c6b",
+        "FakeIpPrivateRouting.test_saved_policy_roundtrip_uses_immutable_health_checksum": "a82347e1b8eb95cbd716f714725ad039a8bca372bbdf65c48cfe49c71e331b97",
+        "FakeIpPrivateRouting.test_tampered_session_or_baseline_cannot_supply_watchdog_policy": "134ff55a80139d4ad0104c56407c6f15e169e133d44af38845b97f87c20a85ac",
+        "FakeIpPrivateRouting.test_old_session_without_projection_remains_compatible": "3d1146613fa79132a9ef6a2e1298e397014f19d9f4532490ca4c4440bb306b69"
+      },
+      "afterOriginalMethodBodySha256": {
+        "FakeIpPrivateRouting.test_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain": "5748fbfceb200626217a6933d594b1b55e58687d3cda4aa08f9eedef9f498b71",
+        "FakeIpPrivateRouting.test_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain": "2e42a2df7c300535f1ad3ce087e594c7fdc3c922fd3c3af5d2943eb654caedc0",
+        "FakeIpPrivateRouting.test_explicit_cidr_uid_gid_interface_mac_returns_keep_priority": "aebc36a8c5898f1eee1e9573d1ff469cf316fc6226b1627e8ccd2f228fa14ad3",
+        "FakeIpPrivateRouting.test_udp_quic_and_kill_guards_do_not_return_fake_destinations": "1e1a61185bc7c1e7d4bca8739940033b8ac8bcd8188010d20f9567c5d6e64b3e",
+        "FakeIpPrivateRouting.test_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses": "a08eb617bf9624cc556481ad612830b982f50dc1f4e0adb8953a1cef5b2df577",
+        "FakeIpPrivateRouting.test_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect": "7ed3ce9b6759d97ef0efce9a401429d5abe93c18fcbdc707059bab009326101b",
+        "FakeIpPrivateRouting.test_legacy_config_without_metadata_retains_original_private_returns": "f8bca09c18195ad9e6c59c066f86c0951714ae3fcf947d6410e1bf03e28f38fb",
+        "FakeIpPrivateRouting.test_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block": "9e2ecf0125ddf0972e4f9d6b05324221af978db4b0c7228a887352209a325ee0",
+        "FakeIpPrivateRouting.test_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls": "614b8249ba2355ea45da5b93368f68b74867309fbc16aa3452c2a6a391234569",
+        "FakeIpPrivateRouting.test_literal_cidr_validation_never_resolves_or_executes_metadata": "a31ac4d0d7d6c41e92c7c7bf3a5a5946624272bd606805f489381829cdcdbc48",
+        "FakeIpPrivateRouting.test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml": "47843bf032890d7e2c8dca1c3c3ab71da81115c311b45cee2776d887541a79f5",
+        "FakeIpPrivateRouting.test_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect": "4296c65f0ecf6aaf7f1c60182b97e5f5c3ba9ac56ebb154c803789844e0b9c66",
+        "FakeIpPrivateRouting.test_real_start_rejects_bad_policy_before_cleanup_or_core_launch": "6e0a9b3c14519173fc41e0f9e4a94859fbe52d70451091e9212cb9c472a50c6b",
+        "FakeIpPrivateRouting.test_saved_policy_roundtrip_uses_immutable_health_checksum": "a82347e1b8eb95cbd716f714725ad039a8bca372bbdf65c48cfe49c71e331b97",
+        "FakeIpPrivateRouting.test_tampered_session_or_baseline_cannot_supply_watchdog_policy": "134ff55a80139d4ad0104c56407c6f15e169e133d44af38845b97f87c20a85ac",
+        "FakeIpPrivateRouting.test_old_session_without_projection_remains_compatible": "3d1146613fa79132a9ef6a2e1298e397014f19d9f4532490ca4c4440bb306b69"
+      }
+    }
+  },
+  "runs": {
+    "exactCffOriginalCore": {
+      "tests": 23,
+      "failed": 0
+    },
+    "exactF25OriginalCore": {
+      "tests": 23,
+      "failed": 3
+    },
+    "currentCoreWithModeledIp6tablesPresent": {
+      "tests": 25,
+      "failed": 0
+    },
+    "exactCffOriginalFakeIp": {
+      "tests": 16,
+      "failed": 0
+    },
+    "exactF25OriginalFakeIp": {
+      "tests": 16,
+      "failed": 1
+    },
+    "currentFakeIp": {
+      "tests": 16,
+      "failed": 0
+    }
+  },
+  "boundary": "Private file proc credential model, real awk parser; no real firewall or UID/GID changes. Original test methods remain exact; only helpers and two new assertions changed.",
+  "logs": {
+    "cff-before.log": "49ea2fe92d51532408eca72b00178e7a0a90e126ef814045e8efe9dd076d155c",
+    "cff-new-fixture-negative.log": "776deb03d2b86dd60d415e79a2331551d99a78993fd28b8eabca231b8ce6c53a",
+    "f25-before-fake-ip.log": "6776e7f061c519bddea0e9b0fc4900e242e8a322eb6c35b6441a69742608b908",
+    "f25-before.log": "5cf50b7b692e2c9f3ba3af87a72fe749294c428ce240461ad21335189d557ce8",
+    "current-fake-ip-after.log": "5ada930e2b7f4177d4d25fde02a9dfa7f32d71e2aaf6f4cf2d01dddf2be963e6",
+    "cff-before-fake-ip.log": "ade656a13486b336274cb8e9d8974f2adeb37bd415d4b20e04ae2a76e1b34913",
+    "current-after.log": "5f8e9135d4a0edb83b5e9f1edee188b94aa0aa78ae6ff162a07d8b3fe5248229"
+  },
+  "productionSha256": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
+  "runtime152Sha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+  "newAssertionsAgainstExactCff": {
+    "tests": 25,
+    "failures": 2,
+    "log": "cff-new-fixture-negative.log"
+  },
+  "ciLog": {
+    "path": "docs/qa/v2093-reconstruction-20261008/ci/f25ef407-build.log",
+    "sha256": "6dda5660148503e9f3f4c494ef47f8a65ae99eb6ce78ebfdec82ff287d7013c6"
+  }
+}

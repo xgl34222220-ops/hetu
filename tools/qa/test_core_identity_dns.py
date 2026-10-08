@@ -195,6 +195,7 @@ class CoreIdentity(Harness):
 
     def prepare(self, env=None, before='', v6='bypass'):
         body = ('magisk(){ printf "%s\\n" ' + shlex.quote(str(self.magisk)) + '; }\n' +
+                'has(){ [ \"$1\" != ip6tables ] && command -v \"$1\" >/dev/null 2>&1; }\n' +
                 f'START_V6={v6}\n' + before + 'core_identity_prepare\n'
                 'printf "runner=%s spec=%s dns=%s\\n" "$CORE_RUNNER" "$CORE_SPEC" "$SYSTEM_DNS"\n')
         result = self.sh(body, env)
@@ -221,12 +222,33 @@ class CoreIdentity(Harness):
         self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}, before='has(){ return 0; }\n', v6='enable'), 'runner= spec= dns=exempt')
         self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}), f'runner={self.busybox} spec=root:net_admin dns=exempt')
 
-    def confirm(self, gid, dns='tproxy', mode='tproxy', runner='/bb'):
-        body = (f'awk(){{ printf "%s\\n" "{gid}"; }}\nCORE_RUNNER={runner}; START_DNS={dns}; START_MODE={mode}\n'
+    def confirm(self, gid, dns='tproxy', mode='tproxy', runner='/bb', uid_fields=None, gid_fields=None):
+        # Model proc credentials explicitly and run the production awk parser.
+        # The old single-value awk replacement cannot exercise four-field checks.
+        status = self.base / 'modeled-core-status'
+        uids = uid_fields if uid_fields is not None else ['0'] * 4
+        gids = gid_fields if gid_fields is not None else [gid] * 4
+        status.write_text('Uid: ' + ' '.join(uids) + '\nGid: ' + ' '.join(gids) + '\n')
+        functions = self.base / 'identity-functions.sh'
+        functions.write_text(self.source.replace('"/proc/$1/status"', shlex.quote(str(status))) + '\n')
+        body = ('pidcore(){ [ "$1" = 4242 ]; } # Explicit fixture executable identity only.\n' +
+                f'CORE_RUNNER={runner}; START_DNS={dns}; START_MODE={mode}\n'
                 'core_identity_confirm 4242\nprintf "gid=%s dns=%s\\n" "$CORE_GID" "$SYSTEM_DNS"\n')
-        result = self.sh(body)
+        result = self.sh(body, functions=functions)
         self.assertEqual((result.returncode, result.stderr), (0, ''), result.stdout + result.stderr)
         return result.stdout.strip()
+
+    def test_bypass_with_ipv6_available_still_requires_combined_owner_match(self):
+        present = 'has(){ return 0; }\n'
+        self.assertEqual(self.prepare(before=present), f'runner={self.busybox} spec=root:net_admin dns=exempt')
+        self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}, before=present), 'runner= spec= dns=exempt')
+
+    def test_confirmation_requires_all_four_uid_and_gid_fields(self):
+        for field in range(4):
+            uids = ['0'] * 4; uids[field] = '2000'
+            self.assertEqual(self.confirm('3005', uid_fields=uids), 'gid= dns=exempt', ('uid', field))
+            gids = ['3005'] * 4; gids[field] = '0'
+            self.assertEqual(self.confirm('3005', gid_fields=gids), 'gid= dns=exempt', ('gid', field))
 
     def test_confirmation_trusts_only_what_the_kernel_reports(self):
         self.assertEqual(self.confirm('3005'), 'gid=3005 dns=captured')

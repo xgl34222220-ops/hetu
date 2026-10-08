@@ -732,19 +732,30 @@
     "tools/qa/test_network_recovery_stress.py": {
       "before": "c4eeca7c6dcf4dfe3df149c3f7afd2980454ecb10a242cb52d6294e1aefbee46",
       "after": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179"
+    },
+    "tools/qa/test_core_identity_dns.py": {
+      "before": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
+      "after": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d"
+    },
+    "tools/qa/test_fake_ip_private_routing.py": {
+      "before": "c69301de4c3fe8aeff65484b3332f0df1eeff91d1427347fb45cc3ac12e46075",
+      "after": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db"
     }
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
-    ".github/scripts/continuity93_source_scope.py": "bc7c6ad260a96b51d8935ad06ad173dd1c50c896b52a3679cf4d1b72775586b5",
+    ".github/scripts/continuity93_source_scope.py": "8d27859ab6dfa9643e4a11b763506cbd3447c4b74ef3056a15f7b8cb82167f12",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
     ".github/scripts/test_continuity93_evidence.py": "45a8c7091e5b2590a5ec6822aa8e8a25b28c9dabed2c1c590713e5b5d50f5826",
+    ".github/scripts/transport_ui93_pngs.py": "1e0c31bdb3b70edd85f3d719419752645014020d1f0b966f31819ed70ea2348c",
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
-    ".github/workflows/v2093-build.yml": "4af9b433eb2b46c4eaf11730f9d0ef79aaaecbfbc9436a8a9bca2135e8977f3a",
+    ".github/workflows/v2093-build.yml": "eacd56d3558f7760eb6f7e46b95b111c17ec385ae75a2089fda32235184c082c",
     "tools/qa/test_app_recovery93.py": "50b807d008b6bdcb9a24e80ac0f34d2d316f07d32b34e8b5afb5c84acfb18f05",
+    "tools/qa/test_core_identity_dns.py": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d",
+    "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
     "tools/qa/test_network_recovery_stress.py": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179",
     "tools/qa/test_root_autostart.py": "ceb85df4182eff2385db3c55447f21ffd12b3c95f4319c92577d00a84b9da44d",
     "tools/qa/test_root_health.py": "85be8d096212d55952ec7d495eff6c9bbab416094422868fc0032f19fce5a06d",

@@ -52,6 +52,7 @@ HOST_FIXTURE = 'tools/qa/test_root_autostart.py'
 HOST_NEW_TEST = 'tools/qa/test_root_safety93.py'
 HEALTH_FIXTURE = 'tools/qa/test_root_health.py'
 STRESS_FIXTURE = 'tools/qa/test_network_recovery_stress.py'
+ADDITIONAL_HOST_FIXTURES = ('tools/qa/test_core_identity_dns.py', 'tools/qa/test_fake_ip_private_routing.py')
 RECOVERY_COMMIT = '5af355d19fc41c3ae09902ca45fa1d70562ac402'
 RECOVERY_FOLDER = 'docs/qa/v2093-recovery-20261008'
 
@@ -94,6 +95,14 @@ def validate_host_fixture(root=ROOT):
     assert host_process_timeouts(old_health) == host_process_timeouts(current_health), 'Old Root health process timeout budgets changed'
     google = 'tools/qa/test_google_firewall.py'
     assert (Path(root) / google).read_bytes() == committed_bytes(google, root), 'Old17 Google firewall fixtures/assertions changed'
+    for name in ADDITIONAL_HOST_FIXTURES:
+        original = committed_bytes(name, root).decode()
+        actual = (Path(root) / name).read_text()
+        old_methods, new_methods = host_test_bodies(original), host_test_bodies(actual)
+        assert all(new_methods.get(method) == body for method, body in old_methods.items()), 'Prior host assertions changed: ' + name
+        old_timeouts = host_process_timeouts(original)
+        original_names = {node.name for node in ast.walk(ast.parse(original)) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))}
+        assert [item for item in host_process_timeouts(actual) if item[0] in original_names] == old_timeouts, 'Prior host timeout budget changed: ' + name
 
 
 def validate_stress_fixture(root=ROOT):
@@ -109,7 +118,7 @@ def validate_stress_fixture(root=ROOT):
 
 def host_fixture_deltas(root=ROOT):
     return {name: {'before': hashlib.sha256(committed_bytes(name, root)).hexdigest(),
-                   'after': digest(Path(root) / name)} for name in (HOST_FIXTURE, HEALTH_FIXTURE, STRESS_FIXTURE)}
+                   'after': digest(Path(root) / name)} for name in (HOST_FIXTURE, HEALTH_FIXTURE, STRESS_FIXTURE, *ADDITIONAL_HOST_FIXTURES)}
 
 
 def recovered_artifacts(root=ROOT):
@@ -142,6 +151,8 @@ def evidence_sources(root=ROOT):
              for path in (root / '.github/scripts').glob(pattern)}
     names.update(('.github/workflows/v2093-build.yml', '.github/scripts/prepare_new_ui_source.py',
                   '.github/workflows/v2092-build.yml', HOST_FIXTURE, HEALTH_FIXTURE, STRESS_FIXTURE, HOST_NEW_TEST))
+    names.update(ADDITIONAL_HOST_FIXTURES)
+    names.add('.github/scripts/transport_ui93_pngs.py')
     names.update(str(p.relative_to(root)) for p in (root / 'tools/qa').glob('*93*.py'))
     return {name: digest(root / name) for name in sorted(names)}
 

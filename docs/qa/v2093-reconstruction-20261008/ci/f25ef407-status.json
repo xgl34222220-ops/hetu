@@ -1,0 +1,20 @@
+{
+  "commit": "f25ef407c7070bd09faf4b1bf406a202df96b946",
+  "runId": 37828470811,
+  "buildJobId": 113487343621,
+  "firstFailure": "Original core identity/DNS host suite: 3 failures among 23 tests",
+  "sourceReconstruction": "passed; generated source matched checkout",
+  "rootOriginal60": "passed in this job",
+  "networkRecovery512Cycles": "passed in this job",
+  "androidBuild": "not reached",
+  "androidTests": "not reached",
+  "supplementalMissingXml": "secondary failure because Android tests were not reached; retained as failed, not waived",
+  "artifact": {
+    "id": 11572288064,
+    "name": "Hetu-V20.93-UI-verification",
+    "downloadTool": "returned reusable file reference",
+    "localTransfer": "HTTP403; archive bytes were not materialized or inspected"
+  },
+  "apkDelivered": false,
+  "priorPassingRunsUsedAsCurrentAcceptance": false
+}

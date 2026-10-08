@@ -1,0 +1,6 @@
+{
+  "cff-before/tools/qa/test_core_identity_dns.py": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
+  "cff-before/android-app/app/src/main/assets/hetu-root.sh": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
+  "f25-before/tools/qa/test_core_identity_dns.py": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
+  "f25-before/android-app/app/src/main/assets/hetu-root.sh": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581"
+}

@@ -1,0 +1,103 @@
+test_current_ui_packages_and_named_bridges_are_allowed (__main__.PresentationScope.test_current_ui_packages_and_named_bridges_are_allowed) ... ok
+test_only_expected_version_change_is_allowed_in_build_inputs (__main__.PresentationScope.test_only_expected_version_change_is_allowed_in_build_inputs) ... ok
+test_path_traversal_is_rejected_even_with_allowed_ui_prefix (__main__.PresentationScope.test_path_traversal_is_rejected_even_with_allowed_ui_prefix) ... ok
+test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch (__main__.PresentationScope.test_runtime_assets_manifest_and_native_payload_cannot_enter_ui_patch) ... ok
+test_unlisted_root_package_bridge_is_rejected (__main__.PresentationScope.test_unlisted_root_package_bridge_is_rejected) ... ok
+
+----------------------------------------------------------------------
+Ran 5 tests in 0.001s
+
+OK
+{"baselineInputs": 379, "locallyVerifiedBaselineInputs": 375, "missingUnchangedPayloadFiles": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "exactFunctionPatchReversed": true, "currentCheckoutUnmodified": true}
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+......
+----------------------------------------------------------------------
+Ran 6 tests in 0.004s
+
+OK
+{"baselineInputs": 379, "locallyVerifiedBaselineInputs": 375, "missingUnchangedPayloadFiles": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "exactFunctionPatchReversed": true, "currentCheckoutUnmodified": true}
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+..................
+----------------------------------------------------------------------
+Ran 18 tests in 1.730s
+
+OK
+{"baselineInputs": 379, "locallyVerifiedBaselineInputs": 375, "missingUnchangedPayloadFiles": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "exactFunctionPatchReversed": true, "currentCheckoutUnmodified": true}
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+........
+----------------------------------------------------------------------
+Ran 8 tests in 0.021s
+
+OK
+{"baselineInputs": 379, "locallyVerifiedBaselineInputs": 375, "missingUnchangedPayloadFiles": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "exactFunctionPatchReversed": true, "currentCheckoutUnmodified": true}
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+test_exact_authentication_production_files_are_allowed (__main__.AuthenticationScope.test_exact_authentication_production_files_are_allowed) ... ok
+test_existing_ui_boundary_still_rejects_authentication_runtime (__main__.AuthenticationScope.test_existing_ui_boundary_still_rejects_authentication_runtime) ... ok
+test_history_fixture_can_only_add_cross_thread_visibility_and_audit (__main__.AuthenticationScope.test_history_fixture_can_only_add_cross_thread_visibility_and_audit) ... ok
+test_manifest_requires_fixed_provenance_and_preserves_the_baseline (__main__.AuthenticationScope.test_manifest_requires_fixed_provenance_and_preserves_the_baseline) ... ok
+test_old_action_safety_assertion_can_only_gain_failure_details (__main__.AuthenticationScope.test_old_action_safety_assertion_can_only_gain_failure_details) ... ok
+test_only_the_named_authentication_tests_are_allowed (__main__.AuthenticationScope.test_only_the_named_authentication_tests_are_allowed) ... ok
+test_only_the_new_version_can_change_in_build_inputs (__main__.AuthenticationScope.test_only_the_new_version_can_change_in_build_inputs) ... ok
+test_path_traversal_is_rejected (__main__.AuthenticationScope.test_path_traversal_is_rejected) ... ok
+test_runtime_assets_manager_manifest_and_dependencies_stay_protected (__main__.AuthenticationScope.test_runtime_assets_manager_manifest_and_dependencies_stay_protected) ... ok
+test_unrelated_presentation_sources_are_not_authorized (__main__.AuthenticationScope.test_unrelated_presentation_sources_are_not_authorized) ... ok
+
+----------------------------------------------------------------------
+Ran 10 tests in 0.001s
+
+OK
+{"baselineInputs": 379, "locallyVerifiedBaselineInputs": 375, "missingUnchangedPayloadFiles": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "exactFunctionPatchReversed": true, "currentCheckoutUnmodified": true}
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 0.126s
+
+OK
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+.....
+----------------------------------------------------------------------
+Ran 5 tests in 0.227s
+
+OK
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+....
+----------------------------------------------------------------------
+Ran 4 tests in 0.004s
+
+OK
+{"exactLaterLayersReversed": 4, "v2086Inputs": 386, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "historicalGatesRunOnOwnSource": true, "baselineVersion": 2086, "baselineRuntimeRevision": 152}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+........................
+----------------------------------------------------------------------
+Ran 24 tests in 0.519s
+
+OK
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 403, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2090, "baselineCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7"}
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+...........
+----------------------------------------------------------------------
+Ran 11 tests in 9.484s
+
+OK
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 405, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2091, "baselineCommit": "d7295d1aec1ffb17a0076d4dc9a8a4122d467447"}
+............
+----------------------------------------------------------------------
+Ran 12 tests in 29.909s
+
+OK
+{"exactNewLayerReversed": true, "verifiedPredecessorInputs": 406, "missingUnchangedNativeInputs": ["android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo", "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo", "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so", "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so"], "currentCheckoutUnmodified": true, "baselineVersion": 2092, "baselineCommit": "cffeff08ee38c7220922bdb36de81b621c935daf"}

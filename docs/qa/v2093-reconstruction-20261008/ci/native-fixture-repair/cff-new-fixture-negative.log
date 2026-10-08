@@ -1,0 +1,52 @@
+test_busybox_that_yields_root_net_admin_becomes_the_runner (__main__.CoreIdentity.test_busybox_that_yields_root_net_admin_becomes_the_runner) ... ok
+test_bypass_with_ipv6_available_still_requires_combined_owner_match (__main__.CoreIdentity.test_bypass_with_ipv6_available_still_requires_combined_owner_match) ... FAIL
+test_confirmation_requires_all_four_uid_and_gid_fields (__main__.CoreIdentity.test_confirmation_requires_all_four_uid_and_gid_fields) ... FAIL
+test_confirmation_trusts_only_what_the_kernel_reports (__main__.CoreIdentity.test_confirmation_trusts_only_what_the_kernel_reports) ... ok
+test_kernel_without_the_combined_owner_match_keeps_the_old_start (__main__.CoreIdentity.test_kernel_without_the_combined_owner_match_keeps_the_old_start) ... ok
+test_numeric_spec_is_the_fallback (__main__.CoreIdentity.test_numeric_spec_is_the_fallback) ... ok
+test_opt_out_marker_keeps_the_old_start (__main__.CoreIdentity.test_opt_out_marker_keeps_the_old_start) ... ok
+test_resolver_capture_needs_dns_takeover_and_an_xtables_mode (__main__.CoreIdentity.test_resolver_capture_needs_dns_takeover_and_an_xtables_mode) ... ok
+test_wrong_identity_or_missing_applet_keeps_the_old_start (__main__.CoreIdentity.test_wrong_identity_or_missing_applet_keeps_the_old_start) ... ok
+test_rules_without_the_core_identity_match_runtime_152 (__main__.LegacyParity.test_rules_without_the_core_identity_match_runtime_152) ... ok
+test_captured_exempts_only_the_core_and_lets_fake_ip_flows_through (__main__.RuleShapes.test_captured_exempts_only_the_core_and_lets_fake_ip_flows_through) ... ok
+test_captured_ipv6_uses_the_ipv6_fake_range (__main__.RuleShapes.test_captured_ipv6_uses_the_ipv6_fake_range) ... ok
+test_dns_protocol_switches_select_the_redirected_protocols (__main__.RuleShapes.test_dns_protocol_switches_select_the_redirected_protocols) ... ok
+test_dot_guard_chain_is_owned_cleaned_and_recorded (__main__.RuleShapes.test_dot_guard_chain_is_owned_cleaned_and_recorded) ... ok
+test_dot_guard_refuses_only_the_resolver_probe (__main__.RuleShapes.test_dot_guard_refuses_only_the_resolver_probe) ... ok
+test_group_exemption_keeps_its_direct_path_for_real_addresses_only (__main__.RuleShapes.test_group_exemption_keeps_its_direct_path_for_real_addresses_only) ... ok
+test_selected_applications_redirect_mode_redirects_fake_ip_tcp (__main__.RuleShapes.test_selected_applications_redirect_mode_redirects_fake_ip_tcp) ... ok
+test_selected_applications_scope_gets_a_resolver_redirect_and_fake_ip_entries (__main__.RuleShapes.test_selected_applications_scope_gets_a_resolver_redirect_and_fake_ip_entries) ... ok
+test_selected_applications_scope_is_untouched_while_the_resolver_is_exempt (__main__.RuleShapes.test_selected_applications_scope_is_untouched_while_the_resolver_is_exempt) ... ok
+test_selected_applications_scope_marks_use_the_script_mark (__main__.RuleShapes.test_selected_applications_scope_marks_use_the_script_mark) ... ok
+test_without_the_core_identity_every_root_socket_stays_out_of_dns_takeover (__main__.RuleShapes.test_without_the_core_identity_every_root_socket_stays_out_of_dns_takeover) ... ok
+test_cpu_mask (__main__.Tuning.test_cpu_mask) ... ok
+test_invalid_values_are_named_before_anything_changes (__main__.Tuning.test_invalid_values_are_named_before_anything_changes) ... ok
+test_memory_limit_bytes (__main__.Tuning.test_memory_limit_bytes) ... ok
+test_tuning_report_names_each_requested_control (__main__.Tuning.test_tuning_report_names_each_requested_control) ... ok
+
+======================================================================
+FAIL: test_bypass_with_ipv6_available_still_requires_combined_owner_match (__main__.CoreIdentity.test_bypass_with_ipv6_available_still_requires_combined_owner_match)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/hetu-recovery-20261008/checkpoint-native-ci-coreidentity/cff-new-fixture/tools/qa/test_core_identity_dns.py", line 244, in test_bypass_with_ipv6_available_still_requires_combined_owner_match
+    self.assertEqual(self.prepare({'XT6_FAIL': '--gid-owner'}, before=present), 'runner= spec= dns=exempt')
+AssertionError: 'runner=/tmp/hetu-core-identity-qa-vp1a1i1n/magis[49 chars]empt' != 'runner= spec= dns=exempt'
+- runner=/tmp/hetu-core-identity-qa-vp1a1i1n/magisk-root/.magisk/busybox spec=root:net_admin dns=exempt
++ runner= spec= dns=exempt
+
+
+======================================================================
+FAIL: test_confirmation_requires_all_four_uid_and_gid_fields (__main__.CoreIdentity.test_confirmation_requires_all_four_uid_and_gid_fields)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "/workspace/hetu-recovery-20261008/checkpoint-native-ci-coreidentity/cff-new-fixture/tools/qa/test_core_identity_dns.py", line 249, in test_confirmation_requires_all_four_uid_and_gid_fields
+    self.assertEqual(self.confirm('3005', uid_fields=uids), 'gid= dns=exempt', ('uid', field))
+AssertionError: 'gid=3005 dns=captured' != 'gid= dns=exempt'
+- gid=3005 dns=captured
++ gid= dns=exempt
+ : ('uid', 0)
+
+----------------------------------------------------------------------
+Ran 25 tests in 0.741s
+
+FAILED (failures=2)

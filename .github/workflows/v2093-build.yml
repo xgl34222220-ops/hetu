@@ -302,6 +302,9 @@ jobs:
         python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
 
         '
+    - name: Transport fixed current fixture PNG bytes for original pixel review
+      if: always()
+      run: python3 .github/scripts/transport_ui93_pngs.py --group host
     - if: always()
       name: Upload concept UI verification evidence
       uses: actions/upload-artifact@v4
@@ -514,6 +517,9 @@ jobs:
         python3 .github/scripts/run_hetu_emulator.py
 
         '
+    - name: Transport fixed API36 fixture PNG bytes for original pixel review
+      if: always() && matrix.api == 36
+      run: python3 .github/scripts/transport_ui93_pngs.py --group api36
     - name: Upload Android smoke evidence
       if: always()
       uses: actions/upload-artifact@v4

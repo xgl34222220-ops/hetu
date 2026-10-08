@@ -1,0 +1,21 @@
+test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml (__main__.FakeIpPrivateRouting.test_canonical_embedded_ipv6_metadata_loads_without_changing_yaml) ... ok
+test_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain (__main__.FakeIpPrivateRouting.test_custom_ipv4_fake_ip_survives_default_lan_bypass_in_real_tproxy_chain) ... ok
+test_explicit_cidr_uid_gid_interface_mac_returns_keep_priority (__main__.FakeIpPrivateRouting.test_explicit_cidr_uid_gid_interface_mac_returns_keep_priority) ... ok
+test_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain (__main__.FakeIpPrivateRouting.test_ipv6_fake_ip_survives_default_ula_bypass_in_real_tproxy_chain) ... ok
+test_legacy_config_without_metadata_retains_original_private_returns (__main__.FakeIpPrivateRouting.test_legacy_config_without_metadata_retains_original_private_returns) ... ok
+test_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block (__main__.FakeIpPrivateRouting.test_legal_scalar_and_fake_body_metadata_cannot_override_terminal_block) ... ok
+test_literal_cidr_validation_never_resolves_or_executes_metadata (__main__.FakeIpPrivateRouting.test_literal_cidr_validation_never_resolves_or_executes_metadata) ... ok
+test_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls (__main__.FakeIpPrivateRouting.test_malformed_duplicate_or_nonterminal_tail_fails_before_network_calls) ... ok
+test_old_session_without_projection_remains_compatible (__main__.FakeIpPrivateRouting.test_old_session_without_projection_remains_compatible) ... ok
+test_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect (__main__.FakeIpPrivateRouting.test_real_start_passes_shared_mac_to_ipv6_dns_return_before_redirect) ... ok
+test_real_start_rejects_bad_policy_before_cleanup_or_core_launch (__main__.FakeIpPrivateRouting.test_real_start_rejects_bad_policy_before_cleanup_or_core_launch) ... ok
+test_saved_policy_roundtrip_uses_immutable_health_checksum (__main__.FakeIpPrivateRouting.test_saved_policy_roundtrip_uses_immutable_health_checksum) ... ok
+test_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses (__main__.FakeIpPrivateRouting.test_strict_ipv4_keeps_default_ula_policy_and_explicit_bypasses) ... ok
+test_tampered_session_or_baseline_cannot_supply_watchdog_policy (__main__.FakeIpPrivateRouting.test_tampered_session_or_baseline_cannot_supply_watchdog_policy) ... ok
+test_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect (__main__.FakeIpPrivateRouting.test_tun_and_ebpf_do_not_install_transparent_mangle_or_redirect) ... ok
+test_udp_quic_and_kill_guards_do_not_return_fake_destinations (__main__.FakeIpPrivateRouting.test_udp_quic_and_kill_guards_do_not_return_fake_destinations) ... ok
+
+----------------------------------------------------------------------
+Ran 16 tests in 1.280s
+
+OK
