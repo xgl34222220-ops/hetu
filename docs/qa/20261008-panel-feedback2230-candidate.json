@@ -1,0 +1,25 @@
+{
+  "oldCommit": "b6ab1210f8c98c9042baabc0a3d6928d85d2566f",
+  "newRequiredInputs": 422,
+  "oldTestsPreserved": 707,
+  "newTests": 17,
+  "expectedUnitTests": 724,
+  "expectedXmlFiles": 79,
+  "supplementalTestsUnchanged": 36,
+  "patchSha256": "7d0ee1400d0ce4dcbd93271603489ab4d6ab0af9f80773074c32b6557b689d77",
+  "forwardReverseByteProof": true,
+  "androidTestsRunLocally": false,
+  "changedExisting": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt"
+  ],
+  "newFiles": [
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt"
+  ]
+}

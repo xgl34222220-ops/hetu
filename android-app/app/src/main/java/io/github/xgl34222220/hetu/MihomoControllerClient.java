@@ -123,13 +123,19 @@ final class MihomoControllerClient {
         return delayIpv6(node, "");
     }
     long delayIpv6(String node,String provider)throws Exception{
-        DELAY_SLOTS.acquire();
+        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
+        boolean ownBudget=budget==null;
+        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
+        boolean acquired=false;
+        try{
+        budget.acquire(DELAY_SLOTS); acquired=true;
         try{
             String url=URLEncoder.encode(IPV6_DELAY_URL,"UTF-8");
             String path=provider==null||provider.isEmpty()?"/proxies/"+Uri.encode(node)+"/delay":
                 "/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck";
             return request("GET",path+"?timeout=4000&url="+url+"&expected=200",null,5500).optLong("delay",-1L);
-        }finally{DELAY_SLOTS.release();}
+        }finally{DELAY_SLOTS.release(); acquired=false;}
+        }finally{if(acquired)DELAY_SLOTS.release();if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
     }
 
     void reloadConfig(String path)throws Exception{
@@ -174,13 +180,19 @@ final class MihomoControllerClient {
     }
 
     private long delayPath(String path,String preferredUrl,String expected)throws Exception{
-        DELAY_SLOTS.acquire();
+        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
+        boolean ownBudget=budget==null;
+        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
+        boolean acquired=false;
+        try{
+        budget.acquire(DELAY_SLOTS); acquired=true;
         try{
             DelayFailure last=null;
             ArrayList<String> urls=new ArrayList<>();
             addDelayUrls(urls,preferredUrl);
             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
             for(String rawUrl:urls){
+                budget.check();
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
                     String status=URLEncoder.encode(expectedRange,"UTF-8");
@@ -198,8 +210,9 @@ final class MihomoControllerClient {
             if(last!=null)throw last;
             throw new IOException("没有可用的测速地址");
         }finally{
-            DELAY_SLOTS.release();
+            DELAY_SLOTS.release(); acquired=false;
         }
+        }finally{if(acquired)DELAY_SLOTS.release();if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
     }
 
     JSONObject groupDelay(String group)throws Exception{
@@ -207,11 +220,16 @@ final class MihomoControllerClient {
     }
 
     JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
+        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
+        boolean ownBudget=budget==null;
+        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
+        try{
         Exception last=null;
         ArrayList<String> urls=new ArrayList<>();
         addDelayUrls(urls,preferredUrl);
         String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
         for(String rawUrl:urls){
+                budget.check();
             try{
                 String test=URLEncoder.encode(rawUrl,"UTF-8");
                 String status=URLEncoder.encode(expectedRange,"UTF-8");
@@ -228,6 +246,7 @@ final class MihomoControllerClient {
         }
         if(last!=null)throw last;
         throw new IOException("策略组延迟测试失败");
+        }finally{if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
     }
 
     void closeAll()throws Exception{request("DELETE","/connections",null);}
@@ -246,9 +265,12 @@ final class MihomoControllerClient {
         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
         ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
         Socket socket=new Socket();
+        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
         try{
-            socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host),endpoint.port),2200);
-            socket.setSoTimeout(socketTimeoutMs);
+            if(budget!=null)budget.register(socket);
+            InetAddress address=budget==null?InetAddress.getByName(endpoint.host):budget.resolve(endpoint.host);
+            socket.connect(new InetSocketAddress(address,endpoint.port),budget==null?2200:Math.min(2200,budget.remainingMillis()));
+            socket.setSoTimeout(budget==null?socketTimeoutMs:Math.min(socketTimeoutMs,budget.remainingMillis()));
             OutputStream raw=socket.getOutputStream();
             StringBuilder head=new StringBuilder();
             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
@@ -281,8 +303,12 @@ final class MihomoControllerClient {
             }else bytes=readToEnd(in);
             String text=new String(bytes,StandardCharsets.UTF_8);
             if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
+            if(budget!=null)budget.check();
             return text.trim().isEmpty()?new JSONObject():new JSONObject(text);
-        }finally{try{socket.close();}catch(Exception ignored){}}
+        }catch(Exception error){
+            if(budget!=null)budget.check();
+            throw error;
+        }finally{try{socket.close();}catch(Exception ignored){}if(budget!=null)budget.unregister(socket);}
     }
 
     private static String readLine(InputStream in)throws IOException{

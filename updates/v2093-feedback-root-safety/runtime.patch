@@ -778,6 +778,243 @@ index ae832da..6925c5a 100755
 +  watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
    *) fail "未知 Root 代理操作";;
  esac
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
+new file mode 100644
+index 0000000..8916da2
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
+@@ -0,0 +1,69 @@
++package io.github.xgl34222220.hetu;
++
++import java.io.IOException;
++import java.net.InetAddress;
++import java.net.Socket;
++import java.util.HashSet;
++import java.util.Set;
++import java.util.concurrent.*;
++
++/** One monotonic budget for metadata, queueing, fallback URLs and every leaf in a wave. */
++final class LatencyProbeBudget implements AutoCloseable {
++    static final long DEFAULT_TIMEOUT_MS = 20_000;
++    static final ThreadLocal<LatencyProbeBudget> CURRENT = new ThreadLocal<>();
++    private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
++        Thread t = new Thread(r, "hetu-probe-deadline"); t.setDaemon(true); return t;
++    });
++    // DNS can be non-interruptible on some systems. Keep both its workers and backlog bounded.
++    private static final ThreadPoolExecutor DNS = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
++        new ArrayBlockingQueue<>(12), r -> { Thread t = new Thread(r, "hetu-probe-dns"); t.setDaemon(true); return t; });
++    private final long deadline;
++    private final Set<Socket> sockets = new HashSet<>();
++    private final ScheduledFuture<?> alarm;
++    private volatile boolean closed;
++
++    LatencyProbeBudget(long timeoutMs) {
++        deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
++        alarm = TIMER.schedule(this::close, timeoutMs, TimeUnit.MILLISECONDS);
++    }
++    boolean expired() { return closed || System.nanoTime() >= deadline; }
++    void check() throws IOException {
++        if (expired() || Thread.currentThread().isInterrupted())
++            throw new IOException("测速请求已取消或达到总时限，已保留完成的结果，请重试");
++    }
++    int remainingMillis() throws IOException {
++        check();
++        return (int)Math.max(1, Math.min(Integer.MAX_VALUE, TimeUnit.NANOSECONDS.toMillis(deadline - System.nanoTime())));
++    }
++    void acquire(Semaphore slots) throws Exception {
++        while (true) {
++            check();
++            if (slots.tryAcquire(Math.min(50, remainingMillis()), TimeUnit.MILLISECONDS)) {
++                try { check(); return; } catch (IOException e) { slots.release(); throw e; }
++            }
++        }
++    }
++    synchronized void register(Socket socket) throws IOException { check(); sockets.add(socket); }
++    synchronized void unregister(Socket socket) { sockets.remove(socket); }
++    InetAddress resolve(String host) throws Exception {
++        check();
++        Future<InetAddress> result;
++        try { result = DNS.submit(() -> InetAddress.getByName(host)); }
++        catch (RejectedExecutionException e) { throw new IOException("测速地址解析繁忙，请重试", e); }
++        try {
++            while (true) {
++                check();
++                try { return result.get(Math.min(50, remainingMillis()), TimeUnit.MILLISECONDS); }
++                catch (TimeoutException retry) { check(); }
++                catch (ExecutionException e) { throw new IOException("测速控制接口地址解析失败", e.getCause()); }
++            }
++        } finally { result.cancel(true); DNS.purge(); }
++    }
++    @Override public synchronized void close() {
++        closed = true;
++        for (Socket socket : sockets) try { socket.close(); } catch (IOException ignored) { }
++        sockets.clear();
++        // The timer may run before construction has assigned alarm with a tiny test budget.
++        if (alarm != null) alarm.cancel(false);
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
+new file mode 100644
+index 0000000..6208593
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
+@@ -0,0 +1,44 @@
++package io.github.xgl34222220.hetu
++
++import kotlinx.coroutines.CoroutineStart
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.asContextElement
++import kotlinx.coroutines.awaitCancellation
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++import kotlinx.coroutines.withTimeout
++import kotlinx.coroutines.TimeoutCancellationException
++import kotlinx.coroutines.currentCoroutineContext
++import kotlinx.coroutines.ensureActive
++import java.io.IOException
++
++internal class IncompleteLatencyProbe(val results: Map<String, Long> = emptyMap()) :
++    IOException("本轮测速已到时限，部分结果未返回，已保留已有读数")
++
++/** Cancellation closes real sockets, rather than merely timing out a blocked IO coroutine. */
++internal suspend fun <T> latencyProbeOperation(
++    timeoutMs: Long = LatencyProbeBudget.DEFAULT_TIMEOUT_MS,
++    block: suspend () -> T,
++): T {
++    // Nested group helpers share the enclosing operation, including its metadata reads.
++    if (LatencyProbeBudget.CURRENT.get() != null) return block()
++    val budget = LatencyProbeBudget(timeoutMs)
++    return try {
++        withContext(Dispatchers.IO + LatencyProbeBudget.CURRENT.asContextElement(budget)) {
++            coroutineScope {
++                val cancellation = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
++                    try { awaitCancellation() } finally { budget.close() }
++                }
++                try {
++                    // A short cleanup margin lets closed sockets return partial results first.
++                    // This also bounds suspension in metadata mutexes, not just network IO.
++                    withTimeout(timeoutMs + 250) { block() }
++                } catch (timeout: TimeoutCancellationException) {
++                    currentCoroutineContext().ensureActive()
++                    throw IncompleteLatencyProbe()
++                } finally { cancellation.cancel() }
++            }
++        }
++    } finally { budget.close() }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
+index f104cef..0a07bf6 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
+@@ -123,13 +123,19 @@ final class MihomoControllerClient {
+         return delayIpv6(node, "");
+     }
+     long delayIpv6(String node,String provider)throws Exception{
+-        DELAY_SLOTS.acquire();
++        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
++        boolean ownBudget=budget==null;
++        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
++        boolean acquired=false;
++        try{
++        budget.acquire(DELAY_SLOTS); acquired=true;
+         try{
+             String url=URLEncoder.encode(IPV6_DELAY_URL,"UTF-8");
+             String path=provider==null||provider.isEmpty()?"/proxies/"+Uri.encode(node)+"/delay":
+                 "/providers/proxies/"+Uri.encode(provider)+"/"+Uri.encode(node)+"/healthcheck";
+             return request("GET",path+"?timeout=4000&url="+url+"&expected=200",null,5500).optLong("delay",-1L);
+-        }finally{DELAY_SLOTS.release();}
++        }finally{DELAY_SLOTS.release(); acquired=false;}
++        }finally{if(acquired)DELAY_SLOTS.release();if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
+     }
+
+     void reloadConfig(String path)throws Exception{
+@@ -174,13 +180,19 @@ final class MihomoControllerClient {
+     }
+
+     private long delayPath(String path,String preferredUrl,String expected)throws Exception{
+-        DELAY_SLOTS.acquire();
++        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
++        boolean ownBudget=budget==null;
++        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
++        boolean acquired=false;
++        try{
++        budget.acquire(DELAY_SLOTS); acquired=true;
+         try{
+             DelayFailure last=null;
+             ArrayList<String> urls=new ArrayList<>();
+             addDelayUrls(urls,preferredUrl);
+             String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
+             for(String rawUrl:urls){
++                budget.check();
+                 try{
+                     String test=URLEncoder.encode(rawUrl,"UTF-8");
+                     String status=URLEncoder.encode(expectedRange,"UTF-8");
+@@ -198,8 +210,9 @@ final class MihomoControllerClient {
+             if(last!=null)throw last;
+             throw new IOException("没有可用的测速地址");
+         }finally{
+-            DELAY_SLOTS.release();
++            DELAY_SLOTS.release(); acquired=false;
+         }
++        }finally{if(acquired)DELAY_SLOTS.release();if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
+     }
+
+     JSONObject groupDelay(String group)throws Exception{
+@@ -207,11 +220,16 @@ final class MihomoControllerClient {
+     }
+
+     JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
++        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
++        boolean ownBudget=budget==null;
++        if(ownBudget){budget=new LatencyProbeBudget(LatencyProbeBudget.DEFAULT_TIMEOUT_MS);LatencyProbeBudget.CURRENT.set(budget);}
++        try{
+         Exception last=null;
+         ArrayList<String> urls=new ArrayList<>();
+         addDelayUrls(urls,preferredUrl);
+         String expectedRange=(expected==null||expected.trim().isEmpty())?"200-399":expected.trim();
+         for(String rawUrl:urls){
++                budget.check();
+             try{
+                 String test=URLEncoder.encode(rawUrl,"UTF-8");
+                 String status=URLEncoder.encode(expectedRange,"UTF-8");
+@@ -228,6 +246,7 @@ final class MihomoControllerClient {
+         }
+         if(last!=null)throw last;
+         throw new IOException("策略组延迟测试失败");
++        }finally{if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
+     }
+
+     void closeAll()throws Exception{request("DELETE","/connections",null);}
+@@ -246,9 +265,12 @@ final class MihomoControllerClient {
+         byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
+         ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
+         Socket socket=new Socket();
++        LatencyProbeBudget budget=LatencyProbeBudget.CURRENT.get();
+         try{
+-            socket.connect(new InetSocketAddress(InetAddress.getByName(endpoint.host),endpoint.port),2200);
+-            socket.setSoTimeout(socketTimeoutMs);
++            if(budget!=null)budget.register(socket);
++            InetAddress address=budget==null?InetAddress.getByName(endpoint.host):budget.resolve(endpoint.host);
++            socket.connect(new InetSocketAddress(address,endpoint.port),budget==null?2200:Math.min(2200,budget.remainingMillis()));
++            socket.setSoTimeout(budget==null?socketTimeoutMs:Math.min(socketTimeoutMs,budget.remainingMillis()));
+             OutputStream raw=socket.getOutputStream();
+             StringBuilder head=new StringBuilder();
+             head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
+@@ -281,8 +303,12 @@ final class MihomoControllerClient {
+             }else bytes=readToEnd(in);
+             String text=new String(bytes,StandardCharsets.UTF_8);
+             if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
++            if(budget!=null)budget.check();
+             return text.trim().isEmpty()?new JSONObject():new JSONObject(text);
+-        }finally{try{socket.close();}catch(Exception ignored){}}
++        }catch(Exception error){
++            if(budget!=null)budget.check();
++            throw error;
++        }finally{try{socket.close();}catch(Exception ignored){}if(budget!=null)budget.unregister(socket);}
+     }
+
+     private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
 index 76318e4..1082f65 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
@@ -791,7 +1028,7 @@ index 76318e4..1082f65 100644
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..d031305 100644
+index 5ae93b3..1f7a30d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -58,11 +58,14 @@ internal class ProxyDashboardRepository(context: Context) {
@@ -824,6 +1061,101 @@ index 5ae93b3..d031305 100644
      }
 
      private fun requireCurrentProbe(identity: ProbeIdentity) {
+@@ -315,7 +321,7 @@ internal class ProxyDashboardRepository(context: Context) {
+     }
+
+     /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
+-    suspend fun quickDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
++    suspend fun quickDelay(): Map<String, Long> = latencyProbeOperation {
+         val snapshot = probeSnapshot(force = true)
+         val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
+             if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
+@@ -325,7 +331,7 @@ internal class ProxyDashboardRepository(context: Context) {
+     }
+
+     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
+-    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
++    suspend fun globalDelay(): Map<String, Long> = latencyProbeOperation {
+         val snapshot = probeSnapshot(force = true)
+         val targets = snapshot.proxies.keys().asSequence().filter { name ->
+             val node = snapshot.proxies.optJSONObject(name)
+@@ -338,17 +344,24 @@ internal class ProxyDashboardRepository(context: Context) {
+     private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
+         val results = LinkedHashMap<String, Long>()
+         for (chunk in targets.distinct().chunked(6)) {
++            coroutineContext.ensureActive()
++            if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
+             coroutineScope {
+                 chunk.map { node -> async {
+-                    try { node to measuredProbe(node, snapshot) }
++                    try {
++                        val value = measuredProbe(node, snapshot)
++                        coroutineContext.ensureActive()
++                        synchronized(results) { results[node] = value }
++                    }
+                     catch (cancel: CancellationException) { throw cancel }
+                     // A controller/transport error has no new node measurement. Keep
+                     // successful siblings and let callers retain this node's old value.
+-                    catch (_: IOException) { node to null }
++                    catch (_: IOException) { }
+                 } }.awaitAll()
+-            }.forEach { (node, value) -> if (value != null) results[node] = value }
++            }
+         }
+         requireCurrentProbe(snapshot.identity)
++        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())
+         return results
+     }
+
+@@ -366,7 +379,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+     }.toList()
+ }
+
+-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
++    suspend fun delay(node: String): Long = latencyProbeOperation {
+         probe(node, probeSnapshot())
+     }
+
+@@ -375,26 +388,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+      * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
+      * clear and reapply a pin, which could briefly reroute live traffic.
+      */
+-    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
+-        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
++    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = latencyProbeOperation {
++        if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
+         val snapshot = probeSnapshot(force = true)
+-        val results = LinkedHashMap<String, Long>()
+-        for (chunk in targets.distinct().chunked(6)) {
+-            val measured = coroutineScope {
+-                chunk.map { node -> async {
+-                    try { node to measuredProbe(node, snapshot) }
+-                    catch (cancel: CancellationException) { throw cancel }
+-                    catch (_: IOException) { node to null }
+-                } }.awaitAll()
+-            }
+-            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
+-        }
+-        requireCurrentProbe(snapshot.identity)
+-        results
++        measureSnapshot(targets, snapshot)
+     }
+
+     /** Core-parallel group latency probe used by strategy-card delay taps. */
+-    suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
++    suspend fun groupDelay(group: String): Map<String, Long> = latencyProbeOperation {
+         // The Selector endpoint returns one complete wave. A successful selection
+         // or provider update can supersede it without changing the API/settings.
+         readCurrentProbe(probeIdentity()) {
+@@ -414,7 +415,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+         }
+     }
+
+-    suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
++    suspend fun ipv6Delay(node: String): Long = latencyProbeOperation {
+         val snapshot = probeSnapshot()
+         val leaf = selectedProxyName(snapshot.proxies, node)
+         readCurrentProbe(snapshot) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
 index 48280df..c33832e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
@@ -2568,7 +2900,7 @@ index 2b1a624..823695c 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..3de90fd 100644
+index 250b8a8..b5eed2e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -21,6 +21,7 @@ import kotlinx.coroutines.async
@@ -2675,7 +3007,18 @@ index 250b8a8..3de90fd 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -893,7 +910,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,6 +880,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                         applyNodeProbe(request, owner, node, delay, stamp)
+                     }
+                 }
++            } catch (partial: IncompleteLatencyProbe) {
++                val stamp = SystemClock.elapsedRealtime()
++                partial.results.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
++                if (currentRuntimeRequest(request)) toast(partial.message.orEmpty())
+             } catch (cancel: CancellationException) {
+                 throw cancel
+             } catch (error: Exception) {
+@@ -893,7 +914,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val stamp = SystemClock.elapsedRealtime()
                  result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                  val ok = result.values.count { it > 0L }
@@ -2684,6 +3027,10 @@ index 250b8a8..3de90fd 100644
 +                    if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
 +                    else toast("测速完成：$ok / ${result.size} 个节点可用")
 +                }
++            } catch (partial: IncompleteLatencyProbe) {
++                val stamp = SystemClock.elapsedRealtime()
++                partial.results.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
++                if (currentRuntimeRequest(request)) toast(partial.message.orEmpty())
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -3016,40 +3363,18 @@ index b187a2f..fd88764 100644
      ) { capsule() }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-index c95890c..06a89b0 100644
+index c95890c..a7ebb5c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-@@ -26,21 +26,29 @@ import androidx.compose.material3.Icon
- import androidx.compose.material3.Text
- import androidx.compose.runtime.Composable
- import androidx.compose.runtime.getValue
-+import androidx.compose.runtime.mutableIntStateOf
- import androidx.compose.runtime.remember
-+import androidx.compose.runtime.setValue
- import androidx.compose.ui.Alignment
- import androidx.compose.ui.Modifier
+@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
  import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.lerp
-+import androidx.compose.ui.layout.onSizeChanged
-+import androidx.compose.ui.platform.LocalConfiguration
 +import androidx.compose.ui.platform.LocalDensity
  import androidx.compose.ui.platform.testTag
  import androidx.compose.ui.semantics.Role
  import androidx.compose.ui.semantics.selected
- import androidx.compose.ui.semantics.semantics
- import androidx.compose.ui.semantics.stateDescription
- import androidx.compose.ui.text.style.TextOverflow
-+import androidx.compose.ui.text.font.FontWeight
-+import androidx.compose.ui.text.rememberTextMeasurer
- import androidx.compose.ui.unit.dp
- import io.github.xgl34222220.hetu.home.HomeCheckMark
- import io.github.xgl34222220.hetu.home.HomeFlag
-+import io.github.xgl34222220.hetu.home.HomeDims
- import io.github.xgl34222220.hetu.home.HomeHaptic
- import io.github.xgl34222220.hetu.home.HomeMotion
- import io.github.xgl34222220.hetu.home.HomePop
-@@ -54,6 +62,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
+@@ -54,6 +55,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
  import io.github.xgl34222220.hetu.home.fill
  import io.github.xgl34222220.hetu.home.homeEnter
  import io.github.xgl34222220.hetu.home.homeTap
@@ -3057,7 +3382,7 @@ index c95890c..06a89b0 100644
  import io.github.xgl34222220.hetu.ui.HetuStaggerState
  import io.github.xgl34222220.hetu.ui.hetuPressScale
  import io.github.xgl34222220.hetu.ui.ht
-@@ -112,6 +121,7 @@ internal fun LazyListScope.panelGroupsTab(
+@@ -112,6 +114,7 @@ internal fun LazyListScope.panelGroupsTab(
                          GroupCard(
                              group = group, data = data, view = view, wide = columns == 1,
                              modifier = Modifier.weight(1f).fillMaxHeight(), onClick = { onToggleGroup(group.name) },
@@ -3065,7 +3390,7 @@ index c95890c..06a89b0 100644
                          )
                      }
                      repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
-@@ -152,51 +162,91 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
+@@ -152,11 +155,24 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
  /* ------------------------------------------------------------------ */
 
  @Composable
@@ -3082,36 +3407,16 @@ index c95890c..06a89b0 100644
 +    val currentName = HomeRegions.withoutFlag(group.now)
 +    val region = HomeRegions.codeOf(leaf)
 +    val density = LocalDensity.current
-+    val textMeasurer = rememberTextMeasurer()
-+    var measuredWidth by remember { mutableIntStateOf(0) }
-+    val screenWidth = LocalConfiguration.current.screenWidthDp.dp
-+    val estimatedWidth = if (wide) screenWidth - HomeDims.gutter * 2 else (screenWidth - HomeDims.gutter * 2 - PanelDims.gap) / 2
-+    val availableWidth = with(density) { (if (measuredWidth > 0) measuredWidth.toDp() else estimatedWidth) - 25.dp }
-+    val nameWidth = with(density) { textMeasurer.measure(currentName, PanelType.groupNow, softWrap = false, maxLines = 1).size.width.toDp() }
-+    val delayCaption = when (delay) {
-+        PanelDelay.Unknown -> ht("未知")
-+        PanelDelay.Testing -> ht("测速中")
-+        PanelDelay.Timeout -> ht("超时")
-+        PanelDelay.Failed -> ht("失败")
-+        is PanelDelay.Ms -> "${delay.value} ms"
-+        null -> ""
-+    }
-+    val delayWidth = if (pending != null) 16.dp else if (delay == null) 0.dp else with(density) {
-+        maxOf(56.dp, textMeasurer.measure(delayCaption, HomeType.delay.copy(fontWeight = FontWeight.Bold), softWrap = false, maxLines = 1).size.width.toDp() + 20.dp + if (testing) 18.dp else 0.dp)
-+    }
-+    val flagWidth = if (region.isBlank()) 0.dp else 16.dp * 1.42f + 7.dp
-+    // Keep short names and their independent 40 dp touch target on one line when they fit.
-+    // The measured card width also covers embedded/narrow hosts; large type and long names
-+    // retain a separate result row instead of being squeezed beside the capsule.
-+    val separateCurrent = density.fontScale > 1.3f || (!wide && nameWidth + flagWidth + delayWidth + 7.dp > availableWidth)
++    // Card density must not depend on node-name length or the current delay caption.
++    // At large font scales every card uses the same extra result row, without a fixed
++    // height that could clip scaled text. Full names remain in Text semantics and
++    // in the expanded node list / node information sheet.
++    val separateCurrent = density.fontScale > 1.3f
 +    val compactInline = compact && !wide && !separateCurrent
      val motion = LocalHomeMotionEnabled.current
      val fill by animateColorAsState(if (expanded) lerp(c.surface, c.accent, if (c.dark) .14f else .055f) else c.surface, HomeMotion.fade(motion), label = "groupFill")
      val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
-     val opened = ht("已展开")
-     val closed = ht("已收起")
-     val shell = modifier
-+        .onSizeChanged { measuredWidth = it.width }
+@@ -166,37 +182,51 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
          .testTag("panel-group:${group.name}")
          .semantics { stateDescription = if (expanded) opened else closed }
          .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
@@ -3126,7 +3431,7 @@ index c95890c..06a89b0 100644
      val title: @Composable (Modifier) -> Unit = { m ->
          Column(m) {
 -            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = 1, overflow = TextOverflow.Ellipsis)
-+            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (wide) 1 else 2, overflow = TextOverflow.Ellipsis)
++            Text(panelHighlight(group.name, view.needle), color = c.t1, style = PanelType.groupName, maxLines = if (compact || wide) 1 else 2, overflow = TextOverflow.Ellipsis)
              Text(group.summary, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
          }
      }
@@ -3142,20 +3447,25 @@ index c95890c..06a89b0 100644
 -            if (pending != null) HomeSpinner(size = 16.dp)
 -            else PanelDelayLabel(data.delayOf(group.now), onCard = true)
 +        val nodeName: @Composable (Modifier) -> Unit = { nameModifier ->
-+            Row(nameModifier.heightIn(min = 28.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
++            Row(nameModifier.heightIn(min = if (separateCurrent) 28.dp else 40.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
 +                HomeFlag(region, height = 16.dp)
 +                Text(
 +                    panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
-+                    color = c.t1, style = PanelType.groupNow, maxLines = if (separateCurrent) 2 else 1, overflow = TextOverflow.Ellipsis,
++                    color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
 +                )
-+                if (pending != null) HomeSpinner(size = 16.dp)
-+                else if (!separateCurrent) PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
++                if (!separateCurrent) {
++                    if (pending != null) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
++                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
++                }
 +            }
 +        }
 +        if (separateCurrent) {
 +            Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
 +                nodeName(Modifier.fillMaxWidth())
-+                if (pending == null) PanelDelayLabel(delay, Modifier.align(Alignment.End), onClick = onTest, onCard = true, onClickLabel = "测速本组")
++                Box(Modifier.align(Alignment.End).heightIn(min = 40.dp), contentAlignment = Alignment.BottomEnd) {
++                    if (pending != null) HomeSpinner(size = 16.dp)
++                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
++                }
 +            }
 +        } else {
 +            nodeName(m)
@@ -3174,7 +3484,7 @@ index c95890c..06a89b0 100644
              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  title(Modifier.weight(1f))
                  GroupTile(group)
-@@ -300,7 +350,7 @@ private fun NodeCard(
+@@ -300,7 +330,7 @@ private fun NodeCard(
      )
      val info = ht("节点信息")
      val shell = modifier
@@ -3183,7 +3493,7 @@ index c95890c..06a89b0 100644
          .testTag("panel-node:${node.name}")
          .semantics { this.selected = selected }
          .hetuPressScale(source, pressedScale = .975f, motion = motion)
-@@ -320,16 +370,16 @@ private fun NodeCard(
+@@ -320,16 +350,16 @@ private fun NodeCard(
          Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              Text(
                  node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
@@ -3204,6 +3514,67 @@ index c95890c..06a89b0 100644
          }
      } else {
          Column(shell) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
+index 253b603..e1418b6 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
+@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
+ import androidx.compose.foundation.horizontalScroll
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.BoxWithConstraints
++import androidx.compose.foundation.layout.widthIn
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.Row
+ import androidx.compose.foundation.layout.Spacer
+@@ -28,6 +30,8 @@ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.text.style.TextAlign
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+@@ -273,19 +277,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
+     items(count = items.size, contentType = { "rule" }) { index ->
+         val rule = items[index]
+         val c = LocalHomeColors.current
+-        HomeCard(ListCard.homeEnter(stagger, index), shape = PanelDims.groupShape) {
+-            Row(
+-                Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = HomeDims.cardPadding, vertical = 9.dp),
+-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+-            ) {
+-                Column(Modifier.weight(1f)) {
+-                    Text(rule.type, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                    if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        HomeCard(ListCard.homeEnter(stagger, index).testTag("panel-rule:$index"), shape = PanelDims.groupShape) {
++            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp)) {
++                // Reserve content space, but measure short policies at their actual width.
++                // The weighted content consumes the remainder, pinning the policy to the end.
++                val policyMaxWidth = maxWidth * .45f
++                Row(
++                    Modifier.fillMaxWidth().heightIn(min = 42.dp),
++                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
++                ) {
++                    Column(Modifier.weight(1f).testTag("panel-rule-content:$index")) {
++                        Text(rule.type, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                    }
++                    Text(
++                        panelHighlight(rule.policy, query), Modifier.widthIn(max = policyMaxWidth).testTag("panel-rule-policy:$index"),
++                        color = policyColor(rule.policy), style = PanelType.policy, textAlign = TextAlign.End,
++                        maxLines = 2, overflow = TextOverflow.Ellipsis,
++                    )
+                 }
+-                Text(panelHighlight(rule.policy, query), Modifier.weight(1f, fill = false), color = policyColor(rule.policy), style = PanelType.policy, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+         }
+     }
++
+     item(key = "rules-note") {
+         val c = LocalHomeColors.current
+         val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 index 3e938c4..627ecb0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
@@ -4786,6 +5157,464 @@ index 0000000..c19d0eb
 +        syncCoreLatencyResults(groups, readings, mapOf("node" to 200L), 300L, emptySet())
 +        assertEquals(72L, readings["node"])
 +    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt
+new file mode 100644
+index 0000000..9f0d8a6
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt
+@@ -0,0 +1,275 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.os.Looper
++import androidx.compose.runtime.MutableState
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.withTimeout
++import kotlinx.coroutines.cancelAndJoin
++import kotlinx.coroutines.async
++import kotlinx.coroutines.asContextElement
++import okhttp3.mockwebserver.SocketPolicy
++import java.util.concurrent.Semaphore
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import java.io.IOException
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++
++/** Controlled loopback HTTP only: total deadline, cancellation and ownership regressions. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    PanelRequestOwnershipShadows.RootStatus::class,
++    PanelRequestOwnershipShadows.Sites::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class LatencyProbeDeadline94Test {
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private lateinit var collector: CoroutineScope
++    private val gates = mutableListOf<CountDownLatch>()
++    private val messages = mutableListOf<String>()
++    private val requests = Collections.synchronizedList(mutableListOf<RecordedRequest>())
++    private val group = ProxyGroupUi("Route", "Selector", "node", listOf(ProxyNodeUi("node"), ProxyNodeUi("other")))
++    @Volatile private var response: (RecordedRequest) -> MockResponse = { MockResponse().setResponseCode(404) }
++
++    @Before fun prepare() {
++        PanelRequestOwnershipShadows.RootStatus.reset()
++        PanelRequestOwnershipShadows.Sites.reset()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse { requests += request; return response(request) }
++            }
++            start()
++        }
++        val app = ApplicationProvider.getApplicationContext<Application>()
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port)
++            .putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
++            .putBoolean("proxyApiHistoryEnabled", false).commit()
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77)
++        vm = HetuViewModel(app)
++        @Suppress("UNCHECKED_CAST")
++        val state = HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
++            .get(vm) as MutableState<ProxyComposeState>
++        state.value = ProxyComposeState(running = true, panelReady = true, corePid = 77, groups = listOf(group))
++        vm.delays["node"] = 44L
++        response = ::normalResponse
++        collector = CoroutineScope(Dispatchers.Main.immediate)
++        collector.launch { vm.messages.collect { messages += it } }
++        shadowOf(Looper.getMainLooper()).idle()
++    }
++
++    @After fun finish() {
++        vm.viewModelScope.cancel()
++        gates.forEach { it.countDown() }
++        PanelRequestOwnershipShadows.Sites.releaseAll()
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        awaitActions()
++        collector.cancel()
++        server.shutdown()
++        assertEquals("Fixtures must not execute Root actions", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun CountDownLatch.hold() { check(await(8, TimeUnit.SECONDS)) { "HTTP fixture gate not released" } }
++    private fun body(value: String) = MockResponse().setBody(value)
++    private fun paths() = synchronized(requests) { requests.map { it.requestUrl!!.encodedPath } }
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue("$reason; requests=${paths()}, busy=${vm.testingNodes}", predicate())
++    }
++    private fun awaitActions() = eventually("ViewModel requests completed") {
++        // Cancellation makes isActive false immediately; held HTTP and finally
++        // cleanup can still be running. Wait for completion before checking owners.
++        vm.viewModelScope.coroutineContext[Job]!!.children.all { it.isCompleted }
++    }
++    private fun normalResponse(req: RecordedRequest): MockResponse = when (req.requestUrl!!.encodedPath) {
++        "/proxies" -> body("""{"proxies":{"Route":{"type":"Selector","now":"node","all":["node","other"]},"node":{"type":"Shadowsocks","history":[{"delay":999}]},"other":{"type":"Shadowsocks"}}}""")
++        "/providers/proxies" -> body("""{"providers":{}}""")
++        "/connections" -> body("""{"connections":[]}""")
++        "/configs" -> body("""{"mode":"rule"}""")
++        "/version" -> body("""{"version":"fixture"}""")
++        "/proxies/node/delay", "/proxies/other/delay" -> body("""{"delay":22}""")
++        else -> MockResponse().setResponseCode(404)
++    }
++
++    private fun boundedFailure(timeoutMs: Long = 300, action: () -> Unit): IOException {
++        val started = System.nanoTime()
++        val budget = LatencyProbeBudget(timeoutMs)
++        LatencyProbeBudget.CURRENT.set(budget)
++        try {
++            try { action(); fail("Expected a real transport deadline") }
++            catch (error: IOException) {
++                assertTrue("Deadline should be explicit", error.message.orEmpty().contains("时限"))
++                assertTrue("Deadline must close IO, even while bytes arrive", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 2000)
++                return error
++            }
++            throw AssertionError("No failure")
++        } finally { budget.close(); LatencyProbeBudget.CURRENT.remove() }
++    }
++
++    @Test fun slowBodyCannotResetTheWholeRequestDeadline() {
++        response = { body("""{"delay":22}""").throttleBody(1, 70, TimeUnit.MILLISECONDS) }
++        boundedFailure { MihomoControllerClient(vm.getApplication()).delay("node") }
++        assertEquals(1, server.requestCount)
++    }
++
++    @Test fun chunkedDripCannotResetTheWholeRequestDeadline() {
++        response = { MockResponse().setChunkedBody("""{"delay":22}""", 1).throttleBody(1, 70, TimeUnit.MILLISECONDS) }
++        boundedFailure { MihomoControllerClient(vm.getApplication()).delay("node") }
++        assertEquals(1, server.requestCount)
++    }
++
++    @Test fun blockedHeadersAreClosedAtTheOperationDeadline() {
++        response = { MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) }
++        boundedFailure { MihomoControllerClient(vm.getApplication()).groupDelay("Route") }
++        assertEquals(1, server.requestCount)
++    }
++
++    @Test fun fallbackUrlsShareOneBudgetInsteadOfRestartingTheClock() {
++        vm.prefs.edit().putBoolean("proxyCustomDelayUrlEnabled", true)
++            .putString("proxyCustomDelayUrl", "https://fixture.invalid/204").commit()
++        response = { MockResponse().setResponseCode(503).setBody("failed").setBodyDelay(210, TimeUnit.MILLISECONDS) }
++        boundedFailure(350) { MihomoControllerClient(vm.getApplication()).delay("node") }
++        assertEquals("Third fallback must not start after the budget", 2, server.requestCount)
++    }
++
++    @Test fun waitingForDelaySlotsIsBoundedAndDoesNotLeakPermits() {
++        val field = MihomoControllerClient::class.java.getDeclaredField("DELAY_SLOTS").apply { isAccessible = true }
++        val slots = field.get(null) as Semaphore
++        assertTrue(slots.tryAcquire(12, 2, TimeUnit.SECONDS))
++        try {
++            boundedFailure(150) { MihomoControllerClient(vm.getApplication()).delay("node") }
++            assertEquals(0, server.requestCount)
++        } finally { slots.release(12) }
++        assertEquals(12, slots.availablePermits())
++    }
++
++    @Test fun cancellingBlockedGroupImmediatelyReleasesBusyWithoutServerCooperation() {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) else normalResponse(req) }
++        vm.testGroup(group)
++        eventually("Blocked group reached HTTP") { paths().contains("/group/Route/delay") }
++        val start = System.nanoTime()
++        vm.viewModelScope.coroutineContext[Job]!!.children.toList().forEach { it.cancel() }
++        awaitActions()
++        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start) < 2000)
++        assertTrue(vm.testingGroups.isEmpty())
++        assertTrue(vm.testingNodes.isEmpty())
++        assertEquals(44L, vm.delays["node"])
++        assertTrue(messages.isEmpty())
++    }
++
++    @Test fun cancelledLateReplyCannotOverwriteFreshProbeOrKeepItsBusyFlag() {
++        val probes = AtomicInteger()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/proxies/node/delay" && probes.incrementAndGet() == 1)
++            body("""{"delay":999}""").setBodyDelay(800, TimeUnit.MILLISECONDS) else normalResponse(req) }
++        vm.testNode("node")
++        eventually("Old node reached HTTP") { probes.get() == 1 }
++        vm.viewModelScope.coroutineContext[Job]!!.children.toList().forEach { it.cancel() }
++        awaitActions()
++        vm.testNode("node"); awaitActions()
++        assertEquals(22L, vm.delays["node"])
++        Thread.sleep(900); shadowOf(Looper.getMainLooper()).idle()
++        assertEquals(22L, vm.delays["node"])
++        assertTrue(vm.testingNodes.isEmpty())
++    }
++
++    @Test fun automaticWaveReturnsCompletedSiblingsAsExplicitPartialOutcome() = runBlocking {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/proxies/other/delay")
++            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) else normalResponse(req) }
++        val failure = try {
++            latencyProbeOperation(400) {
++                vm.repo.groupDelay(group.copy(type = "URLTest"), listOf("node", "other"))
++            }
++            throw AssertionError("Partial wave must not report full success")
++        } catch (partial: IncompleteLatencyProbe) { partial }
++        assertEquals(mapOf("node" to 22L), failure.results)
++        assertTrue(failure.message.orEmpty().contains("部分结果未返回"))
++    }
++
++    @Test fun ordinaryControllerReadHasNoInheritedExpiredProbeBudget() = runBlocking {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
++            else body("""{"version":"fixture"}""").setBodyDelay(450, TimeUnit.MILLISECONDS) }
++        try { latencyProbeOperation(150) { MihomoControllerClient(vm.getApplication()).groupDelay("Route") } }
++        catch (_: IOException) { }
++        assertNull(LatencyProbeBudget.CURRENT.get())
++        assertEquals("fixture", MihomoControllerClient(vm.getApplication()).version().getString("version"))
++    }
++
++    @Test fun realDefaultDeadlineEndsBusyAndTheNextGroupProbeCanRun() {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE) else normalResponse(req) }
++        val started = System.nanoTime()
++        vm.testGroup(group)
++        eventually("Real-budget group reached HTTP") { paths().contains("/group/Route/delay") }
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(23)
++        while (vm.testingGroups.isNotEmpty() && System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            Thread.sleep(10)
++        }
++        assertTrue("The actual 20-second operation budget must end the visible busy state", vm.testingGroups.isEmpty())
++        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 23_000)
++        assertTrue(vm.testingNodes.isEmpty())
++        assertEquals(44L, vm.delays["node"])
++        assertTrue(messages.any { it.contains("时限") })
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            body("""{"node":22,"other":31}""") else normalResponse(req) }
++        vm.testGroup(group); awaitActions()
++        assertEquals(22L, vm.delays["node"])
++        assertEquals(31L, vm.delays["other"])
++        assertTrue(vm.testingGroups.isEmpty())
++    }
++
++    @Test fun successfulGroupStillPublishesActualMeasurementsAndReleasesBusy() {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            body("""{"node":22,"other":31}""") else normalResponse(req) }
++        vm.testGroup(group); awaitActions()
++        assertEquals(22L, vm.delays["node"])
++        assertEquals(31L, vm.delays["other"])
++        assertTrue(vm.testingGroups.isEmpty())
++        assertTrue(vm.testingNodes.isEmpty())
++    }
++
++    @Test fun failedGroupReleasesBusyAndRetainsItsPreviousMeasurement() {
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay")
++            MockResponse().setResponseCode(401) else normalResponse(req) }
++        vm.testGroup(group); awaitActions()
++        assertEquals(44L, vm.delays["node"])
++        assertTrue(vm.testingGroups.isEmpty())
++        assertTrue(vm.testingNodes.isEmpty())
++        assertEquals(1, messages.count { it.contains("401") })
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt
+new file mode 100644
+index 0000000..9563c15
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt
+@@ -0,0 +1,171 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.graphics.Bitmap
++import android.graphics.Canvas
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.*
++import androidx.compose.foundation.lazy.LazyColumn
++import androidx.compose.runtime.*
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalDensity
++import androidx.compose.ui.test.*
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.unit.Density
++import androidx.compose.ui.unit.dp
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.*
++import io.github.xgl34222220.hetu.panel.*
++import io.github.xgl34222220.hetu.ui.HetuStaggerState
++import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
++import java.io.File
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/** New screenshot-feedback regression coverage; existing acceptance assertions are unchanged. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class PanelCompactAlignment94Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val longNode = "Hong Kong 04 两年套餐 专线超长节点名称 完整信息"
++    private val groups = listOf(
++        PanelGroup("短组", "Selector", listOf(PanelNode("短节点")), "短节点"),
++        PanelGroup("香港节点非常长的策略组名称", "URLTest", listOf(PanelNode(longNode)), longNode),
++        PanelGroup("第三组", "Fallback", listOf(PanelNode("节点选择")), "节点选择"),
++        PanelGroup("第四组", "Selector", listOf(PanelNode("Singapore 03 长节点")), "Singapore 03 长节点"),
++    )
++    private var data by mutableStateOf(PanelData(groups = groups,
++        delays = groups.associate { it.now to PanelDelay.Ms(44) }))
++    private var clicks = 0
++    private var expansions = 0
++
++    @Before fun prepare() {
++        ApplicationProvider.getApplicationContext<Application>().getSharedPreferences("hetu", 0)
++            .edit().clear().putBoolean("enableBlur", false).putBoolean("enableAnimations", false).commit()
++    }
++
++    private fun render(scale: Float = 1f, content: @Composable () -> Unit) {
++        rule.setContent {
++            val density = LocalDensity.current
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false,
++                LocalDensity provides Density(density.density, scale)) {
++                HetuHomeTheme(dark = false) {
++                    CompositionLocalProvider(LocalHomeMotionEnabled provides false) { content() }
++                }
++            }
++        }
++        rule.waitForIdle()
++    }
++
++    private fun cards(scale: Float = 1f) = render(scale) {
++        LazyColumn(Modifier.fillMaxSize()) {
++            panelGroupsTab(groups.chunked(2).map { PanelGroupRow.Cards(it) }, data, PanelViewState(),
++                HetuStaggerState(true), { expansions++ }, { _, _ -> }, {}, { clicks++ }, {})
++        }
++    }
++
++    private fun card(name: String) = rule.onNodeWithTag("panel-group:$name")
++    private fun delay(name: String) = rule.onNode(
++        hasClickAction() and hasAnyAncestor(hasTestTag("panel-group:$name")) and
++            (hasText("44 ms") or hasText("测速中")))
++
++    private fun assertEqualCards() {
++        val sizes = groups.map { card(it.name).getUnclippedBoundsInRoot().height }
++        sizes.forEach { assertEquals("All rows, titles and selected-node lengths use the same density", sizes.first(), it) }
++        groups.forEach {
++            val bounds = card(it.name).getUnclippedBoundsInRoot()
++            val action = delay(it.name)
++            action.assertIsDisplayed().assertHeightIsAtLeast(40.dp)
++            val actionBounds = action.getUnclippedBoundsInRoot()
++            assertTrue(actionBounds.left >= bounds.left && actionBounds.right <= bounds.right)
++            assertTrue(actionBounds.top >= bounds.top && actionBounds.bottom <= bounds.bottom)
++        }
++    }
++
++    private fun capture(name: String) = rule.runOnIdle {
++        val view = rule.activity.window.decorView
++        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
++        view.draw(Canvas(bitmap))
++        val output = File("build/outputs/ui93/feedback-2230-$name.png")
++        output.parentFile!!.mkdirs()
++        output.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
++        bitmap.recycle()
++    }
++
++    @Test fun longAndShortNamesAcrossRowsStayAtSmallCardHeightThroughBusyAndResultStates() {
++        cards()
++        assertEqualCards()
++        val before = groups.map { card(it.name).getUnclippedBoundsInRoot() }
++        assertTrue("Use the small card rather than stretching every card to the old long-name variant", before.first().height <= 110.dp)
++        // Ellipsis affects painting only: the complete original node name is still accessible.
++        rule.onNodeWithText(longNode, useUnmergedTree = true).assertExists()
++        capture("compact-idle")
++        rule.runOnIdle { data = data.copy(testingGroups = setOf(groups[1].name, groups[2].name)) }
++        assertEqualCards()
++        assertEquals(before, groups.map { card(it.name).getUnclippedBoundsInRoot() })
++        repeat(3) { delay(groups[1].name).performTouchInput { click() } }
++        assertEquals(0, clicks)
++        assertEquals(0, expansions)
++        capture("compact-mixed-busy")
++        rule.runOnIdle { data = data.copy(testingGroups = emptySet()) }
++        assertEquals(before, groups.map { card(it.name).getUnclippedBoundsInRoot() })
++        delay(groups[1].name).performTouchInput { click() }
++        assertEquals(1, clicks)
++        assertEquals(0, expansions)
++    }
++
++    @Test fun switchingAndUnknownResultsDoNotChangeCompactCardGeometry() {
++        cards()
++        val before = groups.map { card(it.name).getUnclippedBoundsInRoot() }
++        rule.runOnIdle { data = data.copy(switching = mapOf(groups[1].name to groups[1].now), delays = emptyMap()) }
++        assertEquals(before, groups.map { card(it.name).getUnclippedBoundsInRoot() })
++        rule.onNodeWithText(longNode, useUnmergedTree = true).assertExists()
++        capture("compact-switching-unknown")
++    }
++
++    @Test fun largeFontUsesOneUniformAdaptiveLayoutWithoutClippingTheDelayTargets() {
++        cards(scale = 2f)
++        assertEqualCards()
++        val before = groups.map { card(it.name).getUnclippedBoundsInRoot() }
++        rule.runOnIdle { data = data.copy(testingGroups = groups.map { it.name }.toSet()) }
++        assertEqualCards()
++        assertEquals(before, groups.map { card(it.name).getUnclippedBoundsInRoot() })
++        groups.forEach { group ->
++            val name = rule.onNode(hasText(group.now) and hasAnyAncestor(hasTestTag("panel-group:${group.name}")), useUnmergedTree = true)
++            assertTrue("Scaled name and result target occupy separate rows", name.getUnclippedBoundsInRoot().bottom <= delay(group.name).getUnclippedBoundsInRoot().top)
++        }
++        capture("compact-font-2x")
++    }
++
++    private fun rules(scale: Float) {
++        val items = listOf(PanelRule("DomainSuffix", "stun.mi.wifi.com", "REJECT"),
++            PanelRule("DomainRegex", "very.long.domain.and.payload.example.com/another/long/part", "香港节点非常长的策略动作名称"))
++        render(scale) {
++            LazyColumn(Modifier.fillMaxSize()) { panelRulesTab(items, "", items.size, HetuStaggerState(true)) }
++        }
++        for (index in items.indices) {
++            val card = rule.onNodeWithTag("panel-rule:$index").getUnclippedBoundsInRoot()
++            val content = rule.onNodeWithTag("panel-rule-content:$index").getUnclippedBoundsInRoot()
++            val action = rule.onNodeWithTag("panel-rule-policy:$index")
++            action.assertIsDisplayed()
++            val actionBounds = action.getUnclippedBoundsInRoot()
++            assertEquals("Policy hugs the card's trailing padding", card.right - HomeDims.cardPadding, actionBounds.right)
++            assertEquals(card.left + HomeDims.cardPadding, content.left)
++            assertTrue(content.right + 12.dp <= actionBounds.left)
++            assertTrue(actionBounds.top >= card.top && actionBounds.bottom <= card.bottom)
++            action.assertTextEquals(items[index].policy)
++            rule.onNodeWithText(items[index].payload, useUnmergedTree = true).assertExists()
++        }
++        capture("rules-font-$scale")
++    }
++
++    @Test fun rulePoliciesAlignAtTheRightEdgeForShortAndLongContent() = rules(1f)
++    @Test fun largeFontRulesKeepContentAndPolicySeparateAndInsideTheirCards() = rules(2f)
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt
 new file mode 100644

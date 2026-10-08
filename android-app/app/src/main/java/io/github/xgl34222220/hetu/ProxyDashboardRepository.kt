@@ -321,7 +321,7 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
-    suspend fun quickDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+    suspend fun quickDelay(): Map<String, Long> = latencyProbeOperation {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
             if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
@@ -331,7 +331,7 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
-    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
+    suspend fun globalDelay(): Map<String, Long> = latencyProbeOperation {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().filter { name ->
             val node = snapshot.proxies.optJSONObject(name)
@@ -344,17 +344,24 @@ internal class ProxyDashboardRepository(context: Context) {
     private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
         for (chunk in targets.distinct().chunked(6)) {
+            coroutineContext.ensureActive()
+            if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
             coroutineScope {
                 chunk.map { node -> async {
-                    try { node to measuredProbe(node, snapshot) }
+                    try {
+                        val value = measuredProbe(node, snapshot)
+                        coroutineContext.ensureActive()
+                        synchronized(results) { results[node] = value }
+                    }
                     catch (cancel: CancellationException) { throw cancel }
                     // A controller/transport error has no new node measurement. Keep
                     // successful siblings and let callers retain this node's old value.
-                    catch (_: IOException) { node to null }
+                    catch (_: IOException) { }
                 } }.awaitAll()
-            }.forEach { (node, value) -> if (value != null) results[node] = value }
+            }
         }
         requireCurrentProbe(snapshot.identity)
+        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())
         return results
     }
 
@@ -372,7 +379,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }.toList()
 }
 
-    suspend fun delay(node: String): Long = withContext(Dispatchers.IO) {
+    suspend fun delay(node: String): Long = latencyProbeOperation {
         probe(node, probeSnapshot())
     }
 
@@ -381,26 +388,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
      * clear and reapply a pin, which could briefly reroute live traffic.
      */
-    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
-        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
+    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = latencyProbeOperation {
+        if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
-        val results = LinkedHashMap<String, Long>()
-        for (chunk in targets.distinct().chunked(6)) {
-            val measured = coroutineScope {
-                chunk.map { node -> async {
-                    try { node to measuredProbe(node, snapshot) }
-                    catch (cancel: CancellationException) { throw cancel }
-                    catch (_: IOException) { node to null }
-                } }.awaitAll()
-            }
-            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
-        }
-        requireCurrentProbe(snapshot.identity)
-        results
+        measureSnapshot(targets, snapshot)
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */
-    suspend fun groupDelay(group: String): Map<String, Long> = withContext(Dispatchers.IO) {
+    suspend fun groupDelay(group: String): Map<String, Long> = latencyProbeOperation {
         // The Selector endpoint returns one complete wave. A successful selection
         // or provider update can supersede it without changing the API/settings.
         readCurrentProbe(probeIdentity()) {
@@ -420,7 +415,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         }
     }
 
-    suspend fun ipv6Delay(node: String): Long = withContext(Dispatchers.IO) {
+    suspend fun ipv6Delay(node: String): Long = latencyProbeOperation {
         val snapshot = probeSnapshot()
         val leaf = selectedProxyName(snapshot.proxies, node)
         readCurrentProbe(snapshot) {

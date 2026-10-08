@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +30,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -273,19 +277,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, 
     items(count = items.size, contentType = { "rule" }) { index ->
         val rule = items[index]
         val c = LocalHomeColors.current
-        HomeCard(ListCard.homeEnter(stagger, index), shape = PanelDims.groupShape) {
-            Row(
-                Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = HomeDims.cardPadding, vertical = 9.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(rule.type, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        HomeCard(ListCard.homeEnter(stagger, index).testTag("panel-rule:$index"), shape = PanelDims.groupShape) {
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp)) {
+                // Reserve content space, but measure short policies at their actual width.
+                // The weighted content consumes the remainder, pinning the policy to the end.
+                val policyMaxWidth = maxWidth * .45f
+                Row(
+                    Modifier.fillMaxWidth().heightIn(min = 42.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
+                ) {
+                    Column(Modifier.weight(1f).testTag("panel-rule-content:$index")) {
+                        Text(rule.type, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                    Text(
+                        panelHighlight(rule.policy, query), Modifier.widthIn(max = policyMaxWidth).testTag("panel-rule-policy:$index"),
+                        color = policyColor(rule.policy), style = PanelType.policy, textAlign = TextAlign.End,
+                        maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    )
                 }
-                Text(panelHighlight(rule.policy, query), Modifier.weight(1f, fill = false), color = policyColor(rule.policy), style = PanelType.policy, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
+
     item(key = "rules-note") {
         val c = LocalHomeColors.current
         val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""

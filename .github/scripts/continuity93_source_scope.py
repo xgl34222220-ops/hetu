@@ -34,6 +34,8 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'ProxyNetworkMatchService.java', PACKAGE + 'ProxyLatencyHistory.kt',
     PACKAGE + 'ProxyRuntimeSettings.java', PACKAGE + 'ProxyControlEpoch.java',
     PACKAGE + 'StartupConfigViewer.kt', PACKAGE + 'ProxyDashboardRepository.kt',
+    PACKAGE + 'MihomoControllerClient.java', PACKAGE + 'LatencyProbeBudget.java',
+    PACKAGE + 'LatencyProbeOperation.kt',
     PACKAGE + 'ProxyComposeController.kt', PACKAGE + 'ProxyStatusBridge.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'

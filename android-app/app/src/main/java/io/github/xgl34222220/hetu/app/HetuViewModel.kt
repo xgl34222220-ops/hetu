@@ -880,6 +880,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         applyNodeProbe(request, owner, node, delay, stamp)
                     }
                 }
+            } catch (partial: IncompleteLatencyProbe) {
+                val stamp = SystemClock.elapsedRealtime()
+                partial.results.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
+                if (currentRuntimeRequest(request)) toast(partial.message.orEmpty())
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -914,6 +918,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                     else toast("测速完成：$ok / ${result.size} 个节点可用")
                 }
+            } catch (partial: IncompleteLatencyProbe) {
+                val stamp = SystemClock.elapsedRealtime()
+                partial.results.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
+                if (currentRuntimeRequest(request)) toast(partial.message.orEmpty())
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
