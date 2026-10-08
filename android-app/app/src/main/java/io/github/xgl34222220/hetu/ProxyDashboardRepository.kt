@@ -49,6 +49,11 @@ internal data class DashboardRuleSetUi(
 )
 
 internal class ProxyDashboardRepository(context: Context) {
+    private companion object {
+        // Activities have independent repository/cache instances but mutate the
+        // same core. A confirmed mutation must supersede observations in all of them.
+        val probeMutationEpoch = AtomicLong()
+    }
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
@@ -67,7 +72,6 @@ internal class ProxyDashboardRepository(context: Context) {
     private val probeSnapshotMutex = Mutex()
     private var cachedProbeSnapshot: ProbeSnapshot? = null
     private var probeSnapshotAt = 0L
-    private val probeMutationEpoch = AtomicLong()
     private val probeIdentityKeys = setOf(
         "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
         "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",

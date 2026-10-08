@@ -1,6 +1,5 @@
 package io.github.xgl34222220.hetu
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Column
@@ -16,7 +15,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
@@ -39,6 +37,7 @@ import io.github.xgl34222220.hetu.home.HomeSwitchRow
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.home.homeRowHighlight
+import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.ui.ht
 
 /*
@@ -54,7 +53,7 @@ import io.github.xgl34222220.hetu.ui.ht
 @Composable
 internal fun SettingsGroup(title: String? = null, content: @Composable ColumnScope.() -> Unit) {
     Column(
-        Modifier.fillMaxWidth().semantics { isTraversalGroup = true }.clip(HomeDims.cardShape).background(LocalHomeColors.current.surface)
+        Modifier.fillMaxWidth().semantics { isTraversalGroup = true }.homeGlassPanel(HomeDims.cardShape)
             .padding(top = if (title == null) 4.dp else 0.dp, bottom = 4.dp),
     ) {
         if (title != null) HomeCardTitle(title)

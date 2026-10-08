@@ -1,0 +1,127 @@
+{
+  "schema": 1,
+  "observedAt": "2026-10-08T11:14:02.226081+00:00",
+  "repository": "xgl34222220-ops/hetu",
+  "branch": "test/v20.76-new-ui",
+  "recoveredCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7",
+  "originalRun": 37703875494,
+  "originalRunConclusion": "success",
+  "localCheckoutInitiallyClean": true,
+  "uncommittedOldDiffRecovered": false,
+  "oldDiffContentsGuessed": false,
+  "githubInProgressAtHandoff": 0,
+  "githubQueuedAtHandoff": 0,
+  "limitations": [
+    "GitHub state and local process inventory do not exclude an invisible task in another session.",
+    "Original evidence is baseline only, not execution of the new source.",
+    "APK signature metadata was preserved, not independently cryptographically reverified locally."
+  ],
+  "nativeRecovery": {
+    "artifact_id": 11290964603,
+    "run_id": 37171744564,
+    "archive_sha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "zip_sha256": "4ff084378c4f68fcd0861375e0f3c8cac28ca12bc5b68dd23a8c486fe5d5e4e9",
+    "files": [
+      {
+        "path": "android-app/app/src/main/assets/mihomo-root/arm64-v8a/mihomo",
+        "size": 62796768,
+        "sha256": "2eb2ffd88f8822dd7d9a3e68f37661660f46073ded2d1faf93698f47084e68e1",
+        "action": "restored_absent_ignored_binary"
+      },
+      {
+        "path": "android-app/app/src/main/assets/mihomo-root/x86_64/mihomo",
+        "size": 67652160,
+        "sha256": "e96fb9a38ebd38207c99b01f019e1fd0b2a81b308f8f47280fbc9c42f2911b61",
+        "action": "restored_absent_ignored_binary"
+      },
+      {
+        "path": "android-app/app/src/main/jniLibs/arm64-v8a/libhetu_core.so",
+        "size": 62142824,
+        "sha256": "2d45d22f77333135e94ec4e5c54def8b1f4a1aac9648bfeedf83cfe1e64e5412",
+        "action": "restored_absent_ignored_binary"
+      },
+      {
+        "path": "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so",
+        "size": 66954920,
+        "sha256": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03",
+        "action": "restored_absent_ignored_binary"
+      }
+    ],
+    "revision": {
+      "path": "android-app/app/src/main/assets/mihomo-revision.txt",
+      "sha256": "3bcdebd6325695b82900ea52d759436b586a13fc7b6e841ee3654250c4b39db7",
+      "tracked": true,
+      "action": "verified_identical_no_write"
+    }
+  },
+  "apkRecovery": {
+    "runId": 37703875494,
+    "headSha": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7",
+    "apkName": "Hetu-0.12.17-v20-glass.apk",
+    "apkBytes": 134978969,
+    "apkSha256": "8378425f0296bf9c5a6f4a03db4af8da74cc3022139bd244b4a1dd363d02c6a2",
+    "parts": [
+      {
+        "index": 0,
+        "zipSha256": "7f4235b91c9de85ae1d81d263ce265f15fba70dbb5d35450a8f162a5d45c1090",
+        "partSha256": "8161203e85a50a34acbc37acf061dde8c1b25cb171659a4b6646f33aa549bde4",
+        "partBytes": 25165824,
+        "crcPassed": true
+      },
+      {
+        "index": 1,
+        "zipSha256": "47962b5046b7edb5a1700b9b573d32a977e1032a39854505ae61789481e84be7",
+        "partSha256": "0fde4047a073b0729f0d80ad256824612f0b2a8a77ecac1c3000705ef7fd535d",
+        "partBytes": 25165824,
+        "crcPassed": true
+      },
+      {
+        "index": 2,
+        "zipSha256": "7756c45c6cf49a5f990693c26b69dc64f0e714fa927c5a44008c15728df3103f",
+        "partSha256": "cbf7e922d65ef38fbe63093e8f8f74be77923f7e8a224ea55ca0241316084843",
+        "partBytes": 25165824,
+        "crcPassed": true
+      },
+      {
+        "index": 3,
+        "zipSha256": "7b6b1318a8b54f4eb2105da53d5cbeaaa703dbdfd3b8c56855f8265b726650ce",
+        "partSha256": "6f0ee5628ba7f075fa6b570bda8aa3b897bb2935bb5ec7f44d865494558b0667",
+        "partBytes": 25165824,
+        "crcPassed": true
+      },
+      {
+        "index": 4,
+        "zipSha256": "2a0dcf692e4bd02ce31f72c0528c54db4d2c8b8329197770ccd04a897cc39c17",
+        "partSha256": "727c70ae6777df73e2cfd47db7a833b365ace6215f1118a7ea9c05ef6a2c6c07",
+        "partBytes": 25165824,
+        "crcPassed": true
+      },
+      {
+        "index": 5,
+        "zipSha256": "d1989653443870ab94cb8adc8bbdbe360f9c07729d590a6b593953efaa41ddbe",
+        "partSha256": "93890e13f75be58b18ea5d174004706563edb94916f8cc3254b5ef852a314c8a",
+        "partBytes": 9149849,
+        "crcPassed": true
+      }
+    ],
+    "apkCrcPassed": true,
+    "apkEntryCount": 261,
+    "reSigned": false,
+    "packageAndSignatureEvidence": "Transport reports match original; independent cryptographic verification pending tool availability."
+  },
+  "recoveredOriginalUnitTests": {
+    "xmlFiles": 64,
+    "tests": 631,
+    "failures": 0,
+    "errors": 0,
+    "skipped": 0,
+    "reportSha256": "18de6a70835a7499331dcb85fe4bb8adb96554908fd4edb4ce2605081eba9870"
+  },
+  "baselineUiZipSha256": "2f820fb64ed33b285881ad7174859771ea586b4fb9b088eb9246fe7aedad2a1e",
+  "localNativeTransportHostRegression": {
+    "tests": 35,
+    "result": "PASS",
+    "scope": "Host temporary-file transport and cleanup fixtures, not Android core traffic.",
+    "logSha256": "f7aba4ded9af4a20aa78c3356513c7a1bcc5b0c5ecf4b3515fef7f672f8efe9e"
+  }
+}

@@ -1,0 +1,164 @@
+{
+  "schema": 1,
+  "observedAt": "2026-10-08T11:15:54.375028+00:00",
+  "sourceBaseCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7",
+  "result": "SOURCE_AND_HOST_GATES_PASS",
+  "effectiveSourceProof": {
+    "baseCommit": "37e963d488a38900263e33cb8b2047f487bd6dcf",
+    "baseRun": 37171744564,
+    "archiveSha256": "6190b4fd4fcd011cae77e81cdd33b5270e557194c56bf88d0a824d74d811b730",
+    "integrationPatchSha256": "3f08f86d8413c9a905de1eae0c5347e8f7c5dd4032ee4a8e6181d439abda7002",
+    "baselineFiles": 307,
+    "changedOrAddedFiles": 31,
+    "checkoutMatchesGeneratedSource": true,
+    "historicPatchesAppliedToCheckout": false,
+    "presentationLayer": {
+      "baseCommit": "aa599a53856fb26b4d256ba345a496b2a178b3b8",
+      "baseRun": 37211142058,
+      "patchSha256": "a466e4fce0e2e4ec9564760a1089b250f24d90032b123faea90fcee4c241e514",
+      "changedOrAddedFiles": 68,
+      "protectedRuntimeUnchanged": true
+    },
+    "controllerAuthenticationLayer": {
+      "baseCommit": "a93a756d8578cf3afa60ee090405535ad097e49e",
+      "baseRun": 37240041766,
+      "baseAndroidAppTree": "2c698fb681f647e4c3a1d0050bf806a9f4cc5de2",
+      "patchSha256": "327983504205ff1ec26a3c6804a83ae08802a7d4f723de280a92af708e3ea4ee",
+      "changedOrAddedFiles": 17,
+      "runtimePayloadsUnchanged": true,
+      "dependenciesUnchanged": true,
+      "manifestAndPermissionsUnchanged": true,
+      "unchangedOutsideAuthScope": true,
+      "baselineUnitTests": 392,
+      "expectedUnitTests": 422,
+      "newTestCounts": {
+        "ToastFeedbackTest": 6,
+        "ControllerAuthenticationTest": 11,
+        "LegacyControllerCredentialTest": 3,
+        "ControllerReadStateTest": 6,
+        "PanelControllerErrorTest": 4
+      }
+    },
+    "pdfReferenceLayer": {
+      "patchSha256": "09e5f3c1fec4ddcd86e546f6270bf687cbf14aa518764e640c7ff5f77e966d66",
+      "frozenInputs": 332,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "expectedUnitTests": 479
+    },
+    "toolsIntakeLayer": {
+      "baseCommit": "2730954591393c1b81f747cef72adb8940c5a82c",
+      "baseAndroidAppTree": "930994157562814a8e22aeeb1873d8eeb0a51f64",
+      "patchSha256": "108ae764ec0a8cf9a5cafc827d093bedd0f039f6944f7cd9848304e0a2fb7b3b",
+      "changedOrAddedFiles": 5,
+      "frozenInputs": 374,
+      "homeAndPanelUnchanged": true,
+      "runtimePayloadsUnchanged": true,
+      "manifestDependenciesAndSigningUnchanged": true,
+      "baselineUnitTests": 479,
+      "expectedUnitTests": 487,
+      "newTestCounts": {
+        "tools.ToolsDnsConsentIntakeTest": 5,
+        "tools.ToolsDiagIntakeTest": 3
+      }
+    },
+    "finalPdfGeometryLayer": {
+      "baseCommit": "ec211b9ad81748dee30fec43f0a25849559e4623",
+      "patchSha256": "564581886f89da03b19602a67047016051e9b39abf04047f4b51e00d6b5d9066",
+      "changedOrAddedFiles": 4,
+      "frozenInputs": 375,
+      "expectedUnitTests": 487,
+      "exactWholeFilePresentationTransforms": true,
+      "priorLayersUnchanged": true
+    },
+    "functionFixLayer": {
+      "baseCommit": "1dbe40cc4e312c230524092dfe32a2c6cfb5f25d",
+      "patchSha256": "ad70b0c670e70b65a4dfa4b571c9c9dda4144dee1c899ca082c03c93e235d65a",
+      "changedOrAddedFiles": 16,
+      "frozenInputs": 370,
+      "baselineUnitTests": 487,
+      "expectedUnitTests": 545,
+      "expectedTestXmlFiles": 56,
+      "newTestCounts": {
+        "io.github.xgl34222220.hetu.PanelExpansionAnchorTest": 4,
+        "io.github.xgl34222220.hetu.ProxyDashboardProbeSafetyTest": 13,
+        "io.github.xgl34222220.hetu.ProxySubscriptionIntegrityTest": 12,
+        "io.github.xgl34222220.hetu.RootFakeIpRangesTest": 13,
+        "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": 16
+      },
+      "allOriginal487TestsPreserved": true,
+      "rootScriptSha256": "bdee8678922f3c4cdb12ebab532175e67816dce429b64fa632c6641c4fb2d45e",
+      "runtimePayloadCount": 23
+    },
+    "homePanelLayer": {
+      "baseCommit": "13e76ea500849ef551281bcfad09835996758b4f",
+      "patchSha256": "94b7cd170204072f7b1ca76cde5280575fd82fd0bf6e33446c5362160445bcf2",
+      "changedOrAddedFiles": 28,
+      "versionCode": 2086,
+      "versionName": "0.12.16-v20-fix",
+      "protectedRuntimeUnchanged": true,
+      "reproducedSourceMatchesCheckout": true
+    },
+    "toolsSettingsUiLayer": {
+      "baseCommit": "a5d5cc06fd8f294e17495e132ecf1f5de31135f8",
+      "patchSha256": "74c5a00161b20dac4686d5053a92da60899bd37ddfdf25c140ed4aff4961335e",
+      "changedOrAddedFiles": 51,
+      "versionCode": 2086,
+      "versionName": "0.12.16-v20-fix",
+      "protectedRuntimeUnchanged": true,
+      "reproducedSourceMatchesCheckout": true
+    },
+    "runtime153Layer": {
+      "baseCommit": "e2e50b14eaa09b8f36a657699775b5f2fd7b2c9e",
+      "patchSha256": "8b9c3c52b8192fe8c6cd1e5e392e5a7b237dd958e4c5d1322d727087efcc70df",
+      "changedOrAddedFiles": 8,
+      "runtimeRevision": 153,
+      "versionCode": 2086,
+      "versionName": "0.12.16-v20-fix",
+      "protectedPresentationUnchanged": true,
+      "reproducedSourceMatchesCheckout": true
+    },
+    "stability90Layer": {
+      "baseCommit": "610a523ea524dff521b5d01e7aa78c421399594a",
+      "patchSha256": "1011e91ab46403395a09160d55d748f4fbfafac25f60d289e0c6245dee0410a3",
+      "changedOrAddedFiles": 48,
+      "frozenInputs": 355,
+      "versionCode": 2090,
+      "versionName": "0.12.17-v20-glass",
+      "expectedUnitTests": 631,
+      "expectedTestXmlFiles": 64,
+      "allOriginal545TestcaseIdentitiesPreserved": true,
+      "reproducedSourceMatchesCheckout": true
+    },
+    "continuity91Layer": {
+      "baseCommit": "9fe4931b6e37a1a7f7f78fd27835069e2b354aa7",
+      "patchSha256": "31ac89d27f647a5ca668597e8491edd5b34fb489b4b61f6c4887e8fe7e02cbce",
+      "changedOrAddedFiles": 5,
+      "frozenInputs": 400,
+      "versionCode": 2091,
+      "versionName": "0.12.18-v20-glass",
+      "expectedUnitTests": 639,
+      "expectedTestXmlFiles": 66,
+      "allPredecessor631TestcaseIdentitiesPreserved": true,
+      "reproducedSourceMatchesCheckout": true
+    }
+  },
+  "hostTests": {
+    "unchangedHistorical": 91,
+    "newEvidenceGuards": 11,
+    "nativeTransport": 35
+  },
+  "logs": {
+    "out/verification/continuity91-baseline-hosts.txt": "499e527e87f64b9a6f3475939bf066f73b3381b7468ed0f76270f4fd1be01809",
+    "out/verification/continuity91-evidence-host-tests.txt": "6ce44ad598a710168a4681cfb75301c4ea3c0a8fe1458bda6062b5cbd3fc5730",
+    "out/verification/continuity91-effective-source-prepare.txt": "8d2f73459cb5c33de14af91d4802721f8255051ca83a5fd98d92aca65490d53f",
+    "out/verification/effective-source-proof.json": "321e1ad3bc5df96b546f6f3a9c428076b212cef3314de7e881423f0a1a9b3fac"
+  },
+  "androidExecution": "NOT_EXECUTED_LOCALLY",
+  "realHttpBeforeAfter": "PENDING_SAME_COMMIT_CI",
+  "aospNativeTraffic": "PENDING_SAME_COMMIT_CI",
+  "phoneRootGoogleWeChat": "NOT_VERIFIED",
+  "retainedAssertions": true,
+  "retainedPermissionsNativeSignatures": true
+}
