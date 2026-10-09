@@ -1068,9 +1068,18 @@ index f104cef..8b96e4a 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..2b1c453 100644
+index 4f004b9..ac8579a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
+@@ -155,7 +155,7 @@ internal class ProxyComposeController(context: Context) {
+         val profile = ProxyRuntimeProfile.load(prefs)
+         val selected = configs.selected(profile.core)
+         val iconMap = try {
+-            if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
++            if (selected == null) emptyMap() else groupIconsFor(selected)
+         } catch (cancel: CancellationException) { throw cancel }
+         catch (_: Exception) { emptyMap() }
+
 @@ -302,9 +302,18 @@ internal class ProxyComposeController(context: Context) {
 
          if (running) {
@@ -1093,6 +1102,25 @@ index 4f004b9..2b1c453 100644
                  val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
+@@ -813,6 +822,18 @@ internal class ProxyComposeController(context: Context) {
+         return out.sortedBy { it.name.lowercase(Locale.ROOT) }
+     }
+
++    private var lastIconFile: Triple<String, Long, Long>? = null
++
++    /** Polls every 2 s; re-read and re-parse the (up to 4 MiB) profile only when the file changed. */
++    private fun groupIconsFor(entry: ProxyConfigLibrary.Entry): Map<String, String> {
++        val file = entry.file
++        val key = Triple(file.absolutePath, file.length(), file.lastModified())
++        if (key == lastIconFile && lastIconSource != null) return lastIconMap
++        val parsed = parseGroupIcons(configs.read(entry))
++        lastIconFile = key
++        return parsed
++    }
++
+     private var lastIconSource: String? = null
+     private var lastIconMap: Map<String, String> = emptyMap()
+     @Synchronized
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
 index 76318e4..1082f65 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
@@ -1106,7 +1134,7 @@ index 76318e4..1082f65 100644
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..514c931 100644
+index 5ae93b3..2f044dd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -58,11 +58,14 @@ internal class ProxyDashboardRepository(context: Context) {
@@ -1148,17 +1176,20 @@ index 5ae93b3..514c931 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
              if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
-@@ -325,7 +331,7 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -325,30 +331,49 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
 -    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-+    suspend fun globalDelay(): Map<String, Long> = latencyProbeOperation {
++    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().filter { name ->
              val node = snapshot.proxies.optJSONObject(name)
-@@ -335,20 +341,39 @@ internal class ProxyDashboardRepository(context: Context) {
-         measureSnapshot(targets, snapshot)
+             node != null && node.optJSONArray("all") == null &&
+                 node.optString("type").lowercase() !in setOf("direct", "reject", "rejectdrop", "pass", "compatible")
+         }.toList()
+-        measureSnapshot(targets, snapshot)
++        measureSnapshot(targets, snapshot, onResult)
      }
 
 -    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
@@ -3047,7 +3078,7 @@ index 2b1a624..823695c 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..3102255 100644
+index 250b8a8..b115600 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -3279,7 +3310,21 @@ index 250b8a8..3102255 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -893,7 +957,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +952,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         holdNodeProbes(owner, targets)
+         testingAll = true
+         viewModelScope.launch {
++            // Same as a group probe: every reading appears as soon as its node answers.
++            val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
++            val progress = launch {
++                for ((node, value) in landed) {
++                    applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
++                    releaseNodeProbes(owner, listOf(node))
++                }
++            }
+             try {
+-                val result = repo.globalDelay()
++                val result = repo.globalDelay { node, value -> landed.trySend(node to value) }
                  val stamp = SystemClock.elapsedRealtime()
                  result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                  val ok = result.values.count { it > 0L }
@@ -3295,6 +3340,13 @@ index 250b8a8..3102255 100644
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
+                 if (currentRuntimeRequest(request)) toast(errorText(error, "测速失败"))
+             } finally {
++                landed.close()
++                progress.cancel()
+                 releaseNodeProbes(owner, targets)
+                 if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
+             }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
 index 241408e..465541e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
@@ -9341,10 +9393,10 @@ index 0000000..283e398
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt
 new file mode 100644
-index 0000000..e1c9449
+index 0000000..2f458a1
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt
-@@ -0,0 +1,211 @@
+@@ -0,0 +1,226 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -9522,6 +9574,21 @@ index 0000000..e1c9449
 +        assertEquals(22L, vm.delays["node"])
 +        assertEquals(66L, vm.delays["other"])
 +        assertFalse("Automatic groups never call the unfixing group endpoint", paths().any { it.contains("/group/") })
++    }
++
++    @Test fun testAllShowsEachReadingAsItsNodeAnswers() {
++        val held = gate()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/proxies/other/delay") { held.hold(); normalResponse(req) } else normalResponse(req) }
++        vm.testAll()
++        eventually("Fast node is shown while the whole-profile probe continues") {
++            vm.delays["node"] == 22L && vm.testingNodes["node"] == null
++        }
++        assertTrue(vm.testingAll)
++        assertEquals(true, vm.testingNodes["other"])
++        held.countDown()
++        eventually("Whole-profile probe finished") { !vm.testingAll && vm.testingNodes.isEmpty() }
++        assertEquals(66L, vm.delays["other"])
++        assertTrue(messages.any { it.startsWith("测速完成") })
 +    }
 +
 +    @Test fun restoredStrategyCardsDrawAtOnceButCannotActUntilAFreshRead() {

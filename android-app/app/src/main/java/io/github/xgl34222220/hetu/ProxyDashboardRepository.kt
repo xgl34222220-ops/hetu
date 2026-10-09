@@ -331,14 +331,14 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
-    suspend fun globalDelay(): Map<String, Long> = latencyProbeOperation {
+    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().filter { name ->
             val node = snapshot.proxies.optJSONObject(name)
             node != null && node.optJSONArray("all") == null &&
                 node.optString("type").lowercase() !in setOf("direct", "reject", "rejectdrop", "pass", "compatible")
         }.toList()
-        measureSnapshot(targets, snapshot)
+        measureSnapshot(targets, snapshot, onResult)
     }
 
     private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot,

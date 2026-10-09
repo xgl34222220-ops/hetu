@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "a562629c9f27efc403c197ce308fe66fea26af0a7348d08d0222023d7312cb40",
+  "patchSha256": "f1ddf9d19aa86f405bfa7317cfb2d02611b856a5963ab1bec92dcc54e1e4b15d",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -279,9 +279,9 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "46d6e6902dc715394b95c463ea89f3a143ad9939f10dc76ff6fd0bfc7d921d3e",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "bd0aaf9f884e8a529c3f29f46e5e7a79aa5f1928f3b028bbb7db39a7be36fa2b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "7af50d2ed6b2beed66a151757d999116a59065b78bc1f56b4a6c3b5257be8f50",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "58444369650b1b8156163a093a4e8d0f5aa993c29bec09a350672c1048804d5e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "98dd112a4aa9e9f2b7c07d3cdc90c4dc52e2cf327fedee00b64464637da0e695",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "43018298725f0163e59d61eec00d2dc6d8fdb8af0f4d92417d8d175b7cfd3adf",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "ee1f42cd2b9ffbbf596b6dc856231b7ba8ea889d6092c0553ac2a733499cc375",
@@ -290,7 +290,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "f47dfc708e5560821a8f38c4fde51d53edaa6c0582fe6c3583c311f882fdd61c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "79a392068f209b1690f7507849ebbd2ee4b249b398a2a281b9b0eb6bfa1bd593",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "ae7951bfdef4e7b19dfc1925a4dbf534cd93540b6c2c03312eb48ebe5ffd11b0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "38ce090e583c981314dfbbae7a624b964d8785965345cd2bcf976d860a1c0c1d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "08bf2cb919f648eca5e9fa0cc2ccbdb713b87b8599e967c7a32421d1669643de",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "cdefabb9fb7c89bf3e08c1ba82374e8b43768cca5bca48834891ca26e47aa6d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "f6bb5c1d68438be89c0882104e8604ae9d59648e9bff3eb548567c8497d09bd6",
@@ -329,7 +329,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "9be0ba537081f512a51d7a2833368d5ee1533f91bd12adc61490b826bc343e8b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ScriptFeedbackPlacement94Test.kt": "e9fd1bf72ae7f48680634a32b1f9402b3552fa2333571e17f8164bd72a89cd0b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt": "33215b764195bb2b4c3b5320b9ac64f98c8c5a50ac53fb5fa06a7ce686157290"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt": "4632a2702c2bf9be46aedd40c2fcb587eb189276d48ff7f8befd36cc39d531a1"
   },
   "frozenFiles": {
     "android-app/CONCEPT_PROGRESS.md": "3082d07fed4014ba5a77d4591ab73af3748413457578339eb42e03be0050172b",
@@ -2914,6 +2914,7 @@
         "projectorKeepsTheSettledReadingBesideTheTestingMarker",
         "selectorGroupProbeMarksOnlyItsOwnGroupAndUsesOneCoreRequest",
         "automaticGroupLeafResultLandsBeforeItsSlowestSibling",
+        "testAllShowsEachReadingAsItsNodeAnswers",
         "restoredStrategyCardsDrawAtOnceButCannotActUntilAFreshRead"
       ]
     },
@@ -3048,7 +3049,7 @@
       ]
     }
   },
-  "expectedUnitTests": 753,
+  "expectedUnitTests": 754,
   "expectedTestXmlFiles": 84,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesUnchanged": true,

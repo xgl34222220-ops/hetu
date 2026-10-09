@@ -177,6 +177,21 @@ class StrategyLoadSpeed96Test {
         assertFalse("Automatic groups never call the unfixing group endpoint", paths().any { it.contains("/group/") })
     }
 
+    @Test fun testAllShowsEachReadingAsItsNodeAnswers() {
+        val held = gate()
+        response = { req -> if (req.requestUrl!!.encodedPath == "/proxies/other/delay") { held.hold(); normalResponse(req) } else normalResponse(req) }
+        vm.testAll()
+        eventually("Fast node is shown while the whole-profile probe continues") {
+            vm.delays["node"] == 22L && vm.testingNodes["node"] == null
+        }
+        assertTrue(vm.testingAll)
+        assertEquals(true, vm.testingNodes["other"])
+        held.countDown()
+        eventually("Whole-profile probe finished") { !vm.testingAll && vm.testingNodes.isEmpty() }
+        assertEquals(66L, vm.delays["other"])
+        assertTrue(messages.any { it.startsWith("测速完成") })
+    }
+
     @Test fun restoredStrategyCardsDrawAtOnceButCannotActUntilAFreshRead() {
         val config = "restored-config-96"
         StrategySnapshotCache.write(app, config, listOf(route.copy(nodes = route.nodes.map { it.copy(lastDelay = 80L) }), region))

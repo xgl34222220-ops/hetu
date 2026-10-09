@@ -952,8 +952,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         holdNodeProbes(owner, targets)
         testingAll = true
         viewModelScope.launch {
+            // Same as a group probe: every reading appears as soon as its node answers.
+            val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
+            val progress = launch {
+                for ((node, value) in landed) {
+                    applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
+                    releaseNodeProbes(owner, listOf(node))
+                }
+            }
             try {
-                val result = repo.globalDelay()
+                val result = repo.globalDelay { node, value -> landed.trySend(node to value) }
                 val stamp = SystemClock.elapsedRealtime()
                 result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                 val ok = result.values.count { it > 0L }
@@ -970,6 +978,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (error: Exception) {
                 if (currentRuntimeRequest(request)) toast(errorText(error, "测速失败"))
             } finally {
+                landed.close()
+                progress.cancel()
                 releaseNodeProbes(owner, targets)
                 if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
             }

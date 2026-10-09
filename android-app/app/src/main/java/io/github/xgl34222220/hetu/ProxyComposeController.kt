@@ -155,7 +155,7 @@ internal class ProxyComposeController(context: Context) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
         val iconMap = try {
-            if (selected == null) emptyMap() else parseGroupIcons(configs.read(selected))
+            if (selected == null) emptyMap() else groupIconsFor(selected)
         } catch (cancel: CancellationException) { throw cancel }
         catch (_: Exception) { emptyMap() }
 
@@ -820,6 +820,18 @@ internal class ProxyComposeController(context: Context) {
             )
         }
         return out.sortedBy { it.name.lowercase(Locale.ROOT) }
+    }
+
+    private var lastIconFile: Triple<String, Long, Long>? = null
+
+    /** Polls every 2 s; re-read and re-parse the (up to 4 MiB) profile only when the file changed. */
+    private fun groupIconsFor(entry: ProxyConfigLibrary.Entry): Map<String, String> {
+        val file = entry.file
+        val key = Triple(file.absolutePath, file.length(), file.lastModified())
+        if (key == lastIconFile && lastIconSource != null) return lastIconMap
+        val parsed = parseGroupIcons(configs.read(entry))
+        lastIconFile = key
+        return parsed
     }
 
     private var lastIconSource: String? = null
