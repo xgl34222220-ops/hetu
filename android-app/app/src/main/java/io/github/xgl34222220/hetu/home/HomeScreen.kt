@@ -288,7 +288,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
 internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
     if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
     return when (connection.health) {
-        HomeConnectionHealth.LocalReady -> HomeGlyphMode.On
+        HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
         HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
         HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
     }

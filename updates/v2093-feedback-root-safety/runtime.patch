@@ -1068,10 +1068,37 @@ index f104cef..8b96e4a 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..ac8579a 100644
+index 4f004b9..19513b4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-@@ -155,7 +155,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -151,11 +151,34 @@ internal class ProxyComposeController(context: Context) {
+             observation.continuityObservationTicket, observation.continuityObservationSession,
+             observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
+
++    /**
++     * Display-only cold-open read: strategy groups straight from the controller
++     * endpoint the app already holds (loopback + its own secret, or the user's
++     * custom API), overlapping the Root status script instead of waiting for it.
++     * It never sets panelReady, never writes preferences and cannot confirm a
++     * selection; the ViewModel shows it only in place of the restored cache.
++     */
++    suspend fun previewGroups(): List<ProxyGroupUi> = withContext(Dispatchers.IO) {
++        if (!ProxyStatusBridge.rootProxyRunning(app) && !prefs.getBoolean("proxyCustomApiEnabled", false))
++            return@withContext emptyList()
++        val profile = ProxyRuntimeProfile.load(prefs)
++        val iconMap = try {
++            configs.selected(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
++        } catch (cancel: CancellationException) { throw cancel }
++        catch (_: Exception) { emptyMap() }
++        val snapshot = controllerSnapshotOperation {
++            val proxies = async { api.proxies() }
++            val providers = async { api.proxyProviders() }
++            listOf(proxies.await(), providers.await())
++        }
++        parseGroups(mergeProxySnapshots(snapshot[0], snapshot[1]), iconMap)
++    }
++
+     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
          val profile = ProxyRuntimeProfile.load(prefs)
          val selected = configs.selected(profile.core)
          val iconMap = try {
@@ -1080,29 +1107,57 @@ index 4f004b9..ac8579a 100644
          } catch (cancel: CancellationException) { throw cancel }
          catch (_: Exception) { emptyMap() }
 
-@@ -302,9 +302,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -302,10 +325,34 @@ internal class ProxyComposeController(context: Context) {
 
          if (running) {
              try {
 -                val freshMode = api.configs().optString("mode", "")
 -                val freshGroups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
 -                val rawConnections = api.connections()
+-                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
 +                // Independent reads overlap, but publication still requires every
 +                // response and the original runtime observation ownership below.
-+                val snapshot = controllerSnapshotOperation {
-+                    val config = async { api.configs() }
-+                    val proxies = async { api.proxies() }
-+                    val providers = async { api.proxyProviders() }
-+                    val connections = async { api.connections() }
-+                    listOf(config.await(), proxies.await(), providers.await(), connections.await())
-+                }
++                // The /proc/net UID fallback is a Root shell. It used to run after the
++                // controller reads on every poll, delaying the strategy cards by a
++                // whole su round trip. When the last snapshot needed it, overlap it
++                // with the controller reads; otherwise reuse a recent map, and never
++                // hold the first fresh read for it (app names fill in next poll).
++                val uidPrefetch = if (uidFallbackHint) async { readSocketUidMap() } else null
++                val snapshot = try {
++                    controllerSnapshotOperation {
++                        val config = async { api.configs() }
++                        val proxies = async { api.proxies() }
++                        val providers = async { api.proxyProviders() }
++                        val connections = async { api.connections() }
++                        listOf(config.await(), proxies.await(), providers.await(), connections.await())
++                    }
++                } catch (error: Throwable) { uidPrefetch?.cancel(); throw error }
 +                val freshMode = snapshot[0].optString("mode", "")
 +                val freshGroups = parseGroups(mergeProxySnapshots(snapshot[1], snapshot[2]), iconMap)
 +                val rawConnections = snapshot[3]
-                 val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
++                val needsUids = needsSocketUidFallback(rawConnections)
++                uidFallbackHint = needsUids
++                val socketUids = when {
++                    !needsUids -> { uidPrefetch?.cancel(); emptyMap() }
++                    uidPrefetch != null -> uidPrefetch.await().also { if (it.isNotEmpty()) { cachedUids = it; cachedUidsAt = android.os.SystemClock.elapsedRealtime() } }
++                    android.os.SystemClock.elapsedRealtime() - cachedUidsAt in 0L..15_000L -> cachedUids
++                    else -> emptyMap()
++                }
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
-@@ -813,6 +822,18 @@ internal class ProxyComposeController(context: Context) {
+                 // selection or publish the absent counters as a fresh zero measurement.
+@@ -683,6 +730,10 @@ internal class ProxyComposeController(context: Context) {
+
+     private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
+
++    @Volatile private var uidFallbackHint = false
++    @Volatile private var cachedUids: Map<String, Int> = emptyMap()
++    @Volatile private var cachedUidsAt = Long.MIN_VALUE / 2
++
+     private fun needsSocketUidFallback(root: JSONObject): Boolean {
+         val array = root.optJSONArray("connections") ?: return false
+         for (i in 0 until array.length()) {
+@@ -813,6 +864,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -1122,40 +1177,102 @@ index 4f004b9..ac8579a 100644
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
-index 76318e4..1082f65 100644
+index 76318e4..618767e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
-@@ -17,6 +17,7 @@ final class ProxyControlEpoch {
+@@ -5,18 +5,29 @@ import java.util.concurrent.locks.ReentrantLock;
+ final class ProxyControlEpoch {
+     private final ReentrantLock gate = new ReentrantLock(true);
+     private final AtomicLong generation = new AtomicLong();
+-    void lock() { gate.lock(); generation.incrementAndGet(); }
++    // Control transactions only. A short observation publication also holds the
++    // gate, but it changes no runtime and must not look like a transaction to a
++    // read-only latency probe (that made speed tests fail at random on a phone).
++    private volatile int transactions;
++    void lock() { gate.lock(); transactions++; generation.incrementAndGet(); }
+     boolean tryLock() {
+         if (!gate.tryLock()) return false;
+-        generation.incrementAndGet(); return true;
++        transactions++; generation.incrementAndGet(); return true;
+     }
+-    void unlock() { gate.unlock(); }
++    void unlock() { if (gate.isHeldByCurrentThread() && transactions > 0) transactions--; gate.unlock(); }
+     boolean isHeldByCurrentThread() { return gate.isHeldByCurrentThread(); }
+     long observe() {
+         if (gate.isLocked()) return -1;
          long ticket = generation.get();
          return gate.isLocked() ? -1 : ticket;
      }
++    /** -1 only while a real control transaction runs; publications never flip it. */
++    long transactionEpoch() {
++        if (transactions > 0) return -1;
++        long ticket = generation.get();
++        return transactions > 0 ? -1 : ticket;
++    }
 +    void invalidateObservations() { generation.incrementAndGet(); }
      boolean publish(long ticket, Runnable action) {
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..2f044dd 100644
+index 5ae93b3..da84c42 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-@@ -58,11 +58,14 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -53,34 +53,48 @@ internal class ProxyDashboardRepository(context: Context) {
+         // Activities have independent repository/cache instances but mutate the
+         // same core. A confirmed mutation must supersede observations in all of them.
+         val probeMutationEpoch = AtomicLong()
++        val EGRESS_TARGETS = listOf("https://www.gstatic.com/generate_204", "https://cp.cloudflare.com/generate_204")
+     }
+     private val app = context.applicationContext
      private val api = MihomoControllerClient(app)
      private val controller = ProxyComposeController(app)
      // Keep credentials private and out of generated data-class toString output.
 -    internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long, private val mutationEpoch: Long) {
 +    internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long,
-+        private val mutationEpoch: Long, private val delaySettings: Map<String, Any?>) {
++        private val mutationEpoch: Long, private val delaySettings: Map<String, Any?>,
++        private val route: Map<String, Any?> = emptyMap()) {
          val stable: Boolean get() = runtimeEpoch >= 0L
++        internal val routeBound: Boolean get() = route.isNotEmpty()
          override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
 -            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch
 -        override fun hashCode(): Int = 31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) + mutationEpoch.hashCode()
 +            settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch &&
-+                delaySettings == other.delaySettings
-+        override fun hashCode(): Int = 31 * (31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) +
-+            mutationEpoch.hashCode()) + delaySettings.hashCode()
++                delaySettings == other.delaySettings && route == other.route
++        override fun hashCode(): Int = 31 * (31 * (31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) +
++            mutationEpoch.hashCode()) + delaySettings.hashCode()) + route.hashCode()
          fun sameOrigin(other: ProbeIdentity): Boolean = settings == other.settings && runtimeEpoch == other.runtimeEpoch
      }
      internal class SelectionTicket internal constructor(private val settings: Map<String, Any?>, internal val identity: ProbeIdentity) {
-@@ -91,7 +94,10 @@ internal class ProxyDashboardRepository(context: Context) {
+         internal fun client(context: Context) = MihomoControllerClient(context, settings)
+     }
+     private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
++    /** generate_204 targets for [verifyEgress]; replaceable only by tests. */
++    internal var egressTargets: List<String> = EGRESS_TARGETS
+     private val probeSnapshotMutex = Mutex()
+     private var cachedProbeSnapshot: ProbeSnapshot? = null
+     private var probeSnapshotAt = 0L
++    // Only what genuinely invalidates a controller measurement: which controller
++    // (endpoint + secret), which core instance/config/topology, and user intent.
++    // Observational flags that pollers rewrite (proxyRootRuntimeRunning) and the
++    // physical-network epoch are not part of a controller probe's identity; the
++    // epoch still binds website latencies, which really travel the physical route.
+     private val probeIdentityKeys = setOf(
+         "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
+         "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
+-        "proxyRootWanted", "proxyRootRuntimeRunning", "proxyRootLastStartupAt",
++        "proxyRootWanted", "proxyRootLastStartupAt",
+         "proxyRootAppliedSettings", "proxyRootAppliedRuntimeRevision", "proxyRootTopologyFingerprint",
+-        "proxyAdblockSessionGeneration", "proxyNetworkSessionId", "proxyNetworkEpoch",
++        "proxyAdblockSessionGeneration", "proxyNetworkSessionId",
+     )
+
+-    private fun probeIdentity(values: Map<String, Any?> = app.getSharedPreferences("hetu", 0).all): ProbeIdentity {
++    private fun probeIdentity(values: Map<String, Any?> = app.getSharedPreferences("hetu", 0).all,
++        routeBound: Boolean = false): ProbeIdentity {
+         val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
+         val configKey = "proxySelectedConfig.${core.id}"
+         val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
+@@ -91,11 +105,18 @@ internal class ProxyDashboardRepository(context: Context) {
                  ProxyConfigLibrary.BUNDLED_NAME else ""
          }
          // Ordinary status/health reads do not change this nonblocking control epoch.
@@ -1163,11 +1280,29 @@ index 5ae93b3..2f044dd 100644
 +        // A new test target invalidates measurements, but must not revoke an
 +        // unrelated node-selection/refresh transaction on this same controller.
 +        val delaySettings = values.filterKeys { it == "proxyCustomDelayUrlEnabled" || it == "proxyCustomDelayUrl" }
-+        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get(), delaySettings)
++        // A short observation publication (status poll, service health) also holds the
++        // control gate; only a real control transaction makes a probe unstable.
++        val route: Map<String, Any?> = if (routeBound) mapOf("proxyNetworkEpoch" to (values["proxyNetworkEpoch"] ?: 0L))
++            else emptyMap()
++        return ProbeIdentity(settings, RootProxyManager.probeTicket(), probeMutationEpoch.get(), delaySettings, route)
      }
 
      private fun requireCurrentProbe(identity: ProbeIdentity) {
-@@ -315,7 +321,7 @@ internal class ProxyDashboardRepository(context: Context) {
+-        if (!identity.stable || probeIdentity() != identity)
++        if (!identity.stable || probeIdentity(routeBound = identity.routeBound) != identity)
+             throw IOException("代理或控制接口已变化，请重新测速")
+     }
+
+@@ -180,6 +201,8 @@ internal class ProxyDashboardRepository(context: Context) {
+
+
+     suspend fun state(): ProxyComposeState = controller.state()
++    /** Display-only groups for a cold open; see [ProxyComposeController.previewGroups]. */
++    suspend fun previewGroups(): List<ProxyGroupUi> = controller.previewGroups()
+     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
+     suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false,
+         ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
+@@ -315,7 +338,7 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
@@ -1176,7 +1311,7 @@ index 5ae93b3..2f044dd 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
              if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
-@@ -325,30 +331,49 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -325,30 +348,49 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
@@ -1218,7 +1353,7 @@ index 5ae93b3..2f044dd 100644
 +                        synchronized(results) { results[node] = value }
 +                        // Each leaf can be shown as soon as it lands, but only while the
 +                        // wave's identity is still current; the final map keeps its guard.
-+                        if (onResult != null && snapshot.identity.stable && probeIdentity() == snapshot.identity)
++                        if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
 +                            onResult(node, value)
 +                    }
                      catch (cancel: CancellationException) { throw cancel }
@@ -1236,7 +1371,7 @@ index 5ae93b3..2f044dd 100644
          return results
      }
 
-@@ -366,7 +391,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,7 +408,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -1245,7 +1380,7 @@ index 5ae93b3..2f044dd 100644
          probe(node, probeSnapshot())
      }
 
-@@ -375,26 +400,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -375,26 +417,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
       * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
       * clear and reapply a pin, which could briefly reroute live traffic.
       */
@@ -1277,7 +1412,7 @@ index 5ae93b3..2f044dd 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +428,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +445,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -1286,6 +1421,80 @@ index 5ae93b3..2f044dd 100644
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
          readCurrentProbe(snapshot) {
+@@ -423,7 +454,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+     }
+
+     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
+-        val identity = probeIdentity()
++        val identity = probeIdentity(routeBound = true)
+         requireCurrentProbe(identity)
+         val sites = ProxyLatencyTargets.load(app)
+         // Hetu's UID is exempt from transparent Root interception. Explicitly enter
+@@ -444,6 +475,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+         measured
+     }
+
++    /**
++     * Cheap exit check for the home card: one generate_204 through the running
++     * core's local policy listener (the same explicit loopback proxy the network
++     * service uses; Hetu's own UID is exempt from transparent interception). The
++     * result is published only if the core, controller and physical route are
++     * unchanged, under the same observation ownership as a status read.
++     * Returns null when nothing could be concluded (stopped, superseded, busy).
++     */
++    suspend fun verifyEgress(): Boolean? = withContext(Dispatchers.IO) {
++        if (!ProxyStatusBridge.rootProxyRunning(app)) return@withContext null
++        val prefs = app.getSharedPreferences("hetu", 0)
++        val identity = probeIdentity(routeBound = true)
++        if (!identity.stable) return@withContext null
++        val ticket = RootProxyManager.observationTicket()
++        if (ticket < 0L) return@withContext null
++        val session = prefs.getString("proxyNetworkSessionId", "").orEmpty()
++        val epoch = prefs.getLong("proxyNetworkEpoch", 0L)
++        val port = MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT))
++        var reachable = false
++        for (target in egressTargets) {
++            coroutineContext.ensureActive()
++            if (egressStatus(target, port) == 204) { reachable = true; break }
++        }
++        coroutineContext.ensureActive()
++        if (!identity.stable || probeIdentity(routeBound = true) != identity) return@withContext null
++        // A failure only matters when it withdraws an earlier success; otherwise
++        // the card already reads "exit unverified" and nothing needs to be written.
++        if (!reachable && prefs.getString("proxyPolicyEgressState", "") != "reachable") return@withContext false
++        val now = System.currentTimeMillis()
++        val published = RootProxyManager.publishObservation(ticket) {
++            if (session == prefs.getString("proxyNetworkSessionId", "").orEmpty() &&
++                epoch == prefs.getLong("proxyNetworkEpoch", 0L) && ProxyStatusBridge.rootProxyRunning(app)) {
++                val edit = prefs.edit().putString("proxyPolicyEgressState", if (reachable) "reachable" else "unverified")
++                    .putLong("proxyPolicyEgressCheckedAt", now)
++                if (reachable) edit.putLong("proxyRootEgressVerifiedAt", now).putBoolean("proxyRootEgressPending", false)
++                edit.commit()
++            }
++        }
++        if (published && prefs.getLong("proxyPolicyEgressCheckedAt", 0L) == now) reachable else null
++    }
++
++    private suspend fun egressStatus(url: String, port: Int): Int {
++        coroutineContext.ensureActive()
++        return try {
++            val connection = (URL(url).openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
++                as HttpURLConnection).apply {
++                instanceFollowRedirects = false
++                useCaches = false
++                connectTimeout = 2_500
++                readTimeout = 2_500
++                setRequestProperty("Connection", "close")
++                setRequestProperty("User-Agent", "Hetu-Android")
++            }
++            try { connection.responseCode } finally { connection.disconnect() }
++        } catch (cancel: CancellationException) { throw cancel }
++        catch (_: Exception) { -1 }
++    }
++
+     suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
+         requireCurrentOrigin(ticket.identity)
+         val operationApi = ticket.client(app)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
 index 48280df..c33832e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
@@ -1305,7 +1514,7 @@ index 48280df..c33832e 100644
      }
      if (groups.isNotEmpty()) delays.keys.toList().filter { it !in nodes }.forEach(delays::remove)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-index 56b04c2..2c8313c 100644
+index 56b04c2..7289454 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 @@ -45,8 +45,20 @@ public final class ProxyNetworkMatchService extends Service {
@@ -1371,7 +1580,7 @@ index 56b04c2..2c8313c 100644
          evaluate();
          return START_STICKY;
      }
-@@ -123,57 +144,260 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -123,56 +144,259 @@ public final class ProxyNetworkMatchService extends Service {
          bootRestores.request(delayMs);
      }
 
@@ -1472,9 +1681,9 @@ index 56b04c2..2c8313c 100644
 -                    .apply();
 -            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
 +            return deferBootRecovery("Root 代理开机恢复失败："+detail);
-         }
-     }
-
++        }
++    }
++
 +    private boolean bootAutoEnabled(){
 +        return prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartRevoked",false);
 +    }
@@ -1525,8 +1734,8 @@ index 56b04c2..2c8313c 100644
 +                .remove("proxyRecoveryTerminalReason").remove("proxyRecoveryCompletedAfterBudget").commit())
 +            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
 +        nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;
-+        }
-+    }
+         }
+     }
 +    }
 +
 +    private long remainingRecoveryTime(){
@@ -1659,11 +1868,48 @@ index 56b04c2..2c8313c 100644
 +            nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;lastAutoRecoveryElapsed=-1L;
 +        });
 +    }
-+
+
      @Override public void onDestroy(){
          destroyed=true;
-         evaluations.close();
-@@ -243,7 +467,8 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -188,6 +412,27 @@ public final class ProxyNetworkMatchService extends Service {
+     }
+     @Override public android.os.IBinder onBind(Intent i){return null;}
+
++    /**
++     * Route identity of a physical link. LinkProperties.toString() also carries
++     * data that does not change where packets go (MTU, TCP buffer sizes, NAT64
++     * discovery, captive-portal/PCSCF/wake-on-LAN details). Any re-announcement of
++     * those advanced the network epoch, which voids in-flight speed tests, the
++     * egress state and status reads on an unchanged network. Only the interface,
++     * addresses, DNS, routes, private DNS and HTTP proxy count.
++     */
++    static String linkSignature(LinkProperties links){
++        if(links==null||links.getInterfaceName()==null)return null;
++        java.util.TreeSet<String> addresses=new java.util.TreeSet<>(),dns=new java.util.TreeSet<>(),routes=new java.util.TreeSet<>();
++        for(android.net.LinkAddress a:links.getLinkAddresses())
++            if(a!=null&&a.getAddress()!=null)addresses.add(a.getAddress().getHostAddress()+"/"+a.getPrefixLength());
++        for(java.net.InetAddress d:links.getDnsServers())if(d!=null)dns.add(d.getHostAddress());
++        for(android.net.RouteInfo r:links.getRoutes())if(r!=null)
++            routes.add(r.getDestination()+">"+(r.getGateway()==null?"":r.getGateway().getHostAddress())+"@"+r.getInterface());
++        String privateDns=Build.VERSION.SDK_INT>=28?links.isPrivateDnsActive()+":"+links.getPrivateDnsServerName():"";
++        return links.getInterfaceName()+"|"+addresses+"|"+dns+"|"+routes+"|"+privateDns
++                +"|"+(links.getHttpProxy()==null?"":links.getHttpProxy().toString());
++    }
++
+     private void register(){
+         cb=new ConnectivityManager.NetworkCallback(){
+             @Override public void onAvailable(Network n){
+@@ -212,8 +457,7 @@ public final class ProxyNetworkMatchService extends Service {
+                 });
+             }
+             @Override public void onLinkPropertiesChanged(Network n,LinkProperties links){
+-                networkChanged("links",()->networkEvents.links(n,
+-                        links.getInterfaceName()==null?null:links.toString()));
++                networkChanged("links",()->networkEvents.links(n,linkSignature(links)));
+             }
+             @Override public void onBlockedStatusChanged(Network n,boolean blocked){
+                 networkChanged("blocked",()->{networkEvents.blocked(n,blocked);networkState.blocked(n,blocked);});
+@@ -243,7 +487,8 @@ public final class ProxyNetworkMatchService extends Service {
              if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
              pendingRecoveryRoute=null;
              if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
@@ -1673,7 +1919,7 @@ index 56b04c2..2c8313c 100644
                  try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
                          2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
              }
-@@ -482,16 +707,31 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -482,16 +727,31 @@ public final class ProxyNetworkMatchService extends Service {
          }
      }
 
@@ -1708,7 +1954,7 @@ index 56b04c2..2c8313c 100644
                  probeEgressIfPending();
                  return;
              }
-@@ -500,53 +740,60 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -500,53 +760,60 @@ public final class ProxyNetworkMatchService extends Service {
                  prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                  return;
              }
@@ -1922,10 +2168,10 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..d32fc87 100644
+index 9cd82da..7cb1779 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-@@ -30,6 +30,62 @@ final class RootProxyManager {
+@@ -30,8 +30,66 @@ final class RootProxyManager {
      private static final String LEGACY_MODULE="/data/adb/modules/bichen";
      private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
      private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
@@ -1987,8 +2233,12 @@ index 9cd82da..d32fc87 100644
 +    }
      private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
      static long observationTicket(){return CONTROL_LOCK.observe();}
++    /** Read-only controller probes: invalid only during a real start/stop/reload transaction. */
++    static long probeTicket(){return CONTROL_LOCK.transactionEpoch();}
      static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
-@@ -129,7 +185,7 @@ final class RootProxyManager {
+     private final Context context;
+     private final SharedPreferences prefs;
+@@ -129,7 +187,7 @@ final class RootProxyManager {
      }
 
      private String detectDefaultInterface()throws IOException{
@@ -1997,7 +2247,7 @@ index 9cd82da..d32fc87 100644
                  "set -- $(ip route get 1.1.1.1 2>/dev/null); while [ \"$#\" -gt 1 ]; do if [ \"$1\" = dev ]; then printf '%s' \"$2\"; break; fi; shift; done",5000L);
          String iface=result.output==null?"":result.output.trim();
          if(!iface.matches("[A-Za-z0-9_.:@-]{1,32}"))throw new IOException("eBPF 无法识别当前默认出口接口");
-@@ -155,7 +211,7 @@ final class RootProxyManager {
+@@ -155,7 +213,7 @@ final class RootProxyManager {
 
      private boolean runtimeCoreCurrent(String token){
          try{
@@ -2006,7 +2256,7 @@ index 9cd82da..d32fc87 100644
                      "if [ -x "+RootBridge.quote(BIN)+" ] && [ -r "+RootBridge.quote(CORE_TOKEN)+" ] && [ \"$(cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null)\" = "+RootBridge.quote(token)+" ]; then printf 1; else printf 0; fi",
                      4000L);
              return result.ok()&&"1".equals(result.output.trim());
-@@ -167,7 +223,7 @@ final class RootProxyManager {
+@@ -167,7 +225,7 @@ final class RootProxyManager {
      private RootStartupProbe.Result probeStartupRuntime(){
          try{
              RootBridge.requireWorkerThread();
@@ -2015,7 +2265,7 @@ index 9cd82da..d32fc87 100644
                      RootStartupProbe.command(ROOT+"/run/core.pid",BIN,CORE_TOKEN),4000L);
              return RootStartupProbe.parse(result.ok(),result.output);
          }catch(Exception ignored){return RootStartupProbe.parse(false,"");}
-@@ -177,7 +233,7 @@ final class RootProxyManager {
+@@ -177,7 +235,7 @@ final class RootProxyManager {
          try{
              RootBridge.requireWorkerThread();
              String command=ProxyContinuity.coreProbeCommand(ROOT+"/run/core.pid",BIN);
@@ -2024,7 +2274,7 @@ index 9cd82da..d32fc87 100644
              ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
              return ProxyContinuity.preserveRunning(state,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
-@@ -221,7 +277,7 @@ final class RootProxyManager {
+@@ -221,7 +279,7 @@ final class RootProxyManager {
          cmd.append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
                  .append("; printf %s ").append(RootBridge.quote(infoText)).append(" > ").append(RootBridge.quote(info))
                  .append("; chmod 600 ").append(RootBridge.quote(info)).append("; chown 0:0 ").append(RootBridge.quote(info));
@@ -2033,7 +2283,7 @@ index 9cd82da..d32fc87 100644
          if(!r.ok())throw new IOException("无法初始化河图运行目录："+r.output.trim());
          return ROOT;
          }finally{CONTROL_LOCK.unlock();}
-@@ -267,7 +323,7 @@ final class RootProxyManager {
+@@ -267,7 +325,7 @@ final class RootProxyManager {
                      +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
                      +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
                      +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
@@ -2042,7 +2292,7 @@ index 9cd82da..d32fc87 100644
              if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
              int port=liveControllerPort(state);
-@@ -379,7 +435,7 @@ final class RootProxyManager {
+@@ -379,7 +437,7 @@ final class RootProxyManager {
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
          }
@@ -2051,7 +2301,7 @@ index 9cd82da..d32fc87 100644
          if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
      }
 
-@@ -404,7 +460,7 @@ final class RootProxyManager {
+@@ -404,7 +462,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -2060,7 +2310,7 @@ index 9cd82da..d32fc87 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,7 +468,7 @@ final class RootProxyManager {
+@@ -412,7 +470,7 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -2069,7 +2319,7 @@ index 9cd82da..d32fc87 100644
              prefs.edit()
                      .putString("proxyRootTopologyFingerprint",nextFingerprint)
                      .putString("proxyRootAppliedSettings",p.settingsSignature)
-@@ -471,27 +527,76 @@ final class RootProxyManager {
+@@ -471,27 +529,76 @@ final class RootProxyManager {
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
      JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,true);}
      private JSONObject startOwned(ProxyRuntimeProfile profile,Progress progress,boolean replace)throws Exception{
@@ -2154,7 +2404,7 @@ index 9cd82da..d32fc87 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -505,24 +610,36 @@ final class RootProxyManager {
+@@ -505,24 +612,36 @@ final class RootProxyManager {
          return startIfWanted(profile,()->true);
      }
      JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
@@ -2198,7 +2448,7 @@ index 9cd82da..d32fc87 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +652,11 @@ final class RootProxyManager {
+@@ -535,7 +654,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -2211,7 +2461,7 @@ index 9cd82da..d32fc87 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +665,8 @@ final class RootProxyManager {
+@@ -544,7 +667,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -2221,7 +2471,7 @@ index 9cd82da..d32fc87 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +674,7 @@ final class RootProxyManager {
+@@ -552,7 +676,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -2230,7 +2480,7 @@ index 9cd82da..d32fc87 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -579,7 +701,9 @@ final class RootProxyManager {
+@@ -579,7 +703,9 @@ final class RootProxyManager {
          trace.next("deployment");
          // The initial process probe also read the installed core token. Reuse that
          // result instead of opening a second privileged shell just to read one file.
@@ -2240,7 +2490,7 @@ index 9cd82da..d32fc87 100644
 
          trace.next("validation");
          String validationKey=validationFingerprint(p);
-@@ -623,7 +747,6 @@ final class RootProxyManager {
+@@ -623,7 +749,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -2248,7 +2498,7 @@ index 9cd82da..d32fc87 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -659,15 +782,18 @@ final class RootProxyManager {
+@@ -659,15 +784,18 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -2269,7 +2519,7 @@ index 9cd82da..d32fc87 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -723,6 +849,10 @@ final class RootProxyManager {
+@@ -723,6 +851,10 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -2280,7 +2530,7 @@ index 9cd82da..d32fc87 100644
          synchronized(ProxyAdblockSession.LOCK){
          prefs.edit()
                  .putBoolean("proxyRootWanted",true)
-@@ -749,11 +879,18 @@ final class RootProxyManager {
+@@ -749,11 +881,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -2299,7 +2549,7 @@ index 9cd82da..d32fc87 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +898,49 @@ final class RootProxyManager {
+@@ -761,10 +900,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -2350,7 +2600,7 @@ index 9cd82da..d32fc87 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -789,10 +965,12 @@ final class RootProxyManager {
+@@ -789,10 +967,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -2365,7 +2615,7 @@ index 9cd82da..d32fc87 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +980,40 @@ final class RootProxyManager {
+@@ -802,20 +982,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -2411,7 +2661,7 @@ index 9cd82da..d32fc87 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,7 +1023,7 @@ final class RootProxyManager {
+@@ -825,7 +1025,7 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -2420,7 +2670,7 @@ index 9cd82da..d32fc87 100644
                  if(!available.ok())throw new IOException("请先成功启动一次代理，再开启开机自启");
                  if(!p.settingsSignature.equals(prefs.getString("proxyRootAppliedSettings","")))
                      throw new IOException("代理设置已变化，请先启动或重启应用设置，再开启开机自启");
-@@ -834,10 +1032,17 @@ final class RootProxyManager {
+@@ -834,10 +1034,17 @@ final class RootProxyManager {
                  validateRuntimeConfig();
                  installAutostart(p,autostartArgs(p));
              }else RootAutostart.remove(context);
@@ -2440,7 +2690,7 @@ index 9cd82da..d32fc87 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1050,40 @@ final class RootProxyManager {
+@@ -845,31 +1052,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -2497,7 +2747,7 @@ index 9cd82da..d32fc87 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1093,7 @@ final class RootProxyManager {
+@@ -879,7 +1095,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -2506,7 +2756,7 @@ index 9cd82da..d32fc87 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1153,7 @@ final class RootProxyManager {
+@@ -939,7 +1155,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -2515,7 +2765,7 @@ index 9cd82da..d32fc87 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1235,7 @@ final class RootProxyManager {
+@@ -1021,7 +1237,7 @@ final class RootProxyManager {
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -2524,7 +2774,7 @@ index 9cd82da..d32fc87 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1071,22 +1285,22 @@ final class RootProxyManager {
+@@ -1071,22 +1287,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -2552,7 +2802,7 @@ index 9cd82da..d32fc87 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1313,7 @@ final class RootProxyManager {
+@@ -1099,7 +1315,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -2561,7 +2811,7 @@ index 9cd82da..d32fc87 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1361,7 @@ final class RootProxyManager {
+@@ -1147,7 +1363,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -2570,7 +2820,7 @@ index 9cd82da..d32fc87 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1371,7 @@ final class RootProxyManager {
+@@ -1157,7 +1373,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -2579,7 +2829,7 @@ index 9cd82da..d32fc87 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1210,7 +1424,7 @@ final class RootProxyManager {
+@@ -1210,7 +1426,7 @@ final class RootProxyManager {
      private void validateRuntimeConfig()throws Exception{
          RootBridge.requireWorkerThread();
          String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
@@ -2588,7 +2838,7 @@ index 9cd82da..d32fc87 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1241,7 +1455,7 @@ final class RootProxyManager {
+@@ -1241,7 +1457,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -2597,7 +2847,7 @@ index 9cd82da..d32fc87 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1255,7 +1469,7 @@ final class RootProxyManager {
+@@ -1255,7 +1471,7 @@ final class RootProxyManager {
          RootBridge.requireWorkerThread();
          String cmd="if [ -x "+RootBridge.quote(SCRIPT)+" ]; then exec "+RootBridge.quote(SCRIPT)+" "+RootBridge.quote(action)+"; else printf '%s\\n' "+RootBridge.quote(missing.toString())+"; fi";
          long timeout="status".equals(action)?8000L:20000L;
@@ -2606,7 +2856,7 @@ index 9cd82da..d32fc87 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1271,9 +1485,33 @@ final class RootProxyManager {
+@@ -1271,9 +1487,33 @@ final class RootProxyManager {
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
      private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{
          RootBridge.requireWorkerThread();
@@ -2642,7 +2892,7 @@ index 9cd82da..d32fc87 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1289,7 +1527,7 @@ final class RootProxyManager {
+@@ -1289,7 +1529,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -2651,7 +2901,7 @@ index 9cd82da..d32fc87 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +1551,7 @@ final class RootProxyManager {
+@@ -1313,7 +1553,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -2660,7 +2910,7 @@ index 9cd82da..d32fc87 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1412,7 +1650,7 @@ final class RootProxyManager {
+@@ -1412,7 +1652,7 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -3078,7 +3328,7 @@ index 2b1a624..823695c 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..b115600 100644
+index 250b8a8..f334603 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -3101,7 +3351,52 @@ index 250b8a8..b115600 100644
      var state by mutableStateOf(initialState())
          private set
      var runtime by mutableStateOf(initialRuntime())
-@@ -415,16 +419,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,7 +402,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 }
+             }
+             while (isActive) {
+-                if (operation == null) refreshNow()
++                if (operation == null) {
++                    refreshNow()
++                    maybeVerifyEgress()
++                }
+                 delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
+             }
+         }
+@@ -412,19 +419,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         pollJob = null
+     }
+
++    /* ---------------- exit (Internet) verification ---------------- */
++    /** True once a generate_204 answered through this runtime's policy listener. */
++    var egressVerified by mutableStateOf(io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs))
++        private set
++    private var egressCheck: Job? = null
++    private var lastEgressAttemptAt = 0L
++
++    /**
++     * Runs the cheap exit check automatically: right after a start settles and
++     * whenever the app is open with a running core that is not yet verified for
++     * this runtime (or the last success is over ten minutes old). Never blocks a
++     * poll; a failed attempt waits 30 s before the next try.
++     */
++    private fun maybeVerifyEgress() {
++        egressVerified = io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs)
++        if (!state.running || operation != null || egressCheck?.isActive == true) return
++        if (!io.github.xgl34222220.hetu.home.HomeEgress.due(prefs, System.currentTimeMillis())) return
++        val now = SystemClock.elapsedRealtime()
++        if (lastEgressAttemptAt > 0L && now - lastEgressAttemptAt in 0L until 30_000L) return
++        val request = activeRuntimeRequest() ?: return
++        lastEgressAttemptAt = now
++        egressCheck = viewModelScope.launch {
++            try { repo.verifyEgress() }
++            catch (cancel: CancellationException) { throw cancel }
++            catch (_: Exception) { }
++            if (currentRuntimeRequest(request, requireRunning = false))
++                egressVerified = io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs)
++        }
++    }
++
      private fun initialState(): ProxyComposeState {
          val profile = ProxyRuntimeProfile.load(prefs)
          val cachedConfig = prefs.getString("proxySelectedConfig.${profile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
@@ -3142,7 +3437,7 @@ index 250b8a8..b115600 100644
      private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,12 +475,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +508,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -3160,8 +3455,25 @@ index 250b8a8..b115600 100644
 +        }
          try {
              val startedAt = SystemClock.elapsedRealtime()
-             val next = repo.state()
-@@ -509,7 +539,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+-            val next = repo.state()
++            // Cold open: the restored cards are already on the first frame. Overlap
++            // the Root status script with a display-only controller read so the
++            // cards show the live list as soon as the controller answers. They stay
++            // non-authoritative (panelReady false, actions refused) until the
++            // confirmed read below replaces them.
++            val preview = if (showingRestoredGroups()) viewModelScope.launch {
++                val live = try { repo.previewGroups() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { emptyList() }
++                if (live.isNotEmpty() && showingRestoredGroups() && state === expectedState && operation == operationBefore) {
++                    restoredGroups = live
++                    state = state.copy(groups = live)
++                    expectedState = state
++                }
++            } else null
++            val next = try { repo.state() } finally { preview?.cancel() }
+             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
+             if (superseded()) return null
+             // The existing worker status read supplies authority. A cached
+@@ -509,7 +585,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -3189,7 +3501,7 @@ index 250b8a8..b115600 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +609,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +655,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -3207,7 +3519,7 @@ index 250b8a8..b115600 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +617,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +663,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -3215,7 +3527,7 @@ index 250b8a8..b115600 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +628,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +674,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -3226,7 +3538,7 @@ index 250b8a8..b115600 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -785,6 +825,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -785,6 +871,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -3234,7 +3546,7 @@ index 250b8a8..b115600 100644
          val request = activeRuntimeRequest() ?: return
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +868,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,12 +914,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -3253,7 +3565,7 @@ index 250b8a8..b115600 100644
          val request = activeRuntimeRequest() ?: return
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
-@@ -843,6 +888,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,6 +934,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -3261,7 +3573,7 @@ index 250b8a8..b115600 100644
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +898,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -852,10 +944,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -3284,7 +3596,7 @@ index 250b8a8..b115600 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +920,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +966,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -3302,7 +3614,7 @@ index 250b8a8..b115600 100644
                  releaseNodeProbes(owner, targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +941,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,6 +987,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -3310,7 +3622,7 @@ index 250b8a8..b115600 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +952,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +998,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -3423,6 +3735,18 @@ index 5a9c877..ad5f3b7 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
+index df92493..85c3872 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
+@@ -58,6 +58,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+             controllerError = vm.state.controllerError,
+             takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
+             runtimeMessage = vm.state.message,
++            egressVerified = vm.state.running && vm.egressVerified,
+         ),
+     )
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ce5f550..65650a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -3629,6 +3953,68 @@ index 9afc132..0881179 100644
      val progress = animateFloatAsState(if (lifted) 1f else 0f, HomeMotion.fade(LocalHomeMotionEnabled.current, 220), label = "home-bar-glass")
      val active = remember(lifted) { derivedStateOf { lifted || progress.value > .01f } }
      return remember(haze, progress, active) { HomeBarGlass(haze, progress, active) }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
+index 108ce15..550a4f6 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
+@@ -132,11 +132,14 @@ internal data class HomeConnectionObservation(
+     /** Null until a real local runtime health record exists; true does not prove Internet access. */
+     val takeoverHealthy: Boolean? = null,
+     val runtimeMessage: String = "",
++    /** A generate_204 answered through the running core's policy listener for this runtime. */
++    val egressVerified: Boolean = false,
+ ) {
+     val health: HomeConnectionHealth get() = when {
+         controllerReadFailed -> HomeConnectionHealth.ControllerUnavailable
+         takeoverHealthy == false -> HomeConnectionHealth.TakeoverDegraded
+         !controllerReady || takeoverHealthy == null -> HomeConnectionHealth.Unconfirmed
++        egressVerified -> HomeConnectionHealth.Verified
+         else -> HomeConnectionHealth.LocalReady
+     }
+ }
+@@ -146,6 +149,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
+     ControllerUnavailable("控制接口异常 · 连接状态未确认"),
+     TakeoverDegraded("接管检查异常 · 出口未验证"),
+     LocalReady("接管检查通过 · 出口未验证"),
++    Verified("接管检查通过 · 出口已验证"),
++}
++
++/**
++ * Exit (Internet) verification for the home card. Written by the app's own cheap
++ * check or by the network service's probe; valid only for the current runtime.
++ */
++internal object HomeEgress {
++    const val RECHECK_MS = 10 * 60_000L
++
++    fun verifiedAt(prefs: android.content.SharedPreferences): Long {
++        val at = prefs.getLong("proxyRootEgressVerifiedAt", 0L)
++        val startup = prefs.getLong("proxyRootLastStartupAt", 0L)
++        return if (at > 0L && at >= startup && prefs.getString("proxyPolicyEgressState", "") == "reachable") at else 0L
++    }
++
++    fun verified(prefs: android.content.SharedPreferences): Boolean = verifiedAt(prefs) > 0L
++
++    /** Due when never verified for this runtime, or the last success is older than [RECHECK_MS]. */
++    fun due(prefs: android.content.SharedPreferences, nowWall: Long): Boolean {
++        val at = verifiedAt(prefs)
++        return at <= 0L || nowWall - at !in 0L..RECHECK_MS
++    }
+ }
+
+ internal data class HomeUiState(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
+index e31ca99..243edd5 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
+@@ -288,7 +288,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+ internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
+     if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
+     return when (connection.health) {
+-        HomeConnectionHealth.LocalReady -> HomeGlyphMode.On
++        HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
+         HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
+         HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 index 9f66ac0..5500d96 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
@@ -4955,7 +5341,7 @@ index fa7fa0d..1772502 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..8b8faa6 100644
+index 578ce9d..c751472 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
@@ -4967,6 +5353,14 @@ index 578ce9d..8b8faa6 100644
  测速|Test|測速|Проверить
  没有策略组|No proxy groups|沒有策略群組|Нет групп прокси
  当前配置没有可显示的策略组|This configuration has no proxy groups to show|目前設定沒有可顯示的策略群組|В этой конфигурации нет групп для отображения
+@@ -969,6 +971,7 @@ private val vocabularyConnection = """
+ 控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
+ 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
+ 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
++接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+ """.trimIndent()
+
+ private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
 index c5d6deb..8ea577d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
@@ -9023,6 +9417,346 @@ index 0000000..f2a2fa6
 +            }
 +            return RootBridge.Result(0, output)
 +        }
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestExitPanel98Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestExitPanel98Test.kt
+new file mode 100644
+index 0000000..26fe85b
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestExitPanel98Test.kt
+@@ -0,0 +1,334 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.net.LinkProperties
++import android.os.Looper
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HomeConnectionHealth
++import io.github.xgl34222220.hetu.home.HomeConnectionObservation
++import io.github.xgl34222220.hetu.home.HomeEgress
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.async
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.supervisorScope
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import org.robolectric.util.ReflectionHelpers
++import java.io.File
++import java.io.IOException
++import java.net.InetAddress
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++
++/**
++ * 真机反馈三项：测速被身份守卫误丢、首页「出口未验证」从不变为已验证、策略页冷启动等待 Root 状态脚本。
++ * 测速只因控制接口/核心实例/配置/真实控制事务而作废；观测发布、观测性偏好改写与物理网络代次不再作废控制器测速。
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    ControllerRunState90Shadows.RootStatus::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class SpeedTestExitPanel98Test {
++    private val app: Application = ApplicationProvider.getApplicationContext()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++    private val control get() = ReflectionHelpers.getStaticField<ProxyControlEpoch>(RootProxyManager::class.java, "CONTROL_LOCK")
++    private val servers = mutableListOf<MockWebServer>()
++    private val gates = mutableListOf<CountDownLatch>()
++    private val vms = mutableListOf<HetuViewModel>()
++
++    @Before fun prepare() {
++        ControllerRunState90Shadows.RootStatus.reset()
++        PanelActionRuntimeShadows.RuntimeSample.reset()
++        PanelActionRuntimeShadows.HistoryRecord.reset()
++        PanelActionRuntimeShadows.NoRoot.reset()
++        prefs.edit().clear().putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
++            .putBoolean("proxyApiHistoryEnabled", false).commit()
++    }
++
++    @After fun finish() {
++        gates.forEach { it.countDown() }
++        vms.forEach { it.viewModelScope.cancel() }
++        ControllerRunState90Shadows.RootStatus.gate?.countDown()
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        vms.forEach { vm ->
++            eventually("ViewModel work finished") { vm.viewModelScope.coroutineContext[Job]!!.children.none { it.isActive } }
++        }
++        servers.forEach { it.shutdown() }
++        assertEquals("Fixtures never run Root commands", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun CountDownLatch.hold() { check(await(8, TimeUnit.SECONDS)) { "Fixture gate not released" } }
++    private fun server(handler: (RecordedRequest) -> MockResponse) = MockWebServer().also { server ->
++        server.dispatcher = object : Dispatcher() { override fun dispatch(request: RecordedRequest) = handler(request) }
++        server.start(); servers += server
++    }
++    private fun useApi(server: MockWebServer) {
++        prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).commit()
++    }
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue(reason, predicate())
++    }
++
++    /** Holds the observation gate the way a status poll or the network service publishes. */
++    private fun publishWhile(entered: CountDownLatch, release: CountDownLatch): Thread = Thread {
++        RootProxyManager.publishObservation(RootProxyManager.observationTicket()) {
++            entered.countDown(); release.await(8, TimeUnit.SECONDS)
++        }
++    }.also { it.start() }
++
++    /* ------------------------------ 1. speed test identity ------------------------------ */
++
++    @Test fun observationPublicationDuringASelectorWaveKeepsItsResult() = runBlocking {
++        val held = gate()
++        val api = server { request ->
++            if (request.requestUrl!!.encodedPath == "/group/Route/delay") {
++                held.hold(); MockResponse().setBody("""{"A":31,"B":42}""")
++            } else MockResponse().setResponseCode(404)
++        }
++        useApi(api)
++        val repository = ProxyDashboardRepository(app)
++        val publishing = CountDownLatch(1); val endPublish = gate()
++        supervisorScope {
++            val wave = async(Dispatchers.Default) { repository.groupDelay("Route") }
++            eventually("Selector wave reached the controller") { api.requestCount == 1 }
++            val publisher = publishWhile(publishing, endPublish)
++            assertTrue(publishing.await(3, TimeUnit.SECONDS))
++            assertEquals("A publication still reads as busy to observers", -1L, RootProxyManager.observationTicket())
++            assertTrue("…but it is not a control transaction", RootProxyManager.probeTicket() >= 0L)
++            // Pollers also rewrite observational flags and the physical-network epoch.
++            prefs.edit().putBoolean("proxyRootRuntimeRunning", true).putLong("proxyNetworkEpoch", 41L)
++                .putLong("proxyRootHealthProbeElapsed", 99L).commit()
++            held.countDown()
++            assertEquals(mapOf("A" to 31L, "B" to 42L), wave.await())
++            endPublish.countDown(); publisher.join(3000)
++        }
++        assertEquals("One core request for a Selector group", 1, api.requestCount)
++        assertTrue(api.takeRequest().path!!.contains("url=https%3A%2F%2Fwww.gstatic.com%2Fgenerate_204"))
++    }
++
++    @Test fun leafResultsLandPerNodeAcrossObservationalRewrites() = runBlocking {
++        val names = (1..8).map { "n$it" }
++        val slow = gate()
++        val api = server { request ->
++            val path = request.requestUrl!!.encodedPath
++            when {
++                path == "/proxies" -> {
++                    val proxies = org.json.JSONObject()
++                    names.forEach { proxies.put(it, org.json.JSONObject().put("name", it).put("type", "Shadowsocks")) }
++                    proxies.put("Auto", org.json.JSONObject().put("name", "Auto").put("type", "URLTest")
++                        .put("all", org.json.JSONArray(names)).put("now", "n1"))
++                    MockResponse().setBody(org.json.JSONObject().put("proxies", proxies).toString())
++                }
++                path == "/providers/proxies" -> MockResponse().setBody("""{"providers":{}}""")
++                path == "/proxies/n8/delay" -> { slow.hold(); MockResponse().setBody("""{"delay":80}""") }
++                path.endsWith("/delay") -> MockResponse().setBody("""{"delay":20}""")
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        useApi(api)
++        val repository = ProxyDashboardRepository(app)
++        val landed = Collections.synchronizedMap(LinkedHashMap<String, Long>())
++        val group = ProxyGroupUi("Auto", "URLTest", "n1", names.map { ProxyNodeUi(it) })
++        supervisorScope {
++            val wave = async(Dispatchers.Default) { repository.groupDelay(group, names) { node, value -> landed[node] = value } }
++            eventually("Seven fast leaves are shown before the slow one answers") { landed.size == 7 }
++            prefs.edit().putBoolean("proxyRootRuntimeRunning", false).putLong("proxyNetworkEpoch", 7L).commit()
++            prefs.edit().putBoolean("proxyRootRuntimeRunning", true).commit()
++            slow.countDown()
++            val result = wave.await()
++            assertEquals(8, result.size)
++            assertEquals(80L, result["n8"])
++            assertEquals(80L, landed["n8"])
++        }
++    }
++
++    @Test fun aRealControlTransactionOrEndpointChangeStillVoidsTheWave() = runBlocking {
++        for (endpoint in listOf(false, true)) {
++            val held = gate()
++            val api = server { request ->
++                if (request.requestUrl!!.encodedPath == "/group/Route/delay") { held.hold(); MockResponse().setBody("""{"A":31}""") }
++                else MockResponse().setResponseCode(404)
++            }
++            useApi(api)
++            val repository = ProxyDashboardRepository(app)
++            supervisorScope {
++                val wave = async(Dispatchers.Default) { runCatching { repository.groupDelay("Route") } }
++                eventually("Wave entered") { api.requestCount == 1 }
++                if (endpoint) prefs.edit().putString("proxyCustomApiSecret", "rotated").commit()
++                else { control.lock(); assertEquals(-1L, RootProxyManager.probeTicket()) }
++                try { held.countDown() } finally { if (!endpoint) control.unlock() }
++                val failure = wave.await().exceptionOrNull()
++                assertTrue(failure is IOException)
++                assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
++            }
++            prefs.edit().remove("proxyCustomApiSecret").commit()
++        }
++    }
++
++    @Test fun probeTicketTracksTransactionsOnly() {
++        val epoch = ProxyControlEpoch()
++        val first = epoch.transactionEpoch()
++        assertTrue(first >= 0L)
++        assertTrue(epoch.publish(epoch.observe()) {
++            assertEquals(-1L, epoch.observe())
++            assertEquals(first, epoch.transactionEpoch())
++        })
++        epoch.lock()
++        try {
++            assertEquals(-1L, epoch.transactionEpoch())
++            epoch.lock(); epoch.unlock() // reentrant transaction
++            assertEquals(-1L, epoch.transactionEpoch())
++        } finally { epoch.unlock() }
++        val after = epoch.transactionEpoch()
++        assertTrue(after >= 0L && after != first)
++        assertTrue(epoch.tryLock()); epoch.unlock()
++        assertNotEquals(after, epoch.transactionEpoch())
++    }
++
++    @Test fun linkSignatureIgnoresNonRoutingFieldsButSeesRouteChanges() {
++        fun links(dns: String, mtu: Int, name: String? = "wlan0") = LinkProperties().apply {
++            interfaceName = name
++            this.mtu = mtu
++            ReflectionHelpers.callInstanceMethod<Boolean>(this, "addDnsServer",
++                ReflectionHelpers.ClassParameter.from(InetAddress::class.java, InetAddress.getByName(dns)))
++        }
++        val base = links("192.0.2.53", 1500)
++        val remtu = links("192.0.2.53", 1280)
++        assertNotEquals("Precondition: the raw string changes", base.toString(), remtu.toString())
++        assertEquals(ProxyNetworkMatchService.linkSignature(base), ProxyNetworkMatchService.linkSignature(remtu))
++        assertNotEquals(ProxyNetworkMatchService.linkSignature(base),
++            ProxyNetworkMatchService.linkSignature(links("192.0.2.54", 1500)))
++        assertNotEquals(ProxyNetworkMatchService.linkSignature(base),
++            ProxyNetworkMatchService.linkSignature(links("192.0.2.53", 1500, "rmnet0")))
++        assertNull(ProxyNetworkMatchService.linkSignature(links("192.0.2.53", 1500, null)))
++    }
++
++    /* ------------------------------ 2. exit verification ------------------------------ */
++
++    private fun egressProxy(code: () -> Int): MockWebServer = server { request ->
++        if (request.requestLine.startsWith("GET http://egress.invalid/generate_204")) MockResponse().setResponseCode(code())
++        else MockResponse().setResponseCode(400)
++    }.also { proxy ->
++        prefs.edit().putInt("proxyControllerPort", proxy.port - MihomoStartupConfig.EGRESS_PROBE_PORT_OFFSET)
++            .putLong("proxyRootLastStartupAt", System.currentTimeMillis() - 60_000L).commit()
++    }
++
++    @Test fun exitCheckThroughThePolicyListenerVerifiesThisRuntime() = runBlocking {
++        var code = 204
++        val proxy = egressProxy { code }
++        val repository = ProxyDashboardRepository(app).apply { egressTargets = listOf("http://egress.invalid/generate_204") }
++        assertFalse(HomeEgress.verified(prefs))
++        assertTrue(HomeEgress.due(prefs, System.currentTimeMillis()))
++        assertEquals(true, repository.verifyEgress())
++        assertEquals(1, proxy.requestCount)
++        assertEquals("reachable", prefs.getString("proxyPolicyEgressState", ""))
++        assertTrue(HomeEgress.verified(prefs))
++        assertFalse("A fresh success is cached", HomeEgress.due(prefs, System.currentTimeMillis()))
++        assertTrue("…and rechecked after ten minutes", HomeEgress.due(prefs, System.currentTimeMillis() + HomeEgress.RECHECK_MS + 1))
++
++        code = 503
++        assertEquals("A dead exit withdraws the earlier success", false, repository.verifyEgress())
++        assertEquals("unverified", prefs.getString("proxyPolicyEgressState", ""))
++        assertFalse(HomeEgress.verified(prefs))
++        val before = prefs.all
++        assertEquals(false, repository.verifyEgress())
++        assertEquals("Nothing to withdraw: no write", before, prefs.all)
++    }
++
++    @Test fun anOlderRuntimesVerificationOrAStoppedCoreIsNotVerified() = runBlocking {
++        prefs.edit().putString("proxyPolicyEgressState", "reachable").putLong("proxyRootEgressVerifiedAt", 1_000L)
++            .putLong("proxyRootLastStartupAt", 2_000L).commit()
++        assertFalse("Verified before this core started", HomeEgress.verified(prefs))
++        prefs.edit().putBoolean("proxyRootRuntimeRunning", false).commit()
++        val repository = ProxyDashboardRepository(app).apply { egressTargets = listOf("http://egress.invalid/generate_204") }
++        assertNull(repository.verifyEgress())
++    }
++
++    @Test fun homeCardShowsVerifiedOnlyAfterLocalAndExitChecks() {
++        val local = HomeConnectionObservation(controllerReady = true, takeoverHealthy = true)
++        assertEquals(HomeConnectionHealth.LocalReady, local.health)
++        assertEquals("接管检查通过 · 出口未验证", local.health.caption)
++        val verified = local.copy(egressVerified = true)
++        assertEquals(HomeConnectionHealth.Verified, verified.health)
++        assertEquals("接管检查通过 · 出口已验证", verified.health.caption)
++        assertEquals("Exit success never hides a degraded takeover",
++            HomeConnectionHealth.TakeoverDegraded, verified.copy(takeoverHealthy = false).health)
++        assertEquals(HomeConnectionHealth.ControllerUnavailable, verified.copy(controllerReadFailed = true).health)
++    }
++
++    /* ------------------------------ 3. cold-open strategy cards ------------------------------ */
++
++    @Test fun coldOpenShowsLiveGroupsBeforeRootStatusButStaysReadOnly() {
++        val requests = Collections.synchronizedList(mutableListOf<String>())
++        val api = server { request ->
++            requests += request.requestUrl!!.encodedPath
++            MockResponse().setBody(when (request.requestUrl!!.encodedPath) {
++                "/configs" -> """{"mode":"rule"}"""
++                "/proxies" -> """{"proxies":{"Route":{"type":"Selector","now":"other","all":["node","other"]},"node":{"type":"Shadowsocks"},"other":{"type":"Shadowsocks"}}}"""
++                "/providers/proxies" -> """{"providers":{}}"""
++                "/connections" -> """{"connections":[]}"""
++                "/version" -> """{"version":"fixture"}"""
++                else -> "{}"
++            })
++        }
++        useApi(api)
++        val config = "cold-open-98"
++        StrategySnapshotCache.write(app, config, listOf(ProxyGroupUi("Route", "Selector", "node",
++            listOf(ProxyNodeUi("node"), ProxyNodeUi("other")))))
++        eventually("Cache written") { File(app.noBackupFilesDir, "strategy-groups-v1.json").isFile }
++        prefs.edit().putBoolean("proxyUiLastRunning", true).putString("proxyUiLastConfig", config)
++            .putString(StrategySnapshotCache.PREF_KEY, config).commit()
++        val entered = CountDownLatch(1); val release = gate()
++        ControllerRunState90Shadows.RootStatus.reply = """{"ok":true,"running":true,"pid":77,"dataPlaneHealthy":true}"""
++        ControllerRunState90Shadows.RootStatus.entered = entered
++        ControllerRunState90Shadows.RootStatus.gate = release
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77)
++        val vm = HetuViewModel(app).also { vms += it }
++        assertEquals("First frame: cached cards", "node", vm.state.groups.single().now)
++        assertFalse(vm.state.panelReady)
++        val job = vm.viewModelScope.launch { vm.refreshNow() }
++        assertTrue(entered.await(5, TimeUnit.SECONDS))
++        eventually("Live controller list replaces the cache while Root status is still running") {
++            vm.state.groups.singleOrNull()?.now == "other"
++        }
++        assertFalse("Still not an authoritative snapshot", vm.state.panelReady)
++        assertFalse("Only display reads before status", requests.any { it == "/connections" || it == "/configs" })
++        val before = requests.size
++        vm.select("Route", "node"); vm.testGroup(vm.state.groups.single())
++        shadowOf(Looper.getMainLooper()).idle()
++        assertTrue(vm.pendingSelection.isEmpty()); assertTrue(vm.testingGroups.isEmpty())
++        assertEquals("Read-only until confirmed", before, requests.size)
++        release.countDown()
++        eventually("Confirmed snapshot follows") { job.isCompleted && vm.state.panelReady }
++        assertEquals("other", vm.state.groups.single().now)
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt

@@ -151,6 +151,29 @@ internal class ProxyComposeController(context: Context) {
             observation.continuityObservationTicket, observation.continuityObservationSession,
             observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
+    /**
+     * Display-only cold-open read: strategy groups straight from the controller
+     * endpoint the app already holds (loopback + its own secret, or the user's
+     * custom API), overlapping the Root status script instead of waiting for it.
+     * It never sets panelReady, never writes preferences and cannot confirm a
+     * selection; the ViewModel shows it only in place of the restored cache.
+     */
+    suspend fun previewGroups(): List<ProxyGroupUi> = withContext(Dispatchers.IO) {
+        if (!ProxyStatusBridge.rootProxyRunning(app) && !prefs.getBoolean("proxyCustomApiEnabled", false))
+            return@withContext emptyList()
+        val profile = ProxyRuntimeProfile.load(prefs)
+        val iconMap = try {
+            configs.selected(profile.core)?.let { groupIconsFor(it) } ?: emptyMap()
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { emptyMap() }
+        val snapshot = controllerSnapshotOperation {
+            val proxies = async { api.proxies() }
+            val providers = async { api.proxyProviders() }
+            listOf(proxies.await(), providers.await())
+        }
+        parseGroups(mergeProxySnapshots(snapshot[0], snapshot[1]), iconMap)
+    }
+
     suspend fun state(): ProxyComposeState = withContext(Dispatchers.IO) {
         val profile = ProxyRuntimeProfile.load(prefs)
         val selected = configs.selected(profile.core)
@@ -304,17 +327,32 @@ internal class ProxyComposeController(context: Context) {
             try {
                 // Independent reads overlap, but publication still requires every
                 // response and the original runtime observation ownership below.
-                val snapshot = controllerSnapshotOperation {
-                    val config = async { api.configs() }
-                    val proxies = async { api.proxies() }
-                    val providers = async { api.proxyProviders() }
-                    val connections = async { api.connections() }
-                    listOf(config.await(), proxies.await(), providers.await(), connections.await())
-                }
+                // The /proc/net UID fallback is a Root shell. It used to run after the
+                // controller reads on every poll, delaying the strategy cards by a
+                // whole su round trip. When the last snapshot needed it, overlap it
+                // with the controller reads; otherwise reuse a recent map, and never
+                // hold the first fresh read for it (app names fill in next poll).
+                val uidPrefetch = if (uidFallbackHint) async { readSocketUidMap() } else null
+                val snapshot = try {
+                    controllerSnapshotOperation {
+                        val config = async { api.configs() }
+                        val proxies = async { api.proxies() }
+                        val providers = async { api.proxyProviders() }
+                        val connections = async { api.connections() }
+                        listOf(config.await(), proxies.await(), providers.await(), connections.await())
+                    }
+                } catch (error: Throwable) { uidPrefetch?.cancel(); throw error }
                 val freshMode = snapshot[0].optString("mode", "")
                 val freshGroups = parseGroups(mergeProxySnapshots(snapshot[1], snapshot[2]), iconMap)
                 val rawConnections = snapshot[3]
-                val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
+                val needsUids = needsSocketUidFallback(rawConnections)
+                uidFallbackHint = needsUids
+                val socketUids = when {
+                    !needsUids -> { uidPrefetch?.cancel(); emptyMap() }
+                    uidPrefetch != null -> uidPrefetch.await().also { if (it.isNotEmpty()) { cachedUids = it; cachedUidsAt = android.os.SystemClock.elapsedRealtime() } }
+                    android.os.SystemClock.elapsedRealtime() - cachedUidsAt in 0L..15_000L -> cachedUids
+                    else -> emptyMap()
+                }
                 val freshConnections = parseConnections(rawConnections, socketUids)
                 // One complete controller snapshot. Partial reads cannot acknowledge a
                 // selection or publish the absent counters as a fresh zero measurement.
@@ -691,6 +729,10 @@ internal class ProxyComposeController(context: Context) {
     }
 
     private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
+
+    @Volatile private var uidFallbackHint = false
+    @Volatile private var cachedUids: Map<String, Int> = emptyMap()
+    @Volatile private var cachedUidsAt = Long.MIN_VALUE / 2
 
     private fun needsSocketUidFallback(root: JSONObject): Boolean {
         val array = root.optJSONArray("connections") ?: return false

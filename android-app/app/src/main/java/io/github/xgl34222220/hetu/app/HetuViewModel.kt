@@ -402,7 +402,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
             while (isActive) {
-                if (operation == null) refreshNow()
+                if (operation == null) {
+                    refreshNow()
+                    maybeVerifyEgress()
+                }
                 delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
             }
         }
@@ -414,6 +417,36 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         foregroundGeneration++
         pollJob?.cancel()
         pollJob = null
+    }
+
+    /* ---------------- exit (Internet) verification ---------------- */
+    /** True once a generate_204 answered through this runtime's policy listener. */
+    var egressVerified by mutableStateOf(io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs))
+        private set
+    private var egressCheck: Job? = null
+    private var lastEgressAttemptAt = 0L
+
+    /**
+     * Runs the cheap exit check automatically: right after a start settles and
+     * whenever the app is open with a running core that is not yet verified for
+     * this runtime (or the last success is over ten minutes old). Never blocks a
+     * poll; a failed attempt waits 30 s before the next try.
+     */
+    private fun maybeVerifyEgress() {
+        egressVerified = io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs)
+        if (!state.running || operation != null || egressCheck?.isActive == true) return
+        if (!io.github.xgl34222220.hetu.home.HomeEgress.due(prefs, System.currentTimeMillis())) return
+        val now = SystemClock.elapsedRealtime()
+        if (lastEgressAttemptAt > 0L && now - lastEgressAttemptAt in 0L until 30_000L) return
+        val request = activeRuntimeRequest() ?: return
+        lastEgressAttemptAt = now
+        egressCheck = viewModelScope.launch {
+            try { repo.verifyEgress() }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (_: Exception) { }
+            if (currentRuntimeRequest(request, requireRunning = false))
+                egressVerified = io.github.xgl34222220.hetu.home.HomeEgress.verified(prefs)
+        }
     }
 
     private fun initialState(): ProxyComposeState {
@@ -487,7 +520,20 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
         try {
             val startedAt = SystemClock.elapsedRealtime()
-            val next = repo.state()
+            // Cold open: the restored cards are already on the first frame. Overlap
+            // the Root status script with a display-only controller read so the
+            // cards show the live list as soon as the controller answers. They stay
+            // non-authoritative (panelReady false, actions refused) until the
+            // confirmed read below replaces them.
+            val preview = if (showingRestoredGroups()) viewModelScope.launch {
+                val live = try { repo.previewGroups() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { emptyList() }
+                if (live.isNotEmpty() && showingRestoredGroups() && state === expectedState && operation == operationBefore) {
+                    restoredGroups = live
+                    state = state.copy(groups = live)
+                    expectedState = state
+                }
+            } else null
+            val next = try { repo.state() } finally { preview?.cancel() }
             // A later stop/config/state update owns the UI. The next fresh poll can still apply.
             if (superseded()) return null
             // The existing worker status read supplies authority. A cached
