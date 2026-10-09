@@ -132,11 +132,14 @@ internal data class HomeConnectionObservation(
     /** Null until a real local runtime health record exists; true does not prove Internet access. */
     val takeoverHealthy: Boolean? = null,
     val runtimeMessage: String = "",
+    /** A generate_204 answered through the running core's policy listener for this runtime. */
+    val egressVerified: Boolean = false,
 ) {
     val health: HomeConnectionHealth get() = when {
         controllerReadFailed -> HomeConnectionHealth.ControllerUnavailable
         takeoverHealthy == false -> HomeConnectionHealth.TakeoverDegraded
         !controllerReady || takeoverHealthy == null -> HomeConnectionHealth.Unconfirmed
+        egressVerified -> HomeConnectionHealth.Verified
         else -> HomeConnectionHealth.LocalReady
     }
 }
@@ -146,6 +149,29 @@ internal enum class HomeConnectionHealth(val caption: String) {
     ControllerUnavailable("控制接口异常 · 连接状态未确认"),
     TakeoverDegraded("接管检查异常 · 出口未验证"),
     LocalReady("接管检查通过 · 出口未验证"),
+    Verified("接管检查通过 · 出口已验证"),
+}
+
+/**
+ * Exit (Internet) verification for the home card. Written by the app's own cheap
+ * check or by the network service's probe; valid only for the current runtime.
+ */
+internal object HomeEgress {
+    const val RECHECK_MS = 10 * 60_000L
+
+    fun verifiedAt(prefs: android.content.SharedPreferences): Long {
+        val at = prefs.getLong("proxyRootEgressVerifiedAt", 0L)
+        val startup = prefs.getLong("proxyRootLastStartupAt", 0L)
+        return if (at > 0L && at >= startup && prefs.getString("proxyPolicyEgressState", "") == "reachable") at else 0L
+    }
+
+    fun verified(prefs: android.content.SharedPreferences): Boolean = verifiedAt(prefs) > 0L
+
+    /** Due when never verified for this runtime, or the last success is older than [RECHECK_MS]. */
+    fun due(prefs: android.content.SharedPreferences, nowWall: Long): Boolean {
+        val at = verifiedAt(prefs)
+        return at <= 0L || nowWall - at !in 0L..RECHECK_MS
+    }
 }
 
 internal data class HomeUiState(

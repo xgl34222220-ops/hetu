@@ -1,6 +1,8 @@
 package io.github.xgl34222220.hetu.panel
 
+import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -30,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
@@ -161,7 +164,8 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val expanded = group.name in view.expandedGroups
     val compact = view.layout.compactGroups
     val testing = group.name in data.testingGroups || data.testingAll
-    val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
+    // Only this group's own 测速 (or 测试全部) marks the card; shared nodes keep their last reading.
+    val delay = if (testing) PanelDelay.Testing else data.cardDelayOf(group.now)
     val pending = data.switching[group.name]
     val leaf = data.leafOf(group.now)
     val currentName = HomeRegions.withoutFlag(group.now)
@@ -201,8 +205,8 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
                     panelHighlight(currentName, view.needle), Modifier.weight(1f, fill = !wide || separateCurrent),
                     color = c.t1, style = PanelType.groupNow, maxLines = 1, overflow = TextOverflow.Ellipsis,
                 )
-                if (!separateCurrent) {
-                    if (pending != null) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
+                if (!separateCurrent) PanelSwapFade(pending != null, motion) { busy ->
+                    if (busy) Box(Modifier.size(40.dp), contentAlignment = Alignment.BottomEnd) { HomeSpinner(size = 16.dp) }
                     else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
                 }
             }
@@ -211,8 +215,10 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
             Column(m, verticalArrangement = Arrangement.spacedBy(2.dp)) {
                 nodeName(Modifier.fillMaxWidth())
                 Box(Modifier.align(Alignment.End).heightIn(min = 40.dp), contentAlignment = Alignment.BottomEnd) {
-                    if (pending != null) HomeSpinner(size = 16.dp)
-                    else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
+                    PanelSwapFade(pending != null, motion) { busy ->
+                        if (busy) HomeSpinner(size = 16.dp)
+                        else PanelDelayLabel(delay, onClick = onTest, onCard = true, onClickLabel = "测速本组")
+                    }
                 }
             }
         } else {
@@ -270,6 +276,9 @@ private fun GroupTile(group: PanelGroup) {
 private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (String) -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
+    val motion = LocalHomeMotionEnabled.current
+    // A running group test reads as a quieter, non-interactive control rather than a live button.
+    val busyAlpha by animateFloatAsState(if (testing) .72f else 1f, HomeMotion.fade(motion), label = "nodesHeaderBusy")
     Row(
         Modifier.panelGutter().fillMaxWidth()
             .background(c.surface, RoundedCornerShape(topStart = PanelDims.nodesShape, topEnd = PanelDims.nodesShape))
@@ -283,11 +292,14 @@ private fun NodesHeader(group: PanelGroup, testing: Boolean, onTestGroup: (Strin
         Row(
             Modifier.heightIn(min = 44.dp).clip(PanelDims.tabShape)
                 .homeTap(enabled = !testing, onClickLabel = ht("测试该组全部节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onTestGroup(group.name) }
-                .padding(horizontal = 10.dp),
+                .padding(horizontal = 10.dp)
+                .graphicsLayer { alpha = busyAlpha },
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            if (testing) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
+            PanelSwapFade(testing, motion) { busy ->
+                if (busy) HomeSpinner(size = 18.dp) else Icon(PanelIcons.Gauge, null, Modifier.size(20.dp), tint = c.accent)
+            }
             Text(ht(if (testing) "测速中" else "测速"), color = c.accent, style = HomeType.buttonSmall)
         }
     }
@@ -352,8 +364,10 @@ private fun NodeCard(
                 node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
                 maxLines = if (view.layout.wrapNames) 3 else 2, overflow = TextOverflow.Ellipsis,
             )
-            if (switching) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)
-            else HomePop(selected, Modifier.padding(end = 2.dp)) { HomeCheckMark(true, size = 20.dp) }
+            PanelSwapFade(switching, motion) { busy ->
+                if (busy) HomeSpinner(Modifier.padding(top = 2.dp, end = 2.dp), size = 18.dp)
+                else HomePop(selected, Modifier.padding(end = 2.dp)) { HomeCheckMark(true, size = 20.dp) }
+            }
         }
     }
     if (compact) {
@@ -374,4 +388,14 @@ private fun NodeCard(
             }
         }
     }
+}
+
+/**
+ * Cross-fades a busy marker and its settled content in place. With motion off it is the plain
+ * branch, so reduced-motion layouts, semantics and touch targets are exactly the unanimated ones.
+ */
+@Composable
+private fun PanelSwapFade(busy: Boolean, motion: Boolean, content: @Composable (Boolean) -> Unit) {
+    if (!motion) { content(busy); return }
+    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 }

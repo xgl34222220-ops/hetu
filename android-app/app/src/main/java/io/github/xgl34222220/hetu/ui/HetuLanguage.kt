@@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
 重新启动|Start again|重新啟動|Запустить снова
 错误详情|Error details|錯誤詳情|Сведения об ошибке
 测速中|Testing|測速中|Проверка
+同步中|Syncing|同步中|Синхронизация
+正在同步核心最新状态|Syncing the latest core state|正在同步核心最新狀態|Синхронизация текущего состояния ядра
 测速|Test|測速|Проверить
 没有策略组|No proxy groups|沒有策略群組|Нет групп прокси
 当前配置没有可显示的策略组|This configuration has no proxy groups to show|目前設定沒有可顯示的策略群組|В этой конфигурации нет групп для отображения
@@ -969,6 +971,7 @@ private val vocabularyConnection = """
 控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
+接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
 """.trimIndent()
 
 private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")

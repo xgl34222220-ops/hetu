@@ -58,6 +58,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             controllerError = vm.state.controllerError,
             takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
             runtimeMessage = vm.state.message,
+            egressVerified = vm.state.running && vm.egressVerified,
         ),
     )
 }

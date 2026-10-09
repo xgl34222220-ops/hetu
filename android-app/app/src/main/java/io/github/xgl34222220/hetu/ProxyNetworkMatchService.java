@@ -412,6 +412,27 @@ public final class ProxyNetworkMatchService extends Service {
     }
     @Override public android.os.IBinder onBind(Intent i){return null;}
 
+    /**
+     * Route identity of a physical link. LinkProperties.toString() also carries
+     * data that does not change where packets go (MTU, TCP buffer sizes, NAT64
+     * discovery, captive-portal/PCSCF/wake-on-LAN details). Any re-announcement of
+     * those advanced the network epoch, which voids in-flight speed tests, the
+     * egress state and status reads on an unchanged network. Only the interface,
+     * addresses, DNS, routes, private DNS and HTTP proxy count.
+     */
+    static String linkSignature(LinkProperties links){
+        if(links==null||links.getInterfaceName()==null)return null;
+        java.util.TreeSet<String> addresses=new java.util.TreeSet<>(),dns=new java.util.TreeSet<>(),routes=new java.util.TreeSet<>();
+        for(android.net.LinkAddress a:links.getLinkAddresses())
+            if(a!=null&&a.getAddress()!=null)addresses.add(a.getAddress().getHostAddress()+"/"+a.getPrefixLength());
+        for(java.net.InetAddress d:links.getDnsServers())if(d!=null)dns.add(d.getHostAddress());
+        for(android.net.RouteInfo r:links.getRoutes())if(r!=null)
+            routes.add(r.getDestination()+">"+(r.getGateway()==null?"":r.getGateway().getHostAddress())+"@"+r.getInterface());
+        String privateDns=Build.VERSION.SDK_INT>=28?links.isPrivateDnsActive()+":"+links.getPrivateDnsServerName():"";
+        return links.getInterfaceName()+"|"+addresses+"|"+dns+"|"+routes+"|"+privateDns
+                +"|"+(links.getHttpProxy()==null?"":links.getHttpProxy().toString());
+    }
+
     private void register(){
         cb=new ConnectivityManager.NetworkCallback(){
             @Override public void onAvailable(Network n){
@@ -436,8 +457,7 @@ public final class ProxyNetworkMatchService extends Service {
                 });
             }
             @Override public void onLinkPropertiesChanged(Network n,LinkProperties links){
-                networkChanged("links",()->networkEvents.links(n,
-                        links.getInterfaceName()==null?null:links.toString()));
+                networkChanged("links",()->networkEvents.links(n,linkSignature(links)));
             }
             @Override public void onBlockedStatusChanged(Network n,boolean blocked){
                 networkChanged("blocked",()->{networkEvents.blocked(n,blocked);networkState.blocked(n,blocked);});
