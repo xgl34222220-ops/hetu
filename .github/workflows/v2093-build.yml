@@ -328,7 +328,9 @@ jobs:
       timeout-minutes: 20
       run: 'set -euo pipefail
 
-        python3 tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
+        python3 .github/scripts/test_continuity93_network_soak.py -v
+
+        python3 .github/scripts/run_continuity93_network_soak.py --driver tools/qa/run_network_soak90.py --duration 900 --interval 3 --output out/verification/network-model-soak90
 
         '
     - name: Preserve bounded exact current JUnit failure details in job logs

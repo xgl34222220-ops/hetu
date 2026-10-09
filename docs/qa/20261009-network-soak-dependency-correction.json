@@ -1,0 +1,55 @@
+{
+  "failedCommit": "1486d3ddaf8a09d60b68b5bba39ae8bb34da3add",
+  "failedRun": 37861617801,
+  "failedJob": 113598462834,
+  "actualAndroidTests": 724,
+  "actualXmlFiles": 79,
+  "androidFailures": 0,
+  "supplementalTests": 36,
+  "supplementalFailures": 0,
+  "stage": "javac before any sustained network sample",
+  "reproducedCompilerError": "cannot find symbol class LatencyProbeBudget (20 javac errors)",
+  "correction": "Current-layer adapter adds only the new dependency to the original Java copy/hash inventory. Historical driver and every harness assertion remain unchanged. Captured compiler stderr is now retained.",
+  "productionSourceChanged": false,
+  "localAdapterNegativeTestsPassed": 4,
+  "localShortSmoke": {
+    "schema": 1,
+    "startedAt": "2026-10-09T00:35:04.836572+00:00",
+    "completedAt": "2026-10-09T00:35:14.428841+00:00",
+    "requestedDurationSeconds": 6.0,
+    "processWallTimeSeconds": 6.41575816499244,
+    "intervalSeconds": 0.5,
+    "sourcesSha256": {
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "437d34d506bf50b75e986f4cf43c8466f507de09bd412ce3fa570c929628eea9",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "6069c72b75a4568ec31d74b6c82f3fb3f04fcc7176219afff38a1983d840ebad",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkEpoch.java": "d28195df0a5cbd218ae54fd5cf8bca1ab6b4dd40cf4c0c45aa0bda514f9a0092",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyTaskCoalescer.java": "22105a0a75b4f491ee7303bef787c50608b4315d9bce9d6b6b202d8c2bd99895",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkState.java": "edb4ea96a77c5bf9a5989e19eaec25ee0eea5bc2835b8f21ada204437825e6ca",
+      "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "43018298725f0163e59d61eec00d2dc6d8fdb8af0f4d92417d8d175b7cfd3adf",
+      "fetchEgressCodeMethodSha256": "82c57967769e25b7b0a4ec54068b90bfcdd277766063e74f65852ae7cc14c43a"
+    },
+    "javaExit": 0,
+    "actualScope": [
+      "Verbatim production MihomoControllerClient socket/auth/timeout path",
+      "Verbatim production fetchEgressCode HTTP explicit-proxy method",
+      "Verbatim production NetworkEpoch and ProxyNetworkState reducers",
+      "Verbatim production ProxyTaskCoalescer repeated-operation queue"
+    ],
+    "boundary": "Host fixture with Android preference/context shims and local HTTP controller/proxy. Not Android service, Root firewall, Mihomo core, radio handover, public internet, Google/GMS, subscription or device evidence.",
+    "samplesSha256": "099ab5da86ca0947f95decbe2b3a60cbcad9cfe39f246ba17edf4463666145f6",
+    "socketEventsSha256": "06504368d39f9de98b12816fafa9f0beb2547a7f7e84b9ccdaaf3cf01f6fce36",
+    "result": {
+      "cycles": 12,
+      "wallTimeMs": 6205,
+      "healthyControllerResponses": 12,
+      "proxy204Responses": 12,
+      "expected401Failures": 3,
+      "expectedTimeouts": 2,
+      "lateResultsRejectedByActualEpoch": 2,
+      "blockedOfflineReconnectModelCycles": 2,
+      "maximumRecoveryTasksQueued": 1,
+      "failures": 0
+    }
+  },
+  "full900SecondsVerifiedForNewCandidate": false
+}
