@@ -565,7 +565,7 @@ class ConceptStateCoverageTest {
     @Test fun corePickerKeepsRuntimeSelectionAndThreeCards() {
         val original = ProxyRuntimeProfile.load(vm.prefs).core
         show { CoresScreen(vm) {} }
-        expect("Mihomo"); expect("Xray"); expect("sing-box")
+        expectEventually("Mihomo"); expect("Xray"); expect("sing-box")
         capture("03A-034-core-three-cards")
         touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
         capture("core-mihomo-variant-picker")

@@ -36,6 +36,7 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'StartupConfigViewer.kt', PACKAGE + 'ProxyDashboardRepository.kt',
     PACKAGE + 'MihomoControllerClient.java', PACKAGE + 'LatencyProbeBudget.java',
     PACKAGE + 'LatencyProbeOperation.kt',
+    PACKAGE + 'ProxyScriptsActivity.kt',
     PACKAGE + 'ProxyComposeController.kt', PACKAGE + 'ProxyStatusBridge.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
@@ -130,16 +131,30 @@ def recovered_artifacts(root=ROOT):
     return expected
 
 
+CORE_READY_FIXTURE = TEST_ROOT + 'java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt'
+
+
+def validate_initial_core_ready_wait(before, after):
+    # The page loads its three cards on IO; retain all old assertions and the
+    # existing five-second bound, changing only the first readiness wait.
+    old = 'show { CoresScreen(vm) {} }\n        expect("Mihomo"); expect("Xray"); expect("sing-box")'
+    new = 'show { CoresScreen(vm) {} }\n        expectEventually("Mihomo"); expect("Xray"); expect("sing-box")'
+    assert before.count(old) == 1
+    assert after == before.replace(old, new, 1), 'Core picker fixture changed beyond the initial async-ready wait'
+
+
 def validate_baseline_test_sources(root=ROOT):
     root = Path(root)
     predecessor, previous = predecessor_layer(root)
     # Preserve every pre-existing Android test file, including unselected old
-    # suites. The exact runtime revision contract is the only explicit exception.
+    # suites. The exact runtime revision contract and initial async-ready wait are the only explicit exceptions.
     for name in sorted(name for name in previous if name.startswith(TEST_ROOT)):
         before = committed_bytes(name, root)
         current = (root / name).read_bytes()
         if name == REVISION_TEST:
             validate_revision_test(before.decode(), current.decode())
+        elif name == CORE_READY_FIXTURE:
+            validate_initial_core_ready_wait(before.decode(), current.decode())
         else:
             assert current == before, 'Retained 644 test source/fixture/assertion changed: ' + name
     for name in ('CompactHomeDashboardTest.kt', 'Ui92IntegrationTest.kt', 'NodeSelectionContinuityTest.kt'):

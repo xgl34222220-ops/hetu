@@ -179,25 +179,26 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
             }
         },
     ) {
-        // The outcome of the last action sits right under the bar, where it cannot be missed.
-        if (message.isNotBlank()) {
-            item("feedback") {
-                HetuTaskFeedback(message, error = messageError, busy = busy, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
-            }
-        }
+        // Keep feedback in the existing first item. Inserting a new keyed item before
+        // "hooks" after an IO result would preserve that anchor and hide feedback above it.
         item("hooks") {
-            SettingsSection {
-                SettingsGroup {
-                    entries.forEach { entry ->
-                        SettingsNavRow(
-                            ht(entry.title),
-                            icon = if (entry.path == ProxyScriptHooks.PRE_START) HxIcons.CirclePlay else HxIcons.CircleStop,
-                            value = ht(if (fixedStatus[entry.path] == true) "已设置" else "不设置"),
-                            dropdown = true,
-                        ) { open(entry) }
-                        SettingsDivider()
+            Column {
+                if (message.isNotBlank()) {
+                    HetuTaskFeedback(message, error = messageError, busy = busy, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
+                }
+                SettingsSection {
+                    SettingsGroup {
+                        entries.forEach { entry ->
+                            SettingsNavRow(
+                                ht(entry.title),
+                                icon = if (entry.path == ProxyScriptHooks.PRE_START) HxIcons.CirclePlay else HxIcons.CircleStop,
+                                value = ht(if (fixedStatus[entry.path] == true) "已设置" else "不设置"),
+                                dropdown = true,
+                            ) { open(entry) }
+                            SettingsDivider()
+                        }
+                        SettingsNavRow(ht("脚本环境"), icon = ToolsIcons.SquareTerminal) { environment = true }
                     }
-                    SettingsNavRow(ht("脚本环境"), icon = ToolsIcons.SquareTerminal) { environment = true }
                 }
             }
         }

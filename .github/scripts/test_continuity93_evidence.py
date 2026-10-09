@@ -111,6 +111,16 @@ class Continuity93EvidenceTests(unittest.TestCase):
         self.assertNotIn('  push:', old, 'Only the current workflow should run on push')
         self.assertIn('workflow_dispatch:', old)
 
+    def test_core_picker_sync_cannot_remove_assertions_or_extend_wait_budget(self):
+        before = scope.committed_bytes(scope.CORE_READY_FIXTURE).decode()
+        after = (scope.ROOT / scope.CORE_READY_FIXTURE).read_text()
+        scope.validate_initial_core_ready_wait(before, after)
+        for invalid in (before, after.replace('expect("Xray")', 'Unit'),
+                        after.replace('5_000_000_000L', '50_000_000_000L'),
+                        after.replace('assertEquals', 'assertNotEquals')):
+            with self.assertRaises(AssertionError):
+                scope.validate_initial_core_ready_wait(before, invalid)
+
     def test_same_source_api35_and_api36_are_preserved(self):
         text = (scope.ROOT / '.github/workflows/v2093-build.yml').read_text()
         self.assertIn("HETU_EXPECTED_VERSION: '2093'", text)

@@ -1,17 +1,20 @@
 {
   "oldCommit": "b6ab1210f8c98c9042baabc0a3d6928d85d2566f",
-  "newRequiredInputs": 422,
+  "newRequiredInputs": 423,
   "oldTestsPreserved": 707,
-  "newTests": 17,
-  "expectedUnitTests": 724,
-  "expectedXmlFiles": 79,
+  "newTests": 19,
+  "expectedUnitTests": 726,
+  "expectedXmlFiles": 80,
+  "oldTestSourceException": "Exact initial Mihomo ready wait only; all assertions and existing5-second bound preserved",
   "supplementalTestsUnchanged": 36,
-  "patchSha256": "e6adba67d6af0c64cf5eca0daeaf94ce13ff0a229013b5d62b8623fb50817166",
+  "patchSha256": "ff196cf8966e1e733dd34eaf61361591ab3f580a3fec08827ee22cf443aee9dd",
   "forwardReverseByteProof": true,
   "androidTestsRunLocally": false,
   "changedExisting": [
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt"
@@ -20,6 +23,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/ScriptFeedbackPlacement94Test.kt"
   ]
 }
