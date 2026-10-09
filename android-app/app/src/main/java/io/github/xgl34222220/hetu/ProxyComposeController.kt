@@ -302,9 +302,18 @@ internal class ProxyComposeController(context: Context) {
 
         if (running) {
             try {
-                val freshMode = api.configs().optString("mode", "")
-                val freshGroups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
-                val rawConnections = api.connections()
+                // Independent reads overlap, but publication still requires every
+                // response and the original runtime observation ownership below.
+                val snapshot = coroutineScope {
+                    val config = async { api.configs() }
+                    val proxies = async { api.proxies() }
+                    val providers = async { api.proxyProviders() }
+                    val connections = async { api.connections() }
+                    listOf(config.await(), proxies.await(), providers.await(), connections.await())
+                }
+                val freshMode = snapshot[0].optString("mode", "")
+                val freshGroups = parseGroups(mergeProxySnapshots(snapshot[1], snapshot[2]), iconMap)
+                val rawConnections = snapshot[3]
                 val socketUids = if (needsSocketUidFallback(rawConnections)) readSocketUidMap() else emptyMap()
                 val freshConnections = parseConnections(rawConnections, socketUids)
                 // One complete controller snapshot. Partial reads cannot acknowledge a

@@ -343,11 +343,18 @@ internal class ProxyDashboardRepository(context: Context) {
 
     private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
-        for (chunk in targets.distinct().chunked(6)) {
-            coroutineContext.ensureActive()
-            if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
-            coroutineScope {
-                chunk.map { node -> async {
+        val pending = targets.distinct()
+        val next = java.util.concurrent.atomic.AtomicInteger()
+        // A fixed worker pool keeps the six-request limit without a batch barrier:
+        // each free worker can reach later healthy nodes while a sibling is slow.
+        coroutineScope {
+            List(minOf(6, pending.size)) { async {
+                while (true) {
+                    coroutineContext.ensureActive()
+                    if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
+                    val index = next.getAndIncrement()
+                    if (index >= pending.size) break
+                    val node = pending[index]
                     try {
                         val value = measuredProbe(node, snapshot)
                         coroutineContext.ensureActive()
@@ -357,8 +364,8 @@ internal class ProxyDashboardRepository(context: Context) {
                     // A controller/transport error has no new node measurement. Keep
                     // successful siblings and let callers retain this node's old value.
                     catch (_: IOException) { }
-                } }.awaitAll()
-            }
+                }
+            } }.awaitAll()
         }
         requireCurrentProbe(snapshot.identity)
         if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())

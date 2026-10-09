@@ -1,0 +1,31 @@
+{
+  "baselineCommit": "7585c2681cf6dbc7db9accea139ce25b4ced23cf",
+  "reportedVersionConfirmedByUser": true,
+  "scope": [
+    "Overlap four independent controller snapshot reads; retain complete-snapshot and generation publication guards",
+    "Replace six-leaf batch barriers with six reusable workers; retain metadata checkpoints, global12slots and20second operation budget",
+    "Cache independent panel presentation slices; preserve exact projected values, error/stop clearing and in-place map updates"
+  ],
+  "newTests": 13,
+  "priorTestsBytePreserved": 726,
+  "expectedTests": 739,
+  "expectedXmlFiles": 83,
+  "performanceEvidence": {
+    "firstSnapshot": "Real loopback HTTP; four-handler gate plus three alternating equal-delay timing samples",
+    "probeScheduling": "Real loopback HTTP; tail progresses while first leaf blocked; observed concurrency never exceeds6; previous batch reference timed",
+    "panelProjection": "100groups x300nodes,2000connections,10000rules; output parity, traversal/ref reuse assertions,15 alternating host timing samples"
+  },
+  "localAndroidExecution": false,
+  "performanceMeasurementsStatus": "Pending execution in this candidate CI; no speedup claimed from static analysis",
+  "limitations": [
+    "Host timings are not OEM phone FPS or thermal safety proof",
+    "Root observation remains required before authority is published",
+    "Selector server-side group probes still depend on controller/node responses"
+  ],
+  "unchanged": [
+    "Prior726 test bodies",
+    "Native payloads, Root scripts, dependencies, permission manifest and signing",
+    "Network/device security settings",
+    "Both900second acceptance durations"
+  ]
+}

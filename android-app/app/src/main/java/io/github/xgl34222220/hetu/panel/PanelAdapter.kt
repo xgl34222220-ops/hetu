@@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
 import io.github.xgl34222220.hetu.ProxyRuleUi
 import io.github.xgl34222220.hetu.ProxyRuntimeInspector
 import io.github.xgl34222220.hetu.RefLogEntry
-import io.github.xgl34222220.hetu.RefLogLevel
 import io.github.xgl34222220.hetu.RefPanelTab
 import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.home.HomeHaptic
@@ -43,9 +42,6 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.refParseLogs19
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.async
@@ -107,6 +103,7 @@ internal fun HetuPanelV2(
     val subscriptionUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
     val ruleSetUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
     val sampler = remember { PanelTrafficSampler() }
+    val projector = remember { PanelDataProjector() }
     val initialView = remember { loadView(prefs, selectorPrefs) }
     var latestView by remember { mutableStateOf(initialView) }
     val tab = PanelTab.entries.firstOrNull { it.name == selectedTab.name } ?: PanelTab.Groups
@@ -144,10 +141,10 @@ internal fun HetuPanelV2(
     LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
 
     val icons = remember(state.connections) { state.connections.mapNotNull { c -> c.appIcon?.let { c.packageName to it } }.toMap() }
-    val data = buildPanelData(
+    val data = projector.project(
         state = state, starting = starting, providers = providers, rules = rules, ruleSets = ruleSets, logs = logs,
         delays = delays, testing = testing, selectedLocal = selectedLocal,
-        subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, sampler = sampler,
+        subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, traffic = sampler.snapshot(),
     ).copy(refreshing = refreshing)
     val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
@@ -311,174 +308,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
 }
 
 /* ------------------------------------------------------------------ */
-/*  Mapping                                                             */
-/* ------------------------------------------------------------------ */
-
-private fun groupType(raw: String): String = when (raw.lowercase(Locale.ROOT)) {
-    "selector", "select" -> "Selector"
-    "urltest", "url-test" -> "URLTest"
-    "fallback" -> "Fallback"
-    "loadbalance", "load-balance" -> "LoadBalance"
-    else -> raw.ifBlank { "Group" }
-}
-
-private fun buildPanelData(
-    state: ProxyComposeState,
-    starting: Boolean,
-    providers: List<DashboardProviderUi>,
-    rules: List<ProxyRuleUi>,
-    ruleSets: List<DashboardRuleSetUi>,
-    logs: List<RefLogEntry>,
-    delays: Map<String, Long>,
-    testing: Map<String, Boolean>,
-    selectedLocal: Map<String, String>,
-    subscriptionUpdates: Map<String, PanelUpdate>,
-    ruleSetUpdates: Map<String, PanelUpdate>,
-    sampler: PanelTrafficSampler,
-    testingGroups: Set<String> = emptySet(),
-    testingAll: Boolean = false,
-    switching: Map<String, String> = emptyMap(),
-): PanelData {
-    if (!state.running) return PanelData(status = if (starting) PanelStatus.Starting else PanelStatus.NotRunning)
-    if (state.controllerReadFailed) return PanelData(status = PanelStatus.Running,
-        readError = state.controllerError.ifBlank { "控制接口读取失败，请重试或检查 API 设置" })
-    val groupNames = state.groups.mapTo(HashSet()) { it.name }
-    val groups = state.groups.map { g ->
-        PanelGroup(
-            name = g.name,
-            type = groupType(g.type),
-            nodes = g.nodes.map { n ->
-                val kind = when {
-                    n.name in groupNames -> PanelNodeKind.Group
-                    n.name.equals("DIRECT", true) || n.name.equals("REJECT", true) -> PanelNodeKind.Direct
-                    else -> PanelNodeKind.Proxy
-                }
-                PanelNode(n.name, if (kind == PanelNodeKind.Group) "策略组" else n.type, n.udp, n.provider, kind)
-            },
-            now = selectedLocal[g.name] ?: g.now,
-            hidden = g.hidden,
-            availableCount = g.nodes.count { (delays[it.name] ?: it.lastDelay ?: -1L) > 0L },
-        )
-    }
-    val nodeDelays = HashMap<String, PanelDelay>()
-    state.groups.forEach { g -> g.nodes.forEach { n -> if (n.name !in groupNames && n.lastDelay != null) nodeDelays[n.name] = panelDelayOf(n.lastDelay) } }
-    delays.forEach { (name, ms) -> nodeDelays[name] = panelDelayOf(ms) }
-    testing.keys.forEach { nodeDelays[it] = PanelDelay.Testing }
-
-    val rates = sampler.connectionRates
-    val connections = state.connections.map { c ->
-        val rate = rates[c.id]
-        val host = c.host
-        val bare = host.substringBeforeLast(':')
-        PanelConnection(
-            id = c.id,
-            host = host,
-            time = c.startedAt.takeIf { it.isNotBlank() },
-            timeLabel = formatStarted(c.startedAt),
-            network = c.network.substringBefore(" · ").uppercase(Locale.ROOT),
-            inbound = c.inbound,
-            kind = when {
-                bare.count { it == ':' } >= 2 -> "IPv6"
-                bare.all { it.isDigit() || it == '.' } -> "IPv4"
-                else -> "FQDN"
-            },
-            app = c.appName,
-            packageName = c.packageName,
-            // Mihomo lists the chain leaf-first; the panel shows group → node.
-            chain = c.chain.split(" → ").filter { it.isNotBlank() }.asReversed(),
-            rule = listOf(c.rule, c.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
-            uploadBytesPerSecond = rate?.first ?: 0L,
-            downloadBytesPerSecond = rate?.second ?: 0L,
-            uploadTotalBytes = c.upload,
-            downloadTotalBytes = c.download,
-        )
-    }
-    val tracked = providers.filter { it.hasSubscriptionInfo && it.total > 0L }
-    val ranks = connections.groupBy { it.app.ifBlank { "其他应用" } }.map { (app, items) ->
-        PanelRank(
-            app = app, packageName = items.first().packageName,
-            downloadBytesPerSecond = items.sumOf { it.downloadBytesPerSecond }, uploadBytesPerSecond = items.sumOf { it.uploadBytesPerSecond },
-            connections = items.size, totalBytes = items.sumOf { it.uploadTotalBytes + it.downloadTotalBytes },
-        )
-    }
-    return PanelData(
-        status = PanelStatus.Running,
-        globalMode = state.trafficMode.equals("global", ignoreCase = true),
-        groups = groups,
-        delays = nodeDelays,
-        // The core is up but the controller has not answered once yet: placeholders, not empty states.
-        loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
-        testingGroups = testingGroups,
-        testingAll = testingAll,
-        // Only a pick the core has not confirmed yet counts as switching.
-        switching = switching.filter { (group, node) -> state.groups.firstOrNull { it.name == group }?.now != node },
-        overview = PanelOverview(
-            strategyCount = groups.count { !it.hidden && !it.isGlobal },
-            ruleCount = rules.size,
-            connectionCount = connections.size,
-            subscription = if (tracked.isEmpty()) null else PanelOverviewSubscription(
-                usedBytes = tracked.sumOf { it.used }, totalBytes = tracked.sumOf { it.total },
-                expire = tracked.map { it.expire }.filter { it > 0L }.minOrNull()?.let(::formatExpire),
-                subscriptionCount = providers.size, nodeCount = providers.sumOf { it.nodes.size },
-            ),
-            uploadBytesPerSecond = sampler.upload, downloadBytesPerSecond = sampler.download,
-            uploadTotalBytes = state.uploadTotal, downloadTotalBytes = state.downloadTotal,
-            uploadTrend = sampler.uploadTrend.toList(), downloadTrend = sampler.downloadTrend.toList(),
-            ranks = ranks,
-        ),
-        subscriptions = providers.map { p ->
-            PanelSubscription(
-                name = p.name, expire = p.expire.takeIf { it > 0L }?.let(::formatExpire), updatedAt = formatUpdated(p.updatedAt),
-                uploadBytes = p.upload, downloadBytes = p.download, totalBytes = if (p.hasSubscriptionInfo) p.total else 0L,
-                update = subscriptionUpdates[p.name] ?: PanelUpdate.Idle,
-            )
-        },
-        connections = connections,
-        rules = rules.map { PanelRule(it.type, it.payload.ifBlank { if (it.type.equals("Match", true)) "所有其他流量" else "" }, it.proxy) },
-        ruleSets = ruleSets.map {
-            PanelRuleSet(it.name, it.ruleCount, it.behavior, it.format, it.vehicleType, formatUpdated(it.updatedAt), ruleSetUpdates[it.name] ?: PanelUpdate.Idle)
-        },
-        // refParseLogs19 returns oldest first; the panel model is newest first.
-        logs = logs.asReversed().map {
-            PanelLogEntry(
-                it.index,
-                when (it.level) {
-                    RefLogLevel.Debug -> PanelLogLevel.Debug
-                    RefLogLevel.Info -> PanelLogLevel.Info
-                    RefLogLevel.Warn -> PanelLogLevel.Warn
-                    RefLogLevel.Error -> PanelLogLevel.Error
-                },
-                it.time, it.message,
-            )
-        },
-    )
-}
-
-/** “2026-10-02T08:00:00.12Z” → the local clock time “16:00:00”; anything unparseable keeps its time part. */
-private fun formatStarted(raw: String): String? {
-    val value = raw.trim()
-    if (value.isEmpty()) return null
-    return try {
-        java.time.OffsetDateTime.parse(value).atZoneSameInstant(java.time.ZoneId.systemDefault()).toLocalTime()
-            .withNano(0).format(java.time.format.DateTimeFormatter.ISO_LOCAL_TIME)
-    } catch (_: Exception) {
-        if (value.length >= 19 && value[10] == 'T') value.substring(11, 19) else value
-    }
-}
-
-private fun formatExpire(expire: Long): String {
-    val millis = if (expire < 10_000_000_000L) expire * 1000L else expire
-    return SimpleDateFormat("yyyy-MM-dd", Locale.US).format(Date(millis))
-}
-
-/** “2026-10-01T20:30:11Z” → “10-01 20:30”; anything else is passed through; blank → null. */
-private fun formatUpdated(raw: String): String? {
-    val value = raw.trim()
-    if (value.isEmpty()) return null
-    return if (value.length >= 16 && value[4] == '-' && value[7] == '-') value.substring(5, 16).replace('T', ' ') else value.replace('T', ' ')
-}
-
-/* ------------------------------------------------------------------ */
 /*  Traffic sampling                                                    */
 /* ------------------------------------------------------------------ */
 
@@ -519,6 +348,8 @@ private class PanelTrafficSampler {
         lastAt = now; lastUpload = uploadTotal; lastDownload = downloadTotal
         lastConnections = connections.associate { it.id to (it.upload to it.download) }
     }
+
+    fun snapshot() = PanelTrafficSnapshot(upload, download, connectionRates, uploadTrend.toList(), downloadTrend.toList())
 
     fun reset() {
         upload = 0L; download = 0L; connectionRates = emptyMap(); uploadTrend.clear(); downloadTrend.clear()
@@ -630,6 +461,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     }
     var view by remember { mutableStateOf(initial) }
     val sampler = remember { PanelTrafficSampler() }
+    val projector = remember { PanelDataProjector() }
     val tab = when (vm.panelSection) {
         "overview" -> PanelTab.Overview
         "providers" -> PanelTab.Subscriptions
@@ -666,9 +498,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
         if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
     }
-    val data = buildPanelData(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
+    val data = projector.project(vm.state, vm.operation == io.github.xgl34222220.hetu.HxRunOp.Start,
         vm.providers, vm.rules, vm.ruleSets, vm.logEntries, vm.delays, vm.testingNodes,
-        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler,
+        emptyMap(), updates(vm.providerTasks), updates(vm.ruleSetTasks), sampler.snapshot(),
         testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
         switching = vm.pendingSelection.toMap()).copy(
         refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
@@ -706,7 +538,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
             }
         },
     )
-    val icons = vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
+    val icons = remember(vm.state.connections) {
+        vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
+    }
     HetuHomeThemeFromPrefs(vm.prefs) {
         CompositionLocalProvider(
             LocalPanelAppIcons provides PanelAppIcons(
