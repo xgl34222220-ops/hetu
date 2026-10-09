@@ -93,6 +93,7 @@ internal fun ToolsAdblockScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     scroll: ScrollState = rememberScrollState(),
+    onVerify: (() -> Unit)? = null,
 ) {
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
@@ -117,7 +118,7 @@ internal fun ToolsAdblockScreen(
             }
             ToolsLoad.Ready -> {
                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
-                ChainCard(state, Modifier.homeEnter(stagger, 1))
+                ChainCard(state, Modifier.homeEnter(stagger, 1), onVerify)
                 Column(Modifier.homeEnter(stagger, 2)) {
                     // 最近拦截 brings its own gap, so it can unfold without a jump.
                     HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
@@ -213,22 +214,41 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
 }
 
 @Composable
-private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
+private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onVerify: (() -> Unit)? = null) {
     val running = state.enabled && state.proxyRunning
     HomeCard(modifier.fillMaxWidth()) {
         ToolsCardTitle("运行链验证")
         CheckRow(state.enabled && state.ruleCount > 0, ht("本地规则库"), "%,d ".format(state.ruleCount) + ht("条有效规则"))
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
+        CheckRow(
+            state.enabled && state.startupInjected, ht("启动配置注入"),
+            when {
+                state.enabled && state.startupInjected -> ht("hetu-adblock 已写入运行副本")
+                state.enabled && state.lastError.isNotBlank() -> ht("本次启动已降级：") + state.lastError
+                else -> ht("当前启动副本没有广告 provider")
+            },
+        )
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
+        CheckRow(
+            running && state.controllerLoaded, ht("Mihomo 规则链"),
+            when {
+                running && state.coreDetail != null -> state.coreDetail.orEmpty()
+                running && state.controllerLoaded -> ht("核心已加载 REJECT 规则")
+                running -> ht("核心尚未加载广告规则")
+                else -> ht("等待代理启动")
+            },
+        )
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
+        CheckRow(
+            state.effective && state.hits > 0, ht("实际拦截"),
+            "%,d ".format(state.shownHits) + ht("次") + if (onVerify != null) " · " + ht("点按核查与实测") else "",
+            onClick = onVerify,
+        )
     }
 }
 
 @Composable
-private fun CheckRow(ok: Boolean, title: String, detail: String) {
+private fun CheckRow(ok: Boolean, title: String, detail: String, onClick: (() -> Unit)? = null) {
     val c = LocalHomeColors.current
     val tint by animateColorAsState(if (ok) c.good else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current, 260), label = "tools-ad-check")
     ToolsRow(
@@ -236,6 +256,8 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
         icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
         iconTint = tint,
         subtitle = detail, compact = true,
+        onClick = onClick,
+        trailing = if (onClick != null) ({ ToolsChevron() }) else null,
     )
 }
 

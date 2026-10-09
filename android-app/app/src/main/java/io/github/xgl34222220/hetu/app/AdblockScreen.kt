@@ -94,6 +94,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     val running = vm.state.running
     var injected by remember { mutableStateOf<Boolean?>(null) }
     var loadedInCore by remember { mutableStateOf<Boolean?>(null) }
+    var coreAudit by remember { mutableStateOf<AdblockAudit?>(null) }
     var showHelp by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision, running) {
@@ -109,7 +110,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
             injected = try {
                 AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-            loadedInCore = try {
+            // Strict: the REJECT rule itself, ordered before MATCH, with a non-empty block rule-set
+            // as the core reports them; any rule merely naming the provider is not enough.
+            val audit = try { AdblockAuditBridge.audit(context, true) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            coreAudit = audit?.takeIf { it.coreAnswered }
+            loadedInCore = coreAudit?.coreChainOk ?: try {
                 vm.controller.rules().any {
                     it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
                 }
@@ -117,6 +122,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         } else {
             injected = null
             loadedInCore = null
+            coreAudit = null
         }
     }
 
@@ -170,7 +176,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     }
 
     val lastError = if (revision >= 0) prefs.getString("proxyAdblockLastError", "").orEmpty() else ""
-    val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank()
+    // The start path records the switch, not a core check; when the core answered, its own
+    // report decides (rule chain loaded and rule mode), otherwise the recorded flag stands.
+    val coreSaysOff = coreAudit?.let { !it.coreChainOk || it.verdict == AdVerdict.NotEffective } ?: false
+    val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank() && !coreSaysOff
     val actualMode = vm.state.trafficMode.lowercase()
     val wrongMode = running && enabled && actualMode in listOf("global", "direct")
     val snapshot = rules
@@ -280,9 +289,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                     HxDivider(44.dp)
                     VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
+                    VerifyRow("Mihomo 规则链", loadedInCore, coreAudit?.checks?.firstOrNull { it.key == "core" && (loadedInCore == true || it.state == AdCheckState.Fail) }?.detail
+                        ?: when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
+                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, (if (running) "${stats.count} 次" else "代理启动后统计") + " · 点按核查与实测", neutralFalse = true, successColorOverride = verificationSuccessColor,
+                        onClick = { nav.push(HxRoute.AdblockVerify) })
                 }
             }
         }
@@ -504,10 +515,11 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
     }
 }
 @Composable
-private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null) {
+private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null, onClick: (() -> Unit)? = null) {
     val c = Hx.colors
     val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
-    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
+        .heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
             AnimatedContent(
                 targetState = ok,

@@ -400,14 +400,6 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     val profile = ProxyRuntimeProfile.load(prefs)
     LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
-    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) scope.launch {
-            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
-                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
-                .onFailure { vm.toast(it.message ?: "配置导入失败") }
-        }
-    }
-
     fun changed(key: String) {
         ProxyRuntimeSettings.markDirty(prefs, key)
         revision++
@@ -468,6 +460,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 SettingsGroup {
                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
                         icon = ToolsIcons.FileText, onClick = { choice = "config" })
+                    SettingsDivider()
+                    SettingsNavRow(ht("编辑当前配置"), subtitle = ht("YAML 编辑器；保存前预览差异并自动备份"),
+                        icon = HxIcons.SquarePen, onClick = { nav.push(HxRoute.ConfigEditor) })
+                    SettingsDivider()
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板；校验后应用，失败自动回滚"),
+                        icon = HxIcons.Upload, onClick = { nav.push(HxRoute.ConfigImport) })
                 }
             }
         }
@@ -504,9 +502,9 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                     }
                 }
                 item(key = "import-config") {
-                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件导入 YAML 配置"), icon = HxIcons.Upload) {
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板导入 YAML 配置"), icon = HxIcons.Upload) {
                         choice = null
-                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
+                        nav.push(HxRoute.ConfigImport)
                     }
                 }
             }

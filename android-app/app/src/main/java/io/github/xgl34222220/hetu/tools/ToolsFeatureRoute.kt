@@ -389,6 +389,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
         onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
+        onConnectivity = actions.onOpenConnectivity,
         modifier = modifier,
     )
 
@@ -508,6 +509,7 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
         onRetry = { state = ToolsAdblockState(); reload() },
         modifier = modifier,
+        onVerify = actions.onOpenAdblockVerify,
     )
 
     when (val current = overlay) {

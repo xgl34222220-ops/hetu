@@ -120,6 +120,8 @@ internal fun ToolsScreen(
         onConfigChanged = { scope.launch { vm.refreshNow() } },
         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
+        onOpenConnectivity = { nav.push(HxRoute.Connectivity) },
+        onOpenAdblockVerify = { nav.push(HxRoute.AdblockVerify) },
         onOpenExternalEntry = { entry ->
             when (entry) {
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }

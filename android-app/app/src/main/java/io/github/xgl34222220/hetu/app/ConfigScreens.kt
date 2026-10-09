@@ -730,6 +730,9 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         }
     }
 
+    // 保存前预览：本次改动与源文件的差异；确认后经事务写入（先备份，运行中热重载，核心拒绝时回滚源文件）。
+    var savePreview by remember { mutableStateOf<Pair<String, ConfigDiff>?>(null) }
+
     fun save() {
         val expected = source ?: return
         val current = editor?.text?.toString() ?: return
@@ -740,20 +743,48 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 val latest = hxReadConfigSource(context)
                 if (latest.core != expected.core || latest.name != expected.name) throw HxConfigSourceConflict(true, latest.name)
                 if (latest.text != expected.text) throw HxConfigSourceConflict(false, latest.name)
+                ConfigText.inspect(current).error?.let { throw IOException(it) }
                 vm.controller.validateConfigText(current)
-                withContext(Dispatchers.IO) {
-                    // Validation may take time. Recheck identity and contents immediately before writing.
-                    val library = ProxyConfigLibrary(context)
-                    val core = ProxyRuntimeProfile.load(vm.prefs).core
-                    val entry = library.selected(core) ?: error("尚未选择配置")
-                    if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
-                    if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
-                    library.write(entry, current)
-                }
-                source = expected.copy(text = current)
-                dirty = editor?.text?.toString() != current
+                val diff = withContext(Dispatchers.Default) { ConfigDiffer.diff(expected.text, current) }
                 problem = null
-                vm.applyConfigChange("配置已保存")
+                savePreview = current to diff
+            } catch (cancel: CancellationException) { throw cancel }
+            catch (changed: HxConfigSourceConflict) { conflict = changed }
+            catch (error: Exception) { problem = error.message ?: "保存失败" }
+            finally { saving = false }
+        }
+    }
+
+    fun commit(current: String) {
+        val expected = source ?: return
+        if (saving) return
+        saving = true
+        savePreview = null
+        scope.launch {
+            try {
+                val core = ProxyRuntimeProfile.load(vm.prefs).core
+                if (core != expected.core) throw HxConfigSourceConflict(true, expected.name)
+                // The core already validated this exact text in save(); the transaction re-checks the file under it.
+                val transaction = ConfigTransaction(
+                    store = LibraryConfigStore(context), backups = LibraryConfigStore.backups(context),
+                    validate = { },
+                    runningIdle = { if (!vm.state.running) false else if (vm.operation != null) null else true },
+                    reload = { vm.controller.reload() },
+                )
+                val result = try {
+                    transaction.save(expected.name, current, expected = expected.text)
+                } catch (conflicted: ConfigConflictException) {
+                    throw HxConfigSourceConflict(false, expected.name)
+                }
+                if (result is ConfigApplyResult.RolledBack) {
+                    problem = result.message
+                } else {
+                    source = expected.copy(text = current)
+                    dirty = editor?.text?.toString() != current
+                    problem = null
+                    vm.toast(result.message)
+                }
+                vm.refreshNow()
             } catch (cancel: CancellationException) { throw cancel }
             catch (changed: HxConfigSourceConflict) { conflict = changed }
             catch (error: Exception) { problem = error.message ?: "保存失败" }
@@ -890,6 +921,20 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 Spacer(Modifier.height(6.dp))
                 HxButton("保留草稿", { conflict = null }, Modifier.fillMaxWidth(), filled = false)
                 HxButton("重新读取", ::reload, Modifier.fillMaxWidth(), icon = HomeIcons.RefreshCw)
+            }
+        }
+    }
+    savePreview?.let { (pending, diff) ->
+        HxSheet(onDismiss = { savePreview = null }, title = ht("保存前确认")) {
+            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    if (diff.identical) ht("内容没有变化。") else "+${diff.added} / −${diff.removed} " + ht("行") + " · " + ht("原配置会先备份，可在「导入配置 › 备份与恢复」找回"),
+                    color = c.t2, style = HomeType.note,
+                )
+                ConfigDiffPreview(diff)
+                Text(ht(if (vm.state.running) "代理运行中：保存后立即热重载；核心拒绝时自动恢复原配置。" else "代理未运行：保存后下次启动生效。"), color = c.t2, style = HomeType.note)
+                HxButton("保存并应用", { commit(pending) }, Modifier.fillMaxWidth(), icon = HomeIcons.Save, enabled = !diff.identical)
+                HxButton("继续编辑", { savePreview = null }, Modifier.fillMaxWidth(), filled = false)
             }
         }
     }
