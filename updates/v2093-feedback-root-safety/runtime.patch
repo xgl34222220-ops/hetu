@@ -3235,7 +3235,7 @@ index 0000000..07fab10
 +    return result
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
-index 4722bed..4f684fa 100644
+index 4722bed..e88aefc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 @@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
@@ -3301,7 +3301,7 @@ index 4722bed..4f684fa 100644
      val actualMode = vm.state.trafficMode.lowercase()
      val wrongMode = running && enabled && actualMode in listOf("global", "direct")
      val snapshot = rules
-@@ -280,7 +296,24 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -280,9 +296,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                      HxDivider(44.dp)
                      VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                      HxDivider(44.dp)
@@ -3309,25 +3309,29 @@ index 4722bed..4f684fa 100644
 +                    val report = chain
 +                    VerifyRow("Mihomo 规则链", report?.let { it.loaded && it.ordered && it.providersLoaded },
 +                        report?.detail() ?: if (running) "核心未应答，点右上角刷新重试" else "代理启动后检测", successColorOverride = verificationSuccessColor)
-+                    HxDivider(44.dp)
+                     HxDivider(44.dp)
+-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
++                    // 实测 shares the 实际拦截 row: the row keeps its height, the page its layout.
++                    val probed = probe
 +                    VerifyRow(
-+                        "拦截实测",
-+                        if (probing) null else probe?.ok,
++                        "实际拦截",
++                        when { probing -> null; probed?.ok != null -> probed.ok; running -> stats.count > 0; else -> null },
 +                        when {
-+                            probing -> "正在向广告域名发送一次请求…"
-+                            probe != null -> probe!!.detail
-+                            running && enabled -> "向已拦截域名发一次请求，读取核心的实际判定"
-+                            else -> "代理启动后可实测"
++                            probing -> "正在向广告域名发送一次实测请求…"
++                            probed != null -> probed.detail
++                            running -> "${stats.count} 次"
++                            else -> "代理启动后统计"
 +                        },
++                        neutralFalse = probed?.ok == null,
 +                        successColorOverride = verificationSuccessColor,
 +                        trailing = if (running && enabled) ({
 +                            if (probing) HxSpinner(18.dp) else HomePill(ht("实测"), onClick = ::runProbe)
 +                        }) else null,
 +                    )
-                     HxDivider(44.dp)
-                     VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
                  }
-@@ -504,7 +537,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
+             }
+         }
+@@ -504,7 +538,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
      }
  }
  @Composable
@@ -3337,7 +3341,7 @@ index 4722bed..4f684fa 100644
      val c = Hx.colors
      val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
      Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-@@ -528,6 +562,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
+@@ -528,6 +563,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
              Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
              Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
          }

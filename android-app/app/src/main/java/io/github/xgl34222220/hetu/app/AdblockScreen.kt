@@ -300,22 +300,23 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                     VerifyRow("Mihomo 规则链", report?.let { it.loaded && it.ordered && it.providersLoaded },
                         report?.detail() ?: if (running) "核心未应答，点右上角刷新重试" else "代理启动后检测", successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
+                    // 实测 shares the 实际拦截 row: the row keeps its height, the page its layout.
+                    val probed = probe
                     VerifyRow(
-                        "拦截实测",
-                        if (probing) null else probe?.ok,
+                        "实际拦截",
+                        when { probing -> null; probed?.ok != null -> probed.ok; running -> stats.count > 0; else -> null },
                         when {
-                            probing -> "正在向广告域名发送一次请求…"
-                            probe != null -> probe!!.detail
-                            running && enabled -> "向已拦截域名发一次请求，读取核心的实际判定"
-                            else -> "代理启动后可实测"
+                            probing -> "正在向广告域名发送一次实测请求…"
+                            probed != null -> probed.detail
+                            running -> "${stats.count} 次"
+                            else -> "代理启动后统计"
                         },
+                        neutralFalse = probed?.ok == null,
                         successColorOverride = verificationSuccessColor,
                         trailing = if (running && enabled) ({
                             if (probing) HxSpinner(18.dp) else HomePill(ht("实测"), onClick = ::runProbe)
                         }) else null,
                     )
-                    HxDivider(44.dp)
-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
                 }
             }
         }

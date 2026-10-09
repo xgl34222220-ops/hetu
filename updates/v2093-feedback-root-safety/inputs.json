@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "9f04d3b40497bc7d25b8c753fe2cefd6a5f0bffc1026bc62b530fdf1bf7fda57",
+  "patchSha256": "40fe7623ed7f94a5d6c2ae08fa99874f01c9e4a37804699b365591ff8f6185f0",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -312,7 +312,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "0fdf6f3106d22c80e26b82ac121106d55fa6fc2ec2e7b63428aa9e11a49ca21a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "8247dfa66f791e6129218cda1af168b1bc94398bca6140ceb47bf6c399b8db7c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "91c9c154d3ae3cc1a7b48109c633bace811f604557de5ea7ed01aa1e51d444cb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt": "83f85c4076edf4e7b4a182b85f7b3a7e88d45784de9b4cfab0e61dd51b0dbf4a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "4fa93748e0058822533a0587ac8cddff766b3e51297fa2a389df8462dd26f4cd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt": "9640bff23128a1daa0c51979a254a26e6116e4d370fca5e1c45a5abd0846891a",
