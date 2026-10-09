@@ -5122,6 +5122,31 @@ index f8d36e9..0a8c1cc 100644
          capture("03A-034-core-three-cards")
          touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
          capture("core-mihomo-variant-picker")
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+index 366297a..e224bf7 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+@@ -50,6 +50,7 @@ class ControllerReadStateTest {
+     @Volatile private var generation = 1
+     @Volatile private var malformed = false
+     @Volatile private var holdConfigs = false
++    private val siblingReads = listOf("/configs", "/proxies", "/providers/proxies").associateWith { CountDownLatch(1) }
+
+     @Before fun prepare() {
+         // Share the original suspend-capable history shadow and isolate this method's audit.
+@@ -60,6 +61,12 @@ class ControllerReadStateTest {
+         server = MockWebServer().apply {
+             dispatcher = object : Dispatcher() {
+                 override fun dispatch(request: RecordedRequest): MockResponse {
++                    siblingReads[request.path]?.countDown()
++                    if (rejectedPath == "/connections" && request.path == "/connections") {
++                        // A failing sibling read now cancels and closes the snapshot at once; let the
++                        // parallel reads arrive first so the rejection cannot race them off the wire.
++                        siblingReads.values.forEach { it.await(6, TimeUnit.SECONDS) }
++                    }
+                     if (holdConfigs && request.path == "/configs") {
+                         controllerReadEntered.countDown()
+                         check(release.await(6, TimeUnit.SECONDS))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
 new file mode 100644
 index 0000000..549e953

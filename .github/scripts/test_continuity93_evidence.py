@@ -132,6 +132,16 @@ class Continuity93EvidenceTests(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 scope.validate_failed_read_gate(before, invalid)
 
+    def test_controller_read_gate_cannot_remove_assertions_or_change_other_responses(self):
+        before = scope.committed_bytes(scope.CONTROLLER_READ_FIXTURE).decode()
+        after = (scope.ROOT / scope.CONTROLLER_READ_FIXTURE).read_text()
+        scope.validate_controller_read_gate(before, after)
+        for invalid in (before, after.replace('assertTrue(server.requestCount >= 4)', 'assertTrue(server.requestCount >= 1)'),
+                        after.replace('rejectedPath == "/connections" && request.path == "/connections"', 'request.path == "/connections"'),
+                        after.replace('it.await(6, TimeUnit.SECONDS)', 'it.await(60, TimeUnit.SECONDS)')):
+            with self.assertRaises(AssertionError):
+                scope.validate_controller_read_gate(before, invalid)
+
     def test_same_source_api35_and_api36_are_preserved(self):
         text = (scope.ROOT / '.github/workflows/v2093-build.yml').read_text()
         self.assertIn("HETU_EXPECTED_VERSION: '2093'", text)
