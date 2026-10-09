@@ -400,12 +400,15 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     val profile = ProxyRuntimeProfile.load(prefs)
     LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
-    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri != null) scope.launch {
-            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
-                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
-                .onFailure { vm.toast(it.message ?: "配置导入失败") }
+    var importing by remember { mutableStateOf(false) }
+    if (importing) {
+        // File, link or clipboard: validated by Mihomo before it is stored, rolled back if the running core rejects it.
+        ConfigImportPage(vm, onBack = { importing = false }) { message ->
+            importing = false
+            revision++
+            vm.toast(message)
         }
+        return
     }
 
     fun changed(key: String) {
@@ -468,6 +471,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 SettingsGroup {
                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
                         icon = ToolsIcons.FileText, onClick = { choice = "config" })
+                    SettingsDivider()
+                    SettingsNavRow(ht("编辑当前配置"), subtitle = ht("保存前校验，应用失败自动回滚"), icon = HxIcons.SquarePen) {
+                        nav.push(HxRoute.ConfigEditor)
+                    }
+                    SettingsDivider()
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) { importing = true }
                 }
             }
         }
@@ -504,9 +513,9 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                     }
                 }
                 item(key = "import-config") {
-                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件导入 YAML 配置"), icon = HxIcons.Upload) {
+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) {
                         choice = null
-                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
+                        importing = true
                     }
                 }
             }

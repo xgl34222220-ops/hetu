@@ -51,6 +51,7 @@ internal fun ToolsDiagScreen(
     onRestore: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    onOpenNetworkTest: (() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
     val checking = state.preflight is ToolsPreflight.Running
@@ -89,6 +90,13 @@ internal fun ToolsDiagScreen(
                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
             )
+            if (onOpenNetworkTest != null) {
+                HomeRowDivider(start = HomeRowDims.textStart)
+                ToolsRow(
+                    AnnotatedString(ht("多平台网络测试")), icon = ToolsIcons.Activity,
+                    subtitle = ht("并发测试 Google、YouTube、GitHub、Telegram、ChatGPT 等平台"), onClick = onOpenNetworkTest, trailing = { ToolsChevron() },
+                )
+            }
         }
         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
             ToolsCardTitle("运行记录")

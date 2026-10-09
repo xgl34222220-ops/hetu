@@ -52,6 +52,7 @@ import io.github.xgl34222220.hetu.home.HomeRollingText
 import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeRowDivider
 import io.github.xgl34222220.hetu.home.HomeRowSubStyle
+import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.HomeVerticalDivider
 import io.github.xgl34222220.hetu.home.LocalHomeColors
@@ -93,6 +94,7 @@ internal fun ToolsAdblockScreen(
     onRetry: () -> Unit,
     modifier: Modifier = Modifier,
     scroll: ScrollState = rememberScrollState(),
+    onProbe: (() -> Unit)? = null,
 ) {
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
@@ -117,7 +119,7 @@ internal fun ToolsAdblockScreen(
             }
             ToolsLoad.Ready -> {
                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
-                ChainCard(state, Modifier.homeEnter(stagger, 1))
+                ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
                 Column(Modifier.homeEnter(stagger, 2)) {
                     // 最近拦截 brings its own gap, so it can unfold without a jump.
                     HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
@@ -213,7 +215,7 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
 }
 
 @Composable
-private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
+private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onProbe: (() -> Unit)? = null) {
     val running = state.enabled && state.proxyRunning
     HomeCard(modifier.fillMaxWidth()) {
         ToolsCardTitle("运行链验证")
@@ -221,8 +223,29 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
         HomeRowDivider(start = HomeRowDims.textStart)
         CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
         HomeRowDivider(start = HomeRowDims.textStart)
-        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
+        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), state.chainNote.takeIf { running && it.isNotBlank() }
+            ?: ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
         HomeRowDivider(start = HomeRowDims.textStart)
+        if (onProbe != null) {
+            val probe = state.probe
+            ToolsRow(
+                AnnotatedString(ht("拦截实测")),
+                icon = if (probe?.ok == true && !state.probing) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+                iconTint = if (probe?.ok == true && !state.probing) LocalHomeColors.current.good else if (probe?.ok == false && !state.probing) LocalHomeColors.current.bad else LocalHomeColors.current.t3,
+                subtitle = when {
+                    state.probing -> ht("正在向广告域名发送一次请求…")
+                    probe != null -> probe.detail
+                    running -> ht("向已拦截域名发一次请求，读取核心的实际判定")
+                    else -> ht("代理启动后可实测")
+                },
+                compact = true,
+                trailing = {
+                    if (state.probing) HomeSpinner(size = 18.dp, color = LocalHomeColors.current.accent)
+                    else if (running) ToolsButton("实测", onProbe, kind = HomeButtonKind.Soft, height = 36.dp) else Unit
+                },
+            )
+            HomeRowDivider(start = HomeRowDims.textStart)
+        }
         CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
     }
 }

@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import io.github.xgl34222220.hetu.AdblockVerification
 import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
 import io.github.xgl34222220.hetu.ProxyComposeController
 import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
@@ -87,7 +88,7 @@ internal class ToolsFeatureHost(val actions: ToolsFeatureActions, val appIcon: @
  * @param onChanged a runtime setting changed: refresh the shell state (pending-restart banner).
  */
 @Composable
-internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null): ToolsFeatureHost {
+internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null, onOpenNetworkTest: (() -> Unit)? = null): ToolsFeatureHost {
     val context = LocalContext.current
     val app = context.applicationContext
     val prefs = remember(app) { app.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -96,6 +97,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
     val scope = rememberCoroutineScope()
     val changed by rememberUpdatedState(onChanged)
     val diagnosticsDetails by rememberUpdatedState(onOpenDiagnosticsDetails)
+    val networkTest by rememberUpdatedState(onOpenNetworkTest)
 
     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
     fun dirty(key: String) { ToolsRuntimeBridge.markDirty(app, key); changed() }
@@ -216,6 +218,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
+            onOpenNetworkTest = if (onOpenNetworkTest == null) null else { { networkTest?.invoke() } },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
@@ -234,6 +237,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             loadAdblock = {
                 val snapshot = rules.rulesSnapshot()
                 val chain = ToolsRuntimeBridge.adblockChain(app)
+                // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
+                val report = if (chain.running) AdblockVerification.chain(app) else null
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -263,11 +268,16 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                         recent = chain.recent,
                         startupInjected = chain.startupInjected,
-                        controllerLoaded = chain.controllerLoaded,
+                        controllerLoaded = report?.let { it.loaded && it.ordered && it.providersLoaded } ?: chain.controllerLoaded,
+                        chainNote = report?.detail().orEmpty(),
                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
                     ),
                 )
+            },
+            probeAdblock = {
+                val result = AdblockVerification.probe(app)
+                ToolsAdProbe(result.ok, result.detail)
             },
             setAdblockEnabled = { on ->
                 val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }

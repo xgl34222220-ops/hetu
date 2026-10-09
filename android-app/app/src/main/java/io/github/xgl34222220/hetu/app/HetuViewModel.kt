@@ -850,6 +850,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    /**
+     * Hot-reloads the running core for a config transaction and hands the result (or failure) back to
+     * the caller, which decides whether to roll its source back. Same operation slot as [reload].
+     */
+    suspend fun reloadNow(): String {
+        if (!state.running) throw java.io.IOException("代理未运行，无法热重载")
+        if (operation != null) throw java.io.IOException("代理正在执行其他操作，请稍后重启代理应用配置")
+        invalidateRuntimeRequests()
+        operation = HxRunOp.Reload
+        operationText = "正在重载配置…"
+        try {
+            return controller.reload()
+        } finally {
+            operation = null
+            operationText = ""
+            try { refreshNow() } catch (_: Exception) { }
+        }
+    }
+
     fun setTrafficMode(mode: String) {
         if (!state.running) return
         viewModelScope.launch {

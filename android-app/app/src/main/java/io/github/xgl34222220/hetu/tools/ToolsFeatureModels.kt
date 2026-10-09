@@ -218,6 +218,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
 /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
 internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
 
+/** One 实测拦截 request: [ok] is null when nothing could be concluded. */
+internal data class ToolsAdProbe(val ok: Boolean?, val detail: String)
+
 internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
 internal data class ToolsAdblockState(
@@ -241,6 +244,11 @@ internal data class ToolsAdblockState(
     val recent: List<String> = emptyList(),
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
+    /** What the core reported for the chain (position, rule counts); blank when unknown. */
+    val chainNote: String = "",
+    /** Last 实测拦截 result; null until the user runs one. */
+    val probe: ToolsAdProbe? = null,
+    val probing: Boolean = false,
     val standaloneDns: Boolean = false,
     val cnameProtection: Boolean = true,
     val updating: Boolean = false,
@@ -367,6 +375,8 @@ internal class ToolsFeatureActions(
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    /** 多平台网络测试; null hides the row. */
+    val onOpenNetworkTest: (() -> Unit)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
@@ -385,6 +395,8 @@ internal class ToolsFeatureActions(
     val setCnameProtection: suspend (Boolean) -> Unit = {},
     /** “切到规则” on the wrong-mode warning; null hides the button. */
     val switchToRuleMode: (suspend () -> Unit)? = null,
+    /** 实测拦截: one request for a blocked host through the core; null hides the button. */
+    val probeAdblock: (suspend () -> ToolsAdProbe)? = null,
 
     val onMessage: (String) -> Unit = {},
 ) {

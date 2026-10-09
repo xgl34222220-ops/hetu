@@ -119,6 +119,7 @@ internal fun ToolsScreen(
         onSubPageVisibleChanged = onSubPageVisibleChanged,
         onConfigChanged = { scope.launch { vm.refreshNow() } },
         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
+        onOpenNetworkTest = { nav.push(HxRoute.NetTest) },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
         onOpenExternalEntry = { entry ->
             when (entry) {

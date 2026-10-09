@@ -813,6 +813,7 @@ private fun FileEntryRow(entry: RuntimeFileEntry, marked: Boolean, onClick: () -
 
 @Composable
 internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+    val nav = LocalNav.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
@@ -906,6 +907,18 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         iconTint = c.bad,
                         onClick = { confirmRecover = true },
                     ) { if (busy == "recover") HxSpinner(18.dp, c.bad) else HxChevron() }
+                }
+            }
+        }
+        item(key = "connectivity") {
+            SettingsSection {
+                SettingsGroup(title = ht("连通性")) {
+                    SettingsRow(
+                        ht("多平台网络测试"),
+                        subtitle = ht("并发测试 Google、YouTube、GitHub、Telegram、ChatGPT 等平台"),
+                        icon = PanelIcons.Gauge,
+                        onClick = { nav.push(HxRoute.NetTest) },
+                    ) { HxChevron() }
                 }
             }
         }

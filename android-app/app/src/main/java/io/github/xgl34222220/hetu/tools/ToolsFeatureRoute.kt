@@ -389,6 +389,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
         onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
+        onOpenNetworkTest = actions.onOpenNetworkTest,
         modifier = modifier,
     )
 
@@ -427,7 +428,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
     suspend fun read() {
         val snapshot = (actions.loadAdblock ?: return)()
-        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false)
+        // A re-read keeps the last 实测 result; it is the user's evidence, not part of the snapshot.
+        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, probing = state.probing)
     }
 
     fun reload(announce: String? = null) {
@@ -508,6 +510,19 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
         onRetry = { state = ToolsAdblockState(); reload() },
         modifier = modifier,
+        onProbe = actions.probeAdblock?.let { probeOnce ->
+            {
+                if (!state.probing) {
+                    state = state.copy(probing = true)
+                    scope.launch {
+                        val result = try { probeOnce() } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { ToolsAdProbe(null, error.reason("实测失败")) }
+                        state = state.copy(probing = false, probe = result)
+                        reload()
+                    }
+                }
+            }
+        },
     )
 
     when (val current = overlay) {

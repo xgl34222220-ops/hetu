@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.ui.RulesSnapshot
 import io.github.xgl34222220.hetu.tools.ToolsIcons
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.ui.ht
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -93,7 +95,9 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     var whitelistCandidate by remember { mutableStateOf<String?>(null) }
     val running = vm.state.running
     var injected by remember { mutableStateOf<Boolean?>(null) }
-    var loadedInCore by remember { mutableStateOf<Boolean?>(null) }
+    var chain by remember { mutableStateOf<AdblockChainReport?>(null) }
+    var probe by remember { mutableStateOf<AdblockProbe?>(null) }
+    var probing by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
 
     LaunchedEffect(revision, running) {
@@ -109,14 +113,12 @@ internal fun AdblockScreen(vm: HetuViewModel) {
             injected = try {
                 AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-            loadedInCore = try {
-                vm.controller.rules().any {
-                    it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
-                }
-            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
+            chain = AdblockVerification.chain(context)
         } else {
             injected = null
-            loadedInCore = null
+            chain = null
+            probe = null
         }
     }
 
@@ -169,8 +171,22 @@ internal fun AdblockScreen(vm: HetuViewModel) {
         if (prepare != null) vpnPermission.launch(prepare) else vm.filters.startVpn()
     }
 
+    fun runProbe() {
+        if (probing) return
+        probing = true
+        scope.launch {
+            probe = try { AdblockVerification.probe(context) }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) { AdblockProbe(null, "", error.message ?: "实测失败") }
+            probing = false
+            revision++
+        }
+    }
+
     val lastError = if (revision >= 0) prefs.getString("proxyAdblockLastError", "").orEmpty() else ""
-    val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank()
+    // The start path records the chain as effective without asking the core; a live controller reading wins when there is one.
+    val effective = running && enabled && lastError.isBlank() && (chain?.let { it.effective || (it.loaded && it.ordered && it.providersLoaded) }
+        ?: prefs.getBoolean("proxyAdblockLastEffective", false))
     val actualMode = vm.state.trafficMode.lowercase()
     val wrongMode = running && enabled && actualMode in listOf("global", "direct")
     val snapshot = rules
@@ -280,7 +296,24 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                     HxDivider(44.dp)
                     VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                     HxDivider(44.dp)
-                    VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
+                    val report = chain
+                    VerifyRow("Mihomo 规则链", report?.let { it.loaded && it.ordered && it.providersLoaded },
+                        report?.detail() ?: if (running) "核心未应答，点右上角刷新重试" else "代理启动后检测", successColorOverride = verificationSuccessColor)
+                    HxDivider(44.dp)
+                    VerifyRow(
+                        "拦截实测",
+                        if (probing) null else probe?.ok,
+                        when {
+                            probing -> "正在向广告域名发送一次请求…"
+                            probe != null -> probe!!.detail
+                            running && enabled -> "向已拦截域名发一次请求，读取核心的实际判定"
+                            else -> "代理启动后可实测"
+                        },
+                        successColorOverride = verificationSuccessColor,
+                        trailing = if (running && enabled) ({
+                            if (probing) HxSpinner(18.dp) else HomePill(ht("实测"), onClick = ::runProbe)
+                        }) else null,
+                    )
                     HxDivider(44.dp)
                     VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
                 }
@@ -504,7 +537,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
     }
 }
 @Composable
-private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null) {
+private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null,
+    trailing: (@Composable () -> Unit)? = null) {
     val c = Hx.colors
     val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
     Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -527,6 +561,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
         Column(Modifier.weight(1f)) {
             Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
             Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
+        }
+        if (trailing != null) {
+            Spacer(Modifier.width(10.dp))
+            trailing()
         }
     }
 }

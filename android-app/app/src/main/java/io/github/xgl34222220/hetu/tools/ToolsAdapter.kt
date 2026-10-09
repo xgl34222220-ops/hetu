@@ -32,6 +32,7 @@ import io.github.xgl34222220.hetu.ProxySubStoreActivity
 import io.github.xgl34222220.hetu.ProxyWebPanelsActivity
 import io.github.xgl34222220.hetu.ReferenceFileManagerActivity
 import io.github.xgl34222220.hetu.ToolsConfigBridge
+import io.github.xgl34222220.hetu.HxConfigTransaction
 import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.home.HomeHaptic
@@ -39,8 +40,6 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +69,7 @@ internal fun HetuToolsV2(
     onSubPageVisibleChanged: (Boolean) -> Unit = {},
     onConfigChanged: () -> Unit = {},
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    onOpenNetworkTest: (() -> Unit)? = null,
     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
     onOpenConfigEditor: (() -> Unit)? = null,
 ) {
@@ -83,7 +83,7 @@ internal fun HetuToolsV2(
     val changed by rememberUpdatedState(onConfigChanged)
     val openExternal by rememberUpdatedState(onOpenExternalEntry)
     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
-    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
+    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails, onOpenNetworkTest = onOpenNetworkTest)
     var destination by remember { mutableStateOf(ToolsDestination.Root) }
     ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
 
@@ -167,12 +167,19 @@ internal fun HetuToolsV2(
             addSubscription = { name, url -> controller.addSubscription(name, url); changed() },
             updateSubscription = { name, url -> controller.updateSubscription(name, url); changed() },
             deleteSubscription = { name -> controller.deleteSubscription(name); changed() },
-            importFromUrl = { url, name -> download(app, url, name).also { changed() } },
+            importFromUrl = { url, name ->
+                // Validated by Mihomo before it is stored, like 设置 › 导入配置.
+                val text = HxConfigTransaction.decode(HxConfigTransaction.download(url).first)
+                controller.validateConfigText(text)
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
+            },
             onPickImportFile = { picker.launch(arrayOf("*/*")) },
             onClearPickedFile = { pickedFile = null },
             importFile = { file ->
                 val uri = file.token as? Uri ?: throw IOException("无法读取配置文件")
-                controller.importConfig(uri, file.name).also { changed() }
+                val text = HxConfigTransaction.decode(HxConfigTransaction.readUri(app, uri))
+                controller.validateConfigText(text)
+                withContext(Dispatchers.IO) { ToolsConfigBridge.importStream(app, file.name, text.toByteArray(Charsets.UTF_8).inputStream()) }.also { changed() }
             },
             readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
             validateConfig = { text -> controller.validateConfigText(text) },
@@ -238,20 +245,4 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
         else -> String.format(Locale.ROOT, "%.1f MB", size / 1024.0 / 1024.0)
     }
     return ToolsPickedFile(name, detail, uri)
-}
-
-/** Fetches [url] and hands the body to the config library under [name]; returns the stored name. */
-private suspend fun download(context: Context, url: String, name: String): String = withContext(Dispatchers.IO) {
-    val connection = URL(url).openConnection() as? HttpURLConnection ?: throw IOException("请输入有效的 http/https 链接")
-    try {
-        connection.connectTimeout = 15_000
-        connection.readTimeout = 30_000
-        connection.instanceFollowRedirects = true
-        connection.setRequestProperty("User-Agent", "clash.meta")
-        val code = connection.responseCode
-        if (code !in 200..299) throw IOException("下载失败：HTTP $code")
-        ToolsConfigBridge.importStream(context, name, connection.inputStream)
-    } finally {
-        connection.disconnect()
-    }
 }
