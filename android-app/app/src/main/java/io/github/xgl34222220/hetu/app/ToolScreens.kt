@@ -813,6 +813,7 @@ private fun FileEntryRow(entry: RuntimeFileEntry, marked: Boolean, onClick: () -
 
 @Composable
 internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+    val nav = LocalNav.current
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
@@ -892,6 +893,10 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                                 catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
                             sheet = "修复运行记录" to result
                         }
+                    }
+                    SettingsDivider()
+                    DiagnosticRow("多平台网络测试", "并发测试 Google、YouTube、ChatGPT、Netflix 等平台的连通性与延迟", ToolsFeatureIcons.Globe, busy, "connectivity") {
+                        nav.push(HxRoute.Connectivity)
                     }
                 }
             }

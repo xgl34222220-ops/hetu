@@ -3234,8 +3234,1819 @@ index 0000000..07fab10
 +    }
 +    return result
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockAudit.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockAudit.kt
+new file mode 100644
+index 0000000..2928fc9
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockAudit.kt
+@@ -0,0 +1,426 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import java.net.HttpURLConnection
++import java.net.Proxy
++import java.net.URL
++import java.util.Locale
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
++import kotlinx.coroutines.awaitAll
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.withContext
++import org.json.JSONObject
++
++/*
++ * 去广告运行链核查.
++ *
++ * Hetu's ad blocking is not DNS-level inside the Root proxy: the private Mihomo runtime gets two
++ * local `type: file` domain rule-sets (`hetu-adblock`, `hetu-adblock-allow`) and one rule
++ * `AND((RULE-SET,hetu-adblock),(NOT,((RULE-SET,hetu-adblock-allow)))),REJECT`. A connection is
++ * rejected only when (1) the runtime copy carries the rule, (2) the core loaded it with REJECT and
++ * before MATCH, (3) the block rule-set has entries, (4) the core is in rule mode and (5) the
++ * connection reaches the core with a hostname (fake-ip / DNS mapping / sniffer). This file checks
++ * each link from what the core itself reports, and can probe known ad domains through the core.
++ */
++
++internal enum class AdCheckState { Pass, Warn, Fail, Pending }
++
++internal data class AdCheck(val key: String, val title: String, val state: AdCheckState, val detail: String)
++
++internal data class AdRuleRow(val type: String, val payload: String, val proxy: String, val disabled: Boolean, val hitCount: Long?)
++
++internal data class AdProviderInfo(val name: String, val ruleCount: Int, val vehicle: String)
++
++internal enum class AdVerdict { Effective, NotEffective, Waiting, Off, Unknown }
++
++internal data class AdblockAuditInput(
++    val enabled: Boolean,
++    val running: Boolean,
++    /** Controller `mode`; null when the controller did not answer. */
++    val mode: String?,
++    /** Private startup copy; null when it could not be read. */
++    val startupYaml: String?,
++    /** Controller `/rules`; null when it did not answer. */
++    val rules: List<AdRuleRow>?,
++    /** Controller `/providers/rules`; null when it did not answer. */
++    val providers: Map<String, AdProviderInfo>?,
++    val localRuleCount: Int,
++    val lastError: String = "",
++)
++
++internal data class AdblockAudit(
++    val verdict: AdVerdict,
++    val headline: String,
++    val checks: List<AdCheck>,
++    /** 0-based index of the blocking rule in the core's list, when found. */
++    val ruleIndex: Int? = null,
++    val ruleHits: Long? = null,
++    val coreRuleCount: Int? = null,
++    /** The controller answered both rules and providers. */
++    val coreAnswered: Boolean = false,
++    /** Rule present (REJECT, enabled, before MATCH) and the block rule-set has entries. */
++    val coreChainOk: Boolean = false,
++    /** Remote rule-sets (HTTP) the core reports with 0 entries, i.e. never downloaded. */
++    val emptyRemoteProviders: List<String> = emptyList(),
++)
++
++internal enum class SnifferState { Enabled, Disabled, Absent }
++
++internal object AdblockAuditor {
++    const val BLOCK = "hetu-adblock"
++    const val ALLOW = "hetu-adblock-allow"
++
++    fun parseRules(root: JSONObject?): List<AdRuleRow>? {
++        val array = root?.optJSONArray("rules") ?: return null
++        return (0 until array.length()).mapNotNull { i ->
++            val rule = array.optJSONObject(i) ?: return@mapNotNull null
++            val extra = rule.optJSONObject("extra")
++            AdRuleRow(
++                type = rule.optString("type"),
++                payload = rule.optString("payload"),
++                proxy = rule.optString("proxy"),
++                disabled = rule.optBoolean("disabled", false) || (extra?.optBoolean("disabled", false) ?: false),
++                hitCount = extra?.takeIf { it.has("hitCount") }?.optLong("hitCount"),
++            )
++        }
++    }
++
++    fun parseProviders(root: JSONObject?): Map<String, AdProviderInfo>? {
++        val providers = root?.optJSONObject("providers") ?: return null
++        val out = LinkedHashMap<String, AdProviderInfo>()
++        val names = providers.keys()
++        while (names.hasNext()) {
++            val name = names.next()
++            val p = providers.optJSONObject(name) ?: continue
++            out[name] = AdProviderInfo(name, p.optInt("ruleCount", p.optInt("count", -1)), p.optString("vehicleType", p.optString("vehicle", "")))
++        }
++        return out
++    }
++
++    /** Top-level `sniffer:` block of a YAML text: enabled, explicitly disabled, or absent. */
++    fun sniffer(yaml: String?): SnifferState {
++        val block = topLevelBlock(yaml, "sniffer") ?: return SnifferState.Absent
++        val enable = block.firstNotNullOfOrNull { Regex("^\\s+enable\\s*:\\s*([A-Za-z]+)").find(it)?.groupValues?.get(1) }
++        return if (enable != null && enable.lowercase(Locale.ROOT) == "false") SnifferState.Disabled else SnifferState.Enabled
++    }
++
++    /** `dns.enhanced-mode` of a YAML text, lower-case; blank when not set. */
++    fun enhancedMode(yaml: String?): String {
++        val block = topLevelBlock(yaml, "dns") ?: return ""
++        return block.firstNotNullOfOrNull { Regex("^\\s+enhanced-mode\\s*:\\s*['\"]?([A-Za-z-]+)").find(it)?.groupValues?.get(1) }
++            ?.lowercase(Locale.ROOT).orEmpty()
++    }
++
++    private fun topLevelBlock(yaml: String?, key: String): List<String>? {
++        if (yaml.isNullOrEmpty()) return null
++        val lines = yaml.split('\n')
++        val start = lines.indexOfFirst { it.startsWith("$key:") || it.startsWith("$key :") }
++        if (start < 0) return null
++        val out = ArrayList<String>()
++        for (i in start + 1 until lines.size) {
++            val line = lines[i]
++            if (line.isBlank() || line.trimStart().startsWith("#")) continue
++            if (!line.first().isWhitespace()) break
++            out += line
++        }
++        return out
++    }
++
++    private fun isProviderRef(rule: AdRuleRow): Boolean =
++        rule.payload.contains(BLOCK, true) || rule.type.contains(BLOCK, true)
++
++    private val terminalPolicies = setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE")
++
++    fun audit(input: AdblockAuditInput): AdblockAudit {
++        val checks = ArrayList<AdCheck>()
++        if (!input.enabled) {
++            checks += AdCheck("switch", "广告过滤开关", AdCheckState.Fail, "已关闭：运行副本不注入广告规则")
++            return AdblockAudit(AdVerdict.Off, "广告过滤已关闭", checks)
++        }
++        checks += AdCheck("switch", "广告过滤开关", AdCheckState.Pass, "已开启")
++        checks += if (input.localRuleCount > 0) AdCheck("local", "本地规则库", AdCheckState.Pass, "%,d 条有效拦截域名（本地文件，无需下载即可生效）".format(input.localRuleCount))
++            else AdCheck("local", "本地规则库", AdCheckState.Fail, "没有启用的拦截规则")
++
++        val injected = input.startupYaml?.let { AdblockRuleInspection.isInjected(it) }
++        checks += when {
++            injected == true -> AdCheck("startup", "运行副本注入", AdCheckState.Pass, "已写入 hetu-adblock 规则集与 REJECT 规则")
++            input.lastError.isNotBlank() -> AdCheck("startup", "运行副本注入", AdCheckState.Fail, "本次启动已降级为不带广告规则：${input.lastError}")
++            injected == false -> AdCheck("startup", "运行副本注入", AdCheckState.Fail, "运行副本没有广告规则，重启代理后生效")
++            else -> AdCheck("startup", "运行副本注入", AdCheckState.Pending, "尚未生成运行副本")
++        }
++
++        if (!input.running) {
++            checks += AdCheck("mode", "规则模式", AdCheckState.Pending, "代理启动后检测")
++            checks += AdCheck("core", "核心规则链", AdCheckState.Pending, "代理启动后检测")
++            checks += AdCheck("provider", "核心规则集", AdCheckState.Pending, "代理启动后检测")
++            return AdblockAudit(AdVerdict.Waiting, "代理未运行，启动后才会拦截", checks)
++        }
++
++        val mode = input.mode?.trim()?.lowercase(Locale.ROOT)
++        checks += when {
++            mode == null || mode.isEmpty() -> AdCheck("mode", "规则模式", AdCheckState.Warn, "控制接口未返回当前模式")
++            AdblockRuleInspection.isRuleMode(mode) -> AdCheck("mode", "规则模式", AdCheckState.Pass, "rule：规则会逐条执行")
++            else -> AdCheck("mode", "规则模式", AdCheckState.Fail, "当前为 ${if (mode == "global") "全局" else if (mode == "direct") "直连" else mode} 模式，规则（含广告规则）不会执行")
++        }
++
++        var ruleIndex: Int? = null
++        var ruleHits: Long? = null
++        var ruleOk = false
++        val rules = input.rules
++        if (rules == null) {
++            checks += AdCheck("core", "核心规则链", AdCheckState.Warn, "控制接口未返回规则列表")
++        } else {
++            val index = rules.indexOfFirst { AdblockRuleInspection.isBlockingRule(it.type, it.payload, it.proxy, it.disabled) }
++            val match = rules.indexOfFirst { it.type.equals("Match", true) }
++            if (index < 0) {
++                val loose = rules.firstOrNull { isProviderRef(it) }
++                checks += AdCheck(
++                    "core", "核心规则链", AdCheckState.Fail,
++                    when {
++                        loose == null -> "核心没有加载河图广告规则"
++                        loose.disabled -> "核心中的广告规则已被禁用"
++                        !loose.proxy.uppercase(Locale.ROOT).startsWith("REJECT") -> "广告规则的策略是 ${loose.proxy}，不是 REJECT"
++                        else -> "核心中的广告规则与河图注入的形式不一致"
++                    },
++                )
++            } else if (match in 0 until index) {
++                ruleIndex = index
++                checks += AdCheck("core", "核心规则链", AdCheckState.Fail, "广告规则排在第 ${index + 1} 条，位于兜底 MATCH（第 ${match + 1} 条）之后，永远不会命中")
++            } else {
++                ruleIndex = index
++                ruleOk = true
++                ruleHits = rules[index].hitCount
++                val earlier = rules.subList(0, index).count { it.proxy.uppercase(Locale.ROOT) !in terminalPolicies && !it.disabled }
++                checks += if (earlier > 0)
++                    AdCheck("core", "核心规则链", AdCheckState.Warn, "第 ${index + 1} 条 REJECT；前面有 $earlier 条分流规则会先命中，命中它们的域名不经广告规则")
++                else AdCheck("core", "核心规则链", AdCheckState.Pass, "第 ${index + 1} 条 REJECT，先于分流与兜底规则")
++            }
++        }
++
++        var coreCount: Int? = null
++        var providerOk = false
++        val providers = input.providers
++        var emptyRemote = emptyList<String>()
++        if (providers == null) {
++            checks += AdCheck("provider", "核心规则集", AdCheckState.Warn, "控制接口未返回规则集")
++        } else {
++            val block = providers[BLOCK]
++            val allow = providers[ALLOW]
++            coreCount = block?.ruleCount
++            checks += when {
++                block == null -> AdCheck("provider", "核心规则集", AdCheckState.Fail, "核心没有 hetu-adblock 规则集")
++                block.ruleCount <= 0 -> AdCheck("provider", "核心规则集", AdCheckState.Fail, "hetu-adblock 为 0 条：规则文件未写入运行目录或格式无效")
++                allow == null -> AdCheck("provider", "核心规则集", AdCheckState.Warn, "已载入 %,d 条；白名单规则集缺失".format(block.ruleCount))
++                input.localRuleCount > 0 && block.ruleCount != input.localRuleCount ->
++                    AdCheck("provider", "核心规则集", AdCheckState.Warn, "核心 %,d 条，本地 %,d 条：规则更新后尚未热重载".format(block.ruleCount, input.localRuleCount))
++                else -> AdCheck("provider", "核心规则集", AdCheckState.Pass, "核心已载入 %,d 条（白名单 %,d 条）".format(block.ruleCount, allow.ruleCount.coerceAtLeast(0)))
++            }
++            providerOk = block != null && block.ruleCount > 0
++            emptyRemote = providers.values.filter { it.name != BLOCK && it.name != ALLOW && it.vehicle.equals("HTTP", true) && it.ruleCount == 0 }.map { it.name }
++            if (emptyRemote.isNotEmpty()) {
++                checks += AdCheck("remote", "其他远程规则集", AdCheckState.Warn, "未下载成功（0 条）：" + emptyRemote.take(6).joinToString("、") + if (emptyRemote.size > 6) " 等 ${emptyRemote.size} 个" else "")
++            }
++        }
++
++        val sniffer = sniffer(input.startupYaml)
++        val enhanced = enhancedMode(input.startupYaml)
++        val dnsNote = when (enhanced) {
++            "fake-ip" -> "fake-ip：连接带域名进入规则"
++            "redir-host" -> "redir-host：靠 DNS 映射还原域名"
++            else -> "DNS 未指定增强模式"
++        }
++        checks += when (sniffer) {
++            SnifferState.Disabled -> AdCheck("sniffer", "域名识别", AdCheckState.Warn, "源配置关闭了嗅探：自带 DoH 或直连 IP 的广告请求无法按域名拦截；$dnsNote")
++            SnifferState.Enabled -> AdCheck("sniffer", "域名识别", AdCheckState.Pass, "TLS/HTTP/QUIC 嗅探已开启；$dnsNote")
++            SnifferState.Absent -> AdCheck("sniffer", "域名识别", AdCheckState.Warn, "没有嗅探配置：只能识别经核心 DNS 解析的域名；$dnsNote")
++        }
++
++        val answered = rules != null && providers != null
++        val chainOk = ruleOk && providerOk
++        val anyFail = checks.any { it.state == AdCheckState.Fail }
++        val verdict = when {
++            anyFail -> AdVerdict.NotEffective
++            !answered || mode.isNullOrEmpty() -> AdVerdict.Unknown
++            chainOk -> AdVerdict.Effective
++            else -> AdVerdict.Unknown
++        }
++        val headline = when (verdict) {
++            AdVerdict.Effective -> "运行链完整：广告域名会被核心 REJECT"
++            AdVerdict.NotEffective -> checks.first { it.state == AdCheckState.Fail }.let { "未生效：${it.title} · ${it.detail}" }
++            AdVerdict.Unknown -> "无法确认：控制接口未完整应答"
++            else -> ""
++        }
++        return AdblockAudit(verdict, headline, checks, ruleIndex, ruleHits, coreCount, answered, chainOk, emptyRemote)
++    }
++}
++
++/* ------------------------------ 拦截实测 ------------------------------ */
++
++internal enum class AdProbeVerdict { Blocked, BlockedByOther, Allowed, Unknown }
++
++internal data class AdProbeResult(val domain: String, val expectBlocked: Boolean, val verdict: AdProbeVerdict, val detail: String)
++
++internal data class AdLogDecision(val rule: String, val policy: String)
++
++internal object AdblockProbe {
++    /** Well-known ad / tracking hosts; only those the active block list covers are probed. */
++    val candidates = listOf(
++        "doubleclick.net", "googleadservices.com", "googlesyndication.com", "adservice.google.com",
++        "app-measurement.com", "pos.baidu.com", "cpro.baidu.com", "mobads.baidu.com",
++        "mi.gdt.qq.com", "pgdt.ugdtimg.com", "ads.tiktok.com", "ad.xiaomi.com",
++    )
++    /** A control that must pass: proves the probe path itself works. */
++    const val CONTROL = "connectivitycheck.gstatic.com"
++    const val PORT = 80
++    private const val LOG = "/data/adb/hetu/run/core.log"
++
++    /** `+.suffix` semantics: the host or any parent domain is listed. */
++    fun covered(host: String, domains: Set<String>): Boolean {
++        var current = host.trim().trimEnd('.').lowercase(Locale.ROOT)
++        while (current.isNotEmpty()) {
++            if (current in domains) return true
++            val dot = current.indexOf('.')
++            if (dot < 0) return false
++            current = current.substring(dot + 1)
++        }
++        return false
++    }
++
++    fun pick(block: Set<String>, allow: Set<String>, limit: Int = 4): List<String> =
++        candidates.filter { covered(it, block) && !covered(it, allow) }.take(limit)
++
++    /** The core's own verdict for `host:port` in a slice of its info log, newest first. */
++    fun findDecision(log: String, host: String, port: Int = PORT): AdLogDecision? {
++        val needle = "--> $host:$port"
++        for (line in log.lineSequence().toList().asReversed()) {
++            val at = line.indexOf(needle)
++            if (at < 0) continue
++            val after = line.substring(at + needle.length)
++            if (after.isNotEmpty() && !after.first().isWhitespace()) continue
++            val usingAt = after.lastIndexOf(" using ")
++            if (usingAt < 0) continue
++            val policy = after.substring(usingAt + 7).trim().trimEnd('"', '\'').trim()
++            if (policy.isEmpty()) continue
++            val matchAt = after.indexOf(" match ")
++            val rule = if (after.contains("doesn't match") || matchAt < 0 || matchAt > usingAt) "" else after.substring(matchAt + 7, usingAt).trim()
++            return AdLogDecision(rule, policy)
++        }
++        return null
++    }
++
++    fun classify(domain: String, expectBlocked: Boolean, logged: AdLogDecision?, httpCode: Int?, error: String?): AdProbeResult {
++        val verdict: AdProbeVerdict
++        val detail: String
++        when {
++            logged != null && logged.policy.uppercase(Locale.ROOT).startsWith("REJECT") -> {
++                if (logged.rule.contains(AdblockAuditor.BLOCK, true)) {
++                    verdict = AdProbeVerdict.Blocked; detail = "核心按河图广告规则 REJECT"
++                } else {
++                    verdict = AdProbeVerdict.BlockedByOther; detail = "被其他规则拒绝：${logged.rule.ifBlank { "未命名规则" }}"
++                }
++            }
++            logged != null -> {
++                verdict = AdProbeVerdict.Allowed
++                detail = if (logged.rule.isBlank()) "未拦截：未命中任何规则 → ${logged.policy}" else "未拦截：命中 ${logged.rule.take(80)} → ${logged.policy}"
++            }
++            httpCode != null -> { verdict = AdProbeVerdict.Allowed; detail = "未拦截：返回 HTTP $httpCode（核心日志无此请求记录）" }
++            else -> { verdict = AdProbeVerdict.Unknown; detail = "无法确认：${error ?: "请求失败"}，核心日志没有此请求的判定" }
++        }
++        return AdProbeResult(domain, expectBlocked, verdict, detail)
++    }
++
++    /** Verdict matches the expectation (blocked ad, passed control). */
++    fun asExpected(result: AdProbeResult): Boolean = if (result.expectBlocked)
++        result.verdict == AdProbeVerdict.Blocked || result.verdict == AdProbeVerdict.BlockedByOther
++    else result.verdict == AdProbeVerdict.Allowed
++
++    private fun httpGet(host: String, proxy: Proxy): Pair<Int?, String?> {
++        var connection: HttpURLConnection? = null
++        return try {
++            connection = (URL("http://$host/").openConnection(proxy) as HttpURLConnection).apply {
++                instanceFollowRedirects = false
++                useCaches = false
++                connectTimeout = 4_000
++                readTimeout = 4_000
++                setRequestProperty("Connection", "close")
++                setRequestProperty("User-Agent", "Hetu-AdblockProbe")
++            }
++            connection.responseCode to null
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (error: Exception) {
++            null to PlatformProbe.failureReason(error)
++        } finally {
++            try { connection?.disconnect() } catch (_: Exception) {}
++        }
++    }
++
++    /**
++     * Sends one plain HTTP request per domain through the core's loopback listener, then reads
++     * the core's own log lines written since just before the requests. Root is needed for the log.
++     * Requests count as real blocks in the session counter.
++     */
++    suspend fun run(context: Context, domains: List<String>): List<AdProbeResult> = withContext(Dispatchers.IO) {
++        val app = context.applicationContext
++        val proxy = PlatformRoute.proxy(app) ?: throw IllegalStateException("代理未运行，无法经核心实测")
++        val before = RootBridge.rootShell(app, "wc -c < $LOG 2>/dev/null", 5_000L).takeIf { it.ok() }?.output?.trim()?.toLongOrNull()
++        val targets = domains.map { it to true } + (CONTROL to false)
++        val responses = coroutineScope {
++            targets.map { (domain, _) -> async { domain to httpGet(domain, proxy) } }.awaitAll().toMap()
++        }
++        delay(300L) // let the core flush its log line for the last request
++        val slice = if (before == null) "" else {
++            val read = RootBridge.rootShell(app,
++                "size=$(wc -c < $LOG 2>/dev/null); if [ \"${'$'}size\" -ge $before ]; then tail -c +${before + 1} $LOG | tail -c 524288; else tail -c 262144 $LOG; fi",
++                6_000L)
++            if (read.ok()) read.output else ""
++        }
++        targets.map { (domain, expect) ->
++            val (code, error) = responses[domain] ?: (null to null)
++            val logged = findDecision(slice, domain)
++            classify(domain, expect, logged, code, if (before == null && logged == null) (error ?: "") + "（无法读取核心日志）" else error)
++        }
++    }
++}
++
++/** Gathers what the audit needs from the controller, the startup copy and the rule store. */
++internal object AdblockAuditBridge {
++    suspend fun audit(context: Context, running: Boolean? = null): AdblockAudit = withContext(Dispatchers.IO) {
++        val app = context.applicationContext
++        val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++        val live = running ?: ProxyStatusBridge.rootProxyRunning(app)
++        val store = RuleStore(app)
++        quietly(Unit) { store.reload() }
++        val controller = MihomoControllerClient(app)
++        val input = AdblockAuditInput(
++            enabled = prefs.getBoolean("proxyAdblockChain", true),
++            running = live,
++            mode = if (live) quietly(null) { controller.configs().optString("mode", "") } else null,
++            startupYaml = quietly(null) { RootProxyManager(app).startupConfig() },
++            rules = if (live) quietly(null) { AdblockAuditor.parseRules(controller.rules()) } else null,
++            providers = if (live) quietly(null) { AdblockAuditor.parseProviders(controller.ruleProviders()) } else null,
++            localRuleCount = store.count(),
++            lastError = prefs.getString("proxyAdblockLastError", "").orEmpty(),
++        )
++        AdblockAuditor.audit(input)
++    }
++
++    /** Ad hosts from the active list (block minus allow) to probe; empty when none is covered. */
++    suspend fun probeDomains(context: Context): List<String> = withContext(Dispatchers.IO) {
++        val store = RuleStore(context.applicationContext)
++        store.reload()
++        val rules = RuleStore.currentExportRules()
++        AdblockProbe.pick(rules.domains, rules.allowDomains)
++    }
++
++    private inline fun <T> quietly(fallback: T, block: () -> T): T = try {
++        block()
++    } catch (cancel: CancellationException) {
++        throw cancel
++    } catch (_: Exception) {
++        fallback
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
+index 4722bed..2207ebf 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
+@@ -94,6 +94,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+     val running = vm.state.running
+     var injected by remember { mutableStateOf<Boolean?>(null) }
+     var loadedInCore by remember { mutableStateOf<Boolean?>(null) }
++    var coreAudit by remember { mutableStateOf<AdblockAudit?>(null) }
+     var showHelp by remember { mutableStateOf(false) }
+
+     LaunchedEffect(revision, running) {
+@@ -109,7 +110,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+             injected = try {
+                 AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
+             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+-            loadedInCore = try {
++            // Strict: the REJECT rule itself, ordered before MATCH, with a non-empty block rule-set
++            // as the core reports them; any rule merely naming the provider is not enough.
++            val audit = try { AdblockAuditBridge.audit(context, true) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++            coreAudit = audit?.takeIf { it.coreAnswered }
++            loadedInCore = coreAudit?.coreChainOk ?: try {
+                 vm.controller.rules().any {
+                     it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
+                 }
+@@ -117,6 +122,7 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+         } else {
+             injected = null
+             loadedInCore = null
++            coreAudit = null
+         }
+     }
+
+@@ -170,7 +176,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+     }
+
+     val lastError = if (revision >= 0) prefs.getString("proxyAdblockLastError", "").orEmpty() else ""
+-    val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank()
++    // The start path records the switch, not a core check; when the core answered, its own
++    // report decides (rule chain loaded and rule mode), otherwise the recorded flag stands.
++    val coreSaysOff = coreAudit?.let { !it.coreChainOk || it.verdict == AdVerdict.NotEffective } ?: false
++    val effective = running && enabled && prefs.getBoolean("proxyAdblockLastEffective", false) && lastError.isBlank() && !coreSaysOff
+     val actualMode = vm.state.trafficMode.lowercase()
+     val wrongMode = running && enabled && actualMode in listOf("global", "direct")
+     val snapshot = rules
+@@ -280,9 +289,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+                     HxDivider(44.dp)
+                     VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
+                     HxDivider(44.dp)
+-                    VerifyRow("Mihomo 规则链", loadedInCore, when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
++                    VerifyRow("Mihomo 规则链", loadedInCore, coreAudit?.checks?.firstOrNull { it.key == "core" && (loadedInCore == true || it.state == AdCheckState.Fail) }?.detail
++                        ?: when (loadedInCore) { true -> "核心已加载 REJECT 规则"; false -> "核心未看到广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
+                     HxDivider(44.dp)
+-                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, if (running) "${stats.count} 次" else "代理启动后统计", neutralFalse = true, successColorOverride = verificationSuccessColor)
++                    VerifyRow("实际拦截", if (running) stats.count > 0 else null, (if (running) "${stats.count} 次" else "代理启动后统计") + " · 点按核查与实测", neutralFalse = true, successColorOverride = verificationSuccessColor,
++                        onClick = { nav.push(HxRoute.AdblockVerify) })
+                 }
+             }
+         }
+@@ -504,10 +515,11 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
+     }
+ }
+ @Composable
+-private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null) {
++private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null, onClick: (() -> Unit)? = null) {
+     val c = Hx.colors
+     val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
+-    Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
++    Row(Modifier.fillMaxWidth().then(if (onClick != null) Modifier.clickable(onClick = onClick) else Modifier)
++        .heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+             AnimatedContent(
+                 targetState = ok,
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerifyScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerifyScreen.kt
+new file mode 100644
+index 0000000..c562033
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerifyScreen.kt
+@@ -0,0 +1,208 @@
++package io.github.xgl34222220.hetu
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HomeDims
++import io.github.xgl34222220.hetu.home.HomeIconButton
++import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomeRollingText
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.HomeVerticalDivider
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
++import io.github.xgl34222220.hetu.ui.ht
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.launch
++
++/**
++ * 去广告核查: the run chain as the core reports it, hit statistics, and a live probe of known ad
++ * domains through the core. All reads run on IO; the page only renders their results.
++ */
++@Composable
++internal fun AdblockVerifyScreen(vm: HetuViewModel, onBack: () -> Unit) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    val c = LocalHomeColors.current
++    var revision by remember { mutableIntStateOf(0) }
++    var loading by remember { mutableStateOf(true) }
++    var audit by remember { mutableStateOf<AdblockAudit?>(null) }
++    var probing by remember { mutableStateOf(false) }
++    var probes by remember { mutableStateOf<List<AdProbeResult>?>(null) }
++    var probeNote by remember { mutableStateOf<String?>(null) }
++    val running = vm.state.running
++
++    LaunchedEffect(revision, running) {
++        loading = true
++        try {
++            audit = AdblockAuditBridge.audit(context, running)
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (error: Exception) {
++            vm.toast(error.message ?: "核查失败")
++        } finally {
++            loading = false
++        }
++    }
++
++    fun probe() {
++        if (probing || !running) return
++        probing = true
++        probeNote = null
++        scope.launch {
++            try {
++                val domains = AdblockAuditBridge.probeDomains(context)
++                if (domains.isEmpty()) probeNote = "当前拦截库里没有内置的测试广告域名（可能已加入白名单），仅检查对照域名"
++                probes = AdblockProbe.run(context, domains)
++                revision++
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                probeNote = error.message ?: "实测失败"
++            } finally {
++                probing = false
++            }
++        }
++    }
++
++    val current = audit
++    HxPage(
++        title = ht("去广告核查"),
++        subtitle = ht("运行链、核心规则与拦截实测"),
++        onBack = onBack,
++        largeTitle = false,
++        actions = { HomeIconButton(HomeIcons.RefreshCw, "重新核查", { revision++ }, enabled = !loading, spinning = loading) },
++    ) {
++        item(key = "verdict") {
++            SettingsSection {
++                if (current == null) {
++                    HxBanner(ht(if (loading) "正在读取核心状态…" else "无法读取广告过滤状态"), tone = HxTone.Neutral)
++                } else {
++                    HxBanner(
++                        current.headline,
++                        tone = when (current.verdict) {
++                            AdVerdict.Effective -> HxTone.Good
++                            AdVerdict.NotEffective -> HxTone.Bad
++                            AdVerdict.Off, AdVerdict.Waiting -> HxTone.Neutral
++                            AdVerdict.Unknown -> HxTone.Warn
++                        },
++                    )
++                }
++            }
++        }
++        item(key = "stats") {
++            SettingsSection {
++                SettingsGroup(title = ht("拦截统计")) {
++                    Row(Modifier.fillMaxWidth().padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
++                        VerifyMetric("核心规则集", current?.coreRuleCount?.let { "%,d".format(it) } ?: "—", Modifier.weight(1f))
++                        HomeVerticalDivider(Modifier.height(34.dp))
++                        VerifyMetric("规则命中", current?.ruleHits?.let { "%,d".format(it) } ?: "—", Modifier.weight(1f))
++                        HomeVerticalDivider(Modifier.height(34.dp))
++                        VerifyMetric("本次拦截", "%,d".format(vm.prefs.getLong("proxyAdblockSessionHits", 0L).takeIf { revision >= 0 } ?: 0L), Modifier.weight(1f))
++                    }
++                }
++            }
++        }
++        item(key = "checks") {
++            SettingsSection {
++                SettingsGroup(title = ht("运行链核查")) {
++                    val checks = current?.checks.orEmpty()
++                    if (checks.isEmpty()) SettingsRow(ht("读取中"), icon = ToolsFeatureIcons.CircleDashed, iconTint = c.t3, compact = true) { HxSpinner(18.dp) }
++                    checks.forEachIndexed { index, check ->
++                        if (index > 0) SettingsDivider()
++                        val (icon, tint) = checkLook(check.state)
++                        SettingsRow(ht(check.title), subtitle = check.detail, icon = icon, iconTint = tint, compact = true)
++                    }
++                }
++            }
++        }
++        item(key = "probe") {
++            SettingsSection {
++                SettingsGroup(title = ht("拦截实测")) {
++                    SettingsRow(
++                        ht("开始实测"),
++                        subtitle = ht(if (running) "经核心请求几个已知广告域名与一个对照域名，并读取核心日志里的判定" else "代理运行时可用"),
++                        icon = ToolsFeatureIcons.ShieldCheck,
++                        enabled = running && !probing,
++                        onClick = ::probe,
++                    ) { if (probing) HxSpinner(18.dp) else HxChevron() }
++                    probeNote?.let { note ->
++                        HxBanner(note, tone = HxTone.Warn, modifier = Modifier.padding(start = 14.dp, end = 14.dp, top = 2.dp, bottom = 10.dp))
++                    }
++                    probes.orEmpty().forEach { result ->
++                        SettingsDivider()
++                        val ok = AdblockProbe.asExpected(result)
++                        val icon = when {
++                            result.verdict == AdProbeVerdict.Unknown -> ToolsFeatureIcons.CircleDashed
++                            ok -> HomeIcons.CircleCheck
++                            else -> HomeIcons.CircleAlert
++                        }
++                        val tint = when {
++                            result.verdict == AdProbeVerdict.Unknown -> c.warn
++                            ok -> c.good
++                            else -> c.bad
++                        }
++                        val label = if (result.expectBlocked) result.domain else result.domain + ht("（对照）")
++                        SettingsRow(label, subtitle = result.detail, icon = icon, iconTint = tint, compact = true) {
++                            Text(
++                                ht(when (result.verdict) {
++                                    AdProbeVerdict.Blocked, AdProbeVerdict.BlockedByOther -> "已拦截"
++                                    AdProbeVerdict.Allowed -> "已放行"
++                                    AdProbeVerdict.Unknown -> "未确认"
++                                }),
++                                color = tint, style = HomeType.value, maxLines = 1,
++                            )
++                        }
++                    }
++                }
++            }
++        }
++        item(key = "note") {
++            Text(
++                ht("说明：Root 代理内的去广告由 Mihomo 规则执行——广告域名的连接被 REJECT，DNS 查询本身照常应答（fake-ip 下得到虚拟地址）。只在「规则」模式下生效；不进入核心的应用（应用名单外或直连放行）与 HTTPS 页面内嵌的同域广告不受影响。实测请求会计入一次拦截次数。"),
++                Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap),
++                color = c.t2,
++                style = HomeType.note,
++            )
++        }
++    }
++}
++
++@Composable
++private fun checkLook(state: AdCheckState): Pair<ImageVector, Color> {
++    val c = LocalHomeColors.current
++    return when (state) {
++        AdCheckState.Pass -> HomeIcons.CircleCheck to c.good
++        AdCheckState.Warn -> HomeIcons.TriangleAlert to c.warn
++        AdCheckState.Fail -> HomeIcons.CircleAlert to c.bad
++        AdCheckState.Pending -> ToolsFeatureIcons.CircleDashed to c.t3
++    }
++}
++
++@Composable
++private fun VerifyMetric(label: String, value: String, modifier: Modifier) {
++    val c = LocalHomeColors.current
++    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
++        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1)
++        HomeRollingText(value, c.accent, HomeType.metric.copy(fontSize = HomeType.sheetTitle.fontSize), alignment = Alignment.Center)
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigImportScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigImportScreen.kt
+new file mode 100644
+index 0000000..2e6952a
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigImportScreen.kt
+@@ -0,0 +1,366 @@
++package io.github.xgl34222220.hetu
++
++import android.content.ClipboardManager
++import android.content.Context
++import android.net.Uri
++import android.provider.OpenableColumns
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.background
++import androidx.compose.foundation.horizontalScroll
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.text.KeyboardOptions
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.text.AnnotatedString
++import androidx.compose.ui.text.SpanStyle
++import androidx.compose.ui.text.buildAnnotatedString
++import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.text.withStyle
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import io.github.xgl34222220.hetu.home.HomeDims
++import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.tools.ToolsIcons
++import io.github.xgl34222220.hetu.ui.ht
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++/** A config text waiting for the user's decision: where it came from and what the checks said. */
++private data class ImportCandidate(
++    val origin: String,
++    val name: String,
++    val text: String,
++    val check: ConfigCheck,
++    /** Against the current config; null when there is none. */
++    val diff: ConfigDiff?,
++)
++
++private enum class ImportMode { New, Replace }
++
++/**
++ * 基础代理配置 › 导入配置: file / link / clipboard → strict decode, YAML pre-check and a diff
++ * against the current config → the core's validation → backup, atomic write, hot reload, and
++ * rollback when the running core refuses it. Also lists backups for one-tap restore.
++ */
++@Composable
++internal fun ConfigImportScreen(vm: HetuViewModel, onBack: () -> Unit) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    val c = LocalHomeColors.current
++    var busy by remember { mutableStateOf<String?>(null) }
++    var url by remember { mutableStateOf("") }
++    var candidate by remember { mutableStateOf<ImportCandidate?>(null) }
++    var name by remember { mutableStateOf("") }
++    var mode by remember { mutableStateOf(ImportMode.New) }
++    var current by remember { mutableStateOf<String?>(null) }
++    var result by remember { mutableStateOf<ConfigApplyResult?>(null) }
++    var failure by remember { mutableStateOf<String?>(null) }
++    var backups by remember { mutableStateOf<List<ConfigBackup>>(emptyList()) }
++    var restoreTarget by remember { mutableStateOf<ConfigBackup?>(null) }
++    var revision by remember { mutableIntStateOf(0) }
++
++    LaunchedEffect(revision) {
++        try {
++            val (selected, list) = withContext(Dispatchers.IO) {
++                LibraryConfigStore(context).selectedName() to LibraryConfigStore.backups(context).list().take(12)
++            }
++            current = selected
++            backups = list
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (_: Exception) {
++            backups = emptyList()
++        }
++    }
++
++    fun task(key: String, block: suspend () -> Unit) {
++        if (busy != null) return
++        busy = key
++        failure = null
++        scope.launch {
++            try {
++                block()
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                failure = error.message ?: "操作失败"
++            } finally {
++                busy = null
++            }
++        }
++    }
++
++    /** Decode, check and diff off the main thread, then show the preview. */
++    suspend fun stage(origin: String, requestedName: String, text: String) {
++        val prepared = withContext(Dispatchers.Default) {
++            val check = ConfigText.inspect(text)
++            val store = LibraryConfigStore(context)
++            val selected = withContext(Dispatchers.IO) { store.selectedName() }
++            val old = selected?.let { withContext(Dispatchers.IO) { store.read(it) } }
++            ImportCandidate(origin, requestedName, text, check, old?.let { ConfigDiffer.diff(it, text) })
++        }
++        candidate = prepared
++        name = prepared.name
++        result = null
++    }
++
++    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
++        if (uri != null) task("file") {
++            val (display, text) = withContext(Dispatchers.IO) {
++                val stream = context.contentResolver.openInputStream(uri) ?: throw java.io.IOException("无法读取所选文件")
++                importDisplayName(context, uri) to ConfigText.decode(ConfigText.readLimited(stream))
++            }
++            stage(ht0("文件"), ConfigText.importName(display), text)
++        }
++    }
++
++    fun apply() {
++        val pending = candidate ?: return
++        pending.check.error?.let { failure = it; return }
++        task("apply") {
++            val transaction = LibraryConfigStore.transaction(context, vm)
++            val target = current
++            val outcome = if (mode == ImportMode.Replace && target != null) {
++                transaction.save(target, pending.text)
++            } else {
++                transaction.import(ConfigText.importName(name.ifBlank { pending.name }), pending.text).second
++            }
++            result = outcome
++            if (outcome !is ConfigApplyResult.RolledBack) candidate = null
++            vm.toast(outcome.message)
++            vm.bumpSettings()
++            vm.refreshNow()
++            revision++
++        }
++    }
++
++    HxPage(title = ht("导入配置"), subtitle = ht("文件、链接或剪贴板中的 Mihomo YAML"), onBack = onBack, largeTitle = false) {
++        item(key = "sources") {
++            SettingsSection {
++                SettingsGroup(title = ht("来源")) {
++                    SettingsRow(ht("选择文件"), subtitle = ht("从本机或网盘选择 .yaml / .yml"), icon = ToolsIcons.FileText, enabled = busy == null,
++                        onClick = { launchDocumentPicker(vm::toast) { picker.launch(arrayOf("*/*")) } }) {
++                        if (busy == "file") HxSpinner(18.dp) else HxChevron()
++                    }
++                    SettingsDivider()
++                    SettingsRow(ht("从剪贴板读取"), subtitle = ht("读取已复制的完整 YAML 文本"), icon = HomeIcons.Copy, enabled = busy == null,
++                        onClick = {
++                            val clip = try {
++                                val manager = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
++                                manager?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString()
++                            } catch (_: Exception) { null }
++                            if (clip.isNullOrBlank()) failure = "剪贴板里没有文本"
++                            else task("clipboard") {
++                                if (clip.toByteArray(Charsets.UTF_8).size > ConfigText.LIMIT) throw java.io.IOException("配置超过 4 MiB")
++                                stage("剪贴板", ConfigText.importName(null, "剪贴板配置"), clip.removePrefix("\uFEFF"))
++                            }
++                        }) {
++                        if (busy == "clipboard") HxSpinner(18.dp) else HxChevron()
++                    }
++                    SettingsDivider()
++                    Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 10.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                        HxTextField(
++                            url, { url = it }, Modifier.fillMaxWidth(),
++                            label = { Text(ht("从链接下载")) },
++                            placeholder = { Text("https://…/config.yaml") },
++                            singleLine = true,
++                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri),
++                        )
++                        HxButton(ht("下载并预览"), {
++                            task("url") {
++                                val (fileName, text) = ConfigText.download(url)
++                                stage("链接", fileName, text)
++                            }
++                        }, Modifier.fillMaxWidth(), icon = HxIcons.CloudDownload, enabled = busy == null && url.isNotBlank(), busy = busy == "url")
++                    }
++                }
++            }
++        }
++        failure?.let { text ->
++            item(key = "failure") {
++                SettingsSection { HxBanner(text, tone = HxTone.Bad, actionLabel = "关闭", onAction = { failure = null }) }
++            }
++        }
++        result?.let { outcome ->
++            item(key = "result") {
++                SettingsSection {
++                    HxBanner(
++                        outcome.message,
++                        tone = when (outcome) {
++                            is ConfigApplyResult.Applied -> HxTone.Good
++                            is ConfigApplyResult.NeedsRestart -> HxTone.Warn
++                            is ConfigApplyResult.RolledBack -> HxTone.Bad
++                        },
++                        actionLabel = if (outcome is ConfigApplyResult.NeedsRestart && vm.operation == null && vm.state.running) "立即重启" else null,
++                        onAction = { vm.restart() },
++                    )
++                }
++            }
++        }
++        candidate?.let { pending ->
++            item(key = "preview") {
++                SettingsSection {
++                    SettingsGroup(title = ht("预检") + " · " + pending.origin) {
++                        val check = pending.check
++                        if (check.error != null) {
++                            SettingsRow(ht("无法导入"), subtitle = check.error, icon = HomeIcons.CircleAlert, iconTint = c.bad)
++                        } else {
++                            SettingsRow(
++                                ht("YAML 结构"),
++                                subtitle = "${check.lines} " + ht("行") + " · ${HxFormat.bytes(check.bytes.toLong())} · " +
++                                    ht("节点") + " ${check.proxies} · " + ht("订阅") + " ${check.providers} · " + ht("策略组") + " ${check.groups} · " + ht("规则") + " ${check.rules}",
++                                icon = HomeIcons.CircleCheck, iconTint = c.good,
++                            )
++                            check.warnings.forEach { warning ->
++                                SettingsDivider()
++                                SettingsRow(warning, icon = HomeIcons.TriangleAlert, iconTint = c.warn, compact = true)
++                            }
++                        }
++                    }
++                }
++            }
++            if (pending.check.ok) {
++                item(key = "target") {
++                    SettingsSection {
++                        SettingsGroup(title = ht("导入方式")) {
++                            Column(Modifier.padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                                HxSegmented(
++                                    options = listOf(ImportMode.New.name to ht("新配置并启用"), ImportMode.Replace.name to ht("覆盖当前配置")),
++                                    selected = mode.name,
++                                    onSelect = { mode = ImportMode.valueOf(it) },
++                                    enabled = busy == null && current != null,
++                                )
++                                if (mode == ImportMode.New || current == null) {
++                                    HxTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(ht("配置名称")) }, singleLine = true)
++                                } else {
++                                    Text(ht("将覆盖「") + current.orEmpty() + ht("」，原内容会先备份。"), color = c.t2, style = HomeType.note)
++                                }
++                            }
++                        }
++                    }
++                }
++                pending.diff?.let { diff ->
++                    item(key = "diff") {
++                        SettingsSection {
++                            SettingsGroup(title = ht("与当前配置的差异") + " · +${diff.added} / −${diff.removed}") {
++                                Box(Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp)) { ConfigDiffPreview(diff) }
++                            }
++                        }
++                    }
++                }
++                item(key = "apply") {
++                    SettingsSection {
++                        HxButton(
++                            ht("校验并应用"), ::apply, Modifier.fillMaxWidth(), icon = HomeIcons.CircleCheck,
++                            enabled = busy == null, busy = busy == "apply",
++                        )
++                        Text(
++                            ht(if (vm.state.running) "先由核心校验；代理运行中会立即热重载，核心拒绝时自动恢复原配置。" else "先由核心校验；代理未运行，下次启动时生效。"),
++                            Modifier.padding(top = 8.dp, start = 4.dp, end = 4.dp), color = c.t2, style = HomeType.note,
++                        )
++                    }
++                }
++            }
++        }
++        item(key = "backups") {
++            SettingsSection {
++                SettingsGroup(title = ht("备份与恢复")) {
++                    if (backups.isEmpty()) {
++                        SettingsRow(ht("暂无备份"), subtitle = ht("编辑或导入覆盖前会自动备份原配置（每个配置保留 10 份）"), icon = HomeIcons.Clock, iconTint = c.t3)
++                    }
++                    backups.forEachIndexed { index, backup ->
++                        if (index > 0) SettingsDivider()
++                        SettingsRow(
++                            backup.configName,
++                            subtitle = HxFormat.ago(backup.createdAt) + " · " + HxFormat.bytes(backup.size) + " · " + ht(if (backup.reason == "import") "导入前" else "编辑前"),
++                            icon = HomeIcons.RotateCcw, enabled = busy == null, compact = true,
++                            onClick = { restoreTarget = backup },
++                        ) { if (busy == "restore-${backup.file.name}") HxSpinner(18.dp) else HxChevron() }
++                    }
++                }
++            }
++        }
++    }
++
++    restoreTarget?.let { backup ->
++        HxConfirmDialog(
++            title = "恢复这份备份？",
++            message = "将用 ${HxFormat.ago(backup.createdAt)} 的备份覆盖「${backup.configName}」，当前内容会先备份。",
++            confirmLabel = "恢复",
++            onConfirm = {
++                restoreTarget = null
++                task("restore-${backup.file.name}") {
++                    val outcome = LibraryConfigStore.transaction(context, vm).restore(backup)
++                    result = outcome
++                    vm.toast(outcome.message)
++                    vm.refreshNow()
++                    revision++
++                }
++            },
++            onDismiss = { restoreTarget = null },
++        )
++    }
++}
++
++/** Non-composable label helper for text built inside coroutines. */
++private fun ht0(text: String): String = text
++
++private fun importDisplayName(context: Context, uri: Uri): String? {
++    val queried = try {
++        context.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { cursor ->
++            if (cursor.moveToFirst()) cursor.getString(0) else null
++        }
++    } catch (_: Exception) {
++        null
++    }
++    return queried ?: uri.lastPathSegment
++}
++
++/** Unified diff preview: monospace, coloured, scrollable both ways, height-bounded. */
++@Composable
++internal fun ConfigDiffPreview(diff: ConfigDiff, modifier: Modifier = Modifier) {
++    val c = LocalHomeColors.current
++    val text: AnnotatedString = remember(diff, c) {
++        buildAnnotatedString {
++            if (diff.lines.isEmpty()) append("（无差异）")
++            diff.lines.forEachIndexed { index, line ->
++                if (index > 0) append('\n')
++                when (line.kind) {
++                    '+' -> withStyle(SpanStyle(color = c.good, background = c.goodSoft)) { append("+ ").append(line.text) }
++                    '-' -> withStyle(SpanStyle(color = c.bad, background = c.badSoft)) { append("- ").append(line.text) }
++                    '…' -> withStyle(SpanStyle(color = c.t3)) { append("⋯ ${line.text} 行未改动") }
++                    else -> withStyle(SpanStyle(color = c.t2)) { append("  ").append(line.text) }
++                }
++            }
++            if (diff.truncated) withStyle(SpanStyle(color = c.t3)) { append("\n⋯ 仅显示前 ${diff.lines.size} 行差异") }
++        }
++    }
++    Box(
++        modifier.fillMaxWidth().heightIn(max = 320.dp).clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg)
++            .verticalScroll(rememberScrollState()).horizontalScroll(rememberScrollState()).padding(horizontal = 12.dp, vertical = 10.dp),
++    ) {
++        Text(text, style = HomeType.mono.copy(fontSize = 12.sp, lineHeight = 17.sp), softWrap = false)
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+index 63c8e03..1c6041c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
+@@ -730,6 +730,9 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+         }
+     }
+
++    // 保存前预览：本次改动与源文件的差异；确认后经事务写入（先备份，运行中热重载，核心拒绝时回滚源文件）。
++    var savePreview by remember { mutableStateOf<Pair<String, ConfigDiff>?>(null) }
++
+     fun save() {
+         val expected = source ?: return
+         val current = editor?.text?.toString() ?: return
+@@ -740,20 +743,48 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+                 val latest = hxReadConfigSource(context)
+                 if (latest.core != expected.core || latest.name != expected.name) throw HxConfigSourceConflict(true, latest.name)
+                 if (latest.text != expected.text) throw HxConfigSourceConflict(false, latest.name)
++                ConfigText.inspect(current).error?.let { throw IOException(it) }
+                 vm.controller.validateConfigText(current)
+-                withContext(Dispatchers.IO) {
+-                    // Validation may take time. Recheck identity and contents immediately before writing.
+-                    val library = ProxyConfigLibrary(context)
+-                    val core = ProxyRuntimeProfile.load(vm.prefs).core
+-                    val entry = library.selected(core) ?: error("尚未选择配置")
+-                    if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
+-                    if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
+-                    library.write(entry, current)
+-                }
+-                source = expected.copy(text = current)
+-                dirty = editor?.text?.toString() != current
++                val diff = withContext(Dispatchers.Default) { ConfigDiffer.diff(expected.text, current) }
+                 problem = null
+-                vm.applyConfigChange("配置已保存")
++                savePreview = current to diff
++            } catch (cancel: CancellationException) { throw cancel }
++            catch (changed: HxConfigSourceConflict) { conflict = changed }
++            catch (error: Exception) { problem = error.message ?: "保存失败" }
++            finally { saving = false }
++        }
++    }
++
++    fun commit(current: String) {
++        val expected = source ?: return
++        if (saving) return
++        saving = true
++        savePreview = null
++        scope.launch {
++            try {
++                val core = ProxyRuntimeProfile.load(vm.prefs).core
++                if (core != expected.core) throw HxConfigSourceConflict(true, expected.name)
++                // The core already validated this exact text in save(); the transaction re-checks the file under it.
++                val transaction = ConfigTransaction(
++                    store = LibraryConfigStore(context), backups = LibraryConfigStore.backups(context),
++                    validate = { },
++                    runningIdle = { if (!vm.state.running) false else if (vm.operation != null) null else true },
++                    reload = { vm.controller.reload() },
++                )
++                val result = try {
++                    transaction.save(expected.name, current, expected = expected.text)
++                } catch (conflicted: ConfigConflictException) {
++                    throw HxConfigSourceConflict(false, expected.name)
++                }
++                if (result is ConfigApplyResult.RolledBack) {
++                    problem = result.message
++                } else {
++                    source = expected.copy(text = current)
++                    dirty = editor?.text?.toString() != current
++                    problem = null
++                    vm.toast(result.message)
++                }
++                vm.refreshNow()
+             } catch (cancel: CancellationException) { throw cancel }
+             catch (changed: HxConfigSourceConflict) { conflict = changed }
+             catch (error: Exception) { problem = error.message ?: "保存失败" }
+@@ -893,6 +924,20 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+             }
+         }
+     }
++    savePreview?.let { (pending, diff) ->
++        HxSheet(onDismiss = { savePreview = null }, title = ht("保存前确认")) {
++            Column(Modifier.padding(horizontal = 20.dp).padding(bottom = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                Text(
++                    if (diff.identical) ht("内容没有变化。") else "+${diff.added} / −${diff.removed} " + ht("行") + " · " + ht("原配置会先备份，可在「导入配置 › 备份与恢复」找回"),
++                    color = c.t2, style = HomeType.note,
++                )
++                ConfigDiffPreview(diff)
++                Text(ht(if (vm.state.running) "代理运行中：保存后立即热重载；核心拒绝时自动恢复原配置。" else "代理未运行：保存后下次启动生效。"), color = c.t2, style = HomeType.note)
++                HxButton("保存并应用", { commit(pending) }, Modifier.fillMaxWidth(), icon = HomeIcons.Save, enabled = !diff.identical)
++                HxButton("继续编辑", { savePreview = null }, Modifier.fillMaxWidth(), filled = false)
++            }
++        }
++    }
+     if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
+         "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
+         onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
+new file mode 100644
+index 0000000..b69ad76
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
+@@ -0,0 +1,438 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import java.io.ByteArrayOutputStream
++import java.io.File
++import java.io.FileOutputStream
++import java.io.IOException
++import java.io.InputStream
++import java.net.HttpURLConnection
++import java.net.URL
++import java.net.URLDecoder
++import java.net.URLEncoder
++import java.nio.ByteBuffer
++import java.nio.charset.CharacterCodingException
++import java.nio.charset.CodingErrorAction
++import java.nio.charset.StandardCharsets
++import java.util.Locale
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.NonCancellable
++import kotlinx.coroutines.withContext
++import org.yaml.snakeyaml.LoaderOptions
++import org.yaml.snakeyaml.Yaml
++import org.yaml.snakeyaml.error.MarkedYAMLException
++
++/*
++ * 基础代理配置 › 编辑 / 导入.
++ *
++ * Every write of a source config goes through [ConfigTransaction]: strict decoding and a YAML
++ * pre-check, the core's own `-t` validation, a backup of the replaced text, an atomic write
++ * (ProxyConfigLibrary), a hot reload when the proxy runs, and a rollback of the source when the
++ * running core refuses the new config. The storage format of the config library is unchanged;
++ * backups live in their own directory.
++ */
++
++/* ------------------------------ 文本与预检 ------------------------------ */
++
++internal data class ConfigCheck(
++    val error: String?,
++    val warnings: List<String>,
++    val proxies: Int,
++    val providers: Int,
++    val groups: Int,
++    val rules: Int,
++    val lines: Int,
++    val bytes: Int,
++) {
++    val ok: Boolean get() = error == null
++}
++
++internal object ConfigText {
++    const val LIMIT = 4 * 1024 * 1024
++
++    /** Strict UTF-8 (BOM dropped); rejects empty, binary and oversize input. */
++    fun decode(bytes: ByteArray): String {
++        if (bytes.isEmpty()) throw IOException("配置为空")
++        if (bytes.size > LIMIT) throw IOException("配置超过 4 MiB")
++        val text = try {
++            StandardCharsets.UTF_8.newDecoder()
++                .onMalformedInput(CodingErrorAction.REPORT)
++                .onUnmappableCharacter(CodingErrorAction.REPORT)
++                .decode(ByteBuffer.wrap(bytes)).toString()
++        } catch (_: CharacterCodingException) {
++            throw IOException("配置必须是 UTF-8 文本")
++        }
++        val body = text.removePrefix("\uFEFF")
++        if (body.indexOf('\u0000') >= 0) throw IOException("这不是文本配置文件")
++        if (body.isBlank()) throw IOException("配置为空")
++        return body
++    }
++
++    /** Reads at most [LIMIT] + 1 bytes so an oversize source is refused without loading it all. */
++    fun readLimited(input: InputStream): ByteArray = input.use { stream ->
++        val out = ByteArrayOutputStream()
++        val buffer = ByteArray(16 * 1024)
++        var total = 0
++        while (true) {
++            val n = stream.read(buffer)
++            if (n < 0) break
++            total += n
++            if (total > LIMIT) throw IOException("配置超过 4 MiB")
++            out.write(buffer, 0, n)
++        }
++        out.toByteArray()
++    }
++
++    private val base64Line = Regex("^[A-Za-z0-9+/=_-]{40,}$")
++
++    /** Local YAML pre-check; the core's `-t` remains the authority. */
++    fun inspect(text: String): ConfigCheck {
++        val bytes = text.toByteArray(StandardCharsets.UTF_8).size
++        val lines = text.count { it == '\n' } + 1
++        fun fail(message: String) = ConfigCheck(message, emptyList(), 0, 0, 0, 0, lines, bytes)
++        val trimmed = text.trim()
++        if (trimmed.isEmpty()) return fail("配置为空")
++        if (!trimmed.contains(':') && trimmed.lineSequence().all { it.isBlank() || base64Line.matches(it.trim()) })
++            return fail("这是 Base64 节点订阅，不是 Mihomo YAML 配置；请在「配置与订阅」里作为订阅链接添加")
++        if (trimmed.startsWith("<")) return fail("这是网页内容，不是 YAML 配置")
++        val root = try {
++            val options = LoaderOptions().apply {
++                codePointLimit = LIMIT * 2
++                maxAliasesForCollections = 200
++                isAllowDuplicateKeys = true
++            }
++            Yaml(options).load<Any?>(text)
++        } catch (marked: MarkedYAMLException) {
++            val line = marked.problemMark?.line?.plus(1)
++            return fail("第 ${line ?: "?"} 行 YAML 语法错误：${marked.problem ?: marked.message.orEmpty().lineSequence().firstOrNull().orEmpty()}")
++        } catch (error: Exception) {
++            return fail("YAML 无法解析：${error.message?.lineSequence()?.firstOrNull() ?: error.javaClass.simpleName}")
++        }
++        if (root !is Map<*, *>) return fail("顶层必须是键值映射（例如 proxies: / rules:）")
++        fun size(key: String): Int = when (val value = root[key]) {
++            is Collection<*> -> value.size
++            is Map<*, *> -> value.size
++            else -> 0
++        }
++        val proxies = size("proxies")
++        val providers = size("proxy-providers")
++        val warnings = ArrayList<String>()
++        if (proxies == 0 && providers == 0) warnings += "没有节点（proxies）也没有订阅（proxy-providers）"
++        if (size("proxy-groups") == 0) warnings += "没有策略组（proxy-groups）"
++        if (size("rules") == 0 && root["rules"] !is String) warnings += "没有分流规则（rules），流量全部走默认"
++        return ConfigCheck(null, warnings, proxies, providers, size("proxy-groups"), size("rules"), lines, bytes)
++    }
++
++    /** A library file name for an import: keeps a given name, otherwise one from the URL path. */
++    fun importName(raw: String?, fallback: String = "导入配置"): String {
++        var name = raw.orEmpty().substringAfterLast('/').substringBefore('?').substringBefore('#').trim()
++        name = try { URLDecoder.decode(name, "UTF-8") } catch (_: Exception) { name }
++        name = name.replace(Regex("[\\\\/\\u0000-\\u001f]"), "_").trim().take(100)
++        if (name.isBlank() || name == "." || name == "..") name = fallback
++        val lower = name.lowercase(Locale.ROOT)
++        if (!lower.endsWith(".yaml") && !lower.endsWith(".yml")) name += ".yaml"
++        if (name.length < 3) name = "$fallback.yaml"
++        return name
++    }
++
++    /** Downloads a config over HTTP(S); bounded in size and time. Runs on IO. */
++    suspend fun download(url: String): Pair<String, String> = withContext(Dispatchers.IO) {
++        val trimmed = url.trim()
++        if (!(trimmed.startsWith("https://", true) || trimmed.startsWith("http://", true)) || trimmed.length > 4096)
++            throw IOException("请输入有效的 http/https 链接")
++        var connection: HttpURLConnection? = null
++        try {
++            connection = (URL(trimmed).openConnection() as HttpURLConnection).apply {
++                instanceFollowRedirects = true
++                connectTimeout = 10_000
++                readTimeout = 20_000
++                setRequestProperty("User-Agent", "clash.meta (Hetu)")
++                setRequestProperty("Accept", "*/*")
++            }
++            val code = connection.responseCode
++            if (code !in 200..299) throw IOException("下载失败：HTTP $code")
++            val declared = connection.contentLengthLong
++            if (declared > LIMIT) throw IOException("配置超过 4 MiB")
++            val text = decode(readLimited(connection.inputStream))
++            val header = connection.getHeaderField("Content-Disposition").orEmpty()
++            val named = Regex("filename\\*?=(?:UTF-8'')?\"?([^\";]+)").find(header)?.groupValues?.get(1)
++            importName(named ?: connection.url.path) to text
++        } finally {
++            try { connection?.disconnect() } catch (_: Exception) {}
++        }
++    }
++}
++
++/* ------------------------------ 差异预览 ------------------------------ */
++
++internal data class DiffLine(val kind: Char, val text: String)
++
++internal data class ConfigDiff(val added: Int, val removed: Int, val lines: List<DiffLine>, val truncated: Boolean) {
++    val identical: Boolean get() = added == 0 && removed == 0
++}
++
++internal object ConfigDiffer {
++    /** Cells above this fall back to a block replace (still correct, not minimal). */
++    private const val MAX_CELLS = 1_000_000L
++
++    /**
++     * Line diff with [context] unchanged lines around each change; at most [maxLines] lines are
++     * returned. `' '` unchanged, `'+'` added, `'-'` removed, `'…'` skipped unchanged lines.
++     */
++    fun diff(old: String, new: String, context: Int = 2, maxLines: Int = 400): ConfigDiff {
++        val a = old.split('\n')
++        val b = new.split('\n')
++        var prefix = 0
++        while (prefix < a.size && prefix < b.size && a[prefix] == b[prefix]) prefix++
++        var suffix = 0
++        while (suffix < a.size - prefix && suffix < b.size - prefix && a[a.size - 1 - suffix] == b[b.size - 1 - suffix]) suffix++
++        val midA = a.subList(prefix, a.size - suffix)
++        val midB = b.subList(prefix, b.size - suffix)
++        val ops = ArrayList<DiffLine>(a.size + 8)
++        for (i in 0 until prefix) ops += DiffLine(' ', a[i])
++        if (midA.size.toLong() * midB.size.toLong() <= MAX_CELLS) ops += lcs(midA, midB)
++        else { midA.forEach { ops += DiffLine('-', it) }; midB.forEach { ops += DiffLine('+', it) } }
++        for (i in a.size - suffix until a.size) ops += DiffLine(' ', a[i])
++        val added = ops.count { it.kind == '+' }
++        val removed = ops.count { it.kind == '-' }
++        // Keep changes plus [context] lines around them.
++        val keep = BooleanArray(ops.size)
++        ops.forEachIndexed { index, line ->
++            if (line.kind != ' ') for (k in (index - context).coerceAtLeast(0)..(index + context).coerceAtMost(ops.size - 1)) keep[k] = true
++        }
++        val out = ArrayList<DiffLine>()
++        var skipped = 0
++        var truncated = false
++        for (index in ops.indices) {
++            if (!keep[index]) { skipped++; continue }
++            if (skipped > 0) { out += DiffLine('…', "$skipped"); skipped = 0 }
++            if (out.size >= maxLines) { truncated = true; break }
++            out += ops[index]
++        }
++        if (!truncated && skipped > 0 && out.isNotEmpty()) out += DiffLine('…', "$skipped")
++        return ConfigDiff(added, removed, out, truncated)
++    }
++
++    private fun lcs(a: List<String>, b: List<String>): List<DiffLine> {
++        val n = a.size
++        val m = b.size
++        if (n == 0) return b.map { DiffLine('+', it) }
++        if (m == 0) return a.map { DiffLine('-', it) }
++        val width = m + 1
++        val table = IntArray((n + 1) * width)
++        for (i in n - 1 downTo 0) for (j in m - 1 downTo 0) {
++            table[i * width + j] = if (a[i] == b[j]) table[(i + 1) * width + j + 1] + 1
++                else maxOf(table[(i + 1) * width + j], table[i * width + j + 1])
++        }
++        val out = ArrayList<DiffLine>(n + m)
++        var i = 0
++        var j = 0
++        while (i < n && j < m) {
++            when {
++                a[i] == b[j] -> { out += DiffLine(' ', a[i]); i++; j++ }
++                table[(i + 1) * width + j] >= table[i * width + j + 1] -> { out += DiffLine('-', a[i]); i++ }
++                else -> { out += DiffLine('+', b[j]); j++ }
++            }
++        }
++        while (i < n) out += DiffLine('-', a[i++])
++        while (j < m) out += DiffLine('+', b[j++])
++        return out
++    }
++}
++
++/* ------------------------------ 备份 ------------------------------ */
++
++internal data class ConfigBackup(val file: File, val configName: String, val createdAt: Long, val reason: String, val size: Long)
++
++/** Copies of replaced source text, newest first, [keep] per config. */
++internal class ConfigBackups(private val root: File, private val keep: Int = 10) {
++    private fun dir(configName: String) = File(root, URLEncoder.encode(configName, "UTF-8"))
++
++    fun save(configName: String, text: String, reason: String, now: Long = System.currentTimeMillis()): ConfigBackup {
++        val dir = dir(configName)
++        if (!dir.isDirectory && !dir.mkdirs()) throw IOException("无法创建配置备份目录")
++        val safeReason = reason.filter { it.isLetterOrDigit() }.take(16).ifEmpty { "edit" }
++        var stamp = now
++        var target = File(dir, "$stamp-$safeReason.yaml")
++        while (target.exists()) { stamp++; target = File(dir, "$stamp-$safeReason.yaml") }
++        val temp = File(dir, target.name + ".new")
++        try {
++            FileOutputStream(temp, false).use { out -> out.write(text.toByteArray(StandardCharsets.UTF_8)); out.fd.sync() }
++            if (!temp.renameTo(target)) throw IOException("无法保存配置备份")
++        } catch (error: IOException) {
++            temp.delete()
++            throw error
++        }
++        prune(configName)
++        return ConfigBackup(target, configName, stamp, safeReason, target.length())
++    }
++
++    fun list(configName: String? = null): List<ConfigBackup> {
++        val dirs = if (configName != null) listOf(dir(configName)) else root.listFiles { file -> file.isDirectory }?.toList().orEmpty()
++        return dirs.flatMap { dir ->
++            val name = try { URLDecoder.decode(dir.name, "UTF-8") } catch (_: Exception) { dir.name }
++            dir.listFiles { file -> file.isFile && file.name.endsWith(".yaml") }.orEmpty().mapNotNull { file ->
++                val parts = file.name.removeSuffix(".yaml").split('-', limit = 2)
++                val at = parts.firstOrNull()?.toLongOrNull() ?: return@mapNotNull null
++                ConfigBackup(file, name, at, parts.getOrNull(1).orEmpty(), file.length())
++            }
++        }.sortedByDescending { it.createdAt }
++    }
++
++    fun read(backup: ConfigBackup): String = ConfigText.decode(backup.file.readBytes())
++
++    private fun prune(configName: String) {
++        list(configName).drop(keep).forEach { it.file.delete() }
++    }
++}
++
++/* ------------------------------ 事务 ------------------------------ */
++
++/** The config library as the transaction sees it (current core only). */
++internal interface ConfigStore {
++    fun selectedName(): String?
++    fun names(): List<String>
++    fun read(name: String): String
++    fun write(name: String, text: String)
++    /** Adds a new file (unique name) and makes it current; returns its name. */
++    fun create(requestedName: String, text: String): String
++    fun select(name: String)
++}
++
++internal sealed interface ConfigApplyResult {
++    val message: String
++    /** Saved and, when the proxy runs, hot-reloaded into the core. */
++    data class Applied(override val message: String) : ConfigApplyResult
++    /** Saved; network-layer changes or a busy proxy need an explicit restart. */
++    data class NeedsRestart(override val message: String) : ConfigApplyResult
++    /** The core refused it while running; the source was restored. */
++    data class RolledBack(override val message: String) : ConfigApplyResult
++}
++
++internal class ConfigConflictException(message: String) : IOException(message)
++
++internal class ConfigTransaction(
++    private val store: ConfigStore,
++    private val backups: ConfigBackups,
++    private val validate: suspend (String) -> Unit,
++    /** The proxy runs and nothing else is operating on it. Null: it runs but is busy. */
++    private val runningIdle: () -> Boolean?,
++    private val reload: suspend () -> String,
++) {
++    companion object {
++        /** RootProxyManager.reloadCurrentConfig: the change touches routing/DNS layers. */
++        fun needsRestart(error: Throwable): Boolean = error.message.orEmpty().contains("请使用「重启」")
++
++        /** The core stopped between the state read and the reload. */
++        fun notRunning(error: Throwable): Boolean = error.message.orEmpty().contains("代理未运行")
++    }
++
++    /** Overwrites [name] with [text]. [expected] guards against a concurrent edit of the file. */
++    suspend fun save(name: String, text: String, expected: String? = null): ConfigApplyResult {
++        val check = ConfigText.inspect(text)
++        check.error?.let { throw IOException(it) }
++        validate(text)
++        return withContext(NonCancellable + Dispatchers.IO) {
++            val old = withContext(Dispatchers.IO) { store.read(name) }
++            if (expected != null && old != expected) throw ConfigConflictException("文件已在其他位置修改，未保存")
++            if (old == text) return@withContext ConfigApplyResult.Applied("内容没有变化")
++            withContext(Dispatchers.IO) {
++                backups.save(name, old, "edit")
++                store.write(name, text)
++            }
++            if (store.selectedName() != name) return@withContext ConfigApplyResult.Applied("已保存（不是当前配置，切换后生效）")
++            applyOrRollback(
++                applied = "已保存并热重载",
++                rollback = {
++                    if (store.read(name) == text) store.write(name, old)
++                },
++            )
++        }
++    }
++
++    /** Adds [text] as a new config and makes it current; the previous selection returns on failure. */
++    suspend fun import(requestedName: String, text: String): Pair<String, ConfigApplyResult> {
++        val check = ConfigText.inspect(text)
++        check.error?.let { throw IOException(it) }
++        validate(text)
++        return withContext(NonCancellable + Dispatchers.IO) {
++            val previous = store.selectedName()
++            previous?.let { name ->
++                withContext(Dispatchers.IO) { backups.save(name, store.read(name), "import") }
++            }
++            val created = withContext(Dispatchers.IO) { store.create(requestedName, text) }
++            val result = applyOrRollback(
++                applied = "已导入「$created」并设为当前",
++                rollback = { if (previous != null) store.select(previous) },
++            )
++            created to result
++        }
++    }
++
++    /** Replaces the current config with a backup (it is itself backed up first). */
++    suspend fun restore(backup: ConfigBackup): ConfigApplyResult {
++        val text = withContext(Dispatchers.IO) { backups.read(backup) }
++        if (backup.configName !in withContext(Dispatchers.IO) { store.names() }) {
++            return import(backup.configName, text).second
++        }
++        return save(backup.configName, text)
++    }
++
++    private suspend fun applyOrRollback(applied: String, rollback: () -> Unit): ConfigApplyResult {
++        val state = runningIdle()
++        if (state == false) return ConfigApplyResult.Applied(applied.replace("并热重载", "") + "，下次启动代理时生效")
++        if (state == null) return ConfigApplyResult.NeedsRestart(applied.replace("并热重载", "") + "；代理正忙，稍后请手动重载")
++        return try {
++            val note = reload()
++            ConfigApplyResult.Applied(if (note.isBlank()) applied else "$applied · $note")
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (error: Exception) {
++            if (notRunning(error)) {
++                ConfigApplyResult.Applied(applied.replace("并热重载", "") + "，下次启动代理时生效")
++            } else if (needsRestart(error)) {
++                ConfigApplyResult.NeedsRestart(applied.replace("并热重载", "") + "；涉及网络层设置，需「重启」代理生效")
++            } else {
++                withContext(Dispatchers.IO) { rollback() }
++                // The core already fell back to its previous runtime copy; reload once more so the
++                // restored source and the running core agree again.
++                try { reload() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) {}
++                ConfigApplyResult.RolledBack("核心拒绝了新配置，已恢复原配置：${error.message ?: error.javaClass.simpleName}")
++            }
++        }
++    }
++}
++
++/** [ConfigStore] over the real library for the currently selected core. */
++internal class LibraryConfigStore(context: Context) : ConfigStore {
++    private val app = context.applicationContext
++    private val library = ProxyConfigLibrary(app)
++    private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private fun core() = ProxyRuntimeProfile.load(prefs).core
++    private fun entry(name: String) = library.list(core()).firstOrNull { it.name == name } ?: throw IOException("配置不存在：$name")
++
++    override fun selectedName(): String? = library.selected(core())?.name
++    override fun names(): List<String> = library.list(core()).map { it.name }
++    override fun read(name: String): String = library.read(entry(name))
++    override fun write(name: String, text: String) = library.write(entry(name), text)
++    override fun create(requestedName: String, text: String): String =
++        library.importConfig(core(), requestedName, text.toByteArray(StandardCharsets.UTF_8).inputStream()).name
++    override fun select(name: String) = library.select(core(), name)
++
++    companion object {
++        fun backups(context: Context) = ConfigBackups(File(context.applicationContext.filesDir, "hetu-config-backups"))
++
++        /** The transaction the app uses: core validation, hot reload through the controller. */
++        fun transaction(context: Context, vm: HetuViewModel): ConfigTransaction {
++            val app = context.applicationContext
++            return ConfigTransaction(
++                store = LibraryConfigStore(app),
++                backups = backups(app),
++                validate = { text -> vm.controller.validateConfigText(text) },
++                runningIdle = { if (!vm.state.running) false else if (vm.operation != null) null else true },
++                reload = { vm.controller.reload() },
++            )
++        }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectivityScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectivityScreen.kt
+new file mode 100644
+index 0000000..34aab00
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectivityScreen.kt
+@@ -0,0 +1,174 @@
++package io.github.xgl34222220.hetu
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableLongStateOf
++import androidx.compose.runtime.mutableStateMapOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HomeDims
++import io.github.xgl34222220.hetu.home.HomeIconButton
++import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomeRollingText
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.HomeVerticalDivider
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
++import io.github.xgl34222220.hetu.ui.ht
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++/**
++ * 网络测试 › 多平台连通性. Runs once on open; 重新测试 in the bar starts a new round and cancels the
++ * old one. Results arrive one by one on the main thread (one small map write each); all network
++ * work stays on IO.
++ */
++@Composable
++internal fun ConnectivityScreen(vm: HetuViewModel, onBack: () -> Unit) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    val c = LocalHomeColors.current
++    val targets = PlatformCatalog.targets
++    val outcomes = remember { mutableStateMapOf<String, PlatformOutcome>() }
++    var running by remember { mutableStateOf(false) }
++    var viaCore by remember { mutableStateOf<Boolean?>(null) }
++    var finishedAt by remember { mutableLongStateOf(0L) }
++    var job by remember { mutableStateOf<Job?>(null) }
++
++    fun start() {
++        job?.cancel()
++        targets.forEach { outcomes[it.id] = PlatformOutcome.Waiting }
++        running = true
++        val round = scope.launch {
++            try {
++                val proxy = withContext(Dispatchers.IO) { PlatformRoute.proxy(context) }
++                viaCore = proxy != null
++                PlatformProbe.run(targets, proxy).collect { outcomes[it.target.id] = it.outcome }
++                finishedAt = System.currentTimeMillis()
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                vm.toast(error.message ?: "网络测试失败")
++            }
++        }
++        job = round
++        round.invokeOnCompletion { if (job === round) running = false }
++    }
++
++    LaunchedEffect(Unit) { start() }
++
++    val summary = PlatformProbe.summarize(targets.map { outcomes[it.id] ?: PlatformOutcome.Waiting })
++
++    HxPage(
++        title = ht("网络测试"),
++        subtitle = ht("多平台连通性"),
++        onBack = onBack,
++        largeTitle = false,
++        actions = { HomeIconButton(HomeIcons.RefreshCw, "重新测试", ::start, enabled = !running, spinning = running) },
++    ) {
++        item(key = "summary") {
++            SettingsSection {
++                SettingsGroup {
++                    Row(Modifier.fillMaxWidth().padding(vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
++                        ConnectivityMetric("可用", summary.reachable, c.good, Modifier.weight(1f))
++                        HomeVerticalDivider(Modifier.height(34.dp))
++                        ConnectivityMetric("受限", summary.restricted, c.warn, Modifier.weight(1f))
++                        HomeVerticalDivider(Modifier.height(34.dp))
++                        ConnectivityMetric("失败", summary.failed, c.bad, Modifier.weight(1f))
++                    }
++                }
++                val route = viaCore
++                if (route != null) {
++                    HxBanner(
++                        if (route) ht("经代理核心的策略监听测试，结果与当前分流和节点一致")
++                        else ht("代理未运行：以下为不经代理的直连结果"),
++                        tone = if (route) HxTone.Neutral else HxTone.Warn,
++                        modifier = Modifier.padding(top = HomeDims.gap),
++                    )
++                }
++            }
++        }
++        for (group in PlatformGroup.entries) {
++            val members = targets.filter { it.group == group }
++            item(key = "group-${group.name}") {
++                SettingsSection {
++                    SettingsGroup(title = ht(group.title)) {
++                        members.forEachIndexed { index, target ->
++                            if (index > 0) SettingsDivider()
++                            PlatformRow(target, outcomes[target.id] ?: PlatformOutcome.Waiting)
++                        }
++                    }
++                }
++            }
++        }
++        item(key = "note") {
++            Text(
++                ht("耗时为建立连接、TLS 握手到收到响应头的时间；每个平台单独建连，最多同时 6 个，单项超时 6 秒。403/451 表示服务可达但拒绝访问，多为地区限制。") +
++                    if (finishedAt > 0L && summary.done) "\n" + ht("最近完成：") + HxFormat.ago(finishedAt) else "",
++                Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap),
++                color = c.t2,
++                style = HomeType.note,
++            )
++        }
++    }
++}
++
++@Composable
++private fun ConnectivityMetric(label: String, value: Int, color: Color, modifier: Modifier) {
++    val c = LocalHomeColors.current
++    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(2.dp)) {
++        Text(ht(label), color = c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium), maxLines = 1)
++        HomeRollingText(value.toString(), color, HomeType.metric.copy(fontSize = HomeType.sheetTitle.fontSize), alignment = Alignment.Center)
++    }
++}
++
++@Composable
++private fun PlatformRow(target: PlatformTarget, outcome: PlatformOutcome) {
++    val c = LocalHomeColors.current
++    val (icon, tint) = when (outcome) {
++        is PlatformOutcome.Reachable -> HomeIcons.CircleCheck to c.good
++        is PlatformOutcome.Restricted -> HomeIcons.TriangleAlert to c.warn
++        is PlatformOutcome.Failed -> HomeIcons.CircleAlert to c.bad
++        else -> ToolsFeatureIcons.CircleDashed to c.t3
++    }
++    val detail = when (outcome) {
++        is PlatformOutcome.Reachable -> "${target.host} · HTTP ${outcome.code}"
++        is PlatformOutcome.Restricted -> "${target.host} · HTTP ${outcome.code} · " + if (outcome.code == 429) ht("请求过多") else ht("拒绝访问，可能地区限制")
++        is PlatformOutcome.Failed -> "${target.host} · ${outcome.reason}"
++        PlatformOutcome.Running -> "${target.host} · " + ht("测试中")
++        PlatformOutcome.Waiting -> target.host
++    }
++    SettingsRow(target.name, subtitle = detail, icon = icon, iconTint = tint, compact = true) {
++        when (outcome) {
++            PlatformOutcome.Running -> HxSpinner(18.dp)
++            is PlatformOutcome.Reachable -> LatencyText(outcome.latencyMs, if (outcome.latencyMs <= 800L) c.good else c.warn)
++            is PlatformOutcome.Restricted -> LatencyText(outcome.latencyMs, c.warn)
++            is PlatformOutcome.Failed -> Text(ht("失败"), color = c.bad, style = HomeType.value)
++            PlatformOutcome.Waiting -> Text("—", color = c.t3, style = HomeType.value)
++        }
++    }
++}
++
++@Composable
++private fun LatencyText(ms: Long, color: Color) {
++    Text("$ms ms", color = color, style = HomeType.value, maxLines = 1)
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..823695c 100644
+index 2b1a624..8f04b36 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -3267,7 +5078,17 @@ index 2b1a624..823695c 100644
  import androidx.compose.runtime.saveable.rememberSaveableStateHolder
  import androidx.compose.runtime.setValue
  import androidx.compose.runtime.staticCompositionLocalOf
-@@ -232,6 +240,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -195,6 +203,9 @@ internal sealed class HxRoute(val key: String) {
+     data object StartupDownloadSettings : HxRoute("startup-download-settings")
+     data object PublicIp : HxRoute("public-ip")
+     data object Resources : HxRoute("resources")
++    data object Connectivity : HxRoute("connectivity")
++    data object AdblockVerify : HxRoute("adblock-verify")
++    data object ConfigImport : HxRoute("config-import")
+ }
+
+ internal class HxNav {
+@@ -232,6 +243,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -3276,7 +5097,7 @@ index 2b1a624..823695c 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +253,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +256,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -3298,7 +5119,7 @@ index 2b1a624..823695c 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +274,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +277,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -3306,7 +5127,7 @@ index 2b1a624..823695c 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +283,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +286,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -3319,7 +5140,7 @@ index 2b1a624..823695c 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +299,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +302,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -3335,7 +5156,7 @@ index 2b1a624..823695c 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +322,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +325,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -3344,7 +5165,7 @@ index 2b1a624..823695c 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,7 +335,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,7 +338,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -3353,7 +5174,16 @@ index 2b1a624..823695c 100644
                              HxRoute.Configs -> ConfigsScreen(vm)
                              HxRoute.ConfigEditor -> ConfigEditorScreen(vm)
                              HxRoute.Providers -> ProvidersScreen(vm)
-@@ -342,7 +364,9 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -336,13 +361,18 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+                             HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
+                             HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
+                             HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
++                            HxRoute.Connectivity -> ConnectivityScreen(vm) { nav.pop() }
++                            HxRoute.AdblockVerify -> AdblockVerifyScreen(vm) { nav.pop() }
++                            HxRoute.ConfigImport -> ConfigImportScreen(vm) { nav.pop() }
+                         }
+                     }
+                 }
              }
 
              // Toast floats just above the dock (or the bottom edge on sub-pages).
@@ -3364,7 +5194,7 @@ index 2b1a624..823695c 100644
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +375,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +381,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -3374,7 +5204,7 @@ index 2b1a624..823695c 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +397,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +403,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -3391,7 +5221,7 @@ index 2b1a624..823695c 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -398,8 +425,11 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -398,8 +431,11 @@ private fun MainTabs(vm: HetuViewModel) {
              HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
          }
      }
@@ -3405,7 +5235,7 @@ index 2b1a624..823695c 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -420,13 +450,17 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -420,13 +456,17 @@ private fun MainTabs(vm: HetuViewModel) {
      Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
          Box(
              Modifier.fillMaxSize()
@@ -3424,7 +5254,7 @@ index 2b1a624..823695c 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +469,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +475,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -3432,7 +5262,7 @@ index 2b1a624..823695c 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -450,11 +485,12 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -450,11 +491,12 @@ private fun MainTabs(vm: HetuViewModel) {
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
          val dockShift by animateDpAsState(
@@ -3447,7 +5277,7 @@ index 2b1a624..823695c 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -465,6 +501,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -465,6 +507,7 @@ private fun MainTabs(vm: HetuViewModel) {
              hazeState = dockHaze,
              backdrop = liquidBackdrop.takeIf { runtimeLiquid },
              modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
@@ -3455,7 +5285,7 @@ index 2b1a624..823695c 100644
          )
      }
  }
-@@ -472,6 +509,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -472,6 +515,7 @@ private fun MainTabs(vm: HetuViewModel) {
  /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
  @Composable
  internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -3463,7 +5293,7 @@ index 2b1a624..823695c 100644
      var floatingMessage by remember { mutableStateOf<String?>(null) }
      var shownMessage by remember { mutableStateOf("") }
      val haptics = rememberHetuHaptics()
-@@ -489,12 +527,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,12 +533,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -3903,6 +5733,281 @@ index df92493..85c3872 100644
          ),
      )
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+index 820f6b5..ceec7e4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
+@@ -120,6 +120,8 @@ internal fun ToolsScreen(
+         onConfigChanged = { scope.launch { vm.refreshNow() } },
+         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
+         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
++        onOpenConnectivity = { nav.push(HxRoute.Connectivity) },
++        onOpenAdblockVerify = { nav.push(HxRoute.AdblockVerify) },
+         onOpenExternalEntry = { entry ->
+             when (entry) {
+                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PlatformConnectivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PlatformConnectivity.kt
+new file mode 100644
+index 0000000..35ac79d
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PlatformConnectivity.kt
+@@ -0,0 +1,212 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import java.io.IOException
++import java.io.InterruptedIOException
++import java.net.ConnectException
++import java.net.HttpURLConnection
++import java.net.InetSocketAddress
++import java.net.NoRouteToHostException
++import java.net.Proxy
++import java.net.SocketTimeoutException
++import java.net.URL
++import java.net.UnknownHostException
++import java.util.concurrent.atomic.AtomicReference
++import javax.net.ssl.SSLException
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.channelFlow
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.sync.Semaphore
++import kotlinx.coroutines.sync.withPermit
++import kotlinx.coroutines.withContext
++
++/*
++ * 网络测试 › 多平台连通性.
++ *
++ * Every platform is requested at the same time (bounded by [PlatformProbe.DEFAULT_CONCURRENCY]),
++ * each on its own short-lived connection, and every result is pushed as soon as it is known, so the
++ * slowest platform never holds the others back. While the Root proxy runs, requests enter the
++ * running core through its loopback policy listener (Hetu's own UID is exempt from transparent
++ * interception), so the result reflects the active rules and selected nodes; otherwise they go
++ * direct and the page says so.
++ */
++
++internal enum class PlatformGroup(val title: String) { Global("国际平台"), China("国内平台") }
++
++internal data class PlatformTarget(val id: String, val name: String, val url: String, val group: PlatformGroup) {
++    val host: String get() = try { URL(url).host } catch (_: Exception) { url }
++}
++
++internal sealed interface PlatformOutcome {
++    /** Not started yet in this round. */
++    data object Waiting : PlatformOutcome
++    /** Request in flight. */
++    data object Running : PlatformOutcome
++    /** 2xx/3xx, or a 4xx that proves the service answered (401 from an API, 404, 405 …). */
++    data class Reachable(val latencyMs: Long, val code: Int) : PlatformOutcome
++    /** The service answered but refused: 403 / 451 (usually region) or 429 (rate limit). */
++    data class Restricted(val latencyMs: Long, val code: Int) : PlatformOutcome
++    data class Failed(val reason: String) : PlatformOutcome
++}
++
++internal data class PlatformResult(val target: PlatformTarget, val outcome: PlatformOutcome)
++
++internal data class PlatformSummary(val reachable: Int, val restricted: Int, val failed: Int, val pending: Int) {
++    val done: Boolean get() = pending == 0
++}
++
++internal object PlatformCatalog {
++    val targets: List<PlatformTarget> = listOf(
++        PlatformTarget("google", "Google", "https://www.google.com/generate_204", PlatformGroup.Global),
++        PlatformTarget("youtube", "YouTube", "https://www.youtube.com/generate_204", PlatformGroup.Global),
++        PlatformTarget("netflix", "Netflix", "https://www.netflix.com/", PlatformGroup.Global),
++        PlatformTarget("chatgpt", "ChatGPT", "https://chatgpt.com/", PlatformGroup.Global),
++        PlatformTarget("openai-api", "OpenAI API", "https://api.openai.com/v1/models", PlatformGroup.Global),
++        PlatformTarget("claude", "Claude", "https://claude.ai/", PlatformGroup.Global),
++        PlatformTarget("gemini", "Gemini", "https://gemini.google.com/", PlatformGroup.Global),
++        PlatformTarget("github", "GitHub", "https://github.com/", PlatformGroup.Global),
++        PlatformTarget("telegram", "Telegram", "https://web.telegram.org/", PlatformGroup.Global),
++        PlatformTarget("x", "X / Twitter", "https://x.com/", PlatformGroup.Global),
++        PlatformTarget("instagram", "Instagram", "https://www.instagram.com/", PlatformGroup.Global),
++        PlatformTarget("tiktok", "TikTok", "https://www.tiktok.com/", PlatformGroup.Global),
++        PlatformTarget("spotify", "Spotify", "https://open.spotify.com/", PlatformGroup.Global),
++        PlatformTarget("disney", "Disney+", "https://www.disneyplus.com/", PlatformGroup.Global),
++        PlatformTarget("steam", "Steam", "https://store.steampowered.com/", PlatformGroup.Global),
++        PlatformTarget("bilibili", "哔哩哔哩", "https://www.bilibili.com/", PlatformGroup.China),
++        PlatformTarget("baidu", "百度", "https://www.baidu.com/", PlatformGroup.China),
++        PlatformTarget("wechat", "微信", "https://weixin.qq.com/", PlatformGroup.China),
++    )
++}
++
++internal object PlatformProbe {
++    const val DEFAULT_TIMEOUT_MS = 6_000
++    const val DEFAULT_CONCURRENCY = 6
++    private const val USER_AGENT = "Mozilla/5.0 (Linux; Android) Hetu-NetworkTest"
++
++    /** HTTP status → outcome. Only a refusal or a server error is not a plain “reachable”. */
++    fun outcomeFor(code: Int, latencyMs: Long): PlatformOutcome = when {
++        code in 200..399 -> PlatformOutcome.Reachable(latencyMs, code)
++        code == 403 || code == 451 || code == 429 -> PlatformOutcome.Restricted(latencyMs, code)
++        code in 400..499 -> PlatformOutcome.Reachable(latencyMs, code)
++        code >= 500 -> PlatformOutcome.Failed("服务器错误 HTTP $code")
++        else -> PlatformOutcome.Failed("无效响应")
++    }
++
++    fun failureReason(error: Throwable): String = when (error) {
++        is SocketTimeoutException -> "超时"
++        is UnknownHostException -> "域名解析失败"
++        is SSLException -> "TLS 握手失败"
++        is ConnectException -> "连接被拒绝"
++        is NoRouteToHostException -> "无法路由到目标"
++        is InterruptedIOException -> "超时"
++        is IOException -> {
++            val text = error.message.orEmpty()
++            when {
++                text.contains("unexpected end of stream", true) || text.contains("EOF", false) ||
++                    text.contains("reset", true) || text.contains("closed", true) -> "连接被中断"
++                text.isNotBlank() -> text.take(60)
++                else -> error.javaClass.simpleName
++            }
++        }
++        else -> error.javaClass.simpleName
++    }
++
++    /** One request on its own connection. Time is connect + TLS + first response line. */
++    suspend fun probe(target: PlatformTarget, proxy: Proxy?, timeoutMs: Int = DEFAULT_TIMEOUT_MS): PlatformOutcome =
++        withContext(Dispatchers.IO) {
++            val holder = AtomicReference<HttpURLConnection?>()
++            coroutineScope {
++                // Connect/read timeouts do not cover every blocking step (for example a slow
++                // direct DNS lookup); the watchdog closes the socket at a hard deadline.
++                val watchdog = launch {
++                    delay(timeoutMs * 2L + 500L)
++                    holder.get()?.let { try { it.disconnect() } catch (_: Exception) {} }
++                }
++                try {
++                    blockingProbe(target, proxy, timeoutMs, holder)
++                } finally {
++                    watchdog.cancel()
++                }
++            }
++        }
++
++    private fun blockingProbe(target: PlatformTarget, proxy: Proxy?, timeoutMs: Int, holder: AtomicReference<HttpURLConnection?>): PlatformOutcome {
++        val started = System.nanoTime()
++        var connection: HttpURLConnection? = null
++        return try {
++            val url = URL(target.url)
++            connection = ((if (proxy == null) url.openConnection() else url.openConnection(proxy)) as HttpURLConnection).apply {
++                instanceFollowRedirects = false
++                useCaches = false
++                connectTimeout = timeoutMs
++                readTimeout = timeoutMs
++                requestMethod = "GET"
++                setRequestProperty("Connection", "close")
++                setRequestProperty("Cache-Control", "no-cache")
++                setRequestProperty("Accept", "*/*")
++                setRequestProperty("User-Agent", USER_AGENT)
++            }
++            holder.set(connection)
++            val code = connection.responseCode
++            val elapsed = ((System.nanoTime() - started) / 1_000_000L).coerceAtLeast(1L)
++            outcomeFor(code, elapsed)
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (error: Exception) {
++            PlatformOutcome.Failed(failureReason(error))
++        } finally {
++            try { connection?.disconnect() } catch (_: Exception) {}
++        }
++    }
++
++    /**
++     * Probes [targets] concurrently and emits `Running` then the outcome of each one, in the
++     * order they finish. [prober] is injectable for tests.
++     */
++    fun run(
++        targets: List<PlatformTarget>,
++        proxy: Proxy?,
++        timeoutMs: Int = DEFAULT_TIMEOUT_MS,
++        concurrency: Int = DEFAULT_CONCURRENCY,
++        prober: suspend (PlatformTarget) -> PlatformOutcome = { target -> probe(target, proxy, timeoutMs) },
++    ): Flow<PlatformResult> = channelFlow {
++        val gate = Semaphore(concurrency.coerceAtLeast(1))
++        for (target in targets) {
++            launch {
++                gate.withPermit {
++                    send(PlatformResult(target, PlatformOutcome.Running))
++                    val outcome = try {
++                        prober(target)
++                    } catch (cancel: CancellationException) {
++                        throw cancel
++                    } catch (error: Exception) {
++                        PlatformOutcome.Failed(failureReason(error))
++                    }
++                    send(PlatformResult(target, outcome))
++                }
++            }
++        }
++    }
++
++    fun summarize(outcomes: Collection<PlatformOutcome>): PlatformSummary = PlatformSummary(
++        reachable = outcomes.count { it is PlatformOutcome.Reachable },
++        restricted = outcomes.count { it is PlatformOutcome.Restricted },
++        failed = outcomes.count { it is PlatformOutcome.Failed },
++        pending = outcomes.count { it == PlatformOutcome.Waiting || it == PlatformOutcome.Running },
++    )
++}
++
++/** Which path the test takes: the running core's loopback listener, or direct. */
++internal object PlatformRoute {
++    fun proxy(context: Context): Proxy? {
++        val app = context.applicationContext
++        if (!ProxyStatusBridge.rootProxyRunning(app)) return null
++        val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++        val port = MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT))
++        return Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+index 2b4638e..89710d5 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
+@@ -400,14 +400,6 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
+     val profile = ProxyRuntimeProfile.load(prefs)
+     LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
+-    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+-        if (uri != null) scope.launch {
+-            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
+-                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
+-                .onFailure { vm.toast(it.message ?: "配置导入失败") }
+-        }
+-    }
+-
+     fun changed(key: String) {
+         ProxyRuntimeSettings.markDirty(prefs, key)
+         revision++
+@@ -468,6 +460,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+                 SettingsGroup {
+                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
+                         icon = ToolsIcons.FileText, onClick = { choice = "config" })
++                    SettingsDivider()
++                    SettingsNavRow(ht("编辑当前配置"), subtitle = ht("YAML 编辑器；保存前预览差异并自动备份"),
++                        icon = HxIcons.SquarePen, onClick = { nav.push(HxRoute.ConfigEditor) })
++                    SettingsDivider()
++                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板；校验后应用，失败自动回滚"),
++                        icon = HxIcons.Upload, onClick = { nav.push(HxRoute.ConfigImport) })
+                 }
+             }
+         }
+@@ -504,9 +502,9 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+                     }
+                 }
+                 item(key = "import-config") {
+-                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件导入 YAML 配置"), icon = HxIcons.Upload) {
++                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板导入 YAML 配置"), icon = HxIcons.Upload) {
+                         choice = null
+-                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
++                        nav.push(HxRoute.ConfigImport)
+                     }
+                 }
+             }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ce5f550..65650a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -4096,6 +6201,29 @@ index 0000000..65065ca
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index b41cf98..5bf58d0 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -813,6 +813,7 @@ private fun FileEntryRow(entry: RuntimeFileEntry, marked: Boolean, onClick: () -
+
+ @Composable
+ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
++    val nav = LocalNav.current
+     val context = LocalContext.current
+     val scope = rememberCoroutineScope()
+     val c = LocalHomeColors.current
+@@ -893,6 +894,10 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                             sheet = "修复运行记录" to result
+                         }
+                     }
++                    SettingsDivider()
++                    DiagnosticRow("多平台网络测试", "并发测试 Google、YouTube、ChatGPT、Netflix 等平台的连通性与延迟", ToolsFeatureIcons.Globe, busy, "connectivity") {
++                        nav.push(HxRoute.Connectivity)
++                    }
+                 }
+             }
+         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 index 0ceaa23..b6be38b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
@@ -5331,8 +7459,112 @@ index fb308a8..250c025 100644
 +        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1)
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
+index 800055c..656527f 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
+@@ -72,6 +72,8 @@ internal fun HetuToolsV2(
+     onOpenDiagnosticsDetails: (() -> Unit)? = null,
+     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
+     onOpenConfigEditor: (() -> Unit)? = null,
++    onOpenConnectivity: (() -> Unit)? = null,
++    onOpenAdblockVerify: (() -> Unit)? = null,
+ ) {
+     val context = LocalContext.current
+     val app = context.applicationContext
+@@ -83,7 +85,12 @@ internal fun HetuToolsV2(
+     val changed by rememberUpdatedState(onConfigChanged)
+     val openExternal by rememberUpdatedState(onOpenExternalEntry)
+     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
+-    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
++    val features = rememberToolsFeatureHost(
++        onChanged = onConfigChanged,
++        onOpenDiagnosticsDetails = onOpenDiagnosticsDetails,
++        onOpenConnectivity = onOpenConnectivity,
++        onOpenAdblockVerify = onOpenAdblockVerify,
++    )
+     var destination by remember { mutableStateOf(ToolsDestination.Root) }
+     ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
+
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+index d256004..1585361 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
+@@ -93,6 +93,7 @@ internal fun ToolsAdblockScreen(
+     onRetry: () -> Unit,
+     modifier: Modifier = Modifier,
+     scroll: ScrollState = rememberScrollState(),
++    onVerify: (() -> Unit)? = null,
+ ) {
+     val ready = state.load is ToolsLoad.Ready
+     val idle = ready && !state.busy
+@@ -117,7 +118,7 @@ internal fun ToolsAdblockScreen(
+             }
+             ToolsLoad.Ready -> {
+                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
+-                ChainCard(state, Modifier.homeEnter(stagger, 1))
++                ChainCard(state, Modifier.homeEnter(stagger, 1), onVerify)
+                 Column(Modifier.homeEnter(stagger, 2)) {
+                     // 最近拦截 brings its own gap, so it can unfold without a jump.
+                     HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
+@@ -213,22 +214,41 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
+ }
+
+ @Composable
+-private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
++private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onVerify: (() -> Unit)? = null) {
+     val running = state.enabled && state.proxyRunning
+     HomeCard(modifier.fillMaxWidth()) {
+         ToolsCardTitle("运行链验证")
+         CheckRow(state.enabled && state.ruleCount > 0, ht("本地规则库"), "%,d ".format(state.ruleCount) + ht("条有效规则"))
+         HomeRowDivider(start = HomeRowDims.textStart)
+-        CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
++        CheckRow(
++            state.enabled && state.startupInjected, ht("启动配置注入"),
++            when {
++                state.enabled && state.startupInjected -> ht("hetu-adblock 已写入运行副本")
++                state.enabled && state.lastError.isNotBlank() -> ht("本次启动已降级：") + state.lastError
++                else -> ht("当前启动副本没有广告 provider")
++            },
++        )
+         HomeRowDivider(start = HomeRowDims.textStart)
+-        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
++        CheckRow(
++            running && state.controllerLoaded, ht("Mihomo 规则链"),
++            when {
++                running && state.coreDetail != null -> state.coreDetail.orEmpty()
++                running && state.controllerLoaded -> ht("核心已加载 REJECT 规则")
++                running -> ht("核心尚未加载广告规则")
++                else -> ht("等待代理启动")
++            },
++        )
+         HomeRowDivider(start = HomeRowDims.textStart)
+-        CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
++        CheckRow(
++            state.effective && state.hits > 0, ht("实际拦截"),
++            "%,d ".format(state.shownHits) + ht("次") + if (onVerify != null) " · " + ht("点按核查与实测") else "",
++            onClick = onVerify,
++        )
+     }
+ }
+
+ @Composable
+-private fun CheckRow(ok: Boolean, title: String, detail: String) {
++private fun CheckRow(ok: Boolean, title: String, detail: String, onClick: (() -> Unit)? = null) {
+     val c = LocalHomeColors.current
+     val tint by animateColorAsState(if (ok) c.good else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current, 260), label = "tools-ad-check")
+     ToolsRow(
+@@ -236,6 +256,8 @@ private fun CheckRow(ok: Boolean, title: String, detail: String) {
+         icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+         iconTint = tint,
+         subtitle = detail, compact = true,
++        onClick = onClick,
++        trailing = if (onClick != null) ({ ToolsChevron() }) else null,
+     )
+ }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index ee40a76..00a1cc2 100644
+index ee40a76..beb1ddd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 @@ -1,17 +1,25 @@
@@ -5369,7 +7601,29 @@ index ee40a76..00a1cc2 100644
 
  /**
   * 诊断与维护 (工具 › 诊断工具). Stateless.
-@@ -108,9 +117,13 @@ internal fun ToolsDiagScreen(
+@@ -42,6 +51,7 @@ internal fun ToolsDiagScreen(
+     onRestore: () -> Unit,
+     modifier: Modifier = Modifier,
+     onOpenDiagnosticsDetails: (() -> Unit)? = null,
++    onConnectivity: (() -> Unit)? = null,
+ ) {
+     val c = LocalHomeColors.current
+     val checking = state.preflight is ToolsPreflight.Running
+@@ -80,6 +90,13 @@ internal fun ToolsDiagScreen(
+                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
+                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+             )
++            if (onConnectivity != null) {
++                HomeRowDivider(start = HomeRowDims.textStart)
++                ToolsRow(
++                    AnnotatedString(ht("多平台网络测试")), icon = ToolsFeatureIcons.Globe,
++                    subtitle = ht("并发测试 Google、YouTube、ChatGPT、Netflix 等平台的连通性与延迟"), onClick = onConnectivity, trailing = { ToolsChevron() },
++                )
++            }
+         }
+         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
+             ToolsCardTitle("运行记录")
+@@ -108,9 +125,13 @@ internal fun ToolsDiagScreen(
  internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
@@ -5386,7 +7640,7 @@ index ee40a76..00a1cc2 100644
  }
 
  /** The plain-text report, with 复制. */
-@@ -126,19 +139,29 @@ private fun DiagTextSheet(
+@@ -126,19 +147,29 @@ private fun DiagTextSheet(
      content: ToolsDiagText,
      onCopy: (String) -> Unit,
      modifier: Modifier,
@@ -5419,10 +7673,51 @@ index ee40a76..00a1cc2 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..045fa8e 100644
+index f575100..107bc39 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-@@ -225,7 +225,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.asImageBitmap
+ import androidx.compose.ui.platform.LocalContext
++import io.github.xgl34222220.hetu.AdCheckState
++import io.github.xgl34222220.hetu.AdblockAuditBridge
+ import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
+ import io.github.xgl34222220.hetu.ProxyComposeController
+ import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
+@@ -87,7 +89,12 @@ internal class ToolsFeatureHost(val actions: ToolsFeatureActions, val appIcon: @
+  * @param onChanged a runtime setting changed: refresh the shell state (pending-restart banner).
+  */
+ @Composable
+-internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null): ToolsFeatureHost {
++internal fun rememberToolsFeatureHost(
++    onChanged: () -> Unit = {},
++    onOpenDiagnosticsDetails: (() -> Unit)? = null,
++    onOpenConnectivity: (() -> Unit)? = null,
++    onOpenAdblockVerify: (() -> Unit)? = null,
++): ToolsFeatureHost {
+     val context = LocalContext.current
+     val app = context.applicationContext
+     val prefs = remember(app) { app.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
+@@ -96,6 +103,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+     val scope = rememberCoroutineScope()
+     val changed by rememberUpdatedState(onChanged)
+     val diagnosticsDetails by rememberUpdatedState(onOpenDiagnosticsDetails)
++    val connectivity by rememberUpdatedState(onOpenConnectivity)
++    val adblockVerify by rememberUpdatedState(onOpenAdblockVerify)
+
+     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
+     fun dirty(key: String) { ToolsRuntimeBridge.markDirty(app, key); changed() }
+@@ -216,6 +225,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+
+             /* ------------------------------ 诊断与维护 ------------------------------ */
+             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
++            onOpenConnectivity = if (onOpenConnectivity == null) null else { { connectivity?.invoke() } },
++            onOpenAdblockVerify = if (onOpenAdblockVerify == null) null else { { adblockVerify?.invoke() } },
+             runPreflight = {
+                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
+                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
+@@ -225,7 +236,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -5432,6 +7727,87 @@ index f575100..045fa8e 100644
                  toast("已复制$label")
              },
 
+@@ -233,6 +245,16 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+             loadAdblock = {
+                 val snapshot = rules.rulesSnapshot()
+                 val chain = ToolsRuntimeBridge.adblockChain(app)
++                // Strict, core-reported chain: the REJECT rule itself (not any rule naming the
++                // provider), its order before MATCH, and a non-empty block rule-set.
++                val audit = try { AdblockAuditBridge.audit(app, chain.running) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++                val coreAnswered = chain.running && audit?.coreAnswered == true
++                val coreDetail = if (!coreAnswered) null else audit?.checks?.let { checks ->
++                    val core = checks.firstOrNull { it.key == "core" }
++                    val provider = checks.firstOrNull { it.key == "provider" }
++                    listOfNotNull(core, provider).firstOrNull { it.state == AdCheckState.Fail }?.detail
++                        ?: listOfNotNull(core?.detail, provider?.detail).joinToString(" · ")
++                }
+                 val now = System.currentTimeMillis()
+                 ToolsAdblockSnapshot(
+                     ToolsAdblockState(
+@@ -262,7 +284,9 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+                         levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
+                         recent = chain.recent,
+                         startupInjected = chain.startupInjected,
+-                        controllerLoaded = chain.controllerLoaded,
++                        controllerLoaded = if (coreAnswered) audit?.coreChainOk == true else chain.controllerLoaded,
++                        coreDetail = coreDetail,
++                        lastError = prefs.getString("proxyAdblockLastError", "").orEmpty(),
+                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
+                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
+                     ),
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
+index 40111ed..5c96181 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
+@@ -241,6 +241,10 @@ internal data class ToolsAdblockState(
+     val recent: List<String> = emptyList(),
+     val startupInjected: Boolean = false,
+     val controllerLoaded: Boolean = false,
++    /** What the core reports for the rule chain (strict audit); null when it did not answer. */
++    val coreDetail: String? = null,
++    /** Why the last start/reload ran without the ad-block chain; blank when it did not degrade. */
++    val lastError: String = "",
+     val standaloneDns: Boolean = false,
+     val cnameProtection: Boolean = true,
+     val updating: Boolean = false,
+@@ -367,6 +371,8 @@ internal class ToolsFeatureActions(
+     /* 诊断与维护 */
+     val runPreflight: (suspend () -> ToolsPreflight)? = null,
+     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
++    /** 多平台网络测试 page of the host; null hides the row. */
++    val onOpenConnectivity: (() -> Unit)? = null,
+     val startupConfig: suspend () -> String = { "" },
+     val diagnostics: suspend () -> String = { "" },
+     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
+@@ -385,6 +391,8 @@ internal class ToolsFeatureActions(
+     val setCnameProtection: suspend (Boolean) -> Unit = {},
+     /** “切到规则” on the wrong-mode warning; null hides the button. */
+     val switchToRuleMode: (suspend () -> Unit)? = null,
++    /** 去广告核查 page of the host (core audit + live probe); null hides the entry. */
++    val onOpenAdblockVerify: (() -> Unit)? = null,
+
+     val onMessage: (String) -> Unit = {},
+ ) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
+index 6e1e067..2a9e148 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
+@@ -389,6 +389,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
+         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
+         onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
++        onConnectivity = actions.onOpenConnectivity,
+         modifier = modifier,
+     )
+
+@@ -508,6 +509,7 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
+         onRetry = { state = ToolsAdblockState(); reload() },
+         modifier = modifier,
++        onVerify = actions.onOpenAdblockVerify,
+     )
+
+     when (val current = overlay) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 index fa7fa0d..1772502 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
@@ -6207,6 +8583,380 @@ index f8d36e9..0a8c1cc 100644
          capture("03A-034-core-three-cards")
          touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
          capture("core-mihomo-variant-picker")
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConnectivityAdblockConfig101Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConnectivityAdblockConfig101Test.kt
+new file mode 100644
+index 0000000..0125e55
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConnectivityAdblockConfig101Test.kt
+@@ -0,0 +1,368 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import java.io.File
++import java.io.IOException
++import java.net.InetSocketAddress
++import java.net.Proxy
++import java.net.ServerSocket
++import java.nio.file.Files
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicInteger
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.flow.toList
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/**
++ * 多平台网络测试、去广告运行链核查与拦截实测判定、基础代理配置导入/编辑事务。
++ * 全部在主机回环或内存夹具中执行：不启动核心、不访问外网、不需要 Root。
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class ConnectivityAdblockConfig101Test {
++    private val servers = mutableListOf<MockWebServer>()
++    private lateinit var dir: File
++
++    @Before fun setUp() { dir = Files.createTempDirectory("hetu-101").toFile() }
++    @After fun tearDown() { servers.forEach { it.shutdown() }; dir.deleteRecursively() }
++
++    private fun server(vararg responses: MockResponse) = MockWebServer().also { s ->
++        responses.forEach(s::enqueue); s.start(); servers += s
++    }
++    private fun proxyOf(s: MockWebServer) = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", s.port))
++    private fun target(id: String, url: String = "http://$id.example.invalid/") = PlatformTarget(id, id, url, PlatformGroup.Global)
++
++    /* ------------------------------ 多平台连通性 ------------------------------ */
++
++    @Test fun platformRoundRunsConcurrentlyBoundedAndStreamsInCompletionOrder() = runBlocking {
++        val inFlight = AtomicInteger()
++        val peak = AtomicInteger()
++        val delays = mapOf("slow" to 300L, "mid" to 150L, "fast" to 10L, "a" to 40L, "b" to 60L)
++        val targets = delays.keys.map { target(it) }
++        val results = PlatformProbe.run(targets, proxy = null, concurrency = 3) { t ->
++            val now = inFlight.incrementAndGet()
++            peak.updateAndGet { maxOf(it, now) }
++            delay(delays.getValue(t.id))
++            inFlight.decrementAndGet()
++            PlatformOutcome.Reachable(delays.getValue(t.id), 204)
++        }.toList()
++        val finals = results.filter { it.outcome is PlatformOutcome.Reachable }.map { it.target.id }
++        assertEquals("every target reports exactly once", delays.keys, finals.toSet())
++        assertEquals(5, finals.size)
++        assertTrue("concurrency bound respected: ${peak.get()}", peak.get() <= 3)
++        assertTrue("more than one in flight at once", peak.get() >= 2)
++        assertTrue("fast finishes before slow", finals.indexOf("fast") < finals.indexOf("slow"))
++        assertEquals(5, results.count { it.outcome == PlatformOutcome.Running })
++        val summary = PlatformProbe.summarize(finals.map { PlatformOutcome.Reachable(1, 204) })
++        assertTrue(summary.done)
++    }
++
++    @Test fun platformProbeGoesThroughLocalListenerAndClassifiesStatus() = runBlocking {
++        val proxy = server(
++            MockResponse().setResponseCode(204),
++            MockResponse().setResponseCode(403),
++            MockResponse().setResponseCode(503),
++            MockResponse().setResponseCode(401),
++        )
++        val ok = PlatformProbe.probe(target("google", "http://www.google.com/generate_204"), proxyOf(proxy), 3_000)
++        assertTrue(ok is PlatformOutcome.Reachable && ok.code == 204 && ok.latencyMs >= 1)
++        val recorded = proxy.takeRequest(2, TimeUnit.SECONDS)!!
++        assertEquals("request entered the listener with the target host", "www.google.com", recorded.getHeader("Host"))
++        val region = PlatformProbe.probe(target("chatgpt"), proxyOf(proxy), 3_000)
++        assertTrue(region is PlatformOutcome.Restricted && region.code == 403)
++        val broken = PlatformProbe.probe(target("netflix"), proxyOf(proxy), 3_000)
++        assertTrue(broken is PlatformOutcome.Failed && broken.reason.contains("503"))
++        val api = PlatformProbe.probe(target("openai-api"), proxyOf(proxy), 3_000)
++        assertTrue("401 from an API proves reachability", api is PlatformOutcome.Reachable)
++    }
++
++    @Test fun platformProbeFailuresAreBoundedAndNamed() = runBlocking {
++        val closed = ServerSocket(0).use { it.localPort }
++        val refused = PlatformProbe.probe(target("x"), Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", closed)), 2_000)
++        assertTrue(refused is PlatformOutcome.Failed)
++        val slow = server(MockResponse().setResponseCode(204).setHeadersDelay(3, TimeUnit.SECONDS))
++        val started = System.nanoTime()
++        val timedOut = PlatformProbe.probe(target("tiktok"), proxyOf(slow), 400)
++        val elapsedMs = (System.nanoTime() - started) / 1_000_000
++        assertEquals(PlatformOutcome.Failed("超时"), timedOut)
++        assertTrue("hard deadline honoured: $elapsedMs", elapsedMs < 2_500)
++        assertTrue(PlatformProbe.outcomeFor(451, 10) is PlatformOutcome.Restricted)
++        assertTrue(PlatformProbe.outcomeFor(429, 10) is PlatformOutcome.Restricted)
++        assertTrue(PlatformProbe.outcomeFor(302, 10) is PlatformOutcome.Reachable)
++        assertTrue(PlatformCatalog.targets.map { it.id }.toSet().size == PlatformCatalog.targets.size)
++        assertTrue(PlatformCatalog.targets.size >= 17)
++    }
++
++    /* ------------------------------ 去广告核查 ------------------------------ */
++
++    private val injectedStartup = """
++        dns:
++          enable: true
++          enhanced-mode: fake-ip
++        rule-providers:
++          hetu-adblock-allow:
++            type: file
++          hetu-adblock:
++            type: file
++        rules:
++          - AND,((RULE-SET,hetu-adblock),(NOT,((RULE-SET,hetu-adblock-allow)))),REJECT
++          - MATCH,Proxy
++        sniffer:
++          enable: true
++    """.trimIndent()
++
++    /** Exactly what Mihomo's controller reports for the injected AND rule. */
++    private fun coreRule(proxy: String = "REJECT", disabled: Boolean = false, hits: Long = 7) =
++        AdRuleRow("AND", "((RuleSet,hetu-adblock) && (NOT,(!(RuleSet,hetu-adblock-allow))))", proxy, disabled, hits)
++    private fun matchRule() = AdRuleRow("Match", "", "Proxy", false, null)
++    private val goodProviders = mapOf(
++        "hetu-adblock" to AdProviderInfo("hetu-adblock", 120, "File"),
++        "hetu-adblock-allow" to AdProviderInfo("hetu-adblock-allow", 3, "File"),
++    )
++    private fun input(
++        rules: List<AdRuleRow>? = listOf(AdRuleRow("DomainSuffix", "bank.example", "DIRECT", false, null), coreRule(), matchRule()),
++        providers: Map<String, AdProviderInfo>? = goodProviders,
++        mode: String? = "rule",
++        running: Boolean = true,
++        enabled: Boolean = true,
++        startup: String? = injectedStartup,
++        lastError: String = "",
++    ) = AdblockAuditInput(enabled, running, mode, startup, rules, providers, 120, lastError)
++
++    @Test fun auditAcceptsOnlyTheRealRejectChainAsCoreReportsIt() {
++        val good = AdblockAuditor.audit(input())
++        assertEquals(AdVerdict.Effective, good.verdict)
++        assertTrue(good.coreAnswered && good.coreChainOk)
++        assertEquals(1, good.ruleIndex)
++        assertEquals(7L, good.ruleHits)
++        assertEquals(120, good.coreRuleCount)
++
++        // A rule that merely names the provider is not the blocking chain.
++        val allowOnly = AdblockAuditor.audit(input(rules = listOf(AdRuleRow("RuleSet", "hetu-adblock-allow", "DIRECT", false, null), matchRule())))
++        assertEquals(AdVerdict.NotEffective, allowOnly.verdict)
++        assertFalse(allowOnly.coreChainOk)
++        val disabled = AdblockAuditor.audit(input(rules = listOf(coreRule(disabled = true), matchRule())))
++        assertTrue(disabled.checks.first { it.key == "core" }.detail.contains("禁用"))
++        val wrongPolicy = AdblockAuditor.audit(input(rules = listOf(coreRule(proxy = "DIRECT"), matchRule())))
++        assertEquals(AdVerdict.NotEffective, wrongPolicy.verdict)
++        val afterMatch = AdblockAuditor.audit(input(rules = listOf(matchRule(), coreRule())))
++        assertEquals(AdVerdict.NotEffective, afterMatch.verdict)
++        assertTrue(afterMatch.checks.first { it.key == "core" }.detail.contains("MATCH"))
++        val shadowed = AdblockAuditor.audit(input(rules = listOf(AdRuleRow("GeoSite", "google", "Proxy", false, null), coreRule(), matchRule())))
++        assertEquals(AdCheckState.Warn, shadowed.checks.first { it.key == "core" }.state)
++        assertEquals(AdVerdict.Effective, shadowed.verdict)
++    }
++
++    @Test fun auditReportsEmptyProvidersModeDegradationAndUnknowns() {
++        val empty = AdblockAuditor.audit(input(providers = goodProviders + ("hetu-adblock" to AdProviderInfo("hetu-adblock", 0, "File"))))
++        assertEquals(AdVerdict.NotEffective, empty.verdict)
++        assertFalse(empty.coreChainOk)
++        val global = AdblockAuditor.audit(input(mode = "global"))
++        assertEquals(AdVerdict.NotEffective, global.verdict)
++        assertTrue(global.headline.contains("全局"))
++        val degraded = AdblockAuditor.audit(input(startup = "rules:\n  - MATCH,DIRECT\n", lastError = "代理串联去广告需要普通 rules: 列表"))
++        assertEquals(AdVerdict.NotEffective, degraded.verdict)
++        assertTrue(degraded.checks.first { it.key == "startup" }.detail.contains("降级"))
++        val silent = AdblockAuditor.audit(input(rules = null, providers = null, mode = null))
++        assertEquals(AdVerdict.Unknown, silent.verdict)
++        assertFalse(silent.coreAnswered)
++        assertEquals(AdVerdict.Waiting, AdblockAuditor.audit(input(running = false)).verdict)
++        assertEquals(AdVerdict.Off, AdblockAuditor.audit(input(enabled = false)).verdict)
++        val remote = AdblockAuditor.audit(input(providers = goodProviders + ("reject-list" to AdProviderInfo("reject-list", 0, "HTTP"))))
++        assertEquals(listOf("reject-list"), remote.emptyRemoteProviders)
++        assertEquals(AdVerdict.Effective, remote.verdict)
++    }
++
++    @Test fun controllerJsonSnifferAndDnsAreParsed() {
++        val rules = AdblockAuditor.parseRules(JSONObject().put("rules", JSONArray()
++            .put(JSONObject().put("type", "AND").put("payload", "x").put("proxy", "REJECT").put("extra", JSONObject().put("disabled", true).put("hitCount", 9)))
++            .put(JSONObject().put("type", "Match").put("payload", "").put("proxy", "DIRECT"))))!!
++        assertEquals(2, rules.size)
++        assertTrue(rules[0].disabled)
++        assertEquals(9L, rules[0].hitCount)
++        assertNull(rules[1].hitCount)
++        val providers = AdblockAuditor.parseProviders(JSONObject().put("providers", JSONObject()
++            .put("hetu-adblock", JSONObject().put("ruleCount", 42).put("vehicleType", "File"))))!!
++        assertEquals(42, providers.getValue("hetu-adblock").ruleCount)
++        assertNull(AdblockAuditor.parseRules(JSONObject()))
++        assertEquals(SnifferState.Enabled, AdblockAuditor.sniffer(injectedStartup))
++        assertEquals(SnifferState.Disabled, AdblockAuditor.sniffer("sniffer:\n  enable: false\n  sniff:\n    TLS:\n      ports: [443]\n"))
++        assertEquals(SnifferState.Absent, AdblockAuditor.sniffer("dns:\n  enable: true\n"))
++        assertEquals("fake-ip", AdblockAuditor.enhancedMode(injectedStartup))
++        assertEquals(AdCheckState.Warn, AdblockAuditor.audit(input(startup = injectedStartup.replace("sniffer:\n  enable: true", "sniffer:\n  enable: false"))).checks.first { it.key == "sniffer" }.state)
++    }
++
++    @Test fun probePicksCoveredAdHostsAndReadsTheCoreVerdict() {
++        val block = setOf("doubleclick.net", "googlesyndication.com", "pos.baidu.com")
++        assertTrue(AdblockProbe.covered("ad.doubleclick.net", block))
++        assertFalse(AdblockProbe.covered("baidu.com", block))
++        assertEquals(listOf("doubleclick.net", "googlesyndication.com"), AdblockProbe.pick(block, allow = setOf("pos.baidu.com")).take(2))
++        assertFalse("allow-listed host is not probed", "pos.baidu.com" in AdblockProbe.pick(block, setOf("baidu.com")))
++
++        val log = """
++            time="2026-10-10T04:00:00" level=info msg="[TCP] 127.0.0.1:40000 --> doubleclick.net:80 match RuleSet(hetu-adblock) using DIRECT"
++            time="2026-10-10T04:00:01" level=info msg="[TCP] 127.0.0.1:40001 --> doubleclick.net:80 match AND((RuleSet,hetu-adblock) && (NOT,(!(RuleSet,hetu-adblock-allow)))) using REJECT"
++            time="2026-10-10T04:00:01" level=info msg="[TCP] 127.0.0.1:40002 --> googlesyndication.com:80 match GeoSite(category-ads-all) using REJECT"
++            time="2026-10-10T04:00:01" level=info msg="[TCP] 127.0.0.1:40003 --> connectivitycheck.gstatic.com:80 match GeoSite(google) using HK 01[Proxy]"
++            time="2026-10-10T04:00:01" level=info msg="[TCP] 127.0.0.1:40004 --> app-measurement.com:80 doesn't match any rule using DIRECT"
++            time="2026-10-10T04:00:01" level=info msg="[TCP] 127.0.0.1:40005 --> doubleclick.net.evil:80 match Match() using DIRECT"
++        """.trimIndent()
++        val newest = AdblockProbe.findDecision(log, "doubleclick.net")!!
++        assertEquals("REJECT", newest.policy)
++        assertEquals(AdProbeVerdict.Blocked, AdblockProbe.classify("doubleclick.net", true, newest, null, "连接被中断").verdict)
++        val other = AdblockProbe.classify("googlesyndication.com", true, AdblockProbe.findDecision(log, "googlesyndication.com"), null, null)
++        assertEquals(AdProbeVerdict.BlockedByOther, other.verdict)
++        assertTrue(AdblockProbe.asExpected(other))
++        val control = AdblockProbe.classify(AdblockProbe.CONTROL, false, AdblockProbe.findDecision(log, AdblockProbe.CONTROL), 204, null)
++        assertEquals(AdProbeVerdict.Allowed, control.verdict)
++        assertTrue(control.detail.contains("HK 01[Proxy]"))
++        assertTrue(AdblockProbe.asExpected(control))
++        val unmatched = AdblockProbe.findDecision(log, "app-measurement.com")!!
++        assertEquals("", unmatched.rule)
++        assertEquals("DIRECT", unmatched.policy)
++        assertNull(AdblockProbe.findDecision(log, "nothing.example"))
++        val unknown = AdblockProbe.classify("mobads.baidu.com", true, null, null, "超时")
++        assertEquals(AdProbeVerdict.Unknown, unknown.verdict)
++        assertFalse(AdblockProbe.asExpected(unknown))
++        assertEquals(AdProbeVerdict.Allowed, AdblockProbe.classify("ads.tiktok.com", true, null, 200, null).verdict)
++    }
++
++    /* ------------------------------ 配置导入 / 编辑 ------------------------------ */
++
++    private val validYaml = "proxies:\n  - {name: a, type: ss, server: 1.1.1.1, port: 1, cipher: aes-128-gcm, password: x}\nproxy-groups:\n  - {name: P, type: select, proxies: [a]}\nrules:\n  - MATCH,P\n"
++
++    @Test fun configTextIsDecodedStrictlyAndPrechecked() {
++        assertEquals("a: 1\n", ConfigText.decode("\uFEFFa: 1\n".toByteArray()))
++        listOf(byteArrayOf(), byteArrayOf(0xC3.toByte(), 0x28), "a: 1\u0000".toByteArray(), "   \n".toByteArray()).forEach { bytes ->
++            try { ConfigText.decode(bytes); fail("must reject ${bytes.size} bytes") } catch (_: IOException) {}
++        }
++        try { ConfigText.readLimited(ByteArray(ConfigText.LIMIT + 1).inputStream()); fail("oversize") } catch (_: IOException) {}
++        val ok = ConfigText.inspect(validYaml)
++        assertTrue(ok.ok)
++        assertEquals(1, ok.proxies); assertEquals(1, ok.groups); assertEquals(1, ok.rules)
++        assertTrue(ok.warnings.isEmpty())
++        val syntax = ConfigText.inspect("proxies:\n  - [unclosed\nrules: x\n")
++        assertFalse(syntax.ok)
++        assertTrue(syntax.error!!, syntax.error!!.contains("行"))
++        assertTrue(ConfigText.inspect("c3M6Ly9ZV1Z6TFRJMU5pMW5ZMjA2Y0dGemMzZHZjbVE9QDEuMi4zLjQ6ODM4OCNub2Rl\n").error!!.contains("Base64"))
++        assertTrue(ConfigText.inspect("- a\n- b\n").error!!.contains("顶层"))
++        assertTrue(ConfigText.inspect("mode: rule\n").warnings.any { it.contains("节点") })
++        assertEquals("my.yaml", ConfigText.importName("https://x.example/dl/my.yaml?token=1"))
++        assertEquals("sub.yaml", ConfigText.importName("/path/sub"))
++        assertEquals("导入配置.yaml", ConfigText.importName(""))
++    }
++
++    @Test fun configDiffShowsChangesWithContextAndStaysBounded() {
++        val old = (1..50).joinToString("\n") { "line $it" }
++        val new = old.replace("line 25", "line 25 changed") + "\nline 51"
++        val diff = ConfigDiffer.diff(old, new)
++        assertEquals(2, diff.added)
++        assertEquals(1, diff.removed)
++        assertTrue(diff.lines.any { it.kind == '-' && it.text == "line 25" })
++        assertTrue(diff.lines.any { it.kind == '+' && it.text == "line 25 changed" })
++        assertTrue("unchanged runs are folded", diff.lines.any { it.kind == '…' })
++        assertTrue(diff.lines.size < 20)
++        assertTrue(ConfigDiffer.diff(old, old).identical)
++        val big = (1..3000).joinToString("\n") { "a$it" }
++        val other = (1..3000).joinToString("\n") { "b$it" }
++        val bounded = ConfigDiffer.diff(big, other, maxLines = 100)
++        assertEquals(3000, bounded.added); assertEquals(3000, bounded.removed)
++        assertTrue(bounded.truncated)
++        assertTrue(bounded.lines.size <= 101)
++    }
++
++    private class FakeStore(var selected: String?, val files: MutableMap<String, String>) : ConfigStore {
++        override fun selectedName() = selected
++        override fun names() = files.keys.toList()
++        override fun read(name: String) = files[name] ?: throw IOException("missing $name")
++        override fun write(name: String, text: String) { if (name !in files) throw IOException("missing"); files[name] = text }
++        override fun create(requestedName: String, text: String): String {
++            var name = requestedName; var i = 2
++            while (name in files) name = requestedName.removeSuffix(".yaml") + " ($i).yaml".also { i++ }
++            files[name] = text; selected = name; return name
++        }
++        override fun select(name: String) { if (name !in files) throw IOException("missing"); selected = name }
++    }
++
++    private fun transaction(store: FakeStore, running: Boolean?, reload: suspend () -> String, validate: suspend (String) -> Unit = {}) =
++        ConfigTransaction(store, ConfigBackups(File(dir, "backups"), keep = 3), validate, { running }, reload)
++
++    @Test fun editSaveBacksUpWritesAndReloads() = runBlocking {
++        val store = FakeStore("main.yaml", mutableMapOf("main.yaml" to "old: 1\n"))
++        val reloads = AtomicInteger()
++        val result = transaction(store, true, { reloads.incrementAndGet(); "运行配置已热重载" }).save("main.yaml", validYaml, expected = "old: 1\n")
++        assertTrue(result is ConfigApplyResult.Applied)
++        assertEquals(validYaml, store.files["main.yaml"])
++        assertEquals(1, reloads.get())
++        val backups = ConfigBackups(File(dir, "backups")).list("main.yaml")
++        assertEquals(1, backups.size)
++        assertEquals("old: 1\n", ConfigBackups(File(dir, "backups")).read(backups.single()))
++        // A concurrent change of the file is refused without writing.
++        try { transaction(store, true, { "" }).save("main.yaml", validYaml + "#2\n", expected = "stale"); fail("conflict") }
++        catch (_: ConfigConflictException) {}
++        assertEquals(validYaml, store.files["main.yaml"])
++    }
++
++    @Test fun coreRefusalRollsBackWhileRestartOnlyChangesAreKept() = runBlocking {
++        val store = FakeStore("main.yaml", mutableMapOf("main.yaml" to "old: 1\n"))
++        val calls = AtomicInteger()
++        val refused = transaction(store, true, {
++            if (calls.incrementAndGet() == 1) throw IOException("Controller 尚未加载河图广告拦截规则") else "restored"
++        }).save("main.yaml", validYaml)
++        assertTrue(refused is ConfigApplyResult.RolledBack)
++        assertEquals("source restored", "old: 1\n", store.files["main.yaml"])
++        assertEquals("reloaded again after rollback", 2, calls.get())
++
++        val restart = transaction(store, true, { throw IOException("运行模式、应用范围、DNS…已变化，请使用「重启」应用这些网络层设置") }).save("main.yaml", validYaml)
++        assertTrue(restart is ConfigApplyResult.NeedsRestart)
++        assertEquals(validYaml, store.files["main.yaml"])
++
++        val idle = FakeStore("main.yaml", mutableMapOf("main.yaml" to "old: 1\n"))
++        assertTrue(transaction(idle, false, { fail("not running: no reload"); "" }).save("main.yaml", validYaml) is ConfigApplyResult.Applied)
++        assertTrue(transaction(FakeStore("main.yaml", mutableMapOf("main.yaml" to "x: 1\n")), null, { fail("busy: no reload"); "" })
++            .save("main.yaml", validYaml) is ConfigApplyResult.NeedsRestart)
++
++        val invalid = FakeStore("main.yaml", mutableMapOf("main.yaml" to "old: 1\n"))
++        try { transaction(invalid, true, { "" }, validate = { throw IOException("YAML 校验失败") }).save("main.yaml", validYaml); fail("invalid") }
++        catch (error: IOException) { assertTrue(error.message!!.contains("校验失败")) }
++        assertEquals("nothing written when the core rejects validation", "old: 1\n", invalid.files["main.yaml"])
++        assertTrue(ConfigBackups(File(dir, "backups")).list().isNotEmpty())
++    }
++
++    @Test fun importSelectsNewConfigAndRestoresPreviousSelectionOnFailure() = runBlocking {
++        val store = FakeStore("main.yaml", mutableMapOf("main.yaml" to "old: 1\n"))
++        val (name, ok) = transaction(store, true, { "ok" }).import("sub.yaml", validYaml)
++        assertEquals("sub.yaml", name)
++        assertTrue(ok is ConfigApplyResult.Applied)
++        assertEquals("sub.yaml", store.selected)
++
++        val calls = AtomicInteger()
++        val (second, failed) = transaction(store, true, { if (calls.incrementAndGet() == 1) throw IOException("配置无效") else "" }).import("sub.yaml", validYaml)
++        assertEquals("sub (2).yaml", second)
++        assertTrue(failed is ConfigApplyResult.RolledBack)
++        assertEquals("previous selection restored", "sub.yaml", store.selected)
++        assertEquals("old: 1\n", store.files["main.yaml"])
++
++        // Backups keep the newest [keep] per config and restore through the same transaction.
++        val backups = ConfigBackups(File(dir, "keep"), keep = 2)
++        repeat(4) { backups.save("main.yaml", "v$it: 1\n", "edit", now = 1_000L + it) }
++        val listed = backups.list("main.yaml")
++        assertEquals(2, listed.size)
++        assertEquals("v3: 1\n", backups.read(listed.first()))
++        val restoreStore = FakeStore("main.yaml", mutableMapOf("main.yaml" to "now: 1\n"))
++        val restored = ConfigTransaction(restoreStore, backups, {}, { false }, { "" }).restore(listed.last())
++        assertTrue(restored is ConfigApplyResult.Applied)
++        assertEquals("v2: 1\n", restoreStore.files["main.yaml"])
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
 index 366297a..e224bf7 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt

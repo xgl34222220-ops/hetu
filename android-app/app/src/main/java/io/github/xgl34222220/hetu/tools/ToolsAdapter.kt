@@ -72,6 +72,8 @@ internal fun HetuToolsV2(
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
     onOpenConfigEditor: (() -> Unit)? = null,
+    onOpenConnectivity: (() -> Unit)? = null,
+    onOpenAdblockVerify: (() -> Unit)? = null,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -83,7 +85,12 @@ internal fun HetuToolsV2(
     val changed by rememberUpdatedState(onConfigChanged)
     val openExternal by rememberUpdatedState(onOpenExternalEntry)
     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
-    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
+    val features = rememberToolsFeatureHost(
+        onChanged = onConfigChanged,
+        onOpenDiagnosticsDetails = onOpenDiagnosticsDetails,
+        onOpenConnectivity = onOpenConnectivity,
+        onOpenAdblockVerify = onOpenAdblockVerify,
+    )
     var destination by remember { mutableStateOf(ToolsDestination.Root) }
     ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
 

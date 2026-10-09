@@ -23,6 +23,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import io.github.xgl34222220.hetu.AdCheckState
+import io.github.xgl34222220.hetu.AdblockAuditBridge
 import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
 import io.github.xgl34222220.hetu.ProxyComposeController
 import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
@@ -87,7 +89,12 @@ internal class ToolsFeatureHost(val actions: ToolsFeatureActions, val appIcon: @
  * @param onChanged a runtime setting changed: refresh the shell state (pending-restart banner).
  */
 @Composable
-internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null): ToolsFeatureHost {
+internal fun rememberToolsFeatureHost(
+    onChanged: () -> Unit = {},
+    onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    onOpenConnectivity: (() -> Unit)? = null,
+    onOpenAdblockVerify: (() -> Unit)? = null,
+): ToolsFeatureHost {
     val context = LocalContext.current
     val app = context.applicationContext
     val prefs = remember(app) { app.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -96,6 +103,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
     val scope = rememberCoroutineScope()
     val changed by rememberUpdatedState(onChanged)
     val diagnosticsDetails by rememberUpdatedState(onOpenDiagnosticsDetails)
+    val connectivity by rememberUpdatedState(onOpenConnectivity)
+    val adblockVerify by rememberUpdatedState(onOpenAdblockVerify)
 
     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
     fun dirty(key: String) { ToolsRuntimeBridge.markDirty(app, key); changed() }
@@ -216,6 +225,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
+            onOpenConnectivity = if (onOpenConnectivity == null) null else { { connectivity?.invoke() } },
+            onOpenAdblockVerify = if (onOpenAdblockVerify == null) null else { { adblockVerify?.invoke() } },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
@@ -234,6 +245,16 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             loadAdblock = {
                 val snapshot = rules.rulesSnapshot()
                 val chain = ToolsRuntimeBridge.adblockChain(app)
+                // Strict, core-reported chain: the REJECT rule itself (not any rule naming the
+                // provider), its order before MATCH, and a non-empty block rule-set.
+                val audit = try { AdblockAuditBridge.audit(app, chain.running) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+                val coreAnswered = chain.running && audit?.coreAnswered == true
+                val coreDetail = if (!coreAnswered) null else audit?.checks?.let { checks ->
+                    val core = checks.firstOrNull { it.key == "core" }
+                    val provider = checks.firstOrNull { it.key == "provider" }
+                    listOfNotNull(core, provider).firstOrNull { it.state == AdCheckState.Fail }?.detail
+                        ?: listOfNotNull(core?.detail, provider?.detail).joinToString(" · ")
+                }
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -263,7 +284,9 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                         recent = chain.recent,
                         startupInjected = chain.startupInjected,
-                        controllerLoaded = chain.controllerLoaded,
+                        controllerLoaded = if (coreAnswered) audit?.coreChainOk == true else chain.controllerLoaded,
+                        coreDetail = coreDetail,
+                        lastError = prefs.getString("proxyAdblockLastError", "").orEmpty(),
                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
                     ),

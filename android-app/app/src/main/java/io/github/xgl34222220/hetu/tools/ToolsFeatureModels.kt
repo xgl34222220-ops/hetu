@@ -241,6 +241,10 @@ internal data class ToolsAdblockState(
     val recent: List<String> = emptyList(),
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
+    /** What the core reports for the rule chain (strict audit); null when it did not answer. */
+    val coreDetail: String? = null,
+    /** Why the last start/reload ran without the ad-block chain; blank when it did not degrade. */
+    val lastError: String = "",
     val standaloneDns: Boolean = false,
     val cnameProtection: Boolean = true,
     val updating: Boolean = false,
@@ -367,6 +371,8 @@ internal class ToolsFeatureActions(
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    /** 多平台网络测试 page of the host; null hides the row. */
+    val onOpenConnectivity: (() -> Unit)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
@@ -385,6 +391,8 @@ internal class ToolsFeatureActions(
     val setCnameProtection: suspend (Boolean) -> Unit = {},
     /** “切到规则” on the wrong-mode warning; null hides the button. */
     val switchToRuleMode: (suspend () -> Unit)? = null,
+    /** 去广告核查 page of the host (core audit + live probe); null hides the entry. */
+    val onOpenAdblockVerify: (() -> Unit)? = null,
 
     val onMessage: (String) -> Unit = {},
 ) {

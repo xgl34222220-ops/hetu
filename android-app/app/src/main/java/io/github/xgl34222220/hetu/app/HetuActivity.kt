@@ -203,6 +203,9 @@ internal sealed class HxRoute(val key: String) {
     data object StartupDownloadSettings : HxRoute("startup-download-settings")
     data object PublicIp : HxRoute("public-ip")
     data object Resources : HxRoute("resources")
+    data object Connectivity : HxRoute("connectivity")
+    data object AdblockVerify : HxRoute("adblock-verify")
+    data object ConfigImport : HxRoute("config-import")
 }
 
 internal class HxNav {
@@ -358,6 +361,9 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                             HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                             HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
+                            HxRoute.Connectivity -> ConnectivityScreen(vm) { nav.pop() }
+                            HxRoute.AdblockVerify -> AdblockVerifyScreen(vm) { nav.pop() }
+                            HxRoute.ConfigImport -> ConfigImportScreen(vm) { nav.pop() }
                         }
                     }
                 }
