@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "e569e807215d56223ca255dc49aab636c19abe9e7ca47e030f8292f6c3c09886",
+  "patchSha256": "a562629c9f27efc403c197ce308fe66fea26af0a7348d08d0222023d7312cb40",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -320,7 +320,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt": "1abe5f3286a4c739b2475842606ebfa3ed931a2a59f6bf91ce5e6e605aa09f46",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt": "675096999660fe3849184ef6b402d4775b9bcd1ac97abdde120493c5172d7b7c",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt": "b8c176fdc037096ce2278e59387bf2aeb02b16a68d10d2f862fc1401e2e45991",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt": "e7d5a636be25ad909d3a95298807e54896b5f2c9fb87382179fddbb9f544505b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt": "3ea8cdc7eafe32ccb69a773c1549daec49e818380db07c198fde59ee263d8382",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProbeSchedulingPerformance95Test.kt": "ec832515a6c11b88454130850f3877216d8e05fd1de7790ab364786a320ec285",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootRecoveryDeadline93Test.kt": "5d747fe61b120db30a23f356315ff6f3886aeeb1082fda1ffe92fdda4dc057bd",

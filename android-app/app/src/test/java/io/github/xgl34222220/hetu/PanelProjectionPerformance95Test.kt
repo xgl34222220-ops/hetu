@@ -455,6 +455,8 @@ private fun baseline7585PanelData(
     val nodeDelays = HashMap<String, PanelDelay>()
     state.groups.forEach { g -> g.nodes.forEach { n -> if (n.name !in groupNames && n.lastDelay != null) nodeDelays[n.name] = panelDelayOf(n.lastDelay) } }
     delays.forEach { (name, ms) -> nodeDelays[name] = panelDelayOf(ms) }
+    // V96: finished readings without in-flight markers, for cards not being measured themselves.
+    val settledDelays = HashMap(nodeDelays).toMap()
     testing.keys.forEach { nodeDelays[it] = PanelDelay.Testing }
 
     val rates = sampler.connectionRates
@@ -498,6 +500,7 @@ private fun baseline7585PanelData(
         globalMode = state.trafficMode.equals("global", ignoreCase = true),
         groups = groups,
         delays = nodeDelays,
+        settledDelays = settledDelays,
         // The core is up but the controller has not answered once yet: placeholders, not empty states.
         loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
         testingGroups = testingGroups,

@@ -6928,10 +6928,10 @@ index 0000000..f1f8f8a
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt
 new file mode 100644
-index 0000000..8adec45
+index 0000000..0312cfe
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt
-@@ -0,0 +1,571 @@
+@@ -0,0 +1,574 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.runtime.mutableStateMapOf
@@ -7389,6 +7389,8 @@ index 0000000..8adec45
 +    val nodeDelays = HashMap<String, PanelDelay>()
 +    state.groups.forEach { g -> g.nodes.forEach { n -> if (n.name !in groupNames && n.lastDelay != null) nodeDelays[n.name] = panelDelayOf(n.lastDelay) } }
 +    delays.forEach { (name, ms) -> nodeDelays[name] = panelDelayOf(ms) }
++    // V96: finished readings without in-flight markers, for cards not being measured themselves.
++    val settledDelays = HashMap(nodeDelays).toMap()
 +    testing.keys.forEach { nodeDelays[it] = PanelDelay.Testing }
 +
 +    val rates = sampler.connectionRates
@@ -7432,6 +7434,7 @@ index 0000000..8adec45
 +        globalMode = state.trafficMode.equals("global", ignoreCase = true),
 +        groups = groups,
 +        delays = nodeDelays,
++        settledDelays = settledDelays,
 +        // The core is up but the controller has not answered once yet: placeholders, not empty states.
 +        loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
 +        testingGroups = testingGroups,
