@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu
 
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.asContextElement
@@ -46,4 +48,28 @@ internal suspend fun <T> latencyProbeOperation(
         currentCoroutineContext().ensureActive()
         throw error
     } finally { budget.close() }
+}
+
+/** Parallel controller reads cancel sibling sockets without shortening their HTTP timeouts. */
+internal suspend fun <T> controllerSnapshotOperation(block: suspend CoroutineScope.() -> T): T {
+    val inherited = LatencyProbeBudget.CURRENT.get()
+    val budget = inherited ?: LatencyProbeBudget.cancellationOnly()
+    return try {
+        withContext(Dispatchers.IO + LatencyProbeBudget.CURRENT.asContextElement(budget)) {
+            coroutineScope {
+                val operationContext = coroutineContext
+                // This bridge is a sibling of the actual async reads. A failed read
+                // cancels it immediately, before coroutineScope waits for blocked IO.
+                val cancellation = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
+                    try { awaitCancellation() } finally {
+                        if (inherited == null || !operationContext.isActive) budget.close()
+                    }
+                }
+                try { block() } finally { cancellation.cancel() }
+            }
+        }
+    } catch (error: Exception) {
+        currentCoroutineContext().ensureActive()
+        throw error
+    } finally { if (inherited == null) budget.close() }
 }

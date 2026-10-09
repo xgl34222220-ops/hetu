@@ -242,6 +242,166 @@ class PanelProjectionPerformance95Test {
         output.writeText(report)
         println("PANEL_PROJECTION_PERFORMANCE95 $report")
     }
+    @Test fun consecutiveCounterPollsReuseStaticProjectionAndRefreshEveryLiveValue() {
+        val input = fixture()
+        val projector = PanelDataProjector()
+        val first = project(projector, input)
+        var prior = first
+        repeat(4) { index ->
+            val round = index + 1L
+            val fresh = input.copy(state = input.state.copy(
+                connections = input.state.connections.map { it.copy(upload = it.upload + 100L * round,
+                    download = it.download + 900L * round) }, uploadTotal = 1000L + round, downloadTotal = 5000L + round))
+            val traffic = PanelTrafficSnapshot(round * 10L, round * 20L,
+                fresh.state.connections.associate { it.id to (round * 3L to round * 7L) })
+            val updated = project(projector, fresh, traffic)
+            assertEquals(baseline(fresh, traffic), updated)
+            updated.connections.forEachIndexed { connectionIndex, connection ->
+                assertSame(prior.connections[connectionIndex].chain, connection.chain)
+                assertEquals(fresh.state.connections[connectionIndex].upload, connection.uploadTotalBytes)
+                assertEquals(fresh.state.connections[connectionIndex].download, connection.downloadTotalBytes)
+                assertEquals(round * 3L, connection.uploadBytesPerSecond)
+                assertEquals(round * 7L, connection.downloadBytesPerSecond)
+            }
+            assertSame(first.groups, updated.groups)
+            assertSame(first.rules, updated.rules)
+            prior = updated
+        }
+        val reset = input.copy(state = input.state.copy(connections = input.state.connections.map { it.copy(upload = 0L, download = 0L) }))
+        val zeroed = project(projector, reset)
+        assertEquals(baseline(reset), zeroed)
+        zeroed.connections.forEachIndexed { index, connection ->
+            assertSame(first.connections[index].chain, connection.chain)
+            assertEquals(0L, connection.uploadTotalBytes)
+            assertEquals(0L, connection.downloadTotalBytes)
+            assertEquals(0L, connection.uploadBytesPerSecond)
+            assertEquals(0L, connection.downloadBytesPerSecond)
+        }
+        // Returned objects are immutable even after later polls reset the same IDs.
+        assertEquals(100L, first.connections[1].downloadTotalBytes)
+        assertEquals(420L, prior.connections[1].uploadTotalBytes)
+        assertEquals(3700L, prior.connections[1].downloadTotalBytes)
+    }
+
+    @Test fun eachChangedStaticFieldForTheSameConnectionIdRebuildsItsProjection() {
+        val input = fixture(connectionCount = 1)
+        val source = input.state.connections.single()
+        val changes: List<(ProxyConnectionUi) -> ProxyConnectionUi> = listOf(
+            { it.copy(host = "192.0.2.2:80") },
+            { it.copy(startedAt = "2026-10-09T09:45:30.001Z") },
+            { it.copy(network = "udp · Tun") },
+            { it.copy(inbound = "Tun") },
+            { it.copy(appName = "updated application") },
+            { it.copy(packageName = "updated.package") },
+            { it.copy(chain = "DIRECT → changed-group") },
+            { it.copy(rule = "Match") },
+            { it.copy(rulePayload = "changed.test") },
+        )
+        changes.forEach { change ->
+            val projector = PanelDataProjector()
+            val before = project(projector, input)
+            val fresh = input.copy(state = input.state.copy(connections = listOf(change(source))))
+            val after = project(projector, fresh)
+            assertEquals(baseline(fresh), after)
+            assertEquals(source.id, after.connections.single().id)
+            assertNotSame(before.connections.single().chain, after.connections.single().chain)
+            assertSame(before.groups, after.groups)
+        }
+    }
+
+    @Test fun closedConnectionMetadataIsEvictedWhileSurvivingIdsKeepTheirProjection() {
+        val input = fixture(connectionCount = 2)
+        val projector = PanelDataProjector()
+        val first = project(projector, input)
+        val survivor = input.copy(state = input.state.copy(connections = listOf(input.state.connections[1])))
+        val trimmed = project(projector, survivor)
+        assertEquals(baseline(survivor), trimmed)
+        assertSame(first.connections[1].chain, trimmed.connections.single().chain)
+        val returned = project(projector, input)
+        assertEquals(first, returned)
+        assertNotSame(first.connections[0].chain, returned.connections[0].chain)
+        assertSame(first.connections[1].chain, returned.connections[1].chain)
+        val empty = input.copy(state = input.state.copy(connections = emptyList()))
+        assertTrue(project(projector, empty).connections.isEmpty())
+        val reopened = project(projector, input)
+        reopened.connections.forEachIndexed { index, connection -> assertNotSame(returned.connections[index].chain, connection.chain) }
+        assertEquals(first, reopened)
+    }
+
+    @Test fun stoppedAndFailedSnapshotsClearPerConnectionMetadataBeforeRecovery() {
+        val input = fixture()
+        for (state in listOf(input.state.copy(running = false), input.state.copy(controllerReadFailed = true))) {
+            val projector = PanelDataProjector()
+            val before = project(projector, input)
+            assertTrue(project(projector, input.copy(state = state)).connections.isEmpty())
+            val after = project(projector, input)
+            assertEquals(before, after)
+            before.connections.forEachIndexed { index, connection -> assertNotSame(connection.chain, after.connections[index].chain) }
+        }
+    }
+
+    @Test fun changingCounterPollsReportBaselineAndCachedTimesWithStaticReferenceReuse() {
+        val input = fixture(groupCount = 100, nodesPerGroup = 300, connectionCount = 2000, ruleCount = 10000)
+        val projector = PanelDataProjector()
+        fun poll(index: Int) = input.copy(state = input.state.copy(
+            connections = input.state.connections.map { it.copy(upload = it.upload + index * 100L, download = it.download + index * 800L) },
+            uploadTotal = input.state.uploadTotal + index * 200_000L, downloadTotal = input.state.downloadTotal + index * 1_600_000L))
+        fun traffic(index: Int) = PanelTrafficSnapshot(index * 100L, index * 500L,
+            input.state.connections.associate { it.id to (index * 2L to index * 7L) },
+            List(60) { (it + index).toFloat() }, List(60) { (it * 3 + index).toFloat() })
+        repeat(5) { index ->
+            val fresh = poll(index)
+            val rates = traffic(index)
+            assertEquals(baseline(fresh, rates), project(projector, fresh, rates))
+        }
+        val baselineNs = mutableListOf<Long>()
+        val cachedNs = mutableListOf<Long>()
+        var prior: PanelData? = null
+        repeat(15) { offset ->
+            val fresh = poll(offset + 5)
+            val rates = traffic(offset + 5)
+            var before: PanelData? = null
+            var after: PanelData? = null
+            if (offset % 2 == 0) {
+                baselineNs += measureNanoTime { before = baseline(fresh, rates) }
+                cachedNs += measureNanoTime { after = project(projector, fresh, rates) }
+            } else {
+                cachedNs += measureNanoTime { after = project(projector, fresh, rates) }
+                baselineNs += measureNanoTime { before = baseline(fresh, rates) }
+            }
+            assertEquals(before, after)
+            prior?.let { previous ->
+                assertSame(previous.groups, after!!.groups)
+                assertSame(previous.rules, after!!.rules)
+                after!!.connections.forEachIndexed { index, connection ->
+                    assertSame(previous.connections[index].chain, connection.chain)
+                    assertEquals(fresh.state.connections[index].upload, connection.uploadTotalBytes)
+                    assertEquals(fresh.state.connections[index].download, connection.downloadTotalBytes)
+                }
+            }
+            prior = after
+        }
+        fun percentile(values: List<Long>, fraction: Double): Double = values.sorted()[((values.size - 1) * fraction).toInt()] / 1_000_000.0
+        val report = """{
+  "fixture": {"groups":100,"nodesPerGroup":300,"connections":2000,"rules":10000},
+  "samples":15,
+  "scenario":"Every poll replaces connection objects and changes all upload/download counters and rates",
+  "baselineCommit":"7585c268",
+  "baselineMedianMs":${percentile(baselineNs, .5)},
+  "cachedMedianMs":${percentile(cachedNs, .5)},
+  "baselineP95Ms":${percentile(baselineNs, .95)},
+  "cachedP95Ms":${percentile(cachedNs, .95)},
+  "exactOutputParity":true,
+  "staticConnectionChainsReused":true,
+  "liveCountersRefreshed":true,
+  "scope":"Host JVM presentation projection only; not Android device FPS or network latency"
+}"""
+        val output = File("build/outputs/ui93/panel-projection-poll-performance95.json")
+        output.parentFile.mkdirs()
+        output.writeText(report)
+        println("PANEL_PROJECTION_POLL_PERFORMANCE95 $report")
+    }
+
 }
 
 // Frozen 7585c268 projection, copied for output parity and before/after timing only.

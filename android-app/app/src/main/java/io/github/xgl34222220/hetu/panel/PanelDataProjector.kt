@@ -3,6 +3,7 @@ package io.github.xgl34222220.hetu.panel
 import io.github.xgl34222220.hetu.DashboardProviderUi
 import io.github.xgl34222220.hetu.DashboardRuleSetUi
 import io.github.xgl34222220.hetu.ProxyComposeState
+import io.github.xgl34222220.hetu.ProxyConnectionUi
 import io.github.xgl34222220.hetu.ProxyGroupUi
 import io.github.xgl34222220.hetu.ProxyRuleUi
 import io.github.xgl34222220.hetu.RefLogEntry
@@ -51,7 +52,14 @@ internal class PanelDataProjector {
     private val groupBase = PanelProjectionSlice<GroupBase>()
     private val groups = PanelProjectionSlice<List<PanelGroup>>()
     private val nodeDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
-    private val connectionBase = PanelProjectionSlice<List<PanelConnection>>()
+    private data class ConnectionMetadataKey(
+        val host: String, val startedAt: String, val network: String, val inbound: String,
+        val app: String, val packageName: String, val chain: String, val rule: String,
+        val rulePayload: String, val zone: ZoneId,
+    )
+    private data class ConnectionMetadata(val key: ConnectionMetadataKey, val base: PanelConnection)
+    // Replaced after each changed connection snapshot: never retain closed connection IDs.
+    private var connectionMetadata: Map<String, ConnectionMetadata> = emptyMap()
     private val connections = PanelProjectionSlice<List<PanelConnection>>()
     private val ranks = PanelProjectionSlice<List<PanelRank>>()
     private val subscriptionOverview = PanelProjectionSlice<PanelOverviewSubscription?>()
@@ -61,7 +69,7 @@ internal class PanelDataProjector {
     private val logs = PanelProjectionSlice<List<PanelLogEntry>>()
 
     private fun clear() {
-        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionBase.clear()
+        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionMetadata = emptyMap()
         connections.clear(); ranks.clear(); subscriptionOverview.clear(); subscriptions.clear()
         rules.clear(); ruleSets.clear(); logs.clear()
     }
@@ -112,34 +120,27 @@ internal class PanelDataProjector {
             }.toMap()
         }
         val zone = ZoneId.systemDefault()
-        val baseConnections = connectionBase.get(state.connections, zone) {
-            state.connections.map { c ->
-                val bare = c.host.substringBeforeLast(':')
-                PanelConnection(
-                    id = c.id, host = c.host, time = c.startedAt.takeIf { it.isNotBlank() },
-                    timeLabel = formatStarted(c.startedAt, zone),
-                    network = c.network.substringBefore(" · ").uppercase(Locale.ROOT), inbound = c.inbound,
-                    kind = when {
-                        bare.count { it == ':' } >= 2 -> "IPv6"
-                        bare.all { it.isDigit() || it == '.' } -> "IPv4"
-                        else -> "FQDN"
-                    },
-                    app = c.appName, packageName = c.packageName,
-                    chain = c.chain.split(" → ").filter { it.isNotBlank() }.asReversed(),
-                    rule = listOf(c.rule, c.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
-                    uploadTotalBytes = c.upload, downloadTotalBytes = c.download,
-                )
-            }
-        }
         val rates = traffic.connectionRates.toMap()
-        val shownConnections = connections.get(baseConnections, rates) {
-            baseConnections.map { connection ->
-                val rate = rates[connection.id]
+        val shownConnections = connections.get(state.connections, rates, zone) {
+            val currentMetadata = HashMap<String, ConnectionMetadata>(state.connections.size)
+            val projected = state.connections.map { source ->
+                val key = ConnectionMetadataKey(source.host, source.startedAt, source.network, source.inbound,
+                    source.appName, source.packageName, source.chain, source.rule, source.rulePayload, zone)
+                val metadata = connectionMetadata[source.id]?.takeIf { it.key == key }
+                    ?: ConnectionMetadata(key, buildConnectionBase(source, zone))
+                currentMetadata[source.id] = metadata
+                val baseConnection = metadata.base
+                val rate = rates[source.id]
                 val up = rate?.first ?: 0L
                 val down = rate?.second ?: 0L
-                if (up == 0L && down == 0L) connection
-                else connection.copy(uploadBytesPerSecond = up, downloadBytesPerSecond = down)
+                // Totals and rates always belong to this poll, including a reset to zero.
+                // The expensive date/chain/network projection belongs only to the static key.
+                if (source.upload == 0L && source.download == 0L && up == 0L && down == 0L) baseConnection
+                else baseConnection.copy(uploadTotalBytes = source.upload, downloadTotalBytes = source.download,
+                    uploadBytesPerSecond = up, downloadBytesPerSecond = down)
             }
+            connectionMetadata = currentMetadata
+            projected
         }
         val shownRanks = ranks.get(shownConnections) {
             shownConnections.groupBy { it.app.ifBlank { "其他应用" } }.map { (app, items) ->
@@ -197,6 +198,23 @@ internal class PanelDataProjector {
             ),
             subscriptions = shownSubscriptions, connections = shownConnections, rules = shownRules,
             ruleSets = shownRuleSets, logs = shownLogs,
+        )
+    }
+
+    private fun buildConnectionBase(source: ProxyConnectionUi, zone: ZoneId): PanelConnection {
+        val bare = source.host.substringBeforeLast(':')
+        return PanelConnection(
+            id = source.id, host = source.host, time = source.startedAt.takeIf { it.isNotBlank() },
+            timeLabel = formatStarted(source.startedAt, zone),
+            network = source.network.substringBefore(" · ").uppercase(Locale.ROOT), inbound = source.inbound,
+            kind = when {
+                bare.count { it == ':' } >= 2 -> "IPv6"
+                bare.all { it.isDigit() || it == '.' } -> "IPv4"
+                else -> "FQDN"
+            },
+            app = source.appName, packageName = source.packageName,
+            chain = source.chain.split(" → ").filter { it.isNotBlank() }.asReversed(),
+            rule = listOf(source.rule, source.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
         )
     }
 

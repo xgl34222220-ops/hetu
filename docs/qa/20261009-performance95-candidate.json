@@ -4,16 +4,19 @@
   "scope": [
     "Overlap four independent controller snapshot reads; retain complete-snapshot and generation publication guards",
     "Replace six-leaf batch barriers with six reusable workers; retain metadata checkpoints, global12slots and20second operation budget",
-    "Cache independent panel presentation slices; preserve exact projected values, error/stop clearing and in-place map updates"
+    "Cache independent panel presentation slices; preserve exact projected values, error/stop clearing and in-place map updates",
+    "Close parallel-read sibling sockets on failure/cancel without adding a new controller timeout",
+    "Reuse connection static formatting across counter-changing polls; evict closed connection ids"
   ],
-  "newTests": 13,
+  "newTests": 22,
   "priorTestsBytePreserved": 726,
-  "expectedTests": 739,
+  "expectedTests": 748,
   "expectedXmlFiles": 83,
   "performanceEvidence": {
     "firstSnapshot": "Real loopback HTTP; four-handler gate plus three alternating equal-delay timing samples",
     "probeScheduling": "Real loopback HTTP; tail progresses while first leaf blocked; observed concurrency never exceeds6; previous batch reference timed",
-    "panelProjection": "100groups x300nodes,2000connections,10000rules; output parity, traversal/ref reuse assertions,15 alternating host timing samples"
+    "panelProjection": "100groups x300nodes,2000connections,10000rules; output parity, traversal/ref reuse assertions,15 alternating host timing samples",
+    "panelLivePoll": "Second15-sample case replaces all2000 connection counters every poll; metadata identity reuse and full output parity required"
   },
   "localAndroidExecution": false,
   "performanceMeasurementsStatus": "Pending execution in this candidate CI; no speedup claimed from static analysis",
@@ -27,5 +30,6 @@
     "Native payloads, Root scripts, dependencies, permission manifest and signing",
     "Network/device security settings",
     "Both900second acceptance durations"
-  ]
+  ],
+  "reviewFollowupFrom": "1c740ec4053bc7aa89c5ee3a128ab89e94ea89f6; read-only review found cancellation cleanup and realistic counter-poll coverage gaps before acceptance"
 }

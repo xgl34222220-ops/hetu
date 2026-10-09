@@ -780,10 +780,10 @@ index ae832da..6925c5a 100755
  esac
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
-index 0000000..c777ce0
+index 0000000..3477da1
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
-@@ -0,0 +1,72 @@
+@@ -0,0 +1,83 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
@@ -804,21 +804,32 @@ index 0000000..c777ce0
 +    private static final ThreadPoolExecutor DNS = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
 +        new ArrayBlockingQueue<>(12), r -> { Thread t = new Thread(r, "hetu-probe-dns"); t.setDaemon(true); return t; });
 +    private final long deadline;
++    private final boolean hasDeadline;
 +    private final Set<Socket> sockets = new HashSet<>();
 +    private final ScheduledFuture<?> alarm;
 +    private volatile boolean closed;
 +
 +    LatencyProbeBudget(long timeoutMs) {
++        hasDeadline = true;
 +        deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
 +        alarm = TIMER.schedule(this::close, timeoutMs, TimeUnit.MILLISECONDS);
 +    }
-+    boolean expired() { return closed || System.nanoTime() >= deadline; }
++    // Ordinary controller snapshots retain their existing per-request timeouts.
++    // This variant only supplies cancellation-aware DNS/socket cleanup; no timer.
++    private LatencyProbeBudget() {
++        hasDeadline = false;
++        deadline = 0L;
++        alarm = null;
++    }
++    static LatencyProbeBudget cancellationOnly() { return new LatencyProbeBudget(); }
++    boolean expired() { return closed || (hasDeadline && System.nanoTime() >= deadline); }
 +    void check() throws IOException {
 +        if (expired() || Thread.currentThread().isInterrupted())
-+            throw new IOException("测速请求已取消或达到总时限，已保留完成的结果，请重试");
++            throw new IOException(hasDeadline ? "测速请求已取消或达到总时限，已保留完成的结果，请重试" : "控制接口请求已取消");
 +    }
 +    int remainingMillis() throws IOException {
 +        check();
++        if (!hasDeadline) return Integer.MAX_VALUE;
 +        // Round up: truncation can fire SO_TIMEOUT just before the shared deadline,
 +        // incorrectly exposing a generic socket error instead of the terminal budget outcome.
 +        long nanos = Math.max(1, deadline - System.nanoTime());
@@ -858,12 +869,14 @@ index 0000000..c777ce0
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
 new file mode 100644
-index 0000000..27d9768
+index 0000000..244568f
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
-@@ -0,0 +1,49 @@
+@@ -0,0 +1,75 @@
 +package io.github.xgl34222220.hetu
 +
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.isActive
 +import kotlinx.coroutines.CoroutineStart
 +import kotlinx.coroutines.Dispatchers
 +import kotlinx.coroutines.asContextElement
@@ -910,6 +923,30 @@ index 0000000..27d9768
 +        currentCoroutineContext().ensureActive()
 +        throw error
 +    } finally { budget.close() }
++}
++
++/** Parallel controller reads cancel sibling sockets without shortening their HTTP timeouts. */
++internal suspend fun <T> controllerSnapshotOperation(block: suspend CoroutineScope.() -> T): T {
++    val inherited = LatencyProbeBudget.CURRENT.get()
++    val budget = inherited ?: LatencyProbeBudget.cancellationOnly()
++    return try {
++        withContext(Dispatchers.IO + LatencyProbeBudget.CURRENT.asContextElement(budget)) {
++            coroutineScope {
++                val operationContext = coroutineContext
++                // This bridge is a sibling of the actual async reads. A failed read
++                // cancels it immediately, before coroutineScope waits for blocked IO.
++                val cancellation = launch(Dispatchers.Default, start = CoroutineStart.UNDISPATCHED) {
++                    try { awaitCancellation() } finally {
++                        if (inherited == null || !operationContext.isActive) budget.close()
++                    }
++                }
++                try { block() } finally { cancellation.cancel() }
++            }
++        }
++    } catch (error: Exception) {
++        currentCoroutineContext().ensureActive()
++        throw error
++    } finally { if (inherited == null) budget.close() }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 index f104cef..0a07bf6 100644
@@ -1024,7 +1061,7 @@ index f104cef..0a07bf6 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..cd34d36 100644
+index 4f004b9..2b1c453 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -302,9 +302,18 @@ internal class ProxyComposeController(context: Context) {
@@ -1036,7 +1073,7 @@ index 4f004b9..cd34d36 100644
 -                val rawConnections = api.connections()
 +                // Independent reads overlap, but publication still requires every
 +                // response and the original runtime observation ownership below.
-+                val snapshot = coroutineScope {
++                val snapshot = controllerSnapshotOperation {
 +                    val config = async { api.configs() }
 +                    val proxies = async { api.proxies() }
 +                    val providers = async { api.proxyProviders() }
@@ -3694,15 +3731,16 @@ index b187a2f..fd88764 100644
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 new file mode 100644
-index 0000000..64d6060
+index 0000000..e6d791e
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
-@@ -0,0 +1,251 @@
+@@ -0,0 +1,269 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import io.github.xgl34222220.hetu.DashboardProviderUi
 +import io.github.xgl34222220.hetu.DashboardRuleSetUi
 +import io.github.xgl34222220.hetu.ProxyComposeState
++import io.github.xgl34222220.hetu.ProxyConnectionUi
 +import io.github.xgl34222220.hetu.ProxyGroupUi
 +import io.github.xgl34222220.hetu.ProxyRuleUi
 +import io.github.xgl34222220.hetu.RefLogEntry
@@ -3751,7 +3789,14 @@ index 0000000..64d6060
 +    private val groupBase = PanelProjectionSlice<GroupBase>()
 +    private val groups = PanelProjectionSlice<List<PanelGroup>>()
 +    private val nodeDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
-+    private val connectionBase = PanelProjectionSlice<List<PanelConnection>>()
++    private data class ConnectionMetadataKey(
++        val host: String, val startedAt: String, val network: String, val inbound: String,
++        val app: String, val packageName: String, val chain: String, val rule: String,
++        val rulePayload: String, val zone: ZoneId,
++    )
++    private data class ConnectionMetadata(val key: ConnectionMetadataKey, val base: PanelConnection)
++    // Replaced after each changed connection snapshot: never retain closed connection IDs.
++    private var connectionMetadata: Map<String, ConnectionMetadata> = emptyMap()
 +    private val connections = PanelProjectionSlice<List<PanelConnection>>()
 +    private val ranks = PanelProjectionSlice<List<PanelRank>>()
 +    private val subscriptionOverview = PanelProjectionSlice<PanelOverviewSubscription?>()
@@ -3761,7 +3806,7 @@ index 0000000..64d6060
 +    private val logs = PanelProjectionSlice<List<PanelLogEntry>>()
 +
 +    private fun clear() {
-+        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionBase.clear()
++        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionMetadata = emptyMap()
 +        connections.clear(); ranks.clear(); subscriptionOverview.clear(); subscriptions.clear()
 +        rules.clear(); ruleSets.clear(); logs.clear()
 +    }
@@ -3812,34 +3857,27 @@ index 0000000..64d6060
 +            }.toMap()
 +        }
 +        val zone = ZoneId.systemDefault()
-+        val baseConnections = connectionBase.get(state.connections, zone) {
-+            state.connections.map { c ->
-+                val bare = c.host.substringBeforeLast(':')
-+                PanelConnection(
-+                    id = c.id, host = c.host, time = c.startedAt.takeIf { it.isNotBlank() },
-+                    timeLabel = formatStarted(c.startedAt, zone),
-+                    network = c.network.substringBefore(" · ").uppercase(Locale.ROOT), inbound = c.inbound,
-+                    kind = when {
-+                        bare.count { it == ':' } >= 2 -> "IPv6"
-+                        bare.all { it.isDigit() || it == '.' } -> "IPv4"
-+                        else -> "FQDN"
-+                    },
-+                    app = c.appName, packageName = c.packageName,
-+                    chain = c.chain.split(" → ").filter { it.isNotBlank() }.asReversed(),
-+                    rule = listOf(c.rule, c.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
-+                    uploadTotalBytes = c.upload, downloadTotalBytes = c.download,
-+                )
-+            }
-+        }
 +        val rates = traffic.connectionRates.toMap()
-+        val shownConnections = connections.get(baseConnections, rates) {
-+            baseConnections.map { connection ->
-+                val rate = rates[connection.id]
++        val shownConnections = connections.get(state.connections, rates, zone) {
++            val currentMetadata = HashMap<String, ConnectionMetadata>(state.connections.size)
++            val projected = state.connections.map { source ->
++                val key = ConnectionMetadataKey(source.host, source.startedAt, source.network, source.inbound,
++                    source.appName, source.packageName, source.chain, source.rule, source.rulePayload, zone)
++                val metadata = connectionMetadata[source.id]?.takeIf { it.key == key }
++                    ?: ConnectionMetadata(key, buildConnectionBase(source, zone))
++                currentMetadata[source.id] = metadata
++                val baseConnection = metadata.base
++                val rate = rates[source.id]
 +                val up = rate?.first ?: 0L
 +                val down = rate?.second ?: 0L
-+                if (up == 0L && down == 0L) connection
-+                else connection.copy(uploadBytesPerSecond = up, downloadBytesPerSecond = down)
++                // Totals and rates always belong to this poll, including a reset to zero.
++                // The expensive date/chain/network projection belongs only to the static key.
++                if (source.upload == 0L && source.download == 0L && up == 0L && down == 0L) baseConnection
++                else baseConnection.copy(uploadTotalBytes = source.upload, downloadTotalBytes = source.download,
++                    uploadBytesPerSecond = up, downloadBytesPerSecond = down)
 +            }
++            connectionMetadata = currentMetadata
++            projected
 +        }
 +        val shownRanks = ranks.get(shownConnections) {
 +            shownConnections.groupBy { it.app.ifBlank { "其他应用" } }.map { (app, items) ->
@@ -3897,6 +3935,23 @@ index 0000000..64d6060
 +            ),
 +            subscriptions = shownSubscriptions, connections = shownConnections, rules = shownRules,
 +            ruleSets = shownRuleSets, logs = shownLogs,
++        )
++    }
++
++    private fun buildConnectionBase(source: ProxyConnectionUi, zone: ZoneId): PanelConnection {
++        val bare = source.host.substringBeforeLast(':')
++        return PanelConnection(
++            id = source.id, host = source.host, time = source.startedAt.takeIf { it.isNotBlank() },
++            timeLabel = formatStarted(source.startedAt, zone),
++            network = source.network.substringBefore(" · ").uppercase(Locale.ROOT), inbound = source.inbound,
++            kind = when {
++                bare.count { it == ':' } >= 2 -> "IPv6"
++                bare.all { it.isDigit() || it == '.' } -> "IPv4"
++                else -> "FQDN"
++            },
++            app = source.appName, packageName = source.packageName,
++            chain = source.chain.split(" → ").filter { it.isNotBlank() }.asReversed(),
++            rule = listOf(source.rule, source.rulePayload).filter { it.isNotBlank() }.joinToString(" · "),
 +        )
 +    }
 +
@@ -5051,10 +5106,10 @@ index f8d36e9..0a8c1cc 100644
          capture("core-mihomo-variant-picker")
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
 new file mode 100644
-index 0000000..772d334
+index 0000000..549e953
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
-@@ -0,0 +1,250 @@
+@@ -0,0 +1,327 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -5063,6 +5118,7 @@ index 0000000..772d334
 +import androidx.lifecycle.viewModelScope
 +import androidx.test.core.app.ApplicationProvider
 +import kotlinx.coroutines.Job
++import kotlinx.coroutines.async
 +import kotlinx.coroutines.cancel
 +import kotlinx.coroutines.launch
 +import kotlinx.coroutines.runBlocking
@@ -5304,6 +5360,82 @@ index 0000000..772d334
 +        println("HETU_FIRST_SNAPSHOT_PERFORMANCE95 " + report.toString())
 +        println("HETU_FIRST_SNAPSHOT_PERFORMANCE95_REPORT " + file.absolutePath)
 +    }
++    @Test fun fastAuthenticationFailureClosesUnresponsiveSiblingSockets() {
++        val siblings = CountDownLatch(3)
++        response = { request ->
++            when (request.path) {
++                "/configs" -> {
++                    check(siblings.await(4, TimeUnit.SECONDS))
++                    MockResponse().setResponseCode(401)
++                }
++                "/proxies", "/providers/proxies", "/connections" -> {
++                    siblings.countDown()
++                    MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE)
++                }
++                else -> normal(request)
++            }
++        }
++        val start = System.nanoTime()
++        val job = refresh()
++        eventually("A fast 401 must close silent siblings rather than wait their 6.5/12-second HTTP timeouts") {
++            job.isCompleted && vm.loadedOnce
++        }
++        assertEquals(0L, siblings.count)
++        assertTrue(vm.state.controllerReadFailed)
++        assertTrue(vm.state.controllerError.contains("401"))
++        assertFalse(vm.state.panelReady)
++        assertTrue(vm.state.groups.isEmpty())
++        println("PERFORMANCE95_AUTH_FAILURE_MS " + (System.nanoTime() - start) / 1_000_000.0)
++    }
++
++    @Test fun cancellingConcurrentSnapshotClosesAllSilentSocketsWithoutPublishing() {
++        val entered = Collections.synchronizedSet(mutableSetOf<String>())
++        response = { request ->
++            if (request.path in snapshotPaths) {
++                entered += request.path!!
++                MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE)
++            } else normal(request)
++        }
++        val initial = vm.state
++        val job = refresh()
++        eventually("All four silent reads are in flight") { entered.size == snapshotPaths.size }
++        val start = System.nanoTime()
++        job.cancel()
++        eventually("Cancellation must finish cleanup without waiting for server replies") { job.isCompleted }
++        assertSame(initial, vm.state)
++        assertFalse(vm.loadedOnce)
++        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
++        println("PERFORMANCE95_SNAPSHOT_CANCEL_MS " + (System.nanoTime() - start) / 1_000_000.0)
++    }
++
++    @Test fun successfulSnapshotWithinAnExistingBudgetKeepsThatBudgetUsable() = runBlocking {
++        latencyProbeOperation(3_000) {
++            val inherited = LatencyProbeBudget.CURRENT.get()
++            val api = MihomoControllerClient(app)
++            val version = controllerSnapshotOperation { async { api.version() }.await() }
++            assertEquals("fixture", version.optString("version"))
++            assertSame(inherited, LatencyProbeBudget.CURRENT.get())
++            assertFalse("Successful cleanup must not close the enclosing operation", inherited.expired())
++            assertEquals("fixture", api.version().optString("version"))
++        }
++        assertNull(LatencyProbeBudget.CURRENT.get())
++    }
++
++    @Test fun concurrentSnapshotCannotRestartAnInheritedShortDeadline() = runBlocking {
++        response = { MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE) }
++        val started = System.nanoTime()
++        val error = try {
++            latencyProbeOperation(250) {
++                controllerSnapshotOperation { async { MihomoControllerClient(app).version() }.await() }
++            }
++            null
++        } catch (failure: java.io.IOException) { failure }
++        assertNotNull("The original short deadline must close the silent socket", error)
++        assertTrue("A nested snapshot must not replace the250ms budget with the6.5s HTTP timeout",
++            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 2_000)
++        assertNull(LatencyProbeBudget.CURRENT.get())
++    }
++
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt
 new file mode 100644
@@ -6478,10 +6610,10 @@ index 0000000..f1f8f8a
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt
 new file mode 100644
-index 0000000..f042e57
+index 0000000..8adec45
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt
-@@ -0,0 +1,411 @@
+@@ -0,0 +1,571 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.runtime.mutableStateMapOf
@@ -6726,6 +6858,166 @@ index 0000000..f042e57
 +        output.writeText(report)
 +        println("PANEL_PROJECTION_PERFORMANCE95 $report")
 +    }
++    @Test fun consecutiveCounterPollsReuseStaticProjectionAndRefreshEveryLiveValue() {
++        val input = fixture()
++        val projector = PanelDataProjector()
++        val first = project(projector, input)
++        var prior = first
++        repeat(4) { index ->
++            val round = index + 1L
++            val fresh = input.copy(state = input.state.copy(
++                connections = input.state.connections.map { it.copy(upload = it.upload + 100L * round,
++                    download = it.download + 900L * round) }, uploadTotal = 1000L + round, downloadTotal = 5000L + round))
++            val traffic = PanelTrafficSnapshot(round * 10L, round * 20L,
++                fresh.state.connections.associate { it.id to (round * 3L to round * 7L) })
++            val updated = project(projector, fresh, traffic)
++            assertEquals(baseline(fresh, traffic), updated)
++            updated.connections.forEachIndexed { connectionIndex, connection ->
++                assertSame(prior.connections[connectionIndex].chain, connection.chain)
++                assertEquals(fresh.state.connections[connectionIndex].upload, connection.uploadTotalBytes)
++                assertEquals(fresh.state.connections[connectionIndex].download, connection.downloadTotalBytes)
++                assertEquals(round * 3L, connection.uploadBytesPerSecond)
++                assertEquals(round * 7L, connection.downloadBytesPerSecond)
++            }
++            assertSame(first.groups, updated.groups)
++            assertSame(first.rules, updated.rules)
++            prior = updated
++        }
++        val reset = input.copy(state = input.state.copy(connections = input.state.connections.map { it.copy(upload = 0L, download = 0L) }))
++        val zeroed = project(projector, reset)
++        assertEquals(baseline(reset), zeroed)
++        zeroed.connections.forEachIndexed { index, connection ->
++            assertSame(first.connections[index].chain, connection.chain)
++            assertEquals(0L, connection.uploadTotalBytes)
++            assertEquals(0L, connection.downloadTotalBytes)
++            assertEquals(0L, connection.uploadBytesPerSecond)
++            assertEquals(0L, connection.downloadBytesPerSecond)
++        }
++        // Returned objects are immutable even after later polls reset the same IDs.
++        assertEquals(100L, first.connections[1].downloadTotalBytes)
++        assertEquals(420L, prior.connections[1].uploadTotalBytes)
++        assertEquals(3700L, prior.connections[1].downloadTotalBytes)
++    }
++
++    @Test fun eachChangedStaticFieldForTheSameConnectionIdRebuildsItsProjection() {
++        val input = fixture(connectionCount = 1)
++        val source = input.state.connections.single()
++        val changes: List<(ProxyConnectionUi) -> ProxyConnectionUi> = listOf(
++            { it.copy(host = "192.0.2.2:80") },
++            { it.copy(startedAt = "2026-10-09T09:45:30.001Z") },
++            { it.copy(network = "udp · Tun") },
++            { it.copy(inbound = "Tun") },
++            { it.copy(appName = "updated application") },
++            { it.copy(packageName = "updated.package") },
++            { it.copy(chain = "DIRECT → changed-group") },
++            { it.copy(rule = "Match") },
++            { it.copy(rulePayload = "changed.test") },
++        )
++        changes.forEach { change ->
++            val projector = PanelDataProjector()
++            val before = project(projector, input)
++            val fresh = input.copy(state = input.state.copy(connections = listOf(change(source))))
++            val after = project(projector, fresh)
++            assertEquals(baseline(fresh), after)
++            assertEquals(source.id, after.connections.single().id)
++            assertNotSame(before.connections.single().chain, after.connections.single().chain)
++            assertSame(before.groups, after.groups)
++        }
++    }
++
++    @Test fun closedConnectionMetadataIsEvictedWhileSurvivingIdsKeepTheirProjection() {
++        val input = fixture(connectionCount = 2)
++        val projector = PanelDataProjector()
++        val first = project(projector, input)
++        val survivor = input.copy(state = input.state.copy(connections = listOf(input.state.connections[1])))
++        val trimmed = project(projector, survivor)
++        assertEquals(baseline(survivor), trimmed)
++        assertSame(first.connections[1].chain, trimmed.connections.single().chain)
++        val returned = project(projector, input)
++        assertEquals(first, returned)
++        assertNotSame(first.connections[0].chain, returned.connections[0].chain)
++        assertSame(first.connections[1].chain, returned.connections[1].chain)
++        val empty = input.copy(state = input.state.copy(connections = emptyList()))
++        assertTrue(project(projector, empty).connections.isEmpty())
++        val reopened = project(projector, input)
++        reopened.connections.forEachIndexed { index, connection -> assertNotSame(returned.connections[index].chain, connection.chain) }
++        assertEquals(first, reopened)
++    }
++
++    @Test fun stoppedAndFailedSnapshotsClearPerConnectionMetadataBeforeRecovery() {
++        val input = fixture()
++        for (state in listOf(input.state.copy(running = false), input.state.copy(controllerReadFailed = true))) {
++            val projector = PanelDataProjector()
++            val before = project(projector, input)
++            assertTrue(project(projector, input.copy(state = state)).connections.isEmpty())
++            val after = project(projector, input)
++            assertEquals(before, after)
++            before.connections.forEachIndexed { index, connection -> assertNotSame(connection.chain, after.connections[index].chain) }
++        }
++    }
++
++    @Test fun changingCounterPollsReportBaselineAndCachedTimesWithStaticReferenceReuse() {
++        val input = fixture(groupCount = 100, nodesPerGroup = 300, connectionCount = 2000, ruleCount = 10000)
++        val projector = PanelDataProjector()
++        fun poll(index: Int) = input.copy(state = input.state.copy(
++            connections = input.state.connections.map { it.copy(upload = it.upload + index * 100L, download = it.download + index * 800L) },
++            uploadTotal = input.state.uploadTotal + index * 200_000L, downloadTotal = input.state.downloadTotal + index * 1_600_000L))
++        fun traffic(index: Int) = PanelTrafficSnapshot(index * 100L, index * 500L,
++            input.state.connections.associate { it.id to (index * 2L to index * 7L) },
++            List(60) { (it + index).toFloat() }, List(60) { (it * 3 + index).toFloat() })
++        repeat(5) { index ->
++            val fresh = poll(index)
++            val rates = traffic(index)
++            assertEquals(baseline(fresh, rates), project(projector, fresh, rates))
++        }
++        val baselineNs = mutableListOf<Long>()
++        val cachedNs = mutableListOf<Long>()
++        var prior: PanelData? = null
++        repeat(15) { offset ->
++            val fresh = poll(offset + 5)
++            val rates = traffic(offset + 5)
++            var before: PanelData? = null
++            var after: PanelData? = null
++            if (offset % 2 == 0) {
++                baselineNs += measureNanoTime { before = baseline(fresh, rates) }
++                cachedNs += measureNanoTime { after = project(projector, fresh, rates) }
++            } else {
++                cachedNs += measureNanoTime { after = project(projector, fresh, rates) }
++                baselineNs += measureNanoTime { before = baseline(fresh, rates) }
++            }
++            assertEquals(before, after)
++            prior?.let { previous ->
++                assertSame(previous.groups, after!!.groups)
++                assertSame(previous.rules, after!!.rules)
++                after!!.connections.forEachIndexed { index, connection ->
++                    assertSame(previous.connections[index].chain, connection.chain)
++                    assertEquals(fresh.state.connections[index].upload, connection.uploadTotalBytes)
++                    assertEquals(fresh.state.connections[index].download, connection.downloadTotalBytes)
++                }
++            }
++            prior = after
++        }
++        fun percentile(values: List<Long>, fraction: Double): Double = values.sorted()[((values.size - 1) * fraction).toInt()] / 1_000_000.0
++        val report = """{
++  "fixture": {"groups":100,"nodesPerGroup":300,"connections":2000,"rules":10000},
++  "samples":15,
++  "scenario":"Every poll replaces connection objects and changes all upload/download counters and rates",
++  "baselineCommit":"7585c268",
++  "baselineMedianMs":${percentile(baselineNs, .5)},
++  "cachedMedianMs":${percentile(cachedNs, .5)},
++  "baselineP95Ms":${percentile(baselineNs, .95)},
++  "cachedP95Ms":${percentile(cachedNs, .95)},
++  "exactOutputParity":true,
++  "staticConnectionChainsReused":true,
++  "liveCountersRefreshed":true,
++  "scope":"Host JVM presentation projection only; not Android device FPS or network latency"
++}"""
++        val output = File("build/outputs/ui93/panel-projection-poll-performance95.json")
++        output.parentFile.mkdirs()
++        output.writeText(report)
++        println("PANEL_PROJECTION_POLL_PERFORMANCE95 $report")
++    }
++
 +}
 +
 +// Frozen 7585c268 projection, copied for output parity and before/after timing only.

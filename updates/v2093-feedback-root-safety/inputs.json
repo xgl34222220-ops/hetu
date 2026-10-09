@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "70f87853c3aeab876c52448f460441c4f868770ffcbe4a853e200a9518aea0f0",
+  "patchSha256": "79c952e2e6eaeab546f302745f108affbcc5c5fc737fa641c34a1853a17f3f6a",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -272,10 +272,10 @@
     "android-app/app/build.gradle.kts": "5b9cc72bc82c12bdccb2cc6f20d68bf9b0f11c0dedb30163ab3196ea8f637bac",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
     "android-app/app/src/main/assets/hetu-root.sh": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "6069c72b75a4568ec31d74b6c82f3fb3f04fcc7176219afff38a1983d840ebad",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "831ffb77ffcd26abaa88f414947b8dbfc33d4003f9a02bc39d79810c015882e6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "437d34d506bf50b75e986f4cf43c8466f507de09bd412ce3fa570c929628eea9",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "7b4bae3631a1635d563f2300d27ae3762a6bf9171237a0ebfb698b6d26c43c34",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "bd0aaf9f884e8a529c3f29f46e5e7a79aa5f1928f3b028bbb7db39a7be36fa2b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "ed57211129acc70c2a6b158f53ea8258e276e5402ba311d6271848bbc63a3e6e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286",
@@ -294,7 +294,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt": "a8588515d62e48001a96fdf20d49437f18419cd3c0303a84c427542a65b9696f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt": "f05c6e0397014084fd415ce3980351653df807fd6cff6181471f4c9b637fd5be",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "bbe7f7652c96053c7ec96a5cd9742a8b33ba7cc95371b1b4b83c2854a063a14c",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt": "04d306cd561df83c0ab3e09dfd3b962f095daf24d5d185e9ce77ab6c534a0f0f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt": "ec675c19ddf812f818427109911e092e15db516be7f66e6bfd612bb3234b5872",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "a006e7376f268ee642e45536eb704093dcef428cc2efdb87d493b595ab6cc094",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "019c592e906839dce4b06a6a45cfb951ecca9bfc27bf180caa95a4d813785a04",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "ea97f906f635149b7269768983ad6d8abb4705f4da9ac8cb6a615225f1903224",
@@ -305,7 +305,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt": "8574033a0e4ce3b3bd1842b8e88111dba7155390f23a6d40c3c4632415689311",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "c0705d3e07febf290c7d0ea5ab2184e22330a0253d9d122b18c3da03995fef5a",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "ee0d4052efda89cb8b8691e6abe3690b3608849a918af75bceab60b7617b1b6e",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "3c486b54085b8cca752183314d02d066eff04e93e4675c2466c733c462cc3d0e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt": "fe813de466b743b21adab864049561f93ff399a173eb618ad1ebbaabbf74fbd8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java": "e87ae72a46563ccba7e36ac3b0a5293abad93a8dd70ef92248ca2d1323629a6a",
@@ -313,7 +313,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt": "c906754a2eceb61b3270e2bedaaea6e6c43bf4738e2dd7534da63387835dece8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt": "675096999660fe3849184ef6b402d4775b9bcd1ac97abdde120493c5172d7b7c",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt": "ff47484a3636d2fb7489b996644ee339b545870b074f3dc736a34a8d2da599b7",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt": "b8c176fdc037096ce2278e59387bf2aeb02b16a68d10d2f862fc1401e2e45991",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelTouchFeedback93Test.kt": "3ea8cdc7eafe32ccb69a773c1549daec49e818380db07c198fde59ee263d8382",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProbeSchedulingPerformance95Test.kt": "ec832515a6c11b88454130850f3877216d8e05fd1de7790ab364786a320ec285",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootRecoveryDeadline93Test.kt": "5d747fe61b120db30a23f356315ff6f3886aeeb1082fda1ffe92fdda4dc057bd",
@@ -2130,7 +2130,11 @@
         "fourControllerReadsOverlapBeforeAnyFirstSnapshotIsPublished",
         "oneFailedConcurrentReadCannotPublishSuccessfulPartialControllerData",
         "changedNetworkGenerationRejectsTheLateConcurrentFirstSnapshot",
-        "reportSerialReferenceAndConcurrentSnapshotWithEqualResponseDelays"
+        "reportSerialReferenceAndConcurrentSnapshotWithEqualResponseDelays",
+        "fastAuthenticationFailureClosesUnresponsiveSiblingSockets",
+        "cancellingConcurrentSnapshotClosesAllSilentSocketsWithoutPublishing",
+        "successfulSnapshotWithinAnExistingBudgetKeepsThatBudgetUsable",
+        "concurrentSnapshotCannotRestartAnInheritedShortDeadline"
       ]
     },
     "io.github.xgl34222220.hetu.GlassDockFeedback93Test": {
@@ -2477,7 +2481,12 @@
         "sourceReplacementUpdatesNestedNodesConnectionsRulesAndLogs",
         "stopOrControllerFailureCannotExposeCachedListsAndRecoveryRebuilds",
         "busyAndPendingSelectionRemainCurrentWithoutRemappingLargeLists",
-        "largeProjectionReportsBaselineAndCachedTimesWithExactOutputParity"
+        "largeProjectionReportsBaselineAndCachedTimesWithExactOutputParity",
+        "consecutiveCounterPollsReuseStaticProjectionAndRefreshEveryLiveValue",
+        "eachChangedStaticFieldForTheSameConnectionIdRebuildsItsProjection",
+        "closedConnectionMetadataIsEvictedWhileSurvivingIdsKeepTheirProjection",
+        "stoppedAndFailedSnapshotsClearPerConnectionMetadataBeforeRecovery",
+        "changingCounterPollsReportBaselineAndCachedTimesWithStaticReferenceReuse"
       ]
     },
     "io.github.xgl34222220.hetu.PanelRequestOwnershipTest": {
@@ -3023,7 +3032,7 @@
       ]
     }
   },
-  "expectedUnitTests": 739,
+  "expectedUnitTests": 748,
   "expectedTestXmlFiles": 83,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesUnchanged": true,

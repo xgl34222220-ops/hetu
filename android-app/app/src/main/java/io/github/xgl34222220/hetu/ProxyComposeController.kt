@@ -304,7 +304,7 @@ internal class ProxyComposeController(context: Context) {
             try {
                 // Independent reads overlap, but publication still requires every
                 // response and the original runtime observation ownership below.
-                val snapshot = coroutineScope {
+                val snapshot = controllerSnapshotOperation {
                     val config = async { api.configs() }
                     val proxies = async { api.proxies() }
                     val providers = async { api.proxyProviders() }

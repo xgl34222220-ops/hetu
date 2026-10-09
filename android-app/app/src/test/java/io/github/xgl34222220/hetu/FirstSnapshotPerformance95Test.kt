@@ -6,6 +6,7 @@ import android.os.Looper
 import androidx.lifecycle.viewModelScope
 import androidx.test.core.app.ApplicationProvider
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -247,4 +248,80 @@ class FirstSnapshotPerformance95Test {
         println("HETU_FIRST_SNAPSHOT_PERFORMANCE95 " + report.toString())
         println("HETU_FIRST_SNAPSHOT_PERFORMANCE95_REPORT " + file.absolutePath)
     }
+    @Test fun fastAuthenticationFailureClosesUnresponsiveSiblingSockets() {
+        val siblings = CountDownLatch(3)
+        response = { request ->
+            when (request.path) {
+                "/configs" -> {
+                    check(siblings.await(4, TimeUnit.SECONDS))
+                    MockResponse().setResponseCode(401)
+                }
+                "/proxies", "/providers/proxies", "/connections" -> {
+                    siblings.countDown()
+                    MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE)
+                }
+                else -> normal(request)
+            }
+        }
+        val start = System.nanoTime()
+        val job = refresh()
+        eventually("A fast 401 must close silent siblings rather than wait their 6.5/12-second HTTP timeouts") {
+            job.isCompleted && vm.loadedOnce
+        }
+        assertEquals(0L, siblings.count)
+        assertTrue(vm.state.controllerReadFailed)
+        assertTrue(vm.state.controllerError.contains("401"))
+        assertFalse(vm.state.panelReady)
+        assertTrue(vm.state.groups.isEmpty())
+        println("PERFORMANCE95_AUTH_FAILURE_MS " + (System.nanoTime() - start) / 1_000_000.0)
+    }
+
+    @Test fun cancellingConcurrentSnapshotClosesAllSilentSocketsWithoutPublishing() {
+        val entered = Collections.synchronizedSet(mutableSetOf<String>())
+        response = { request ->
+            if (request.path in snapshotPaths) {
+                entered += request.path!!
+                MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE)
+            } else normal(request)
+        }
+        val initial = vm.state
+        val job = refresh()
+        eventually("All four silent reads are in flight") { entered.size == snapshotPaths.size }
+        val start = System.nanoTime()
+        job.cancel()
+        eventually("Cancellation must finish cleanup without waiting for server replies") { job.isCompleted }
+        assertSame(initial, vm.state)
+        assertFalse(vm.loadedOnce)
+        assertTrue(PanelActionRuntimeShadows.HistoryRecord.samples.isEmpty())
+        println("PERFORMANCE95_SNAPSHOT_CANCEL_MS " + (System.nanoTime() - start) / 1_000_000.0)
+    }
+
+    @Test fun successfulSnapshotWithinAnExistingBudgetKeepsThatBudgetUsable() = runBlocking {
+        latencyProbeOperation(3_000) {
+            val inherited = LatencyProbeBudget.CURRENT.get()
+            val api = MihomoControllerClient(app)
+            val version = controllerSnapshotOperation { async { api.version() }.await() }
+            assertEquals("fixture", version.optString("version"))
+            assertSame(inherited, LatencyProbeBudget.CURRENT.get())
+            assertFalse("Successful cleanup must not close the enclosing operation", inherited.expired())
+            assertEquals("fixture", api.version().optString("version"))
+        }
+        assertNull(LatencyProbeBudget.CURRENT.get())
+    }
+
+    @Test fun concurrentSnapshotCannotRestartAnInheritedShortDeadline() = runBlocking {
+        response = { MockResponse().setSocketPolicy(okhttp3.mockwebserver.SocketPolicy.NO_RESPONSE) }
+        val started = System.nanoTime()
+        val error = try {
+            latencyProbeOperation(250) {
+                controllerSnapshotOperation { async { MihomoControllerClient(app).version() }.await() }
+            }
+            null
+        } catch (failure: java.io.IOException) { failure }
+        assertNotNull("The original short deadline must close the silent socket", error)
+        assertTrue("A nested snapshot must not replace the250ms budget with the6.5s HTTP timeout",
+            TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 2_000)
+        assertNull(LatencyProbeBudget.CURRENT.get())
+    }
+
 }

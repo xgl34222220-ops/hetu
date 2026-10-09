@@ -18,21 +18,32 @@ final class LatencyProbeBudget implements AutoCloseable {
     private static final ThreadPoolExecutor DNS = new ThreadPoolExecutor(2, 2, 0, TimeUnit.SECONDS,
         new ArrayBlockingQueue<>(12), r -> { Thread t = new Thread(r, "hetu-probe-dns"); t.setDaemon(true); return t; });
     private final long deadline;
+    private final boolean hasDeadline;
     private final Set<Socket> sockets = new HashSet<>();
     private final ScheduledFuture<?> alarm;
     private volatile boolean closed;
 
     LatencyProbeBudget(long timeoutMs) {
+        hasDeadline = true;
         deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMs);
         alarm = TIMER.schedule(this::close, timeoutMs, TimeUnit.MILLISECONDS);
     }
-    boolean expired() { return closed || System.nanoTime() >= deadline; }
+    // Ordinary controller snapshots retain their existing per-request timeouts.
+    // This variant only supplies cancellation-aware DNS/socket cleanup; no timer.
+    private LatencyProbeBudget() {
+        hasDeadline = false;
+        deadline = 0L;
+        alarm = null;
+    }
+    static LatencyProbeBudget cancellationOnly() { return new LatencyProbeBudget(); }
+    boolean expired() { return closed || (hasDeadline && System.nanoTime() >= deadline); }
     void check() throws IOException {
         if (expired() || Thread.currentThread().isInterrupted())
-            throw new IOException("测速请求已取消或达到总时限，已保留完成的结果，请重试");
+            throw new IOException(hasDeadline ? "测速请求已取消或达到总时限，已保留完成的结果，请重试" : "控制接口请求已取消");
     }
     int remainingMillis() throws IOException {
         check();
+        if (!hasDeadline) return Integer.MAX_VALUE;
         // Round up: truncation can fire SO_TIMEOUT just before the shared deadline,
         // incorrectly exposing a generic socket error instead of the terminal budget outcome.
         long nanos = Math.max(1, deadline - System.nanoTime());
