@@ -143,11 +143,56 @@ def validate_initial_core_ready_wait(before, after):
     assert after == before.replace(old, new, 1), 'Core picker fixture changed beyond the initial async-ready wait'
 
 
+SELECTION_READ_FIXTURE = TEST_ROOT + 'java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt'
+
+
+def validate_failed_read_gate(before, after):
+    # Parallel controller reads fail fast once a sibling read fails. The old
+    # unreadable-controller case returned /connections 500 ungated, so the
+    # failure could publish before its fixture state change. Only that failing
+    # response now waits on the same existing readback gate; every test body,
+    # assertion and wait budget stays byte-identical.
+    old = '            req.path == "/connections" -> body("{\\"connections\\":[]}").setResponseCode(connectionCode)\n'
+    new = ('            req.path == "/connections" -> {\n'
+           '                // A failing sibling read now closes the snapshot at once; hold it with the\n'
+           '                // gated /proxies read so the failure cannot win the race with the fixture.\n'
+           '                if (connectionCode != 200) readGate?.hold()\n'
+           '                body("{\\"connections\\":[]}").setResponseCode(connectionCode)\n'
+           '            }\n')
+    assert before.count(old) == 1
+    assert after == before.replace(old, new, 1), 'Panel action fixture changed beyond the failed-read gate'
+
+
+CONTROLLER_READ_FIXTURE = TEST_ROOT + 'java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt'
+
+
+def validate_controller_read_gate(before, after):
+    # Same fail-fast race as the panel action fixture: a rejected /connections
+    # read cancels and closes its siblings, so they could miss the server and
+    # break the unchanged requestCount assertion. Only the rejected /connections
+    # response now waits for the three sibling reads to arrive; every test body,
+    # assertion and other response stays byte-identical.
+    old1 = '    @Volatile private var holdConfigs = false\n'
+    new1 = old1 + '    private val siblingReads = listOf("/configs", "/proxies", "/providers/proxies").associateWith { CountDownLatch(1) }\n'
+    old2 = ('                override fun dispatch(request: RecordedRequest): MockResponse {\n'
+            '                    if (holdConfigs && request.path == "/configs") {\n')
+    new2 = ('                override fun dispatch(request: RecordedRequest): MockResponse {\n'
+            '                    siblingReads[request.path]?.countDown()\n'
+            '                    if (rejectedPath == "/connections" && request.path == "/connections") {\n'
+            '                        // A failing sibling read now cancels and closes the snapshot at once; let the\n'
+            '                        // parallel reads arrive first so the rejection cannot race them off the wire.\n'
+            '                        siblingReads.values.forEach { it.await(6, TimeUnit.SECONDS) }\n'
+            '                    }\n'
+            '                    if (holdConfigs && request.path == "/configs") {\n')
+    assert before.count(old1) == 1 and before.count(old2) == 1
+    assert after == before.replace(old1, new1, 1).replace(old2, new2, 1), 'Controller read fixture changed beyond the sibling-read gate'
+
+
 def validate_baseline_test_sources(root=ROOT):
     root = Path(root)
     predecessor, previous = predecessor_layer(root)
     # Preserve every pre-existing Android test file, including unselected old
-    # suites. The exact runtime revision contract and initial async-ready wait are the only explicit exceptions.
+    # suites. The exact runtime revision contract, initial async-ready wait, failed-read gate and controller sibling-read gate are the only explicit exceptions.
     for name in sorted(name for name in previous if name.startswith(TEST_ROOT)):
         before = committed_bytes(name, root)
         current = (root / name).read_bytes()
@@ -155,6 +200,10 @@ def validate_baseline_test_sources(root=ROOT):
             validate_revision_test(before.decode(), current.decode())
         elif name == CORE_READY_FIXTURE:
             validate_initial_core_ready_wait(before.decode(), current.decode())
+        elif name == SELECTION_READ_FIXTURE:
+            validate_failed_read_gate(before.decode(), current.decode())
+        elif name == CONTROLLER_READ_FIXTURE:
+            validate_controller_read_gate(before.decode(), current.decode())
         else:
             assert current == before, 'Retained 644 test source/fixture/assertion changed: ' + name
     for name in ('CompactHomeDashboardTest.kt', 'Ui92IntegrationTest.kt', 'NodeSelectionContinuityTest.kt'):

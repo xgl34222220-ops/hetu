@@ -50,6 +50,7 @@ class ControllerReadStateTest {
     @Volatile private var generation = 1
     @Volatile private var malformed = false
     @Volatile private var holdConfigs = false
+    private val siblingReads = listOf("/configs", "/proxies", "/providers/proxies").associateWith { CountDownLatch(1) }
 
     @Before fun prepare() {
         // Share the original suspend-capable history shadow and isolate this method's audit.
@@ -60,6 +61,12 @@ class ControllerReadStateTest {
         server = MockWebServer().apply {
             dispatcher = object : Dispatcher() {
                 override fun dispatch(request: RecordedRequest): MockResponse {
+                    siblingReads[request.path]?.countDown()
+                    if (rejectedPath == "/connections" && request.path == "/connections") {
+                        // A failing sibling read now cancels and closes the snapshot at once; let the
+                        // parallel reads arrive first so the rejection cannot race them off the wire.
+                        siblingReads.values.forEach { it.await(6, TimeUnit.SECONDS) }
+                    }
                     if (holdConfigs && request.path == "/configs") {
                         controllerReadEntered.countDown()
                         check(release.await(6, TimeUnit.SECONDS))

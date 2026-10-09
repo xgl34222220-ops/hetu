@@ -3615,7 +3615,7 @@ index 9f66ac0..cdb3c77 100644
          CompositionLocalProvider(
              LocalPanelAppIcons provides PanelAppIcons(
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..fd88764 100644
+index b187a2f..62dacb2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -3729,6 +3729,15 @@ index b187a2f..fd88764 100644
          contentAlignment = Alignment.BottomEnd,
      ) { capsule() }
  }
+@@ -464,7 +501,7 @@ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, val
+ internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
+     val c = LocalHomeColors.current
+     Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+-        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1)
++        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         Spacer(Modifier.weight(1f))
+         if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+         if (trailing != null) trailing()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 new file mode 100644
 index 0000000..e6d791e
@@ -4157,7 +4166,7 @@ index c95890c..a7ebb5c 100644
      } else {
          Column(shell) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..e1418b6 100644
+index 253b603..0d01797 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 @@ -6,6 +6,8 @@ import androidx.compose.foundation.background
@@ -4178,6 +4187,15 @@ index 253b603..e1418b6 100644
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.dp
+@@ -211,7 +215,7 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+                 Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
+             }
+-            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1)
++            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             Row(Modifier.fillMaxWidth().padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                 if (conn.app.isNotBlank()) {
+                     PanelAvatar(conn.app, conn.packageName, size = 18.dp)
 @@ -273,19 +277,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
      items(count = items.size, contentType = { "rule" }) { index ->
          val rule = items[index]
@@ -5104,6 +5122,31 @@ index f8d36e9..0a8c1cc 100644
          capture("03A-034-core-three-cards")
          touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
          capture("core-mihomo-variant-picker")
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+index 366297a..e224bf7 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
+@@ -50,6 +50,7 @@ class ControllerReadStateTest {
+     @Volatile private var generation = 1
+     @Volatile private var malformed = false
+     @Volatile private var holdConfigs = false
++    private val siblingReads = listOf("/configs", "/proxies", "/providers/proxies").associateWith { CountDownLatch(1) }
+
+     @Before fun prepare() {
+         // Share the original suspend-capable history shadow and isolate this method's audit.
+@@ -60,6 +61,12 @@ class ControllerReadStateTest {
+         server = MockWebServer().apply {
+             dispatcher = object : Dispatcher() {
+                 override fun dispatch(request: RecordedRequest): MockResponse {
++                    siblingReads[request.path]?.countDown()
++                    if (rejectedPath == "/connections" && request.path == "/connections") {
++                        // A failing sibling read now cancels and closes the snapshot at once; let the
++                        // parallel reads arrive first so the rejection cannot race them off the wire.
++                        siblingReads.values.forEach { it.await(6, TimeUnit.SECONDS) }
++                    }
+                     if (holdConfigs && request.path == "/configs") {
+                         controllerReadEntered.countDown()
+                         check(release.await(6, TimeUnit.SECONDS))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
 new file mode 100644
 index 0000000..549e953
@@ -6431,6 +6474,24 @@ index 0000000..4499405
 +        assertEquals(1, messages.count { it.contains("401") })
 +    }
 +}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+index 0f9e4a9..a1cdde8 100644
+--- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
+@@ -158,7 +158,12 @@ class PanelActionSafetyTest {
+                     body("""{"providers":{"late":{"vehicleType":"HTTP","proxies":["old","new"]}}}""")
+                 } else body("{\"providers\":{}}")
+             }
+-            req.path == "/connections" -> body("{\"connections\":[]}").setResponseCode(connectionCode)
++            req.path == "/connections" -> {
++                // A failing sibling read now closes the snapshot at once; hold it with the
++                // gated /proxies read so the failure cannot win the race with the fixture.
++                if (connectionCode != 200) readGate?.hold()
++                body("{\"connections\":[]}").setResponseCode(connectionCode)
++            }
+             req.path == "/configs" -> body("{\"mode\":\"rule\"}")
+             req.path == "/version" -> { versionGate?.hold(); body("{\"version\":\"fixture\"}") }
+             else -> MockResponse().setResponseCode(404)
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt
 new file mode 100644
 index 0000000..f1f8f8a

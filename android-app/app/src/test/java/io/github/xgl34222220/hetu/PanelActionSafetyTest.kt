@@ -158,7 +158,12 @@ class PanelActionSafetyTest {
                     body("""{"providers":{"late":{"vehicleType":"HTTP","proxies":["old","new"]}}}""")
                 } else body("{\"providers\":{}}")
             }
-            req.path == "/connections" -> body("{\"connections\":[]}").setResponseCode(connectionCode)
+            req.path == "/connections" -> {
+                // A failing sibling read now closes the snapshot at once; hold it with the
+                // gated /proxies read so the failure cannot win the race with the fixture.
+                if (connectionCode != 200) readGate?.hold()
+                body("{\"connections\":[]}").setResponseCode(connectionCode)
+            }
             req.path == "/configs" -> body("{\"mode\":\"rule\"}")
             req.path == "/version" -> { versionGate?.hold(); body("{\"version\":\"fixture\"}") }
             else -> MockResponse().setResponseCode(404)
