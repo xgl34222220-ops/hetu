@@ -348,10 +348,10 @@ internal fun ConfigDiffPreview(diff: ConfigDiff, modifier: Modifier = Modifier) 
             diff.lines.forEachIndexed { index, line ->
                 if (index > 0) append('\n')
                 when (line.kind) {
-                    '+' -> withStyle(SpanStyle(color = c.good, background = c.goodSoft)) { append("+ ").append(line.text) }
-                    '-' -> withStyle(SpanStyle(color = c.bad, background = c.badSoft)) { append("- ").append(line.text) }
+                    '+' -> withStyle(SpanStyle(color = c.good, background = c.goodSoft)) { append("+ " + line.text) }
+                    '-' -> withStyle(SpanStyle(color = c.bad, background = c.badSoft)) { append("- " + line.text) }
                     '…' -> withStyle(SpanStyle(color = c.t3)) { append("⋯ ${line.text} 行未改动") }
-                    else -> withStyle(SpanStyle(color = c.t2)) { append("  ").append(line.text) }
+                    else -> withStyle(SpanStyle(color = c.t2)) { append("  " + line.text) }
                 }
             }
             if (diff.truncated) withStyle(SpanStyle(color = c.t3)) { append("\n⋯ 仅显示前 ${diff.lines.size} 行差异") }

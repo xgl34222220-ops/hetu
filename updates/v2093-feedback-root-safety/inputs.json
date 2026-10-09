@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "3952e753c8f876158cfc4fccee1a3381ef488f329a1f1eceeef66f61e4151201",
+  "patchSha256": "ab93b508aa3ddeba326b40748afb860acc6abe2be86cd98a066be861024f75cf",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -318,7 +318,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockAudit.kt": "c424d08d034eb03ae7938064a5b92964a8a896bd3568981d1d6e34963dd8bc9d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "56988d3ea40781d577d457434d8294085c302f1c4b923ca649489c7cf1a8d854",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerifyScreen.kt": "a82a5f0b4efcbb41872d22d1328b45f503eb2fd98489787ea25ace614fde9752",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigImportScreen.kt": "a13bf0028ceb2aa39923fe0bee77f84acf16938add7138ade8ee3f8346f0fa97",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigImportScreen.kt": "45e3bb31705e7b144816aadb29c64d11a97b526aa9d34024f673d0359ccaf668",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "9d56804ffd4155285f09b1b022594f4b6248ccfc436372629114e9ae9cd5bfad",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt": "9a20ecd84f69c35ce29cc7833e1c634378803b1229450dfb3a50720e5ac03a3b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectivityScreen.kt": "97dbc1c6c2283f06a59298c4767e314c04de4da3b39f4197dd0a796872916198",
