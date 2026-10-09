@@ -88,6 +88,8 @@ final class RootProxyManager {
     }
     private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
     static long observationTicket(){return CONTROL_LOCK.observe();}
+    /** Read-only controller probes: invalid only during a real start/stop/reload transaction. */
+    static long probeTicket(){return CONTROL_LOCK.transactionEpoch();}
     static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
     private final Context context;
     private final SharedPreferences prefs;

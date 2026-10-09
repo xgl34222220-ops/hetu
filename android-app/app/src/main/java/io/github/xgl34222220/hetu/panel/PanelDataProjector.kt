@@ -52,6 +52,7 @@ internal class PanelDataProjector {
     private val groupBase = PanelProjectionSlice<GroupBase>()
     private val groups = PanelProjectionSlice<List<PanelGroup>>()
     private val nodeDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
+    private val settledDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
     private data class ConnectionMetadataKey(
         val host: String, val startedAt: String, val network: String, val inbound: String,
         val app: String, val packageName: String, val chain: String, val rule: String,
@@ -69,7 +70,7 @@ internal class PanelDataProjector {
     private val logs = PanelProjectionSlice<List<PanelLogEntry>>()
 
     private fun clear() {
-        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionMetadata = emptyMap()
+        groupBase.clear(); groups.clear(); nodeDelays.clear(); settledDelays.clear(); connectionMetadata = emptyMap()
         connections.clear(); ranks.clear(); subscriptionOverview.clear(); subscriptions.clear()
         rules.clear(); ruleSets.clear(); logs.clear()
     }
@@ -118,6 +119,9 @@ internal class PanelDataProjector {
                 delayValues.forEach { (name, ms) -> this[name] = panelDelayOf(ms) }
                 testingNames.forEach { this[it] = PanelDelay.Testing }
             }.toMap()
+        }
+        val shownSettled = settledDelays.get(base.delays, delayValues) {
+            HashMap(base.delays).apply { delayValues.forEach { (name, ms) -> this[name] = panelDelayOf(ms) } }.toMap()
         }
         val zone = ZoneId.systemDefault()
         val rates = traffic.connectionRates.toMap()
@@ -185,7 +189,7 @@ internal class PanelDataProjector {
         }
         return PanelData(
             status = PanelStatus.Running, globalMode = state.trafficMode.equals("global", ignoreCase = true),
-            groups = shownGroups, delays = shownDelays,
+            groups = shownGroups, delays = shownDelays, settledDelays = shownSettled,
             loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
             testingGroups = testingGroups.toSet(), testingAll = testingAll,
             switching = switching.filter { (group, node) -> sourceGroups.firstOrNull { it.name == group }?.now != node },

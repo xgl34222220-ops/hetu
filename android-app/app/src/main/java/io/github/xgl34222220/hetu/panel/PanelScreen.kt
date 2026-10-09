@@ -45,6 +45,10 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeBarBackdrop
@@ -57,6 +61,7 @@ import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeModalSheet
 import io.github.xgl34222220.hetu.home.HomePop
 import io.github.xgl34222220.hetu.home.HomeRefreshBox
+import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
@@ -281,7 +286,13 @@ private fun BoxScope.PanelHeader(
             alpha = (1f - moved / (titlePx * .62f)).coerceIn(0f, 1f)
         },
         contentAlignment = Alignment.CenterStart,
-    ) { Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1) }
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(ht("面板"), color = c.t1, style = HomeType.largeTitle, maxLines = 1)
+            // Restored cards are display-only until the first fresh read lands; say so quietly.
+            HomePop(data.running && data.syncing) { PanelSyncChip() }
+        }
+    }
 
     // The strip floats above the list, so a vertical drag that starts on it is handed to the
     // list by hand; horizontal drags still scroll the strip itself.
@@ -411,5 +422,21 @@ private fun PanelInlineOverlay(
                 PanelCloseAllDialogCard(onConfirm = {}, onDismiss = {}, modifier = Modifier.align(Alignment.Center))
             }
         }
+    }
+}
+
+/** Quiet “同步中” capsule next to the large title while restored cards await a fresh controller read. */
+@Composable
+private fun PanelSyncChip() {
+    val c = LocalHomeColors.current
+    val label = ht("正在同步核心最新状态")
+    Row(
+        Modifier.clip(HomeDims.pillShape).background(c.accentSoft).padding(horizontal = 10.dp, vertical = 4.dp)
+            .semantics(mergeDescendants = true) { contentDescription = label; liveRegion = LiveRegionMode.Polite },
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+    ) {
+        HomeSpinner(size = 12.dp, color = c.accent, strokeWidth = 1.6.dp)
+        Text(ht("同步中"), color = c.accent, style = HomeType.note, maxLines = 1)
     }
 }

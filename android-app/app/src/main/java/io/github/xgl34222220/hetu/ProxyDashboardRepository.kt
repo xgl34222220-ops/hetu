@@ -53,37 +53,48 @@ internal class ProxyDashboardRepository(context: Context) {
         // Activities have independent repository/cache instances but mutate the
         // same core. A confirmed mutation must supersede observations in all of them.
         val probeMutationEpoch = AtomicLong()
+        val EGRESS_TARGETS = listOf("https://www.gstatic.com/generate_204", "https://cp.cloudflare.com/generate_204")
     }
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
     private val controller = ProxyComposeController(app)
     // Keep credentials private and out of generated data-class toString output.
     internal class ProbeIdentity(private val settings: Map<String, Any?>, private val runtimeEpoch: Long,
-        private val mutationEpoch: Long, private val delaySettings: Map<String, Any?>) {
+        private val mutationEpoch: Long, private val delaySettings: Map<String, Any?>,
+        private val route: Map<String, Any?> = emptyMap()) {
         val stable: Boolean get() = runtimeEpoch >= 0L
+        internal val routeBound: Boolean get() = route.isNotEmpty()
         override fun equals(other: Any?): Boolean = other is ProbeIdentity &&
             settings == other.settings && runtimeEpoch == other.runtimeEpoch && mutationEpoch == other.mutationEpoch &&
-                delaySettings == other.delaySettings
-        override fun hashCode(): Int = 31 * (31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) +
-            mutationEpoch.hashCode()) + delaySettings.hashCode()
+                delaySettings == other.delaySettings && route == other.route
+        override fun hashCode(): Int = 31 * (31 * (31 * (31 * settings.hashCode() + runtimeEpoch.hashCode()) +
+            mutationEpoch.hashCode()) + delaySettings.hashCode()) + route.hashCode()
         fun sameOrigin(other: ProbeIdentity): Boolean = settings == other.settings && runtimeEpoch == other.runtimeEpoch
     }
     internal class SelectionTicket internal constructor(private val settings: Map<String, Any?>, internal val identity: ProbeIdentity) {
         internal fun client(context: Context) = MihomoControllerClient(context, settings)
     }
     private class ProbeSnapshot(val proxies: JSONObject, val providers: List<DashboardProviderUi>, val identity: ProbeIdentity)
+    /** generate_204 targets for [verifyEgress]; replaceable only by tests. */
+    internal var egressTargets: List<String> = EGRESS_TARGETS
     private val probeSnapshotMutex = Mutex()
     private var cachedProbeSnapshot: ProbeSnapshot? = null
     private var probeSnapshotAt = 0L
+    // Only what genuinely invalidates a controller measurement: which controller
+    // (endpoint + secret), which core instance/config/topology, and user intent.
+    // Observational flags that pollers rewrite (proxyRootRuntimeRunning) and the
+    // physical-network epoch are not part of a controller probe's identity; the
+    // epoch still binds website latencies, which really travel the physical route.
     private val probeIdentityKeys = setOf(
         "proxyBaseCore", "proxyBaseMode", "proxyCustomApiEnabled", "proxyCustomApiHost",
         "proxyCustomApiPort", "proxyCustomApiSecret", "proxyControllerPort", "proxyControllerSecret",
-        "proxyRootWanted", "proxyRootRuntimeRunning", "proxyRootLastStartupAt",
+        "proxyRootWanted", "proxyRootLastStartupAt",
         "proxyRootAppliedSettings", "proxyRootAppliedRuntimeRevision", "proxyRootTopologyFingerprint",
-        "proxyAdblockSessionGeneration", "proxyNetworkSessionId", "proxyNetworkEpoch",
+        "proxyAdblockSessionGeneration", "proxyNetworkSessionId",
     )
 
-    private fun probeIdentity(values: Map<String, Any?> = app.getSharedPreferences("hetu", 0).all): ProbeIdentity {
+    private fun probeIdentity(values: Map<String, Any?> = app.getSharedPreferences("hetu", 0).all,
+        routeBound: Boolean = false): ProbeIdentity {
         val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
         val configKey = "proxySelectedConfig.${core.id}"
         val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
@@ -97,11 +108,15 @@ internal class ProxyDashboardRepository(context: Context) {
         // A new test target invalidates measurements, but must not revoke an
         // unrelated node-selection/refresh transaction on this same controller.
         val delaySettings = values.filterKeys { it == "proxyCustomDelayUrlEnabled" || it == "proxyCustomDelayUrl" }
-        return ProbeIdentity(settings, RootProxyManager.observationTicket(), probeMutationEpoch.get(), delaySettings)
+        // A short observation publication (status poll, service health) also holds the
+        // control gate; only a real control transaction makes a probe unstable.
+        val route: Map<String, Any?> = if (routeBound) mapOf("proxyNetworkEpoch" to (values["proxyNetworkEpoch"] ?: 0L))
+            else emptyMap()
+        return ProbeIdentity(settings, RootProxyManager.probeTicket(), probeMutationEpoch.get(), delaySettings, route)
     }
 
     private fun requireCurrentProbe(identity: ProbeIdentity) {
-        if (!identity.stable || probeIdentity() != identity)
+        if (!identity.stable || probeIdentity(routeBound = identity.routeBound) != identity)
             throw IOException("代理或控制接口已变化，请重新测速")
     }
 
@@ -186,6 +201,8 @@ internal class ProxyDashboardRepository(context: Context) {
 
 
     suspend fun state(): ProxyComposeState = controller.state()
+    /** Display-only groups for a cold open; see [ProxyComposeController.previewGroups]. */
+    suspend fun previewGroups(): List<ProxyGroupUi> = controller.previewGroups()
     suspend fun rules(): List<ProxyRuleUi> = controller.rules()
     suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false,
         ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
@@ -331,17 +348,18 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
-    suspend fun globalDelay(): Map<String, Long> = latencyProbeOperation {
+    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().filter { name ->
             val node = snapshot.proxies.optJSONObject(name)
             node != null && node.optJSONArray("all") == null &&
                 node.optString("type").lowercase() !in setOf("direct", "reject", "rejectdrop", "pass", "compatible")
         }.toList()
-        measureSnapshot(targets, snapshot)
+        measureSnapshot(targets, snapshot, onResult)
     }
 
-    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
+    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot,
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
         val pending = targets.distinct()
         val next = java.util.concurrent.atomic.AtomicInteger()
@@ -359,6 +377,10 @@ internal class ProxyDashboardRepository(context: Context) {
                         val value = measuredProbe(node, snapshot)
                         coroutineContext.ensureActive()
                         synchronized(results) { results[node] = value }
+                        // Each leaf can be shown as soon as it lands, but only while the
+                        // wave's identity is still current; the final map keeps its guard.
+                        if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
+                            onResult(node, value)
                     }
                     catch (cancel: CancellationException) { throw cancel }
                     // A controller/transport error has no new node measurement. Keep
@@ -395,10 +417,11 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
      * clear and reapply a pin, which could briefly reroute live traffic.
      */
-    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = latencyProbeOperation {
+    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
         if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
-        measureSnapshot(targets, snapshot)
+        measureSnapshot(targets, snapshot, onResult)
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */
@@ -431,7 +454,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
     suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
-        val identity = probeIdentity()
+        val identity = probeIdentity(routeBound = true)
         requireCurrentProbe(identity)
         val sites = ProxyLatencyTargets.load(app)
         // Hetu's UID is exempt from transparent Root interception. Explicitly enter
@@ -450,6 +473,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
         // for the replacement route, even when the core and API port stay put.
         requireCurrentProbe(identity)
         measured
+    }
+
+    /**
+     * Cheap exit check for the home card: one generate_204 through the running
+     * core's local policy listener (the same explicit loopback proxy the network
+     * service uses; Hetu's own UID is exempt from transparent interception). The
+     * result is published only if the core, controller and physical route are
+     * unchanged, under the same observation ownership as a status read.
+     * Returns null when nothing could be concluded (stopped, superseded, busy).
+     */
+    suspend fun verifyEgress(): Boolean? = withContext(Dispatchers.IO) {
+        if (!ProxyStatusBridge.rootProxyRunning(app)) return@withContext null
+        val prefs = app.getSharedPreferences("hetu", 0)
+        val identity = probeIdentity(routeBound = true)
+        if (!identity.stable) return@withContext null
+        val ticket = RootProxyManager.observationTicket()
+        if (ticket < 0L) return@withContext null
+        val session = prefs.getString("proxyNetworkSessionId", "").orEmpty()
+        val epoch = prefs.getLong("proxyNetworkEpoch", 0L)
+        val port = MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT))
+        var reachable = false
+        for (target in egressTargets) {
+            coroutineContext.ensureActive()
+            if (egressStatus(target, port) == 204) { reachable = true; break }
+        }
+        coroutineContext.ensureActive()
+        if (!identity.stable || probeIdentity(routeBound = true) != identity) return@withContext null
+        // A failure only matters when it withdraws an earlier success; otherwise
+        // the card already reads "exit unverified" and nothing needs to be written.
+        if (!reachable && prefs.getString("proxyPolicyEgressState", "") != "reachable") return@withContext false
+        val now = System.currentTimeMillis()
+        val published = RootProxyManager.publishObservation(ticket) {
+            if (session == prefs.getString("proxyNetworkSessionId", "").orEmpty() &&
+                epoch == prefs.getLong("proxyNetworkEpoch", 0L) && ProxyStatusBridge.rootProxyRunning(app)) {
+                val edit = prefs.edit().putString("proxyPolicyEgressState", if (reachable) "reachable" else "unverified")
+                    .putLong("proxyPolicyEgressCheckedAt", now)
+                if (reachable) edit.putLong("proxyRootEgressVerifiedAt", now).putBoolean("proxyRootEgressPending", false)
+                edit.commit()
+            }
+        }
+        if (published && prefs.getLong("proxyPolicyEgressCheckedAt", 0L) == now) reachable else null
+    }
+
+    private suspend fun egressStatus(url: String, port: Int): Int {
+        coroutineContext.ensureActive()
+        return try {
+            val connection = (URL(url).openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
+                as HttpURLConnection).apply {
+                instanceFollowRedirects = false
+                useCaches = false
+                connectTimeout = 2_500
+                readTimeout = 2_500
+                setRequestProperty("Connection", "close")
+                setRequestProperty("User-Agent", "Hetu-Android")
+            }
+            try { connection.responseCode } finally { connection.disconnect() }
+        } catch (cancel: CancellationException) { throw cancel }
+        catch (_: Exception) { -1 }
     }
 
     suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
