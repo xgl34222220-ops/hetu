@@ -954,8 +954,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
             try {
-                // Selector groups retain the parallel core endpoint. Automatic groups use
-                // bounded leaf probes because that endpoint silently clears their fixed choice.
+                // Selector groups retain the parallel core endpoint. Unpinned automatic groups
+                // use it too and stream each member as the core records it; a pinned one keeps
+                // bounded leaf probes because that endpoint silently clears its fixed choice.
                 val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
                 if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
                     toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")

@@ -54,6 +54,8 @@ internal class ProxyDashboardRepository(context: Context) {
         // same core. A confirmed mutation must supersede observations in all of them.
         val probeMutationEpoch = AtomicLong()
         val EGRESS_TARGETS = listOf("https://www.gstatic.com/generate_204", "https://cp.cloudflare.com/generate_204")
+        const val CORE_WAVE_TIMEOUT_MS = 5000
+        const val CORE_WAVE_POLL_MS = 350L
     }
     private val app = context.applicationContext
     private val api = MihomoControllerClient(app)
@@ -414,14 +416,93 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
 
     /**
      * Mihomo's /group/{name}/delay clears fixed selection on non-Selector groups
-     * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
-     * clear and reapply a pin, which could briefly reroute live traffic.
+     * (upstream ab405bad, hub/route/groups.go). An unpinned automatic group (and
+     * LoadBalance, which has no pin) uses that core-parallel endpoint: one request,
+     * every member tested at once by the core. A pinned group, or a core that does
+     * not report its pin, keeps the bounded leaf probes; never clear and reapply a
+     * pin, which could briefly reroute live traffic.
      */
     suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
         onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
         if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
+        if (coreGroupWaveKeepsSelection(snapshot.proxies.optJSONObject(group.name)))
+            coreGroupWave(group.name, targets, snapshot, onResult)?.let { return@latencyProbeOperation it }
         measureSnapshot(targets, snapshot, onResult)
+    }
+
+    /**
+     * One GET /group/{name}/delay. While the core works, its per-member history is read
+     * every [CORE_WAVE_POLL_MS] so each member lands as soon as the core recorded it,
+     * instead of every result waiting for the slowest member. Returns null only when the
+     * endpoint itself is unavailable (old core, 404, transport error) so the caller can
+     * fall back to leaf probes; a 504 is a real wave in which every member failed.
+     */
+    private suspend fun coreGroupWave(group: String, targets: List<String>, snapshot: ProbeSnapshot,
+        onResult: ((String, Long) -> Unit)?): Map<String, Long>? = coroutineScope {
+        val entry = snapshot.proxies.optJSONObject(group) ?: return@coroutineScope null
+        val url = api.waveDelayUrl(entry.optString("testUrl"))
+        val expected = entry.optString("expectedStatus").ifBlank { "200-399" }
+        val pending = targets.distinct()
+        val baseline = pending.associateWith { lastCoreWaveRecord(snapshot.proxies.optJSONObject(it), url)?.time }
+        val results = LinkedHashMap<String, Long>()
+        fun land(node: String, value: Long) {
+            val changed = synchronized(results) { results.put(node, value) != value }
+            // Same identity guard as leaf probes: a superseded wave publishes nothing.
+            if (changed && onResult != null && snapshot.identity.stable &&
+                probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity) onResult(node, value)
+        }
+        requireCurrentProbe(snapshot.identity)
+        val wave = async {
+            try { Result.success(api.groupDelayOnce(group, url, expected, CORE_WAVE_TIMEOUT_MS)) }
+            catch (cancel: CancellationException) { throw cancel }
+            catch (error: Exception) { Result.failure(error) }
+        }
+        val poller = if (onResult == null) null else async {
+            while (!wave.isCompleted) {
+                kotlinx.coroutines.delay(CORE_WAVE_POLL_MS)
+                if (wave.isCompleted) break
+                val live = try { api.proxies() }
+                    catch (cancel: CancellationException) { throw cancel }
+                    catch (_: Exception) { continue }
+                coroutineContext.ensureActive()
+                val landed = synchronized(results) { results.keys.toSet() }
+                freshCoreWaveResults(live, url, baseline.filterKeys { it !in landed }).forEach { (node, value) -> land(node, value) }
+            }
+        }
+        val outcome = wave.await()
+        poller?.cancel()
+        val raw = outcome.getOrElse { error ->
+            when {
+                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 504 -> JSONObject()
+                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
+                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() })
+                else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
+            }
+        }
+        val allFailed = outcome.isFailure
+        requireCurrentProbe(snapshot.identity)
+        val keys = raw.keys()
+        while (keys.hasNext()) {
+            val name = keys.next()
+            if (name !in baseline) continue
+            // Only exact integer measurements; malformed values never become timeouts.
+            when (val value = raw.opt(name)) {
+                is Int -> if (value > 0) land(name, value.toLong())
+                is Long -> if (value > 0L) land(name, value)
+            }
+        }
+        // Members the core answered without a success (dead nodes, expected-status misses)
+        // have a fresh failure record. One read settles them; anything still unknown keeps
+        // its earlier reading rather than becoming a guessed timeout.
+        val unsettled = synchronized(results) { baseline.filterKeys { it !in results } }
+        if (unsettled.isNotEmpty()) {
+            val live = try { api.proxies() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            if (live != null) freshCoreWaveResults(live, url, unsettled, failure = if (allFailed) -1L else -2L)
+                .forEach { (node, value) -> land(node, value) }
+        }
+        requireCurrentProbe(snapshot.identity)
+        synchronized(results) { results.toMap() }
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */

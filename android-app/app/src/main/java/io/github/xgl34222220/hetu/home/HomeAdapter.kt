@@ -290,8 +290,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
 @Composable
 private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
     var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
-    LaunchedEffect(enabled) {
+    val visible = rememberScreenVisible()
+    LaunchedEffect(enabled, visible) {
         if (!enabled) { rates = null to null; return@LaunchedEffect }
+        // Stopped screen: no 1 s TrafficStats wake-ups; resume from a fresh baseline.
+        if (!visible) return@LaunchedEffect
         var lastTx = TrafficStats.getTotalTxBytes()
         var lastRx = TrafficStats.getTotalRxBytes()
         var lastAt = SystemClock.elapsedRealtime()
@@ -321,8 +324,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes: 
     val memoryPoints = remember { mutableStateListOf<Float?>() }
     val latestCpu by rememberUpdatedState(cpu)
     val latestMemory by rememberUpdatedState(memoryBytes)
-    LaunchedEffect(sampling) {
+    val visible = rememberScreenVisible()
+    LaunchedEffect(sampling, visible) {
         if (!sampling) { cpuPoints.clear(); memoryPoints.clear(); return@LaunchedEffect }
+        // Keep the window while stopped, but do not wake every 2 s to append to it.
+        if (!visible) return@LaunchedEffect
         while (true) {
             cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
             memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })

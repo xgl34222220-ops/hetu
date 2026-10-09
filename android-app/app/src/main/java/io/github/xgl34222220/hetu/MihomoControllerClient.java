@@ -204,7 +204,9 @@ final class MihomoControllerClient {
                     if(d==0)last=new DelayFailure(false);
                     else throw new IOException("测速接口未返回延迟数据");
                 }catch(ControllerHttpException error){
-                    if(error.statusCode==504)last=new DelayFailure(true);
+                    // A core-confirmed timeout already spent the whole 5 s window on this node.
+                    // Retrying the next default URL only doubled the dead-node cost of a wave.
+                    if(error.statusCode==504)throw new DelayFailure(true);
                     else if(error.statusCode==503)last=new DelayFailure(false);
                     else throw error;
                 }
@@ -249,6 +251,24 @@ final class MihomoControllerClient {
         if(last!=null)throw last;
         throw new IOException("策略组延迟测试失败");
         }finally{if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
+    }
+
+    /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
+    String waveDelayUrl(String groupUrl){
+        String custom=customDelayUrl();
+        if(!custom.isEmpty())return custom;
+        if(groupUrl!=null&&!groupUrl.trim().isEmpty())return groupUrl.trim();
+        return DEFAULT_DELAY_URLS[0];
+    }
+
+    /**
+     * One core-parallel wave with exactly one URL and no client fallback. Mihomo tests every
+     * member concurrently and writes each member's history as it lands; callers decide fallback.
+     */
+    JSONObject groupDelayOnce(String group,String url,String expected,int timeoutMs)throws Exception{
+        String test=URLEncoder.encode(url,"UTF-8");
+        String status=URLEncoder.encode(expected==null||expected.trim().isEmpty()?"200-399":expected.trim(),"UTF-8");
+        return request("GET","/group/"+Uri.encode(group)+"/delay?timeout="+timeoutMs+"&url="+test+"&expected="+status,null,timeoutMs+2000);
     }
 
     void closeAll()throws Exception{request("DELETE","/connections",null);}

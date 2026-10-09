@@ -92,3 +92,49 @@ internal fun syncCoreLatencyResults(groups: List<ProxyGroupUi>, delays: MutableM
     }
     if (groups.isNotEmpty()) delays.keys.toList().filter { it !in nodes }.forEach(delays::remove)
 }
+
+/**
+ * True when Mihomo's GET /group/{name}/delay cannot change what the group routes through.
+ * Upstream groups.go calls ForceSet("") on every non-Selector SelectAble group (URLTest,
+ * Fallback). That only clears a fixed pin, so it is safe exactly when the core reports the
+ * group unpinned. A core that does not report `fixed` is treated as pinned.
+ */
+internal fun coreGroupWaveKeepsSelection(entry: JSONObject?): Boolean {
+    if (entry == null || entry.optJSONArray("all") == null) return false
+    return when (entry.optString("type").lowercase()) {
+        "loadbalance" -> true
+        "urltest", "fallback" -> entry.has("fixed") && !entry.isNull("fixed") && entry.optString("fixed").isEmpty()
+        else -> false
+    }
+}
+
+/** The newest history record the core wrote for one probe URL, exactly as written. */
+internal data class CoreWaveRecord(val time: String, val delay: Long)
+
+internal fun lastCoreWaveRecord(node: JSONObject?, url: String): CoreWaveRecord? {
+    if (node == null) return null
+    // Cores with per-URL history: only this URL counts (root history also holds IPv6 and
+    // other-URL probes). Older cores without `extra` only have the root history.
+    val extra = node.optJSONObject("extra")
+    val history = (if (extra != null) extra.optJSONObject(url)?.optJSONArray("history")
+        else node.optJSONArray("history")) ?: return null
+    if (history.length() == 0) return null
+    val item = history.optJSONObject(history.length() - 1) ?: return null
+    if (!item.has("delay") || item.isNull("delay")) return null
+    val value = item.optLong("delay", Long.MIN_VALUE)
+    val time = item.optString("time")
+    if (value < 0L || time.isBlank()) return null
+    return CoreWaveRecord(time, value)
+}
+
+/**
+ * Members whose newest record is newer than the wave's baseline: the core finished testing
+ * them during this wave. A zero record is a core-confirmed failure ([failure]).
+ */
+internal fun freshCoreWaveResults(proxies: JSONObject, url: String, baseline: Map<String, String?>,
+    failure: Long = -2L): Map<String, Long> = buildMap {
+    baseline.forEach { (name, before) ->
+        val record = lastCoreWaveRecord(proxies.optJSONObject(name), url) ?: return@forEach
+        if (record.time != before) put(name, if (record.delay > 0L) record.delay else failure)
+    }
+}

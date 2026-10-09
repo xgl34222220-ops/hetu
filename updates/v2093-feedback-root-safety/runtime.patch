@@ -949,7 +949,7 @@ index 0000000..244568f
 +    } finally { if (inherited == null) budget.close() }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..8b96e4a 100644
+index f104cef..32f4c97 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -123,13 +123,19 @@ final class MihomoControllerClient {
@@ -974,7 +974,7 @@ index f104cef..8b96e4a 100644
      }
 
      void reloadConfig(String path)throws Exception{
-@@ -174,17 +180,25 @@ final class MihomoControllerClient {
+@@ -174,23 +180,33 @@ final class MihomoControllerClient {
      }
 
      private long delayPath(String path,String preferredUrl,String expected)throws Exception{
@@ -1002,7 +1002,16 @@ index f104cef..8b96e4a 100644
                      long d=v.optLong("delay",-1);
                      if(d>0)return d;
                      if(d==0)last=new DelayFailure(false);
-@@ -198,8 +212,9 @@ final class MihomoControllerClient {
+                     else throw new IOException("测速接口未返回延迟数据");
+                 }catch(ControllerHttpException error){
+-                    if(error.statusCode==504)last=new DelayFailure(true);
++                    // A core-confirmed timeout already spent the whole 5 s window on this node.
++                    // Retrying the next default URL only doubled the dead-node cost of a wave.
++                    if(error.statusCode==504)throw new DelayFailure(true);
+                     else if(error.statusCode==503)last=new DelayFailure(false);
+                     else throw error;
+                 }
+@@ -198,8 +214,9 @@ final class MihomoControllerClient {
              if(last!=null)throw last;
              throw new IOException("没有可用的测速地址");
          }finally{
@@ -1013,7 +1022,7 @@ index f104cef..8b96e4a 100644
      }
 
      JSONObject groupDelay(String group)throws Exception{
-@@ -207,11 +222,16 @@ final class MihomoControllerClient {
+@@ -207,11 +224,16 @@ final class MihomoControllerClient {
      }
 
      JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
@@ -1030,15 +1039,33 @@ index f104cef..8b96e4a 100644
              try{
                  String test=URLEncoder.encode(rawUrl,"UTF-8");
                  String status=URLEncoder.encode(expectedRange,"UTF-8");
-@@ -228,6 +248,7 @@ final class MihomoControllerClient {
+@@ -228,6 +250,25 @@ final class MihomoControllerClient {
          }
          if(last!=null)throw last;
          throw new IOException("策略组延迟测试失败");
 +        }finally{if(ownBudget){budget.close();LatencyProbeBudget.CURRENT.remove();}}
++    }
++
++    /** The single URL a core group wave uses: custom URL, else the group's own, else the default. */
++    String waveDelayUrl(String groupUrl){
++        String custom=customDelayUrl();
++        if(!custom.isEmpty())return custom;
++        if(groupUrl!=null&&!groupUrl.trim().isEmpty())return groupUrl.trim();
++        return DEFAULT_DELAY_URLS[0];
++    }
++
++    /**
++     * One core-parallel wave with exactly one URL and no client fallback. Mihomo tests every
++     * member concurrently and writes each member's history as it lands; callers decide fallback.
++     */
++    JSONObject groupDelayOnce(String group,String url,String expected,int timeoutMs)throws Exception{
++        String test=URLEncoder.encode(url,"UTF-8");
++        String status=URLEncoder.encode(expected==null||expected.trim().isEmpty()?"200-399":expected.trim(),"UTF-8");
++        return request("GET","/group/"+Uri.encode(group)+"/delay?timeout="+timeoutMs+"&url="+test+"&expected="+status,null,timeoutMs+2000);
      }
 
      void closeAll()throws Exception{request("DELETE","/connections",null);}
-@@ -246,9 +267,12 @@ final class MihomoControllerClient {
+@@ -246,9 +287,12 @@ final class MihomoControllerClient {
          byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
          ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
          Socket socket=new Socket();
@@ -1053,7 +1080,7 @@ index f104cef..8b96e4a 100644
              OutputStream raw=socket.getOutputStream();
              StringBuilder head=new StringBuilder();
              head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-@@ -281,8 +305,12 @@ final class MihomoControllerClient {
+@@ -281,8 +325,12 @@ final class MihomoControllerClient {
              }else bytes=readToEnd(in);
              String text=new String(bytes,StandardCharsets.UTF_8);
              if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
@@ -1214,14 +1241,16 @@ index 76318e4..618767e 100644
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..da84c42 100644
+index 5ae93b3..0ba493d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-@@ -53,34 +53,48 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -53,34 +53,50 @@ internal class ProxyDashboardRepository(context: Context) {
          // Activities have independent repository/cache instances but mutate the
          // same core. A confirmed mutation must supersede observations in all of them.
          val probeMutationEpoch = AtomicLong()
 +        val EGRESS_TARGETS = listOf("https://www.gstatic.com/generate_204", "https://cp.cloudflare.com/generate_204")
++        const val CORE_WAVE_TIMEOUT_MS = 5000
++        const val CORE_WAVE_POLL_MS = 350L
      }
      private val app = context.applicationContext
      private val api = MihomoControllerClient(app)
@@ -1272,7 +1301,7 @@ index 5ae93b3..da84c42 100644
          val core = ProxyRuntimeProfile.Core.from(values["proxyBaseCore"] as? String ?: "mihomo")
          val configKey = "proxySelectedConfig.${core.id}"
          val settings = values.filterKeys { key -> key == configKey || key in probeIdentityKeys }.toMutableMap()
-@@ -91,11 +105,18 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -91,11 +107,18 @@ internal class ProxyDashboardRepository(context: Context) {
                  ProxyConfigLibrary.BUNDLED_NAME else ""
          }
          // Ordinary status/health reads do not change this nonblocking control epoch.
@@ -1293,7 +1322,7 @@ index 5ae93b3..da84c42 100644
              throw IOException("代理或控制接口已变化，请重新测速")
      }
 
-@@ -180,6 +201,8 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -180,6 +203,8 @@ internal class ProxyDashboardRepository(context: Context) {
 
 
      suspend fun state(): ProxyComposeState = controller.state()
@@ -1302,7 +1331,7 @@ index 5ae93b3..da84c42 100644
      suspend fun rules(): List<ProxyRuleUi> = controller.rules()
      suspend fun select(group: String, node: String, disconnectPrevious: Boolean = false,
          ticket: SelectionTicket = captureSelection()) = withContext(Dispatchers.IO) {
-@@ -315,7 +338,7 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -315,7 +340,7 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Probe selected nodes only. Provider metadata is shared by the whole wave. */
@@ -1311,7 +1340,7 @@ index 5ae93b3..da84c42 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
              if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
-@@ -325,30 +348,49 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -325,30 +350,49 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
@@ -1371,7 +1400,7 @@ index 5ae93b3..da84c42 100644
          return results
      }
 
-@@ -366,7 +408,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,35 +410,103 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -1380,9 +1409,15 @@ index 5ae93b3..da84c42 100644
          probe(node, probeSnapshot())
      }
 
-@@ -375,26 +417,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
-      * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
-      * clear and reapply a pin, which could briefly reroute live traffic.
+     /**
+      * Mihomo's /group/{name}/delay clears fixed selection on non-Selector groups
+-     * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
+-     * clear and reapply a pin, which could briefly reroute live traffic.
++     * (upstream ab405bad, hub/route/groups.go). An unpinned automatic group (and
++     * LoadBalance, which has no pin) uses that core-parallel endpoint: one request,
++     * every member tested at once by the core. A pinned group, or a core that does
++     * not report its pin, keeps the bounded leaf probes; never clear and reapply a
++     * pin, which could briefly reroute live traffic.
       */
 -    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
 -        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
@@ -1390,20 +1425,91 @@ index 5ae93b3..da84c42 100644
 +        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
 +        if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
          val snapshot = probeSnapshot(force = true)
--        val results = LinkedHashMap<String, Long>()
++        if (coreGroupWaveKeepsSelection(snapshot.proxies.optJSONObject(group.name)))
++            coreGroupWave(group.name, targets, snapshot, onResult)?.let { return@latencyProbeOperation it }
++        measureSnapshot(targets, snapshot, onResult)
++    }
++
++    /**
++     * One GET /group/{name}/delay. While the core works, its per-member history is read
++     * every [CORE_WAVE_POLL_MS] so each member lands as soon as the core recorded it,
++     * instead of every result waiting for the slowest member. Returns null only when the
++     * endpoint itself is unavailable (old core, 404, transport error) so the caller can
++     * fall back to leaf probes; a 504 is a real wave in which every member failed.
++     */
++    private suspend fun coreGroupWave(group: String, targets: List<String>, snapshot: ProbeSnapshot,
++        onResult: ((String, Long) -> Unit)?): Map<String, Long>? = coroutineScope {
++        val entry = snapshot.proxies.optJSONObject(group) ?: return@coroutineScope null
++        val url = api.waveDelayUrl(entry.optString("testUrl"))
++        val expected = entry.optString("expectedStatus").ifBlank { "200-399" }
++        val pending = targets.distinct()
++        val baseline = pending.associateWith { lastCoreWaveRecord(snapshot.proxies.optJSONObject(it), url)?.time }
+         val results = LinkedHashMap<String, Long>()
 -        for (chunk in targets.distinct().chunked(6)) {
 -            val measured = coroutineScope {
 -                chunk.map { node -> async {
 -                    try { node to measuredProbe(node, snapshot) }
--                    catch (cancel: CancellationException) { throw cancel }
++        fun land(node: String, value: Long) {
++            val changed = synchronized(results) { results.put(node, value) != value }
++            // Same identity guard as leaf probes: a superseded wave publishes nothing.
++            if (changed && onResult != null && snapshot.identity.stable &&
++                probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity) onResult(node, value)
++        }
++        requireCurrentProbe(snapshot.identity)
++        val wave = async {
++            try { Result.success(api.groupDelayOnce(group, url, expected, CORE_WAVE_TIMEOUT_MS)) }
++            catch (cancel: CancellationException) { throw cancel }
++            catch (error: Exception) { Result.failure(error) }
++        }
++        val poller = if (onResult == null) null else async {
++            while (!wave.isCompleted) {
++                kotlinx.coroutines.delay(CORE_WAVE_POLL_MS)
++                if (wave.isCompleted) break
++                val live = try { api.proxies() }
+                     catch (cancel: CancellationException) { throw cancel }
 -                    catch (_: IOException) { node to null }
 -                } }.awaitAll()
--            }
++                    catch (_: Exception) { continue }
++                coroutineContext.ensureActive()
++                val landed = synchronized(results) { results.keys.toSet() }
++                freshCoreWaveResults(live, url, baseline.filterKeys { it !in landed }).forEach { (node, value) -> land(node, value) }
++            }
++        }
++        val outcome = wave.await()
++        poller?.cancel()
++        val raw = outcome.getOrElse { error ->
++            when {
++                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 504 -> JSONObject()
++                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
++                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() })
++                else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
++            }
++        }
++        val allFailed = outcome.isFailure
++        requireCurrentProbe(snapshot.identity)
++        val keys = raw.keys()
++        while (keys.hasNext()) {
++            val name = keys.next()
++            if (name !in baseline) continue
++            // Only exact integer measurements; malformed values never become timeouts.
++            when (val value = raw.opt(name)) {
++                is Int -> if (value > 0) land(name, value.toLong())
++                is Long -> if (value > 0L) land(name, value)
+             }
 -            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
--        }
--        requireCurrentProbe(snapshot.identity)
++        }
++        // Members the core answered without a success (dead nodes, expected-status misses)
++        // have a fresh failure record. One read settles them; anything still unknown keeps
++        // its earlier reading rather than becoming a guessed timeout.
++        val unsettled = synchronized(results) { baseline.filterKeys { it !in results } }
++        if (unsettled.isNotEmpty()) {
++            val live = try { api.proxies() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++            if (live != null) freshCoreWaveResults(live, url, unsettled, failure = if (allFailed) -1L else -2L)
++                .forEach { (node, value) -> land(node, value) }
+         }
+         requireCurrentProbe(snapshot.identity)
 -        results
-+        measureSnapshot(targets, snapshot, onResult)
++        synchronized(results) { results.toMap() }
      }
 
      /** Core-parallel group latency probe used by strategy-card delay taps. */
@@ -1412,7 +1518,7 @@ index 5ae93b3..da84c42 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +445,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +526,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -1421,7 +1527,7 @@ index 5ae93b3..da84c42 100644
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
          readCurrentProbe(snapshot) {
-@@ -423,7 +454,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -423,7 +535,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -1430,7 +1536,7 @@ index 5ae93b3..da84c42 100644
          requireCurrentProbe(identity)
          val sites = ProxyLatencyTargets.load(app)
          // Hetu's UID is exempt from transparent Root interception. Explicitly enter
-@@ -444,6 +475,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -444,6 +556,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          measured
      }
 
@@ -1496,10 +1602,10 @@ index 5ae93b3..da84c42 100644
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
-index 48280df..c33832e 100644
+index 48280df..b453abf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
-@@ -83,10 +83,11 @@ internal fun resolvedCoreLatency(proxies: JSONObject, name: String, preferredUrl
+@@ -83,11 +83,58 @@ internal fun resolvedCoreLatency(proxies: JSONObject, name: String, preferredUrl
 
  /** A new successful core/WebUI reading must replace an old locally cached failure. */
  internal fun syncCoreLatencyResults(groups: List<ProxyGroupUi>, delays: MutableMap<String, Long>,
@@ -1513,6 +1619,53 @@ index 48280df..c33832e 100644
          copies.filter { it.lastDelay != null }.maxByOrNull { it.lastDelayAt }?.lastDelay?.let { delays[name] = it }
      }
      if (groups.isNotEmpty()) delays.keys.toList().filter { it !in nodes }.forEach(delays::remove)
+ }
++
++/**
++ * True when Mihomo's GET /group/{name}/delay cannot change what the group routes through.
++ * Upstream groups.go calls ForceSet("") on every non-Selector SelectAble group (URLTest,
++ * Fallback). That only clears a fixed pin, so it is safe exactly when the core reports the
++ * group unpinned. A core that does not report `fixed` is treated as pinned.
++ */
++internal fun coreGroupWaveKeepsSelection(entry: JSONObject?): Boolean {
++    if (entry == null || entry.optJSONArray("all") == null) return false
++    return when (entry.optString("type").lowercase()) {
++        "loadbalance" -> true
++        "urltest", "fallback" -> entry.has("fixed") && !entry.isNull("fixed") && entry.optString("fixed").isEmpty()
++        else -> false
++    }
++}
++
++/** The newest history record the core wrote for one probe URL, exactly as written. */
++internal data class CoreWaveRecord(val time: String, val delay: Long)
++
++internal fun lastCoreWaveRecord(node: JSONObject?, url: String): CoreWaveRecord? {
++    if (node == null) return null
++    // Cores with per-URL history: only this URL counts (root history also holds IPv6 and
++    // other-URL probes). Older cores without `extra` only have the root history.
++    val extra = node.optJSONObject("extra")
++    val history = (if (extra != null) extra.optJSONObject(url)?.optJSONArray("history")
++        else node.optJSONArray("history")) ?: return null
++    if (history.length() == 0) return null
++    val item = history.optJSONObject(history.length() - 1) ?: return null
++    if (!item.has("delay") || item.isNull("delay")) return null
++    val value = item.optLong("delay", Long.MIN_VALUE)
++    val time = item.optString("time")
++    if (value < 0L || time.isBlank()) return null
++    return CoreWaveRecord(time, value)
++}
++
++/**
++ * Members whose newest record is newer than the wave's baseline: the core finished testing
++ * them during this wave. A zero record is a core-confirmed failure ([failure]).
++ */
++internal fun freshCoreWaveResults(proxies: JSONObject, url: String, baseline: Map<String, String?>,
++    failure: Long = -2L): Map<String, Long> = buildMap {
++    baseline.forEach { (name, before) ->
++        val record = lastCoreWaveRecord(proxies.optJSONObject(name), url) ?: return@forEach
++        if (record.time != before) put(name, if (record.delay > 0L) record.delay else failure)
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 index 56b04c2..7289454 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
@@ -3328,7 +3481,7 @@ index 2b1a624..823695c 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..f334603 100644
+index 250b8a8..793a13e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -3573,7 +3726,7 @@ index 250b8a8..f334603 100644
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +944,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -852,10 +944,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -3587,16 +3740,19 @@ index 250b8a8..f334603 100644
 +                }
 +            }
              try {
-                 // Selector groups retain the parallel core endpoint. Automatic groups use
-                 // bounded leaf probes because that endpoint silently clears their fixed choice.
+-                // Selector groups retain the parallel core endpoint. Automatic groups use
+-                // bounded leaf probes because that endpoint silently clears their fixed choice.
 -                val result = repo.groupDelay(group, targets)
++                // Selector groups retain the parallel core endpoint. Unpinned automatic groups
++                // use it too and stream each member as the core records it; a pinned one keeps
++                // bounded leaf probes because that endpoint silently clears its fixed choice.
 +                val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
 +                if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
 +                    toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +966,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +967,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -3614,7 +3770,7 @@ index 250b8a8..f334603 100644
                  releaseNodeProbes(owner, targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +987,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,6 +988,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -3622,7 +3778,7 @@ index 250b8a8..f334603 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +998,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +999,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -3940,6 +4096,36 @@ index 0000000..65065ca
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
+index 0ceaa23..b6be38b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
+@@ -290,8 +290,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+ @Composable
+ private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
+     var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
+-    LaunchedEffect(enabled) {
++    val visible = rememberScreenVisible()
++    LaunchedEffect(enabled, visible) {
+         if (!enabled) { rates = null to null; return@LaunchedEffect }
++        // Stopped screen: no 1 s TrafficStats wake-ups; resume from a fresh baseline.
++        if (!visible) return@LaunchedEffect
+         var lastTx = TrafficStats.getTotalTxBytes()
+         var lastRx = TrafficStats.getTotalRxBytes()
+         var lastAt = SystemClock.elapsedRealtime()
+@@ -321,8 +324,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+     val memoryPoints = remember { mutableStateListOf<Float?>() }
+     val latestCpu by rememberUpdatedState(cpu)
+     val latestMemory by rememberUpdatedState(memoryBytes)
+-    LaunchedEffect(sampling) {
++    val visible = rememberScreenVisible()
++    LaunchedEffect(sampling, visible) {
+         if (!sampling) { cpuPoints.clear(); memoryPoints.clear(); return@LaunchedEffect }
++        // Keep the window while stopped, but do not wake every 2 s to append to it.
++        if (!visible) return@LaunchedEffect
+         while (true) {
+             cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
+             memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 index 9afc132..0881179 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
@@ -4015,8 +4201,32 @@ index e31ca99..243edd5 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt
+new file mode 100644
+index 0000000..bcd5c0c
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt
+@@ -0,0 +1,18 @@
++package io.github.xgl34222220.hetu.home
++
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.lifecycle.Lifecycle
++import androidx.lifecycle.compose.LocalLifecycleOwner
++import androidx.lifecycle.compose.currentStateAsState
++
++/**
++ * True while the hosting screen is at least STARTED. A composition stays alive after the
++ * activity stops, so a `LaunchedEffect` polling loop keyed only on data keeps sampling (and
++ * waking the CPU) in the background. Key every periodic UI loop on this as well.
++ */
++@Composable
++internal fun rememberScreenVisible(): Boolean {
++    val state by LocalLifecycleOwner.current.lifecycle.currentStateAsState()
++    return state.isAtLeast(Lifecycle.State.STARTED)
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..5500d96 100644
+index 9f66ac0..2bc02e2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 @@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
@@ -4256,7 +4466,32 @@ index 9f66ac0..5500d96 100644
      val tab = when (vm.panelSection) {
          "overview" -> PanelTab.Overview
          "providers" -> PanelTab.Subscriptions
-@@ -672,9 +498,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -645,9 +471,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+         "logs" -> PanelTab.Logs
+         else -> PanelTab.Groups
+     }
+-    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision) {
++    val visible = io.github.xgl34222220.hetu.home.rememberScreenVisible()
++    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible) {
+         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+         if (vm.state.controllerReadFailed) return@LaunchedEffect
++        // A stopped activity keeps its composition: never reload tabs or tail logs from the background.
++        if (!visible) return@LaunchedEffect
+         when (tab) {
+             PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
+             PanelTab.Subscriptions -> vm.loadProviders()
+@@ -660,8 +489,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+             else -> Unit
+         }
+     }
+-    LaunchedEffect(vm.state.running) {
++    LaunchedEffect(vm.state.running, visible) {
+         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
++        if (!visible) return@LaunchedEffect
+         while (true) {
+             if (vm.state.panelReady && !vm.state.controllerReadFailed) {
+                 sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
+@@ -672,9 +502,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
      fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
          if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
      }
@@ -4268,7 +4503,7 @@ index 9f66ac0..5500d96 100644
          testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
          switching = vm.pendingSelection.toMap()).copy(
          refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
-@@ -685,6 +511,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -685,6 +515,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          },
          updatingAllSubscriptions = vm.providersUpdatingAll,
          updatingAllRuleSets = vm.ruleSetsUpdatingAll,
@@ -4276,7 +4511,7 @@ index 9f66ac0..5500d96 100644
      )
      val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
      val actions = PanelActions(
-@@ -712,7 +539,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -712,7 +543,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
              }
          },
      )
@@ -5997,6 +6232,232 @@ index 366297a..e224bf7 100644
                      if (holdConfigs && request.path == "/configs") {
                          controllerReadEntered.countDown()
                          check(release.await(6, TimeUnit.SECONDS))
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
+new file mode 100644
+index 0000000..6fca653
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
+@@ -0,0 +1,220 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
++import kotlinx.coroutines.runBlocking
++import kotlinx.coroutines.supervisorScope
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.IOException
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicReference
++
++/**
++ * BoxProxy 对标：未固定的自动组（URLTest/Fallback）与 LoadBalance 走核心并发的
++ * GET /group/{name}/delay，一次请求由核心同时测完全部成员，并按核心写入的历史逐个落结果；
++ * 已固定或核心不报告 fixed 的组仍只测叶子，绝不清除用户固定的选择。
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class CoreGroupWave99Test {
++    private val app = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", 0)
++    private val servers = mutableListOf<MockWebServer>()
++    private val gates = mutableListOf<CountDownLatch>()
++    private val url = "https://www.gstatic.com/generate_204"
++    private val names = (1..6).map { "n$it" }
++
++    @Before fun reset() { prefs.edit().clear().commit() }
++    @After fun finish() { gates.forEach { it.countDown() }; servers.forEach { it.shutdown() } }
++
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun server(handler: (RecordedRequest) -> MockResponse) = MockWebServer().also { server ->
++        server.dispatcher = object : Dispatcher() { override fun dispatch(request: RecordedRequest) = handler(request) }
++        server.start(); servers += server
++        prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).putBoolean("proxyRootRuntimeRunning", true)
++            .putBoolean("proxyRootWanted", true).commit()
++    }
++
++    private fun record(time: String, delay: Long) = JSONObject().put("time", time).put("delay", delay)
++    private fun leaf(name: String, history: List<JSONObject>) = JSONObject().put("name", name).put("type", "Shadowsocks")
++        .put("history", JSONArray(history)).put("extra", JSONObject().put(url, JSONObject().put("history", JSONArray(history))))
++
++    /** /proxies body: group of [type] pinned to [fixed] (null = core does not report it), leaves with [records]. */
++    private fun proxies(type: String, fixed: String?, records: Map<String, List<JSONObject>>): String {
++        val all = JSONObject()
++        names.forEach { all.put(it, leaf(it, records[it].orEmpty())) }
++        all.put("Auto", JSONObject().put("name", "Auto").put("type", type).put("all", JSONArray(names))
++            .put("now", "n1").put("testUrl", url).apply { if (fixed != null) put("fixed", fixed) })
++        return JSONObject().put("proxies", all).toString()
++    }
++    private val old = names.associateWith { listOf(record("2026-10-10T01:00:00.000000000+08:00", 900)) }
++    private fun group(type: String) = ProxyGroupUi("Auto", type, "n1", names.map { ProxyNodeUi(it) })
++
++    /* ------------------------------ pure decisions ------------------------------ */
++
++    @Test fun onlyUnpinnedAutomaticGroupsAndLoadBalanceMayUseTheCoreGroupEndpoint() {
++        fun g(type: String, fixed: Any? = Unit) = JSONObject().put("type", type).put("all", JSONArray(names))
++            .apply { if (fixed != Unit) put("fixed", fixed ?: JSONObject.NULL) }
++        assertTrue(coreGroupWaveKeepsSelection(g("URLTest", "")))
++        assertTrue(coreGroupWaveKeepsSelection(g("Fallback", "")))
++        assertTrue(coreGroupWaveKeepsSelection(g("LoadBalance")))
++        assertFalse("A pin would be cleared by ForceSet(\"\")", coreGroupWaveKeepsSelection(g("URLTest", "n2")))
++        assertFalse(coreGroupWaveKeepsSelection(g("Fallback", "n2")))
++        assertFalse("Unknown pin state is treated as pinned", coreGroupWaveKeepsSelection(g("URLTest")))
++        assertFalse(coreGroupWaveKeepsSelection(g("URLTest", null)))
++        assertFalse("Selector keeps its own existing path", coreGroupWaveKeepsSelection(g("Selector", "")))
++        assertFalse(coreGroupWaveKeepsSelection(JSONObject().put("type", "URLTest").put("fixed", "")))
++        assertFalse(coreGroupWaveKeepsSelection(null))
++    }
++
++    @Test fun onlyRecordsNewerThanTheBaselineOfTheSameUrlLand() {
++        val ipv6 = MihomoControllerClient.IPV6_DELAY_URL
++        val live = JSONObject()
++            .put("fresh", leaf("fresh", listOf(record("t0", 300), record("t1", 41))))
++            .put("dead", leaf("dead", listOf(record("t0", 300), record("t1", 0))))
++            .put("same", leaf("same", listOf(record("t0", 300))))
++            .put("otherUrl", JSONObject().put("history", JSONArray(listOf(record("t9", 12))))
++                .put("extra", JSONObject().put(ipv6, JSONObject().put("history", JSONArray(listOf(record("t9", 12)))))))
++            .put("legacy", JSONObject().put("history", JSONArray(listOf(record("t2", 77)))))
++        val baseline = mapOf("fresh" to "t0", "dead" to "t0", "same" to "t0", "otherUrl" to null, "legacy" to null, "missing" to null)
++        assertEquals(mapOf("fresh" to 41L, "dead" to -2L, "legacy" to 77L), freshCoreWaveResults(live, url, baseline))
++        assertEquals(-1L, freshCoreWaveResults(live, url, mapOf("dead" to "t0"), failure = -1L)["dead"])
++        assertNull(lastCoreWaveRecord(JSONObject().put("history", JSONArray(listOf(JSONObject().put("time", "t").put("delay", JSONObject.NULL))))), url))
++    }
++
++    /* ------------------------------ repository ------------------------------ */
++
++    @Test fun unpinnedUrlTestGroupIsOneCoreRequestAndStreamsMembersBeforeTheSlowestFinishes() = runBlocking {
++        val release = gate()
++        val fast = names.take(4).associateWith { listOf(old.getValue(it).single(), record("2026-10-10T02:00:00.1+08:00", 40L + it.drop(1).toLong())) }
++        val waveStarted = AtomicReference(false)
++        val api = server { req ->
++            when (req.requestUrl!!.encodedPath) {
++                "/proxies" -> MockResponse().setBody(proxies("URLTest", "", if (waveStarted.get()) old + fast else old))
++                "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                "/group/Auto/delay" -> {
++                    waveStarted.set(true)
++                    check(release.await(8, TimeUnit.SECONDS))
++                    MockResponse().setBody("""{"n1":41,"n2":42,"n3":43,"n4":44,"n5":45}""")
++                }
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        val streamed = Collections.synchronizedList(mutableListOf<Pair<String, Long>>())
++        val repository = ProxyDashboardRepository(app)
++        val wave = async(Dispatchers.IO) { repository.groupDelay(group("URLTest"), names) { n, v -> streamed += n to v } }
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(4)
++        while (streamed.size < 4 && System.nanoTime() < deadline) Thread.sleep(20)
++        assertEquals("Four members land from core history while the group request is still open",
++            names.take(4).map { it to 40L + it.drop(1).toLong() }.toSet(), streamed.toSet())
++        assertFalse(wave.isCompleted)
++        release.countDown()
++        val result = wave.await()
++        assertEquals(mapOf("n1" to 41L, "n2" to 42L, "n3" to 43L, "n4" to 44L, "n5" to 45L), result)
++        val paths = generateSequence { api.takeRequest(0, TimeUnit.SECONDS) }.map { it.requestUrl!! }.toList()
++        assertEquals(1, paths.count { it.encodedPath == "/group/Auto/delay" })
++        assertFalse("No leaf probes when the core runs the wave", paths.any { it.encodedPath.startsWith("/proxies/") })
++        val groupRequest = paths.single { it.encodedPath == "/group/Auto/delay" }
++        assertEquals(url, groupRequest.queryParameter("url"))
++        assertEquals("5000", groupRequest.queryParameter("timeout"))
++    }
++
++    @Test fun pinnedOrUnreportedAutomaticGroupsNeverCallTheUnfixingEndpoint() = runBlocking {
++        for (fixed in listOf("n2", null)) {
++            val api = server { req ->
++                when (req.requestUrl!!.encodedPath) {
++                    "/proxies" -> MockResponse().setBody(proxies("Fallback", fixed, old))
++                    "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                    else -> if (req.requestUrl!!.encodedPath.endsWith("/delay") && req.requestUrl!!.encodedPath.startsWith("/proxies/"))
++                        MockResponse().setBody("{\"delay\":33}") else MockResponse().setResponseCode(404)
++                }
++            }
++            val result = ProxyDashboardRepository(app).groupDelay(group("Fallback"), names)
++            assertEquals(names.associateWith { 33L }, result)
++            val paths = generateSequence { api.takeRequest(0, TimeUnit.SECONDS) }.map { it.requestUrl!!.encodedPath }.toList()
++            assertFalse(paths.any { it.startsWith("/group/") })
++        }
++    }
++
++    @Test fun unavailableGroupEndpointFallsBackToLeafProbes() = runBlocking {
++        val api = server { req ->
++            val path = req.requestUrl!!.encodedPath
++            when {
++                path == "/proxies" -> MockResponse().setBody(proxies("URLTest", "", old))
++                path == "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                path == "/group/Auto/delay" -> MockResponse().setResponseCode(404).setBody("{\"message\":\"not found\"}")
++                path.startsWith("/proxies/") && path.endsWith("/delay") -> MockResponse().setBody("{\"delay\":52}")
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        assertEquals(names.associateWith { 52L }, ProxyDashboardRepository(app).groupDelay(group("URLTest"), names))
++        val paths = generateSequence { api.takeRequest(0, TimeUnit.SECONDS) }.map { it.requestUrl!!.encodedPath }.toList()
++        assertEquals(1, paths.count { it == "/group/Auto/delay" })
++        assertEquals(names.size, paths.count { it.startsWith("/proxies/") && it.endsWith("/delay") })
++    }
++
++    @Test fun allMembersTimingOutIsARealWaveSettledFromCoreFailureRecords() = runBlocking {
++        val failed = names.take(5).associateWith { listOf(old.getValue(it).single(), record("2026-10-10T02:00:05+08:00", 0)) }
++        val after = AtomicReference(false)
++        server { req ->
++            when (req.requestUrl!!.encodedPath) {
++                "/proxies" -> MockResponse().setBody(proxies("LoadBalance", null, if (after.get()) old + failed else old))
++                "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                "/group/Auto/delay" -> { after.set(true); MockResponse().setResponseCode(504).setBody("{\"message\":\"all proxies timeout\"}") }
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        val result = ProxyDashboardRepository(app).groupDelay(group("LoadBalance"), names)
++        assertEquals("Five confirmed timeouts; n6 has no new record and keeps its earlier reading",
++            names.take(5).associateWith { -1L }, result)
++    }
++
++    @Test fun successfulSelectionDuringAWaveSupersedesItAndStopsStreaming() = runBlocking {
++        val entered = gate(); val release = gate()
++        server { req ->
++            when (req.requestUrl!!.encodedPath) {
++                "/proxies" -> MockResponse().setBody(proxies("URLTest", "", old))
++                "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                "/group/Auto/delay" -> { entered.countDown(); check(release.await(8, TimeUnit.SECONDS)); MockResponse().setBody("""{"n1":999}""") }
++                "/proxies/Other" -> MockResponse().setResponseCode(204)
++                else -> MockResponse().setResponseCode(404)
++            }
++        }
++        val repository = ProxyDashboardRepository(app)
++        val streamed = Collections.synchronizedList(mutableListOf<String>())
++        supervisorScope {
++            val wave = async(Dispatchers.IO) { repository.groupDelay(group("URLTest"), names) { n, _ -> streamed += n } }
++            assertTrue(entered.await(4, TimeUnit.SECONDS))
++            repository.select("Other", "n2")
++            release.countDown()
++            val failure = try { wave.await(); null } catch (error: IOException) { error }
++            assertNotNull(failure)
++            assertEquals("代理或控制接口已变化，请重新测速", failure!!.message)
++            assertTrue("A superseded wave publishes nothing", streamed.isEmpty())
++        }
++    }
++
++    @Test fun aCoreConfirmedLeafTimeoutIsNotRetriedOnTheNextDefaultUrl() {
++        val api = server { MockResponse().setResponseCode(504).setBody("{\"message\":\"timeout\"}") }
++        val error = assertThrows(MihomoControllerClient.DelayFailure::class.java) { MihomoControllerClient(app).delay("Japan") }
++        assertTrue(error.timedOut)
++        assertEquals("One 5 s window per dead node, not two", 1, api.requestCount)
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
 new file mode 100644
 index 0000000..549e953

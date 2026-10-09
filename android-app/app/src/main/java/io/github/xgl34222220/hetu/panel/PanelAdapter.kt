@@ -471,9 +471,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         "logs" -> PanelTab.Logs
         else -> PanelTab.Groups
     }
-    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision) {
+    val visible = io.github.xgl34222220.hetu.home.rememberScreenVisible()
+    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
         if (vm.state.controllerReadFailed) return@LaunchedEffect
+        // A stopped activity keeps its composition: never reload tabs or tail logs from the background.
+        if (!visible) return@LaunchedEffect
         when (tab) {
             PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
             PanelTab.Subscriptions -> vm.loadProviders()
@@ -486,8 +489,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
             else -> Unit
         }
     }
-    LaunchedEffect(vm.state.running) {
+    LaunchedEffect(vm.state.running, visible) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
+        if (!visible) return@LaunchedEffect
         while (true) {
             if (vm.state.panelReady && !vm.state.controllerReadFailed) {
                 sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
