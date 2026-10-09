@@ -143,11 +143,31 @@ def validate_initial_core_ready_wait(before, after):
     assert after == before.replace(old, new, 1), 'Core picker fixture changed beyond the initial async-ready wait'
 
 
+SELECTION_READ_FIXTURE = TEST_ROOT + 'java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt'
+
+
+def validate_failed_read_gate(before, after):
+    # Parallel controller reads fail fast once a sibling read fails. The old
+    # unreadable-controller case returned /connections 500 ungated, so the
+    # failure could publish before its fixture state change. Only that failing
+    # response now waits on the same existing readback gate; every test body,
+    # assertion and wait budget stays byte-identical.
+    old = '            req.path == "/connections" -> body("{\\"connections\\":[]}").setResponseCode(connectionCode)\n'
+    new = ('            req.path == "/connections" -> {\n'
+           '                // A failing sibling read now closes the snapshot at once; hold it with the\n'
+           '                // gated /proxies read so the failure cannot win the race with the fixture.\n'
+           '                if (connectionCode != 200) readGate?.hold()\n'
+           '                body("{\\"connections\\":[]}").setResponseCode(connectionCode)\n'
+           '            }\n')
+    assert before.count(old) == 1
+    assert after == before.replace(old, new, 1), 'Panel action fixture changed beyond the failed-read gate'
+
+
 def validate_baseline_test_sources(root=ROOT):
     root = Path(root)
     predecessor, previous = predecessor_layer(root)
     # Preserve every pre-existing Android test file, including unselected old
-    # suites. The exact runtime revision contract and initial async-ready wait are the only explicit exceptions.
+    # suites. The exact runtime revision contract, initial async-ready wait and failed-read gate are the only explicit exceptions.
     for name in sorted(name for name in previous if name.startswith(TEST_ROOT)):
         before = committed_bytes(name, root)
         current = (root / name).read_bytes()
@@ -155,6 +175,8 @@ def validate_baseline_test_sources(root=ROOT):
             validate_revision_test(before.decode(), current.decode())
         elif name == CORE_READY_FIXTURE:
             validate_initial_core_ready_wait(before.decode(), current.decode())
+        elif name == SELECTION_READ_FIXTURE:
+            validate_failed_read_gate(before.decode(), current.decode())
         else:
             assert current == before, 'Retained 644 test source/fixture/assertion changed: ' + name
     for name in ('CompactHomeDashboardTest.kt', 'Ui92IntegrationTest.kt', 'NodeSelectionContinuityTest.kt'):

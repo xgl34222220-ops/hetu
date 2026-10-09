@@ -215,7 +215,7 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
                 Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
             }
-            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1)
+            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth().padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 if (conn.app.isNotBlank()) {
                     PanelAvatar(conn.app, conn.packageName, size = 18.dp)
