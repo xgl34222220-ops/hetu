@@ -6234,10 +6234,10 @@ index 366297a..e224bf7 100644
                          check(release.await(6, TimeUnit.SECONDS))
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
 new file mode 100644
-index 0000000..6fca653
+index 0000000..c0a9ffb
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt
-@@ -0,0 +1,220 @@
+@@ -0,0 +1,221 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -6336,7 +6336,8 @@ index 0000000..6fca653
 +        val baseline = mapOf("fresh" to "t0", "dead" to "t0", "same" to "t0", "otherUrl" to null, "legacy" to null, "missing" to null)
 +        assertEquals(mapOf("fresh" to 41L, "dead" to -2L, "legacy" to 77L), freshCoreWaveResults(live, url, baseline))
 +        assertEquals(-1L, freshCoreWaveResults(live, url, mapOf("dead" to "t0"), failure = -1L)["dead"])
-+        assertNull(lastCoreWaveRecord(JSONObject().put("history", JSONArray(listOf(JSONObject().put("time", "t").put("delay", JSONObject.NULL))))), url))
++        val nullDelay = JSONObject().put("history", JSONArray().put(JSONObject().put("time", "t").put("delay", JSONObject.NULL)))
++        assertNull("A null delay is not a measurement", lastCoreWaveRecord(nullDelay, url))
 +    }
 +
 +    /* ------------------------------ repository ------------------------------ */

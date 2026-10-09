@@ -96,7 +96,8 @@ class CoreGroupWave99Test {
         val baseline = mapOf("fresh" to "t0", "dead" to "t0", "same" to "t0", "otherUrl" to null, "legacy" to null, "missing" to null)
         assertEquals(mapOf("fresh" to 41L, "dead" to -2L, "legacy" to 77L), freshCoreWaveResults(live, url, baseline))
         assertEquals(-1L, freshCoreWaveResults(live, url, mapOf("dead" to "t0"), failure = -1L)["dead"])
-        assertNull(lastCoreWaveRecord(JSONObject().put("history", JSONArray(listOf(JSONObject().put("time", "t").put("delay", JSONObject.NULL))))), url))
+        val nullDelay = JSONObject().put("history", JSONArray().put(JSONObject().put("time", "t").put("delay", JSONObject.NULL)))
+        assertNull("A null delay is not a measurement", lastCoreWaveRecord(nullDelay, url))
     }
 
     /* ------------------------------ repository ------------------------------ */

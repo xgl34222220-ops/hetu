@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "9b9bb1f5b579f33c0bc78c0f7d1a6e4c70c34a7cc06f5de62bcd246efc33a070",
+  "patchSha256": "bcdaef1d0ca2a16c7f3a500cefe6457825f2ae84e857ad980bb88c2afced274b",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -328,7 +328,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "c0705d3e07febf290c7d0ea5ab2184e22330a0253d9d122b18c3da03995fef5a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "dba4f530d43b9b961a7d8e074ef1d7bc4f89705e1afda99fa176405c4b570c6e",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt": "62e9c4d975348f6386caf336c59c9cc990645d642c656dca56f63854c123a081",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt": "4de3065bf8a50b5c03b04fb2686df205bec805a998336bfe20a760708cb797aa",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "3c486b54085b8cca752183314d02d066eff04e93e4675c2466c733c462cc3d0e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt": "fe813de466b743b21adab864049561f93ff399a173eb618ad1ebbaabbf74fbd8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765",
