@@ -4282,7 +4282,7 @@ index 2b1a624..d420621 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..a6952eb 100644
+index 250b8a8..5031071 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -4296,10 +4296,10 @@ index 250b8a8..a6952eb 100644
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -61,6 +63,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -73,6 +75,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         get() = tabState
+         set(value) { tabState = value }
 
-     /** Current 「面板」 section; startup uses the user's configured default page. */
-     var panelSection by mutableStateOf(defaultPanelSection())
 +    /** A tools page another tab asked to open (e.g. 首页 › 打开配置管理); the tools tab consumes it once. */
 +    var toolsRequest by mutableStateOf<io.github.xgl34222220.hetu.tools.ToolsEntry?>(null)
 +
@@ -4308,10 +4308,11 @@ index 250b8a8..a6952eb 100644
 +        toolsRequest = entry
 +        tab = HxTab.Tools
 +    }
-         private set
-
-     private fun defaultPanelSection(): String {
-@@ -142,6 +152,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
++
+     /** Open a live panel section from home cards, tools or deep links. */
+     fun openPanel(section: String) {
+         val requested = section.ifBlank { "overview" }
+@@ -142,6 +153,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      /* ---------------- runtime state ---------------- */
@@ -4320,7 +4321,7 @@ index 250b8a8..a6952eb 100644
      var state by mutableStateOf(initialState())
          private set
      var runtime by mutableStateOf(initialRuntime())
-@@ -398,7 +410,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,7 +411,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -4332,7 +4333,7 @@ index 250b8a8..a6952eb 100644
                  delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
              }
          }
-@@ -412,19 +427,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,19 +428,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -4406,7 +4407,7 @@ index 250b8a8..a6952eb 100644
      private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,15 +516,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +517,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -4442,7 +4443,7 @@ index 250b8a8..a6952eb 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +593,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +594,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -4470,7 +4471,7 @@ index 250b8a8..a6952eb 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +663,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +664,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -4488,7 +4489,7 @@ index 250b8a8..a6952eb 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +671,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +672,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -4496,7 +4497,7 @@ index 250b8a8..a6952eb 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +682,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +683,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -4507,7 +4508,7 @@ index 250b8a8..a6952eb 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -764,6 +858,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,6 +859,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -4533,7 +4534,7 @@ index 250b8a8..a6952eb 100644
      fun setTrafficMode(mode: String) {
          if (!state.running) return
          viewModelScope.launch {
-@@ -785,6 +898,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -785,6 +899,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -4541,7 +4542,7 @@ index 250b8a8..a6952eb 100644
          val request = activeRuntimeRequest() ?: return
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +941,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,12 +942,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -4560,7 +4561,7 @@ index 250b8a8..a6952eb 100644
          val request = activeRuntimeRequest() ?: return
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
-@@ -843,6 +961,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,6 +962,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -4568,7 +4569,7 @@ index 250b8a8..a6952eb 100644
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +971,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -852,10 +972,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -4594,7 +4595,7 @@ index 250b8a8..a6952eb 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +994,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +995,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -4612,7 +4613,7 @@ index 250b8a8..a6952eb 100644
                  releaseNodeProbes(owner, targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +1015,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,6 +1016,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -4620,7 +4621,7 @@ index 250b8a8..a6952eb 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +1026,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +1027,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -4820,7 +4821,7 @@ index 0000000..4bf546b
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
 new file mode 100644
-index 0000000..7e173bf
+index 0000000..360e5cb
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
 @@ -0,0 +1,495 @@
@@ -5010,11 +5011,11 @@ index 0000000..7e173bf
 +    fun resolve(results: List<NetSiteResult>, routes: Map<String, String>, hosts: Map<String, String>, directRegion: String?, viaProxy: Boolean): List<NetSiteResult> {
 +        val nodeRegion = HashMap<String, String>()
 +        results.forEach { result ->
-+            val chain = routes[hosts[result.id]] ?: return@forEach
++            val chain = hosts[result.id]?.let { routes[it] } ?: return@forEach
 +            if (result.regionSource == NetRegionSource.Trace && result.region != null) nodeRegion.putIfAbsent(leafOf(chain), result.region)
 +        }
 +        return results.map { result ->
-+            val chain = routes[hosts[result.id]]
++            val chain = hosts[result.id]?.let { routes[it] }
 +            val resolved = when {
 +                result.regionSource == NetRegionSource.Trace && result.region != null -> result
 +                !viaProxy -> if (directRegion != null) result.copy(region = directRegion, regionSource = NetRegionSource.Direct) else result
@@ -10240,7 +10241,7 @@ index 0000000..4499405
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt
 new file mode 100644
-index 0000000..33f2f19
+index 0000000..ba49c1b
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt
 @@ -0,0 +1,279 @@
@@ -10402,7 +10403,7 @@ index 0000000..33f2f19
 +        assertTrue(finished.all { it.bytes > 0 && it.mbps > 0 })
 +        assertEquals(SpeedPhase.Done, (events.last() as SpeedEvent.Phase).phase)
 +        assertNull(events.firstOrNull { it is SpeedEvent.Failed })
-+        assertEquals(12.5, SpeedTest.mbps(12_500_000 / 8 * 8, 8_000), 0.01)
++        assertEquals(12.5, SpeedTest.mbps(12_500_000L, 8_000L), 0.01)
 +        assertEquals(20L, SpeedTest.latency(listOf(90L, 30L, 20L, 10L)))
 +        assertNull(SpeedTest.parseMeta("not json"))
 +    }
@@ -10413,7 +10414,7 @@ index 0000000..33f2f19
 +            override fun dispatch(request: RecordedRequest): MockResponse = when {
 +                request.path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"JP"}""")
 +                request.path == "/__down?bytes=0" -> MockResponse().setBody("")
-+                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16 * 1024, 1, TimeUnit.SECONDS)
++                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16_384L, 1L, TimeUnit.SECONDS)
 +            }
 +        }
 +        server.start()

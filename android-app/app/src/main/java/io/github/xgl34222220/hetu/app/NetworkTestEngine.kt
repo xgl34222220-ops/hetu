@@ -184,11 +184,11 @@ internal object NetworkTest {
     fun resolve(results: List<NetSiteResult>, routes: Map<String, String>, hosts: Map<String, String>, directRegion: String?, viaProxy: Boolean): List<NetSiteResult> {
         val nodeRegion = HashMap<String, String>()
         results.forEach { result ->
-            val chain = routes[hosts[result.id]] ?: return@forEach
+            val chain = hosts[result.id]?.let { routes[it] } ?: return@forEach
             if (result.regionSource == NetRegionSource.Trace && result.region != null) nodeRegion.putIfAbsent(leafOf(chain), result.region)
         }
         return results.map { result ->
-            val chain = routes[hosts[result.id]]
+            val chain = hosts[result.id]?.let { routes[it] }
             val resolved = when {
                 result.regionSource == NetRegionSource.Trace && result.region != null -> result
                 !viaProxy -> if (directRegion != null) result.copy(region = directRegion, regionSource = NetRegionSource.Direct) else result

@@ -156,7 +156,7 @@ class NetAdblockConfig100Test {
         assertTrue(finished.all { it.bytes > 0 && it.mbps > 0 })
         assertEquals(SpeedPhase.Done, (events.last() as SpeedEvent.Phase).phase)
         assertNull(events.firstOrNull { it is SpeedEvent.Failed })
-        assertEquals(12.5, SpeedTest.mbps(12_500_000 / 8 * 8, 8_000), 0.01)
+        assertEquals(12.5, SpeedTest.mbps(12_500_000L, 8_000L), 0.01)
         assertEquals(20L, SpeedTest.latency(listOf(90L, 30L, 20L, 10L)))
         assertNull(SpeedTest.parseMeta("not json"))
     }
@@ -167,7 +167,7 @@ class NetAdblockConfig100Test {
             override fun dispatch(request: RecordedRequest): MockResponse = when {
                 request.path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"JP"}""")
                 request.path == "/__down?bytes=0" -> MockResponse().setBody("")
-                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16 * 1024, 1, TimeUnit.SECONDS)
+                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16_384L, 1L, TimeUnit.SECONDS)
             }
         }
         server.start()
