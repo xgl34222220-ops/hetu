@@ -393,24 +393,11 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     val nav = LocalNav.current
     val context = LocalContext.current
     val prefs = vm.prefs
-    val scope = rememberCoroutineScope()
-    val c = LocalHomeColors.current
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
     val profile = ProxyRuntimeProfile.load(prefs)
     LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
-    var importing by remember { mutableStateOf(false) }
-    if (importing) {
-        // File, link or clipboard: validated by Mihomo before it is stored, rolled back if the running core rejects it.
-        ConfigImportPage(vm, onBack = { importing = false }) { message ->
-            importing = false
-            revision++
-            vm.toast(message)
-        }
-        return
-    }
-
     fun changed(key: String) {
         ProxyRuntimeSettings.markDirty(prefs, key)
         revision++
@@ -469,14 +456,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         item(key = "config") {
             SettingsSection {
                 SettingsGroup {
+                    // Selecting, importing and editing configs all live on one page: 工具 › 配置管理.
                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
-                        icon = ToolsIcons.FileText, onClick = { choice = "config" })
-                    SettingsDivider()
-                    SettingsNavRow(ht("编辑当前配置"), subtitle = ht("保存前校验，应用失败自动回滚"), icon = HxIcons.SquarePen) {
-                        nav.push(HxRoute.ConfigEditor)
+                        icon = ToolsIcons.FileText, value = ht("配置管理")) {
+                        nav.openRequested(HxRoute.Main)
+                        vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
                     }
-                    SettingsDivider()
-                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) { importing = true }
                 }
             }
         }
@@ -494,32 +479,6 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     }
 
     when (choice) {
-        "config" -> HxSheet(title = ht("当前配置"), onDismiss = { choice = null }) {
-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
-                items(configs.size, key = { configs[it].name }) { index ->
-                    val config = configs[index]
-                    SettingsRow(config.name, icon = ToolsIcons.FileText, compact = true, onClick = {
-                        choice = null
-                        if (!config.selected) scope.launch {
-                            try {
-                                vm.controller.selectConfig(config.name)
-                                vm.applyConfigChange("已切换到 ${config.name}")
-                                revision++
-                            } catch (cancel: CancellationException) { throw cancel }
-                            catch (error: Exception) { vm.toast(error.message ?: "切换配置失败") }
-                        }
-                    }) {
-                        if (config.selected) Icon(HomeIcons.Check, ht("当前配置"), Modifier.size(22.dp), tint = c.accent)
-                    }
-                }
-                item(key = "import-config") {
-                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) {
-                        choice = null
-                        importing = true
-                    }
-                }
-            }
-        }
         "core" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
             title = ht("代理核心"),

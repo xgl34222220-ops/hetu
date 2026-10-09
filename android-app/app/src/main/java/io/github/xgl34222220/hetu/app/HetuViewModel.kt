@@ -63,6 +63,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Current 「面板」 section; startup uses the user's configured default page. */
     var panelSection by mutableStateOf(defaultPanelSection())
+    /** A tools page another tab asked to open (e.g. 首页 › 打开配置管理); the tools tab consumes it once. */
+    var toolsRequest by mutableStateOf<io.github.xgl34222220.hetu.tools.ToolsEntry?>(null)
+
+    /** Opens [entry] inside 工具, so every feature has one page wherever it is reached from. */
+    fun openTools(entry: io.github.xgl34222220.hetu.tools.ToolsEntry) {
+        toolsRequest = entry
+        tab = HxTab.Tools
+    }
         private set
 
     private fun defaultPanelSection(): String {

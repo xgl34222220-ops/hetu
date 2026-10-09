@@ -161,10 +161,8 @@ class HetuActivity : ComponentActivity() {
             "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
             "connections" -> vm.openPanel("conn")
             "providers", "subscriptions" -> vm.openPanel("providers")
-            "configs" -> {
-                vm.tab = HxTab.Tools
-                requestedRoute = HxRoute.Configs
-            }
+            // One config page: 工具 › 配置管理.
+            "configs" -> vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
             "rules" -> vm.openPanel("rules")
             "home" -> vm.tab = HxTab.Home
         }
@@ -186,16 +184,10 @@ internal sealed class HxRoute(val key: String) {
     data object Providers : HxRoute("providers")
     data object Adblock : HxRoute("adblock")
     data object Network : HxRoute("network")
-    data object Apps : HxRoute("apps")
-    data object Cores : HxRoute("cores")
     data object About : HxRoute("about")
-    data object Bypass : HxRoute("bypass")
     data object Files : HxRoute("files")
-    data object SharedNet : HxRoute("shared-net")
-    data object CnIp : HxRoute("cnip")
     data object Logs : HxRoute("logs")
     data object NetMatch : HxRoute("net-match")
-    data object Diagnostics : HxRoute("diagnostics")
     data object Notifications : HxRoute("notifications")
     data object Theme : HxRoute("theme")
     data object DefaultPanelSettings : HxRoute("default-panel-settings")
@@ -342,16 +334,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.Providers -> ProvidersScreen(vm)
                             HxRoute.Adblock -> AdblockScreen(vm)
                             HxRoute.Network -> NetworkSettingsScreen(vm)
-                            HxRoute.Apps -> AppListScreen(vm)
-                            HxRoute.Cores -> CoresScreen(vm)
                             HxRoute.About -> AboutScreen(vm)
-                            HxRoute.Bypass -> BypassRulesScreen(vm) { nav.pop() }
                             HxRoute.Files -> FileManagerScreen(vm) { nav.pop() }
-                            HxRoute.SharedNet -> SharedNetworkScreen(vm) { nav.pop() }
-                            HxRoute.CnIp -> CnIpScreen(vm) { nav.pop() }
                             HxRoute.Logs -> HxLogFilesScreen(vm) { nav.pop() }
                             HxRoute.NetMatch -> HxNetworkMatchScreen(vm) { nav.pop() }
-                            HxRoute.Diagnostics -> DiagnosticsScreen(vm) { nav.pop() }
                             HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                             HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                             HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }

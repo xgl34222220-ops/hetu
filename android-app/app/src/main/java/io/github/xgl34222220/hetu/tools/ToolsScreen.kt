@@ -53,6 +53,7 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
     ToolsEntry.Cores -> ToolsIcons.Cpu
     ToolsEntry.Adblock -> ToolsIcons.ShieldX
     ToolsEntry.Diag -> ToolsIcons.Activity
+    ToolsEntry.NetTest -> PanelIcons.Gauge
     ToolsEntry.WebUi -> ToolsIcons.Monitor
 }
 

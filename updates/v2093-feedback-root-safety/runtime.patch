@@ -3976,7 +3976,7 @@ index 0000000..6c1130f
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..13ef3ac 100644
+index 2b1a624..d420621 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -4008,7 +4008,37 @@ index 2b1a624..13ef3ac 100644
  import androidx.compose.runtime.saveable.rememberSaveableStateHolder
  import androidx.compose.runtime.setValue
  import androidx.compose.runtime.staticCompositionLocalOf
-@@ -195,6 +203,7 @@ internal sealed class HxRoute(val key: String) {
+@@ -153,10 +161,8 @@ class HetuActivity : ComponentActivity() {
+             "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
+             "connections" -> vm.openPanel("conn")
+             "providers", "subscriptions" -> vm.openPanel("providers")
+-            "configs" -> {
+-                vm.tab = HxTab.Tools
+-                requestedRoute = HxRoute.Configs
+-            }
++            // One config page: 工具 › 配置管理.
++            "configs" -> vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
+             "rules" -> vm.openPanel("rules")
+             "home" -> vm.tab = HxTab.Home
+         }
+@@ -178,16 +184,10 @@ internal sealed class HxRoute(val key: String) {
+     data object Providers : HxRoute("providers")
+     data object Adblock : HxRoute("adblock")
+     data object Network : HxRoute("network")
+-    data object Apps : HxRoute("apps")
+-    data object Cores : HxRoute("cores")
+     data object About : HxRoute("about")
+-    data object Bypass : HxRoute("bypass")
+     data object Files : HxRoute("files")
+-    data object SharedNet : HxRoute("shared-net")
+-    data object CnIp : HxRoute("cnip")
+     data object Logs : HxRoute("logs")
+     data object NetMatch : HxRoute("net-match")
+-    data object Diagnostics : HxRoute("diagnostics")
+     data object Notifications : HxRoute("notifications")
+     data object Theme : HxRoute("theme")
+     data object DefaultPanelSettings : HxRoute("default-panel-settings")
+@@ -195,6 +195,7 @@ internal sealed class HxRoute(val key: String) {
      data object StartupDownloadSettings : HxRoute("startup-download-settings")
      data object PublicIp : HxRoute("public-ip")
      data object Resources : HxRoute("resources")
@@ -4016,7 +4046,7 @@ index 2b1a624..13ef3ac 100644
  }
 
  internal class HxNav {
-@@ -232,6 +241,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -232,6 +233,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -4025,7 +4055,7 @@ index 2b1a624..13ef3ac 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +254,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +246,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -4047,7 +4077,7 @@ index 2b1a624..13ef3ac 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +275,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +267,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -4055,7 +4085,7 @@ index 2b1a624..13ef3ac 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +284,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +276,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -4068,7 +4098,7 @@ index 2b1a624..13ef3ac 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +300,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +292,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -4084,7 +4114,7 @@ index 2b1a624..13ef3ac 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +323,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +315,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -4093,7 +4123,7 @@ index 2b1a624..13ef3ac 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,7 +336,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,22 +328,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -4102,7 +4132,22 @@ index 2b1a624..13ef3ac 100644
                              HxRoute.Configs -> ConfigsScreen(vm)
                              HxRoute.ConfigEditor -> ConfigEditorScreen(vm)
                              HxRoute.Providers -> ProvidersScreen(vm)
-@@ -336,13 +359,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+                             HxRoute.Adblock -> AdblockScreen(vm)
+                             HxRoute.Network -> NetworkSettingsScreen(vm)
+-                            HxRoute.Apps -> AppListScreen(vm)
+-                            HxRoute.Cores -> CoresScreen(vm)
+                             HxRoute.About -> AboutScreen(vm)
+-                            HxRoute.Bypass -> BypassRulesScreen(vm) { nav.pop() }
+                             HxRoute.Files -> FileManagerScreen(vm) { nav.pop() }
+-                            HxRoute.SharedNet -> SharedNetworkScreen(vm) { nav.pop() }
+-                            HxRoute.CnIp -> CnIpScreen(vm) { nav.pop() }
+                             HxRoute.Logs -> HxLogFilesScreen(vm) { nav.pop() }
+                             HxRoute.NetMatch -> HxNetworkMatchScreen(vm) { nav.pop() }
+-                            HxRoute.Diagnostics -> DiagnosticsScreen(vm) { nav.pop() }
+                             HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
+                             HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
+                             HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
+@@ -336,13 +345,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                              HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                              HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
@@ -4120,7 +4165,7 @@ index 2b1a624..13ef3ac 100644
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +377,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +363,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -4130,7 +4175,7 @@ index 2b1a624..13ef3ac 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +399,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +385,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -4147,7 +4192,7 @@ index 2b1a624..13ef3ac 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -398,8 +427,11 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -398,8 +413,11 @@ private fun MainTabs(vm: HetuViewModel) {
              HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
          }
      }
@@ -4161,7 +4206,7 @@ index 2b1a624..13ef3ac 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -420,13 +452,17 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -420,13 +438,17 @@ private fun MainTabs(vm: HetuViewModel) {
      Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
          Box(
              Modifier.fillMaxSize()
@@ -4180,7 +4225,7 @@ index 2b1a624..13ef3ac 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +471,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +457,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -4188,7 +4233,7 @@ index 2b1a624..13ef3ac 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -450,11 +487,12 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -450,11 +473,12 @@ private fun MainTabs(vm: HetuViewModel) {
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
          val dockShift by animateDpAsState(
@@ -4203,7 +4248,7 @@ index 2b1a624..13ef3ac 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -465,6 +503,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -465,6 +489,7 @@ private fun MainTabs(vm: HetuViewModel) {
              hazeState = dockHaze,
              backdrop = liquidBackdrop.takeIf { runtimeLiquid },
              modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
@@ -4211,7 +4256,7 @@ index 2b1a624..13ef3ac 100644
          )
      }
  }
-@@ -472,6 +511,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -472,6 +497,7 @@ private fun MainTabs(vm: HetuViewModel) {
  /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
  @Composable
  internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -4219,7 +4264,7 @@ index 2b1a624..13ef3ac 100644
      var floatingMessage by remember { mutableStateOf<String?>(null) }
      var shownMessage by remember { mutableStateOf("") }
      val haptics = rememberHetuHaptics()
-@@ -489,12 +529,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,12 +515,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -4237,7 +4282,7 @@ index 2b1a624..13ef3ac 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..6a411c8 100644
+index 250b8a8..a6952eb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -4251,7 +4296,22 @@ index 250b8a8..6a411c8 100644
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -142,6 +144,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -61,6 +63,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     /** Current 「面板」 section; startup uses the user's configured default page. */
+     var panelSection by mutableStateOf(defaultPanelSection())
++    /** A tools page another tab asked to open (e.g. 首页 › 打开配置管理); the tools tab consumes it once. */
++    var toolsRequest by mutableStateOf<io.github.xgl34222220.hetu.tools.ToolsEntry?>(null)
++
++    /** Opens [entry] inside 工具, so every feature has one page wherever it is reached from. */
++    fun openTools(entry: io.github.xgl34222220.hetu.tools.ToolsEntry) {
++        toolsRequest = entry
++        tab = HxTab.Tools
++    }
+         private set
+
+     private fun defaultPanelSection(): String {
+@@ -142,6 +152,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      /* ---------------- runtime state ---------------- */
@@ -4260,7 +4320,7 @@ index 250b8a8..6a411c8 100644
      var state by mutableStateOf(initialState())
          private set
      var runtime by mutableStateOf(initialRuntime())
-@@ -398,7 +402,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -398,7 +410,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -4272,7 +4332,7 @@ index 250b8a8..6a411c8 100644
                  delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
              }
          }
-@@ -412,19 +419,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,19 +427,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -4346,7 +4406,7 @@ index 250b8a8..6a411c8 100644
      private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,15 +508,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +516,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -4382,7 +4442,7 @@ index 250b8a8..6a411c8 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +585,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +593,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -4410,7 +4470,7 @@ index 250b8a8..6a411c8 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +655,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +663,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -4428,7 +4488,7 @@ index 250b8a8..6a411c8 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +663,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +671,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -4436,7 +4496,7 @@ index 250b8a8..6a411c8 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +674,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +682,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -4447,7 +4507,7 @@ index 250b8a8..6a411c8 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -764,6 +850,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,6 +858,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -4473,7 +4533,7 @@ index 250b8a8..6a411c8 100644
      fun setTrafficMode(mode: String) {
          if (!state.running) return
          viewModelScope.launch {
-@@ -785,6 +890,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -785,6 +898,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -4481,7 +4541,7 @@ index 250b8a8..6a411c8 100644
          val request = activeRuntimeRequest() ?: return
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +933,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,12 +941,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -4500,7 +4560,7 @@ index 250b8a8..6a411c8 100644
          val request = activeRuntimeRequest() ?: return
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
-@@ -843,6 +953,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,6 +961,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -4508,7 +4568,7 @@ index 250b8a8..6a411c8 100644
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +963,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -852,10 +971,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -4534,7 +4594,7 @@ index 250b8a8..6a411c8 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +986,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +994,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -4552,7 +4612,7 @@ index 250b8a8..6a411c8 100644
                  releaseNodeProbes(owner, targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +1007,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,6 +1015,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -4560,7 +4620,7 @@ index 250b8a8..6a411c8 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +1018,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +1026,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -4673,142 +4733,413 @@ index 5a9c877..ad5f3b7 100644
 -}
 \ No newline at end of file
 +}
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt
 new file mode 100644
-index 0000000..fd596a2
+index 0000000..4bf546b
 --- /dev/null
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,222 @@
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt
+@@ -0,0 +1,79 @@
++package io.github.xgl34222220.hetu
++
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.graphics.vector.addPathNodes
++import androidx.compose.ui.unit.dp
++import java.util.concurrent.ConcurrentHashMap
++
++/**
++ * Brand marks of 网络测试, bundled as vector path data: nothing is downloaded at runtime.
++ * Paths and brand colours are from Simple Icons 16.34.0 (CC0 1.0, https://simpleicons.org);
++ * the marks remain the trademarks of their owners and are only used to label each service.
++ * Services Simple Icons does not carry are drawn as a lettered tile instead (see [NetBrand.mark]).
++ */
++internal object NetBrandIcons {
++    private val built = ConcurrentHashMap<String, ImageVector>()
++
++    /** Monochrome mark for [slug] (tinted when drawn); null when the service has no bundled mark. */
++    fun vector(slug: String): ImageVector? {
++        val path = paths[slug] ?: return null
++        return built.getOrPut(slug) {
++            ImageVector.Builder(name = "brand-$slug", defaultWidth = 24.dp, defaultHeight = 24.dp, viewportWidth = 24f, viewportHeight = 24f)
++                .addPath(pathData = addPathNodes(path), fill = SolidColor(Color.Black))
++                .build()
++        }
++    }
++
++    /** Simple Icons brand colours, ARGB. */
++    val colors: Map<String, Long> = mapOf(
++        "claude" to 0xFFD97757L,
++        "googlegemini" to 0xFF8E75B2L,
++        "discord" to 0xFF5865F2L,
++        "tiktok" to 0xFF000000L,
++        "reddit" to 0xFFFF4500L,
++        "x" to 0xFF000000L,
++        "telegram" to 0xFF26A5E4L,
++        "appletv" to 0xFF000000L,
++        "bilibili" to 0xFF00A1D6L,
++        "netflix" to 0xFFE50914L,
++        "spotify" to 0xFF1ED760L,
++        "twitch" to 0xFF9146FFL,
++        "youtube" to 0xFFFF0000L,
++        "alibabadotcom" to 0xFFFF6A00L,
++        "apple" to 0xFF000000L,
++        "cloudflare" to 0xFFF38020L,
++        "github" to 0xFF181717L,
++        "paypal" to 0xFF002991L,
++        "steam" to 0xFF000000L,
++        "wikipedia" to 0xFF000000L,
++        "google" to 0xFF4285F4L,
++        "baidu" to 0xFF2932E1L,
++    )
++
++    private val paths: Map<String, String> = mapOf(
++        "claude" to "m4.7144 15.9555 4.7174-2.6471.079-.2307-.079-.1275h-.2307l-.7893-.0486-2.6956-.0729-2.3375-.0971-2.2646-.1214-.5707-.1215-.5343-.7042.0546-.3522.4797-.3218.686.0608 1.5179.1032 2.2767.1578 1.6514.0972 2.4468.255h.3886l.0546-.1579-.1336-.0971-.1032-.0972L6.973 9.8356l-2.55-1.6879-1.3356-.9714-.7225-.4918-.3643-.4614-.1578-1.0078.6557-.7225.8803.0607.2246.0607.8925.686 1.9064 1.4754 2.4893 1.8336.3643.3035.1457-.1032.0182-.0728-.164-.2733-1.3539-2.4467-1.445-2.4893-.6435-1.032-.17-.6194c-.0607-.255-.1032-.4674-.1032-.7285L6.287.1335 6.6997 0l.9957.1336.419.3642.6192 1.4147 1.0018 2.2282 1.5543 3.0296.4553.8985.2429.8318.091.255h.1579v-.1457l.1275-1.706.2368-2.0947.2307-2.6957.0789-.7589.3764-.9107.7468-.4918.5828.2793.4797.686-.0668.4433-.2853 1.8517-.5586 2.9021-.3643 1.9429h.2125l.2429-.2429.9835-1.3053 1.6514-2.0643.7286-.8196.85-.9046.5464-.4311h1.0321l.759 1.1293-.34 1.1657-1.0625 1.3478-.8804 1.1414-1.2628 1.7-.7893 1.36.0729.1093.1882-.0183 2.8535-.607 1.5421-.2794 1.8396-.3157.8318.3886.091.3946-.3278.8075-1.967.4857-2.3072.4614-3.4364.8136-.0425.0304.0486.0607 1.5482.1457.6618.0364h1.621l3.0175.2247.7892.522.4736.6376-.079.4857-1.2142.6193-1.6393-.3886-3.825-.9107-1.3113-.3279h-.1822v.1093l1.0929 1.0686 2.0035 1.8092 2.5075 2.3314.1275.5768-.3218.4554-.34-.0486-2.2039-1.6575-.85-.7468-1.9246-1.621h-.1275v.17l.4432.6496 2.3436 3.5214.1214 1.0807-.17.3521-.6071.2125-.6679-.1214-1.3721-1.9246L14.38 17.959l-1.1414-1.9428-.1397.079-.674 7.2552-.3156.3703-.7286.2793-.6071-.4614-.3218-.7468.3218-1.4753.3886-1.9246.3157-1.53.2853-1.9004.17-.6314-.0121-.0425-.1397.0182-1.4328 1.9672-2.1796 2.9446-1.7243 1.8456-.4128.164-.7164-.3704.0667-.6618.4008-.5889 2.386-3.0357 1.4389-1.882.929-1.0868-.0062-.1579h-.0546l-6.3385 4.1164-1.1293.1457-.4857-.4554.0608-.7467.2307-.2429 1.9064-1.3114Z",
++        "googlegemini" to "M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81",
++        "discord" to "M20.317 4.3698a19.7913 19.7913 0 00-4.8851-1.5152.0741.0741 0 00-.0785.0371c-.211.3753-.4447.8648-.6083 1.2495-1.8447-.2762-3.68-.2762-5.4868 0-.1636-.3933-.4058-.8742-.6177-1.2495a.077.077 0 00-.0785-.037 19.7363 19.7363 0 00-4.8852 1.515.0699.0699 0 00-.0321.0277C.5334 9.0458-.319 13.5799.0992 18.0578a.0824.0824 0 00.0312.0561c2.0528 1.5076 4.0413 2.4228 5.9929 3.0294a.0777.0777 0 00.0842-.0276c.4616-.6304.8731-1.2952 1.226-1.9942a.076.076 0 00-.0416-.1057c-.6528-.2476-1.2743-.5495-1.8722-.8923a.077.077 0 01-.0076-.1277c.1258-.0943.2517-.1923.3718-.2914a.0743.0743 0 01.0776-.0105c3.9278 1.7933 8.18 1.7933 12.0614 0a.0739.0739 0 01.0785.0095c.1202.099.246.1981.3728.2924a.077.077 0 01-.0066.1276 12.2986 12.2986 0 01-1.873.8914.0766.0766 0 00-.0407.1067c.3604.698.7719 1.3628 1.225 1.9932a.076.076 0 00.0842.0286c1.961-.6067 3.9495-1.5219 6.0023-3.0294a.077.077 0 00.0313-.0552c.5004-5.177-.8382-9.6739-3.5485-13.6604a.061.061 0 00-.0312-.0286zM8.02 15.3312c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9555-2.4189 2.157-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.9555 2.4189-2.1569 2.4189zm7.9748 0c-1.1825 0-2.1569-1.0857-2.1569-2.419 0-1.3332.9554-2.4189 2.1569-2.4189 1.2108 0 2.1757 1.0952 2.1568 2.419 0 1.3332-.946 2.4189-2.1568 2.4189Z",
++        "tiktok" to "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z",
++        "reddit" to "M12 0C5.373 0 0 5.373 0 12c0 3.314 1.343 6.314 3.515 8.485l-2.286 2.286C.775 23.225 1.097 24 1.738 24H12c6.627 0 12-5.373 12-12S18.627 0 12 0Zm4.388 3.199c1.104 0 1.999.895 1.999 1.999 0 1.105-.895 2-1.999 2-.946 0-1.739-.657-1.947-1.539v.002c-1.147.162-2.032 1.15-2.032 2.341v.007c1.776.067 3.4.567 4.686 1.363.473-.363 1.064-.58 1.707-.58 1.547 0 2.802 1.254 2.802 2.802 0 1.117-.655 2.081-1.601 2.531-.088 3.256-3.637 5.876-7.997 5.876-4.361 0-7.905-2.617-7.998-5.87-.954-.447-1.614-1.415-1.614-2.538 0-1.548 1.255-2.802 2.803-2.802.645 0 1.239.218 1.712.585 1.275-.79 2.881-1.291 4.64-1.365v-.01c0-1.663 1.263-3.034 2.88-3.207.188-.911.993-1.595 1.959-1.595Zm-8.085 8.376c-.784 0-1.459.78-1.506 1.797-.047 1.016.64 1.429 1.426 1.429.786 0 1.371-.369 1.418-1.385.047-1.017-.553-1.841-1.338-1.841Zm7.406 0c-.786 0-1.385.824-1.338 1.841.047 1.017.634 1.385 1.418 1.385.785 0 1.473-.413 1.426-1.429-.046-1.017-.721-1.797-1.506-1.797Zm-3.703 4.013c-.974 0-1.907.048-2.77.135-.147.015-.241.168-.183.305.483 1.154 1.622 1.964 2.953 1.964 1.33 0 2.47-.81 2.953-1.964.057-.137-.037-.29-.184-.305-.863-.087-1.795-.135-2.769-.135Z",
++        "x" to "M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z",
++        "telegram" to "M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z",
++        "appletv" to "M20.57 17.735h-1.815l-3.34-9.203h1.633l2.02 5.987c.075.231.273.9.586 2.012l.297-.997.33-1.006 2.094-6.004H24zm-5.344-.066a5.76 5.76 0 0 1-1.55.207c-1.23 0-1.84-.693-1.84-2.087V9.646h-1.063V8.532h1.121V7.081l1.476-.602v2.062h1.707v1.113H13.38v5.805c0 .446.074.75.214.932.14.182.396.264.75.264.207 0 .495-.041.883-.115zm-7.29-5.343c.017 1.764 1.55 2.358 1.567 2.366-.017.042-.248.842-.808 1.658-.487.71-.99 1.418-1.79 1.435-.783.016-1.03-.462-1.93-.462-.89 0-1.17.445-1.913.478-.758.025-1.344-.775-1.838-1.484-.998-1.451-1.765-4.098-.734-5.88.51-.89 1.426-1.451 2.416-1.46.75-.016 1.468.512 1.93.512.461 0 1.327-.627 2.234-.536.38.016 1.452.157 2.136 1.154-.058.033-1.278.743-1.27 2.219M6.468 7.988c.404-.495.685-1.18.61-1.864-.585.025-1.294.388-1.723.883-.38.437-.71 1.138-.619 1.806.652.05 1.328-.338 1.732-.825Z",
++        "bilibili" to "M17.813 4.653h.854c1.51.054 2.769.578 3.773 1.574 1.004.995 1.524 2.249 1.56 3.76v7.36c-.036 1.51-.556 2.769-1.56 3.773s-2.262 1.524-3.773 1.56H5.333c-1.51-.036-2.769-.556-3.773-1.56S.036 18.858 0 17.347v-7.36c.036-1.511.556-2.765 1.56-3.76 1.004-.996 2.262-1.52 3.773-1.574h.774l-1.174-1.12a1.234 1.234 0 0 1-.373-.906c0-.356.124-.658.373-.907l.027-.027c.267-.249.573-.373.92-.373.347 0 .653.124.92.373L9.653 4.44c.071.071.134.142.187.213h4.267a.836.836 0 0 1 .16-.213l2.853-2.747c.267-.249.573-.373.92-.373.347 0 .662.151.929.4.267.249.391.551.391.907 0 .355-.124.657-.373.906zM5.333 7.24c-.746.018-1.373.276-1.88.773-.506.498-.769 1.13-.786 1.894v7.52c.017.764.28 1.395.786 1.893.507.498 1.134.756 1.88.773h13.334c.746-.017 1.373-.275 1.88-.773.506-.498.769-1.129.786-1.893v-7.52c-.017-.765-.28-1.396-.786-1.894-.507-.497-1.134-.755-1.88-.773zM8 11.107c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c0-.373.129-.689.386-.947.258-.257.574-.386.947-.386zm8 0c.373 0 .684.124.933.373.25.249.383.569.4.96v1.173c-.017.391-.15.711-.4.96-.249.25-.56.374-.933.374s-.684-.125-.933-.374c-.25-.249-.383-.569-.4-.96V12.44c.017-.391.15-.711.4-.96.249-.249.56-.373.933-.373Z",
++        "netflix" to "m5.398 0 8.348 23.602c2.346.059 4.856.398 4.856.398L10.113 0H5.398zm8.489 0v9.172l4.715 13.33V0h-4.715zM5.398 1.5V24c1.873-.225 2.81-.312 4.715-.398V14.83L5.398 1.5z",
++        "spotify" to "M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z",
++        "twitch" to "M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z",
++        "youtube" to "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z",
++        "alibabadotcom" to "M14.391 16.22c-.963.044-.865-.459-.302-1.234 1.32-1.768 3.82-4.236 3.906-5.982.151-2.283-2.143-3.026-4.501-3.004-1.645.022-3.344.492-4.501.906C5 8.315 2.489 10.576.909 13.076-.768 15.554-.216 17.923 3.322 18c2.716-.109 4.48-.862 6.32-1.802.01 0-5.086 1.453-6.958.383l-.008-.002c-.193-.11-.404-.264-.457-.683-.012-.885 1.46-1.802 2.283-2.097v-1.533a5.374 5.374 0 0 0 1.955.366 5.378 5.378 0 0 0 3.472-1.265c.037.13.056.278.044.447h.371c.048-.394-.172-.706-.172-.706-.333-.529-.915-.52-.915-.52s.315.137.529.466a4.953 4.953 0 0 1-4.665.932l1.21-1.2-.336-.874c2.435-.852 4.48-1.507 7.812-2.085l-.746-.624.389-.24c2.01.568 3.325.985 3.253 2.051a2.672 2.672 0 0 1-.202.611c-.584 1.158-2.326 3.09-3.029 3.898-.465.535-.92 1.06-1.245 1.562-.335.503-.54.971-.551 1.42.043 3.504 10.334-1.64 12.324-3.003-2.943 1.266-6.113 2.489-9.609 2.718Z",
++        "apple" to "M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701",
++        "cloudflare" to "M16.5088 16.8447c.1475-.5068.0908-.9707-.1553-1.3154-.2246-.3164-.6045-.499-1.0615-.5205l-8.6592-.1123a.1559.1559 0 0 1-.1333-.0713c-.0283-.042-.0351-.0986-.021-.1553.0278-.084.1123-.1484.2036-.1562l8.7359-.1123c1.0351-.0489 2.1601-.8868 2.5537-1.9136l.499-1.3013c.0215-.0561.0293-.1128.0147-.168-.5625-2.5463-2.835-4.4453-5.5499-4.4453-2.5039 0-4.6284 1.6177-5.3876 3.8614-.4927-.3658-1.1187-.5625-1.794-.499-1.2026.119-2.1665 1.083-2.2861 2.2856-.0283.31-.0069.6128.0635.894C1.5683 13.171 0 14.7754 0 16.752c0 .1748.0142.3515.0352.5273.0141.083.0844.1475.1689.1475h15.9814c.0909 0 .1758-.0645.2032-.1553l.12-.4268zm2.7568-5.5634c-.0771 0-.1611 0-.2383.0112-.0566 0-.1054.0415-.127.0976l-.3378 1.1744c-.1475.5068-.0918.9707.1543 1.3164.2256.3164.6055.498 1.0625.5195l1.8437.1133c.0557 0 .1055.0263.1329.0703.0283.043.0351.1074.0214.1562-.0283.084-.1132.1485-.204.1553l-1.921.1123c-1.041.0488-2.1582.8867-2.5527 1.914l-.1406.3585c-.0283.0713.0215.1416.0986.1416h6.5977c.0771 0 .1474-.0489.169-.126.1122-.4082.1757-.837.1757-1.2803 0-2.6025-2.125-4.727-4.7344-4.727",
++        "github" to "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12",
++        "paypal" to "M15.607 4.653H8.941L6.645 19.251H1.82L4.862 0h7.995c3.754 0 6.375 2.294 6.473 5.513-.648-.478-2.105-.86-3.722-.86m6.57 5.546c0 3.41-3.01 6.853-6.958 6.853h-2.493L11.595 24H6.74l1.845-11.538h3.592c4.208 0 7.346-3.634 7.153-6.949a5.24 5.24 0 0 1 2.848 4.686M9.653 5.546h6.408c.907 0 1.942.222 2.363.541-.195 2.741-2.655 5.483-6.441 5.483H8.714Z",
++        "steam" to "M11.979 0C5.678 0 .511 4.86.022 11.037l6.432 2.658c.545-.371 1.203-.59 1.912-.59.063 0 .125.004.188.006l2.861-4.142V8.91c0-2.495 2.028-4.524 4.524-4.524 2.494 0 4.524 2.031 4.524 4.527s-2.03 4.525-4.524 4.525h-.105l-4.076 2.911c0 .052.004.105.004.159 0 1.875-1.515 3.396-3.39 3.396-1.635 0-3.016-1.173-3.331-2.727L.436 15.27C1.862 20.307 6.486 24 11.979 24c6.627 0 11.999-5.373 11.999-12S18.605 0 11.979 0zM7.54 18.21l-1.473-.61c.262.543.714.999 1.314 1.25 1.297.539 2.793-.076 3.332-1.375.263-.63.264-1.319.005-1.949s-.75-1.121-1.377-1.383c-.624-.26-1.29-.249-1.878-.03l1.523.63c.956.4 1.409 1.5 1.009 2.455-.397.957-1.497 1.41-2.454 1.012H7.54zm11.415-9.303c0-1.662-1.353-3.015-3.015-3.015-1.665 0-3.015 1.353-3.015 3.015 0 1.665 1.35 3.015 3.015 3.015 1.663 0 3.015-1.35 3.015-3.015zm-5.273-.005c0-1.252 1.013-2.266 2.265-2.266 1.249 0 2.266 1.014 2.266 2.266 0 1.251-1.017 2.265-2.266 2.265-1.253 0-2.265-1.014-2.265-2.265z",
++        "wikipedia" to "M12.09 13.119c-.936 1.932-2.217 4.548-2.853 5.728-.616 1.074-1.127.931-1.532.029-1.406-3.321-4.293-9.144-5.651-12.409-.251-.601-.441-.987-.619-1.139-.181-.15-.554-.24-1.122-.271C.103 5.033 0 4.982 0 4.898v-.455l.052-.045c.924-.005 5.401 0 5.401 0l.051.045v.434c0 .119-.075.176-.225.176l-.564.031c-.485.029-.727.164-.727.436 0 .135.053.33.166.601 1.082 2.646 4.818 10.521 4.818 10.521l.136.046 2.411-4.81-.482-1.067-1.658-3.264s-.318-.654-.428-.872c-.728-1.443-.712-1.518-1.447-1.617-.207-.023-.313-.05-.313-.149v-.468l.06-.045h4.292l.113.037v.451c0 .105-.076.15-.227.15l-.308.047c-.792.061-.661.381-.136 1.422l1.582 3.252 1.758-3.504c.293-.64.233-.801.111-.947-.07-.084-.305-.22-.812-.24l-.201-.021c-.052 0-.098-.015-.145-.051-.045-.031-.067-.076-.067-.129v-.427l.061-.045c1.247-.008 4.043 0 4.043 0l.059.045v.436c0 .121-.059.178-.193.178-.646.03-.782.095-1.023.439-.12.186-.375.589-.646 1.039l-2.301 4.273-.065.135 2.792 5.712.17.048 4.396-10.438c.154-.422.129-.722-.064-.895-.197-.172-.346-.273-.857-.295l-.42-.016c-.061 0-.105-.014-.152-.045-.043-.029-.072-.075-.072-.119v-.436l.059-.045h4.961l.041.045v.437c0 .119-.074.18-.209.18-.648.03-1.127.18-1.443.421-.314.255-.557.616-.736 1.067 0 0-4.043 9.258-5.426 12.339-.525 1.007-1.053.917-1.503-.031-.571-1.171-1.773-3.786-2.646-5.71l.053-.036z",
++        "google" to "M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z",
++        "baidu" to "M9.154 0C7.71 0 6.54 1.658 6.54 3.707c0 2.051 1.171 3.71 2.615 3.71 1.446 0 2.614-1.659 2.614-3.71C11.768 1.658 10.6 0 9.154 0zm7.025.594C14.86.58 13.347 2.589 13.2 3.927c-.187 1.745.25 3.487 2.179 3.735 1.933.25 3.175-1.806 3.422-3.364.252-1.555-.995-3.364-2.362-3.674a1.218 1.218 0 0 0-.261-.03zM3.582 5.535a2.811 2.811 0 0 0-.156.008c-2.118.19-2.428 3.24-2.428 3.24-.287 1.41.686 4.425 3.297 3.864 2.617-.561 2.262-3.68 2.183-4.362-.125-1.018-1.292-2.773-2.896-2.75zm16.534 1.753c-2.308 0-2.617 2.119-2.617 3.616 0 1.43.121 3.425 2.988 3.362 2.867-.063 2.553-3.238 2.553-3.988 0-.745-.62-2.99-2.924-2.99zm-8.264 2.478c-1.424.014-2.708.925-3.323 1.947-1.118 1.868-2.863 3.05-3.112 3.363-.25.309-3.61 2.116-2.864 5.42.746 3.301 3.365 3.237 3.365 3.237s1.93.19 4.171-.31c2.24-.495 4.17.123 4.17.123s5.233 1.748 6.665-1.616c1.43-3.364-.808-5.109-.808-5.109s-2.99-2.306-4.736-4.798c-1.072-1.665-2.348-2.268-3.528-2.257zm-2.234 3.84l1.542.024v8.197H7.758c-1.47-.291-2.055-1.292-2.13-1.462-.072-.173-.488-.976-.268-2.343.635-2.049 2.447-2.196 2.447-2.196h1.81zm3.964 2.39v3.881c.096.413.612.488.612.488h1.614v-4.343h1.689v5.782h-3.915c-1.517-.39-1.59-1.465-1.59-1.465v-4.317zm-5.458 1.147c-.66.197-.978.708-1.05.928-.076.22-.247.78-.1 1.269.294 1.095 1.248 1.144 1.248 1.144h1.37v-3.34z",
++    )
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
+new file mode 100644
+index 0000000..7e173bf
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
+@@ -0,0 +1,495 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
-+import android.os.SystemClock
-+import androidx.compose.foundation.layout.Spacer
-+import androidx.compose.foundation.layout.fillMaxWidth
-+import androidx.compose.foundation.layout.height
-+import androidx.compose.foundation.layout.padding
-+import androidx.compose.material3.Text
-+import androidx.compose.runtime.Composable
-+import androidx.compose.runtime.LaunchedEffect
-+import androidx.compose.runtime.getValue
-+import androidx.compose.runtime.mutableIntStateOf
-+import androidx.compose.runtime.mutableStateMapOf
-+import androidx.compose.runtime.mutableStateOf
-+import androidx.compose.runtime.remember
-+import androidx.compose.runtime.setValue
-+import androidx.compose.ui.Modifier
-+import androidx.compose.ui.platform.LocalContext
-+import androidx.compose.ui.unit.dp
-+import io.github.xgl34222220.hetu.home.HomeIcons
-+import io.github.xgl34222220.hetu.home.HomePill
-+import io.github.xgl34222220.hetu.home.HomeTone
-+import io.github.xgl34222220.hetu.home.HomeType
-+import io.github.xgl34222220.hetu.home.LocalHomeColors
-+import io.github.xgl34222220.hetu.panel.PanelIcons
-+import io.github.xgl34222220.hetu.ui.ht
 +import java.io.IOException
 +import java.net.ConnectException
 +import java.net.HttpURLConnection
 +import java.net.InetSocketAddress
 +import java.net.Proxy
 +import java.net.SocketTimeoutException
++import java.net.URI
 +import java.net.URL
 +import java.net.UnknownHostException
++import java.util.Locale
++import java.util.concurrent.atomic.AtomicLong
 +import javax.net.ssl.SSLException
++import kotlin.random.Random
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
++import kotlinx.coroutines.awaitCancellation
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.currentCoroutineContext
++import kotlinx.coroutines.delay
++import kotlinx.coroutines.ensureActive
 +import kotlinx.coroutines.flow.Flow
 +import kotlinx.coroutines.flow.channelFlow
 +import kotlinx.coroutines.flow.flowOn
++import kotlinx.coroutines.isActive
 +import kotlinx.coroutines.launch
++import kotlinx.coroutines.sync.Semaphore
++import kotlinx.coroutines.sync.withPermit
++import kotlinx.coroutines.withContext
++import org.json.JSONObject
 +
-+/** One platform of 网络测试. [domestic] targets are expected to go DIRECT under usual rules. */
-+internal data class NetTestTarget(val name: String, val url: String, val domestic: Boolean = false)
++/* ------------------------------------------------------------------ */
++/*  网络测试 · 连通性                                                    */
++/* ------------------------------------------------------------------ */
 +
-+/** [millis] is time to the first response line (DNS + connect + TLS + first byte); -1 when it failed. */
-+internal data class NetTestResult(val name: String, val ok: Boolean, val millis: Long, val code: Int, val error: String = "")
++internal enum class NetCategory(val title: String) { Ai("AI 服务"), Social("社交媒体"), Media("影音娱乐"), Tools("工具与服务") }
 +
 +/**
-+ * Multi-platform connectivity test. Every target runs at once on IO and each result is emitted the
-+ * moment it finishes, so the page fills in row by row and the slowest platform never holds the others.
-+ * While the Root proxy runs, requests enter the core through its loopback policy listener (Hetu's own
-+ * UID is exempt from transparent interception), so the result reflects the real rules and nodes.
++ * One service of 网络测试. [brand] names a bundled Simple Icons mark (null draws [monogram]);
++ * [trace] asks the service's own host for Cloudflare's `/cdn-cgi/trace`, which reports the country
++ * of the exit IP the request actually left from. [aiRegion] marks services that refuse some regions.
 + */
-+internal object NetworkTest {
-+    const val TIMEOUT_MS = 6_000
++internal data class NetSite(
++    val id: String,
++    val name: String,
++    val category: NetCategory,
++    val url: String,
++    val brand: String? = null,
++    val color: Long = 0xFF6B7280L,
++    val monogram: String = name.take(1),
++    val trace: Boolean = true,
++    val aiRegion: Boolean = false,
++) {
++    val host: String get() = URI(url).host.orEmpty().lowercase(Locale.ROOT)
++    val traceUrl: String? get() = when {
++        url.endsWith("/cdn-cgi/trace") -> null
++        trace -> "https://$host/cdn-cgi/trace"
++        else -> null
++    }
++}
 +
-+    val targets = listOf(
-+        NetTestTarget("Google", "https://www.google.com/generate_204"),
-+        NetTestTarget("YouTube", "https://www.youtube.com/generate_204"),
-+        NetTestTarget("GitHub", "https://github.com/"),
-+        NetTestTarget("Telegram", "https://web.telegram.org/"),
-+        NetTestTarget("ChatGPT", "https://chatgpt.com/cdn-cgi/trace"),
-+        NetTestTarget("Netflix", "https://www.netflix.com/"),
-+        NetTestTarget("Cloudflare", "https://www.cloudflare.com/cdn-cgi/trace"),
-+        NetTestTarget("百度", "https://www.baidu.com/", domestic = true),
++/** How the exit region of a row was established; every source is a real observation. */
++internal enum class NetRegionSource { Trace, SameNode, Direct }
++
++/**
++ * [millis] is time to the response line (DNS + connect + TLS + first byte), -1 when it failed.
++ * [blocked] is a reachable service that refused this exit (HTTP 403/451, or an AI service in a
++ * region it does not serve). [route] is the core's policy chain for the host, when its log has it.
++ */
++internal data class NetSiteResult(
++    val id: String,
++    val ok: Boolean,
++    val millis: Long,
++    val code: Int,
++    val error: String = "",
++    val region: String? = null,
++    val regionSource: NetRegionSource? = null,
++    val route: String? = null,
++    val blocked: Boolean = false,
++)
++
++internal object NetworkTest {
++    const val TIMEOUT_MS = 8_000
++    /** Requests in flight at once: every row still starts within the first wave, the core is not flooded. */
++    const val PARALLEL = 14
++
++    val sites: List<NetSite> = listOf(
++        NetSite("chatgpt", "ChatGPT", NetCategory.Ai, "https://chatgpt.com/cdn-cgi/trace", null, 0xFF10A37FL, "C", aiRegion = true),
++        NetSite("claude", "Claude", NetCategory.Ai, "https://claude.ai/cdn-cgi/trace", "claude", NetBrandIcons.colors.getValue("claude"), aiRegion = true),
++        NetSite("doubao", "Doubao", NetCategory.Ai, "https://www.doubao.com/", null, 0xFF3B5BFFL, "豆", trace = false),
++        NetSite("gemini", "Gemini", NetCategory.Ai, "https://gemini.google.com/", "googlegemini", NetBrandIcons.colors.getValue("googlegemini"), aiRegion = true),
++        NetSite("grok", "Grok", NetCategory.Ai, "https://grok.com/", null, 0xFF111111L, "G"),
++
++        NetSite("discord", "Discord", NetCategory.Social, "https://discord.com/cdn-cgi/trace", "discord", NetBrandIcons.colors.getValue("discord")),
++        NetSite("douyin", "Douyin", NetCategory.Social, "https://www.douyin.com/", "tiktok", 0xFF111111L, trace = false),
++        NetSite("reddit", "Reddit", NetCategory.Social, "https://www.reddit.com/", "reddit", NetBrandIcons.colors.getValue("reddit")),
++        NetSite("tiktok", "TikTok", NetCategory.Social, "https://www.tiktok.com/", "tiktok", NetBrandIcons.colors.getValue("tiktok")),
++        NetSite("x", "X", NetCategory.Social, "https://x.com/", "x", NetBrandIcons.colors.getValue("x")),
++        NetSite("telegram", "Telegram", NetCategory.Social, "https://web.telegram.org/", "telegram", NetBrandIcons.colors.getValue("telegram")),
++
++        NetSite("appletv", "Apple TV+", NetCategory.Media, "https://tv.apple.com/", "appletv", NetBrandIcons.colors.getValue("appletv")),
++        NetSite("bilibili", "Bilibili", NetCategory.Media, "https://www.bilibili.com/", "bilibili", NetBrandIcons.colors.getValue("bilibili"), trace = false),
++        NetSite("disney", "Disney+", NetCategory.Media, "https://www.disneyplus.com/", null, 0xFF113CCFL, "D+"),
++        NetSite("hulu", "Hulu", NetCategory.Media, "https://www.hulu.com/", null, 0xFF1CE783L, "h"),
++        NetSite("netflix", "Netflix", NetCategory.Media, "https://www.netflix.com/", "netflix", NetBrandIcons.colors.getValue("netflix")),
++        NetSite("spotify", "Spotify", NetCategory.Media, "https://open.spotify.com/", "spotify", NetBrandIcons.colors.getValue("spotify")),
++        NetSite("twitch", "Twitch", NetCategory.Media, "https://www.twitch.tv/", "twitch", NetBrandIcons.colors.getValue("twitch")),
++        NetSite("youtube", "YouTube", NetCategory.Media, "https://www.youtube.com/generate_204", "youtube", NetBrandIcons.colors.getValue("youtube")),
++
++        NetSite("alibaba", "Alibaba", NetCategory.Tools, "https://www.alibaba.com/", "alibabadotcom", NetBrandIcons.colors.getValue("alibabadotcom"), trace = false),
++        NetSite("apple", "Apple", NetCategory.Tools, "https://www.apple.com/library/test/success.html", "apple", NetBrandIcons.colors.getValue("apple")),
++        NetSite("cloudflare", "Cloudflare", NetCategory.Tools, "https://www.cloudflare.com/cdn-cgi/trace", "cloudflare", NetBrandIcons.colors.getValue("cloudflare")),
++        NetSite("github", "GitHub", NetCategory.Tools, "https://github.com/", "github", NetBrandIcons.colors.getValue("github")),
++        NetSite("netease", "NetEase", NetCategory.Tools, "https://www.163.com/", null, 0xFFD81E06L, "易", trace = false),
++        NetSite("paypal", "PayPal", NetCategory.Tools, "https://www.paypal.com/", "paypal", NetBrandIcons.colors.getValue("paypal")),
++        NetSite("steam", "Steam", NetCategory.Tools, "https://store.steampowered.com/", "steam", NetBrandIcons.colors.getValue("steam")),
++        NetSite("tencent", "Tencent", NetCategory.Tools, "https://www.qq.com/", null, 0xFF1E88E5L, "腾", trace = false),
++        NetSite("wikipedia", "Wikipedia", NetCategory.Tools, "https://www.wikipedia.org/", "wikipedia", NetBrandIcons.colors.getValue("wikipedia")),
++        NetSite("google", "Google", NetCategory.Tools, "https://www.google.com/generate_204", "google", NetBrandIcons.colors.getValue("google")),
++        NetSite("baidu", "Baidu", NetCategory.Tools, "https://www.baidu.com/", "baidu", NetBrandIcons.colors.getValue("baidu"), trace = false),
 +    )
 +
-+    /** Any HTTP answer below 500 proves the path works (a 403 from a CDN is still the site); 5xx is the proxy or site failing. */
++    /** Regions the AI services above do not serve; a known exit in one of them reads 未解锁. */
++    val aiUnsupported = setOf("CN", "HK", "MO", "RU", "BY", "IR", "KP", "SY", "CU")
++
++    /** Any HTTP answer below 500 proves the path works (a CDN 403 is still the site); 5xx is the proxy or site failing. */
 +    fun reachable(code: Int): Boolean = code in 200..499
++
++    /** 403/451 from the service itself: reachable, but this exit is refused. */
++    fun refused(code: Int): Boolean = code == 403 || code == 451
 +
 +    fun failureText(error: Throwable): String = when (error) {
 +        is SocketTimeoutException -> "超时"
-+        is UnknownHostException -> "域名解析失败"
++        is UnknownHostException -> "解析失败"
 +        is ConnectException -> "连接被拒绝"
-+        is SSLException -> "TLS 握手失败"
-+        is IOException -> error.message?.takeIf { it.isNotBlank() }?.take(60) ?: "连接失败"
-+        else -> error.javaClass.simpleName
++        is SSLException -> "TLS 失败"
++        is IOException -> "连接失败"
++        else -> "失败"
 +    }
 +
-+    /** “6/8 可达 · 平均 230 ms”; blank before the first result. */
-+    fun summary(results: Collection<NetTestResult>, total: Int = targets.size): String {
-+        if (results.isEmpty()) return ""
-+        val ok = results.filter { it.ok }
-+        val average = if (ok.isEmpty()) "" else " · 平均 ${ok.sumOf { it.millis } / ok.size} ms"
-+        return "${ok.size}/$total 可达$average"
++    /** Country of a Cloudflare trace body; null unless it is a real trace (loc plus colo/fl lines). */
++    fun parseTrace(body: String): String? {
++        val fields = body.lineSequence().mapNotNull { line ->
++            val at = line.indexOf('=')
++            if (at <= 0) null else line.substring(0, at).trim() to line.substring(at + 1).trim()
++        }.toMap()
++        if (!fields.containsKey("colo") && !fields.containsKey("fl")) return null
++        return fields["loc"]?.uppercase(Locale.ROOT)?.takeIf { it.length == 2 && it.all(Char::isLetter) && it != "XX" }
 +    }
 +
-+    fun tone(result: NetTestResult): HomeTone = when {
-+        !result.ok -> HomeTone.Bad
-+        result.millis < 400 -> HomeTone.Good
-+        result.millis < 1_000 -> HomeTone.Warn
-+        else -> HomeTone.Bad
++    /** Newest core-log policy chain per host, e.g. `节点选择[🇯🇵 日本 01]` or `DIRECT`. */
++    fun parseRoutes(log: String, hosts: Collection<String>): Map<String, String> {
++        val routes = HashMap<String, String>()
++        log.lineSequence().forEach { raw ->
++            val line = raw.trim().trimEnd('"')
++            val arrow = line.indexOf("--> ")
++            if (arrow < 0) return@forEach
++            val target = line.substring(arrow + 4).substringBefore(' ')
++            val host = target.substringBeforeLast(':').lowercase(Locale.ROOT)
++            if (host !in hosts) return@forEach
++            val using = line.lastIndexOf(" using ")
++            if (using < 0) return@forEach
++            routes[host] = line.substring(using + 7).trim()
++        }
++        return routes
 +    }
 +
-+    /** Blocking; call on IO. A fresh connection per target, so every row measures a cold path. */
-+    fun measure(target: NetTestTarget, proxyPort: Int?): NetTestResult {
-+        val started = SystemClock.elapsedRealtime()
-+        return try {
-+            val url = URL(target.url)
-+            val opened = if (proxyPort == null) url.openConnection()
-+                else url.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", proxyPort)))
-+            val connection = (opened as HttpURLConnection).apply {
-+                instanceFollowRedirects = false
-+                useCaches = false
-+                connectTimeout = TIMEOUT_MS
-+                readTimeout = TIMEOUT_MS
-+                setRequestProperty("Connection", "close")
-+                setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Hetu-NetTest")
++    /** The proxy that actually carried the request: Mihomo writes `outer[leaf]`, or the leaf alone. */
++    fun leafOf(chain: String): String {
++        val open = chain.indexOf('[')
++        return if (open >= 0 && chain.endsWith("]")) chain.substring(open + 1, chain.length - 1).trim() else chain.trim()
++    }
++
++    fun isDirect(chain: String): Boolean = leafOf(chain).uppercase(Locale.ROOT) == "DIRECT"
++
++    /**
++     * Fills regions from real observations only: a row's own Cloudflare trace; otherwise the trace of
++     * another row whose request left through the same leaf node; otherwise, for DIRECT (or any row
++     * when the proxy is off), the device's own exit. Everything else stays unknown.
++     */
++    fun resolve(results: List<NetSiteResult>, routes: Map<String, String>, hosts: Map<String, String>, directRegion: String?, viaProxy: Boolean): List<NetSiteResult> {
++        val nodeRegion = HashMap<String, String>()
++        results.forEach { result ->
++            val chain = routes[hosts[result.id]] ?: return@forEach
++            if (result.regionSource == NetRegionSource.Trace && result.region != null) nodeRegion.putIfAbsent(leafOf(chain), result.region)
++        }
++        return results.map { result ->
++            val chain = routes[hosts[result.id]]
++            val resolved = when {
++                result.regionSource == NetRegionSource.Trace && result.region != null -> result
++                !viaProxy -> if (directRegion != null) result.copy(region = directRegion, regionSource = NetRegionSource.Direct) else result
++                chain == null -> result
++                isDirect(chain) -> if (directRegion != null) result.copy(region = directRegion, regionSource = NetRegionSource.Direct) else result
++                else -> nodeRegion[leafOf(chain)]?.let { result.copy(region = it, regionSource = NetRegionSource.SameNode) } ?: result
 +            }
++            resolved.copy(route = chain)
++        }
++    }
++
++    /** 未解锁: the service answered but refused, or it is an AI service at an exit it does not serve. */
++    fun blocked(site: NetSite, result: NetSiteResult): Boolean =
++        (result.ok && refused(result.code)) || (site.aiRegion && result.ok && result.region != null && result.region in aiUnsupported)
++
++    fun withVerdict(site: NetSite, result: NetSiteResult): NetSiteResult = result.copy(blocked = blocked(site, result))
++
++    /** 🇯🇵 for JP; blank for anything that is not two letters. */
++    fun flag(region: String?): String {
++        val code = region?.uppercase(Locale.ROOT)?.takeIf { it.length == 2 && it.all { c -> c in 'A'..'Z' } } ?: return ""
++        return String(Character.toChars(0x1F1E6 + (code[0] - 'A'))) + String(Character.toChars(0x1F1E6 + (code[1] - 'A')))
++    }
++
++    private fun open(url: String, proxyPort: Int?, direct: Boolean = false): HttpURLConnection {
++        val target = URL(url)
++        val opened = when {
++            proxyPort != null -> target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", proxyPort)))
++            direct -> target.openConnection(Proxy.NO_PROXY)
++            else -> target.openConnection()
++        }
++        return (opened as HttpURLConnection).apply {
++            instanceFollowRedirects = false
++            useCaches = false
++            connectTimeout = TIMEOUT_MS
++            readTimeout = TIMEOUT_MS
++            setRequestProperty("Connection", "close")
++            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Mobile Safari/537.36")
++        }
++    }
++
++    private fun readSmall(connection: HttpURLConnection, limit: Int = 4_096): String {
++        val stream = (if (connection.responseCode < 400) connection.inputStream else connection.errorStream) ?: return ""
++        return stream.use { input ->
++            val buffer = ByteArray(limit)
++            var total = 0
++            while (total < limit) {
++                val n = input.read(buffer, total, limit - total)
++                if (n < 0) break
++                total += n
++            }
++            String(buffer, 0, total, Charsets.UTF_8)
++        }
++    }
++
++    /** Blocking; call on IO. A fresh connection per request, so every row measures a cold path. */
++    fun measure(site: NetSite, proxyPort: Int?): NetSiteResult {
++        val started = System.nanoTime()
++        return try {
++            val connection = open(site.url, proxyPort)
 +            try {
 +                val code = connection.responseCode
-+                val elapsed = (SystemClock.elapsedRealtime() - started).coerceAtLeast(1L)
-+                if (reachable(code)) NetTestResult(target.name, true, elapsed, code)
-+                else NetTestResult(target.name, false, -1L, code, "HTTP $code")
++                val elapsed = ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(1L)
++                val region = if (site.url.endsWith("/cdn-cgi/trace") && code == 200) parseTrace(readSmall(connection)) else null
++                if (reachable(code)) NetSiteResult(site.id, true, elapsed, code, region = region, regionSource = region?.let { NetRegionSource.Trace })
++                else NetSiteResult(site.id, false, -1L, code, "HTTP $code")
 +            } finally {
 +                connection.disconnect()
 +            }
 +        } catch (cancel: CancellationException) {
 +            throw cancel
 +        } catch (error: Exception) {
-+            NetTestResult(target.name, false, -1L, -1, failureText(error))
++            NetSiteResult(site.id, false, -1L, -1, failureText(error))
 +        }
 +    }
 +
-+    /** Emits each result as soon as its request finishes. */
-+    fun run(proxyPort: Int?, list: List<NetTestTarget> = targets): Flow<NetTestResult> = channelFlow {
-+        list.forEach { target -> launch { send(measure(target, proxyPort)) } }
++    /** Country reported by Cloudflare for [url]; null when the host is not behind Cloudflare or the request failed. */
++    fun trace(url: String, proxyPort: Int?, direct: Boolean = false): String? = try {
++        val connection = open(url, proxyPort, direct)
++        try { if (connection.responseCode == 200) parseTrace(readSmall(connection)) else null } finally { connection.disconnect() }
++    } catch (cancel: CancellationException) {
++        throw cancel
++    } catch (_: Exception) {
++        null
++    }
++
++    /** Emits each row the moment its requests finish; the row's own trace runs beside its timed request. */
++    fun run(proxyPort: Int?, list: List<NetSite> = sites): Flow<NetSiteResult> = channelFlow {
++        val gate = Semaphore(PARALLEL)
++        list.forEach { site ->
++            launch {
++                val result = coroutineScope {
++                    val traced = site.traceUrl?.let { url -> async { gate.withPermit { trace(url, proxyPort) } } }
++                    val main = gate.withPermit { measure(site, proxyPort) }
++                    val region = traced?.await()
++                    if (main.ok && main.region == null && region != null) main.copy(region = region, regionSource = NetRegionSource.Trace) else main
++                }
++                send(withVerdict(site, result))
++            }
++        }
 +    }.flowOn(Dispatchers.IO)
++
++    /**
++     * Second pass, once every row is in: the core's routing decision per host (from core.log, read
++     * once) and the device's own exit for DIRECT rows. Rows whose region cannot be observed stay blank.
++     */
++    suspend fun regions(context: Context, results: List<NetSiteResult>, proxyPort: Int?, list: List<NetSite> = sites): List<NetSiteResult> = withContext(Dispatchers.IO) {
++        val hosts = list.associate { it.id to it.host }
++        val directRegion = trace("https://www.cloudflare.com/cdn-cgi/trace", null, direct = true)
++        val routes = if (proxyPort == null) emptyMap() else readRoutes(context, hosts.values.toSet())
++        val bySite = list.associateBy { it.id }
++        resolve(results, routes, hosts, directRegion, proxyPort != null).map { result ->
++            bySite[result.id]?.let { withVerdict(it, result) } ?: result
++        }
++    }
++
++    private fun readRoutes(context: Context, hosts: Set<String>): Map<String, String> = try {
++        val patterns = hosts.joinToString(" ") { "-e " + RootBridge.quote("--> $it:") }
++        val output = RootBridge.rootShell(context.applicationContext,
++            "tail -n 6000 /data/adb/hetu/run/core.log 2>/dev/null | grep -F $patterns | tail -n 600", 5_000L).output.orEmpty()
++        parseRoutes(output, hosts)
++    } catch (cancel: CancellationException) {
++        throw cancel
++    } catch (_: Exception) {
++        emptyMap()
++    }
 +
 +    /** The core's loopback listener while the Root proxy runs; null means a direct test. */
 +    fun proxyPort(context: Context): Int? {
@@ -4818,93 +5149,641 @@ index 0000000..fd596a2
 +    }
 +}
 +
++/* ------------------------------------------------------------------ */
++/*  网络测试 · 网速 (speed.cloudflare.com)                               */
++/* ------------------------------------------------------------------ */
++
++internal data class SpeedMeta(val ip: String, val country: String, val city: String, val colo: String, val org: String)
++
++internal enum class SpeedPhase { Idle, Meta, Latency, Download, Upload, Done, Failed }
++
++internal sealed interface SpeedEvent {
++    data class Phase(val phase: SpeedPhase) : SpeedEvent
++    data class Meta(val meta: SpeedMeta?) : SpeedEvent
++    data class Latency(val millis: Long) : SpeedEvent
++    /** Live rate of the running phase, sampled every [SpeedTest.SAMPLE_MS]. */
++    data class Live(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
++    data class Finished(val upload: Boolean, val mbps: Double, val bytes: Long) : SpeedEvent
++    data class Failed(val reason: String) : SpeedEvent
++}
++
++/**
++ * Cloudflare speed test through the current proxy node: metadata of the exit (`/meta`), idle
++ * latency (`__down?bytes=0`), then download (`__down`) and upload (`__up`) for a fixed time with a
++ * few parallel streams. Everything runs on IO; cancelling the collection closes the sockets.
++ */
++internal object SpeedTest {
++    const val SAMPLE_MS = 250L
++    const val PHASE_MS = 8_000L
++    const val STREAMS = 3
++    private const val DOWN_CHUNK = 25_000_000L
++    internal const val UP_CHUNK = 4_000_000
++
++    fun mbps(bytes: Long, millis: Long): Double = if (millis <= 0) 0.0 else bytes * 8.0 / (millis / 1000.0) / 1_000_000.0
++
++    fun parseMeta(body: String): SpeedMeta? = try {
++        val json = JSONObject(body)
++        SpeedMeta(
++            ip = json.optString("clientIp"), country = json.optString("country").uppercase(Locale.ROOT),
++            city = json.optString("city"), colo = json.optString("colo"), org = json.optString("asOrganization"),
++        ).takeIf { it.ip.isNotBlank() }
++    } catch (_: Exception) {
++        null
++    }
++
++    /** Median of the samples after the first (which pays for the handshake). */
++    fun latency(samples: List<Long>): Long {
++        val usable = (if (samples.size > 2) samples.drop(1) else samples).sorted()
++        return if (usable.isEmpty()) -1L else usable[usable.size / 2]
++    }
++
++    private fun open(url: String, port: Int?): HttpURLConnection {
++        val target = URL(url)
++        val opened = if (port == null) target.openConnection() else target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
++        return (opened as HttpURLConnection).apply {
++            useCaches = false
++            connectTimeout = 10_000
++            readTimeout = 10_000
++            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Hetu-SpeedTest")
++        }
++    }
++
++    /**
++     * Runs [block] while a sibling watcher waits; cancelling the collection cancels the watcher at
++     * once (even while [block] is stuck in a socket read) and it closes [connection], so the read returns.
++     */
++    private suspend fun <T> guarded(connection: HttpURLConnection, block: suspend () -> T): T = coroutineScope {
++        val watcher = launch { try { awaitCancellation() } finally { connection.disconnect() } }
++        try {
++            block()
++        } finally {
++            watcher.cancel()
++            connection.disconnect()
++        }
++    }
++
++    private suspend fun download(base: String, port: Int?, deadline: Long, counter: AtomicLong) {
++        val buffer = ByteArray(64 * 1024)
++        while (System.nanoTime() < deadline) {
++            currentCoroutineContext().ensureActive()
++            val connection = open("$base/__down?bytes=$DOWN_CHUNK", port)
++            guarded(connection) {
++                if (connection.responseCode !in 200..299) throw IOException("下载请求失败：HTTP ${connection.responseCode}")
++                connection.inputStream.use { input ->
++                    while (System.nanoTime() < deadline) {
++                        currentCoroutineContext().ensureActive()
++                        val n = input.read(buffer)
++                        if (n < 0) break
++                        counter.addAndGet(n.toLong())
++                    }
++                }
++            }
++        }
++    }
++
++    private suspend fun upload(base: String, port: Int?, deadline: Long, counter: AtomicLong, chunk: Int) {
++        val payload = Random.nextBytes(64 * 1024)
++        while (System.nanoTime() < deadline) {
++            currentCoroutineContext().ensureActive()
++            val connection = open("$base/__up", port).apply {
++                requestMethod = "POST"
++                doOutput = true
++                setFixedLengthStreamingMode(chunk)
++                setRequestProperty("Content-Type", "application/octet-stream")
++            }
++            guarded(connection) {
++                var sent = 0
++                connection.outputStream.use { output ->
++                    while (sent < chunk) {
++                        currentCoroutineContext().ensureActive()
++                        val n = minOf(payload.size, chunk - sent)
++                        output.write(payload, 0, n)
++                        sent += n
++                        counter.addAndGet(n.toLong())
++                    }
++                }
++                connection.responseCode
++            }
++        }
++    }
++
++    /** Runs the whole test; the flow completes after [SpeedEvent.Finished] for upload, or [SpeedEvent.Failed]. */
++    fun run(port: Int?, base: String = "https://speed.cloudflare.com", phaseMs: Long = PHASE_MS, streams: Int = STREAMS, upChunk: Int = UP_CHUNK): Flow<SpeedEvent> = channelFlow {
++        try {
++            send(SpeedEvent.Phase(SpeedPhase.Meta))
++            val meta = try {
++                val connection = open("$base/meta", port)
++                guarded(connection) { if (connection.responseCode == 200) parseMeta(connection.inputStream.bufferedReader().use { it.readText() }) else null }
++            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++            send(SpeedEvent.Meta(meta))
++
++            send(SpeedEvent.Phase(SpeedPhase.Latency))
++            val samples = ArrayList<Long>()
++            repeat(6) {
++                val started = System.nanoTime()
++                val connection = open("$base/__down?bytes=0", port)
++                guarded(connection) {
++                    connection.responseCode
++                    connection.inputStream.use { it.readBytes() }
++                }
++                samples += (System.nanoTime() - started) / 1_000_000
++            }
++            send(SpeedEvent.Latency(latency(samples)))
++
++            for (uploading in listOf(false, true)) {
++                send(SpeedEvent.Phase(if (uploading) SpeedPhase.Upload else SpeedPhase.Download))
++                val counter = AtomicLong()
++                val started = System.nanoTime()
++                val deadline = started + phaseMs * 1_000_000
++                coroutineScope {
++                    val workers = (0 until streams).map {
++                        async { if (uploading) upload(base, port, deadline, counter, upChunk) else download(base, port, deadline, counter) }
++                    }
++                    launch {
++                        while (isActive && workers.any { !it.isCompleted }) {
++                            delay(SAMPLE_MS)
++                            val elapsed = (System.nanoTime() - started) / 1_000_000
++                            send(SpeedEvent.Live(uploading, mbps(counter.get(), elapsed), counter.get()))
++                        }
++                    }
++                    workers.forEach { it.await() }
++                }
++                val elapsed = ((System.nanoTime() - started) / 1_000_000).coerceAtLeast(1L)
++                send(SpeedEvent.Finished(uploading, mbps(counter.get(), elapsed), counter.get()))
++            }
++            send(SpeedEvent.Phase(SpeedPhase.Done))
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (error: Exception) {
++            send(SpeedEvent.Failed(NetworkTest.failureText(error).takeIf { error !is IOException || error.message.isNullOrBlank() } ?: error.message!!.take(80)))
++        }
++    }.flowOn(Dispatchers.IO)
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
+new file mode 100644
+index 0000000..37eed58
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
+@@ -0,0 +1,446 @@
++package io.github.xgl34222220.hetu
++
++import androidx.compose.animation.core.animateFloatAsState
++import androidx.compose.animation.core.tween
++import androidx.compose.foundation.Canvas
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.width
++import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.material3.Icon
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
++import androidx.compose.runtime.LaunchedEffect
++import androidx.compose.runtime.MutableState
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateListOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.saveable.rememberSaveable
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.snapshots.SnapshotStateList
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.Path
++import androidx.compose.ui.graphics.StrokeCap
++import androidx.compose.ui.graphics.StrokeJoin
++import androidx.compose.ui.graphics.drawscope.Stroke
++import androidx.compose.ui.graphics.luminance
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.lifecycle.Lifecycle
++import androidx.lifecycle.LifecycleEventObserver
++import androidx.lifecycle.compose.LocalLifecycleOwner
++import io.github.xgl34222220.hetu.home.HomeColors
++import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomeRowDims
++import io.github.xgl34222220.hetu.home.HomeRowDivider
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
++import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.goodText
++import io.github.xgl34222220.hetu.home.warnText
++import io.github.xgl34222220.hetu.panel.PanelIcons
++import io.github.xgl34222220.hetu.ui.ht
++import java.util.Locale
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/** What a 连通性 row shows; [result] is null until its requests finish. */
++internal data class NetRowState(val testing: Boolean = false, val result: NetSiteResult? = null)
++
++/** Live and final readings of 网速, kept by the page so switching tabs does not lose them. */
++internal class SpeedUiState {
++    var phase by mutableStateOf(SpeedPhase.Idle)
++    var meta by mutableStateOf<SpeedMeta?>(null)
++    var metaKnown by mutableStateOf(false)
++    var latency by mutableStateOf(-1L)
++    var live by mutableStateOf(0.0)
++    var down by mutableStateOf<Pair<Double, Long>?>(null)
++    var up by mutableStateOf<Pair<Double, Long>?>(null)
++    var error by mutableStateOf<String?>(null)
++    val downSamples: SnapshotStateList<Float> = mutableStateListOf()
++    val upSamples: SnapshotStateList<Float> = mutableStateListOf()
++
++    val running: Boolean get() = phase != SpeedPhase.Idle && phase != SpeedPhase.Done && phase != SpeedPhase.Failed
++
++    fun reset() {
++        phase = SpeedPhase.Meta; meta = null; metaKnown = false; latency = -1L; live = 0.0
++        down = null; up = null; error = null; downSamples.clear(); upSamples.clear()
++    }
++
++    fun accept(event: SpeedEvent) {
++        when (event) {
++            is SpeedEvent.Phase -> { phase = event.phase; if (event.phase == SpeedPhase.Download || event.phase == SpeedPhase.Upload) live = 0.0 }
++            is SpeedEvent.Meta -> { meta = event.meta; metaKnown = true }
++            is SpeedEvent.Latency -> latency = event.millis
++            is SpeedEvent.Live -> {
++                live = event.mbps
++                val list = if (event.upload) upSamples else downSamples
++                list.add(event.mbps.toFloat())
++                if (list.size > SAMPLE_CAP) list.removeAt(0)
++            }
++            is SpeedEvent.Finished -> if (event.upload) up = event.mbps to event.bytes else down = event.mbps to event.bytes
++            is SpeedEvent.Failed -> { error = event.reason; phase = SpeedPhase.Failed }
++        }
++    }
++
++    companion object { const val SAMPLE_CAP = 64 }
++}
++
++internal fun formatMbps(value: Double): String = when {
++    value <= 0.0 -> "0"
++    value < 10 -> String.format(Locale.ROOT, "%.2f", value)
++    value < 100 -> String.format(Locale.ROOT, "%.1f", value)
++    else -> String.format(Locale.ROOT, "%.0f", value)
++}
++
++/**
++ * 网络测试: 连通性 (many services at once, each with the exit region it really left from) and
++ * 网速 (Cloudflare speed test through the current node). Every request runs on IO; leaving the
++ * page, or the app going to the background, cancels whatever is still running.
++ */
 +@Composable
 +internal fun NetworkTestScreen(onBack: () -> Unit) {
 +    val context = LocalContext.current
 +    val c = LocalHomeColors.current
-+    // Starts once on open; 重新测试 bumps it. Leaving the page cancels the collection.
++    var tab by rememberSaveable { mutableStateOf("conn") }
++
++    /* ---------------- 连通性 ---------------- */
++    val rows = remember { NetworkTest.sites.associate { it.id to mutableStateOf(NetRowState()) } }
 +    var runId by remember { mutableIntStateOf(1) }
 +    var testing by remember { mutableStateOf(false) }
 +    var viaProxy by remember { mutableStateOf<Boolean?>(null) }
-+    val results = remember { mutableStateMapOf<String, NetTestResult>() }
++    var summary by remember { mutableStateOf("") }
++    val availableLabel = ht("可用")
 +
 +    LaunchedEffect(runId) {
-+        results.clear()
++        if (runId == 0) return@LaunchedEffect
 +        testing = true
-+        val port = NetworkTest.proxyPort(context)
-+        viaProxy = port != null
++        summary = ""
++        rows.values.forEach { it.value = NetRowState(testing = true) }
++        val results = ArrayList<NetSiteResult>()
 +        try {
-+            NetworkTest.run(port).collect { results[it.name] = it }
++            val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
++            viaProxy = port != null
++            NetworkTest.run(port).collect { result ->
++                results += result
++                rows[result.id]?.value = NetRowState(testing = false, result = result)
++            }
++            NetworkTest.regions(context, results, port).forEach { result -> rows[result.id]?.value = NetRowState(false, result) }
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (_: Exception) {
++            rows.values.forEach { if (it.value.testing) it.value = NetRowState() }
 +        } finally {
 +            testing = false
++            val done = rows.values.mapNotNull { it.value.result }
++            if (done.isNotEmpty()) {
++                val ok = done.count { it.ok && !it.blocked }
++                summary = "$ok/${NetworkTest.sites.size} $availableLabel"
++            }
 +        }
++    }
++
++    /* ---------------- 网速 ---------------- */
++    val speed = remember { SpeedUiState() }
++    var speedRun by remember { mutableIntStateOf(0) }
++    var speedActive by remember { mutableStateOf(false) }
++    LaunchedEffect(speedRun, speedActive) {
++        if (!speedActive) {
++            if (speed.running) speed.phase = if (speed.down != null) SpeedPhase.Done else SpeedPhase.Idle
++            return@LaunchedEffect
++        }
++        val generation = speedRun
++        speed.reset()
++        try {
++            val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
++            SpeedTest.run(port).collect { speed.accept(it) }
++        } finally {
++            // A late finish of an older run must not stop the one that replaced it.
++            if (speedRun == generation) speedActive = false
++        }
++    }
++    // A speed test is data the user pays for: it never keeps running behind another app.
++    val lifecycle = LocalLifecycleOwner.current.lifecycle
++    DisposableEffect(lifecycle) {
++        val observer = LifecycleEventObserver { _, event -> if (event == Lifecycle.Event.ON_STOP) speedActive = false }
++        lifecycle.addObserver(observer)
++        onDispose { lifecycle.removeObserver(observer) }
++    }
++    fun toggleSpeed() {
++        if (speedActive) speedActive = false else { speedRun++; speedActive = true }
 +    }
 +
 +    HxPage(
 +        title = ht("网络测试"),
-+        subtitle = ht("并发测试常用平台的连通性与首包耗时"),
 +        onBack = onBack,
-+        largeTitle = false,
-+        actions = { HxBarAction(HomeIcons.RefreshCw, "重新测试", onClick = { if (!testing) runId++ }, busy = testing) },
++        actions = {
++            if (tab == "conn") HxBarAction(HomeIcons.RefreshCw, ht("重新测试"), onClick = { if (!testing) runId++ }, busy = testing)
++            else HxBarAction(HomeIcons.RefreshCw, ht("重新测速"), onClick = { if (!speedActive) toggleSpeed() }, busy = speedActive)
++        },
 +    ) {
-+        item(key = "summary") {
++        item(key = "tabs") {
 +            HxSection {
-+                HxCard {
-+                    Text(
-+                        when (viaProxy) {
-+                            true -> ht("经由河图代理（按当前规则与节点）")
-+                            false -> ht("直连（代理未运行）")
-+                            null -> ""
-+                        },
-+                        color = c.t2, style = HomeType.note,
-+                    )
-+                    Spacer(Modifier.height(6.dp))
-+                    Text(
-+                        NetworkTest.summary(results.values).ifBlank { ht("正在测试…") },
-+                        color = c.t1, style = HomeType.cardLabel,
-+                    )
-+                    Spacer(Modifier.height(14.dp))
-+                    HxButton(if (testing) "测试中" else "重新测试", { if (!testing) runId++ }, Modifier.fillMaxWidth(),
-+                        icon = HomeIcons.RefreshCw, enabled = !testing, busy = testing)
-+                }
++                HxSegmented(listOf("conn" to ht("连通性"), "speed" to ht("网速")), tab, { tab = it }, Modifier.fillMaxWidth())
 +            }
 +        }
-+        item(key = "results") {
-+            HxSection {
-+                HxGroup {
-+                    NetworkTest.targets.forEachIndexed { index, target ->
-+                        if (index > 0) HxDivider()
-+                        val result = results[target.name]
-+                        HxRow(
-+                            target.name,
-+                            subtitle = when {
-+                                result == null -> if (testing) ht("测试中…") else ht("未测试")
-+                                result.ok -> "HTTP ${result.code}" + if (target.domestic) " · ${ht("国内直连参考")}" else ""
-+                                else -> result.error
-+                            },
-+                            icon = PanelIcons.Globe,
-+                        ) {
-+                            when {
-+                                result == null -> if (testing) HxSpinner(16.dp) else Unit
-+                                result.ok -> HomePill("${result.millis} ms", tone = NetworkTest.tone(result))
-+                                else -> HomePill(ht("失败"), tone = HomeTone.Bad)
++        if (tab == "conn") {
++            item(key = "conn-note") {
++                Row(
++                    Modifier.fillMaxWidth().padding(horizontal = HomeRowDims.start + 14.dp).padding(bottom = 12.dp),
++                    verticalAlignment = Alignment.CenterVertically,
++                ) {
++                    Text(
++                        when (viaProxy) {
++                            true -> ht("经由河图代理 · 按当前规则与节点")
++                            false -> ht("代理未运行 · 直连测试")
++                            null -> ht("准备测试…")
++                        },
++                        Modifier.weight(1f), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis,
++                    )
++                    if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
++                }
++            }
++            NetCategory.entries.forEach { category ->
++                val sites = NetworkTest.sites.filter { it.category == category }
++                item(key = "cat-${category.name}") {
++                    HxSection(ht(category.title)) {
++                        HxGroup {
++                            sites.forEachIndexed { index, site ->
++                                if (index > 0) HomeRowDivider(start = HomeRowDims.start + BrandTileSize + 14.dp)
++                                NetSiteRow(site, rows.getValue(site.id))
 +                            }
 +                        }
 +                    }
 +                }
++            }
++            item(key = "conn-foot") {
 +                Text(
-+                    ht("耗时为首包时间，含 DNS、握手与 TLS；同一时刻全部平台并发测试。"),
-+                    Modifier.padding(start = 16.dp, end = 16.dp, top = 10.dp),
++                    ht("延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。"),
++                    Modifier.padding(horizontal = HomeRowDims.start + 14.dp).padding(bottom = 8.dp),
 +                    color = c.t3, style = HomeType.caption,
 +                )
++            }
++        } else {
++            item(key = "speed-hero") { SpeedHeroCard(speed, speedActive, ::toggleSpeed) }
++            item(key = "speed-exit") { SpeedExitCard(speed) }
++            item(key = "speed-result") { SpeedResultCard(speed) }
++            item(key = "speed-chart") { SpeedChartCard(speed) }
++        }
++    }
++}
++
++private val BrandTileSize = 36.dp
++
++/** Brand colour that stays readable on this theme (black marks turn to the text colour in dark mode). */
++private fun brandColor(site: NetSite, c: HomeColors): Color {
++    val color = Color(site.color)
++    return if (c.dark && color.luminance() < .08f) c.t1 else color
++}
++
++@Composable
++private fun BrandTile(site: NetSite) {
++    val c = LocalHomeColors.current
++    val tint = brandColor(site, c)
++    Box(
++        Modifier.size(BrandTileSize).clip(RoundedCornerShape(11.dp)).background(tint.copy(alpha = if (c.dark) .16f else .10f)),
++        contentAlignment = Alignment.Center,
++    ) {
++        val mark = remember(site.brand) { site.brand?.let(NetBrandIcons::vector) }
++        if (mark != null) Icon(mark, contentDescription = null, Modifier.size(20.dp), tint = tint)
++        else Text(site.monogram, color = tint, style = HomeType.cardLabel.copy(fontWeight = FontWeight.Bold, fontSize = if (site.monogram.length > 1) 13.sp else 16.sp))
++    }
++}
++
++@Composable
++private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
++    val c = LocalHomeColors.current
++    val state = holder.value
++    val result = state.result
++    val region = result?.region
++    val status: String
++    val statusColor: Color
++    when {
++        state.testing -> { status = ht("测试中"); statusColor = c.t2 }
++        result == null -> { status = "—"; statusColor = c.t3 }
++        result.blocked -> { status = ht("未解锁"); statusColor = c.badText }
++        !result.ok -> { status = ht(result.error.ifBlank { "失败" }); statusColor = c.badText }
++        else -> {
++            status = "${result.millis}ms"
++            statusColor = when {
++                result.millis < 300 -> c.goodText
++                result.millis < 1_000 -> c.t1
++                else -> c.warnText
++            }
++        }
++    }
++    val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
++    Row(
++        Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = HomeRowDims.start, end = HomeRowDims.end, top = 9.dp, bottom = 9.dp)
++            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        BrandTile(site)
++        Spacer(Modifier.width(14.dp))
++        Text(site.name, Modifier.weight(1f), color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
++            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
++            Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++        }
++    }
++}
++
++/* ---------------- 网速 cards ---------------- */
++
++@Composable
++private fun SpeedHeroCard(speed: SpeedUiState, active: Boolean, onToggle: () -> Unit) {
++    val c = LocalHomeColors.current
++    val motion = LocalHomeMotionEnabled.current
++    val shown = when (speed.phase) {
++        SpeedPhase.Download, SpeedPhase.Upload -> speed.live
++        else -> speed.down?.first ?: 0.0
++    }
++    val animated by animateFloatAsState(shown.toFloat(), if (motion) tween(260) else tween(0), label = "speed-readout")
++    HxSection {
++        HxCard {
++            Text(ht("经当前代理节点连接 Cloudflare 测速服务器（speed.cloudflare.com），依次测量延迟、下载与上传，约 20 秒，会消耗流量。"), color = c.t2, style = HomeType.note)
++            Spacer(Modifier.height(18.dp))
++            Row(verticalAlignment = Alignment.Bottom) {
++                Text(formatMbps(animated.toDouble()), color = c.t1, style = HomeType.metricLarge.copy(fontSize = 54.sp, lineHeight = 58.sp))
++                Spacer(Modifier.width(8.dp))
++                Text("Mbps", Modifier.padding(bottom = 9.dp), color = c.t2, style = HomeType.cardLabel)
++            }
++            Text(
++                when (speed.phase) {
++                    SpeedPhase.Idle -> ht("尚未测速")
++                    SpeedPhase.Meta -> ht("正在连接测速服务器…")
++                    SpeedPhase.Latency -> ht("正在测量延迟…")
++                    SpeedPhase.Download -> ht("正在测量下载…")
++                    SpeedPhase.Upload -> ht("正在测量上传…")
++                    SpeedPhase.Done -> ht("下载速率")
++                    SpeedPhase.Failed -> speed.error ?: ht("测速失败")
++                },
++                color = if (speed.phase == SpeedPhase.Failed) c.badText else c.t3, style = HomeType.caption,
++            )
++            Spacer(Modifier.height(16.dp))
++            HxButton(if (active) ht("停止测速") else ht("开始测速"), onToggle, Modifier.fillMaxWidth(),
++                icon = if (active) null else PanelIcons.Gauge, tone = if (active) HxTone.Bad else HxTone.Accent, filled = !active)
++        }
++    }
++}
++
++@Composable
++private fun SpeedLine(label: String, value: String, detail: String? = null) {
++    val c = LocalHomeColors.current
++    Row(
++        Modifier.fillMaxWidth().heightIn(min = 54.dp).padding(horizontal = HomeRowDims.start, vertical = 8.dp)
++            .semantics(mergeDescendants = true) {},
++        verticalAlignment = Alignment.CenterVertically,
++    ) {
++        Text(label, Modifier.weight(1f), color = c.t2, style = HomeType.label)
++        Column(horizontalAlignment = Alignment.End) {
++            Text(value, color = c.t1, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            if (!detail.isNullOrBlank()) Text(detail, color = c.t3, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        }
++    }
++}
++
++@Composable
++private fun SpeedExitCard(speed: SpeedUiState) {
++    val meta = speed.meta
++    HxSection(ht("出口")) {
++        HxGroup {
++            val region = when {
++                meta != null -> listOf((NetworkTest.flag(meta.country) + " " + meta.country).trim(), meta.city, meta.colo.takeIf { it.isNotBlank() }?.let { "$it" })
++                    .filterNotNull().filter { it.isNotBlank() }.joinToString(" · ")
++                speed.metaKnown -> ht("未知")
++                else -> "—"
++            }
++            SpeedLine(ht("地区"), region)
++            HxDivider(0.dp)
++            SpeedLine("IP", meta?.ip ?: if (speed.metaKnown) ht("未知") else "—", meta?.org)
++        }
++    }
++}
++
++@Composable
++private fun SpeedResultCard(speed: SpeedUiState) {
++    HxSection(ht("测速结果")) {
++        HxGroup {
++            SpeedLine(ht("延迟"), if (speed.latency >= 0) "${speed.latency} ms" else "—")
++            HxDivider(0.dp)
++            SpeedLine(ht("下载"), speed.down?.let { "${formatMbps(it.first)} Mbps" } ?: "—", speed.down?.let { HxFormat.bytes(it.second) })
++            HxDivider(0.dp)
++            SpeedLine(ht("上传"), speed.up?.let { "${formatMbps(it.first)} Mbps" } ?: "—", speed.up?.let { HxFormat.bytes(it.second) })
++        }
++    }
++}
++
++@Composable
++private fun SpeedChartCard(speed: SpeedUiState) {
++    val c = LocalHomeColors.current
++    val downColor = c.accent
++    val upColor = c.good
++    HxSection(ht("实时速率")) {
++        HxCard {
++            Row(verticalAlignment = Alignment.CenterVertically) {
++                Box(Modifier.size(8.dp).clip(CircleShape).background(downColor))
++                Spacer(Modifier.width(6.dp))
++                Text(ht("下载"), color = c.t2, style = HomeType.caption)
++                Spacer(Modifier.width(16.dp))
++                Box(Modifier.size(8.dp).clip(CircleShape).background(upColor))
++                Spacer(Modifier.width(6.dp))
++                Text(ht("上传"), color = c.t2, style = HomeType.caption)
++            }
++            Spacer(Modifier.height(12.dp))
++            // Reads the sample lists only while drawing, so a new sample redraws the chart without recomposing the page.
++            Canvas(Modifier.fillMaxWidth().height(150.dp)) {
++                val grid = c.line
++                for (i in 0..3) {
++                    val y = size.height * i / 3f
++                    drawLine(grid, Offset(0f, y), Offset(size.width, y), strokeWidth = 1f)
++                }
++                val down = speed.downSamples.toList()
++                val up = speed.upSamples.toList()
++                val peak = maxOf(down.maxOrNull() ?: 0f, up.maxOrNull() ?: 0f, 1f) * 1.15f
++                val slots = (SpeedTest.PHASE_MS / SpeedTest.SAMPLE_MS).toInt().coerceAtLeast(2)
++                fun series(points: List<Float>, color: Color) {
++                    if (points.size < 2) return
++                    val path = Path()
++                    points.forEachIndexed { index, value ->
++                        val x = size.width * index / (slots - 1).toFloat()
++                        val y = size.height - size.height * (value / peak)
++                        if (index == 0) path.moveTo(x, y) else path.lineTo(x.coerceAtMost(size.width), y)
++                    }
++                    drawPath(path, color, style = Stroke(width = 2.5.dp.toPx(), cap = StrokeCap.Round, join = StrokeJoin.Round))
++                }
++                series(down, downColor)
++                series(up, upColor)
 +            }
 +        }
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-index df92493..85c3872 100644
+index df92493..1c0c91d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
+@@ -41,7 +41,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+         onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
+         onOpenSubscription = { vm.openPanel("providers") },
+         onOpenBasicSettings = { nav.push(HxRoute.Network) },
+-        onOpenConfigs = { nav.push(HxRoute.Configs) },
++        onOpenConfigs = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs) },
+         onViewConfig = { nav.push(HxRoute.ConfigEditor) },
+         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
+         cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
 @@ -58,6 +58,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
              controllerError = vm.state.controllerError,
              takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
@@ -4914,22 +5793,38 @@ index df92493..85c3872 100644
      )
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
-index 820f6b5..1ee3861 100644
+index 820f6b5..3f00dcf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
-@@ -119,6 +119,7 @@ internal fun ToolsScreen(
+@@ -118,13 +118,15 @@ internal fun ToolsScreen(
+         ),
          onSubPageVisibleChanged = onSubPageVisibleChanged,
          onConfigChanged = { scope.launch { vm.refreshNow() } },
-         onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
-+        onOpenNetworkTest = { nav.push(HxRoute.NetTest) },
+-        onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
          onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
++        requestedEntry = vm.toolsRequest,
++        onRequestConsumed = { vm.toolsRequest = null },
          onOpenExternalEntry = { entry ->
              when (entry) {
+                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
+                 io.github.xgl34222220.hetu.tools.ToolsEntry.Logs -> { nav.push(HxRoute.Logs); true }
+                 io.github.xgl34222220.hetu.tools.ToolsEntry.NetMatch -> { nav.push(HxRoute.NetMatch); true }
++                io.github.xgl34222220.hetu.tools.ToolsEntry.NetTest -> { nav.push(HxRoute.NetTest); true }
+                 else -> false
+             }
+         },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..17747a7 100644
+index 2b4638e..9305bef 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-@@ -400,12 +400,15 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -393,21 +393,11 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+     val nav = LocalNav.current
+     val context = LocalContext.current
+     val prefs = vm.prefs
+-    val scope = rememberCoroutineScope()
+-    val c = LocalHomeColors.current
+     var revision by remember { mutableIntStateOf(0) }
+     var choice by remember { mutableStateOf<String?>(null) }
      var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
      val profile = ProxyRuntimeProfile.load(prefs)
      LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
@@ -4938,43 +5833,59 @@ index 2b4638e..17747a7 100644
 -            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
 -                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
 -                .onFailure { vm.toast(it.message ?: "配置导入失败") }
-+    var importing by remember { mutableStateOf(false) }
-+    if (importing) {
-+        // File, link or clipboard: validated by Mihomo before it is stored, rolled back if the running core rejects it.
-+        ConfigImportPage(vm, onBack = { importing = false }) { message ->
-+            importing = false
-+            revision++
-+            vm.toast(message)
+-        }
+-    }
+-
+     fun changed(key: String) {
+         ProxyRuntimeSettings.markDirty(prefs, key)
+         revision++
+@@ -466,8 +456,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+         item(key = "config") {
+             SettingsSection {
+                 SettingsGroup {
++                    // Selecting, importing and editing configs all live on one page: 工具 › 配置管理.
+                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
+-                        icon = ToolsIcons.FileText, onClick = { choice = "config" })
++                        icon = ToolsIcons.FileText, value = ht("配置管理")) {
++                        nav.openRequested(HxRoute.Main)
++                        vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
++                    }
+                 }
+             }
          }
-+        return
+@@ -485,32 +479,6 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
 
-     fun changed(key: String) {
-@@ -468,6 +471,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
-                 SettingsGroup {
-                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
-                         icon = ToolsIcons.FileText, onClick = { choice = "config" })
-+                    SettingsDivider()
-+                    SettingsNavRow(ht("编辑当前配置"), subtitle = ht("保存前校验，应用失败自动回滚"), icon = HxIcons.SquarePen) {
-+                        nav.push(HxRoute.ConfigEditor)
-+                    }
-+                    SettingsDivider()
-+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) { importing = true }
-                 }
-             }
-         }
-@@ -504,9 +513,9 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
-                     }
-                 }
-                 item(key = "import-config") {
+     when (choice) {
+-        "config" -> HxSheet(title = ht("当前配置"), onDismiss = { choice = null }) {
+-            LazyColumn(Modifier.fillMaxWidth().heightIn(max = 480.dp)) {
+-                items(configs.size, key = { configs[it].name }) { index ->
+-                    val config = configs[index]
+-                    SettingsRow(config.name, icon = ToolsIcons.FileText, compact = true, onClick = {
+-                        choice = null
+-                        if (!config.selected) scope.launch {
+-                            try {
+-                                vm.controller.selectConfig(config.name)
+-                                vm.applyConfigChange("已切换到 ${config.name}")
+-                                revision++
+-                            } catch (cancel: CancellationException) { throw cancel }
+-                            catch (error: Exception) { vm.toast(error.message ?: "切换配置失败") }
+-                        }
+-                    }) {
+-                        if (config.selected) Icon(HomeIcons.Check, ht("当前配置"), Modifier.size(22.dp), tint = c.accent)
+-                    }
+-                }
+-                item(key = "import-config") {
 -                    SettingsNavRow(ht("导入配置"), subtitle = ht("从文件导入 YAML 配置"), icon = HxIcons.Upload) {
-+                    SettingsNavRow(ht("导入配置"), subtitle = ht("文件、链接或剪贴板，校验后导入"), icon = HxIcons.Upload) {
-                         choice = null
+-                        choice = null
 -                        launchDocumentPicker(vm::toast) { importConfig.launch(arrayOf("*/*")) }
-+                        importing = true
-                     }
-                 }
-             }
+-                    }
+-                }
+-            }
+-        }
+         "core" -> HxChoiceSheet(
+             presentation = HxChoicePresentation.Settings,
+             title = ht("代理核心"),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ce5f550..65650a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -5168,37 +6079,6 @@ index 0000000..65065ca
 +        }
 +    }
 +}
-diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..6d4d4df 100644
---- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-+++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-@@ -813,6 +813,7 @@ private fun FileEntryRow(entry: RuntimeFileEntry, marked: Boolean, onClick: () -
-
- @Composable
- internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
-+    val nav = LocalNav.current
-     val context = LocalContext.current
-     val scope = rememberCoroutineScope()
-     val c = LocalHomeColors.current
-@@ -909,6 +910,18 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
-                 }
-             }
-         }
-+        item(key = "connectivity") {
-+            SettingsSection {
-+                SettingsGroup(title = ht("连通性")) {
-+                    SettingsRow(
-+                        ht("多平台网络测试"),
-+                        subtitle = ht("并发测试 Google、YouTube、GitHub、Telegram、ChatGPT 等平台"),
-+                        icon = PanelIcons.Gauge,
-+                        onClick = { nav.push(HxRoute.NetTest) },
-+                    ) { HxChevron() }
-+                }
-+            }
-+        }
-     }
-
-     sheet?.let { (title, text) -> HxTextSheet(title, text, onDismiss = { sheet = null }, showCopyLabel = true) }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 index 0ceaa23..b6be38b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
@@ -6435,7 +7315,7 @@ index fb308a8..250c025 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
-index 800055c..cb70a69 100644
+index 800055c..8cdcaa3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 @@ -32,6 +32,7 @@ import io.github.xgl34222220.hetu.ProxySubStoreActivity
@@ -6455,24 +7335,25 @@ index 800055c..cb70a69 100644
  import java.util.Locale
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
-@@ -70,6 +69,7 @@ internal fun HetuToolsV2(
-     onSubPageVisibleChanged: (Boolean) -> Unit = {},
-     onConfigChanged: () -> Unit = {},
+@@ -72,6 +71,8 @@ internal fun HetuToolsV2(
      onOpenDiagnosticsDetails: (() -> Unit)? = null,
-+    onOpenNetworkTest: (() -> Unit)? = null,
      onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
      onOpenConfigEditor: (() -> Unit)? = null,
++    requestedEntry: ToolsEntry? = null,
++    onRequestConsumed: () -> Unit = {},
  ) {
-@@ -83,7 +83,7 @@ internal fun HetuToolsV2(
-     val changed by rememberUpdatedState(onConfigChanged)
-     val openExternal by rememberUpdatedState(onOpenExternalEntry)
-     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
--    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
-+    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails, onOpenNetworkTest = onOpenNetworkTest)
-     var destination by remember { mutableStateOf(ToolsDestination.Root) }
-     ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
-
-@@ -167,12 +167,19 @@ internal fun HetuToolsV2(
+     val context = LocalContext.current
+     val app = context.applicationContext
+@@ -133,7 +134,7 @@ internal fun HetuToolsV2(
+                     ToolsEntry.Cores -> ProxyCoreActivity::class.java
+                     ToolsEntry.Adblock -> ProxyAdblockChainActivity::class.java
+                     ToolsEntry.WebUi -> ProxyWebPanelsActivity::class.java
+-                    ToolsEntry.Diag, ToolsEntry.Configs -> null
++                    ToolsEntry.Diag, ToolsEntry.Configs, ToolsEntry.NetTest -> null
+                 }
+                 if (target != null) {
+                     context.startActivity(Intent(context, target))
+@@ -167,12 +168,19 @@ internal fun HetuToolsV2(
              addSubscription = { name, url -> controller.addSubscription(name, url); changed() },
              updateSubscription = { name, url -> controller.updateSubscription(name, url); changed() },
              deleteSubscription = { name -> controller.deleteSubscription(name); changed() },
@@ -6494,7 +7375,16 @@ index 800055c..cb70a69 100644
              },
              readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
              validateConfig = { text -> controller.validateConfigText(text) },
-@@ -239,19 +246,3 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
+@@ -208,6 +216,8 @@ internal fun HetuToolsV2(
+                 features = features.actions,
+                 appIcon = features.appIcon,
+                 onDestinationChanged = { destination = it },
++                requestedEntry = requestedEntry,
++                onRequestConsumed = onRequestConsumed,
+             )
+         }
+       }
+@@ -239,19 +249,3 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
      }
      return ToolsPickedFile(name, detail, uri)
  }
@@ -6584,7 +7474,7 @@ index d256004..fa05457 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
-index ee40a76..6095b10 100644
+index ee40a76..8c39531 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 @@ -1,17 +1,25 @@
@@ -6625,25 +7515,29 @@ index ee40a76..6095b10 100644
      onRestore: () -> Unit,
      modifier: Modifier = Modifier,
      onOpenDiagnosticsDetails: (() -> Unit)? = null,
-+    onOpenNetworkTest: (() -> Unit)? = null,
++    onRepairRecord: (() -> Unit)? = null,
  ) {
      val c = LocalHomeColors.current
      val checking = state.preflight is ToolsPreflight.Running
-@@ -80,6 +90,13 @@ internal fun ToolsDiagScreen(
-                 AnnotatedString(ht("消息与网络诊断")), icon = ToolsFeatureIcons.Router,
-                 subtitle = ht("Google / 微信连接、分流与最近运行事件"), onClick = onReport, trailing = { ToolsChevron() },
+@@ -85,9 +95,16 @@ internal fun ToolsDiagScreen(
+             ToolsCardTitle("运行记录")
+             ToolsRow(
+                 AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
+-                subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
++                subtitle = ht(if (onRepairRecord != null) "切网与错误编号；满额暂停，历史保留" else "事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
+                 onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() },
              )
-+            if (onOpenNetworkTest != null) {
++            if (onRepairRecord != null) {
 +                HomeRowDivider(start = HomeRowDims.textStart)
 +                ToolsRow(
-+                    AnnotatedString(ht("多平台网络测试")), icon = ToolsIcons.Activity,
-+                    subtitle = ht("并发测试 Google、YouTube、GitHub、Telegram、ChatGPT 等平台"), onClick = onOpenNetworkTest, trailing = { ToolsChevron() },
++                    AnnotatedString(ht("修复运行记录")), icon = ToolsFeatureIcons.ShieldCheck,
++                    subtitle = ht("核对原会话基线、规则、DNS 与守护进程；保留现有连接"), onClick = onRepairRecord, trailing = { ToolsChevron() },
 +                )
 +            }
          }
-         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
-             ToolsCardTitle("运行记录")
-@@ -108,9 +125,13 @@ internal fun ToolsDiagScreen(
+         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
+             ToolsCardTitle("紧急")
+@@ -108,9 +125,19 @@ internal fun ToolsDiagScreen(
  internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
      val c = LocalHomeColors.current
      val palette = remember(c) { ToolsYamlPalette(key = c.t1, bool = c.accent, number = c.accent, comment = c.t3, error = c.bad) }
@@ -6657,10 +7551,16 @@ index ee40a76..6095b10 100644
 +            Modifier.clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg).padding(horizontal = 16.dp, vertical = 14.dp),
 +            annotated = annotate) },
 +    ) { AnnotatedString(it) }
++}
++
++/** 网络事件记录 / 修复运行记录, with 复制. */
++@Composable
++internal fun ToolsRecordSheetContent(title: String, subtitle: String, content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
++    DiagTextSheet(title, subtitle, content, onCopy, modifier) { AnnotatedString(it) }
  }
 
  /** The plain-text report, with 复制. */
-@@ -126,19 +147,29 @@ private fun DiagTextSheet(
+@@ -126,19 +153,29 @@ private fun DiagTextSheet(
      content: ToolsDiagText,
      onCopy: (String) -> Unit,
      modifier: Modifier,
@@ -6693,7 +7593,7 @@ index ee40a76..6095b10 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..6d09804 100644
+index f575100..ff6d15e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -6704,32 +7604,20 @@ index f575100..6d09804 100644
  import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
  import io.github.xgl34222220.hetu.ProxyComposeController
  import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
-@@ -87,7 +88,7 @@ internal class ToolsFeatureHost(val actions: ToolsFeatureActions, val appIcon: @
-  * @param onChanged a runtime setting changed: refresh the shell state (pending-restart banner).
-  */
- @Composable
--internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null): ToolsFeatureHost {
-+internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null, onOpenNetworkTest: (() -> Unit)? = null): ToolsFeatureHost {
-     val context = LocalContext.current
-     val app = context.applicationContext
-     val prefs = remember(app) { app.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-@@ -96,6 +97,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
-     val scope = rememberCoroutineScope()
-     val changed by rememberUpdatedState(onChanged)
-     val diagnosticsDetails by rememberUpdatedState(onOpenDiagnosticsDetails)
-+    val networkTest by rememberUpdatedState(onOpenNetworkTest)
-
-     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
-     fun dirty(key: String) { ToolsRuntimeBridge.markDirty(app, key); changed() }
-@@ -216,6 +218,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -216,6 +217,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
 
              /* ------------------------------ 诊断与维护 ------------------------------ */
              onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
-+            onOpenNetworkTest = if (onOpenNetworkTest == null) null else { { networkTest?.invoke() } },
++            networkEvents = { proxy.networkEvents() },
++            repairSessionRecord = {
++                try { proxy.repairSessionRecord() }
++                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
++                catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
++            },
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
                  if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
-@@ -225,7 +228,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -225,7 +232,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -6739,7 +7627,7 @@ index f575100..6d09804 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +237,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +241,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
@@ -6748,7 +7636,7 @@ index f575100..6d09804 100644
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -262,12 +268,17 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +272,17 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -6768,10 +7656,20 @@ index f575100..6d09804 100644
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..8514fcc 100644
+index 40111ed..eecb30c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-@@ -218,6 +218,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
+@@ -203,6 +203,9 @@ internal sealed interface ToolsDiagOverlay {
+
+     /** Page 42. */
+     data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
++
++    /** 网络事件记录 / 修复运行记录: read-outs that used to live on a second 诊断与维护 page. */
++    data class Record(val title: String, val subtitle: String, val content: ToolsDiagText = ToolsDiagText()) : ToolsDiagOverlay
+ }
+
+ internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
+@@ -218,6 +221,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
  /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
  internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
 
@@ -6781,7 +7679,7 @@ index 40111ed..8514fcc 100644
  internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
  internal data class ToolsAdblockState(
-@@ -241,6 +244,11 @@ internal data class ToolsAdblockState(
+@@ -241,6 +247,11 @@ internal data class ToolsAdblockState(
      val recent: List<String> = emptyList(),
      val startupInjected: Boolean = false,
      val controllerLoaded: Boolean = false,
@@ -6793,16 +7691,18 @@ index 40111ed..8514fcc 100644
      val standaloneDns: Boolean = false,
      val cnameProtection: Boolean = true,
      val updating: Boolean = false,
-@@ -367,6 +375,8 @@ internal class ToolsFeatureActions(
+@@ -367,6 +378,10 @@ internal class ToolsFeatureActions(
      /* 诊断与维护 */
      val runPreflight: (suspend () -> ToolsPreflight)? = null,
      val onOpenDiagnosticsDetails: (() -> Unit)? = null,
-+    /** 多平台网络测试; null hides the row. */
-+    val onOpenNetworkTest: (() -> Unit)? = null,
++    /** 网络事件记录 read-out; null falls back to [onOpenDiagnosticsDetails]. */
++    val networkEvents: (suspend () -> String)? = null,
++    /** 修复运行记录; null hides the row. */
++    val repairSessionRecord: (suspend () -> String)? = null,
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +395,8 @@ internal class ToolsFeatureActions(
+@@ -385,6 +400,8 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -6812,18 +7712,34 @@ index 40111ed..8514fcc 100644
      val onMessage: (String) -> Unit = {},
  ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-index 6e1e067..0fcaec8 100644
+index 6e1e067..cedcda6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-@@ -389,6 +389,7 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -388,7 +388,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+         onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
          onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
          onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
-         onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
-+        onOpenNetworkTest = actions.onOpenNetworkTest,
+-        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
++        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
++            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
++        } ?: actions.onOpenDiagnosticsDetails,
++        onRepairRecord = actions.repairSessionRecord?.let { repair ->
++            { open(ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接"), repair) { ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接", it) } }
++        },
          modifier = modifier,
      )
 
-@@ -427,7 +428,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -399,6 +404,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+         is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
+             ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
+         }
++        is ToolsDiagOverlay.Record -> HomeModalSheet(onDismiss = { overlay = null }) {
++            ToolsRecordSheetContent(current.title, current.subtitle, current.content, onCopy = { actions.onCopy(current.title, it) })
++        }
+         is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
+             ToolsRestoreNetworkDialogCard(
+                 loading = current.running,
+@@ -427,7 +435,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
      suspend fun read() {
          val snapshot = (actions.loadAdblock ?: return)()
@@ -6833,7 +7749,7 @@ index 6e1e067..0fcaec8 100644
      }
 
      fun reload(announce: String? = null) {
-@@ -508,6 +510,19 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -508,6 +517,19 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
          onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
          onRetry = { state = ToolsAdblockState(); reload() },
          modifier = modifier,
@@ -6853,6 +7769,94 @@ index 6e1e067..0fcaec8 100644
      )
 
      when (val current = overlay) {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
+index 60a38ad..3cba88d 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
+@@ -10,7 +10,7 @@ import java.util.Locale
+ /* ---------------------------- 工具 (tab root) ---------------------------- */
+
+ /**
+- * The 14 entries of the tools tab.
++ * The 15 entries of the tools tab.
+  *
+  * @param summary line under the title on the root list (concept page 1).
+  * @param brief shorter line shown in search results (concept page 3).
+@@ -30,6 +30,7 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
+     Cores("核心管理", "下载与更新", "下载与更新", "内核 mihomo xray sing-box"),
+     Adblock("广告过滤", "规则与屏蔽", "规则与屏蔽", "去广告 adguard 拦截"),
+     Diag("诊断工具", "网络与环境", "网络与环境", "预检 恢复网络 排查"),
++    NetTest("网络测试", "连通性与网速", "连通性与网速", "测速 解锁 延迟 speedtest cloudflare chatgpt netflix"),
+     WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
+ }
+
+@@ -44,14 +45,14 @@ internal object ToolsCatalog {
+         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
+         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
+         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
+-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
++        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.NetTest, ToolsEntry.WebUi)),
+     )
+
+     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
+     val titled: List<ToolsGroupSpec> = listOf(
+         ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
+         ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
+-        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
++        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.NetTest)),
+         ToolsGroupSpec("核心与面板", listOf(ToolsEntry.Cores, ToolsEntry.WebUi)),
+         ToolsGroupSpec("文件与维护", listOf(ToolsEntry.Files, ToolsEntry.Scripts, ToolsEntry.Logs, ToolsEntry.Diag)),
+     )
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
+index 7967521..17acd48 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
+@@ -54,6 +54,8 @@ internal fun ToolsRoute(
+     features: ToolsFeatureActions? = null,
+     appIcon: (@Composable (ToolsApp, Modifier) -> Unit)? = null,
+     onDestinationChanged: (ToolsDestination) -> Unit = {},
++    requestedEntry: ToolsEntry? = null,
++    onRequestConsumed: () -> Unit = {},
+ ) {
+     val act by rememberUpdatedState(actions)
+     val scope = rememberCoroutineScope()
+@@ -338,6 +340,24 @@ internal fun ToolsRoute(
+         }
+     }
+
++    // Another tab asked for one of these pages: open it on top of the root, once.
++    val consumeRequest by rememberUpdatedState(onRequestConsumed)
++    LaunchedEffect(requestedEntry) {
++        val entry = requestedEntry ?: return@LaunchedEffect
++        val feature = entry.featureDestination()
++        when {
++            entry == ToolsEntry.Configs -> {
++                if (top != ToolsDestination.Configs) {
++                    stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name)
++                }
++                refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
++            }
++            feature != null && features?.hosts(entry) == true -> stackNames = listOf(ToolsDestination.Root.name, feature.name)
++            else -> act.onOpenEntry(entry)
++        }
++        consumeRequest()
++    }
++
+     /* ------------------------------ 页面 ------------------------------ */
+
+     AnimatedContent(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
+index af5a645..065d546 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt
+@@ -53,6 +53,7 @@ internal fun ToolsEntry.icon(): ImageVector = when (this) {
+     ToolsEntry.Cores -> ToolsIcons.Cpu
+     ToolsEntry.Adblock -> ToolsIcons.ShieldX
+     ToolsEntry.Diag -> ToolsIcons.Activity
++    ToolsEntry.NetTest -> PanelIcons.Gauge
+     ToolsEntry.WebUi -> ToolsIcons.Monitor
+ }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 index fa7fa0d..1772502 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
@@ -6997,7 +8001,7 @@ index fa7fa0d..1772502 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..c751472 100644
+index 578ce9d..358b8ed 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
@@ -7009,7 +8013,34 @@ index 578ce9d..c751472 100644
  测速|Test|測速|Проверить
  没有策略组|No proxy groups|沒有策略群組|Нет групп прокси
  当前配置没有可显示的策略组|This configuration has no proxy groups to show|目前設定沒有可顯示的策略群組|В этой конфигурации нет групп для отображения
-@@ -969,6 +971,7 @@ private val vocabularyConnection = """
+@@ -591,6 +593,26 @@ API 设置|API settings|API 設定|Настройки API
+ // 工具: the tool pages rebuilt on the shared kit, and what their components say themselves.
+ // "\n" in a line stands for a line break, so a two-line message can be a key.
+ private val vocabularyTools = """
++网络测试|Network test|網路測試|Тест сети
++连通性|Connectivity|連通性|Доступность
++连通性与网速|Connectivity and speed|連通性與網速|Доступность и скорость
++开始测速|Start test|開始測速|Начать тест
++停止测速|Stop test|停止測速|Остановить тест
++测试中|Testing|測試中|Проверка
++未解锁|Blocked|未解鎖|Недоступно
++实时速率|Live rate|即時速率|Скорость в реальном времени
++测速结果|Results|測速結果|Результаты
++出口|Exit|出口|Выход
++重新测试|Test again|重新測試|Повторить
++可用|available|可用|доступно
++AI 服务|AI services|AI 服務|ИИ-сервисы
++社交媒体|Social|社群媒體|Соцсети
++影音娱乐|Streaming|影音娛樂|Видео и музыка
++工具与服务|Tools and services|工具與服務|Инструменты и сервисы
++尚未测速|Not tested yet|尚未測速|Тест не выполнялся
++下载速率|Download rate|下載速率|Скорость загрузки
++测速失败|Speed test failed|測速失敗|Тест не удался
++失败|Failed|失敗|Ошибка
+ 切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
+ 上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
+ 下一个匹配|Next match|下一個相符項目|Следующее совпадение
+@@ -969,6 +991,7 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -9209,10 +10240,10 @@ index 0000000..4499405
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt
 new file mode 100644
-index 0000000..20142dd
+index 0000000..33f2f19
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt
-@@ -0,0 +1,171 @@
+@@ -0,0 +1,279 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -9256,36 +10287,144 @@ index 0000000..20142dd
 +        }
 +        server.start()
 +        val base = "http://127.0.0.1:${server.port}"
-+        val targets = listOf(
-+            NetTestTarget("Slow", "$base/slow"), NetTestTarget("Mid", "$base/mid"),
-+            NetTestTarget("Fast", "$base/fast"), NetTestTarget("Broken", "$base/broken"),
-+        )
-+        // Robolectric's SystemClock is virtual; wall time proves the targets overlap.
++        fun site(id: String, path: String) = NetSite(id, id, NetCategory.Tools, "$base/$path", trace = false)
++        val sites = listOf(site("Slow", "slow"), site("Mid", "mid"), site("Fast", "fast"), site("Broken", "broken"))
++        // Robolectric's SystemClock is virtual; wall time proves the rows overlap.
 +        val started = System.nanoTime()
-+        val results = NetworkTest.run(null, targets).toList()
++        val results = NetworkTest.run(null, sites).toList()
 +        val elapsed = (System.nanoTime() - started) / 1_000_000
 +        assertEquals(4, results.size)
-+        assertEquals("Slow is emitted last, after every faster row", "Slow", results.last().name)
-+        assertTrue("Fast must not wait for Mid", results.indexOfFirst { it.name == "Fast" } < results.indexOfFirst { it.name == "Mid" })
-+        assertTrue("All targets run at once, not one after another: $elapsed ms", elapsed < 900 + 450 - 100)
-+        val byName = results.associateBy { it.name }
-+        assertTrue(byName.getValue("Slow").ok)
-+        assertTrue("A CDN 403 is still a reachable path", byName.getValue("Mid").ok)
-+        assertEquals(403, byName.getValue("Mid").code)
-+        assertFalse("A 5xx is a failed path", byName.getValue("Broken").ok)
-+        assertEquals("HTTP 503", byName.getValue("Broken").error)
-+        assertTrue(byName.getValue("Slow").millis >= 1)
-+        assertEquals("3/4 可达", NetworkTest.summary(results, 4).substringBefore(" ·"))
++        assertEquals("Slow is emitted last, after every faster row", "Slow", results.last().id)
++        assertTrue("Fast must not wait for Mid", results.indexOfFirst { it.id == "Fast" } < results.indexOfFirst { it.id == "Mid" })
++        assertTrue("All rows run at once, not one after another: $elapsed ms", elapsed < 900 + 450 - 100)
++        val byId = results.associateBy { it.id }
++        assertTrue(byId.getValue("Slow").ok)
++        assertTrue("A CDN 403 is still a reachable path", byId.getValue("Mid").ok)
++        assertTrue("…but the service refused this exit: 未解锁", byId.getValue("Mid").blocked)
++        assertFalse("A 5xx is a failed path", byId.getValue("Broken").ok)
++        assertEquals("HTTP 503", byId.getValue("Broken").error)
++        assertTrue(byId.getValue("Slow").millis >= 1)
++        assertNull("No trace, no route: the region stays unknown, never guessed", byId.getValue("Fast").region)
 +    }
 +
 +    @Test fun networkTestReportsUnreachableTargetsWithoutThrowing() = runBlocking {
 +        val port = MockWebServer().let { it.start(); val bound = it.port; it.shutdown(); bound }
-+        val result = NetworkTest.run(null, listOf(NetTestTarget("Down", "http://127.0.0.1:$port/"))).toList().single()
++        val result = NetworkTest.run(null, listOf(NetSite("Down", "Down", NetCategory.Tools, "http://127.0.0.1:$port/", trace = false))).toList().single()
 +        assertFalse(result.ok)
 +        assertEquals(-1L, result.millis)
 +        assertTrue(result.error.isNotBlank())
-+        assertEquals("", NetworkTest.summary(emptyList()))
-+        assertTrue(NetworkTest.targets.map { it.name }.containsAll(listOf("Google", "YouTube", "GitHub", "Telegram", "ChatGPT", "Netflix", "Cloudflare", "百度")))
++        val names = NetworkTest.sites.map { it.name }
++        listOf("ChatGPT", "Claude", "Doubao", "Gemini", "Grok", "Discord", "Douyin", "Reddit", "TikTok", "X", "Telegram",
++            "Apple TV+", "Bilibili", "Disney+", "Hulu", "Netflix", "Spotify", "Twitch", "YouTube",
++            "Alibaba", "Apple", "Cloudflare", "GitHub", "NetEase", "PayPal", "Steam", "Tencent", "Wikipedia", "Google", "Baidu")
++            .forEach { assertTrue("missing $it", it in names) }
++        assertEquals("ids are unique", NetworkTest.sites.size, NetworkTest.sites.map { it.id }.toSet().size)
++        NetworkTest.sites.mapNotNull { it.brand }.forEach { assertNotNull("bundled mark $it", NetBrandIcons.vector(it)) }
++    }
++
++    @Test fun regionComesOnlyFromRealTraceRouteOrDirectExit() = runBlocking {
++        val server = MockWebServer().also { servers += it }
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
++                "/cdn-cgi/trace" -> MockResponse().setBody("fl=123\nh=example\nip=203.0.113.9\ncolo=NRT\nloc=JP\ntls=TLSv1.3\n")
++                else -> MockResponse().setResponseCode(200).setBody("ok")
++            }
++        }
++        server.start()
++        val base = "http://127.0.0.1:${server.port}"
++        val traced = NetworkTest.run(null, listOf(NetSite("cf", "CF", NetCategory.Ai, "$base/cdn-cgi/trace", aiRegion = true))).toList().single()
++        assertEquals("JP", traced.region)
++        assertEquals(NetRegionSource.Trace, traced.regionSource)
++        assertFalse(traced.blocked)
++
++        assertEquals("JP", NetworkTest.parseTrace("fl=1\ncolo=NRT\nloc=jp"))
++        assertNull("A page that merely contains loc= is not a trace", NetworkTest.parseTrace("<html>loc=JP</html>"))
++        assertNull(NetworkTest.parseTrace("colo=NRT\nloc=XX"))
++
++        val log = """
++            time="t" level=info msg="[TCP] 127.0.0.1:40000 --> chatgpt.com:443 match DomainSuffix(chatgpt.com) using 节点选择[🇯🇵 日本 01]"
++            time="t" level=info msg="[TCP] 127.0.0.1:40001 --> www.netflix.com:443 match GeoSite(netflix) using 流媒体[🇯🇵 日本 01]"
++            time="t" level=info msg="[TCP] 127.0.0.1:40002 --> www.reddit.com:443 match Match using 兜底[🇺🇸 美国 02]"
++            time="t" level=info msg="[TCP] 127.0.0.1:40003 --> www.baidu.com:443 match GeoSite(cn) using DIRECT"
++        """.trimIndent()
++        val hosts = mapOf("chatgpt" to "chatgpt.com", "netflix" to "www.netflix.com", "reddit" to "www.reddit.com", "baidu" to "www.baidu.com", "x" to "x.com")
++        val routes = NetworkTest.parseRoutes(log, hosts.values)
++        assertEquals("节点选择[🇯🇵 日本 01]", routes["chatgpt.com"])
++        assertEquals("🇯🇵 日本 01", NetworkTest.leafOf(routes.getValue("www.netflix.com")))
++        assertTrue(NetworkTest.isDirect(routes.getValue("www.baidu.com")))
++        val rows = listOf(
++            NetSiteResult("chatgpt", true, 300, 200, region = "JP", regionSource = NetRegionSource.Trace),
++            NetSiteResult("netflix", true, 400, 200), NetSiteResult("reddit", true, 500, 200),
++            NetSiteResult("baidu", true, 40, 200), NetSiteResult("x", true, 350, 200),
++        )
++        val resolved = NetworkTest.resolve(rows, routes, hosts, directRegion = "CN", viaProxy = true).associateBy { it.id }
++        assertEquals("Same leaf node as a traced row", "JP", resolved.getValue("netflix").region)
++        assertEquals(NetRegionSource.SameNode, resolved.getValue("netflix").regionSource)
++        assertNull("A node nobody traced stays unknown", resolved.getValue("reddit").region)
++        assertEquals("DIRECT leaves from the device's own exit", "CN", resolved.getValue("baidu").region)
++        assertNull("No log line for the host: unknown", resolved.getValue("x").region)
++        val direct = NetworkTest.resolve(rows, emptyMap(), hosts, directRegion = "CN", viaProxy = false).associateBy { it.id }
++        assertEquals("Proxy off: every row exits directly", "CN", direct.getValue("reddit").region)
++        assertEquals("…except a row that traced its own exit", "JP", direct.getValue("chatgpt").region)
++
++        val chatgpt = NetworkTest.sites.first { it.id == "chatgpt" }
++        assertTrue("An AI service at an exit it does not serve is 未解锁",
++            NetworkTest.blocked(chatgpt, NetSiteResult("chatgpt", true, 200, 200, region = "HK")))
++        assertFalse(NetworkTest.blocked(chatgpt, NetSiteResult("chatgpt", true, 200, 200, region = "JP")))
++        assertEquals("🇯🇵", NetworkTest.flag("JP"))
++        assertEquals("", NetworkTest.flag(null))
++    }
++
++    @Test fun speedTestStreamsLiveRatesAndFinishesBothDirections() = runBlocking {
++        val server = MockWebServer().also { servers += it }
++        val chunk = ByteArray(256 * 1024)
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                val path = request.path.orEmpty()
++                return when {
++                    path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"jp","city":"Tokyo","colo":"NRT","asOrganization":"Example"}""")
++                    path == "/__down?bytes=0" -> MockResponse().setBody("")
++                    path.startsWith("/__down") -> MockResponse().setBody(okio.Buffer().write(chunk))
++                    path == "/__up" -> MockResponse().setResponseCode(200).setHeadersDelay(25, TimeUnit.MILLISECONDS)
++                    else -> MockResponse().setResponseCode(404)
++                }
++            }
++        }
++        server.start()
++        val events = SpeedTest.run(null, "http://127.0.0.1:${server.port}", phaseMs = 700, streams = 2, upChunk = 64 * 1024).toList()
++        val meta = events.filterIsInstance<SpeedEvent.Meta>().single().meta
++        assertEquals("203.0.113.7", meta?.ip)
++        assertEquals("JP", meta?.country)
++        assertTrue(events.filterIsInstance<SpeedEvent.Latency>().single().millis >= 0)
++        assertTrue("live samples stream while a phase runs", events.filterIsInstance<SpeedEvent.Live>().isNotEmpty())
++        val finished = events.filterIsInstance<SpeedEvent.Finished>()
++        assertEquals(listOf(false, true), finished.map { it.upload })
++        assertTrue(finished.all { it.bytes > 0 && it.mbps > 0 })
++        assertEquals(SpeedPhase.Done, (events.last() as SpeedEvent.Phase).phase)
++        assertNull(events.firstOrNull { it is SpeedEvent.Failed })
++        assertEquals(12.5, SpeedTest.mbps(12_500_000 / 8 * 8, 8_000), 0.01)
++        assertEquals(20L, SpeedTest.latency(listOf(90L, 30L, 20L, 10L)))
++        assertNull(SpeedTest.parseMeta("not json"))
++    }
++
++    @Test fun speedTestCancelsPromptlyWhenThePageGoesAway() = runBlocking {
++        val server = MockWebServer().also { servers += it }
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse = when {
++                request.path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"JP"}""")
++                request.path == "/__down?bytes=0" -> MockResponse().setBody("")
++                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16 * 1024, 1, TimeUnit.SECONDS)
++            }
++        }
++        server.start()
++        val started = System.nanoTime()
++        val seen = mutableListOf<SpeedEvent>()
++        kotlinx.coroutines.withTimeoutOrNull(1_500) {
++            SpeedTest.run(null, "http://127.0.0.1:${server.port}", phaseMs = 30_000, streams = 2).collect { seen += it }
++        }
++        val elapsed = (System.nanoTime() - started) / 1_000_000
++        assertTrue("cancellation closes the sockets instead of waiting for the phase: $elapsed ms", elapsed < 4_000)
++        assertTrue(seen.none { it is SpeedEvent.Finished })
 +    }
 +
 +    /* ------------------------------ 去广告核查 ------------------------------ */

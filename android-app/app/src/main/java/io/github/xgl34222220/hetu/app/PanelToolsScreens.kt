@@ -118,14 +118,15 @@ internal fun ToolsScreen(
         ),
         onSubPageVisibleChanged = onSubPageVisibleChanged,
         onConfigChanged = { scope.launch { vm.refreshNow() } },
-        onOpenDiagnosticsDetails = { nav.push(HxRoute.Diagnostics) },
-        onOpenNetworkTest = { nav.push(HxRoute.NetTest) },
         onOpenConfigEditor = { nav.push(HxRoute.ConfigEditor) },
+        requestedEntry = vm.toolsRequest,
+        onRequestConsumed = { vm.toolsRequest = null },
         onOpenExternalEntry = { entry ->
             when (entry) {
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Files -> { nav.push(HxRoute.Files); true }
                 io.github.xgl34222220.hetu.tools.ToolsEntry.Logs -> { nav.push(HxRoute.Logs); true }
                 io.github.xgl34222220.hetu.tools.ToolsEntry.NetMatch -> { nav.push(HxRoute.NetMatch); true }
+                io.github.xgl34222220.hetu.tools.ToolsEntry.NetTest -> { nav.push(HxRoute.NetTest); true }
                 else -> false
             }
         },

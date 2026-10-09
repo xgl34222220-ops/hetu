@@ -10,7 +10,7 @@ import java.util.Locale
 /* ---------------------------- 工具 (tab root) ---------------------------- */
 
 /**
- * The 14 entries of the tools tab.
+ * The 15 entries of the tools tab.
  *
  * @param summary line under the title on the root list (concept page 1).
  * @param brief shorter line shown in search results (concept page 3).
@@ -30,6 +30,7 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
     Cores("核心管理", "下载与更新", "下载与更新", "内核 mihomo xray sing-box"),
     Adblock("广告过滤", "规则与屏蔽", "规则与屏蔽", "去广告 adguard 拦截"),
     Diag("诊断工具", "网络与环境", "网络与环境", "预检 恢复网络 排查"),
+    NetTest("网络测试", "连通性与网速", "连通性与网速", "测速 解锁 延迟 speedtest cloudflare chatgpt netflix"),
     WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
 }
 
@@ -44,14 +45,14 @@ internal object ToolsCatalog {
         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.NetTest, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
     val titled: List<ToolsGroupSpec> = listOf(
         ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
         ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
-        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
+        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.NetTest)),
         ToolsGroupSpec("核心与面板", listOf(ToolsEntry.Cores, ToolsEntry.WebUi)),
         ToolsGroupSpec("文件与维护", listOf(ToolsEntry.Files, ToolsEntry.Scripts, ToolsEntry.Logs, ToolsEntry.Diag)),
     )

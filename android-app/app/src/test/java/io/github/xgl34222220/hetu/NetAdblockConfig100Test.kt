@@ -41,36 +41,144 @@ class NetAdblockConfig100Test {
         }
         server.start()
         val base = "http://127.0.0.1:${server.port}"
-        val targets = listOf(
-            NetTestTarget("Slow", "$base/slow"), NetTestTarget("Mid", "$base/mid"),
-            NetTestTarget("Fast", "$base/fast"), NetTestTarget("Broken", "$base/broken"),
-        )
-        // Robolectric's SystemClock is virtual; wall time proves the targets overlap.
+        fun site(id: String, path: String) = NetSite(id, id, NetCategory.Tools, "$base/$path", trace = false)
+        val sites = listOf(site("Slow", "slow"), site("Mid", "mid"), site("Fast", "fast"), site("Broken", "broken"))
+        // Robolectric's SystemClock is virtual; wall time proves the rows overlap.
         val started = System.nanoTime()
-        val results = NetworkTest.run(null, targets).toList()
+        val results = NetworkTest.run(null, sites).toList()
         val elapsed = (System.nanoTime() - started) / 1_000_000
         assertEquals(4, results.size)
-        assertEquals("Slow is emitted last, after every faster row", "Slow", results.last().name)
-        assertTrue("Fast must not wait for Mid", results.indexOfFirst { it.name == "Fast" } < results.indexOfFirst { it.name == "Mid" })
-        assertTrue("All targets run at once, not one after another: $elapsed ms", elapsed < 900 + 450 - 100)
-        val byName = results.associateBy { it.name }
-        assertTrue(byName.getValue("Slow").ok)
-        assertTrue("A CDN 403 is still a reachable path", byName.getValue("Mid").ok)
-        assertEquals(403, byName.getValue("Mid").code)
-        assertFalse("A 5xx is a failed path", byName.getValue("Broken").ok)
-        assertEquals("HTTP 503", byName.getValue("Broken").error)
-        assertTrue(byName.getValue("Slow").millis >= 1)
-        assertEquals("3/4 可达", NetworkTest.summary(results, 4).substringBefore(" ·"))
+        assertEquals("Slow is emitted last, after every faster row", "Slow", results.last().id)
+        assertTrue("Fast must not wait for Mid", results.indexOfFirst { it.id == "Fast" } < results.indexOfFirst { it.id == "Mid" })
+        assertTrue("All rows run at once, not one after another: $elapsed ms", elapsed < 900 + 450 - 100)
+        val byId = results.associateBy { it.id }
+        assertTrue(byId.getValue("Slow").ok)
+        assertTrue("A CDN 403 is still a reachable path", byId.getValue("Mid").ok)
+        assertTrue("…but the service refused this exit: 未解锁", byId.getValue("Mid").blocked)
+        assertFalse("A 5xx is a failed path", byId.getValue("Broken").ok)
+        assertEquals("HTTP 503", byId.getValue("Broken").error)
+        assertTrue(byId.getValue("Slow").millis >= 1)
+        assertNull("No trace, no route: the region stays unknown, never guessed", byId.getValue("Fast").region)
     }
 
     @Test fun networkTestReportsUnreachableTargetsWithoutThrowing() = runBlocking {
         val port = MockWebServer().let { it.start(); val bound = it.port; it.shutdown(); bound }
-        val result = NetworkTest.run(null, listOf(NetTestTarget("Down", "http://127.0.0.1:$port/"))).toList().single()
+        val result = NetworkTest.run(null, listOf(NetSite("Down", "Down", NetCategory.Tools, "http://127.0.0.1:$port/", trace = false))).toList().single()
         assertFalse(result.ok)
         assertEquals(-1L, result.millis)
         assertTrue(result.error.isNotBlank())
-        assertEquals("", NetworkTest.summary(emptyList()))
-        assertTrue(NetworkTest.targets.map { it.name }.containsAll(listOf("Google", "YouTube", "GitHub", "Telegram", "ChatGPT", "Netflix", "Cloudflare", "百度")))
+        val names = NetworkTest.sites.map { it.name }
+        listOf("ChatGPT", "Claude", "Doubao", "Gemini", "Grok", "Discord", "Douyin", "Reddit", "TikTok", "X", "Telegram",
+            "Apple TV+", "Bilibili", "Disney+", "Hulu", "Netflix", "Spotify", "Twitch", "YouTube",
+            "Alibaba", "Apple", "Cloudflare", "GitHub", "NetEase", "PayPal", "Steam", "Tencent", "Wikipedia", "Google", "Baidu")
+            .forEach { assertTrue("missing $it", it in names) }
+        assertEquals("ids are unique", NetworkTest.sites.size, NetworkTest.sites.map { it.id }.toSet().size)
+        NetworkTest.sites.mapNotNull { it.brand }.forEach { assertNotNull("bundled mark $it", NetBrandIcons.vector(it)) }
+    }
+
+    @Test fun regionComesOnlyFromRealTraceRouteOrDirectExit() = runBlocking {
+        val server = MockWebServer().also { servers += it }
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when (request.path) {
+                "/cdn-cgi/trace" -> MockResponse().setBody("fl=123\nh=example\nip=203.0.113.9\ncolo=NRT\nloc=JP\ntls=TLSv1.3\n")
+                else -> MockResponse().setResponseCode(200).setBody("ok")
+            }
+        }
+        server.start()
+        val base = "http://127.0.0.1:${server.port}"
+        val traced = NetworkTest.run(null, listOf(NetSite("cf", "CF", NetCategory.Ai, "$base/cdn-cgi/trace", aiRegion = true))).toList().single()
+        assertEquals("JP", traced.region)
+        assertEquals(NetRegionSource.Trace, traced.regionSource)
+        assertFalse(traced.blocked)
+
+        assertEquals("JP", NetworkTest.parseTrace("fl=1\ncolo=NRT\nloc=jp"))
+        assertNull("A page that merely contains loc= is not a trace", NetworkTest.parseTrace("<html>loc=JP</html>"))
+        assertNull(NetworkTest.parseTrace("colo=NRT\nloc=XX"))
+
+        val log = """
+            time="t" level=info msg="[TCP] 127.0.0.1:40000 --> chatgpt.com:443 match DomainSuffix(chatgpt.com) using 节点选择[🇯🇵 日本 01]"
+            time="t" level=info msg="[TCP] 127.0.0.1:40001 --> www.netflix.com:443 match GeoSite(netflix) using 流媒体[🇯🇵 日本 01]"
+            time="t" level=info msg="[TCP] 127.0.0.1:40002 --> www.reddit.com:443 match Match using 兜底[🇺🇸 美国 02]"
+            time="t" level=info msg="[TCP] 127.0.0.1:40003 --> www.baidu.com:443 match GeoSite(cn) using DIRECT"
+        """.trimIndent()
+        val hosts = mapOf("chatgpt" to "chatgpt.com", "netflix" to "www.netflix.com", "reddit" to "www.reddit.com", "baidu" to "www.baidu.com", "x" to "x.com")
+        val routes = NetworkTest.parseRoutes(log, hosts.values)
+        assertEquals("节点选择[🇯🇵 日本 01]", routes["chatgpt.com"])
+        assertEquals("🇯🇵 日本 01", NetworkTest.leafOf(routes.getValue("www.netflix.com")))
+        assertTrue(NetworkTest.isDirect(routes.getValue("www.baidu.com")))
+        val rows = listOf(
+            NetSiteResult("chatgpt", true, 300, 200, region = "JP", regionSource = NetRegionSource.Trace),
+            NetSiteResult("netflix", true, 400, 200), NetSiteResult("reddit", true, 500, 200),
+            NetSiteResult("baidu", true, 40, 200), NetSiteResult("x", true, 350, 200),
+        )
+        val resolved = NetworkTest.resolve(rows, routes, hosts, directRegion = "CN", viaProxy = true).associateBy { it.id }
+        assertEquals("Same leaf node as a traced row", "JP", resolved.getValue("netflix").region)
+        assertEquals(NetRegionSource.SameNode, resolved.getValue("netflix").regionSource)
+        assertNull("A node nobody traced stays unknown", resolved.getValue("reddit").region)
+        assertEquals("DIRECT leaves from the device's own exit", "CN", resolved.getValue("baidu").region)
+        assertNull("No log line for the host: unknown", resolved.getValue("x").region)
+        val direct = NetworkTest.resolve(rows, emptyMap(), hosts, directRegion = "CN", viaProxy = false).associateBy { it.id }
+        assertEquals("Proxy off: every row exits directly", "CN", direct.getValue("reddit").region)
+        assertEquals("…except a row that traced its own exit", "JP", direct.getValue("chatgpt").region)
+
+        val chatgpt = NetworkTest.sites.first { it.id == "chatgpt" }
+        assertTrue("An AI service at an exit it does not serve is 未解锁",
+            NetworkTest.blocked(chatgpt, NetSiteResult("chatgpt", true, 200, 200, region = "HK")))
+        assertFalse(NetworkTest.blocked(chatgpt, NetSiteResult("chatgpt", true, 200, 200, region = "JP")))
+        assertEquals("🇯🇵", NetworkTest.flag("JP"))
+        assertEquals("", NetworkTest.flag(null))
+    }
+
+    @Test fun speedTestStreamsLiveRatesAndFinishesBothDirections() = runBlocking {
+        val server = MockWebServer().also { servers += it }
+        val chunk = ByteArray(256 * 1024)
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse {
+                val path = request.path.orEmpty()
+                return when {
+                    path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"jp","city":"Tokyo","colo":"NRT","asOrganization":"Example"}""")
+                    path == "/__down?bytes=0" -> MockResponse().setBody("")
+                    path.startsWith("/__down") -> MockResponse().setBody(okio.Buffer().write(chunk))
+                    path == "/__up" -> MockResponse().setResponseCode(200).setHeadersDelay(25, TimeUnit.MILLISECONDS)
+                    else -> MockResponse().setResponseCode(404)
+                }
+            }
+        }
+        server.start()
+        val events = SpeedTest.run(null, "http://127.0.0.1:${server.port}", phaseMs = 700, streams = 2, upChunk = 64 * 1024).toList()
+        val meta = events.filterIsInstance<SpeedEvent.Meta>().single().meta
+        assertEquals("203.0.113.7", meta?.ip)
+        assertEquals("JP", meta?.country)
+        assertTrue(events.filterIsInstance<SpeedEvent.Latency>().single().millis >= 0)
+        assertTrue("live samples stream while a phase runs", events.filterIsInstance<SpeedEvent.Live>().isNotEmpty())
+        val finished = events.filterIsInstance<SpeedEvent.Finished>()
+        assertEquals(listOf(false, true), finished.map { it.upload })
+        assertTrue(finished.all { it.bytes > 0 && it.mbps > 0 })
+        assertEquals(SpeedPhase.Done, (events.last() as SpeedEvent.Phase).phase)
+        assertNull(events.firstOrNull { it is SpeedEvent.Failed })
+        assertEquals(12.5, SpeedTest.mbps(12_500_000 / 8 * 8, 8_000), 0.01)
+        assertEquals(20L, SpeedTest.latency(listOf(90L, 30L, 20L, 10L)))
+        assertNull(SpeedTest.parseMeta("not json"))
+    }
+
+    @Test fun speedTestCancelsPromptlyWhenThePageGoesAway() = runBlocking {
+        val server = MockWebServer().also { servers += it }
+        server.dispatcher = object : Dispatcher() {
+            override fun dispatch(request: RecordedRequest): MockResponse = when {
+                request.path == "/meta" -> MockResponse().setBody("""{"clientIp":"203.0.113.7","country":"JP"}""")
+                request.path == "/__down?bytes=0" -> MockResponse().setBody("")
+                else -> MockResponse().setBody(okio.Buffer().write(ByteArray(64 * 1024))).throttleBody(16 * 1024, 1, TimeUnit.SECONDS)
+            }
+        }
+        server.start()
+        val started = System.nanoTime()
+        val seen = mutableListOf<SpeedEvent>()
+        kotlinx.coroutines.withTimeoutOrNull(1_500) {
+            SpeedTest.run(null, "http://127.0.0.1:${server.port}", phaseMs = 30_000, streams = 2).collect { seen += it }
+        }
+        val elapsed = (System.nanoTime() - started) / 1_000_000
+        assertTrue("cancellation closes the sockets instead of waiting for the phase: $elapsed ms", elapsed < 4_000)
+        assertTrue(seen.none { it is SpeedEvent.Finished })
     }
 
     /* ------------------------------ 去广告核查 ------------------------------ */

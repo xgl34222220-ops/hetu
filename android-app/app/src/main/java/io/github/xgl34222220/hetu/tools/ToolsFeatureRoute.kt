@@ -388,8 +388,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
-        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
-        onOpenNetworkTest = actions.onOpenNetworkTest,
+        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
+            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
+        } ?: actions.onOpenDiagnosticsDetails,
+        onRepairRecord = actions.repairSessionRecord?.let { repair ->
+            { open(ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接"), repair) { ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接", it) } }
+        },
         modifier = modifier,
     )
 
@@ -399,6 +403,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         }
         is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
             ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
+        }
+        is ToolsDiagOverlay.Record -> HomeModalSheet(onDismiss = { overlay = null }) {
+            ToolsRecordSheetContent(current.title, current.subtitle, current.content, onCopy = { actions.onCopy(current.title, it) })
         }
         is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
             ToolsRestoreNetworkDialogCard(

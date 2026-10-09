@@ -88,7 +88,7 @@ internal class ToolsFeatureHost(val actions: ToolsFeatureActions, val appIcon: @
  * @param onChanged a runtime setting changed: refresh the shell state (pending-restart banner).
  */
 @Composable
-internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null, onOpenNetworkTest: (() -> Unit)? = null): ToolsFeatureHost {
+internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnosticsDetails: (() -> Unit)? = null): ToolsFeatureHost {
     val context = LocalContext.current
     val app = context.applicationContext
     val prefs = remember(app) { app.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -97,7 +97,6 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
     val scope = rememberCoroutineScope()
     val changed by rememberUpdatedState(onChanged)
     val diagnosticsDetails by rememberUpdatedState(onOpenDiagnosticsDetails)
-    val networkTest by rememberUpdatedState(onOpenNetworkTest)
 
     fun toast(text: String) = Toast.makeText(app, text, Toast.LENGTH_SHORT).show()
     fun dirty(key: String) { ToolsRuntimeBridge.markDirty(app, key); changed() }
@@ -218,7 +217,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
-            onOpenNetworkTest = if (onOpenNetworkTest == null) null else { { networkTest?.invoke() } },
+            networkEvents = { proxy.networkEvents() },
+            repairSessionRecord = {
+                try { proxy.repairSessionRecord() }
+                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
+            },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })

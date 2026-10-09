@@ -69,9 +69,10 @@ internal fun HetuToolsV2(
     onSubPageVisibleChanged: (Boolean) -> Unit = {},
     onConfigChanged: () -> Unit = {},
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
-    onOpenNetworkTest: (() -> Unit)? = null,
     onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
     onOpenConfigEditor: (() -> Unit)? = null,
+    requestedEntry: ToolsEntry? = null,
+    onRequestConsumed: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val app = context.applicationContext
@@ -83,7 +84,7 @@ internal fun HetuToolsV2(
     val changed by rememberUpdatedState(onConfigChanged)
     val openExternal by rememberUpdatedState(onOpenExternalEntry)
     val openConfigEditor by rememberUpdatedState(onOpenConfigEditor)
-    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails, onOpenNetworkTest = onOpenNetworkTest)
+    val features = rememberToolsFeatureHost(onChanged = onConfigChanged, onOpenDiagnosticsDetails = onOpenDiagnosticsDetails)
     var destination by remember { mutableStateOf(ToolsDestination.Root) }
     ToolsAdblockVisibilityFlag(visible = destination == ToolsDestination.Adblock)
 
@@ -133,7 +134,7 @@ internal fun HetuToolsV2(
                     ToolsEntry.Cores -> ProxyCoreActivity::class.java
                     ToolsEntry.Adblock -> ProxyAdblockChainActivity::class.java
                     ToolsEntry.WebUi -> ProxyWebPanelsActivity::class.java
-                    ToolsEntry.Diag, ToolsEntry.Configs -> null
+                    ToolsEntry.Diag, ToolsEntry.Configs, ToolsEntry.NetTest -> null
                 }
                 if (target != null) {
                     context.startActivity(Intent(context, target))
@@ -215,6 +216,8 @@ internal fun HetuToolsV2(
                 features = features.actions,
                 appIcon = features.appIcon,
                 onDestinationChanged = { destination = it },
+                requestedEntry = requestedEntry,
+                onRequestConsumed = onRequestConsumed,
             )
         }
       }

@@ -203,6 +203,9 @@ internal sealed interface ToolsDiagOverlay {
 
     /** Page 42. */
     data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
+
+    /** 网络事件记录 / 修复运行记录: read-outs that used to live on a second 诊断与维护 page. */
+    data class Record(val title: String, val subtitle: String, val content: ToolsDiagText = ToolsDiagText()) : ToolsDiagOverlay
 }
 
 internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
@@ -375,8 +378,10 @@ internal class ToolsFeatureActions(
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
-    /** 多平台网络测试; null hides the row. */
-    val onOpenNetworkTest: (() -> Unit)? = null,
+    /** 网络事件记录 read-out; null falls back to [onOpenDiagnosticsDetails]. */
+    val networkEvents: (suspend () -> String)? = null,
+    /** 修复运行记录; null hides the row. */
+    val repairSessionRecord: (suspend () -> String)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */

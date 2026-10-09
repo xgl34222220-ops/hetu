@@ -593,6 +593,26 @@ API 设置|API settings|API 設定|Настройки API
 // 工具: the tool pages rebuilt on the shared kit, and what their components say themselves.
 // "\n" in a line stands for a line break, so a two-line message can be a key.
 private val vocabularyTools = """
+网络测试|Network test|網路測試|Тест сети
+连通性|Connectivity|連通性|Доступность
+连通性与网速|Connectivity and speed|連通性與網速|Доступность и скорость
+开始测速|Start test|開始測速|Начать тест
+停止测速|Stop test|停止測速|Остановить тест
+测试中|Testing|測試中|Проверка
+未解锁|Blocked|未解鎖|Недоступно
+实时速率|Live rate|即時速率|Скорость в реальном времени
+测速结果|Results|測速結果|Результаты
+出口|Exit|出口|Выход
+重新测试|Test again|重新測試|Повторить
+可用|available|可用|доступно
+AI 服务|AI services|AI 服務|ИИ-сервисы
+社交媒体|Social|社群媒體|Соцсети
+影音娱乐|Streaming|影音娛樂|Видео и музыка
+工具与服务|Tools and services|工具與服務|Инструменты и сервисы
+尚未测速|Not tested yet|尚未測速|Тест не выполнялся
+下载速率|Download rate|下載速率|Скорость загрузки
+测速失败|Speed test failed|測速失敗|Тест не удался
+失败|Failed|失敗|Ошибка
 切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
 上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
 下一个匹配|Next match|下一個相符項目|Следующее совпадение

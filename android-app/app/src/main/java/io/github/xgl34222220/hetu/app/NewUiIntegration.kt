@@ -41,7 +41,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
         onOpenSubscription = { vm.openPanel("providers") },
         onOpenBasicSettings = { nav.push(HxRoute.Network) },
-        onOpenConfigs = { nav.push(HxRoute.Configs) },
+        onOpenConfigs = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs) },
         onViewConfig = { nav.push(HxRoute.ConfigEditor) },
         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
         cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
