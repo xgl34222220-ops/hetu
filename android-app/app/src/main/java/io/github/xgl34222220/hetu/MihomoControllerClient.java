@@ -196,7 +196,9 @@ final class MihomoControllerClient {
                 try{
                     String test=URLEncoder.encode(rawUrl,"UTF-8");
                     String status=URLEncoder.encode(expectedRange,"UTF-8");
-                    JSONObject v=request("GET",path+"?timeout=10000&url="+test+"&expected="+status,null,13000);
+                    // A dead node used to hold one of the six probe workers for 10 s per URL.
+                    // 5 s matches the group endpoint and keeps a wave of leaves moving.
+                    JSONObject v=request("GET",path+"?timeout=5000&url="+test+"&expected="+status,null,6500);
                     long d=v.optLong("delay",-1);
                     if(d>0)return d;
                     if(d==0)last=new DelayFailure(false);

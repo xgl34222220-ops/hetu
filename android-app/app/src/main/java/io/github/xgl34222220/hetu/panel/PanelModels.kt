@@ -206,6 +206,11 @@ internal data class PanelData(
     val readError: String = "",
     /** Running, but the first controller snapshot has not arrived yet: tabs show placeholders. */
     val loading: Boolean = false,
+    /**
+     * Latest finished readings without in-flight markers. A group card shows its own
+     * 测速 only; a node shared with another group's probe keeps its last reading here.
+     */
+    val settledDelays: Map<String, PanelDelay> = emptyMap(),
     /** Groups whose 测速 is in flight. */
     val testingGroups: Set<String> = emptySet(),
     /** A whole-profile latency test is in flight. */
@@ -233,6 +238,17 @@ internal data class PanelData(
         // Preserve that busy state instead of hiding it behind the leaf's old result.
         if (delays[node] == PanelDelay.Testing) return PanelDelay.Testing
         return delays[leafOf(node)] ?: PanelDelay.Unknown
+    }
+
+    /**
+     * What a group card shows when that group itself is not being measured. Testing
+     * markers owned by other probes (e.g. a large selector containing this card's
+     * current node) must not flip every card on the page to 测速中.
+     */
+    fun cardDelayOf(node: String): PanelDelay? {
+        val shown = delayOf(node)
+        if (shown != PanelDelay.Testing) return shown
+        return settledDelays[leafOf(node)] ?: PanelDelay.Unknown
     }
 }
 

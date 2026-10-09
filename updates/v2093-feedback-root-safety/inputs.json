@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "8127551a2e5968a492f9fcf107f6705c0a62330148030a7961b85e802a242c5b",
+  "patchSha256": "e569e807215d56223ca255dc49aab636c19abe9e7ca47e030f8292f6c3c09886",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -236,6 +236,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt",
@@ -268,7 +269,8 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartTransaction93Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ScriptFeedbackPlacement94Test.kt",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt"
   ],
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "5b9cc72bc82c12bdccb2cc6f20d68bf9b0f11c0dedb30163ab3196ea8f637bac",
@@ -276,10 +278,10 @@
     "android-app/app/src/main/assets/hetu-root.sh": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "437d34d506bf50b75e986f4cf43c8466f507de09bd412ce3fa570c929628eea9",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "46d6e6902dc715394b95c463ea89f3a143ad9939f10dc76ff6fd0bfc7d921d3e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "bd0aaf9f884e8a529c3f29f46e5e7a79aa5f1928f3b028bbb7db39a7be36fa2b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "e96a2fbfd1dd53b12660db49a7a98895efd779e743e1108774d17268196dec3c",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "ed57211129acc70c2a6b158f53ea8258e276e5402ba311d6271848bbc63a3e6e",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt": "58444369650b1b8156163a093a4e8d0f5aa993c29bec09a350672c1048804d5e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt": "bbb6e53f52cc3e61c9c431af31a3dcb53e99f22b0f6ae3b3c4666db9967cf286",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java": "43018298725f0163e59d61eec00d2dc6d8fdb8af0f4d92417d8d175b7cfd3adf",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "ee1f42cd2b9ffbbf596b6dc856231b7ba8ea889d6092c0553ac2a733499cc375",
@@ -288,18 +290,19 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "f47dfc708e5560821a8f38c4fde51d53edaa6c0582fe6c3583c311f882fdd61c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "79a392068f209b1690f7507849ebbd2ee4b249b398a2a281b9b0eb6bfa1bd593",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "9d551d90ccc3082c61aba473a81653072d9c8d5bb50a7741ae00a42590c0021b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "ae7951bfdef4e7b19dfc1925a4dbf534cd93540b6c2c03312eb48ebe5ffd11b0",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "08bf2cb919f648eca5e9fa0cc2ccbdb713b87b8599e967c7a32421d1669643de",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "cdefabb9fb7c89bf3e08c1ba82374e8b43768cca5bca48834891ca26e47aa6d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "f6bb5c1d68438be89c0882104e8604ae9d59648e9bff3eb548567c8497d09bd6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt": "184a18a33de974d068a766c8365bdeb4ab6ebd8d54a0e6db5390c1f48839f2cc",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt": "924ee8ae5c62ca0653310632cd17feec92513c9b16423fd718bb20e6f66413e4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt": "a8588515d62e48001a96fdf20d49437f18419cd3c0303a84c427542a65b9696f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt": "f05c6e0397014084fd415ce3980351653df807fd6cff6181471f4c9b637fd5be",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "8098f3f8050514aab09cfc6ac34dc28cc0054470357fb44580ce53d15fe176b4",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt": "ec675c19ddf812f818427109911e092e15db516be7f66e6bfd612bb3234b5872",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "a006e7376f268ee642e45536eb704093dcef428cc2efdb87d493b595ab6cc094",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt": "a708782f5db74b58dfecb2a5512ae2ab2b99471d696db26a615d89383d8591c5",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "0fa94576d5a0bfbf73a0b2dbb1c55fa24e4cf44db3ebb9505dd9b34ecc98281c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "055b71781d5b05373fd68ffc686d7db7e299a95ee4450ac7f459efee3f2ef1a3",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "ea97f906f635149b7269768983ad6d8abb4705f4da9ac8cb6a615225f1903224",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "c856451bb5e51b904f211b33abb3e84f42e9382bc6071d41c2244d401ca0efd9",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt": "ff0abd1f616951a0c5a8461dfd89ea40f866411ae0ff11a9870d5a39b57e422c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt": "ef29a56934b01b7630944a2a3cf209f0f118f4a5b258d53dbe06d6fa79c546c7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt": "b78242b5b0314c812f1092bf2370c737ca1f60ded392e8be5051c94c4c85b982",
@@ -325,7 +328,8 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartTransaction93Test.kt": "b469c64b5a71880fbe5237bf24b243c332fc99984dfe9df90ec78c86e0ac7166",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "9be0ba537081f512a51d7a2833368d5ee1533f91bd12adc61490b826bc343e8b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ScriptFeedbackPlacement94Test.kt": "e9fd1bf72ae7f48680634a32b1f9402b3552fa2333571e17f8164bd72a89cd0b",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040"
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt": "33215b764195bb2b4c3b5320b9ac64f98c8c5a50ac53fb5fa06a7ce686157290"
   },
   "frozenFiles": {
     "android-app/CONCEPT_PROGRESS.md": "3082d07fed4014ba5a77d4591ab73af3748413457578339eb42e03be0050172b",
@@ -2903,6 +2907,16 @@
         "actualToolsClipboardRejectionAndMissingServiceNeverClaimSuccess"
       ]
     },
+    "io.github.xgl34222220.hetu.StrategyLoadSpeed96Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt",
+      "methods": [
+        "groupCardKeepsItsLastReadingWhileAnotherGroupProbesItsCurrentNode",
+        "projectorKeepsTheSettledReadingBesideTheTestingMarker",
+        "selectorGroupProbeMarksOnlyItsOwnGroupAndUsesOneCoreRequest",
+        "automaticGroupLeafResultLandsBeforeItsSlowestSibling",
+        "restoredStrategyCardsDrawAtOnceButCannotActUntilAFreshRead"
+      ]
+    },
     "io.github.xgl34222220.hetu.ToastFeedbackTest": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/ToastFeedbackTest.kt",
       "methods": [
@@ -3034,8 +3048,8 @@
       ]
     }
   },
-  "expectedUnitTests": 748,
-  "expectedTestXmlFiles": 83,
+  "expectedUnitTests": 753,
+  "expectedTestXmlFiles": 84,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesUnchanged": true,
   "signingUnchanged": true,

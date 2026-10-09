@@ -341,7 +341,8 @@ internal class ProxyDashboardRepository(context: Context) {
         measureSnapshot(targets, snapshot)
     }
 
-    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
+    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot,
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
         val pending = targets.distinct()
         val next = java.util.concurrent.atomic.AtomicInteger()
@@ -359,6 +360,10 @@ internal class ProxyDashboardRepository(context: Context) {
                         val value = measuredProbe(node, snapshot)
                         coroutineContext.ensureActive()
                         synchronized(results) { results[node] = value }
+                        // Each leaf can be shown as soon as it lands, but only while the
+                        // wave's identity is still current; the final map keeps its guard.
+                        if (onResult != null && snapshot.identity.stable && probeIdentity() == snapshot.identity)
+                            onResult(node, value)
                     }
                     catch (cancel: CancellationException) { throw cancel }
                     // A controller/transport error has no new node measurement. Keep
@@ -395,10 +400,11 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
      * clear and reapply a pin, which could briefly reroute live traffic.
      */
-    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = latencyProbeOperation {
+    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
         if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
-        measureSnapshot(targets, snapshot)
+        measureSnapshot(targets, snapshot, onResult)
     }
 
     /** Core-parallel group latency probe used by strategy-card delay taps. */

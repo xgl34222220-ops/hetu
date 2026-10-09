@@ -161,7 +161,8 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState, 
     val expanded = group.name in view.expandedGroups
     val compact = view.layout.compactGroups
     val testing = group.name in data.testingGroups || data.testingAll
-    val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
+    // Only this group's own 测速 (or 测试全部) marks the card; shared nodes keep their last reading.
+    val delay = if (testing) PanelDelay.Testing else data.cardDelayOf(group.now)
     val pending = data.switching[group.name]
     val leaf = data.leafOf(group.now)
     val currentName = HomeRegions.withoutFlag(group.now)

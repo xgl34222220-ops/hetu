@@ -19,6 +19,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
@@ -143,6 +144,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     /* ---------------- runtime state ---------------- */
+    /** Groups restored from the last complete snapshot; display only until a fresh read replaces them. */
+    private var restoredGroups: List<ProxyGroupUi>? = null
     var state by mutableStateOf(initialState())
         private set
     var runtime by mutableStateOf(initialRuntime())
@@ -416,14 +419,36 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     private fun initialState(): ProxyComposeState {
         val profile = ProxyRuntimeProfile.load(prefs)
         val cachedConfig = prefs.getString("proxySelectedConfig.${profile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
+        val running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false))
+        val config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig
+        // Draw the last complete strategy cards at once instead of ~2 s of placeholders.
+        // panelReady stays false, so nothing here can confirm a selection or count as data.
+        val restored = if (running && prefs.getString(StrategySnapshotCache.PREF_KEY, null) == config)
+            StrategySnapshotCache.read(app, config) else emptyList()
+        if (restored.isNotEmpty()) restoredGroups = restored
         return ProxyComposeState(
-            running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
+            running = running,
             core = profile.core.label,
             mode = profile.mode.label,
             ipv6 = profile.ipv6.id,
             autoOverwrite = profile.autoOverwrite,
-            config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig,
+            config = config,
+            groups = restored,
         )
+    }
+
+    /** True while the cards still show the restored list rather than a fresh controller read. */
+    private fun showingRestoredGroups(): Boolean {
+        val restored = restoredGroups ?: return false
+        if (state.groups === restored) return true
+        restoredGroups = null
+        return false
+    }
+
+    private fun refuseRestoredGroups(): Boolean {
+        if (!showingRestoredGroups()) return false
+        toast("正在读取核心最新状态，请稍候")
+        return true
     }
 
     private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
@@ -603,7 +628,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
+        val completeGroups = next.running && next.panelReady && !next.controllerReadFailed && next.groups.isNotEmpty()
+        if (completeGroups) StrategySnapshotCache.write(app, next.config, next.groups)
         prefs.edit()
+            .also { if (completeGroups) it.putString(StrategySnapshotCache.PREF_KEY, next.config) }
             .putBoolean("proxyUiLastRunning", next.running)
             .putString("proxyUiLastConfig", next.config)
             .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
@@ -797,6 +825,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /* ---------------- proxies ---------------- */
 
     fun select(group: String, node: String) {
+        if (refuseRestoredGroups()) return
         val request = activeRuntimeRequest() ?: return
         if (pendingSelection.containsKey(group)) return
         val current = state.groups.firstOrNull { it.name == group } ?: return
@@ -848,6 +877,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun testNode(node: String) {
+        if (refuseRestoredGroups()) return
         val request = activeRuntimeRequest() ?: return
         if (testingNodes[node] == true) return
         val owner = ++requestSequence
@@ -858,6 +888,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun testGroup(group: ProxyGroupUi) {
+        if (refuseRestoredGroups()) return
         val request = activeRuntimeRequest() ?: return
         if (testingGroups[group.name] == true) return
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
@@ -867,10 +898,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         testingGroups[group.name] = true
         holdNodeProbes(owner, targets)
         viewModelScope.launch {
+            // Leaf probes of automatic groups land one by one: show each reading and stop
+            // that node's spinner at once instead of holding all of them for the slowest.
+            val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
+            val progress = launch {
+                for ((node, value) in landed) {
+                    applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
+                    releaseNodeProbes(owner, listOf(node))
+                }
+            }
             try {
                 // Selector groups retain the parallel core endpoint. Automatic groups use
                 // bounded leaf probes because that endpoint silently clears their fixed choice.
-                val result = repo.groupDelay(group, targets)
+                val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
                 if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
                     toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                 val stamp = SystemClock.elapsedRealtime()
@@ -889,6 +929,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (error: Exception) {
                 if (currentRuntimeRequest(request)) toast(errorText(error, "策略组测速失败"))
             } finally {
+                landed.close()
+                progress.cancel()
                 releaseNodeProbes(owner, targets)
                 if (groupProbeOwners[group.name] == owner) {
                     groupProbeOwners.remove(group.name)
@@ -899,6 +941,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun testAll() {
+        if (refuseRestoredGroups()) return
         val request = activeRuntimeRequest() ?: return
         if (testingAll) return
         val owner = ++requestSequence

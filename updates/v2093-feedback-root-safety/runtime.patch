@@ -949,7 +949,7 @@ index 0000000..244568f
 +    } finally { if (inherited == null) budget.close() }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..0a07bf6 100644
+index f104cef..8b96e4a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -123,13 +123,19 @@ final class MihomoControllerClient {
@@ -974,7 +974,7 @@ index f104cef..0a07bf6 100644
      }
 
      void reloadConfig(String path)throws Exception{
-@@ -174,13 +180,19 @@ final class MihomoControllerClient {
+@@ -174,17 +180,25 @@ final class MihomoControllerClient {
      }
 
      private long delayPath(String path,String preferredUrl,String expected)throws Exception{
@@ -995,7 +995,14 @@ index f104cef..0a07bf6 100644
                  try{
                      String test=URLEncoder.encode(rawUrl,"UTF-8");
                      String status=URLEncoder.encode(expectedRange,"UTF-8");
-@@ -198,8 +210,9 @@ final class MihomoControllerClient {
+-                    JSONObject v=request("GET",path+"?timeout=10000&url="+test+"&expected="+status,null,13000);
++                    // A dead node used to hold one of the six probe workers for 10 s per URL.
++                    // 5 s matches the group endpoint and keeps a wave of leaves moving.
++                    JSONObject v=request("GET",path+"?timeout=5000&url="+test+"&expected="+status,null,6500);
+                     long d=v.optLong("delay",-1);
+                     if(d>0)return d;
+                     if(d==0)last=new DelayFailure(false);
+@@ -198,8 +212,9 @@ final class MihomoControllerClient {
              if(last!=null)throw last;
              throw new IOException("没有可用的测速地址");
          }finally{
@@ -1006,7 +1013,7 @@ index f104cef..0a07bf6 100644
      }
 
      JSONObject groupDelay(String group)throws Exception{
-@@ -207,11 +220,16 @@ final class MihomoControllerClient {
+@@ -207,11 +222,16 @@ final class MihomoControllerClient {
      }
 
      JSONObject groupDelay(String group,String preferredUrl,String expected)throws Exception{
@@ -1023,7 +1030,7 @@ index f104cef..0a07bf6 100644
              try{
                  String test=URLEncoder.encode(rawUrl,"UTF-8");
                  String status=URLEncoder.encode(expectedRange,"UTF-8");
-@@ -228,6 +246,7 @@ final class MihomoControllerClient {
+@@ -228,6 +248,7 @@ final class MihomoControllerClient {
          }
          if(last!=null)throw last;
          throw new IOException("策略组延迟测试失败");
@@ -1031,7 +1038,7 @@ index f104cef..0a07bf6 100644
      }
 
      void closeAll()throws Exception{request("DELETE","/connections",null);}
-@@ -246,9 +265,12 @@ final class MihomoControllerClient {
+@@ -246,9 +267,12 @@ final class MihomoControllerClient {
          byte[] payload=body==null?new byte[0]:body.toString().getBytes(StandardCharsets.UTF_8);
          ControllerEndpoint endpoint=frozenEndpoint!=null?frozenEndpoint:new ControllerEndpoint(prefs().getAll());
          Socket socket=new Socket();
@@ -1046,7 +1053,7 @@ index f104cef..0a07bf6 100644
              OutputStream raw=socket.getOutputStream();
              StringBuilder head=new StringBuilder();
              head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-@@ -281,8 +303,12 @@ final class MihomoControllerClient {
+@@ -281,8 +305,12 @@ final class MihomoControllerClient {
              }else bytes=readToEnd(in);
              String text=new String(bytes,StandardCharsets.UTF_8);
              if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
@@ -1099,7 +1106,7 @@ index 76318e4..1082f65 100644
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..5eb4f8d 100644
+index 5ae93b3..514c931 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -58,11 +58,14 @@ internal class ProxyDashboardRepository(context: Context) {
@@ -1150,9 +1157,13 @@ index 5ae93b3..5eb4f8d 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().filter { name ->
              val node = snapshot.proxies.optJSONObject(name)
-@@ -337,18 +343,32 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -335,20 +341,39 @@ internal class ProxyDashboardRepository(context: Context) {
+         measureSnapshot(targets, snapshot)
+     }
 
-     private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
+-    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot): Map<String, Long> {
++    private suspend fun measureSnapshot(targets: List<String>, snapshot: ProbeSnapshot,
++        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
          val results = LinkedHashMap<String, Long>()
 -        for (chunk in targets.distinct().chunked(6)) {
 -            coroutineScope {
@@ -1174,6 +1185,10 @@ index 5ae93b3..5eb4f8d 100644
 +                        val value = measuredProbe(node, snapshot)
 +                        coroutineContext.ensureActive()
 +                        synchronized(results) { results[node] = value }
++                        // Each leaf can be shown as soon as it lands, but only while the
++                        // wave's identity is still current; the final map keeps its guard.
++                        if (onResult != null && snapshot.identity.stable && probeIdentity() == snapshot.identity)
++                            onResult(node, value)
 +                    }
                      catch (cancel: CancellationException) { throw cancel }
                      // A controller/transport error has no new node measurement. Keep
@@ -1190,7 +1205,7 @@ index 5ae93b3..5eb4f8d 100644
          return results
      }
 
-@@ -366,7 +386,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,7 +391,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -1199,13 +1214,14 @@ index 5ae93b3..5eb4f8d 100644
          probe(node, probeSnapshot())
      }
 
-@@ -375,26 +395,14 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -375,26 +400,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
       * (upstream ab405bad, hub/route/groups.go). Probe their leaves instead; never
       * clear and reapply a pin, which could briefly reroute live traffic.
       */
 -    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
 -        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
-+    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = latencyProbeOperation {
++    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
++        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
 +        if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
          val snapshot = probeSnapshot(force = true)
 -        val results = LinkedHashMap<String, Long>()
@@ -1221,7 +1237,7 @@ index 5ae93b3..5eb4f8d 100644
 -        }
 -        requireCurrentProbe(snapshot.identity)
 -        results
-+        measureSnapshot(targets, snapshot)
++        measureSnapshot(targets, snapshot, onResult)
      }
 
      /** Core-parallel group latency probe used by strategy-card delay taps. */
@@ -1230,7 +1246,7 @@ index 5ae93b3..5eb4f8d 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +422,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +428,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -3031,18 +3047,71 @@ index 2b1a624..823695c 100644
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..b5eed2e 100644
+index 250b8a8..3102255 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-@@ -21,6 +21,7 @@ import kotlinx.coroutines.async
+@@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
+ import kotlinx.coroutines.Job
+ import kotlinx.coroutines.async
  import kotlinx.coroutines.awaitAll
++import kotlinx.coroutines.channels.Channel
  import kotlinx.coroutines.coroutineScope
  import kotlinx.coroutines.delay
 +import kotlinx.coroutines.ensureActive
  import kotlinx.coroutines.flow.MutableSharedFlow
  import kotlinx.coroutines.flow.SharedFlow
  import kotlinx.coroutines.isActive
-@@ -449,12 +450,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -142,6 +144,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     /* ---------------- runtime state ---------------- */
++    /** Groups restored from the last complete snapshot; display only until a fresh read replaces them. */
++    private var restoredGroups: List<ProxyGroupUi>? = null
+     var state by mutableStateOf(initialState())
+         private set
+     var runtime by mutableStateOf(initialRuntime())
+@@ -415,16 +419,38 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     private fun initialState(): ProxyComposeState {
+         val profile = ProxyRuntimeProfile.load(prefs)
+         val cachedConfig = prefs.getString("proxySelectedConfig.${profile.core.id}", "").orEmpty().ifBlank { "尚未选择配置" }
++        val running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false))
++        val config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig
++        // Draw the last complete strategy cards at once instead of ~2 s of placeholders.
++        // panelReady stays false, so nothing here can confirm a selection or count as data.
++        val restored = if (running && prefs.getString(StrategySnapshotCache.PREF_KEY, null) == config)
++            StrategySnapshotCache.read(app, config) else emptyList()
++        if (restored.isNotEmpty()) restoredGroups = restored
+         return ProxyComposeState(
+-            running = prefs.getBoolean("proxyUiLastRunning", prefs.getBoolean("proxyRootWanted", false)),
++            running = running,
+             core = profile.core.label,
+             mode = profile.mode.label,
+             ipv6 = profile.ipv6.id,
+             autoOverwrite = profile.autoOverwrite,
+-            config = prefs.getString("proxyUiLastConfig", cachedConfig) ?: cachedConfig,
++            config = config,
++            groups = restored,
+         )
+     }
+
++    /** True while the cards still show the restored list rather than a fresh controller read. */
++    private fun showingRestoredGroups(): Boolean {
++        val restored = restoredGroups ?: return false
++        if (state.groups === restored) return true
++        restoredGroups = null
++        return false
++    }
++
++    private fun refuseRestoredGroups(): Boolean {
++        if (!showingRestoredGroups()) return false
++        toast("正在读取核心最新状态，请稍候")
++        return true
++    }
++
+     private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
+         running = prefs.getBoolean("proxyUiLastRunning", false),
+         elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
+@@ -449,12 +475,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -3061,7 +3130,7 @@ index 250b8a8..b5eed2e 100644
          try {
              val startedAt = SystemClock.elapsedRealtime()
              val next = repo.state()
-@@ -509,7 +514,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +539,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -3089,7 +3158,7 @@ index 250b8a8..b5eed2e 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +584,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +609,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -3107,7 +3176,7 @@ index 250b8a8..b5eed2e 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +592,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +617,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -3115,7 +3184,26 @@ index 250b8a8..b5eed2e 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -827,8 +839,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +628,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
++        val completeGroups = next.running && next.panelReady && !next.controllerReadFailed && next.groups.isNotEmpty()
++        if (completeGroups) StrategySnapshotCache.write(app, next.config, next.groups)
+         prefs.edit()
++            .also { if (completeGroups) it.putString(StrategySnapshotCache.PREF_KEY, next.config) }
+             .putBoolean("proxyUiLastRunning", next.running)
+             .putString("proxyUiLastConfig", next.config)
+             .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
+@@ -785,6 +825,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     /* ---------------- proxies ---------------- */
+
+     fun select(group: String, node: String) {
++        if (refuseRestoredGroups()) return
+         val request = activeRuntimeRequest() ?: return
+         if (pendingSelection.containsKey(group)) return
+         val current = state.groups.firstOrNull { it.name == group } ?: return
+@@ -827,12 +868,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -3129,16 +3217,43 @@ index 250b8a8..b5eed2e 100644
          }
      }
 
-@@ -856,6 +871,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     fun testNode(node: String) {
++        if (refuseRestoredGroups()) return
+         val request = activeRuntimeRequest() ?: return
+         if (testingNodes[node] == true) return
+         val owner = ++requestSequence
+@@ -843,6 +888,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun testGroup(group: ProxyGroupUi) {
++        if (refuseRestoredGroups()) return
+         val request = activeRuntimeRequest() ?: return
+         if (testingGroups[group.name] == true) return
+         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
+@@ -852,10 +898,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         testingGroups[group.name] = true
+         holdNodeProbes(owner, targets)
+         viewModelScope.launch {
++            // Leaf probes of automatic groups land one by one: show each reading and stop
++            // that node's spinner at once instead of holding all of them for the slowest.
++            val landed = Channel<Pair<String, Long>>(Channel.UNLIMITED)
++            val progress = launch {
++                for ((node, value) in landed) {
++                    applyNodeProbe(request, owner, node, value, SystemClock.elapsedRealtime())
++                    releaseNodeProbes(owner, listOf(node))
++                }
++            }
+             try {
                  // Selector groups retain the parallel core endpoint. Automatic groups use
                  // bounded leaf probes because that endpoint silently clears their fixed choice.
-                 val result = repo.groupDelay(group, targets)
+-                val result = repo.groupDelay(group, targets)
++                val result = repo.groupDelay(group, targets) { node, value -> landed.trySend(node to value) }
 +                if (targets.none { it in result } && currentRuntimeRequest(request) && groupProbeOwners[group.name] == owner)
 +                    toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,6 +880,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +920,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -3149,7 +3264,22 @@ index 250b8a8..b5eed2e 100644
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
-@@ -893,7 +914,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                 if (currentRuntimeRequest(request)) toast(errorText(error, "策略组测速失败"))
+             } finally {
++                landed.close()
++                progress.cancel()
+                 releaseNodeProbes(owner, targets)
+                 if (groupProbeOwners[group.name] == owner) {
+                     groupProbeOwners.remove(group.name)
+@@ -878,6 +941,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun testAll() {
++        if (refuseRestoredGroups()) return
+         val request = activeRuntimeRequest() ?: return
+         if (testingAll) return
+         val owner = ++requestSequence
+@@ -893,7 +957,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  val stamp = SystemClock.elapsedRealtime()
                  result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                  val ok = result.values.count { it > 0L }
@@ -3337,6 +3467,103 @@ index ce5f550..65650a3 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt
+new file mode 100644
+index 0000000..65065ca
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt
+@@ -0,0 +1,91 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import org.json.JSONArray
++import org.json.JSONObject
++import java.io.File
++import java.util.concurrent.Executors
++
++/**
++ * The last complete strategy-group list, kept only so a cold open can draw the
++ * cards at once instead of empty placeholders while Root status and the four
++ * controller reads finish. It is display data: the restored list never sets
++ * panelReady, and the ViewModel refuses selections/probes while it is shown.
++ * Latency readings are not stored; they always come from a fresh measurement.
++ */
++internal object StrategySnapshotCache {
++    private const val FILE = "strategy-groups-v1.json"
++    private const val SCHEMA = 1
++    const val PREF_KEY = "proxyUiStrategyCacheConfig"
++    private val writer = Executors.newSingleThreadExecutor { task ->
++        Thread(task, "hetu-strategy-cache").apply { isDaemon = true }
++    }
++    @Volatile private var lastWritten: Pair<String, List<ProxyGroupUi>>? = null
++
++    private fun file(context: Context) = File(context.applicationContext.noBackupFilesDir, FILE)
++
++    private fun stripped(groups: List<ProxyGroupUi>) = groups.map { group ->
++        group.copy(nodes = group.nodes.map { it.copy(lastDelay = null, lastDelayAt = 0L) })
++    }
++
++    fun read(context: Context, config: String): List<ProxyGroupUi> = try {
++        val source = file(context)
++        if (!source.isFile) emptyList() else {
++            val root = JSONObject(source.readText())
++            if (root.optInt("schema") != SCHEMA || root.optString("config") != config) emptyList()
++            else {
++                val array = root.optJSONArray("groups") ?: JSONArray()
++                (0 until array.length()).mapNotNull { index ->
++                    val group = array.optJSONObject(index) ?: return@mapNotNull null
++                    val name = group.optString("name")
++                    if (name.isBlank()) return@mapNotNull null
++                    val nodes = group.optJSONArray("nodes") ?: JSONArray()
++                    ProxyGroupUi(
++                        name = name, type = group.optString("type"), now = group.optString("now"),
++                        nodes = (0 until nodes.length()).mapNotNull { n ->
++                            val node = nodes.optJSONObject(n) ?: return@mapNotNull null
++                            node.optString("name").takeIf { it.isNotBlank() }?.let {
++                                ProxyNodeUi(it, node.optString("type"), node.optBoolean("udp", false),
++                                    provider = node.optString("provider"))
++                            }
++                        },
++                        iconUrl = group.optString("iconUrl"), iconPath = group.optString("iconPath"),
++                        hidden = group.optBoolean("hidden", false),
++                    )
++                }
++            }
++        }
++    } catch (_: Exception) { emptyList() }
++
++    /** Writes off the main thread, and only when the group structure actually changed. */
++    fun write(context: Context, config: String, groups: List<ProxyGroupUi>) {
++        if (groups.isEmpty()) return
++        val clean = stripped(groups)
++        val key = config to clean
++        if (lastWritten == key) return
++        lastWritten = key
++        val target = file(context)
++        writer.execute {
++            try {
++                val array = JSONArray()
++                clean.forEach { group ->
++                    val nodes = JSONArray()
++                    group.nodes.forEach { node ->
++                        nodes.put(JSONObject().put("name", node.name).put("type", node.type)
++                            .put("udp", node.udp).put("provider", node.provider))
++                    }
++                    array.put(JSONObject().put("name", group.name).put("type", group.type).put("now", group.now)
++                        .put("iconUrl", group.iconUrl).put("iconPath", group.iconPath)
++                        .put("hidden", group.hidden).put("nodes", nodes))
++                }
++                val text = JSONObject().put("schema", SCHEMA).put("config", config).put("groups", array).toString()
++                target.parentFile?.mkdirs()
++                val temporary = File(target.parentFile, "$FILE.tmp")
++                temporary.writeText(text)
++                if (!temporary.renameTo(target)) { target.delete(); temporary.renameTo(target) }
++            } catch (_: Exception) {
++                lastWritten = null
++            }
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 index 9afc132..0881179 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
@@ -3740,10 +3967,10 @@ index b187a2f..62dacb2 100644
          if (trailing != null) trailing()
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 new file mode 100644
-index 0000000..e6d791e
+index 0000000..15ff606
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
-@@ -0,0 +1,269 @@
+@@ -0,0 +1,273 @@
 +package io.github.xgl34222220.hetu.panel
 +
 +import io.github.xgl34222220.hetu.DashboardProviderUi
@@ -3798,6 +4025,7 @@ index 0000000..e6d791e
 +    private val groupBase = PanelProjectionSlice<GroupBase>()
 +    private val groups = PanelProjectionSlice<List<PanelGroup>>()
 +    private val nodeDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
++    private val settledDelays = PanelProjectionSlice<Map<String, PanelDelay>>()
 +    private data class ConnectionMetadataKey(
 +        val host: String, val startedAt: String, val network: String, val inbound: String,
 +        val app: String, val packageName: String, val chain: String, val rule: String,
@@ -3815,7 +4043,7 @@ index 0000000..e6d791e
 +    private val logs = PanelProjectionSlice<List<PanelLogEntry>>()
 +
 +    private fun clear() {
-+        groupBase.clear(); groups.clear(); nodeDelays.clear(); connectionMetadata = emptyMap()
++        groupBase.clear(); groups.clear(); nodeDelays.clear(); settledDelays.clear(); connectionMetadata = emptyMap()
 +        connections.clear(); ranks.clear(); subscriptionOverview.clear(); subscriptions.clear()
 +        rules.clear(); ruleSets.clear(); logs.clear()
 +    }
@@ -3864,6 +4092,9 @@ index 0000000..e6d791e
 +                delayValues.forEach { (name, ms) -> this[name] = panelDelayOf(ms) }
 +                testingNames.forEach { this[it] = PanelDelay.Testing }
 +            }.toMap()
++        }
++        val shownSettled = settledDelays.get(base.delays, delayValues) {
++            HashMap(base.delays).apply { delayValues.forEach { (name, ms) -> this[name] = panelDelayOf(ms) } }.toMap()
 +        }
 +        val zone = ZoneId.systemDefault()
 +        val rates = traffic.connectionRates.toMap()
@@ -3931,7 +4162,7 @@ index 0000000..e6d791e
 +        }
 +        return PanelData(
 +            status = PanelStatus.Running, globalMode = state.trafficMode.equals("global", ignoreCase = true),
-+            groups = shownGroups, delays = shownDelays,
++            groups = shownGroups, delays = shownDelays, settledDelays = shownSettled,
 +            loading = !state.panelReady && state.groups.isEmpty() && state.connections.isEmpty(),
 +            testingGroups = testingGroups.toSet(), testingAll = testingAll,
 +            switching = switching.filter { (group, node) -> sourceGroups.firstOrNull { it.name == group }?.now != node },
@@ -4014,7 +4245,7 @@ index 0000000..e6d791e
 +    return if (value.length >= 16 && value[4] == '-' && value[7] == '-') value.substring(5, 16).replace('T', ' ') else value.replace('T', ' ')
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
-index c95890c..a7ebb5c 100644
+index c95890c..9c088e6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 @@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
@@ -4041,7 +4272,7 @@ index c95890c..a7ebb5c 100644
                          )
                      }
                      repeat(columns - row.groups.size) { Spacer(Modifier.weight(1f)) }
-@@ -152,11 +155,24 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
+@@ -152,11 +155,25 @@ internal fun LazyListScope.panelLoadingTab(columns: Int) {
  /* ------------------------------------------------------------------ */
 
  @Composable
@@ -4052,7 +4283,8 @@ index c95890c..a7ebb5c 100644
      val expanded = group.name in view.expandedGroups
      val compact = view.layout.compactGroups
 +    val testing = group.name in data.testingGroups || data.testingAll
-+    val delay = if (testing) PanelDelay.Testing else data.delayOf(group.now)
++    // Only this group's own 测速 (or 测试全部) marks the card; shared nodes keep their last reading.
++    val delay = if (testing) PanelDelay.Testing else data.cardDelayOf(group.now)
 +    val pending = data.switching[group.name]
 +    val leaf = data.leafOf(group.now)
 +    val currentName = HomeRegions.withoutFlag(group.now)
@@ -4067,7 +4299,7 @@ index c95890c..a7ebb5c 100644
      val motion = LocalHomeMotionEnabled.current
      val fill by animateColorAsState(if (expanded) lerp(c.surface, c.accent, if (c.dark) .14f else .055f) else c.surface, HomeMotion.fade(motion), label = "groupFill")
      val outline by animateColorAsState(if (expanded) c.accent.copy(alpha = .58f) else Color.Transparent, HomeMotion.fade(motion), label = "groupOutline")
-@@ -166,37 +182,51 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
+@@ -166,37 +183,51 @@ private fun GroupCard(group: PanelGroup, data: PanelData, view: PanelViewState,
          .testTag("panel-group:${group.name}")
          .semantics { stateDescription = if (expanded) opened else closed }
          .homeTap(onClickLabel = ht(if (expanded) "收起节点" else "展开节点"), role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
@@ -4135,7 +4367,7 @@ index c95890c..a7ebb5c 100644
              Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  title(Modifier.weight(1f))
                  GroupTile(group)
-@@ -300,7 +330,7 @@ private fun NodeCard(
+@@ -300,7 +331,7 @@ private fun NodeCard(
      )
      val info = ht("节点信息")
      val shell = modifier
@@ -4144,7 +4376,7 @@ index c95890c..a7ebb5c 100644
          .testTag("panel-node:${node.name}")
          .semantics { this.selected = selected }
          .hetuPressScale(source, pressedScale = .975f, motion = motion)
-@@ -320,16 +350,16 @@ private fun NodeCard(
+@@ -320,16 +351,16 @@ private fun NodeCard(
          Row(m, verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              Text(
                  node.name, Modifier.weight(1f), color = c.t1, style = PanelType.nodeName,
@@ -4236,7 +4468,7 @@ index 253b603..0d01797 100644
          val c = LocalHomeColors.current
          val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
-index 3e938c4..627ecb0 100644
+index 3e938c4..ad98826 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 @@ -38,9 +38,17 @@ internal sealed interface PanelDelay {
@@ -4257,7 +4489,19 @@ index 3e938c4..627ecb0 100644
  internal enum class PanelNodeKind { Proxy, Group, Direct }
 
  internal data class PanelNode(
-@@ -221,6 +229,9 @@ internal data class PanelData(
+@@ -198,6 +206,11 @@ internal data class PanelData(
+     val readError: String = "",
+     /** Running, but the first controller snapshot has not arrived yet: tabs show placeholders. */
+     val loading: Boolean = false,
++    /**
++     * Latest finished readings without in-flight markers. A group card shows its own
++     * 测速 only; a node shared with another group's probe keeps its last reading here.
++     */
++    val settledDelays: Map<String, PanelDelay> = emptyMap(),
+     /** Groups whose 测速 is in flight. */
+     val testingGroups: Set<String> = emptySet(),
+     /** A whole-profile latency test is in flight. */
+@@ -221,8 +234,22 @@ internal data class PanelData(
      /** Latency to show next to [node]; null when a figure makes no sense (DIRECT). */
      fun delayOf(node: String): PanelDelay? {
          if (node.equals("DIRECT", ignoreCase = true) || node.equals("REJECT", ignoreCase = true)) return null
@@ -4266,7 +4510,20 @@ index 3e938c4..627ecb0 100644
 +        if (delays[node] == PanelDelay.Testing) return PanelDelay.Testing
          return delays[leafOf(node)] ?: PanelDelay.Unknown
      }
++
++    /**
++     * What a group card shows when that group itself is not being measured. Testing
++     * markers owned by other probes (e.g. a large selector containing this card's
++     * current node) must not flip every card on the page to 测速中.
++     */
++    fun cardDelayOf(node: String): PanelDelay? {
++        val shown = delayOf(node)
++        if (shown != PanelDelay.Testing) return shown
++        return settledDelays[leafOf(node)] ?: PanelDelay.Unknown
++    }
  }
+
+ /* ------------------------------------------------------------------ */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 index ee40a76..00a1cc2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
@@ -9077,5 +9334,222 @@ index 0000000..283e398
 +        attempts.incrementAndGet()
 +        if (reject) throw TransactionTooLargeException("Synthetic clipboard Binder rejection")
 +        super.setPrimaryClip(clip)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt
+new file mode 100644
+index 0000000..e1c9449
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt
+@@ -0,0 +1,211 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.os.Looper
++import androidx.compose.runtime.MutableState
++import androidx.lifecycle.viewModelScope
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.panel.PanelData
++import io.github.xgl34222220.hetu.panel.PanelDataProjector
++import io.github.xgl34222220.hetu.panel.PanelDelay
++import io.github.xgl34222220.hetu.panel.PanelGroup
++import io.github.xgl34222220.hetu.panel.PanelNode
++import io.github.xgl34222220.hetu.panel.PanelTrafficSnapshot
++import kotlinx.coroutines.CoroutineScope
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.Job
++import kotlinx.coroutines.cancel
++import kotlinx.coroutines.launch
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import org.junit.After
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.Shadows.shadowOf
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.LooperMode
++import java.io.File
++import java.util.Collections
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++
++/** 策略页加载与测速：只标记被测组、自动组逐个落结果、冷启动先画上次完整策略组（只读）。 */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class, shadows = [
++    PanelRequestOwnershipShadows.RootStatus::class,
++    PanelRequestOwnershipShadows.Sites::class,
++    PanelActionRuntimeShadows.RuntimeSample::class,
++    PanelActionRuntimeShadows.HistoryRecord::class,
++    PanelActionRuntimeShadows.NoRoot::class,
++])
++@LooperMode(LooperMode.Mode.PAUSED)
++class StrategyLoadSpeed96Test {
++    private lateinit var app: Application
++    private lateinit var vm: HetuViewModel
++    private lateinit var server: MockWebServer
++    private lateinit var collector: CoroutineScope
++    private val extraVms = mutableListOf<HetuViewModel>()
++    private val gates = mutableListOf<CountDownLatch>()
++    private val messages = Collections.synchronizedList(mutableListOf<String>())
++    private val requests = Collections.synchronizedList(mutableListOf<RecordedRequest>())
++    private val route = ProxyGroupUi("Route", "Selector", "node", listOf(ProxyNodeUi("node"), ProxyNodeUi("other")))
++    private val region = ProxyGroupUi("Region", "Selector", "node", listOf(ProxyNodeUi("node")))
++    @Volatile private var response: (RecordedRequest) -> MockResponse = ::normalResponse
++
++    @Before fun prepare() {
++        PanelRequestOwnershipShadows.RootStatus.reset()
++        PanelRequestOwnershipShadows.Sites.reset()
++        server = MockWebServer().apply {
++            dispatcher = object : Dispatcher() {
++                override fun dispatch(request: RecordedRequest): MockResponse { requests += request; return response(request) }
++            }
++            start()
++        }
++        app = ApplicationProvider.getApplicationContext()
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port)
++            .putBoolean("proxyRootWanted", true).putBoolean("proxyRootRuntimeRunning", true)
++            .putBoolean("proxyApiHistoryEnabled", false).commit()
++        PanelActionRuntimeShadows.RuntimeSample.value = ProxyRuntimeSnapshot(running = true, pid = 77)
++        vm = HetuViewModel(app)
++        setState(vm, ProxyComposeState(running = true, panelReady = true, corePid = 77, groups = listOf(route, region)))
++        vm.delays["node"] = 44L
++        collector = CoroutineScope(Dispatchers.Main.immediate)
++        collector.launch { vm.messages.collect { messages += it } }
++        shadowOf(Looper.getMainLooper()).idle()
++    }
++
++    @After fun finish() {
++        (extraVms + vm).forEach { it.viewModelScope.cancel() }
++        gates.forEach { it.countDown() }
++        PanelRequestOwnershipShadows.Sites.releaseAll()
++        PanelActionRuntimeShadows.RuntimeSample.release()
++        PanelActionRuntimeShadows.HistoryRecord.release()
++        eventually("ViewModel requests completed") {
++            (extraVms + vm).all { model -> model.viewModelScope.coroutineContext[Job]!!.children.all { it.isCompleted } }
++        }
++        collector.cancel()
++        server.shutdown()
++        assertEquals("Fixtures must not execute Root actions", 0, PanelActionRuntimeShadows.NoRoot.calls)
++    }
++
++    @Suppress("UNCHECKED_CAST")
++    private fun setState(model: HetuViewModel, value: ProxyComposeState) {
++        (HetuViewModel::class.java.getDeclaredField("state\$delegate").apply { isAccessible = true }
++            .get(model) as MutableState<ProxyComposeState>).value = value
++    }
++    private fun gate() = CountDownLatch(1).also { gates += it }
++    private fun CountDownLatch.hold() { check(await(8, TimeUnit.SECONDS)) { "HTTP fixture gate not released" } }
++    private fun body(value: String) = MockResponse().setBody(value)
++    private fun paths() = synchronized(requests) { requests.map { "${it.method} ${it.requestUrl!!.encodedPath}" } }
++    private fun eventually(reason: String, predicate: () -> Boolean) {
++        val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(6)
++        while (System.nanoTime() < deadline) {
++            shadowOf(Looper.getMainLooper()).idle()
++            if (predicate()) return
++            Thread.sleep(10)
++        }
++        assertTrue("$reason; requests=${paths()}, busy=${vm.testingNodes}", predicate())
++    }
++    private fun normalResponse(req: RecordedRequest): MockResponse = when (req.requestUrl!!.encodedPath) {
++        "/proxies" -> body("""{"proxies":{"Route":{"type":"Selector","now":"node","all":["node","other"]},"Region":{"type":"Selector","now":"node","all":["node"]},"node":{"type":"Shadowsocks"},"other":{"type":"Shadowsocks"}}}""")
++        "/providers/proxies" -> body("""{"providers":{}}""")
++        "/connections" -> body("""{"connections":[]}""")
++        "/configs" -> body("""{"mode":"rule"}""")
++        "/version" -> body("""{"version":"fixture"}""")
++        "/group/Route/delay" -> body("""{"node":31,"other":42}""")
++        "/proxies/node/delay" -> body("""{"delay":22}""")
++        "/proxies/other/delay" -> body("""{"delay":66}""")
++        else -> MockResponse().setResponseCode(404)
++    }
++
++    @Test fun groupCardKeepsItsLastReadingWhileAnotherGroupProbesItsCurrentNode() {
++        val data = PanelData(groups = listOf(PanelGroup("Region", "Selector", listOf(PanelNode("node")), "node")),
++            delays = mapOf("node" to PanelDelay.Testing), settledDelays = mapOf("node" to PanelDelay.Ms(52L)))
++        assertEquals("Node rows still show the in-flight probe", PanelDelay.Testing, data.delayOf("node"))
++        assertEquals(PanelDelay.Ms(52L), data.cardDelayOf("node"))
++        assertEquals(PanelDelay.Unknown, data.copy(settledDelays = emptyMap()).cardDelayOf("node"))
++        assertNull(data.cardDelayOf("DIRECT"))
++    }
++
++    @Test fun projectorKeepsTheSettledReadingBesideTheTestingMarker() {
++        val data = PanelDataProjector().project(
++            ProxyComposeState(running = true, panelReady = true, groups = listOf(route, region)), false,
++            emptyList(), emptyList(), emptyList(), emptyList(), mapOf("node" to 52L), mapOf("node" to true),
++            emptyMap(), emptyMap(), emptyMap(), PanelTrafficSnapshot(), testingGroups = setOf("Route"))
++        assertEquals(PanelDelay.Testing, data.delays["node"])
++        assertEquals(PanelDelay.Ms(52L), data.settledDelays["node"])
++        assertEquals(setOf("Route"), data.testingGroups)
++        assertEquals("Region card is not being measured", PanelDelay.Ms(52L), data.cardDelayOf(data.groups.first { it.name == "Region" }.now))
++    }
++
++    @Test fun selectorGroupProbeMarksOnlyItsOwnGroupAndUsesOneCoreRequest() {
++        val held = gate()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/group/Route/delay") { held.hold(); normalResponse(req) } else normalResponse(req) }
++        vm.testGroup(route)
++        eventually("Group probe reached the controller") { paths().contains("GET /group/Route/delay") }
++        assertEquals(true, vm.testingGroups["Route"])
++        assertNull("A different card must not become 测速中", vm.testingGroups["Region"])
++        assertFalse(vm.testingAll)
++        held.countDown()
++        eventually("Group probe finished") { vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty() }
++        assertEquals(31L, vm.delays["node"])
++        assertEquals(42L, vm.delays["other"])
++        assertEquals(1, paths().count { it.startsWith("GET /group/") })
++        assertFalse(paths().any { it.startsWith("GET /proxies/") && it.endsWith("/delay") })
++    }
++
++    @Test fun automaticGroupLeafResultLandsBeforeItsSlowestSibling() {
++        val held = gate()
++        response = { req -> if (req.requestUrl!!.encodedPath == "/proxies/other/delay") { held.hold(); normalResponse(req) } else normalResponse(req) }
++        vm.testGroup(route.copy(type = "URLTest"))
++        eventually("Fast leaf is shown while its sibling is still measuring") {
++            vm.delays["node"] == 22L && vm.testingNodes["node"] == null
++        }
++        assertEquals(true, vm.testingNodes["other"])
++        assertEquals(true, vm.testingGroups["Route"])
++        held.countDown()
++        eventually("Automatic group probe finished") { vm.testingGroups.isEmpty() && vm.testingNodes.isEmpty() }
++        assertEquals(22L, vm.delays["node"])
++        assertEquals(66L, vm.delays["other"])
++        assertFalse("Automatic groups never call the unfixing group endpoint", paths().any { it.contains("/group/") })
++    }
++
++    @Test fun restoredStrategyCardsDrawAtOnceButCannotActUntilAFreshRead() {
++        val config = "restored-config-96"
++        StrategySnapshotCache.write(app, config, listOf(route.copy(nodes = route.nodes.map { it.copy(lastDelay = 80L) }), region))
++        val file = File(app.noBackupFilesDir, "strategy-groups-v1.json")
++        eventually("Snapshot cache was written off the main thread") { file.isFile }
++        app.getSharedPreferences("hetu", 0).edit().putBoolean("proxyUiLastRunning", true)
++            .putString("proxyUiLastConfig", config).putString(StrategySnapshotCache.PREF_KEY, config).commit()
++        val restored = HetuViewModel(app).also { extraVms += it }
++        collector.launch { restored.messages.collect { messages += it } }
++        assertTrue(restored.state.running)
++        assertFalse("Restored cards are never a confirmed controller snapshot", restored.state.panelReady)
++        assertEquals(listOf("Route", "Region"), restored.state.groups.map { it.name })
++        assertEquals(listOf("node", "other"), restored.state.groups.first().nodes.map { it.name })
++        assertNull("Latency is not restored from disk", restored.state.groups.first().nodes.first().lastDelay)
++        val before = paths().size
++        restored.testGroup(restored.state.groups.first())
++        restored.testNode("node")
++        restored.testAll()
++        restored.select("Route", "other")
++        eventually("Refusal is reported") { messages.any { it.contains("正在读取核心最新状态") } }
++        assertTrue(restored.testingGroups.isEmpty())
++        assertTrue(restored.testingNodes.isEmpty())
++        assertTrue(restored.pendingSelection.isEmpty())
++        assertEquals("No probe or selection reaches the controller", before, paths().size)
++
++        val mismatched = File(app.noBackupFilesDir, "strategy-groups-v1.json").readText()
++        assertTrue(mismatched.contains(config))
++        app.getSharedPreferences("hetu", 0).edit().putString("proxyUiLastConfig", "another-config").commit()
++        val other = HetuViewModel(app).also { extraVms += it }
++        assertTrue("A different configuration never shows the cached cards", other.state.groups.isEmpty())
 +    }
 +}
