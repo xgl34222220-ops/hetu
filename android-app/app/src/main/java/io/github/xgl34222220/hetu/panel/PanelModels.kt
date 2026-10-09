@@ -220,6 +220,8 @@ internal data class PanelData(
     /** “全部更新” is running for subscriptions / rule sets, including while single items have already finished. */
     val updatingAllSubscriptions: Boolean = false,
     val updatingAllRuleSets: Boolean = false,
+    /** Cards still show the last complete snapshot while the first fresh controller read is pending. */
+    val syncing: Boolean = false,
 ) {
     val running: Boolean get() = status == PanelStatus.Running
 

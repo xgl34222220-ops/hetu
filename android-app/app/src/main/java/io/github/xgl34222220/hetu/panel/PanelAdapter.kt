@@ -511,6 +511,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         },
         updatingAllSubscriptions = vm.providersUpdatingAll,
         updatingAllRuleSets = vm.ruleSetsUpdatingAll,
+        syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
     )
     val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
     val actions = PanelActions(
