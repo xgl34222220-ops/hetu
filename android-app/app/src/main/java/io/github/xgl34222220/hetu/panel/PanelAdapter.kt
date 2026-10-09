@@ -39,6 +39,7 @@ import io.github.xgl34222220.hetu.RefPanelTab
 import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.asHomeHaptics
 import io.github.xgl34222220.hetu.refParseLogs19
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -253,23 +254,22 @@ internal fun HetuPanelV2(
         },
     )
 
+    // These locals are static: remembered values keep the 1 s traffic tick from recomposing every row.
+    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
+    val appIcons = remember(icons) {
+        PanelAppIcons(
+            has = { it in icons },
+            draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
+        )
+    }
+    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
+        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
+    }
     HetuHomeThemeFromPrefs(prefs) {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                hetuHaptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
-            LocalPanelAppIcons provides PanelAppIcons(
-                has = { it in icons },
-                draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
-            ),
-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
+            LocalHomeHaptics provides homeHaptics,
+            LocalPanelAppIcons provides appIcons,
+            LocalPanelGroupIcon provides groupIcon,
         ) {
             PanelRoute(
                 data = data,
@@ -546,20 +546,18 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
     val icons = remember(vm.state.connections) {
         vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
     }
+    val appIcons = remember(icons) {
+        PanelAppIcons(has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } })
+    }
+    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
+        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
+    }
+    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(vm.prefs) {
         CompositionLocalProvider(
-            LocalPanelAppIcons provides PanelAppIcons(
-                has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
-            ),
-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
-            LocalHomeHaptics provides { kind ->
-                haptics.perform(when (kind) {
-                    HomeHaptic.Tap -> HetuHaptic.Tap
-                    HomeHaptic.Tick -> HetuHaptic.Tick
-                    HomeHaptic.Confirm -> HetuHaptic.Confirm
-                    HomeHaptic.Reject -> HetuHaptic.Reject
-                })
-            },
+            LocalPanelAppIcons provides appIcons,
+            LocalPanelGroupIcon provides groupIcon,
+            LocalHomeHaptics provides homeHaptics,
         ) {
             PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
                 PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"

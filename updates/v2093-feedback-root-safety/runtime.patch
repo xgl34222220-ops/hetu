@@ -4734,6 +4734,24 @@ index 5a9c877..ad5f3b7 100644
 -}
 \ No newline at end of file
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+index 1ee2881..5ddd8ac 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
+@@ -492,8 +492,11 @@ internal fun AboutScreen(vm: HetuViewModel) {
+     val scope = rememberCoroutineScope()
+     val c = LocalHomeColors.current
+     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
+-    val revision = remember {
+-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
++    // Asset read stays off the main thread; the row simply shows the hash once it is known.
++    val revision by produceState("", context) {
++        value = withContext(Dispatchers.IO) {
++            runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
++        }
+     }
+
+     fun openAsset(title: String, path: String) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt
 new file mode 100644
 index 0000000..4bf546b
@@ -5322,10 +5340,10 @@ index 0000000..360e5cb
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..37eed58
+index 0000000..2655f62
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,446 @@
+@@ -0,0 +1,455 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -5384,6 +5402,7 @@ index 0000000..37eed58
 +import io.github.xgl34222220.hetu.home.HomeIcons
 +import io.github.xgl34222220.hetu.home.HomeRowDims
 +import io.github.xgl34222220.hetu.home.HomeRowDivider
++import io.github.xgl34222220.hetu.home.HomeSpinner
 +import io.github.xgl34222220.hetu.home.HomeType
 +import io.github.xgl34222220.hetu.home.LocalHomeColors
 +import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
@@ -5523,6 +5542,9 @@ index 0000000..37eed58
 +        if (speedActive) speedActive = false else { speedRun++; speedActive = true }
 +    }
 +
++    // Static catalogue: grouped once, not on every row update.
++    val byCategory = remember { NetCategory.entries.map { category -> category to NetworkTest.sites.filter { it.category == category } } }
++
 +    HxPage(
 +        title = ht("网络测试"),
 +        onBack = onBack,
@@ -5553,8 +5575,7 @@ index 0000000..37eed58
 +                    if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
 +                }
 +            }
-+            NetCategory.entries.forEach { category ->
-+                val sites = NetworkTest.sites.filter { it.category == category }
++            byCategory.forEach { (category, sites) ->
 +                item(key = "cat-${category.name}") {
 +                    HxSection(ht(category.title)) {
 +                        HxGroup {
@@ -5637,7 +5658,13 @@ index 0000000..37eed58
 +        Text(site.name, Modifier.weight(1f), color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
 +            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
-+            Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++            if (state.testing) {
++                Row(verticalAlignment = Alignment.CenterVertically) {
++                    HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
++                    Spacer(Modifier.width(6.dp))
++                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++                }
++            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
 +        }
 +    }
 +}
@@ -5773,10 +5800,28 @@ index 0000000..37eed58
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-index df92493..1c0c91d 100644
+index df92493..daf9bf2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-@@ -41,7 +41,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+@@ -1,6 +1,7 @@
+ package io.github.xgl34222220.hetu
+
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.remember
+ import androidx.compose.ui.unit.Dp
+ import io.github.xgl34222220.hetu.home.HetuHomeV2
+ import io.github.xgl34222220.hetu.home.HomeWanExtras
+@@ -9,7 +10,8 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
+ @Composable
+ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Unit) {
+     val nav = LocalNav.current
+-    val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
++    val providers = vm.providers
++    val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
+     val rt = vm.runtime
+     HetuHomeV2(
+         data = CompactHomeData(
+@@ -41,7 +43,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
          onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
          onOpenSubscription = { vm.openPanel("providers") },
          onOpenBasicSettings = { nav.push(HxRoute.Network) },
@@ -5785,7 +5830,7 @@ index df92493..1c0c91d 100644
          onViewConfig = { nav.push(HxRoute.ConfigEditor) },
          onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
          cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
-@@ -58,6 +58,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+@@ -58,6 +60,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
              controllerError = vm.state.controllerError,
              takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
              runtimeMessage = vm.state.message,
@@ -6081,10 +6126,32 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..b6be38b 100644
+index 0ceaa23..f0b0246 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-@@ -290,8 +290,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+@@ -171,18 +171,11 @@ internal fun HetuHomeV2(
+         )
+     }
+
++    // Static local: a fresh lambda on every poll would invalidate the whole home tree.
++    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
+     HetuHomeThemeFromPrefs(prefs) {
+         CompositionLocalProvider(
+-            LocalHomeHaptics provides { kind ->
+-                hetuHaptics.perform(
+-                    when (kind) {
+-                        HomeHaptic.Tap -> HetuHaptic.Tap
+-                        HomeHaptic.Tick -> HetuHaptic.Tick
+-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
+-                        HomeHaptic.Reject -> HetuHaptic.Reject
+-                    },
+-                )
+-            },
++            LocalHomeHaptics provides homeHaptics,
+         ) {
+             HomeRoute(
+                 state = state.copy(ipRefreshing = data.refreshing),
+@@ -290,8 +283,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
      var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
@@ -6097,7 +6164,7 @@ index 0ceaa23..b6be38b 100644
          var lastTx = TrafficStats.getTotalTxBytes()
          var lastRx = TrafficStats.getTotalRxBytes()
          var lastAt = SystemClock.elapsedRealtime()
-@@ -321,8 +324,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+@@ -321,8 +317,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
      val memoryPoints = remember { mutableStateListOf<Float?>() }
      val latestCpu by rememberUpdatedState(cpu)
      val latestMemory by rememberUpdatedState(memoryBytes)
@@ -6110,6 +6177,22 @@ index 0ceaa23..b6be38b 100644
          while (true) {
              cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
              memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
+@@ -418,3 +417,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
+ }
+
+ private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
++
++/** One stable [HomeHaptic] sink per [HetuHaptics]; callers remember it so static locals stay put. */
++internal fun io.github.xgl34222220.hetu.ui.HetuHaptics.asHomeHaptics(): (HomeHaptic) -> Unit = { kind ->
++    perform(
++        when (kind) {
++            HomeHaptic.Tap -> HetuHaptic.Tap
++            HomeHaptic.Tick -> HetuHaptic.Tick
++            HomeHaptic.Confirm -> HetuHaptic.Confirm
++            HomeHaptic.Reject -> HetuHaptic.Reject
++        },
++    )
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 index 9afc132..0881179 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
@@ -6185,6 +6268,29 @@ index e31ca99..243edd5 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
+index 256be3e..512e1e8 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
+@@ -10,6 +10,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.CompositionLocalProvider
+ import androidx.compose.runtime.Immutable
++import androidx.compose.runtime.remember
+ import androidx.compose.runtime.staticCompositionLocalOf
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.Shape
+@@ -290,7 +291,9 @@ internal fun HetuHomeTheme(
+     customAccent: Color? = null,
+     content: @Composable () -> Unit,
+ ) {
+-    val colors = homeColors(dark, customAccent ?: accent.color(dark), pureBlack)
++    val accentColor = customAccent ?: accent.color(dark)
++    // Built once per appearance, not on every poll-driven recomposition of the host.
++    val colors = remember(dark, accentColor, pureBlack) { homeColors(dark, accentColor, pureBlack) }
+     CompositionLocalProvider(
+         LocalHomeColors provides colors,
+         LocalHomeMotionEnabled provides homeMotionEnabled(),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt
 new file mode 100644
 index 0000000..bcd5c0c
@@ -6210,10 +6316,10 @@ index 0000000..bcd5c0c
 +    return state.isAtLeast(Lifecycle.State.STARTED)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..2bc02e2 100644
+index 9f66ac0..fbac1da 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-@@ -35,7 +35,6 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
+@@ -35,17 +35,14 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
  import io.github.xgl34222220.hetu.ProxyRuleUi
  import io.github.xgl34222220.hetu.ProxyRuntimeInspector
  import io.github.xgl34222220.hetu.RefLogEntry
@@ -6221,7 +6327,8 @@ index 9f66ac0..2bc02e2 100644
  import io.github.xgl34222220.hetu.RefPanelTab
  import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
  import io.github.xgl34222220.hetu.home.HomeHaptic
-@@ -43,9 +42,6 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
++import io.github.xgl34222220.hetu.home.asHomeHaptics
  import io.github.xgl34222220.hetu.refParseLogs19
  import io.github.xgl34222220.hetu.ui.HetuHaptic
  import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -6231,7 +6338,7 @@ index 9f66ac0..2bc02e2 100644
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.CoroutineScope
  import kotlinx.coroutines.async
-@@ -107,6 +103,7 @@ internal fun HetuPanelV2(
+@@ -107,6 +104,7 @@ internal fun HetuPanelV2(
      val subscriptionUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
      val ruleSetUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
      val sampler = remember { PanelTrafficSampler() }
@@ -6239,7 +6346,7 @@ index 9f66ac0..2bc02e2 100644
      val initialView = remember { loadView(prefs, selectorPrefs) }
      var latestView by remember { mutableStateOf(initialView) }
      val tab = PanelTab.entries.firstOrNull { it.name == selectedTab.name } ?: PanelTab.Groups
-@@ -144,10 +141,10 @@ internal fun HetuPanelV2(
+@@ -144,10 +142,10 @@ internal fun HetuPanelV2(
      LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
 
      val icons = remember(state.connections) { state.connections.mapNotNull { c -> c.appIcon?.let { c.packageName to it } }.toMap() }
@@ -6252,6 +6359,44 @@ index 9f66ac0..2bc02e2 100644
      ).copy(refreshing = refreshing)
      val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
+@@ -256,23 +254,22 @@ internal fun HetuPanelV2(
+         },
+     )
+
++    // These locals are static: remembered values keep the 1 s traffic tick from recomposing every row.
++    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
++    val appIcons = remember(icons) {
++        PanelAppIcons(
++            has = { it in icons },
++            draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
++        )
++    }
++    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
++        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
++    }
+     HetuHomeThemeFromPrefs(prefs) {
+         CompositionLocalProvider(
+-            LocalHomeHaptics provides { kind ->
+-                hetuHaptics.perform(
+-                    when (kind) {
+-                        HomeHaptic.Tap -> HetuHaptic.Tap
+-                        HomeHaptic.Tick -> HetuHaptic.Tick
+-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
+-                        HomeHaptic.Reject -> HetuHaptic.Reject
+-                    },
+-                )
+-            },
+-            LocalPanelAppIcons provides PanelAppIcons(
+-                has = { it in icons },
+-                draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
+-            ),
+-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
++            LocalHomeHaptics provides homeHaptics,
++            LocalPanelAppIcons provides appIcons,
++            LocalPanelGroupIcon provides groupIcon,
+         ) {
+             PanelRoute(
+                 data = data,
 @@ -310,180 +307,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
      }
  }
@@ -6495,7 +6640,7 @@ index 9f66ac0..2bc02e2 100644
      )
      val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
      val actions = PanelActions(
-@@ -712,7 +543,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -712,21 +543,21 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
              }
          },
      )
@@ -6503,9 +6648,33 @@ index 9f66ac0..2bc02e2 100644
 +    val icons = remember(vm.state.connections) {
 +        vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
 +    }
++    val appIcons = remember(icons) {
++        PanelAppIcons(has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } })
++    }
++    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
++        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
++    }
++    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
      HetuHomeThemeFromPrefs(vm.prefs) {
          CompositionLocalProvider(
-             LocalPanelAppIcons provides PanelAppIcons(
+-            LocalPanelAppIcons provides PanelAppIcons(
+-                has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
+-            ),
+-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
+-            LocalHomeHaptics provides { kind ->
+-                haptics.perform(when (kind) {
+-                    HomeHaptic.Tap -> HetuHaptic.Tap
+-                    HomeHaptic.Tick -> HetuHaptic.Tick
+-                    HomeHaptic.Confirm -> HetuHaptic.Confirm
+-                    HomeHaptic.Reject -> HetuHaptic.Reject
+-                })
+-            },
++            LocalPanelAppIcons provides appIcons,
++            LocalPanelGroupIcon provides groupIcon,
++            LocalHomeHaptics provides homeHaptics,
+         ) {
+             PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
+                 PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 index b187a2f..62dacb2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
@@ -7316,10 +7485,10 @@ index fb308a8..250c025 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
-index 800055c..8cdcaa3 100644
+index 800055c..d43d597 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
-@@ -32,6 +32,7 @@ import io.github.xgl34222220.hetu.ProxySubStoreActivity
+@@ -32,15 +32,15 @@ import io.github.xgl34222220.hetu.ProxySubStoreActivity
  import io.github.xgl34222220.hetu.ProxyWebPanelsActivity
  import io.github.xgl34222220.hetu.ReferenceFileManagerActivity
  import io.github.xgl34222220.hetu.ToolsConfigBridge
@@ -7327,7 +7496,8 @@ index 800055c..8cdcaa3 100644
  import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
  import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
  import io.github.xgl34222220.hetu.home.HomeHaptic
-@@ -39,8 +40,6 @@ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
++import io.github.xgl34222220.hetu.home.asHomeHaptics
  import io.github.xgl34222220.hetu.ui.HetuHaptic
  import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
  import java.io.IOException
@@ -7336,7 +7506,7 @@ index 800055c..8cdcaa3 100644
  import java.util.Locale
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
-@@ -72,6 +71,8 @@ internal fun HetuToolsV2(
+@@ -72,6 +72,8 @@ internal fun HetuToolsV2(
      onOpenDiagnosticsDetails: (() -> Unit)? = null,
      onOpenExternalEntry: (ToolsEntry) -> Boolean = { false },
      onOpenConfigEditor: (() -> Unit)? = null,
@@ -7345,7 +7515,7 @@ index 800055c..8cdcaa3 100644
  ) {
      val context = LocalContext.current
      val app = context.applicationContext
-@@ -133,7 +134,7 @@ internal fun HetuToolsV2(
+@@ -133,7 +135,7 @@ internal fun HetuToolsV2(
                      ToolsEntry.Cores -> ProxyCoreActivity::class.java
                      ToolsEntry.Adblock -> ProxyAdblockChainActivity::class.java
                      ToolsEntry.WebUi -> ProxyWebPanelsActivity::class.java
@@ -7354,7 +7524,7 @@ index 800055c..8cdcaa3 100644
                  }
                  if (target != null) {
                      context.startActivity(Intent(context, target))
-@@ -167,12 +168,19 @@ internal fun HetuToolsV2(
+@@ -167,12 +169,19 @@ internal fun HetuToolsV2(
              addSubscription = { name, url -> controller.addSubscription(name, url); changed() },
              updateSubscription = { name, url -> controller.updateSubscription(name, url); changed() },
              deleteSubscription = { name -> controller.deleteSubscription(name); changed() },
@@ -7376,7 +7546,29 @@ index 800055c..8cdcaa3 100644
              },
              readConfig = { withContext(Dispatchers.IO) { ToolsConfigBridge.document(app) } },
              validateConfig = { text -> controller.validateConfigText(text) },
-@@ -208,6 +216,8 @@ internal fun HetuToolsV2(
+@@ -185,19 +194,11 @@ internal fun HetuToolsV2(
+         )
+     }
+
++    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
+     HetuHomeThemeFromPrefs(prefs) {
+       ToolsConceptTheme {
+         CompositionLocalProvider(
+-            LocalHomeHaptics provides { kind ->
+-                haptics.perform(
+-                    when (kind) {
+-                        HomeHaptic.Tap -> HetuHaptic.Tap
+-                        HomeHaptic.Tick -> HetuHaptic.Tick
+-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
+-                        HomeHaptic.Reject -> HetuHaptic.Reject
+-                    },
+-                )
+-            },
++            LocalHomeHaptics provides homeHaptics,
+         ) {
+             ToolsRoute(
+                 actions = actions,
+@@ -208,6 +209,8 @@ internal fun HetuToolsV2(
                  features = features.actions,
                  appIcon = features.appIcon,
                  onDestinationChanged = { destination = it },
@@ -7385,7 +7577,7 @@ index 800055c..8cdcaa3 100644
              )
          }
        }
-@@ -239,19 +249,3 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
+@@ -239,19 +242,3 @@ private fun pickedFileOf(context: Context, uri: Uri): ToolsPickedFile {
      }
      return ToolsPickedFile(name, detail, uri)
  }

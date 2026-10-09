@@ -171,18 +171,11 @@ internal fun HetuHomeV2(
         )
     }
 
+    // Static local: a fresh lambda on every poll would invalidate the whole home tree.
+    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(prefs) {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                hetuHaptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
+            LocalHomeHaptics provides homeHaptics,
         ) {
             HomeRoute(
                 state = state.copy(ipRefreshing = data.refreshing),
@@ -424,3 +417,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
 }
 
 private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
+
+/** One stable [HomeHaptic] sink per [HetuHaptics]; callers remember it so static locals stay put. */
+internal fun io.github.xgl34222220.hetu.ui.HetuHaptics.asHomeHaptics(): (HomeHaptic) -> Unit = { kind ->
+    perform(
+        when (kind) {
+            HomeHaptic.Tap -> HetuHaptic.Tap
+            HomeHaptic.Tick -> HetuHaptic.Tick
+            HomeHaptic.Confirm -> HetuHaptic.Confirm
+            HomeHaptic.Reject -> HetuHaptic.Reject
+        },
+    )
+}

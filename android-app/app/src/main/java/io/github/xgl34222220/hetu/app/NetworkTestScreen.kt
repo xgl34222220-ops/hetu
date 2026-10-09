@@ -56,6 +56,7 @@ import io.github.xgl34222220.hetu.home.HomeColors
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeRowDivider
+import io.github.xgl34222220.hetu.home.HomeSpinner
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
@@ -195,6 +196,9 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
         if (speedActive) speedActive = false else { speedRun++; speedActive = true }
     }
 
+    // Static catalogue: grouped once, not on every row update.
+    val byCategory = remember { NetCategory.entries.map { category -> category to NetworkTest.sites.filter { it.category == category } } }
+
     HxPage(
         title = ht("网络测试"),
         onBack = onBack,
@@ -225,8 +229,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
                     if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
                 }
             }
-            NetCategory.entries.forEach { category ->
-                val sites = NetworkTest.sites.filter { it.category == category }
+            byCategory.forEach { (category, sites) ->
                 item(key = "cat-${category.name}") {
                     HxSection(ht(category.title)) {
                         HxGroup {
@@ -309,7 +312,13 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
         Text(site.name, Modifier.weight(1f), color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
             if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
-            Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
+            if (state.testing) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
+                    Spacer(Modifier.width(6.dp))
+                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
+                }
+            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
         }
     }
 }

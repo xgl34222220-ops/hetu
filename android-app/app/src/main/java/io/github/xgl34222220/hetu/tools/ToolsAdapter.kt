@@ -37,6 +37,7 @@ import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.tools.ToolsDesignDims as HomeDims
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.asHomeHaptics
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
 import java.io.IOException
@@ -193,19 +194,11 @@ internal fun HetuToolsV2(
         )
     }
 
+    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(prefs) {
       ToolsConceptTheme {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                haptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
+            LocalHomeHaptics provides homeHaptics,
         ) {
             ToolsRoute(
                 actions = actions,

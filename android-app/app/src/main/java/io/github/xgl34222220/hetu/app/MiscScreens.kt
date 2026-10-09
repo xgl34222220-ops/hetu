@@ -492,8 +492,11 @@ internal fun AboutScreen(vm: HetuViewModel) {
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val revision = remember {
-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+    // Asset read stays off the main thread; the row simply shows the hash once it is known.
+    val revision by produceState("", context) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+        }
     }
 
     fun openAsset(title: String, path: String) {

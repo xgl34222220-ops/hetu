@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.home.HetuHomeV2
 import io.github.xgl34222220.hetu.home.HomeWanExtras
@@ -9,7 +10,8 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
 @Composable
 internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Unit) {
     val nav = LocalNav.current
-    val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val providers = vm.providers
+    val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
     val rt = vm.runtime
     HetuHomeV2(
         data = CompactHomeData(
