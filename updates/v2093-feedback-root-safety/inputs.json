@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "0c8fe1783fdb756b8028d388109785e9e69d55d6b6c19d42222bfb088ae72c7d",
+  "patchSha256": "bf00f541efdc0fbc982ee7e4b96dd086c78a6fdb93c35ca09e672b7b66c1a605",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -346,7 +346,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt": "8098f3f8050514aab09cfc6ac34dc28cc0054470357fb44580ce53d15fe176b4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt": "a708782f5db74b58dfecb2a5512ae2ab2b99471d696db26a615d89383d8591c5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt": "9469f4339e83932a80868a830b7047a93f64b7f7aa6c6347783a2f99a4f0c2cb",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "055b71781d5b05373fd68ffc686d7db7e299a95ee4450ac7f459efee3f2ef1a3",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt": "e1c21e27a29f31f8011084e9bc8ba8c4a9982fc5897015ef95cc59ac92f09a10",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt": "4bd36c3d7d7c9a041d6e434bfbbe2a457879b2d638236a0ae95a0dc4c8aac737",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt": "0dbe749b95fc6e282755108b417db59b6ab4e371f1effb55bda7c1a5ab1b2155",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt": "6b8558528e8037d226d2175b8bb2a5210bbb7387cab61803600977b881132e5b",

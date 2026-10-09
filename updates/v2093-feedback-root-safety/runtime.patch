@@ -7291,7 +7291,7 @@ index c95890c..5099f52 100644
 +    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..0d01797 100644
+index 253b603..1bdf4d8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 @@ -6,6 +6,8 @@ import androidx.compose.foundation.background
@@ -7312,7 +7312,33 @@ index 253b603..0d01797 100644
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.dp
-@@ -211,7 +215,7 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+@@ -183,12 +187,12 @@ internal fun LazyListScope.panelConnectionsTab(
+                 }
+             }
+             if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
+-                ConnectionCard(group.connections[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
++                ConnectionCard(group.connections[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
+             }
+         }
+     } else {
+         items(count = list.size, key = { "conn:" + list[it].id }) {
+-            ConnectionCard(list[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
++            ConnectionCard(list[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
+         }
+     }
+ }
+@@ -202,8 +206,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
+     }
+ }
+
++// Takes the memoized group list, not the whole PanelData: an idle connection skips the 1 s traffic tick.
+ @Composable
+-private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Modifier, onOpen: (String) -> Unit) {
++private fun ConnectionCard(conn: PanelConnection, groups: List<PanelGroup>, modifier: Modifier, onOpen: (String) -> Unit) {
+     val c = LocalHomeColors.current
+     HomeCard(modifier, onClick = { onOpen(conn.id) }, clickLabel = "连接详情", shape = PanelDims.groupShape) {
+         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
+@@ -211,14 +216,14 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
                  Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
              }
@@ -7321,7 +7347,28 @@ index 253b603..0d01797 100644
              Row(Modifier.fillMaxWidth().padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                  if (conn.app.isNotBlank()) {
                      PanelAvatar(conn.app, conn.packageName, size = 18.dp)
-@@ -273,19 +277,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
+                     Text(conn.app, Modifier.weight(1f, fill = false), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     Text("/", color = c.t3, style = HomeType.rowSub)
+                 }
+-                ChainMark(conn, data)
++                ChainMark(conn, groups)
+                 Text(
+                     conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
+                     color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
+@@ -234,10 +239,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+
+ /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
+ @Composable
+-private fun ChainMark(conn: PanelConnection, data: PanelData) {
++private fun ChainMark(conn: PanelConnection, groups: List<PanelGroup>) {
+     val slot = LocalPanelGroupIcon.current ?: return
+     val head = conn.chain.firstOrNull() ?: return
+-    val group = data.groups.firstOrNull { it.name == head } ?: return
++    val group = groups.firstOrNull { it.name == head } ?: return
+     slot(group, Modifier.size(16.dp))
+ }
+
+@@ -273,19 +278,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
      items(count = items.size, contentType = { "rule" }) { index ->
          val rule = items[index]
          val c = LocalHomeColors.current

@@ -187,12 +187,12 @@ internal fun LazyListScope.panelConnectionsTab(
                 }
             }
             if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
-                ConnectionCard(group.connections[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
+                ConnectionCard(group.connections[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
             }
         }
     } else {
         items(count = list.size, key = { "conn:" + list[it].id }) {
-            ConnectionCard(list[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
+            ConnectionCard(list[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
         }
     }
 }
@@ -206,8 +206,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
     }
 }
 
+// Takes the memoized group list, not the whole PanelData: an idle connection skips the 1 s traffic tick.
 @Composable
-private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Modifier, onOpen: (String) -> Unit) {
+private fun ConnectionCard(conn: PanelConnection, groups: List<PanelGroup>, modifier: Modifier, onOpen: (String) -> Unit) {
     val c = LocalHomeColors.current
     HomeCard(modifier, onClick = { onOpen(conn.id) }, clickLabel = "连接详情", shape = PanelDims.groupShape) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
@@ -222,7 +223,7 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
                     Text(conn.app, Modifier.weight(1f, fill = false), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("/", color = c.t3, style = HomeType.rowSub)
                 }
-                ChainMark(conn, data)
+                ChainMark(conn, groups)
                 Text(
                     conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
                     color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -238,10 +239,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
 
 /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
 @Composable
-private fun ChainMark(conn: PanelConnection, data: PanelData) {
+private fun ChainMark(conn: PanelConnection, groups: List<PanelGroup>) {
     val slot = LocalPanelGroupIcon.current ?: return
     val head = conn.chain.firstOrNull() ?: return
-    val group = data.groups.firstOrNull { it.name == head } ?: return
+    val group = groups.firstOrNull { it.name == head } ?: return
     slot(group, Modifier.size(16.dp))
 }
 
