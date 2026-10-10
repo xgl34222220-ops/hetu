@@ -72,6 +72,10 @@ AUTHORIZED_FILES = frozenset((
     # run in Root TPROXY/Redirect. Only the core/mode capability model and the new pure-Java
     # config writer/converter (no Android API) are added to the runtime scope.
     PACKAGE + 'ProxyRuntimeProfile.java', PACKAGE + 'ProxyCoreConfig.java', PACKAGE + 'CoreJson.java',
+    # 2026-10-11 fast-start authorization: a manual start runs the cancellation receipt, the
+    # pre-start hook, deployment and hetu-root.sh start in one Root invocation. Only the pure-Java
+    # shell-fragment builder (no Android API) is added.
+    PACKAGE + 'StartPrelude.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

@@ -46,7 +46,7 @@ class ProxyAdblockCoordinator {static void exit(Context c){} }
 class ProxyRuntimeProfile {}
 class ProxyRuntimeSettings {static final String APPLIED_RUNTIME_REVISION_KEY="revision";static final int RUNTIME_REVISION=154;}
 class ProxyContinuity {enum ProcessState{ALIVE,DEAD,UNKNOWN};static boolean preserveRunning(ProcessState s,boolean old){return s==ProcessState.ALIVE||s==ProcessState.UNKNOWN&&old;}}
-class RootStartupProbe {static class Result {ProxyContinuity.ProcessState process=ProxyContinuity.ProcessState.ALIVE;}}
+class RootStartupProbe {static class Result {ProxyContinuity.ProcessState process=ProxyContinuity.ProcessState.ALIVE;String installedCoreToken="";}static Result parse(boolean success,String output){Result r=new Result();r.process=ProxyContinuity.ProcessState.UNKNOWN;return r;}}
 class RootAutostart {static volatile boolean cancelFails=false;static volatile java.util.concurrent.CountDownLatch cancelled;static boolean confirmedRunningThisBoot(Context c){return true;}static void cancelCurrentBoot(Context c)throws java.io.IOException{if(cancelled!=null)cancelled.countDown();if(cancelFails)throw new java.io.IOException("cancel failed");}}
 '''
 

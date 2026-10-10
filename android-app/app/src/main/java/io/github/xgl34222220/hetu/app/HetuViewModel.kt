@@ -778,9 +778,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             operationText = if (stopping) "正在停止…" else "正在启动…"
             try {
-                if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
-                state = controller.state()
-                if (!stopping) toast("代理已启动")
+                if (stopping) {
+                    controller.stop { operationText = it }
+                    state = controller.state()
+                } else {
+                    val started = controller.start { operationText = it }
+                    // hetu-root.sh answers ok only after the core is alive, every listener is up,
+                    // rules, health baseline and watchdog are in place: show 运行中 now. The
+                    // status/network-health read follows in the background (refreshNow below),
+                    // and the watchdog/status self-heal cadence is unchanged.
+                    state = state.copy(running = true, healthObserved = false,
+                        message = started.optString("message", state.message))
+                    toast("代理已启动")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

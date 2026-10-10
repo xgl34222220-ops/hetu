@@ -41,6 +41,8 @@ class RootStartTransaction93BridgeShadow {
         @Volatile var bootInstallRelease: CountDownLatch? = null
         @Volatile var deploymentAdvanceMillis = 0L
         @Volatile var cleanupOk = true
+        /** Reply of the single merged start command before exec (StartPrelude refusal), if any. */
+        @Volatile var preludeRefusal: String? = null
 
         @JvmStatic @Implementation fun hasRoot(context: Context): Boolean = true
         @JvmStatic @Implementation
@@ -66,6 +68,22 @@ class RootStartTransaction93BridgeShadow {
                 nativeStops.incrementAndGet()
                 return RootBridge.Result(0, if (cleanupOk) """{"ok":true,"running":false}"""
                     else """{"ok":false,"running":true,"message":"fixture cleanup denied"}""")
+            }
+            if (command.startsWith("hetu_t=''; ") && command.contains("exec '/data/adb/hetu/hetu-root.sh' 'start'")) {
+                // The merged manual start: its shell reads the receipt first, then hook/deployment,
+                // then hetu-root.sh compares the receipt after joining its transaction lock.
+                check(command.contains("export HETU_START_CANCEL_TOKEN=\"\$hetu_t\"; ")) { "Merged start must export the receipt it read" }
+                check(command.contains("hetu_d=\$(sh -c 'set -e; mkdir -p ")) { "Merged start must deploy in its own set -e shell" }
+                check(command.contains("export HETU_PRIVATE_DNS_MODE=")) { "The App passes private_dns_mode" }
+                val captured = cancelToken
+                readTokens += captured
+                tokenReadEntered?.countDown()
+                check(tokenReadRelease?.await(12, TimeUnit.SECONDS) != false) { "Cancel-token read gate not released" }
+                preludeRefusal?.let { return RootBridge.Result(0, it) }
+                if (captured != cancelToken)
+                    return RootBridge.Result(1, """{"ok":false,"running":false,"message":"无法建立启动事务截止时间或请求已撤销"}""")
+                nativeStarts.incrementAndGet()
+                return RootBridge.Result(0, """{"ok":true,"running":true,"message":"fixture native transaction completed"}""")
             }
             if (command.contains("exec '/data/adb/hetu/hetu-root.sh' 'start'")) {
                 check(command.contains("export HETU_START_CANCEL_TOKEN=" + RootBridge.quote(cancelToken) + "; ")) {
@@ -130,6 +148,7 @@ class RootStartTransaction93Test {
         RootStartTransaction93BridgeShadow.bootInstallRelease = null
         RootStartTransaction93BridgeShadow.deploymentAdvanceMillis = 0L
         RootStartTransaction93BridgeShadow.cleanupOk = true
+        RootStartTransaction93BridgeShadow.preludeRefusal = null
         DnsVpnService.running = false
         prefs.edit().clear().putBoolean("proxyRootWanted", false)
             .putBoolean("proxyRootRuntimeRunning", false).putBoolean("proxyRootAutoStart", false)
@@ -155,12 +174,13 @@ class RootStartTransaction93Test {
 
     private fun gate() = CountDownLatch(1).also { gates += it }
     private fun profile() = ProxyRuntimeProfile.load(prefs)
-    private fun assertActuallyPrepared(manager: RootProxyManager) {
+    private fun assertActuallyPrepared(manager: RootProxyManager, deploymentDispatched: Boolean = true) {
         assertTrue("Real prepare wrote a startup configuration", manager.startupFile().isFile)
         assertTrue(manager.startupConfig().contains("fixture-node"))
         assertEquals("Runtime generation must preserve imported source", sourceYaml, ProxyConfigLibrary(app).read(source))
-        assertTrue("Real deployment command was reached", RootStartTransaction93BridgeShadow.commands.any {
-            it.startsWith("set -e; mkdir -p") && it.contains("/data/adb/hetu/bin") && it.contains("startup-config")
+        // Separate deployment (automatic starts) or deployment inside the merged manual start.
+        assertEquals("Real deployment command was reached", deploymentDispatched, RootStartTransaction93BridgeShadow.commands.any {
+            it.contains("set -e; mkdir -p") && it.contains("/data/adb/hetu/bin") && it.contains("startup-config")
         })
     }
     private fun stopWhileControlHeld(): IOException {
@@ -235,7 +255,9 @@ class RootStartTransaction93Test {
             })
         } }
         assertTrue("Actual handoff stage reached", entered.await(8, TimeUnit.SECONDS))
-        assertActuallyPrepared(manager)
+        // A manual start after a clean stop opens no Root shell before its single start command.
+        assertActuallyPrepared(manager, deploymentDispatched = false)
+        assertTrue(RootStartTransaction93BridgeShadow.commands.isEmpty())
         assertEquals(0, RootStartTransaction93BridgeShadow.nativeStarts.get())
         stopWhileControlHeld(); release.countDown()
         assertTrue(starting.get(8, TimeUnit.SECONDS).exceptionOrNull() is IOException)
@@ -286,12 +308,43 @@ class RootStartTransaction93Test {
         release.countDown()
         val result = starting.get(8, TimeUnit.SECONDS)
         assertTrue("A late empty-token reply cannot authorize a stopped manual request", result.exceptionOrNull() is IOException)
-        assertEquals("Java intent recheck rejects the old reply before native dispatch", 0, RootStartTransaction93BridgeShadow.nativeStarts.get())
+        assertEquals("The native receipt comparison refuses the stopped transaction", 0, RootStartTransaction93BridgeShadow.nativeStarts.get())
         assertEquals(0, RootStartTransaction93BridgeShadow.nativeStops.get())
         assertFalse(prefs.getBoolean("proxyRootWanted", true))
         assertFalse(prefs.getBoolean("proxyRootRuntimeRunning", true))
         assertFalse(prefs.contains("proxyRootManualStartSucceededGeneration"))
         assertFalse(prefs.getString("proxyRootLastStartupTiming", "")!!.contains("outcome=ready"))
+    }
+
+    @Test fun manualStartAfterCleanStopUsesExactlyOneRootInvocation() {
+        val manager = RootProxyManager(app)
+        val result = workers.submit<JSONObject> { manager.startManual(profile(), null, true) }.get(10, TimeUnit.SECONDS)
+        assertTrue(result.getBoolean("ok"))
+        val commands = RootStartTransaction93BridgeShadow.commands.toList()
+        assertEquals("Probe, receipt, hook, deployment and start share one su: $commands", 1, commands.size)
+        val start = commands.single()
+        assertTrue("No hook file means one [ -s ] test, no extra shell", start.contains("if [ -s '/data/adb/hetu/scripts/pre-start.sh' ]; then"))
+        assertTrue("Receipt is read before the hook", start.indexOf("hetu_t=") < start.indexOf("pre-start.sh"))
+        assertTrue("Hook runs before deployment", start.indexOf("pre-start.sh") < start.indexOf("hetu_d=\$(sh -c"))
+        assertTrue("Deployment precedes exec", start.indexOf("hetu_d=") < start.indexOf("exec '/data/adb/hetu/hetu-root.sh' 'start'"))
+        assertFalse("No Java-based settings call is left for the shell", start.contains("settings get"))
+        assertEquals(1, RootStartTransaction93BridgeShadow.nativeStarts.get())
+        assertTrue(prefs.getBoolean("proxyRootRuntimeRunning", false))
+    }
+
+    @Test fun failingPreStartHookRefusesBeforeNativeAndReleasesHandoff() {
+        prefs.edit().putBoolean("proxyAdblockFallbackEnabled", true).commit()
+        RootStartTransaction93BridgeShadow.preludeRefusal = "HETU_PRENATIVE\thook\t3\n"
+        val manager = RootProxyManager(app)
+        val result = workers.submit<Result<JSONObject>> { runCatching { manager.startManual(profile(), null, true) } }
+            .get(10, TimeUnit.SECONDS)
+        val error = result.exceptionOrNull()
+        assertTrue(error is IOException)
+        assertEquals("脚本执行失败（3），请查看 scripts.log", error!!.message)
+        assertEquals(0, RootStartTransaction93BridgeShadow.nativeStarts.get())
+        assertEquals("Nothing native ran, so nothing is rolled back", 0, RootStartTransaction93BridgeShadow.nativeStops.get())
+        assertFalse("Refused before native: the filter handoff is released", prefs.getBoolean("proxyAdblockChainActive", true))
+        assertFalse(prefs.getBoolean("proxyRootRuntimeRunning", true))
     }
 
     @Test fun nativeAdmissionDeadlineFailureAfterHandoffDoesNotPretendDispatchOccurred() {

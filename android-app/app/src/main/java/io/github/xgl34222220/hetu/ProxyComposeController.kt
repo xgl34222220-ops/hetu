@@ -478,9 +478,9 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
         }
-        onProgress("执行服务启动前脚本…")
-        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)
-        root.startManual(profile) { onProgress(it) }
+        // The pre-start hook runs inside the single Root start invocation (no extra su when
+        // no hook exists); a failing hook still refuses the start before the network changes.
+        root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {

@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "5e807a6f8681233926e7b3ed6443c5ac21f7ae9d8345b023eac004c97c5cae19",
+  "patchSha256": "75bf822c5ceb6bf6755614a64dd71fb71d70a037ea58736219ea82cfebd0650f",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -235,6 +235,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt",
@@ -338,13 +339,13 @@
     "android-app/app/build.gradle.kts": "01df1e786b083fd352a43700f02274701db367e21b0ce8d1960b3ba1e58c3001",
     "android-app/app/proguard-rules.pro": "9b458c761f6b8f9b2d2b60fa2ec1bdd691fe53ec1899f77cdc84aba962b16f75",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
-    "android-app/app/src/main/assets/hetu-root.sh": "93ff0c8f55ec099ca7d924970f3da00ae778d0a22305a279165a41f70561e362",
+    "android-app/app/src/main/assets/hetu-root.sh": "7fd3ee1b63e263383209a892d93a6d2be85eadceed1baa6fd758ae46b74f1c0a",
     "android-app/app/src/main/baseline-prof.txt": "5e6fa13436e74cb3cfc8f29571a45172e9d601e0fb2bd0ada3d8199bff4a5d00",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "6d52221f519e64805d335cf68c1099641a7bf5475a2cb610d5a12e68c1e02f2e",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "cc35489799857354fca2280bf2bc64a93efbc585f485fa99c1e09c3bde0ded58",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "d0551e92a057ff0e3507ca3d6d10956a8b943d42e81cdf570154c76edf50568d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "0d7d1884c75dde624828a02fe1859818ab35189052ae9e70238c4f5255ff8e7c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java": "97a8991aea71ebdef3bfed0292d6c0448ef8866a885921857c66137132ac5c95",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt": "88c570032274e0557fad10d66c61859f01b4624f1b44fe4f76f6cf530b343e74",
@@ -355,7 +356,8 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeSettings.java": "ee1f42cd2b9ffbbf596b6dc856231b7ba8ea889d6092c0553ac2a733499cc375",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt": "e31e216d54077a73a21b0363a1cca4210ebed53dd4e6e3a273b1ce28b14b62f0",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "3a7b33d4a4dddafc6f4766cf0913abb202789ecd1e19b700068163318cfc00e7",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "e8efe346c871f20ebc1d95cbb9dde2b5e62db5f5fb791b6f085d0fec0696e51d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java": "47ce0f0006a5e9696437d14182290d850c2396e70fbc51ebf75d5c00ef6008e1",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "91c9c154d3ae3cc1a7b48109c633bace811f604557de5ea7ed01aa1e51d444cb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt": "83f85c4076edf4e7b4a182b85f7b3a7e88d45784de9b4cfab0e61dd51b0dbf4a",
@@ -363,7 +365,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt": "9640bff23128a1daa0c51979a254a26e6116e4d370fca5e1c45a5abd0846891a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt": "2dd0d538e4e5c545d09073d5a2ef042284049d11e9ec08fdbed11559dcb4e7a6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "90e373a6338b0fb0179045fee775d1703665c90f4cc6388a800edc7ea75da991",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "0555b5e6b9632a9a11ea730413daf2876af624731a995b152059dc554e010ed6",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "2e2098f5e71fbbd67c6d9100b63dce770b674e282ba7197b9e18dc3a55af0dae",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "08bf2cb919f648eca5e9fa0cc2ccbdb713b87b8599e967c7a32421d1669643de",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "cdefabb9fb7c89bf3e08c1ba82374e8b43768cca5bca48834891ca26e47aa6d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "f6bb5c1d68438be89c0882104e8604ae9d59648e9bff3eb548567c8497d09bd6",
@@ -436,7 +438,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ProxyCoreConfigGoldenTest.kt": "9241b0797293fc2c2f9153386f64f1c1fc27b9c66cd22253829291723e04abd3",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootRecoveryDeadline93Test.kt": "5d747fe61b120db30a23f356315ff6f3886aeeb1082fda1ffe92fdda4dc057bd",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartIntentSafety93Test.kt": "cfcd695d66d6e1c63e6357f86b8b98f311a9cfb4e2f8a83274ee9e4ab8d2f7e9",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartTransaction93Test.kt": "b469c64b5a71880fbe5237bf24b243c332fc99984dfe9df90ec78c86e0ac7166",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/RootStartTransaction93Test.kt": "6d770068891ebd1346d672263a910a77d31bc7439e09f4b722df75d0e55d8dc2",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt": "9be0ba537081f512a51d7a2833368d5ee1533f91bd12adc61490b826bc343e8b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ScriptFeedbackPlacement94Test.kt": "e9fd1bf72ae7f48680634a32b1f9402b3552fa2333571e17f8164bd72a89cd0b",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestExitPanel98Test.kt": "2c163f50f446f30b19aca3aa5a8d662aacc90a4f655e0b8fec9ac3d81b7a63b8",
@@ -808,12 +810,12 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "93ff0c8f55ec099ca7d924970f3da00ae778d0a22305a279165a41f70561e362",
+  "rootScriptSha256": "7fd3ee1b63e263383209a892d93a6d2be85eadceed1baa6fd758ae46b74f1c0a",
   "autostartScriptSha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "93ff0c8f55ec099ca7d924970f3da00ae778d0a22305a279165a41f70561e362"
+      "after": "7fd3ee1b63e263383209a892d93a6d2be85eadceed1baa6fd758ae46b74f1c0a"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
@@ -860,7 +862,7 @@
     },
     "tools/qa/test_core_identity_dns.py": {
       "before": "c3746ac09cb71d6557eef96d0769267d90e7b87e45d4ec84380a114b304a2e71",
-      "after": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d"
+      "after": "033f03fe73e3f1d32f7f9ba87f3b413256806fa230e46968da0dfd357b4fc451"
     },
     "tools/qa/test_fake_ip_private_routing.py": {
       "before": "c69301de4c3fe8aeff65484b3332f0df1eeff91d1427347fb45cc3ac12e46075",
@@ -869,25 +871,26 @@
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
-    ".github/scripts/continuity93_source_scope.py": "3699a26df892ceca5758c20d175c11b1f2788bb99126edffa8f6fe57f8481e4a",
+    ".github/scripts/continuity93_source_scope.py": "76a4a49c5e2aa56b24ee9969eea54ba3e9ff81be37171f1f272d38fc0ae0df14",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
     ".github/scripts/run_continuity93_network_soak.py": "69cc5fd6df391835e98c7249ce8b2676835f9efec5ed37518ded924a1d8ee1cf",
     ".github/scripts/smoke_release_continuity93.py": "d28ccbd79f5f950eb58c9efbceb83c6bccf05f0a7dfa396a2dbd6ead1bb9eef0",
-    ".github/scripts/test_continuity93_evidence.py": "c968f7b8eaca538db436e9982c470553e1958e5bf97fcf2606b6f58cfe4affeb",
+    ".github/scripts/test_continuity93_evidence.py": "0640fba789a8056a0b7d5452eccd633aafbc3006909c09115a6c3880ac8d2039",
     ".github/scripts/test_continuity93_network_soak.py": "e0cbcb6d7b898627849f6c41c6e0e1903be537e1189c604372c11fffd6dba5d8",
     ".github/scripts/transport_continuity93_failures.py": "5afddef49021db6ed7bc8e8f27a57a078b749e7d9f5dfd13185a3599835fa9a9",
     ".github/scripts/transport_ui93_pngs.py": "da87843f04dfc90c245fdde3a0a69f988daff47ccf5e2ab33ffde2a2f8849a39",
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
     ".github/scripts/verify_release_continuity93.py": "cc829fd3859ffa9cb9db1f2c88e595257271cb618750c613a1fe2f84c2990f92",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
-    ".github/workflows/v2093-build.yml": "af6909e18febccb9ea6e660797a9401b92dd81f043ebb7a846014fd0618cc1d2",
+    ".github/workflows/v2093-build.yml": "2cc47e9ba88ce77198ba097172c59de3848bd563508dd8dc44f6fdebe0f7a028",
     "tools/qa/netfilter_model93.py": "a74b517bc29e817a27d35fda03cefddcb40ad3e5a1d19d5e5371320100bf4e3c",
-    "tools/qa/test_app_recovery93.py": "50b807d008b6bdcb9a24e80ac0f34d2d316f07d32b34e8b5afb5c84acfb18f05",
-    "tools/qa/test_core_identity_dns.py": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d",
+    "tools/qa/test_app_recovery93.py": "d315f66ce2f8717b010fbd6b6021765238fb5d422cda26f604d26bbd08366e9a",
+    "tools/qa/test_core_identity_dns.py": "033f03fe73e3f1d32f7f9ba87f3b413256806fa230e46968da0dfd357b4fc451",
     "tools/qa/test_core_support93.py": "5baf826e05bddc8f40a2bcb1a82620019122467a953a35e353cc271313a8c89d",
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
+    "tools/qa/test_fast_start93.py": "8a3014b5841151e49ddc8f03bd31d06e5b2c449b19c44ac0ff599c61195af796",
     "tools/qa/test_network_recovery_stress.py": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179",
     "tools/qa/test_root_autostart.py": "ceb85df4182eff2385db3c55447f21ffd12b3c95f4319c92577d00a84b9da44d",
     "tools/qa/test_root_health.py": "85be8d096212d55952ec7d495eff6c9bbab416094422868fc0032f19fce5a06d",
@@ -2945,6 +2948,8 @@
         "stopAfterActualHandoffBeforeNativeRestoresCoordinatorOwnership",
         "rejectedPostNativePublicationWithFailedCleanupRetainsUnknownHandoff",
         "stopDuringEmptyCancelTokenReadRejectsTheLateManualStart",
+        "manualStartAfterCleanStopUsesExactlyOneRootInvocation",
+        "failingPreStartHookRefusesBeforeNativeAndReleasesHandoff",
         "nativeAdmissionDeadlineFailureAfterHandoffDoesNotPretendDispatchOccurred"
       ]
     },
@@ -3260,7 +3265,7 @@
       ]
     }
   },
-  "expectedUnitTests": 825,
+  "expectedUnitTests": 827,
   "expectedTestXmlFiles": 92,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,

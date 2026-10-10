@@ -1555,9 +1555,45 @@ probe_core_owner(){
 # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
 # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
 # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
+# A verified runner (BusyBox path + spec, both owner probes passed) is reused within one boot:
+# boot_id, the core group, IPv6 availability and the BusyBox inode/mtime/size must all match.
+# Any mismatch or read failure re-runs the full probe; only a positive result is cached, and
+# core_identity_confirm still checks the real core's /proc status on every start.
+identity_cache_key(){
+  ICK_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
+  [ -n "$ICK_BOOT" ] || return 1
+  ICK_V6=0; if v6supported && has ip6tables; then ICK_V6=1; fi
+  printf 'v1|%s|%s|%s' "$ICK_BOOT" "$CORE_GROUP_ID" "$ICK_V6"
+}
+identity_file_sig(){ stat -c '%i:%Y:%s' "$1" 2>/dev/null; }
+identity_cache_hit(){
+  [ -n "$CI_KEY" ] && [ -r "$RUN/state/identity.cache" ] || return 1
+  IFS='|' read -r ICH_V ICH_BOOT ICH_GID ICH_V6 ICH_BB ICH_SPEC ICH_SIG < "$RUN/state/identity.cache" || return 1
+  [ "$ICH_V|$ICH_BOOT|$ICH_GID|$ICH_V6" = "$CI_KEY" ] || return 1
+  case "$ICH_SPEC" in root:net_admin|"0:$CORE_GROUP_ID") ;; *) return 1;; esac
+  case "$ICH_BB" in /data/adb/ksu/bin/busybox|/data/adb/ap/bin/busybox|/data/adb/magisk/busybox|*/.magisk/busybox) ;; *) return 1;; esac
+  [ -x "$ICH_BB" ] && [ -n "$ICH_SIG" ] && [ "$(identity_file_sig "$ICH_BB")" = "$ICH_SIG" ] || return 1
+  CORE_RUNNER="$ICH_BB"; CORE_SPEC="$ICH_SPEC"
+}
+identity_cache_store(){
+  rm -f "$RUN/state/identity.cache" 2>/dev/null || true
+  [ -n "$CI_KEY" ] && [ -n "$CORE_RUNNER" ] || return 0
+  ICS_SIG=$(identity_file_sig "$CORE_RUNNER") && [ -n "$ICS_SIG" ] || return 0
+  mkdir -p "$RUN/state" 2>/dev/null || return 0
+  { printf '%s|%s|%s\n' "$CI_KEY" "$CORE_RUNNER" "$CORE_SPEC|$ICS_SIG" > "$RUN/state/identity.cache.$$" &&
+    mv -f "$RUN/state/identity.cache.$$" "$RUN/state/identity.cache"; } 2>/dev/null || rm -f "$RUN/state/identity.cache.$$" 2>/dev/null || true
+}
 core_identity_prepare(){
-  CORE_GID=""; CORE_RUNNER=""; CORE_SPEC=""; SYSTEM_DNS=exempt
+  CORE_GID=""; CORE_RUNNER=""; CORE_SPEC=""; SYSTEM_DNS=exempt; IDENTITY_SOURCE=probe
   [ ! -f "$BASE/policy/system-dns-direct" ] || return 0
+  CI_KEY=$(identity_cache_key 2>/dev/null || true)
+  if identity_cache_hit; then IDENTITY_SOURCE=cache; return 0; fi
+  CORE_RUNNER=""; CORE_SPEC=""
+  core_identity_probe
+  identity_cache_store
+  return 0
+}
+core_identity_probe(){
   CI_MAGISK=$(magisk --path 2>/dev/null || true)
   for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
     [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
@@ -1671,6 +1707,21 @@ core_tune(){
 }
 
 google_firewall_uids(){
+  # A start from the App passes the GMS/Play/GSF app IDs it resolved itself (START_GMS_APPIDS),
+  # so the start path forks no pm/cmd Java process: one UID per app ID and /data/user/<id>.
+  # Only the start transaction uses them; the watchdog's periodic upkeep resolves again via pm.
+  if [ -n "${START_GMS_APPIDS:-}" ]; then
+    GF_USERS=$(ls /data/user 2>/dev/null | grep -E '^[0-9]{1,6}$')
+    [ -n "$GF_USERS" ] || GF_USERS=0
+    for GF_USER in $GF_USERS; do
+      for GF_APP in $(printf '%s\n' "$START_GMS_APPIDS" | tr ',' ' '); do
+        case "$GF_APP" in ''|*[!0-9]*) continue;; esac
+        [ "$GF_APP" -ge 10000 ] && [ "$GF_APP" -le 19999 ] || continue
+        printf '%s\n' $((GF_USER*100000+GF_APP))
+      done
+    done | sort -nu
+    return 0
+  fi
   # Resolve each installed user/profile. Android can reassign app UIDs after reset.
   GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
   [ -n "$GF_USERS" ] || GF_USERS=0
@@ -1805,6 +1856,11 @@ capture_unwind(){
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
   START_VENDOR_CLEAN="${30:-0}"
+  # Values the App resolved in-process (no Java child processes on the start path). Shell-local:
+  # the watchdog and everything spawned later fall back to settings/pm as before.
+  START_GMS_APPIDS=""; case "${HETU_GMS_APPIDS:-}" in *[!0-9,]*) ;; *) START_GMS_APPIDS="${HETU_GMS_APPIDS:-}";; esac
+  START_PRIVATE_DNS="${HETU_PRIVATE_DNS_MODE:-}"
+  unset HETU_GMS_APPIDS HETU_PRIVATE_DNS_MODE
   START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
   bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
   tuning_valid || fail "$TUNE_ERROR"
@@ -1874,7 +1930,7 @@ start(){
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
   : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
-  core_identity_confirm "$START_PID" || fail "核心隔离身份验证失败"
+  core_identity_confirm "$START_PID" || { rm -f "$RUN/state/identity.cache" 2>/dev/null; fail "核心隔离身份验证失败"; }
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
@@ -1906,7 +1962,9 @@ start(){
   fi
   start_stage "install-dot-guard"
   if [ "$SYSTEM_DNS" = captured ]; then
-    PRIVATE_DNS=$(settings get global private_dns_mode 2>/dev/null | head -n 1)
+    # The App passes Settings.Global private_dns_mode; only starts without it (boot) ask settings.
+    PRIVATE_DNS=${START_PRIVATE_DNS:-}
+    [ -n "$PRIVATE_DNS" ] || PRIVATE_DNS=$(settings get global private_dns_mode 2>/dev/null | head -n 1)
     case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
     if [ "$PRIVATE_DNS" != hostname ]; then
       # Optional: a kernel without tcp-reset REJECT simply runs without the guard.

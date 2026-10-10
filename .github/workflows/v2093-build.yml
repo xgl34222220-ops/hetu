@@ -194,6 +194,8 @@ jobs:
 
         python3 tools/qa/test_app_recovery93.py --output out/verification/app-recovery93-host.json 2>&1 | tee out/verification/app-recovery93-host.log
 
+        python3 tools/qa/test_fast_start93.py -v 2>&1 | tee out/verification/fast-start93-tests.txt
+
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter
       run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java

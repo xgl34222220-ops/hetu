@@ -43,6 +43,8 @@ final class RootProxyManager {
     private static final ThreadLocal<Long> AUTOMATIC_DEADLINE=new ThreadLocal<>();
     private static final ThreadLocal<Long> STOP_DEADLINE=new ThreadLocal<>();
     private static final ThreadLocal<Long> AUTOMATIC_RESERVE=new ThreadLocal<>();
+    /** Set only for the user's own Start: the pre-start hook rides on the single start command. */
+    private static final ThreadLocal<Boolean> PRE_START_HOOK=new ThreadLocal<>();
     private static final class StartIntent {
         final long generation; final boolean wanted,automatic; final java.util.function.BooleanSupplier current;
         boolean nativeDispatched;
@@ -658,6 +660,12 @@ final class RootProxyManager {
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
     JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
+    /** The user's Start button: the pre-start hook runs inside the same Root invocation as the start. */
+    JSONObject startManual(ProxyRuntimeProfile profile,Progress progress,boolean preStartHook)throws Exception{
+        if(!preStartHook)return startOwned(profile,progress,false);
+        PRE_START_HOOK.set(Boolean.TRUE);
+        try{return startOwned(profile,progress,false);}finally{PRE_START_HOOK.remove();}
+    }
     JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,true);}
     private JSONObject startOwned(ProxyRuntimeProfile profile,Progress progress,boolean replace)throws Exception{
         final long request=STOP_GENERATION.get();
@@ -771,7 +779,15 @@ final class RootProxyManager {
         try{
             checkStartIntent();
             trace.next("runtimeProbe");
-            RootStartupProbe.Result initial=probeStartupRuntime();
+            StartIntent entryIntent=START_INTENT.get();
+            boolean automaticEntry=entryIntent!=null&&entryIntent.automatic;
+            // A user/app start after a clean stop (nothing wanted, nothing recorded running) does not
+            // open a separate Root shell just to probe liveness and the installed core token: the
+            // single start command compares the token itself, and hetu-root.sh start still cleans up
+            // and stops any orphan core before it takes over the network.
+            boolean mergedProbe=!replaceRunning&&!automaticEntry
+                    &&!prefs.getBoolean("proxyRootRuntimeRunning",false)&&!prefs.getBoolean("proxyRootWanted",false);
+            RootStartupProbe.Result initial=mergedProbe?RootStartupProbe.parse(false,""):probeStartupRuntime();
             checkStartIntent();
             if(initial.process==ProxyContinuity.ProcessState.DEAD){
                 // Clear stale health only on confirmed absence, never on a probe
@@ -833,18 +849,24 @@ final class RootProxyManager {
         // A core that cannot run the adblock chain (Hysteria) starts without it, explicitly.
         if(profile.adblockChain&&!p.profile.adblockChain)profile=p.profile;
         String conversionWarnings=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?"":prefs.getString("proxyCoreConversionWarnings","");
-        stage(progress,"部署必要运行文件…");
-        trace.next("deployment");
-        // The initial process probe also read the installed core token. Reuse that
-        // result instead of opening a second privileged shell just to read one file.
-        checkStartIntent();
-        installRuntimeFiles(p,true,initial.installedCoreToken);
-        checkStartIntent();
-
-        trace.next("validation");
         String validationKey=validationFingerprint(p);
         boolean validationKnown=validationKey.equals(prefs.getString("proxyRootValidatedFingerprint",""));
         boolean preserveLiveNeedsValidation=replaceRunning&&existingRunning&&!validationKnown;
+        // Deployment rides on the native start command (one Root invocation) unless a live
+        // replacement must validate the new files first, or this is an automatic recovery start.
+        boolean mergedDeploy=!preserveLiveNeedsValidation&&!automaticEntry;
+        // The probe (when one ran) also read the installed core token; null lets the start
+        // command compare it itself.
+        String probedCoreToken=mergedProbe?null:initial.installedCoreToken;
+        stage(progress,"部署必要运行文件…");
+        trace.next("deployment");
+        checkStartIntent();
+        if(!mergedDeploy){
+            installRuntimeFiles(p,true,probedCoreToken);
+            checkStartIntent();
+        }
+
+        trace.next("validation");
         if(preserveLiveNeedsValidation){
             stage(progress,"配置有变化，先校验后再替换当前核心…");
             try{
@@ -918,8 +940,16 @@ final class RootProxyManager {
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                 dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
+        String prelude=null;
+        if(mergedDeploy){
+            StringBuilder inline=new StringBuilder();
+            if(Boolean.TRUE.equals(PRE_START_HOOK.get()))
+                inline.append(StartPrelude.preStartHook(profile.mode.id,p.source==null?"":p.source.name));
+            inline.append(inlineDeployment(p,true,probedCoreToken));
+            prelude=inline.toString();
+        }
         checkStartIntent();
-        try{result=runJsonWithTimeout(145000L,prependStart(bootArgs));
+        try{result=runJsonWithTimeout(145000L,prelude,prependStart(bootArgs));
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
             nativeStartSucceeded=true;automaticStartCompleted();
         }catch(Exception startFailure){throw startFailure;}
@@ -1669,12 +1699,25 @@ final class RootProxyManager {
     }
 
     private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
-    private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{
+    private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{return runJsonWithTimeout(timeoutMs,null,args);}
+    /**
+     * prelude (start only): shell run inside the same Root invocation before hetu-root.sh start.
+     * The cancellation receipt is then read in that shell first, before the hook and deployment,
+     * so a Stop during either still cancels natively. The prelude ends in a StartPrelude refusal
+     * line instead of JSON when it declines to dispatch the native transaction.
+     */
+    private JSONObject runJsonWithTimeout(long timeoutMs,String prelude,String...args)throws Exception{
         RootBridge.requireWorkerThread();
         boolean starting=args.length>0&&"start".equals(args[0]);
         boolean automaticStart=starting&&START_INTENT.get()!=null&&START_INTENT.get().automatic;
         StringBuilder cmd=new StringBuilder();
-        if(starting){
+        if(starting&&prelude!=null){
+            // Final Java intent check before the single privileged dispatch; the shell then reads
+            // the receipt as its very first step. A Stop racing in between is still caught by
+            // the post-native checkStartIntent in startInternal and rolled back exactly once.
+            checkStartIntent();
+            cmd.append(StartPrelude.cancelReceipt(ROOT+"/run/start-cancel-generation"));
+        }else if(starting){
             checkStartIntent();
             String marker=RootBridge.quote(ROOT+"/run/start-cancel-generation");
             RootBridge.Result capture=boundedRootShell(context,"if [ -e "+marker+" ]; then cat "+marker+"; else printf ''; fi",3000L);
@@ -1694,11 +1737,53 @@ final class RootProxyManager {
                 throw new IOException("恢复剩余时间不足以完成启动及回滚");
         }
         checkStartIntent();
+        if(starting){
+            if(prelude!=null)cmd.append(prelude);
+            // The App answers what `settings get global private_dns_mode` would (a Java process
+            // on the device, 0.3-0.8 s); boot/autostart starts without it still ask settings.
+            cmd.append("export HETU_PRIVATE_DNS_MODE=").append(RootBridge.quote(privateDnsMode())).append("; ");
+            // Vendor GMS firewall cleanup: app IDs from PackageManager instead of pm/cmd package.
+            if(prefs.getBoolean("proxyVendorFirewallCleanup",false))
+                cmd.append("export HETU_GMS_APPIDS=").append(RootBridge.quote(gmsAppIds())).append("; ");
+        }
         cmd.append("exec ").append(RootBridge.quote(SCRIPT));
         for(String a:args)cmd.append(' ').append(RootBridge.quote(a==null?"":a));
         if(args.length>0&&"start".equals(args[0])&&START_INTENT.get()!=null)START_INTENT.get().nativeDispatched=true;
         RootBridge.Result r=automaticStart?RootBridge.rootShell(context,cmd.toString(),timeoutMs):boundedRootShell(context,cmd.toString(),timeoutMs);
+        if(starting&&prelude!=null){
+            String refused=StartPrelude.refusal(r.output);
+            if(refused!=null){
+                // Nothing native ran: the hook, receipt or deployment stopped before exec.
+                if(START_INTENT.get()!=null)START_INTENT.get().nativeDispatched=false;
+                throw new IOException(refused);
+            }
+        }
         return RootCommandReply.read(r.code,r.output);
+    }
+
+    private String privateDnsMode(){
+        String mode=null;
+        try{mode=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");}
+        catch(RuntimeException ignored){}
+        return StartPrelude.privateDnsMode(mode);
+    }
+
+    /** App IDs (uid % 100000) of GMS, Play Store and GSF; "0" when none is installed. */
+    private String gmsAppIds(){
+        StringBuilder out=new StringBuilder();
+        android.content.pm.PackageManager pm=context.getPackageManager();
+        for(String name:new String[]{"com.google.android.gms","com.android.vending","com.google.android.gsf"}){
+            try{
+                int app=pm.getApplicationInfo(name,0).uid%100000;
+                if(app>=10000&&app<=19999)out.append(out.length()==0?"":",").append(app);
+            }catch(Exception ignored){}
+        }
+        return out.length()==0?"0":out.toString();
+    }
+
+    /** installRuntimeFiles' commands, run by `sh -c` inside the start invocation (set -e intact). */
+    private String inlineDeployment(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
+        return StartPrelude.deployment(deploymentCommand(p,includeConfig,probedCoreToken));
     }
 
     private void quiesceLegacyRuntime(Progress progress){
@@ -1758,12 +1843,27 @@ final class RootProxyManager {
 
     private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
         RootBridge.requireWorkerThread();
+        if(probedCoreToken==null){
+            String expected=expectedCoreToken(p.profile.core);
+            probedCoreToken=runtimeCoreCurrent(expected)?expected:"";
+        }
+        RootBridge.Result r=boundedRootShell(context,deploymentCommand(p,includeConfig,probedCoreToken),45000L);
+        if(!r.ok())throw new IOException("无法安装 Root 运行文件："+r.output.trim());
+    }
+
+    /**
+     * probedCoreToken null: the command itself keeps bin/core when the installed token already
+     * matches (the merged start path, which skipped the separate probe).
+     */
+    private String deploymentCommand(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
+        RootBridge.requireWorkerThread();
         File stage=new File(context.getCacheDir(),"hetu-root-stage");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行临时目录");
         File script=new File(stage,"hetu-root.sh");
         copyScriptAsset(script);
         String coreToken=expectedCoreToken(p.profile.core);
-        boolean deployCore=probedCoreToken==null?!runtimeCoreCurrent(coreToken):!coreToken.equals(probedCoreToken);
+        boolean shellDecidesCore=probedCoreToken==null;
+        boolean deployCore=shellDecidesCore||!coreToken.equals(probedCoreToken);
         File binary=deployCore?coreFile(p.profile.core,stage):null;
         File cfg=new File(stage,"startup-config");
         File adblock=p.adblock==null?null:p.adblock.file;
@@ -1791,12 +1891,15 @@ final class RootProxyManager {
         else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                 .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
         if(deployCore){
+            if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
+                    .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
             cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
                     .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
                     .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
                     .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
                     .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
             appendCoreAssets(cmd,p.profile.core);
+            if(shellDecidesCore)cmd.append("; fi");
         }
         appendCoreKind(cmd,p.profile.core);
         if(adblock!=null){
@@ -1838,8 +1941,7 @@ final class RootProxyManager {
                     .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                     .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
         }
-        RootBridge.Result r=boundedRootShell(context,cmd.toString(),45000L);
-        if(!r.ok())throw new IOException("无法安装 Root 运行文件："+r.output.trim());
+        return cmd.toString();
     }
 
     /** hetu-root.sh reads which CLI bin/core speaks from this file (absent = Mihomo). */
@@ -1865,7 +1967,18 @@ final class RootProxyManager {
     private File coreFile(ProxyRuntimeProfile.Core core,File stage)throws IOException{
         if(cores.installed(core))return cores.file(core);
         if(core!=ProxyRuntimeProfile.Core.MIHOMO)throw new IOException(core.label+" 尚未安装核心");
-        File out=new File(stage,"mihomo");copyAsset(rootBinaryAsset(),out,true);return out;
+        // The embedded binary is staged once per revision: the merged start command always needs
+        // a source path even when the installed token matches and nothing is copied.
+        File out=new File(stage,"mihomo"),stamp=new File(stage,"mihomo.token");
+        String token=expectedCoreToken(core);
+        try{
+            if(out.isFile()&&out.length()>0&&out.canExecute()&&stamp.isFile()
+                    &&token.equals(new String(Files.readAllBytes(stamp.toPath()),StandardCharsets.UTF_8)))return out;
+        }catch(IOException ignored){}
+        if(stamp.exists()&&!stamp.delete())throw new IOException("无法刷新内置核心暂存标记");
+        copyAsset(rootBinaryAsset(),out,true);
+        try(FileOutputStream target=new FileOutputStream(stamp,false)){target.write(token.getBytes(StandardCharsets.UTF_8));target.getFD().sync();}
+        return out;
     }
     private String rootBinaryAsset()throws IOException{
         for(String abi:Build.SUPPORTED_ABIS){
