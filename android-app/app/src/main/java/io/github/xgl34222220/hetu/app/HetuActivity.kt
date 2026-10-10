@@ -411,7 +411,7 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
         dockTabs.mapIndexed { index, tab ->
             val label = labels[index]
             when (tab) {
-                HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
+                HxTab.Home -> DockItem(label, io.github.xgl34222220.hetu.ui.HetuLucideIcons.House, 1f) // monochrome outline, like the other three
                 HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
                 HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
                 HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
@@ -445,8 +445,8 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
     Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
+                // The dock's glass is static (no backdrop blur), so the tab page is not recorded
+                // into an offscreen layer on every scroll frame.
                 .nestedScroll(dockScroll),
         ) {
             AnimatedContent(
@@ -495,7 +495,7 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
                 if (next == vm.tab) vm.reselect++ else vm.tab = next
             },
             hazeState = dockHaze,
-            backdrop = liquidBackdrop.takeIf { runtimeLiquid },
+            backdrop = null,
             modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
             onHeightChanged = { measuredDockHeight = it },
         )

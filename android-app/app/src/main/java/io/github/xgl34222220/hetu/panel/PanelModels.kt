@@ -414,7 +414,9 @@ internal object PanelLogic {
         val groupWidth = (widthDp - 32f - 8f) / 2f
         val nodeWidth = (widthDp - 32f - 16f - 8f) / 2f
         return layout.copy(
-            groupColumns = if (groupWidth < 148f * scale) 1 else layout.groupColumns,
+            // Compact glass group cards stay a two-column grid at common enlarged font sizes
+            // (MIUI/HyperOS default 1.15–1.3); only very large type falls back to one column.
+            groupColumns = if (groupWidth < 128f * scale) 1 else layout.groupColumns,
             nodeColumns = if (nodeWidth < 148f * scale) 1 else layout.nodeColumns,
         )
     }

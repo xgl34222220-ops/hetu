@@ -740,9 +740,10 @@ internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
 }
 
 /** Put this on the scrolling content that passes beneath the bar. */
-internal fun Modifier.homeGlassSource(glass: HomeBarGlass): Modifier {
-    val haze = glass.haze
-    return if (haze != null && glass.active) hazeSource(haze) else this
+internal fun Modifier.homeGlassSource(@Suppress("UNUSED_PARAMETER") glass: HomeBarGlass): Modifier {
+    // Liquid-glass pass: scrolling content is never recorded for a live blur. The bar below fakes
+    // its frost with a cached translucent gradient, so scrolling costs no offscreen pass.
+    return this
 }
 
 /**
@@ -756,7 +757,8 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
     if (!glass.active) return
     val c = LocalHomeColors.current
     val line = c.line
-    val haze = glass.haze
+    // No live blur (see homeGlassSource): the frosted bar is a static translucent canvas tint.
+    val haze: HazeState? = null
     val progressive = haze != null && LocalHomeBarProgressive.current
     val surface = if (haze != null) {
         Modifier

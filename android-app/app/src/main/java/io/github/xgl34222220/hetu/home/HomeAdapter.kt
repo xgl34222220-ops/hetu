@@ -177,6 +177,12 @@ internal fun HetuHomeV2(
             onOpenBasicSettings = { openBasicSettings() },
             onOpenConfigs = { openConfigs() },
             onViewConfig = { viewConfig() },
+            onOpenWebUi = {
+                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyWebPanelsActivity::class.java))
+            },
+            onOpenLogs = {
+                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyLogViewerActivity::class.java))
+            },
             onDismissStartFailure = { dismissStartupError() },
             onCopy = { label, text -> copyToClipboard(context, label, text) },
             loadTargets = { loadTargets(prefs) },

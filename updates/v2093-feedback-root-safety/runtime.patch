@@ -4768,7 +4768,7 @@ index 2243235..e6f8082 100644
          Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..651c3d2 100644
+index 2b1a624..00667b9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -5009,7 +5009,7 @@ index 2b1a624..651c3d2 100644
 +        dockTabs.mapIndexed { index, tab ->
 +            val label = labels[index]
 +            when (tab) {
-+                HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
++                HxTab.Home -> DockItem(label, io.github.xgl34222220.hetu.ui.HetuLucideIcons.House, 1f) // monochrome outline, like the other three
 +                HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
 +                HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
 +                HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
@@ -5037,8 +5037,9 @@ index 2b1a624..651c3d2 100644
          Box(
              Modifier.fillMaxSize()
 -                .then(if (!runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
-+                .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
-                 .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
+-                .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
++                // The dock's glass is static (no backdrop blur), so the tab page is not recorded
++                // into an offscreen layer on every scroll frame.
                  .nestedScroll(dockScroll),
          ) {
              AnimatedContent(
@@ -5077,11 +5078,13 @@ index 2b1a624..651c3d2 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -464,7 +496,8 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -463,8 +495,9 @@ private fun MainTabs(vm: HetuViewModel) {
+                 if (next == vm.tab) vm.reselect++ else vm.tab = next
              },
              hazeState = dockHaze,
-             backdrop = liquidBackdrop.takeIf { runtimeLiquid },
+-            backdrop = liquidBackdrop.takeIf { runtimeLiquid },
 -            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
++            backdrop = null,
 +            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
 +            onHeightChanged = { measuredDockHeight = it },
          )
@@ -7181,7 +7184,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..c0a7a1f 100644
+index 0ceaa23..968c280 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 @@ -140,16 +140,30 @@ internal fun HetuHomeV2(
@@ -7224,7 +7227,7 @@ index 0ceaa23..c0a7a1f 100644
              onNetSideChange = { side ->
                  netSide = side
                  prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
-@@ -158,12 +172,12 @@ internal fun HetuHomeV2(
+@@ -158,12 +172,18 @@ internal fun HetuHomeV2(
                  speedSource = source
                  prefs.edit().putString(PrefSpeedSource, source.id).apply()
              },
@@ -7239,11 +7242,17 @@ index 0ceaa23..c0a7a1f 100644
 +            onOpenBasicSettings = { openBasicSettings() },
 +            onOpenConfigs = { openConfigs() },
 +            onViewConfig = { viewConfig() },
++            onOpenWebUi = {
++                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyWebPanelsActivity::class.java))
++            },
++            onOpenLogs = {
++                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyLogViewerActivity::class.java))
++            },
 +            onDismissStartFailure = { dismissStartupError() },
              onCopy = { label, text -> copyToClipboard(context, label, text) },
              loadTargets = { loadTargets(prefs) },
              saveTargets = { config -> saveTargets(prefs, config) },
-@@ -171,18 +185,11 @@ internal fun HetuHomeV2(
+@@ -171,18 +191,11 @@ internal fun HetuHomeV2(
          )
      }
 
@@ -7265,7 +7274,7 @@ index 0ceaa23..c0a7a1f 100644
          ) {
              HomeRoute(
                  state = state.copy(ipRefreshing = data.refreshing),
-@@ -290,8 +297,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+@@ -290,8 +303,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
      var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
@@ -7278,7 +7287,7 @@ index 0ceaa23..c0a7a1f 100644
          var lastTx = TrafficStats.getTotalTxBytes()
          var lastRx = TrafficStats.getTotalRxBytes()
          var lastAt = SystemClock.elapsedRealtime()
-@@ -321,8 +331,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+@@ -321,8 +337,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
      val memoryPoints = remember { mutableStateListOf<Float?>() }
      val latestCpu by rememberUpdatedState(cpu)
      val latestMemory by rememberUpdatedState(memoryBytes)
@@ -7291,7 +7300,7 @@ index 0ceaa23..c0a7a1f 100644
          while (true) {
              cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
              memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
-@@ -418,3 +431,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
+@@ -418,3 +437,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
  }
 
  private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
@@ -7308,7 +7317,7 @@ index 0ceaa23..c0a7a1f 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..f8a658a 100644
+index 9afc132..ca3dd97 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 @@ -1,6 +1,7 @@
@@ -7357,7 +7366,7 @@ index 9afc132..f8a658a 100644
          drawCircle(tint, radius)
      }
  }
-@@ -724,7 +733,7 @@ internal class HomeBarGlass internal constructor(
+@@ -724,16 +733,17 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
  internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
@@ -7366,8 +7375,145 @@ index 9afc132..f8a658a 100644
      val progress = animateFloatAsState(if (lifted) 1f else 0f, HomeMotion.fade(LocalHomeMotionEnabled.current, 220), label = "home-bar-glass")
      val active = remember(lifted) { derivedStateOf { lifted || progress.value > .01f } }
      return remember(haze, progress, active) { HomeBarGlass(haze, progress, active) }
+ }
+
+ /** Put this on the scrolling content that passes beneath the bar. */
+-internal fun Modifier.homeGlassSource(glass: HomeBarGlass): Modifier {
+-    val haze = glass.haze
+-    return if (haze != null && glass.active) hazeSource(haze) else this
++internal fun Modifier.homeGlassSource(@Suppress("UNUSED_PARAMETER") glass: HomeBarGlass): Modifier {
++    // Liquid-glass pass: scrolling content is never recorded for a live blur. The bar below fakes
++    // its frost with a cached translucent gradient, so scrolling costs no offscreen pass.
++    return this
+ }
+
+ /**
+@@ -747,7 +757,8 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
+     if (!glass.active) return
+     val c = LocalHomeColors.current
+     val line = c.line
+-    val haze = glass.haze
++    // No live blur (see homeGlassSource): the frosted bar is a static translucent canvas tint.
++    val haze: HazeState? = null
+     val progressive = haze != null && LocalHomeBarProgressive.current
+     val surface = if (haze != null) {
+         Modifier
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
+index 36f72fa..c751c37 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
+@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.graphics.Brush
+ import androidx.compose.ui.graphics.Color
+ import androidx.compose.ui.graphics.Shape
++import androidx.compose.ui.graphics.drawOutline
++import androidx.compose.ui.graphics.drawscope.translate
+ import androidx.compose.ui.graphics.lerp
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.unit.dp
+@@ -26,37 +28,33 @@ internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier {
+     val c = LocalHomeColors.current
+     val base = background ?: c.bg
+     if (c.dark && c.bg == Color.Black && base == c.bg) return this.background(base)
+-    val cool = lerp(c.accent, if (c.dark) Color(0xFF8E93CC) else Color(0xFFAFA9EB), .62f)
+-    val warm = if (c.dark) Color(0xFF947D9F) else Color(0xFFD8BCD6)
++    // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
++    // soft light at the top. No coloured blobs; cached per size, nothing animates.
++    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
+     val material = remember(c, base) { Modifier.drawWithCache {
+-        val extent = max(size.width, size.height).coerceAtLeast(1f)
+-        val top = Brush.radialGradient(
+-            listOf(cool.copy(alpha = if (c.dark) .13f else .19f), Color.Transparent),
+-            center = Offset(size.width * .08f, size.height * .05f), radius = extent * .67f,
+-        )
+-        val side = Brush.radialGradient(
+-            listOf(warm.copy(alpha = if (c.dark) .08f else .17f), Color.Transparent),
+-            center = Offset(size.width * 1.05f, size.height * .49f), radius = extent * .57f,
+-        )
+-        val foot = Brush.radialGradient(
+-            listOf(c.accent.copy(alpha = if (c.dark) .06f else .065f), Color.Transparent),
+-            center = Offset(size.width * .22f, size.height * 1.08f), radius = extent * .61f,
++        val wash = Brush.verticalGradient(listOf(
++            lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),
++            base,
++            lerp(base, mist, if (c.dark) .28f else .34f),
++        ))
++        val light = Brush.radialGradient(
++            listOf(Color.White.copy(alpha = if (c.dark) .035f else .28f), Color.Transparent),
++            center = Offset(size.width * .5f, 0f), radius = max(size.width, 1f) * .95f,
+         )
+         onDrawBehind {
+             drawRect(base)
+-            drawRect(top)
+-            drawRect(side)
+-            drawRect(foot)
++            drawRect(wash)
++            drawRect(light)
+         }
+     } }
+     return this.then(material)
+ }
+
+ /**
+- * Lightweight glass material for content and overlays. The high-opacity fill protects small
+- * text from the canvas; raised surfaces are opaque so underlying text cannot show through a
+- * menu or dialog. One physical-pixel edge gives definition without a resting shadow.
+- * Existing shapes and hit targets are supplied by the caller and do not change.
++ * Restrained iOS liquid-glass material, faked without any blur so it costs nothing while lists
++ * scroll: a frosted translucent fill (a cached vertical gradient, opaque enough for small text),
++ * a thin bright edge that is strongest along the top, and a soft low shadow drawn once per size.
++ * Raised surfaces (menus, dialogs) stay opaque. Shapes and hit targets come from the caller.
+  */
+ @Composable
+ internal fun Modifier.homeGlassPanel(
+@@ -65,22 +63,34 @@ internal fun Modifier.homeGlassPanel(
+     raised: Boolean = false,
+ ): Modifier {
+     val c = LocalHomeColors.current
++    val dark = c.dark
++    val black = dark && c.bg == Color.Black
+     val pixel = (1f / LocalDensity.current.density).dp
+-    val top = lerp(background, Color.White, if (c.dark) .025f else .16f)
+-        .copy(alpha = if (raised) 1f else if (c.dark) .98f else .96f)
+-    val bottom = lerp(background, c.accent, if (c.dark) .014f else .016f)
+-        .copy(alpha = if (raised) 1f else if (c.dark) .96f else .90f)
++    val top = lerp(background, Color.White, if (dark) .05f else .34f)
++        .copy(alpha = if (raised) 1f else if (dark) .92f else .86f)
++    val bottom = lerp(background, if (dark) Color(0xFF2A3546) else Color(0xFFD7E0EC), if (dark) .10f else .22f)
++        .copy(alpha = if (raised) 1f else if (dark) .90f else .80f)
+     val fill = remember(top, background, bottom, raised) {
+-        Brush.verticalGradient(listOf(top, background.copy(alpha = if (raised) 1f else .95f), bottom))
++        Brush.verticalGradient(listOf(top, background.copy(alpha = if (raised) 1f else if (dark) .91f else .84f), bottom))
+     }
+-    val rim = remember(c.dark, c.line) {
+-        Brush.linearGradient(listOf(
+-            Color.White.copy(alpha = if (c.dark) .13f else .82f),
+-            c.line.copy(alpha = if (c.dark) .55f else .74f),
++    val rim = remember(dark, c.line) {
++        Brush.verticalGradient(listOf(
++            Color.White.copy(alpha = if (dark) .20f else .95f),
++            Color.White.copy(alpha = if (dark) .06f else .45f),
++            c.line.copy(alpha = if (dark) .45f else .55f),
+         ))
+     }
+-    val material = remember(shape, fill, rim, pixel) {
+-        Modifier.clip(shape).background(fill).border(pixel, rim, shape)
++    val shadowTint = if (dark) Color.Black.copy(alpha = .30f) else Color(0xFF51617A).copy(alpha = .10f)
++    val material = remember(shape, fill, rim, pixel, shadowTint, black) {
++        val shadow = if (black) Modifier else Modifier.drawWithCache {
++            // Two offset translucent copies of the outline read as a soft contact shadow.
++            val near = shape.createOutline(size, layoutDirection, this)
++            onDrawBehind {
++                translate(0f, 2.dp.toPx()) { drawOutline(near, shadowTint) }
++                translate(0f, 5.dp.toPx()) { drawOutline(near, shadowTint.copy(alpha = shadowTint.alpha * .45f)) }
++            }
++        }
++        shadow.clip(shape).background(fill).border(pixel * 1.5f, rim, shape)
+     }
+     return this.then(material)
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
-index 108ce15..550a4f6 100644
+index 108ce15..de14f2c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 @@ -132,11 +132,14 @@ internal data class HomeConnectionObservation(
@@ -7415,6 +7561,17 @@ index 108ce15..550a4f6 100644
  }
 
  internal data class HomeUiState(
+@@ -247,6 +273,10 @@ internal class HomeActions(
+     val onOpenBasicSettings: () -> Unit = {},
+     /** Config tag: opens 工具 › 配置管理. */
+     val onOpenConfigs: () -> Unit = {},
++    /** WebUI shortcut under 启动: the existing 工具 › WebUI page (external panels / built-in dashboard). */
++    val onOpenWebUi: () -> Unit = {},
++    /** 日志 shortcut under 启动: the existing log viewer (工具 › 日志文件). */
++    val onOpenLogs: () -> Unit = {},
+     /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
+     val onViewConfig: () -> Unit = {},
+     val onDismissStartFailure: () -> Unit = {},
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
 index a6f5728..59d48c7 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
@@ -7448,7 +7605,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..d36736f 100644
+index e31ca99..f996da9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -90,6 +90,12 @@ internal fun HomeScreen(
@@ -7464,7 +7621,16 @@ index e31ca99..d36736f 100644
      val scroll = rememberScrollState()
      val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
      val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
-@@ -137,8 +143,8 @@ internal fun HomeScreen(
+@@ -127,7 +133,7 @@ internal fun HomeScreen(
+                     val reach = 340.dp.toPx()
+                     drawRect(
+                         Brush.verticalGradient(
+-                            0f to glow.copy(alpha = if (c.dark) .13f else .10f),
++                            0f to glow.copy(alpha = if (c.dark) .07f else .05f),
+                             1f to glow.copy(alpha = 0f),
+                             startY = 0f, endY = reach,
+                         ),
+@@ -137,8 +143,9 @@ internal fun HomeScreen(
                  .padding(contentPadding)
                  .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
          ) {
@@ -7472,10 +7638,11 @@ index e31ca99..d36736f 100644
 -            HomeControlCard(state, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
 +            HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
 +            HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
++            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
              if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                  HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                      Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
-@@ -167,21 +173,21 @@ internal fun HomeScreen(
+@@ -167,21 +174,21 @@ internal fun HomeScreen(
                  )
              }
 
@@ -7501,7 +7668,7 @@ index e31ca99..d36736f 100644
                  HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
              }
              Spacer(Modifier.height(8.dp))
-@@ -201,6 +207,22 @@ internal fun HomeScreen(
+@@ -201,6 +208,22 @@ internal fun HomeScreen(
 
  internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
@@ -7524,7 +7691,7 @@ index e31ca99..d36736f 100644
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -288,7 +310,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -288,7 +311,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
      return when (connection.health) {
@@ -7533,6 +7700,33 @@ index e31ca99..d36736f 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
+@@ -347,6 +370,26 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+     }
+ }
+
++/** WebUI and 日志, side by side under the control card. Both reuse the existing pages. */
++@Composable
++private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
++    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
++        HomeShortcutCard("WebUI", ht("Web 界面"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
++        HomeShortcutCard(ht("日志"), ht("查看"), "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
++    }
++}
++
++@Composable
++private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onClick: () -> Unit, modifier: Modifier) {
++    val c = LocalHomeColors.current
++    HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
++        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
++            Text(title, color = c.t1, style = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(subtitle, color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        }
++    }
++}
++
+ @Composable
+ private fun ControlDivider() {
+     Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
 index 552f3dd..cad6ae2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
@@ -8761,7 +8955,7 @@ index 253b603..c2bed70 100644
          val c = LocalHomeColors.current
          val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
-index 3e938c4..f76c9eb 100644
+index 3e938c4..01066a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 @@ -38,9 +38,17 @@ internal sealed interface PanelDelay {
@@ -8826,6 +9020,17 @@ index 3e938c4..f76c9eb 100644
  }
 
  /* ------------------------------------------------------------------ */
+@@ -385,7 +414,9 @@ internal object PanelLogic {
+         val groupWidth = (widthDp - 32f - 8f) / 2f
+         val nodeWidth = (widthDp - 32f - 16f - 8f) / 2f
+         return layout.copy(
+-            groupColumns = if (groupWidth < 148f * scale) 1 else layout.groupColumns,
++            // Compact glass group cards stay a two-column grid at common enlarged font sizes
++            // (MIUI/HyperOS default 1.15–1.3); only very large type falls back to one column.
++            groupColumns = if (groupWidth < 128f * scale) 1 else layout.groupColumns,
+             nodeColumns = if (nodeWidth < 148f * scale) 1 else layout.nodeColumns,
+         )
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 index fb308a8..da3c1a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
@@ -9536,7 +9741,7 @@ index 1265384..25902d4 100644
          iconCache.get(packageName)?.let { return@withContext it }
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-index fa7fa0d..bdb1b3a 100644
+index fa7fa0d..b79bcff 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 @@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
@@ -9606,19 +9811,36 @@ index fa7fa0d..bdb1b3a 100644
              }
          }
          prefs.registerOnSharedPreferenceChangeListener(listener)
-@@ -102,10 +110,9 @@ fun HetuGlassDock(
+@@ -102,10 +110,11 @@ fun HetuGlassDock(
      val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
      // Never render a translucent glass shell without a real blur/backdrop behind it.
      // That fallback was the source of the opaque white slab when either appearance switch was disabled.
 -    val renderGlass = activeGlass && enableBlur
-+    val renderGlass = rememberHetuGlassEnabled()
-     val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
-     val activeHaze = renderGlass && !runtimeLiquid
+-    val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
+-    val activeHaze = renderGlass && !runtimeLiquid
 -    val dockSurfaceBackdrop = rememberLayerBackdrop()
++    val renderGlass = rememberHetuGlassEnabled()
++    // Liquid-glass pass: the capsule is faked (translucent gradient, bright rim, soft shadow), so
++    // no page content is recorded or blurred per frame while lists scroll beneath it.
++    val runtimeLiquid = false
++    val activeHaze = false
      val hazeModifier = if (activeHaze) {
          Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
              blurRadius = 32.dp
-@@ -134,7 +141,7 @@ fun HetuGlassDock(
+@@ -114,10 +123,10 @@ fun HetuGlassDock(
+     } else Modifier
+     val glassBrush = when {
+         renderGlass && dark -> Brush.verticalGradient(
+-            listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .035f)),
++            listOf(Color(0xFF2A3342).copy(alpha = .90f), Color(0xFF1B222D).copy(alpha = .88f)),
+         )
+         renderGlass -> Brush.verticalGradient(
+-            listOf(Color.White.copy(alpha = .22f), Color(0xFFE8E9F5).copy(alpha = .08f)),
++            listOf(Color.White.copy(alpha = .86f), Color(0xFFE9EEF5).copy(alpha = .80f)),
+         )
+         else -> Brush.verticalGradient(
+             if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
+@@ -134,7 +143,7 @@ fun HetuGlassDock(
                  colorControls(
                      brightness = if (dark) -.015f else .025f,
                      contrast = 1.05f,
@@ -9627,8 +9849,15 @@ index fa7fa0d..bdb1b3a 100644
                  )
                  blur(26.dp.toPx(), 26.dp.toPx())
                  liquidGlassLens(
-@@ -185,23 +192,18 @@ fun HetuGlassDock(
+@@ -183,43 +192,49 @@ fun HetuGlassDock(
+             }
+     }
 
++    val rimBrush = Brush.verticalGradient(listOf(
++        Color.White.copy(alpha = if (dark) .22f else .95f),
++        Color.White.copy(alpha = if (dark) .05f else .40f),
++    ))
++    val shadowTint = if (dark) Color.Black.copy(alpha = .34f) else Color(0xFF4A5A74).copy(alpha = .12f)
      Box(
          modifier = modifier
 +            .onSizeChanged { onHeightChanged(with(density) { it.height.toDp() }) }
@@ -9638,8 +9867,7 @@ index fa7fa0d..bdb1b3a 100644
 -            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
 +            .height(bodyHeight + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
      ) {
-+        // The shell samples the page backdrop only. It no longer records itself into a second
-+        // offscreen layer every frame: nothing reads that layer (the lens is drawn in DockItems).
++        // Static glass capsule: soft shadow (two offset translucent outlines), frosted fill, bright rim.
          Box(
              modifier = Modifier
                  .fillMaxSize()
@@ -9650,12 +9878,20 @@ index fa7fa0d..bdb1b3a 100644
 -                    ambientColor = Color(0xFF12161A).copy(alpha = if (dark) .12f else .035f),
 -                    spotColor = Color(0xFF12161A).copy(alpha = if (dark) .16f else .075f),
 -                )
++                .drawBehind {
++                    if (!renderGlass) return@drawBehind
++                    val r = if (floating) CornerRadius(31.dp.toPx()) else CornerRadius(0f)
++                    drawRoundRect(shadowTint, Offset(0f, 3.dp.toPx()), size, r)
++                    drawRoundRect(shadowTint.copy(alpha = shadowTint.alpha * .5f), Offset(0f, 7.dp.toPx()), size, r)
++                }
                  .clip(shape)
 -                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
-                 .then(liquidShellModifier),
+-                .then(liquidShellModifier),
++                .then(liquidShellModifier)
++                .border(1.dp, rimBrush, shape),
          )
 
-@@ -209,7 +211,7 @@ fun HetuGlassDock(
+         DockItems(
              items = items,
              selected = selected,
              onSelect = onSelect,
@@ -9664,16 +9900,36 @@ index fa7fa0d..bdb1b3a 100644
              modifier = Modifier
                  .fillMaxSize()
                  .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = if (floating) 4.dp else bottomInset + 4.dp),
-@@ -219,7 +221,7 @@ fun HetuGlassDock(
+-            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFB7B9C9).copy(alpha = .24f),
+-            indicatorBorderColor = if (dark) Color.White.copy(alpha = .18f) else Color.White.copy(alpha = .82f),
++            indicatorColor = if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .92f),
++            indicatorBorderColor = if (dark) Color.White.copy(alpha = .22f) else Color.White,
+             indicatorShadow = 0.dp,
              selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF1267D6),
-             unselectedColor = scheme.onSurface,
+-            unselectedColor = scheme.onSurface,
++            unselectedColor = if (dark) Color(0xFFC9D1DC) else Color(0xFF3A4352),
              liquidGlass = renderGlass,
 -            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
 +            indicatorBackdrop = null,
              dark = dark,
          )
      }
-@@ -288,7 +290,8 @@ private fun DockItems(
+@@ -268,7 +283,14 @@ private fun DockItems(
+             val x = lensLeft.value + (width - w) / 2f
+             val y = (size.height - h) / 2f
+             val r = CornerRadius(h / 2f)
++            // Raised lens: a soft shadow under it, then a frosted fill that is brighter at the top.
++            drawRoundRect(Color.Black.copy(alpha = if (dark) .28f else .07f), Offset(x, y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(w, h), r)
++            drawRoundRect(Color.Black.copy(alpha = if (dark) .12f else .035f), Offset(x, y + 5.dp.toPx()), androidx.compose.ui.geometry.Size(w, h), r)
+             drawRoundRect(indicatorColor, Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r)
++            drawRoundRect(
++                Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) .10f else .55f), Color.Transparent), startY = y, endY = y + h),
++                Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r,
++            )
+             // Specular rim: bright top edge fading down, like the reference lens.
+             drawRoundRect(
+                 Brush.verticalGradient(listOf(highlight, Color.Transparent), startY = y, endY = y + h * .55f),
+@@ -288,7 +310,8 @@ private fun DockItems(
                      if (motion) tween(200) else snap(), label = "dock-tint-$index")
                  val iconPop = remember { Animatable(1f) }
                  var wasActive by remember { mutableStateOf(active) }
@@ -9683,7 +9939,7 @@ index fa7fa0d..bdb1b3a 100644
                      if (active && !wasActive && motion) {
                          iconPop.snapTo(1f)
                          iconPop.animateTo(1.14f, tween(120, easing = HetuMotion.Standard))
-@@ -298,6 +301,7 @@ private fun DockItems(
+@@ -298,6 +321,7 @@ private fun DockItems(
                  }
                  // Pressing the active slot squeezes the lens itself (tactile "glass" feel).
                  LaunchedEffect(interaction, active, motion) {
@@ -9691,7 +9947,7 @@ index fa7fa0d..bdb1b3a 100644
                      if (!active || !motion) return@LaunchedEffect
                      interaction.interactions.collect { event ->
                          when (event) {
-@@ -313,7 +317,12 @@ private fun DockItems(
+@@ -313,7 +337,12 @@ private fun DockItems(
                  }
                  Column(
                      Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
@@ -9705,7 +9961,7 @@ index fa7fa0d..bdb1b3a 100644
                          .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
                          .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
                              onClick = { if (!active) haptics.perform(HetuHaptic.Tick); onSelect(index) })
-@@ -325,7 +334,7 @@ private fun DockItems(
+@@ -325,7 +354,7 @@ private fun DockItems(
                          scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                      }, tint = color)
                      Spacer(Modifier.height(1.dp))
@@ -9715,7 +9971,7 @@ index fa7fa0d..bdb1b3a 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..43406f0 100644
+index 578ce9d..fab9089 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
@@ -9754,7 +10010,7 @@ index 578ce9d..43406f0 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,6 +991,16 @@ private val vocabularyConnection = """
+@@ -969,6 +991,17 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -9768,6 +10024,7 @@ index 578ce9d..43406f0 100644
 +正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
 +暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
 +暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
++Web 界面|Web interface|Web 介面|Веб-интерфейс
  """.trimIndent()
 
  private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")

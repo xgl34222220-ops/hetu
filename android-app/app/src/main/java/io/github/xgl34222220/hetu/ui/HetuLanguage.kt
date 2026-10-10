@@ -1001,6 +1001,7 @@ private val vocabularyConnection = """
 正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
 暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
 暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
+Web 界面|Web interface|Web 介面|Веб-интерфейс
 """.trimIndent()
 
 private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")

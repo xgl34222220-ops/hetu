@@ -133,7 +133,7 @@ internal fun HomeScreen(
                     val reach = 340.dp.toPx()
                     drawRect(
                         Brush.verticalGradient(
-                            0f to glow.copy(alpha = if (c.dark) .13f else .10f),
+                            0f to glow.copy(alpha = if (c.dark) .07f else .05f),
                             1f to glow.copy(alpha = 0f),
                             startY = 0f, endY = reach,
                         ),
@@ -145,6 +145,7 @@ internal fun HomeScreen(
         ) {
             HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
             HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
+            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                     Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
@@ -365,6 +366,26 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier: 
                     }
                 }
             }
+        }
+    }
+}
+
+/** WebUI and 日志, side by side under the control card. Both reuse the existing pages. */
+@Composable
+private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
+    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
+        HomeShortcutCard("WebUI", ht("Web 界面"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
+        HomeShortcutCard(ht("日志"), ht("查看"), "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
+    }
+}
+
+@Composable
+private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onClick: () -> Unit, modifier: Modifier) {
+    val c = LocalHomeColors.current
+    HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+            Text(title, color = c.t1, style = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
