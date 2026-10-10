@@ -992,6 +992,15 @@ private val vocabularyConnection = """
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+配置选择|Configurations|設定選擇|Конфигурации
+当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
+内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
+尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
+在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
+只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху
+正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
+暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
+暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
 """.trimIndent()
 
 private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")

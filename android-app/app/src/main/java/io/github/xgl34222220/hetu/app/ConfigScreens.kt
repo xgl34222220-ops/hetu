@@ -657,18 +657,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 
 private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
 
-private suspend fun hxReadConfigSource(context: Context): HxConfigSource = withContext(Dispatchers.IO) {
+/**
+ * The config an editor works on: the current config, or the named one ([target]) when a page opens
+ * a specific file from its list (设置 › 基础代理配置 › 配置选择).
+ */
+private fun hxConfigEntry(library: ProxyConfigLibrary, core: ProxyRuntimeProfile.Core, target: String?): ProxyConfigLibrary.Entry =
+    if (target == null) library.selected(core) ?: error("尚未选择配置")
+    else library.list(core).firstOrNull { it.name == target } ?: error("配置不存在：$target")
+
+private suspend fun hxReadConfigSource(context: Context, target: String? = null): HxConfigSource = withContext(Dispatchers.IO) {
     val prefs = context.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     val core = ProxyRuntimeProfile.load(prefs).core
     val library = ProxyConfigLibrary(context)
-    val entry = library.selected(core) ?: error("尚未选择配置")
+    val entry = hxConfigEntry(library, core, target)
     HxConfigSource(core, entry.name, library.read(entry))
 }
 
 private class HxConfigSourceConflict(val selectionChanged: Boolean, val selectedName: String) : IOException()
 
 @Composable
-internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
+internal fun ConfigEditorScreen(
+    vm: HetuViewModel,
+    target: String? = null,
+    startReadOnly: Boolean = false,
+    // Last, so existing `ConfigEditorScreen(vm) { … }` callers keep binding their trailing lambda here.
+    onBackOverride: (() -> Unit)? = null,
+) {
     val nav = if (onBackOverride == null) LocalNav.current else null
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -686,6 +700,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmReload by remember { mutableStateOf(false) }
     var showOutline by remember { mutableStateOf(false) }
+    // 查看 opens the same editor read-only; «编辑» in its bar unlocks it in place.
+    var readOnly by remember { mutableStateOf(startReadOnly) }
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     val editorColors = remember(c.dark, c.surface) {
         HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
@@ -701,7 +717,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         loadFailure = null
         source = null
         try {
-            source = hxReadConfigSource(context)
+            source = hxReadConfigSource(context, target)
             dirty = false
             problem = null
         } catch (cancel: CancellationException) { throw cancel }
@@ -728,7 +744,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 val expected = source
                 if (expected != null && !loading && !saving) scope.launch {
                     try {
-                        val latest = hxReadConfigSource(context)
+                        val latest = hxReadConfigSource(context, target)
                         if (latest.core != expected.core || latest.name != expected.name)
                             conflict = HxConfigSourceConflict(true, latest.name)
                         else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
@@ -762,25 +778,29 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         saving = true
         scope.launch {
             try {
-                val latest = hxReadConfigSource(context)
+                val latest = hxReadConfigSource(context, target)
                 if (latest.core != expected.core || latest.name != expected.name) throw HxConfigSourceConflict(true, latest.name)
                 if (latest.text != expected.text) throw HxConfigSourceConflict(false, latest.name)
                 vm.controller.validateConfigText(current)
                 // Write, apply and (on rejection) restore as one transaction: leaving the page must not strand it.
                 val outcome = withContext(NonCancellable) {
-                    withContext(Dispatchers.IO) {
+                    val isCurrent = withContext(Dispatchers.IO) {
                         // Validation may take time. Recheck identity and contents immediately before writing.
                         val library = ProxyConfigLibrary(context)
                         val core = ProxyRuntimeProfile.load(vm.prefs).core
-                        val entry = library.selected(core) ?: error("尚未选择配置")
+                        val entry = hxConfigEntry(library, core, target)
                         if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
                         if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
                         library.write(entry, current)
+                        library.selected(core)?.name == entry.name
                     }
+                    // Only the current config runs: another file from the list is just saved.
+                    if (!isCurrent) return@withContext null
                     HxConfigTransaction.apply(vm.state.running, { vm.reloadNow() }) {
                         withContext(Dispatchers.IO) {
                             val library = ProxyConfigLibrary(context)
-                            val entry = library.selected(expected.core)
+                            val entry = if (target == null) library.selected(expected.core)
+                                else library.list(expected.core).firstOrNull { it.name == expected.name }
                             // Only undo our own write; a newer edit from elsewhere is never overwritten.
                             if (entry == null || entry.name != expected.name || library.read(entry) != current)
                                 throw IOException("配置已被其他操作修改，未自动回滚")
@@ -789,6 +809,12 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                     }
                 }
                 when (outcome) {
+                    null -> {
+                        source = expected.copy(text = current)
+                        dirty = editor?.text?.toString() != current
+                        problem = null
+                        vm.toast("配置已保存（非当前配置，切换为当前配置后生效）")
+                    }
                     is HxApplyOutcome.RolledBack -> {
                         // The file is back to what this page loaded; the draft stays on screen to fix and retry.
                         source = expected
@@ -818,8 +844,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
         Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
             HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
-            Text(ht("编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
-            HomeIconButton(
+            Text(ht(if (readOnly) "查看配置" else "编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
+            if (readOnly) HomeIconButton(
+                ToolsIcons.Pencil, "编辑", { readOnly = false }, Modifier.align(Alignment.CenterEnd),
+                enabled = source != null && !loading, tint = c.accent,
+            ) else HomeIconButton(
                 HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
                 enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
             )
@@ -828,7 +857,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
             HomeRowLayout(
                 AnnotatedString(source?.name ?: ht("读取配置")),
-                subtitle = ht(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" }),
+                subtitle = ht(when { loading -> "正在读取配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; readOnly -> "只读查看 · 点右上角编辑"; else -> "已保存" }),
                 icon = ToolsIcons.FileCog,
                 iconTint = if (source == null) c.t3 else c.t1,
                 subtitleColor = if (dirty) c.warnText else c.t2,
@@ -839,8 +868,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
             Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready) { editor?.let { if (it.canUndo()) it.undo() } }
-            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready) { editor?.let { if (it.canRedo()) it.redo() } }
+            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
+            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
             ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
             ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
         }
@@ -864,7 +893,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                             CodeEditor(viewContext).apply {
                                 setEditorLanguage(HetuYamlLanguage())
                                 setText(initial.text)
-                                setEditable(true)
+                                setEditable(!readOnly)
                                 setSoftKeyboardEnabled(true)
                                 typefaceText = Typeface.MONOSPACE
                                 setTextSize(14f)
@@ -882,14 +911,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                             }
                         },
                         modifier = Modifier.fillMaxSize().padding(vertical = 10.dp),
-                        update = { native -> if (native.colorScheme !== editorColors) native.colorScheme = editorColors },
+                        update = { native ->
+                            if (native.colorScheme !== editorColors) native.colorScheme = editorColors
+                            if (native.isEditable == readOnly) native.setEditable(!readOnly)
+                        },
                         onRelease = { native -> if (editor === native) editor = null; native.release() },
                     )
                 }
             }
         }
         // The characters YAML needs and a phone keyboard hides, one tap each.
-        Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
+        if (!readOnly) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
             .clip(HomeDims.cardShape).background(c.surface)
             .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HxYamlSymbols.forEach { symbol ->

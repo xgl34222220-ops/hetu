@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..9b59e8e 100644
+index 8a43698..3df1b50 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -13,6 +13,71 @@ index 8a43698..9b59e8e 100644
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
+@@ -53,8 +53,14 @@ android {
+         getByName("debug") {
+             isDebuggable = true
+         }
++        // Shipped build: R8 + non-debuggable ART (debuggable=true disables JIT/AOT optimisations and is
++        // the main cause of Compose jank). Same CI signing identity as debug, so it upgrades in place.
+         getByName("release") {
+-            isMinifyEnabled = false
++            isMinifyEnabled = true
++            isShrinkResources = false
++            isDebuggable = false
++            signingConfig = signingConfigs.getByName("debug")
++            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+         }
+     }
+
+@@ -77,6 +83,8 @@ dependencies {
+     implementation(composeBom)
+     implementation("androidx.activity:activity-compose:1.13.0")
+     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
++    // Installs the bundled baseline profile (src/main/baseline-prof.txt) on sideloaded installs.
++    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
+     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
+     implementation("androidx.compose.foundation:foundation")
+diff --git a/android-app/app/proguard-rules.pro b/android-app/app/proguard-rules.pro
+new file mode 100644
+index 0000000..daa410d
+--- /dev/null
++++ b/android-app/app/proguard-rules.pro
+@@ -0,0 +1,34 @@
++# Hetu release (R8). Names are kept: crash reports, JNI and reflective libraries stay readable.
++-dontobfuscate
++
++# JNI: libhetu_core.so exports Java_io_github_xgl34222220_hetu_MihomoNative_invoke.
++-keep class io.github.xgl34222220.hetu.MihomoNative { *; }
++-keepclasseswithmembernames,includedescriptorclasses class * { native <methods>; }
++
++# ViewModels created reflectively by ViewModelProvider.
++-keepclassmembers class * extends androidx.lifecycle.ViewModel { <init>(...); }
++
++# Reflection-heavy libraries: YAML (SnakeYAML), JSON schema validation (networknt + Jackson),
++# the code editor and SVG decoding. Kept whole; they are small next to Compose.
++-keep class org.yaml.snakeyaml.** { *; }
++-keep class com.networknt.** { *; }
++-keep class com.fasterxml.jackson.** { *; }
++-keep class io.github.rosemoe.** { *; }
++-keep class com.caverock.androidsvg.** { *; }
++-keepattributes Signature,InnerClasses,EnclosingMethod,*Annotation*,SourceFile,LineNumberTable
++
++# Optional JVM-only dependencies of those libraries that Android does not ship.
++-dontwarn java.beans.**
++-dontwarn javax.annotation.**
++-dontwarn org.slf4j.**
++-dontwarn com.ethlo.**
++-dontwarn org.joda.**
++-dontwarn javax.xml.**
++-dontwarn org.w3c.dom.**
++-dontwarn com.google.re2j.**
++-dontwarn org.jcodings.**
++-dontwarn org.joni.**
++-dontwarn kotlinx.serialization.**
++-dontwarn org.graalvm.**
++-dontwarn com.oracle.svm.**
++-ignorewarnings
 diff --git a/android-app/app/src/main/assets/hetu-autostart.sh b/android-app/app/src/main/assets/hetu-autostart.sh
 index 4d17a16..303e13a 100644
 --- a/android-app/app/src/main/assets/hetu-autostart.sh
@@ -1070,6 +1135,27 @@ index ae832da..b96a732 100755
 +  watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
    *) fail "未知 Root 代理操作";;
  esac
+diff --git a/android-app/app/src/main/baseline-prof.txt b/android-app/app/src/main/baseline-prof.txt
+new file mode 100644
+index 0000000..b577946
+--- /dev/null
++++ b/android-app/app/src/main/baseline-prof.txt
+@@ -0,0 +1,15 @@
++# Baseline profile for the main screens (首页, 面板/策略, 工具, 设置, 编辑器). Compose, Material3 and
++# other AndroidX libraries ship their own profiles; this covers Hetu's code and its UI libraries.
++# Installed by androidx.profileinstaller on first launch; compiled ahead of time by ART.
++HSPLio/github/xgl34222220/hetu/**;->**(**)**
++Lio/github/xgl34222220/hetu/**;
++HSPLtop/yukonga/miuix/**;->**(**)**
++Ltop/yukonga/miuix/**;
++HSPLdev/chrisbanes/haze/**;->**(**)**
++Ldev/chrisbanes/haze/**;
++HSPLcom/patrykandpatrick/vico/**;->**(**)**
++Lcom/patrykandpatrick/vico/**;
++HSPLcoil3/**;->**(**)**
++Lcoil3/**;
++HSPLkotlinx/coroutines/**;->**(**)**
++Lkotlinx/coroutines/**;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
 index 0000000..3477da1
@@ -1532,6 +1618,264 @@ index 76318e4..618767e 100644
      boolean publish(long ticket, Runnable action) {
          if (ticket < 0 || !gate.tryLock()) return false;
          try {
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
+index b914f23..ad03381 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
+@@ -35,6 +35,32 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
+     return "正在下载 · " + if (total > 0L) "$transferred / ${bytes(total)}" else transferred
+ }
+
++/**
++ * Which downloadable cores can actually run in Hetu's Root runtime.
++ *
++ * The whole runtime is built on the Mihomo CLI and its Clash-compatible controller:
++ * MihomoStartupConfig generates the startup YAML (tproxy/redir ports, DNS, controller, adblock
++ * rule-set), hetu-root.sh validates and launches `bin/core -t -d RUN -f CFG` / `-d RUN -f CFG`, and
++ * start-up readiness, the panel, latency tests, adblock verification and hot reload all talk to the
++ * Clash API. Mihomo and Mihomo Smart share that CLI and API. The other cores need their own config
++ * generator, launch arguments and (missing) controller, so they are shown disabled with the reason
++ * instead of being downloadable and then failing to start.
++ */
++internal object ProxyCoreSupport {
++    fun runtimeSupported(core: ProxyRuntimeProfile.Core): Boolean =
++        core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
++
++    fun unsupportedReason(core: ProxyRuntimeProfile.Core): String = when (core) {
++        ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART -> ""
++        ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND ->
++            "河图的 Root TPROXY 运行链（启动配置生成、启动校验、面板/测速、广告过滤与热重载）基于 Mihomo 配置与 Clash 控制接口；sing-box 使用 JSON 配置与 run -c 启动参数，尚未接入"
++        ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY ->
++            "${core.label} 没有 Clash 兼容控制接口，河图的启动就绪检查、面板、测速与广告过滤无法工作；其 JSON 配置与启动参数也尚未接入"
++        ProxyRuntimeProfile.Core.HYSTERIA ->
++            "Hysteria 是单服务器客户端，没有河图需要的规则分流、策略组与 Clash 控制接口"
++    }
++}
++
+ internal data class ProxyCoreRemoteStatus(
+     val id: String,
+     val label: String,
+@@ -143,6 +169,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
+     }
+
+     suspend fun status(core: ProxyRuntimeProfile.Core, network: Boolean = true): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
++        // A core the runtime cannot start is never offered for download (and costs no GitHub request).
++        if (!ProxyCoreSupport.runtimeSupported(core)) return@withContext localStatus(core, "暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
+         val local = localStatus(core)
+         val source = sources.firstOrNull { it.core == core }
+             ?: return@withContext local.copy(message = "暂未配置可信下载源")
+@@ -171,6 +199,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+         core: ProxyRuntimeProfile.Core,
+         onProgress: (String) -> Unit = {},
+     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
++        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
+         val source = sources.firstOrNull { it.core == core }
+             ?: throw IOException("${core.label} 暂未配置下载源")
+         onProgress("检查 ${core.label} 最新版本…")
+@@ -210,6 +239,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+         uri: Uri,
+         displayName: String,
+     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
++        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
+         val temp = File(app.cacheDir, "proxy-core-import-${core.id}-${System.nanoTime()}.bin")
+         try {
+             val input = app.contentResolver.openInputStream(uri) ?: throw IOException("无法读取核心文件")
+@@ -256,7 +286,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+             installedVersion = installed,
+             latestVersion = "",
+             updateAvailable = false,
+-            canDownload = sources.any { it.core == core },
++            canDownload = ProxyCoreSupport.runtimeSupported(core) && sources.any { it.core == core },
+             runtimeReady = runtimeReady(core),
+             source = source,
+             message = message,
+@@ -266,8 +296,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+     private fun installedVersion(core: ProxyRuntimeProfile.Core): String =
+         prefs.getString("version_${core.id}", "") ?: ""
+
+-    private fun runtimeReady(core: ProxyRuntimeProfile.Core): Boolean =
+-        core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
++    private fun runtimeReady(core: ProxyRuntimeProfile.Core): Boolean = ProxyCoreSupport.runtimeSupported(core)
+
+     private fun resolve(source: Source): Asset? {
+         val root = readJson(source.endpoint)
+@@ -280,16 +309,17 @@ internal class ProxyCoreDownloadManager(context: Context) {
+         } ?: return null
+         val tag = release.optString("tag_name", release.optString("name", "latest"))
+         val assets = release.optJSONArray("assets") ?: return null
++        val abi = abiTag(Build.SUPPORTED_ABIS)
+         val candidates = ArrayList<JSONObject>()
+         for (i in 0 until assets.length()) {
+             val item = assets.optJSONObject(i) ?: continue
+-            if (matchesAsset(source.core, item.optString("name", ""))) candidates += item
++            if (matchesAsset(source.core, item.optString("name", ""), abi)) candidates += item
+         }
+         val chosen = candidates.minByOrNull { assetRank(source.core, it.optString("name", "")) } ?: return null
+         val url = chosen.optString("browser_download_url", "")
+         if (!url.startsWith("https://")) return null
+         return Asset(
+-            version = tag,
++            version = assetVersion(source.core, tag, chosen.optString("name", "")),
+             name = chosen.optString("name", "core"),
+             url = url,
+             digest = chosen.optString("digest", ""),
+@@ -298,71 +328,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
+         )
+     }
+
+-    private fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String): Boolean {
+-        val name = rawName.lowercase(Locale.ROOT)
+-        val abi = primaryAbi()
+-        return when (core) {
+-            ProxyRuntimeProfile.Core.MIHOMO,
+-            ProxyRuntimeProfile.Core.MIHOMO_SMART -> {
+-                name.startsWith("mihomo-android-") && name.endsWith(".gz") && when (abi) {
+-                    "arm64" -> name.contains("android-arm64")
+-                    "armv7" -> name.contains("android-armv7")
+-                    "amd64" -> name.contains("android-amd64")
+-                    "386" -> name.contains("android-386")
+-                    else -> false
+-                }
+-            }
+-            ProxyRuntimeProfile.Core.SING_BOX,
+-            ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
+-                name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
+-            }
+-            ProxyRuntimeProfile.Core.XRAY -> {
+-                name.endsWith(".zip") && !name.endsWith(".zip.dgst") && when (abi) {
+-                    "arm64" -> name == "xray-android-arm64-v8a.zip"
+-                    "armv7" -> name.contains("xray-android-arm32-v7a.zip") || name.contains("xray-android-arm32-v7.zip")
+-                    "amd64" -> name == "xray-android-amd64.zip"
+-                    "386" -> name == "xray-android-386.zip"
+-                    else -> false
+-                }
+-            }
+-            ProxyRuntimeProfile.Core.V2FLY -> {
+-                name.endsWith(".zip") && !name.endsWith(".zip.dgst") && when (abi) {
+-                    "arm64" -> name == "v2ray-android-arm64-v8a.zip"
+-                    "armv7" -> name.contains("v2ray-android-arm32-v7a.zip") || name.contains("v2ray-android-arm32-v7.zip")
+-                    "amd64" -> name == "v2ray-android-amd64.zip"
+-                    "386" -> name == "v2ray-android-386.zip"
+-                    else -> false
+-                }
+-            }
+-            ProxyRuntimeProfile.Core.HYSTERIA -> name == "hysteria-android-$abi"
+-        }
+-    }
+-
+-    private fun assetRank(core: ProxyRuntimeProfile.Core, rawName: String): Int {
+-        val name = rawName.lowercase(Locale.ROOT)
+-        if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
+-            return when {
+-                name.contains("compatible") -> 0
+-                name.contains("-v1-") -> 1
+-                name.contains("-v8-") -> 2
+-                else -> 3
+-            }
+-        }
+-        return 0
+-    }
+-
+-    private fun primaryAbi(): String {
+-        for (raw in Build.SUPPORTED_ABIS) {
+-            when (raw.lowercase(Locale.ROOT)) {
+-                "arm64-v8a" -> return "arm64"
+-                "armeabi-v7a" -> return "armv7"
+-                "x86_64" -> return "amd64"
+-                "x86" -> return "386"
+-            }
+-        }
+-        return "unknown"
+-    }
+-
+     private fun abiLabel(): String = Build.SUPPORTED_ABIS.joinToString("/")
+
+     private fun readJson(url: String): Any {
+@@ -594,6 +559,84 @@ internal class ProxyCoreDownloadManager(context: Context) {
+     }
+
+     companion object {
++        /** Release asset naming per core, for one ABI tag (see [abiTag]). Pure, so it is unit tested. */
++        internal fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String, abi: String): Boolean {
++            val name = rawName.lowercase(Locale.ROOT)
++            return when (core) {
++                ProxyRuntimeProfile.Core.MIHOMO,
++                ProxyRuntimeProfile.Core.MIHOMO_SMART -> {
++                    // mihomo-android-arm64-v8-v1.19.32.gz, mihomo-android-armv7-alpha-smart-8d4c8c7.gz …
++                    name.startsWith("mihomo-android-") && name.endsWith(".gz") && when (abi) {
++                        "arm64", "armv7", "amd64", "386" -> name.startsWith("mihomo-android-$abi-")
++                        else -> false
++                    }
++                }
++                ProxyRuntimeProfile.Core.SING_BOX,
++                ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
++                    abi != "unknown" && name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
++                }
++                ProxyRuntimeProfile.Core.XRAY -> {
++                    name.endsWith(".zip") && when (abi) {
++                        "arm64" -> name == "xray-android-arm64-v8a.zip"
++                        "armv7" -> name == "xray-android-arm32-v7a.zip" || name == "xray-android-arm32-v7.zip"
++                        "amd64" -> name == "xray-android-amd64.zip"
++                        "386" -> name == "xray-android-386.zip"
++                        else -> false
++                    }
++                }
++                ProxyRuntimeProfile.Core.V2FLY -> {
++                    name.endsWith(".zip") && when (abi) {
++                        "arm64" -> name == "v2ray-android-arm64-v8a.zip"
++                        "armv7" -> name == "v2ray-android-arm32-v7a.zip" || name == "v2ray-android-arm32-v7.zip"
++                        "amd64" -> name == "v2ray-android-amd64.zip"
++                        "386" -> name == "v2ray-android-386.zip"
++                        else -> false
++                    }
++                }
++                ProxyRuntimeProfile.Core.HYSTERIA -> abi != "unknown" && name == "hysteria-android-$abi"
++            }
++        }
++
++        /** Prefer the most compatible Mihomo build when a release offers several for one ABI. */
++        internal fun assetRank(core: ProxyRuntimeProfile.Core, rawName: String): Int {
++            val name = rawName.lowercase(Locale.ROOT)
++            if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
++                return when {
++                    name.contains("compatible") -> 0
++                    name.contains("-v1-") -> 1
++                    name.contains("-v8-") -> 2
++                    else -> 3
++                }
++            }
++            return 0
++        }
++
++        /** Release ABI tag of the first supported device ABI: arm64, armv7, amd64, 386 or unknown. */
++        internal fun abiTag(supportedAbis: Array<String>): String {
++            for (raw in supportedAbis) {
++                when (raw.lowercase(Locale.ROOT)) {
++                    "arm64-v8a" -> return "arm64"
++                    "armeabi-v7a" -> return "armv7"
++                    "x86_64" -> return "amd64"
++                    "x86" -> return "386"
++                }
++            }
++            return "unknown"
++        }
++
++        /**
++         * The version recorded for an installed download. Mihomo Smart publishes every build under the
++         * same tag (Prerelease-Alpha), so its build id from the asset name is part of the version;
++         * otherwise a new Smart build would never show as an update.
++         */
++        internal fun assetVersion(core: ProxyRuntimeProfile.Core, tag: String, assetName: String): String {
++            if (core != ProxyRuntimeProfile.Core.MIHOMO_SMART) return tag
++            val build = assetName.lowercase(Locale.ROOT).removeSuffix(".gz")
++                .replace(Regex("^mihomo-android-(arm64|armv7|amd64|386)-"), "")
++                .replace(Regex("^(v8|v1|v2|v3|compatible)-"), "")
++            return if (build.isBlank() || build == tag.lowercase(Locale.ROOT)) tag else "$tag · $build"
++        }
++
+         private const val PREFS = "hetu_core_updates"
+         private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
+         private const val MAX_EXTRACTED = 128L * 1024L * 1024L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 index 5ae93b3..0ba493d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
@@ -3839,7 +4183,7 @@ index 0000000..6fff4a9
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-index 63c8e03..f212a92 100644
+index 63c8e03..387cdf8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 @@ -99,11 +99,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
@@ -4049,7 +4393,70 @@ index 63c8e03..f212a92 100644
  /* ------------------------------------------------------------------ */
  /*  Providers (live subscription usage)                                 */
  /* ------------------------------------------------------------------ */
-@@ -734,6 +757,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -634,18 +657,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
+
+ private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
+
+-private suspend fun hxReadConfigSource(context: Context): HxConfigSource = withContext(Dispatchers.IO) {
++/**
++ * The config an editor works on: the current config, or the named one ([target]) when a page opens
++ * a specific file from its list (设置 › 基础代理配置 › 配置选择).
++ */
++private fun hxConfigEntry(library: ProxyConfigLibrary, core: ProxyRuntimeProfile.Core, target: String?): ProxyConfigLibrary.Entry =
++    if (target == null) library.selected(core) ?: error("尚未选择配置")
++    else library.list(core).firstOrNull { it.name == target } ?: error("配置不存在：$target")
++
++private suspend fun hxReadConfigSource(context: Context, target: String? = null): HxConfigSource = withContext(Dispatchers.IO) {
+     val prefs = context.getSharedPreferences("hetu", Context.MODE_PRIVATE)
+     val core = ProxyRuntimeProfile.load(prefs).core
+     val library = ProxyConfigLibrary(context)
+-    val entry = library.selected(core) ?: error("尚未选择配置")
++    val entry = hxConfigEntry(library, core, target)
+     HxConfigSource(core, entry.name, library.read(entry))
+ }
+
+ private class HxConfigSourceConflict(val selectionChanged: Boolean, val selectedName: String) : IOException()
+
+ @Composable
+-internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
++internal fun ConfigEditorScreen(
++    vm: HetuViewModel,
++    target: String? = null,
++    startReadOnly: Boolean = false,
++    // Last, so existing `ConfigEditorScreen(vm) { … }` callers keep binding their trailing lambda here.
++    onBackOverride: (() -> Unit)? = null,
++) {
+     val nav = if (onBackOverride == null) LocalNav.current else null
+     val context = LocalContext.current
+     val scope = rememberCoroutineScope()
+@@ -663,6 +700,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+     var confirmLeave by remember { mutableStateOf(false) }
+     var confirmReload by remember { mutableStateOf(false) }
+     var showOutline by remember { mutableStateOf(false) }
++    // 查看 opens the same editor read-only; «编辑» in its bar unlocks it in place.
++    var readOnly by remember { mutableStateOf(startReadOnly) }
+     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
+     val editorColors = remember(c.dark, c.surface) {
+         HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
+@@ -678,7 +717,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+         loadFailure = null
+         source = null
+         try {
+-            source = hxReadConfigSource(context)
++            source = hxReadConfigSource(context, target)
+             dirty = false
+             problem = null
+         } catch (cancel: CancellationException) { throw cancel }
+@@ -705,7 +744,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+                 val expected = source
+                 if (expected != null && !loading && !saving) scope.launch {
+                     try {
+-                        val latest = hxReadConfigSource(context)
++                        val latest = hxReadConfigSource(context, target)
+                         if (latest.core != expected.core || latest.name != expected.name)
+                             conflict = HxConfigSourceConflict(true, latest.name)
+                         else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
+@@ -734,26 +773,66 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          val expected = source ?: return
          val current = editor?.text?.toString() ?: return
          if (saving || validating) return
@@ -4058,7 +4465,8 @@ index 63c8e03..f212a92 100644
          saving = true
          scope.launch {
              try {
-@@ -741,19 +766,47 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+-                val latest = hxReadConfigSource(context)
++                val latest = hxReadConfigSource(context, target)
                  if (latest.core != expected.core || latest.name != expected.name) throw HxConfigSourceConflict(true, latest.name)
                  if (latest.text != expected.text) throw HxConfigSourceConflict(false, latest.name)
                  vm.controller.validateConfigText(current)
@@ -4072,19 +4480,23 @@ index 63c8e03..f212a92 100644
 -                    library.write(entry, current)
 +                // Write, apply and (on rejection) restore as one transaction: leaving the page must not strand it.
 +                val outcome = withContext(NonCancellable) {
-+                    withContext(Dispatchers.IO) {
++                    val isCurrent = withContext(Dispatchers.IO) {
 +                        // Validation may take time. Recheck identity and contents immediately before writing.
 +                        val library = ProxyConfigLibrary(context)
 +                        val core = ProxyRuntimeProfile.load(vm.prefs).core
-+                        val entry = library.selected(core) ?: error("尚未选择配置")
++                        val entry = hxConfigEntry(library, core, target)
 +                        if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
 +                        if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
 +                        library.write(entry, current)
++                        library.selected(core)?.name == entry.name
 +                    }
++                    // Only the current config runs: another file from the list is just saved.
++                    if (!isCurrent) return@withContext null
 +                    HxConfigTransaction.apply(vm.state.running, { vm.reloadNow() }) {
 +                        withContext(Dispatchers.IO) {
 +                            val library = ProxyConfigLibrary(context)
-+                            val entry = library.selected(expected.core)
++                            val entry = if (target == null) library.selected(expected.core)
++                                else library.list(expected.core).firstOrNull { it.name == expected.name }
 +                            // Only undo our own write; a newer edit from elsewhere is never overwritten.
 +                            if (entry == null || entry.name != expected.name || library.read(entry) != current)
 +                                throw IOException("配置已被其他操作修改，未自动回滚")
@@ -4093,6 +4505,12 @@ index 63c8e03..f212a92 100644
 +                    }
 +                }
 +                when (outcome) {
++                    null -> {
++                        source = expected.copy(text = current)
++                        dirty = editor?.text?.toString() != current
++                        problem = null
++                        vm.toast("配置已保存（非当前配置，切换为当前配置后生效）")
++                    }
 +                    is HxApplyOutcome.RolledBack -> {
 +                        // The file is back to what this page loaded; the draft stays on screen to fix and retry.
 +                        source = expected
@@ -4118,6 +4536,69 @@ index 63c8e03..f212a92 100644
              } catch (cancel: CancellationException) { throw cancel }
              catch (changed: HxConfigSourceConflict) { conflict = changed }
              catch (error: Exception) { problem = error.message ?: "保存失败" }
+@@ -765,8 +844,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+     Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
+         Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
+             HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
+-            Text(ht("编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
+-            HomeIconButton(
++            Text(ht(if (readOnly) "查看配置" else "编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
++            if (readOnly) HomeIconButton(
++                ToolsIcons.Pencil, "编辑", { readOnly = false }, Modifier.align(Alignment.CenterEnd),
++                enabled = source != null && !loading, tint = c.accent,
++            ) else HomeIconButton(
+                 HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
+                 enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
+             )
+@@ -775,7 +857,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+         Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
+             HomeRowLayout(
+                 AnnotatedString(source?.name ?: ht("读取配置")),
+-                subtitle = ht(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" }),
++                subtitle = ht(when { loading -> "正在读取配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; readOnly -> "只读查看 · 点右上角编辑"; else -> "已保存" }),
+                 icon = ToolsIcons.FileCog,
+                 iconTint = if (source == null) c.t3 else c.t1,
+                 subtitleColor = if (dirty) c.warnText else c.t2,
+@@ -786,8 +868,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+             Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
+             verticalAlignment = Alignment.CenterVertically,
+         ) {
+-            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready) { editor?.let { if (it.canUndo()) it.undo() } }
+-            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready) { editor?.let { if (it.canRedo()) it.redo() } }
++            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
++            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
+             ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
+             ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
+         }
+@@ -811,7 +893,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+                             CodeEditor(viewContext).apply {
+                                 setEditorLanguage(HetuYamlLanguage())
+                                 setText(initial.text)
+-                                setEditable(true)
++                                setEditable(!readOnly)
+                                 setSoftKeyboardEnabled(true)
+                                 typefaceText = Typeface.MONOSPACE
+                                 setTextSize(14f)
+@@ -829,14 +911,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+                             }
+                         },
+                         modifier = Modifier.fillMaxSize().padding(vertical = 10.dp),
+-                        update = { native -> if (native.colorScheme !== editorColors) native.colorScheme = editorColors },
++                        update = { native ->
++                            if (native.colorScheme !== editorColors) native.colorScheme = editorColors
++                            if (native.isEditable == readOnly) native.setEditable(!readOnly)
++                        },
+                         onRelease = { native -> if (editor === native) editor = null; native.release() },
+                     )
+                 }
+             }
+         }
+         // The characters YAML needs and a phone keyboard hides, one tap each.
+-        Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
++        if (!readOnly) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
+             .clip(HomeDims.cardShape).background(c.surface)
+             .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+             HxYamlSymbols.forEach { symbol ->
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt
 new file mode 100644
 index 0000000..6c1130f
@@ -4267,6 +4748,25 @@ index 0000000..6c1130f
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
+index 2243235..e6f8082 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt
+@@ -91,12 +91,12 @@ internal fun CoreManagerPicker(family: String, current: String, statuses: List<P
+     @Composable fun ColumnScope.choices() {
+         coreFamilyVariantIds(family).mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
+             HxMenuItem(coreManagerDisplayName(item.id, item.label), { onPick(item.id) }, selected = item.id == current,
+-                enabled = item.id !in otherSelected, description = if (item.runtimeReady) "下载与版本管理" else "仅下载管理")
++                enabled = item.id !in otherSelected, description = if (item.runtimeReady) "下载与版本管理" else "暂不支持运行")
+         }
+         Text("其他可管理核心", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+         listOf("v2fly", "hysteria").mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
+             HxMenuItem(item.label, { onPick(item.id) }, selected = item.id == current, enabled = item.id !in otherSelected,
+-                description = "独立核心 · 仅下载管理")
++                description = "独立核心 · 暂不支持运行")
+         }
+         Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 index 2b1a624..651c3d2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
@@ -5066,10 +5566,29 @@ index 5a9c877..ad5f3b7 100644
 \ No newline at end of file
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
-index 1ee2881..5ddd8ac 100644
+index 1ee2881..ad04665 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
-@@ -492,8 +492,11 @@ internal fun AboutScreen(vm: HetuViewModel) {
+@@ -380,7 +380,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
+                                 }
+                                 if (!status.runtimeReady) {
+                                     Spacer(Modifier.width(8.dp))
+-                                    HxPill(ht("仅下载管理"), HxTone.Neutral)
++                                    HxPill(ht("暂不支持运行"), HxTone.Neutral)
+                                 }
+                             }
+                             Text(
+@@ -437,7 +437,8 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
+                             },
+                             icon = Icons.Rounded.FileOpen,
+                             filled = false,
+-                            enabled = working == null,
++                            // A core the Root runtime cannot start is not imported either; the card says why.
++                            enabled = working == null && status.runtimeReady,
+                             modifier = Modifier.weight(1f),
+                         )
+                         if (status.downloaded) {
+@@ -492,8 +493,11 @@ internal fun AboutScreen(vm: HetuViewModel) {
      val scope = rememberCoroutineScope()
      val c = LocalHomeColors.current
      var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
@@ -6190,11 +6709,194 @@ index 820f6b5..3f00dcf 100644
                  else -> false
              }
          },
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt
+new file mode 100644
+index 0000000..2d3ab0f
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt
+@@ -0,0 +1,177 @@
++package io.github.xgl34222220.hetu
++
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.material3.Icon
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HomeIcons
++import io.github.xgl34222220.hetu.home.HomePop
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.tools.ToolsIcons
++import io.github.xgl34222220.hetu.ui.ht
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++
++/** Which config the in-place editor of 基础代理配置 shows, and whether it opens read-only. */
++internal data class SettingsConfigEditTarget(val name: String, val readOnly: Boolean)
++
++/** The long-press menu of one row in 配置选择; the bundled template cannot be renamed or deleted. */
++internal fun settingsConfigMenu(config: ProxyConfigUi): List<String> = buildList {
++    add("查看"); add("编辑"); add("导出")
++    if (!config.bundled) { add("重命名"); add("删除") }
++}
++
++/**
++ * 配置选择 in 设置 › 基础代理配置: the configs of the selected core. Tap makes one current (applied to
++ * the running core); hold, or ···, opens 查看 / 编辑 / 导出 / 重命名 / 删除. 查看 and 编辑 open the
++ * shared config editor in place through [onOpen]; nothing here switches to the 工具 tab.
++ */
++@Composable
++internal fun SettingsConfigPicker(
++    vm: HetuViewModel,
++    configs: List<ProxyConfigUi>,
++    loading: Boolean,
++    onChanged: () -> Unit,
++    onOpen: (SettingsConfigEditTarget) -> Unit,
++) {
++    val context = LocalContext.current
++    val scope = rememberCoroutineScope()
++    val c = LocalHomeColors.current
++    var busy by remember { mutableStateOf(false) }
++    var menuFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
++    var renameFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
++    var deleteFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
++    var exportFor by remember { mutableStateOf<ProxyConfigUi?>(null) }
++
++    fun perform(action: String, applyToRuntime: Boolean, block: suspend () -> Unit) {
++        if (busy) return
++        busy = true
++        scope.launch {
++            try {
++                block()
++                onChanged()
++                vm.refreshNow()
++                if (applyToRuntime) vm.applyConfigChange(action) else vm.toast(action)
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                vm.toast(error.message ?: "操作失败")
++            } finally {
++                busy = false
++            }
++        }
++    }
++
++    fun entryOf(config: ProxyConfigUi): ProxyConfigLibrary.Entry {
++        val library = ProxyConfigLibrary(context)
++        return library.list(ProxyRuntimeProfile.load(vm.prefs).core).firstOrNull { it.name == config.name } ?: error("配置不存在")
++    }
++
++    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/yaml")) { uri ->
++        val config = exportFor
++        exportFor = null
++        if (uri != null && config != null) perform("已导出 ${config.name}", false) {
++            withContext(Dispatchers.IO) {
++                val content = ProxyConfigLibrary(context).read(entryOf(config))
++                val output = context.contentResolver.openOutputStream(uri) ?: error("无法写入导出文件")
++                output.use { it.write(content.toByteArray(Charsets.UTF_8)) }
++            }
++        }
++    }
++
++    SettingsGroup(ht("配置选择")) {
++        when {
++            loading && configs.isEmpty() -> Box(Modifier.fillMaxWidth().padding(vertical = 22.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
++            configs.isEmpty() -> SettingsRow(ht("尚无配置"), subtitle = ht("在 工具 › 配置管理 导入配置后会显示在这里"), icon = ToolsIcons.FileText)
++            else -> configs.forEachIndexed { index, config ->
++                if (index > 0) SettingsDivider()
++                HxRow(
++                    config.name,
++                    subtitle = ht(when {
++                        config.selected -> "当前配置 · 长按查看或编辑"
++                        config.bundled -> "内置模板 · 需要填写订阅"
++                        else -> "本地配置"
++                    }),
++                    icon = if (config.bundled) ToolsIcons.FileCog else ToolsIcons.FileText,
++                    selected = config.selected,
++                    enabled = !busy,
++                    onClick = { if (!config.selected) perform("已切换到 ${config.name}", true) { vm.controller.selectConfig(config.name) } },
++                    onLongClick = { menuFor = config },
++                ) {
++                    HomePop(config.selected) { Icon(HomeIcons.CircleCheck, ht("当前配置"), Modifier.size(22.dp), tint = c.accent) }
++                    HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { menuFor = config }, enabled = !busy, anchorMenu = true)
++                }
++            }
++        }
++    }
++
++    menuFor?.let { config ->
++        HxActionMenu(
++            title = config.name,
++            referenceFileMenu = true,
++            headerIcon = if (config.bundled) ToolsIcons.FileCog else ToolsIcons.FileText,
++            actions = settingsConfigMenu(config).map { label ->
++                when (label) {
++                    "查看" -> HxMenuAction(ht("查看"), ToolsIcons.FileText) { menuFor = null; onOpen(SettingsConfigEditTarget(config.name, readOnly = true)) }
++                    "编辑" -> HxMenuAction(ht("编辑"), ToolsIcons.Pencil) { menuFor = null; onOpen(SettingsConfigEditTarget(config.name, readOnly = false)) }
++                    "导出" -> HxMenuAction(ht("导出"), ToolsIcons.Share) {
++                        menuFor = null; exportFor = config
++                        launchDocumentPicker(vm::toast) { exporter.launch(config.name) }
++                    }
++                    "重命名" -> HxMenuAction(ht("重命名"), HxIcons.TextCursorInput) { menuFor = null; renameFor = config }
++                    else -> HxMenuAction(ht("删除"), ToolsIcons.Trash2, danger = true) { menuFor = null; deleteFor = config }
++                }
++            },
++            onDismiss = { menuFor = null },
++        )
++    }
++    renameFor?.let { config ->
++        HxFormDialog(
++            title = "重命名配置", fields = listOf(HxField("名称", config.name)), confirmLabel = "重命名",
++            validate = { values ->
++                val name = values[0]
++                when {
++                    name == config.name -> "名称没有变化"
++                    else -> runCatching {
++                        ProxyConfigLibrary.safeName(name)
++                        require(ProxyConfigLibrary.coreAccepts(ProxyRuntimeProfile.load(vm.prefs).core, name)) { "当前核心不支持该配置格式" }
++                    }.exceptionOrNull()?.message
++                }
++            },
++            onConfirm = { values ->
++                renameFor = null
++                perform("配置已重命名", false) {
++                    withContext(Dispatchers.IO) { ProxyConfigLibrary(context).rename(entryOf(config), values[0]) }
++                }
++            },
++            onDismiss = { renameFor = null },
++        )
++    }
++    deleteFor?.let { config ->
++        HxConfirmDialog(
++            title = "删除配置？",
++            message = "「${config.name}」将被永久删除。" + if (config.selected) "删除后会切换回内置模板。" else "",
++            confirmLabel = "删除", danger = true,
++            onConfirm = {
++                deleteFor = null
++                perform("已删除", applyToRuntime = config.selected) { vm.controller.deleteConfig(config.name) }
++            },
++            onDismiss = { deleteFor = null },
++        )
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..9305bef 100644
+index 2b4638e..940fd92 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-@@ -393,21 +393,11 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -393,21 +393,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      val nav = LocalNav.current
      val context = LocalContext.current
      val prefs = vm.prefs
@@ -6203,34 +6905,43 @@ index 2b4638e..9305bef 100644
      var revision by remember { mutableIntStateOf(0) }
      var choice by remember { mutableStateOf<String?>(null) }
      var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
++    var configsLoading by remember { mutableStateOf(true) }
++    var editTarget by remember { mutableStateOf<SettingsConfigEditTarget?>(null) }
      val profile = ProxyRuntimeProfile.load(prefs)
-     LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
+-    LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
 -    val importConfig = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
 -        if (uri != null) scope.launch {
 -            runCatching { vm.controller.importConfig(uri, uri.lastPathSegment?.substringAfterLast('/') ?: "config.yaml") }
 -                .onSuccess { vm.applyConfigChange("配置已导入并设为当前"); revision++ }
 -                .onFailure { vm.toast(it.message ?: "配置导入失败") }
 -        }
--    }
++    LaunchedEffect(revision, profile.core) {
++        configsLoading = true
++        configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList())
++        configsLoading = false
++    }
++    // 查看 / 编辑 open the shared config editor right here, over this page; back returns to it.
++    editTarget?.let { target ->
++        ConfigEditorScreen(vm, onBackOverride = { editTarget = null; revision++ }, target = target.name, startReadOnly = target.readOnly)
++        return
+     }
 -
      fun changed(key: String) {
          ProxyRuntimeSettings.markDirty(prefs, key)
          revision++
-@@ -466,8 +456,12 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -465,10 +466,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+         }
          item(key = "config") {
              SettingsSection {
-                 SettingsGroup {
-+                    // Selecting, importing and editing configs all live on one page: 工具 › 配置管理.
-                     SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
+-                SettingsGroup {
+-                    SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
 -                        icon = ToolsIcons.FileText, onClick = { choice = "config" })
-+                        icon = ToolsIcons.FileText, value = ht("配置管理")) {
-+                        nav.openRequested(HxRoute.Main)
-+                        vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
-+                    }
-                 }
+-                }
++                SettingsConfigPicker(vm, configs, configsLoading, onChanged = { revision++ }, onOpen = { editTarget = it })
              }
          }
-@@ -485,32 +479,6 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+         if (pending) {
+@@ -485,38 +483,17 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
 
      when (choice) {
@@ -6263,6 +6974,19 @@ index 2b4638e..9305bef 100644
          "core" -> HxChoiceSheet(
              presentation = HxChoicePresentation.Settings,
              title = ht("代理核心"),
+-            choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
++            choices = ProxyRuntimeProfile.Core.values().map { core ->
++                val supported = ProxyCoreSupport.runtimeSupported(core)
+                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
+-                HxChoice(core.id, core.label, if (installed) null else ht("尚未安装，请先在核心管理下载"), enabled = installed)
++                when {
++                    !supported -> HxChoice(core.id, core.label, ht("暂不支持：") + ProxyCoreSupport.unsupportedReason(core), enabled = false)
++                    installed -> HxChoice(core.id, core.label, null)
++                    else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"), enabled = false)
++                }
+             },
+             selected = profile.core.id,
+             onPick = { putString("proxyBaseCore", it); choice = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ce5f550..65650a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -8381,6 +9105,19 @@ index d256004..fa05457 100644
          CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
      }
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
+index 67585f1..2702aa2 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
+@@ -117,7 +117,7 @@ private fun CoreCard(
+                             style = HomeType.sheetTitle.copy(fontSize = 23.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                         )
+                         when {
+-                            !core.runnable -> HomePill(ht("仅下载管理"), tone = HomeTone.Neutral)
++                            !core.runnable -> HomePill(ht("暂不支持运行"), tone = HomeTone.Neutral)
+                             core.updateAvailable -> HomePill(ht("有更新"), tone = HomeTone.Accent)
+                             core.latest.isNotBlank() -> HomePill(ht("已是最新"), tone = HomeTone.Good)
+                         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
 index ee40a76..8c39531 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsDiagScreen.kt
@@ -8697,7 +9434,7 @@ index 6e1e067..cedcda6 100644
 
      when (val current = overlay) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
-index 60a38ad..3cba88d 100644
+index 60a38ad..ba9a3fa 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 @@ -10,7 +10,7 @@ import java.util.Locale
@@ -8717,23 +9454,23 @@ index 60a38ad..3cba88d 100644
      WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
  }
 
-@@ -44,14 +45,14 @@ internal object ToolsCatalog {
+@@ -39,6 +40,8 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
+ internal object ToolsCatalog {
+     /** Concept layout (03A page 1): six untitled cards. This is the default. */
+     val concept: List<ToolsGroupSpec> = listOf(
++        // 网络测试 is the most used tool: it opens the list on its own card.
++        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest)),
+         ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
+         ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
          ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
-         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
-         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
--        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
-+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.NetTest, ToolsEntry.WebUi)),
-     )
+@@ -49,6 +52,7 @@ internal object ToolsCatalog {
 
      /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
      val titled: List<ToolsGroupSpec> = listOf(
++        ToolsGroupSpec("网络测试", listOf(ToolsEntry.NetTest)),
          ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
          ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
--        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
-+        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.NetTest)),
-         ToolsGroupSpec("核心与面板", listOf(ToolsEntry.Cores, ToolsEntry.WebUi)),
-         ToolsGroupSpec("文件与维护", listOf(ToolsEntry.Files, ToolsEntry.Scripts, ToolsEntry.Logs, ToolsEntry.Diag)),
-     )
+         ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
 index 7967521..17acd48 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
@@ -8978,7 +9715,7 @@ index fa7fa0d..bdb1b3a 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..358b8ed 100644
+index 578ce9d..43406f0 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
@@ -9017,11 +9754,20 @@ index 578ce9d..358b8ed 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,6 +991,7 @@ private val vocabularyConnection = """
+@@ -969,6 +991,16 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 +接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
++配置选择|Configurations|設定選擇|Конфигурации
++当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
++内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
++尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
++在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
++只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху
++正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
++暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
++暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
  """.trimIndent()
 
  private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
@@ -9908,6 +10654,92 @@ index 0000000..c0a9ffb
 +        val error = assertThrows(MihomoControllerClient.DelayFailure::class.java) { MihomoControllerClient(app).delay("Japan") }
 +        assertTrue(error.timedOut)
 +        assertEquals("One 5 s window per dead node, not two", 1, api.requestCount)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
+new file mode 100644
+index 0000000..b602ef5
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
+@@ -0,0 +1,80 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * Core download/runtime mapping: every core that can be downloaded can also run; the rest are
++ * disabled with a reason. Asset names are the real release names (MetaCubeX/mihomo v1.19.32,
++ * lux5am/mihomo-smart Prerelease-Alpha, 2026-10).
++ */
++class CoreRuntimeSupport93Test {
++    private val mihomo = listOf(
++        "mihomo-android-386-v1.19.32.gz", "mihomo-android-amd64-v1.19.32.gz",
++        "mihomo-android-arm64-v8-v1.19.32.gz", "mihomo-android-armv7-v1.19.32.gz",
++        "mihomo-linux-arm64-v1.19.32.gz", "mihomo-android-arm64-v8-v1.19.32.gz.sha256",
++    )
++    private val smart = listOf(
++        "mihomo-android-386-alpha-smart-8d4c8c7.gz", "mihomo-android-amd64-alpha-smart-8d4c8c7.gz",
++        "mihomo-android-arm64-v8-alpha-smart-8d4c8c7.gz", "mihomo-android-armv7-alpha-smart-8d4c8c7.gz",
++    )
++
++    private fun pick(core: ProxyRuntimeProfile.Core, names: List<String>, abi: String): String? =
++        names.filter { ProxyCoreDownloadManager.matchesAsset(core, it, abi) }
++            .minByOrNull { ProxyCoreDownloadManager.assetRank(core, it) }
++
++    @Test fun abiTagFollowsTheFirstSupportedDeviceAbi() {
++        assertEquals("arm64", ProxyCoreDownloadManager.abiTag(arrayOf("arm64-v8a", "armeabi-v7a", "armeabi")))
++        assertEquals("armv7", ProxyCoreDownloadManager.abiTag(arrayOf("armeabi-v7a", "armeabi")))
++        assertEquals("amd64", ProxyCoreDownloadManager.abiTag(arrayOf("x86_64", "x86", "arm64-v8a")))
++        assertEquals("386", ProxyCoreDownloadManager.abiTag(arrayOf("x86")))
++        assertEquals("unknown", ProxyCoreDownloadManager.abiTag(arrayOf("mips")))
++    }
++
++    @Test fun mihomoReleaseHasExactlyOneAndroidBinaryPerAbi() {
++        val core = ProxyRuntimeProfile.Core.MIHOMO
++        assertEquals("mihomo-android-arm64-v8-v1.19.32.gz", pick(core, mihomo, "arm64"))
++        assertEquals("mihomo-android-armv7-v1.19.32.gz", pick(core, mihomo, "armv7"))
++        assertEquals("mihomo-android-amd64-v1.19.32.gz", pick(core, mihomo, "amd64"))
++        assertEquals("mihomo-android-386-v1.19.32.gz", pick(core, mihomo, "386"))
++        assertEquals(null, pick(core, mihomo, "unknown"))
++        assertEquals("v1.19.32", ProxyCoreDownloadManager.assetVersion(core, "v1.19.32", "mihomo-android-arm64-v8-v1.19.32.gz"))
++    }
++
++    @Test fun compatibleMihomoBuildIsPreferredWhenOffered() {
++        val names = listOf("mihomo-android-amd64-v1.19.32.gz", "mihomo-android-amd64-compatible-v1.19.32.gz")
++        assertEquals("mihomo-android-amd64-compatible-v1.19.32.gz", pick(ProxyRuntimeProfile.Core.MIHOMO, names, "amd64"))
++    }
++
++    @Test fun mihomoSmartMapsEveryAbiAndRecordsItsBuildAsVersion() {
++        val core = ProxyRuntimeProfile.Core.MIHOMO_SMART
++        assertEquals("mihomo-android-arm64-v8-alpha-smart-8d4c8c7.gz", pick(core, smart, "arm64"))
++        assertEquals("mihomo-android-armv7-alpha-smart-8d4c8c7.gz", pick(core, smart, "armv7"))
++        assertEquals("mihomo-android-amd64-alpha-smart-8d4c8c7.gz", pick(core, smart, "amd64"))
++        assertEquals("mihomo-android-386-alpha-smart-8d4c8c7.gz", pick(core, smart, "386"))
++        // Every Smart build is published under the same tag: the build id must be part of the version.
++        val first = ProxyCoreDownloadManager.assetVersion(core, "Prerelease-Alpha", "mihomo-android-arm64-v8-alpha-smart-8d4c8c7.gz")
++        val next = ProxyCoreDownloadManager.assetVersion(core, "Prerelease-Alpha", "mihomo-android-arm64-v8-alpha-smart-9e0f1a2.gz")
++        assertEquals("Prerelease-Alpha · alpha-smart-8d4c8c7", first)
++        assertTrue(first != next)
++    }
++
++    @Test fun onlyTheMihomoFamilyRunsAndEveryOtherCoreSaysWhy() {
++        ProxyRuntimeProfile.Core.values().forEach { core ->
++            val mihomoFamily = core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
++            assertEquals(core.id, mihomoFamily, ProxyCoreSupport.runtimeSupported(core))
++            // The Root runtime capability model agrees with the download policy.
++            assertEquals(core.id, mihomoFamily, ProxyRuntimeProfile.capability(core, ProxyRuntimeProfile.Mode.TPROXY).available)
++            if (mihomoFamily) assertEquals("", ProxyCoreSupport.unsupportedReason(core))
++            else assertTrue(core.id, ProxyCoreSupport.unsupportedReason(core).length > 10)
++        }
++        assertFalse(ProxyCoreSupport.runtimeSupported(ProxyRuntimeProfile.Core.SING_BOX))
++    }
++
++    @Test fun settingsConfigMenuOpensViewAndEditInPlace() {
++        assertEquals(listOf("查看", "编辑", "导出", "重命名", "删除"), settingsConfigMenu(ProxyConfigUi("自用_tproxy.yaml", selected = true, bundled = false)))
++        assertEquals(listOf("查看", "编辑", "导出"), settingsConfigMenu(ProxyConfigUi("config.yaml", selected = false, bundled = true)))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt

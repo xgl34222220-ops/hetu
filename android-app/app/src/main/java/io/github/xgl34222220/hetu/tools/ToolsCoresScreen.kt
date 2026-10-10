@@ -117,7 +117,7 @@ private fun CoreCard(
                             style = HomeType.sheetTitle.copy(fontSize = 23.sp), maxLines = 1, overflow = TextOverflow.Ellipsis,
                         )
                         when {
-                            !core.runnable -> HomePill(ht("仅下载管理"), tone = HomeTone.Neutral)
+                            !core.runnable -> HomePill(ht("暂不支持运行"), tone = HomeTone.Neutral)
                             core.updateAvailable -> HomePill(ht("有更新"), tone = HomeTone.Accent)
                             core.latest.isNotBlank() -> HomePill(ht("已是最新"), tone = HomeTone.Good)
                         }

@@ -40,19 +40,22 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
 internal object ToolsCatalog {
     /** Concept layout (03A page 1): six untitled cards. This is the default. */
     val concept: List<ToolsGroupSpec> = listOf(
+        // 网络测试 is the most used tool: it opens the list on its own card.
+        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.NetTest, ToolsEntry.WebUi)),
+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
     val titled: List<ToolsGroupSpec> = listOf(
+        ToolsGroupSpec("网络测试", listOf(ToolsEntry.NetTest)),
         ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
         ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
-        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.NetTest)),
+        ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
         ToolsGroupSpec("核心与面板", listOf(ToolsEntry.Cores, ToolsEntry.WebUi)),
         ToolsGroupSpec("文件与维护", listOf(ToolsEntry.Files, ToolsEntry.Scripts, ToolsEntry.Logs, ToolsEntry.Diag)),
     )

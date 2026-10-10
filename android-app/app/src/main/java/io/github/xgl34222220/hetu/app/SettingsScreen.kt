@@ -396,8 +396,19 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
     var revision by remember { mutableIntStateOf(0) }
     var choice by remember { mutableStateOf<String?>(null) }
     var configs by remember { mutableStateOf<List<ProxyConfigUi>>(emptyList()) }
+    var configsLoading by remember { mutableStateOf(true) }
+    var editTarget by remember { mutableStateOf<SettingsConfigEditTarget?>(null) }
     val profile = ProxyRuntimeProfile.load(prefs)
-    LaunchedEffect(revision, profile.core) { configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList()) }
+    LaunchedEffect(revision, profile.core) {
+        configsLoading = true
+        configs = runCatching { vm.controller.configLibrary() }.getOrDefault(emptyList())
+        configsLoading = false
+    }
+    // 查看 / 编辑 open the shared config editor right here, over this page; back returns to it.
+    editTarget?.let { target ->
+        ConfigEditorScreen(vm, onBackOverride = { editTarget = null; revision++ }, target = target.name, startReadOnly = target.readOnly)
+        return
+    }
     fun changed(key: String) {
         ProxyRuntimeSettings.markDirty(prefs, key)
         revision++
@@ -455,14 +466,7 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         }
         item(key = "config") {
             SettingsSection {
-                SettingsGroup {
-                    // Selecting, importing and editing configs all live on one page: 工具 › 配置管理.
-                    SettingsNavRow(ht("当前配置"), subtitle = configs.firstOrNull { it.selected }?.name ?: ht("尚未选择配置"),
-                        icon = ToolsIcons.FileText, value = ht("配置管理")) {
-                        nav.openRequested(HxRoute.Main)
-                        vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
-                    }
-                }
+                SettingsConfigPicker(vm, configs, configsLoading, onChanged = { revision++ }, onOpen = { editTarget = it })
             }
         }
         if (pending) {
@@ -482,9 +486,14 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
         "core" -> HxChoiceSheet(
             presentation = HxChoicePresentation.Settings,
             title = ht("代理核心"),
-            choices = listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).map { core ->
+            choices = ProxyRuntimeProfile.Core.values().map { core ->
+                val supported = ProxyCoreSupport.runtimeSupported(core)
                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
-                HxChoice(core.id, core.label, if (installed) null else ht("尚未安装，请先在核心管理下载"), enabled = installed)
+                when {
+                    !supported -> HxChoice(core.id, core.label, ht("暂不支持：") + ProxyCoreSupport.unsupportedReason(core), enabled = false)
+                    installed -> HxChoice(core.id, core.label, null)
+                    else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"), enabled = false)
+                }
             },
             selected = profile.core.id,
             onPick = { putString("proxyBaseCore", it); choice = null },

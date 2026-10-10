@@ -91,12 +91,12 @@ internal fun CoreManagerPicker(family: String, current: String, statuses: List<P
     @Composable fun ColumnScope.choices() {
         coreFamilyVariantIds(family).mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
             HxMenuItem(coreManagerDisplayName(item.id, item.label), { onPick(item.id) }, selected = item.id == current,
-                enabled = item.id !in otherSelected, description = if (item.runtimeReady) "下载与版本管理" else "仅下载管理")
+                enabled = item.id !in otherSelected, description = if (item.runtimeReady) "下载与版本管理" else "暂不支持运行")
         }
         Text("其他可管理核心", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
         listOf("v2fly", "hysteria").mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
             HxMenuItem(item.label, { onPick(item.id) }, selected = item.id == current, enabled = item.id !in otherSelected,
-                description = "独立核心 · 仅下载管理")
+                description = "独立核心 · 暂不支持运行")
         }
         Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
     }

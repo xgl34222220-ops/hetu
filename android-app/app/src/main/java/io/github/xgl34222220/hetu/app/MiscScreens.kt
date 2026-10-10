@@ -380,7 +380,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                                 }
                                 if (!status.runtimeReady) {
                                     Spacer(Modifier.width(8.dp))
-                                    HxPill(ht("仅下载管理"), HxTone.Neutral)
+                                    HxPill(ht("暂不支持运行"), HxTone.Neutral)
                                 }
                             }
                             Text(
@@ -437,7 +437,8 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                             },
                             icon = Icons.Rounded.FileOpen,
                             filled = false,
-                            enabled = working == null,
+                            // A core the Root runtime cannot start is not imported either; the card says why.
+                            enabled = working == null && status.runtimeReady,
                             modifier = Modifier.weight(1f),
                         )
                         if (status.downloaded) {

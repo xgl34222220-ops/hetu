@@ -81,6 +81,8 @@ jobs:
 
         python3 tools/qa/test_root_safety93.py -v 2>&1 | tee out/verification/root-safety93-tests.txt
 
+        python3 tools/qa/test_core_support93.py -v 2>&1 | tee out/verification/core-support93-tests.txt
+
         '
     - name: Verify presentation patch cannot alter runtime or dependency inputs
       run: 'set -euo pipefail
@@ -262,10 +264,14 @@ jobs:
 
         '
     - name: Build APK
-      run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx3g -Dfile.encoding=UTF-8' :app:assembleDebug --stacktrace
+      # Debug is the instrumented test build; release (R8, non-debuggable, baseline profile,
+      # same CI signing identity) is the shipped APK.
+      run: gradle --no-daemon --max-workers=2 -Dorg.gradle.jvmargs='-Xmx4g -Dfile.encoding=UTF-8' :app:assembleDebug :app:assembleRelease --stacktrace
       working-directory: android-app
     - name: Verify APK embeds the tested runtime
       run: python3 .github/scripts/verify_packaged_runtime.py verify
+    - name: Verify shipped release APK is non-debuggable, shrunk, profiled and identically signed
+      run: python3 .github/scripts/verify_release_continuity93.py
     - name: Verify packaged MaterialKolor constructors
       run: python3 .github/scripts/verify_materialkolor_abi.py android-app/app/build/outputs/apk/debug/app-debug.apk --output out/verification/materialkolor-abi.json
     - name: Verify packaged launcher and concept icon bytes
@@ -380,15 +386,19 @@ jobs:
     - name: Verify APK
       run: 'set -euo pipefail
 
-        APK=android-app/app/build/outputs/apk/debug/app-debug.apk
+        APK=android-app/app/build/outputs/apk/release/app-release.apk
 
-        mkdir -p out/apk-transfer
+        mkdir -p out/apk-transfer out/test-apk
+
+        cp android-app/app/build/outputs/apk/debug/app-debug.apk out/test-apk/Hetu-debug-test.apk
 
         "$ANDROID_HOME/build-tools/37.0.0/aapt" dump badging "$APK" > out/apk-transfer/apk-metadata.txt
 
         head -3 out/apk-transfer/apk-metadata.txt
 
         grep -q "versionCode=''2093'' versionName=''0.12.20-v20-glass''" out/apk-transfer/apk-metadata.txt
+
+        if grep -q "application-debuggable" out/apk-transfer/apk-metadata.txt; then echo "Shipped APK is debuggable"; exit 1; fi
 
         "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK" > out/apk-transfer/apk-signature.txt
 
@@ -411,6 +421,12 @@ jobs:
         if-no-files-found: error
         name: Hetu-APK
         path: out/*.apk
+    - uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: error
+        name: Hetu-V20.93-debug-test-APK
+        path: out/test-apk/*.apk
     - name: Upload APK transport manifest
       uses: actions/upload-artifact@v4
       with:
@@ -468,7 +484,7 @@ jobs:
   android-ui-smoke:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 75
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-node@v4
@@ -480,8 +496,12 @@ jobs:
         java-version: '21'
     - uses: actions/download-artifact@v4
       with:
-        name: Hetu-APK
+        name: Hetu-V20.93-debug-test-APK
         path: candidate
+    - uses: actions/download-artifact@v4
+      with:
+        name: Hetu-APK
+        path: release-candidate
     - name: Prepare official AOSP emulator
       run: 'set -euo pipefail
 
@@ -533,6 +553,7 @@ jobs:
       env:
         HETU_EXPECTED_VERSION: '2093'
         HETU_EXPECT_NEW_UI: '1'
+        HETU_RELEASE_SMOKE: '1'
         HETU_NATIVE_SOAK90_SECONDS: ${{ matrix.api == 36 && '900' || '' }}
       run: 'set -euo pipefail
 

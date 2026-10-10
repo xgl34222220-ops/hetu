@@ -1,0 +1,15 @@
+# Baseline profile for the main screens (首页, 面板/策略, 工具, 设置, 编辑器). Compose, Material3 and
+# other AndroidX libraries ship their own profiles; this covers Hetu's code and its UI libraries.
+# Installed by androidx.profileinstaller on first launch; compiled ahead of time by ART.
+HSPLio/github/xgl34222220/hetu/**;->**(**)**
+Lio/github/xgl34222220/hetu/**;
+HSPLtop/yukonga/miuix/**;->**(**)**
+Ltop/yukonga/miuix/**;
+HSPLdev/chrisbanes/haze/**;->**(**)**
+Ldev/chrisbanes/haze/**;
+HSPLcom/patrykandpatrick/vico/**;->**(**)**
+Lcom/patrykandpatrick/vico/**;
+HSPLcoil3/**;->**(**)**
+Lcoil3/**;
+HSPLkotlinx/coroutines/**;->**(**)**
+Lkotlinx/coroutines/**;

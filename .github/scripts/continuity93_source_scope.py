@@ -28,6 +28,31 @@ PRIOR_FOLDER = 'updates/v2092-rule-mode-continuity'
 # The 2026-10-08 authorization covers all UI pages and existing runtime safety.
 # Build dependencies, permissions, package, signing and other runtime binaries
 # remain outside this source layer, and every actual delta is sealed individually.
+RELEASE_RULES = 'android-app/app/proguard-rules.pro'
+BASELINE_PROFILE = 'android-app/app/src/main/baseline-prof.txt'
+# The exact authorized Gradle change of the release-build pass: the shipped variant becomes an
+# R8, non-debuggable release signed by the unchanged CI debug identity, plus profileinstaller.
+# Nothing else in the build file may differ from the pinned predecessor beyond the version.
+RELEASE_BUILD_DELTA = (
+    ('''        getByName("release") {
+            isMinifyEnabled = false
+        }''',
+     '''        // Shipped build: R8 + non-debuggable ART (debuggable=true disables JIT/AOT optimisations and is
+        // the main cause of Compose jank). Same CI signing identity as debug, so it upgrades in place.
+        getByName("release") {
+            isMinifyEnabled = true
+            isShrinkResources = false
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+        }'''),
+    ('''    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+''',
+     '''    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    // Installs the bundled baseline profile (src/main/baseline-prof.txt) on sideloaded installs.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
+'''),
+)
 AUTHORIZED_FILES = frozenset((
     BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT,
     PACKAGE + 'RootAutostart.java', PACKAGE + 'RootProxyManager.java',
@@ -38,13 +63,18 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'LatencyProbeOperation.kt',
     PACKAGE + 'ProxyScriptsActivity.kt',
     PACKAGE + 'ProxyComposeController.kt', PACKAGE + 'ProxyStatusBridge.kt',
+    # 2026-10-11 release-build authorization: every downloadable core must run or be disabled
+    # with a reason (download policy), and the shipped APK is an R8 release build with a
+    # baseline profile. Only these three inputs are added; the Gradle delta is pinned below.
+    PACKAGE + 'ProxyCoreDownloadManager.kt',
+    RELEASE_RULES, BASELINE_PROFILE,
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
 # Old layers retain their original protected flags. This new layer records the
 # explicitly authorized two Root asset deltas instead of claiming unchanged bytes.
 PROTECTED_FLAGS = (
-    'manifestAndPermissionsUnchanged', 'dependenciesUnchanged', 'signingUnchanged',
+    'manifestAndPermissionsUnchanged', 'dependenciesChangedOnlyByProfileInstaller', 'signingUnchanged',
     'nativePayloadsUnchanged', 'allBaselineTestMethodsPreserved',
     'allPredecessor644TestMethodsPreserved', 'other21RuntimePayloadsPreserved',
     'runtimeRevisionTestChangedOnly153To154', 'old17BootTestBodiesPreserved',
@@ -276,7 +306,10 @@ def validate_version(before, after):
     expected = before.replace('versionCode = 2092', 'versionCode = 2093', 1)
     expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "0.12.20-v20-glass"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
-    assert after == expected, 'V20.93 changed Gradle inputs beyond the two version values'
+    for old, new in RELEASE_BUILD_DELTA:
+        assert expected.count(old) == 1, 'Pinned release-build anchor missing'
+        expected = expected.replace(old, new, 1)
+    assert after == expected, 'V20.93 changed Gradle inputs beyond the two version values and the pinned release-build delta'
 
 
 def selected_tests(root=ROOT, extra_sources=()):

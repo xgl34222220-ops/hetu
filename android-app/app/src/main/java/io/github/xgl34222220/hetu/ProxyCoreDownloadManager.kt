@@ -35,6 +35,32 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
     return "正在下载 · " + if (total > 0L) "$transferred / ${bytes(total)}" else transferred
 }
 
+/**
+ * Which downloadable cores can actually run in Hetu's Root runtime.
+ *
+ * The whole runtime is built on the Mihomo CLI and its Clash-compatible controller:
+ * MihomoStartupConfig generates the startup YAML (tproxy/redir ports, DNS, controller, adblock
+ * rule-set), hetu-root.sh validates and launches `bin/core -t -d RUN -f CFG` / `-d RUN -f CFG`, and
+ * start-up readiness, the panel, latency tests, adblock verification and hot reload all talk to the
+ * Clash API. Mihomo and Mihomo Smart share that CLI and API. The other cores need their own config
+ * generator, launch arguments and (missing) controller, so they are shown disabled with the reason
+ * instead of being downloadable and then failing to start.
+ */
+internal object ProxyCoreSupport {
+    fun runtimeSupported(core: ProxyRuntimeProfile.Core): Boolean =
+        core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
+
+    fun unsupportedReason(core: ProxyRuntimeProfile.Core): String = when (core) {
+        ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART -> ""
+        ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND ->
+            "河图的 Root TPROXY 运行链（启动配置生成、启动校验、面板/测速、广告过滤与热重载）基于 Mihomo 配置与 Clash 控制接口；sing-box 使用 JSON 配置与 run -c 启动参数，尚未接入"
+        ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY ->
+            "${core.label} 没有 Clash 兼容控制接口，河图的启动就绪检查、面板、测速与广告过滤无法工作；其 JSON 配置与启动参数也尚未接入"
+        ProxyRuntimeProfile.Core.HYSTERIA ->
+            "Hysteria 是单服务器客户端，没有河图需要的规则分流、策略组与 Clash 控制接口"
+    }
+}
+
 internal data class ProxyCoreRemoteStatus(
     val id: String,
     val label: String,
@@ -143,6 +169,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
     }
 
     suspend fun status(core: ProxyRuntimeProfile.Core, network: Boolean = true): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
+        // A core the runtime cannot start is never offered for download (and costs no GitHub request).
+        if (!ProxyCoreSupport.runtimeSupported(core)) return@withContext localStatus(core, "暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val local = localStatus(core)
         val source = sources.firstOrNull { it.core == core }
             ?: return@withContext local.copy(message = "暂未配置可信下载源")
@@ -171,6 +199,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
         core: ProxyRuntimeProfile.Core,
         onProgress: (String) -> Unit = {},
     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
+        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val source = sources.firstOrNull { it.core == core }
             ?: throw IOException("${core.label} 暂未配置下载源")
         onProgress("检查 ${core.label} 最新版本…")
@@ -210,6 +239,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
         uri: Uri,
         displayName: String,
     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
+        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val temp = File(app.cacheDir, "proxy-core-import-${core.id}-${System.nanoTime()}.bin")
         try {
             val input = app.contentResolver.openInputStream(uri) ?: throw IOException("无法读取核心文件")
@@ -256,7 +286,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
             installedVersion = installed,
             latestVersion = "",
             updateAvailable = false,
-            canDownload = sources.any { it.core == core },
+            canDownload = ProxyCoreSupport.runtimeSupported(core) && sources.any { it.core == core },
             runtimeReady = runtimeReady(core),
             source = source,
             message = message,
@@ -266,8 +296,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
     private fun installedVersion(core: ProxyRuntimeProfile.Core): String =
         prefs.getString("version_${core.id}", "") ?: ""
 
-    private fun runtimeReady(core: ProxyRuntimeProfile.Core): Boolean =
-        core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
+    private fun runtimeReady(core: ProxyRuntimeProfile.Core): Boolean = ProxyCoreSupport.runtimeSupported(core)
 
     private fun resolve(source: Source): Asset? {
         val root = readJson(source.endpoint)
@@ -280,87 +309,23 @@ internal class ProxyCoreDownloadManager(context: Context) {
         } ?: return null
         val tag = release.optString("tag_name", release.optString("name", "latest"))
         val assets = release.optJSONArray("assets") ?: return null
+        val abi = abiTag(Build.SUPPORTED_ABIS)
         val candidates = ArrayList<JSONObject>()
         for (i in 0 until assets.length()) {
             val item = assets.optJSONObject(i) ?: continue
-            if (matchesAsset(source.core, item.optString("name", ""))) candidates += item
+            if (matchesAsset(source.core, item.optString("name", ""), abi)) candidates += item
         }
         val chosen = candidates.minByOrNull { assetRank(source.core, it.optString("name", "")) } ?: return null
         val url = chosen.optString("browser_download_url", "")
         if (!url.startsWith("https://")) return null
         return Asset(
-            version = tag,
+            version = assetVersion(source.core, tag, chosen.optString("name", "")),
             name = chosen.optString("name", "core"),
             url = url,
             digest = chosen.optString("digest", ""),
             size = chosen.optLong("size", 0L),
             source = source,
         )
-    }
-
-    private fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String): Boolean {
-        val name = rawName.lowercase(Locale.ROOT)
-        val abi = primaryAbi()
-        return when (core) {
-            ProxyRuntimeProfile.Core.MIHOMO,
-            ProxyRuntimeProfile.Core.MIHOMO_SMART -> {
-                name.startsWith("mihomo-android-") && name.endsWith(".gz") && when (abi) {
-                    "arm64" -> name.contains("android-arm64")
-                    "armv7" -> name.contains("android-armv7")
-                    "amd64" -> name.contains("android-amd64")
-                    "386" -> name.contains("android-386")
-                    else -> false
-                }
-            }
-            ProxyRuntimeProfile.Core.SING_BOX,
-            ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
-                name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
-            }
-            ProxyRuntimeProfile.Core.XRAY -> {
-                name.endsWith(".zip") && !name.endsWith(".zip.dgst") && when (abi) {
-                    "arm64" -> name == "xray-android-arm64-v8a.zip"
-                    "armv7" -> name.contains("xray-android-arm32-v7a.zip") || name.contains("xray-android-arm32-v7.zip")
-                    "amd64" -> name == "xray-android-amd64.zip"
-                    "386" -> name == "xray-android-386.zip"
-                    else -> false
-                }
-            }
-            ProxyRuntimeProfile.Core.V2FLY -> {
-                name.endsWith(".zip") && !name.endsWith(".zip.dgst") && when (abi) {
-                    "arm64" -> name == "v2ray-android-arm64-v8a.zip"
-                    "armv7" -> name.contains("v2ray-android-arm32-v7a.zip") || name.contains("v2ray-android-arm32-v7.zip")
-                    "amd64" -> name == "v2ray-android-amd64.zip"
-                    "386" -> name == "v2ray-android-386.zip"
-                    else -> false
-                }
-            }
-            ProxyRuntimeProfile.Core.HYSTERIA -> name == "hysteria-android-$abi"
-        }
-    }
-
-    private fun assetRank(core: ProxyRuntimeProfile.Core, rawName: String): Int {
-        val name = rawName.lowercase(Locale.ROOT)
-        if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
-            return when {
-                name.contains("compatible") -> 0
-                name.contains("-v1-") -> 1
-                name.contains("-v8-") -> 2
-                else -> 3
-            }
-        }
-        return 0
-    }
-
-    private fun primaryAbi(): String {
-        for (raw in Build.SUPPORTED_ABIS) {
-            when (raw.lowercase(Locale.ROOT)) {
-                "arm64-v8a" -> return "arm64"
-                "armeabi-v7a" -> return "armv7"
-                "x86_64" -> return "amd64"
-                "x86" -> return "386"
-            }
-        }
-        return "unknown"
     }
 
     private fun abiLabel(): String = Build.SUPPORTED_ABIS.joinToString("/")
@@ -594,6 +559,84 @@ internal class ProxyCoreDownloadManager(context: Context) {
     }
 
     companion object {
+        /** Release asset naming per core, for one ABI tag (see [abiTag]). Pure, so it is unit tested. */
+        internal fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String, abi: String): Boolean {
+            val name = rawName.lowercase(Locale.ROOT)
+            return when (core) {
+                ProxyRuntimeProfile.Core.MIHOMO,
+                ProxyRuntimeProfile.Core.MIHOMO_SMART -> {
+                    // mihomo-android-arm64-v8-v1.19.32.gz, mihomo-android-armv7-alpha-smart-8d4c8c7.gz …
+                    name.startsWith("mihomo-android-") && name.endsWith(".gz") && when (abi) {
+                        "arm64", "armv7", "amd64", "386" -> name.startsWith("mihomo-android-$abi-")
+                        else -> false
+                    }
+                }
+                ProxyRuntimeProfile.Core.SING_BOX,
+                ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
+                    abi != "unknown" && name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
+                }
+                ProxyRuntimeProfile.Core.XRAY -> {
+                    name.endsWith(".zip") && when (abi) {
+                        "arm64" -> name == "xray-android-arm64-v8a.zip"
+                        "armv7" -> name == "xray-android-arm32-v7a.zip" || name == "xray-android-arm32-v7.zip"
+                        "amd64" -> name == "xray-android-amd64.zip"
+                        "386" -> name == "xray-android-386.zip"
+                        else -> false
+                    }
+                }
+                ProxyRuntimeProfile.Core.V2FLY -> {
+                    name.endsWith(".zip") && when (abi) {
+                        "arm64" -> name == "v2ray-android-arm64-v8a.zip"
+                        "armv7" -> name == "v2ray-android-arm32-v7a.zip" || name == "v2ray-android-arm32-v7.zip"
+                        "amd64" -> name == "v2ray-android-amd64.zip"
+                        "386" -> name == "v2ray-android-386.zip"
+                        else -> false
+                    }
+                }
+                ProxyRuntimeProfile.Core.HYSTERIA -> abi != "unknown" && name == "hysteria-android-$abi"
+            }
+        }
+
+        /** Prefer the most compatible Mihomo build when a release offers several for one ABI. */
+        internal fun assetRank(core: ProxyRuntimeProfile.Core, rawName: String): Int {
+            val name = rawName.lowercase(Locale.ROOT)
+            if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
+                return when {
+                    name.contains("compatible") -> 0
+                    name.contains("-v1-") -> 1
+                    name.contains("-v8-") -> 2
+                    else -> 3
+                }
+            }
+            return 0
+        }
+
+        /** Release ABI tag of the first supported device ABI: arm64, armv7, amd64, 386 or unknown. */
+        internal fun abiTag(supportedAbis: Array<String>): String {
+            for (raw in supportedAbis) {
+                when (raw.lowercase(Locale.ROOT)) {
+                    "arm64-v8a" -> return "arm64"
+                    "armeabi-v7a" -> return "armv7"
+                    "x86_64" -> return "amd64"
+                    "x86" -> return "386"
+                }
+            }
+            return "unknown"
+        }
+
+        /**
+         * The version recorded for an installed download. Mihomo Smart publishes every build under the
+         * same tag (Prerelease-Alpha), so its build id from the asset name is part of the version;
+         * otherwise a new Smart build would never show as an update.
+         */
+        internal fun assetVersion(core: ProxyRuntimeProfile.Core, tag: String, assetName: String): String {
+            if (core != ProxyRuntimeProfile.Core.MIHOMO_SMART) return tag
+            val build = assetName.lowercase(Locale.ROOT).removeSuffix(".gz")
+                .replace(Regex("^mihomo-android-(arm64|armv7|amd64|386)-"), "")
+                .replace(Regex("^(v8|v1|v2|v3|compatible)-"), "")
+            return if (build.isBlank() || build == tag.lowercase(Locale.ROOT)) tag else "$tag · $build"
+        }
+
         private const val PREFS = "hetu_core_updates"
         private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
         private const val MAX_EXTRACTED = 128L * 1024L * 1024L
