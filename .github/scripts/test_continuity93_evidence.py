@@ -114,7 +114,7 @@ class Continuity93EvidenceTests(unittest.TestCase):
                       '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad',
                       'Reproduce V20.74 custom palette crash on API 36',
                       ':app:assembleRelease', 'verify_release_continuity93.py', "HETU_RELEASE_SMOKE: '1'",
-                      'test_core_support93.py', 'test_fast_start93.py', 'name: Hetu-V20.93-debug-test-APK'):
+                      'test_core_support93.py', 'test_fast_start93.py', 'test_cnip93.py', 'name: Hetu-V20.93-debug-test-APK'):
             self.assertIn(token, text)
         self.assertNotIn('continue-on-error:', text)
         old = (scope.ROOT / '.github/workflows/v2092-build.yml').read_text()

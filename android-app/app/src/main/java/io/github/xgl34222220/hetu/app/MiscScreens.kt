@@ -582,6 +582,8 @@ internal fun AboutScreen(vm: HetuViewModel) {
                     SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = HxIcons.Scale) { openAsset("AdGuard", "ADGUARD-LICENSE") }
                     SettingsDivider()
                     SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = HxIcons.Scale) { openAsset("Lucide", "licenses/lucide.txt") }
+                    SettingsDivider()
+                    SettingsNavRow("china-operator-ip", subtitle = "MIT · CNIP", icon = HxIcons.Scale) { openAsset("china-operator-ip", "licenses/china-operator-ip.txt") }
                 }
             }
         }

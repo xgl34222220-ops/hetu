@@ -328,7 +328,9 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
     LaunchedEffect(Unit) {
         val loader = actions.loadCnIp ?: return@LaunchedEffect
         state = try {
-            ToolsCnIpState(ToolsLoad.Ready, loader())
+            val kernel = actions.loadCnIpKernel?.invoke()
+            if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
+            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -346,6 +348,14 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             }
         },
         modifier = modifier,
+        onKernelChange = if (actions.loadCnIpKernel == null) null else { v4, v6 ->
+            val previous = state
+            state = state.copy(kernelV4 = v4, kernelV6 = v6)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpKernel(v4, v6)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
     )
 }
 

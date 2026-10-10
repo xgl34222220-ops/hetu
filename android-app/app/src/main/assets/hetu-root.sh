@@ -89,6 +89,21 @@ V6FWD=HETU_V6FWD
 KOUT=HETU_KOUT
 KFWD=HETU_KFWD
 
+# CNIP kernel bypass (ipset). The App writes $BASE/policy/cnip (V4=0|1, V6=0|1, FORCE=uid ranges);
+# the address lists are the core's own CN providers in $RUN/ruleset (APK snapshot first, then
+# refreshed daily from gaoyifan/china-operator-ip by the core). Without ipset the core RULE-SET
+# keeps doing the job and status reports cnip=degraded.
+CN_SET4=hetu_cn4
+CN_SET6=hetu_cn6
+CN_FILE4="$RUN/ruleset/hetu-cn-v4.txt"
+CN_FILE6="$RUN/ruleset/hetu-cn-v6.txt"
+CN4_ON=0
+CN6_ON=0
+CN_FORCE=""
+CN_CHAIN=""
+CNIP_STATE=off
+CNIP_REASON=""
+
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
@@ -462,6 +477,7 @@ cleanup4(){
   unhook xt4 filter OUTPUT "$DOTOUT"
   unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
   if [ "$PRESERVE_KILL" != 1 ]; then unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; fi
+  cn_drop_tails xt4
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -477,6 +493,7 @@ cleanup6(){
   unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
   unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
   if [ "$PRESERVE_KILL" != 1 ]; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
+  cn_drop_tails xt6
   if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -491,7 +508,7 @@ cleanup6(){
 sweep_plan(){
   awk -v keep="$PRESERVE_KILL" -v want="$1" -v only="${SWEEP_ONLY:-}" '
     function own(c){ if (only != "") return index(" " only " ", " " c " ") > 0; return c ~ /^(HETU|BICHEN)_/ }
-    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD") }
+    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T") }
     function hook(   i){ for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1)) && !kept($(i+1))) return 1; return 0 }
     $1 == "-N" && own($2) && !kept($2) { n++; chain[n] = $2; next }
     $1 == "-A" && own($2) && !kept($2) { next }
@@ -537,7 +554,7 @@ sweep_policy_routes(){
     for SR_T in $SR_TABLES; do ip -"$SR_F" route flush table "$SR_T" >/dev/null 2>&1 || true; done
   done
 }
-cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; cnip_sweep_sets keep; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
 cleanup_verify(){
   for CC_BIN in xt4 xt6; do
@@ -545,7 +562,8 @@ cleanup_verify(){
     # Not CC_TABLE: that name holds the journaled routing table checked below.
     for CC_XT in mangle nat filter; do
       CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_XT") || return 1
-      if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j )(HETU_|BICHEN_)'; then return 1; fi
+      if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j | -g )(HETU_|BICHEN_)'; then return 1; fi
+      if printf '%s\n' "$CC_RULES" | grep -q -- '--match-set hetu_'; then return 1; fi
     done
   done
   # Independent of net.state: no fwmark rule may still point at a Hetu table.
@@ -576,6 +594,9 @@ cleanup_confirmed(){
     [ -z "$CC_SAVED_NET" ] || printf '%s\n' "$CC_SAVED_NET" > "$NET_STATE"
     return 1
   fi
+  # ipset destroy only after the sweep was verified: no rule references a hetu_ set any more.
+  # A Kill Switch guard kept in place still references them, so they stay with it.
+  if [ "$PRESERVE_KILL" != 1 ] && ! cnip_rules_reference_sets; then cnip_sweep_sets all; fi
 }
 
 stop_transaction(){
@@ -909,6 +930,167 @@ bypass6(){
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 
+# ---------------------------------------------------------------- CNIP (ipset)
+cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
+cnip_load_policy(){
+  CNP_V4=0; CNP_V6=0; CN_FORCE=""
+  [ -r "$BASE/policy/cnip" ] || return 1
+  CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
+  bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
+  split_safe_uids "$CN_FORCE" || CN_FORCE=""
+  [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
+}
+# What the running session installed (watchdog Kill Switch, status, reload read it back).
+cnip_load_session(){
+  CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
+  CN4_ON=0; CN6_ON=0; CN_FORCE=""
+  [ "$CNIP_STATE" = ipset ] || return 0
+  [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
+  [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
+  CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
+  split_safe_uids "$CN_FORCE" || CN_FORCE=""
+}
+cnip_ipset(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 10 ipset "$@"; else ipset "$@"; fi; }
+cnip_set_exists(){ cnip_ipset list -n "$1" >/dev/null 2>&1; }
+# The kernel must offer hash:net sets AND the iptables set match, else nothing is installed.
+cnip_capable(){
+  has ipset || return 1
+  cnip_ipset destroy hetu_probe >/dev/null 2>&1 || true
+  cnip_ipset create hetu_probe hash:net family inet -exist >/dev/null 2>&1 || return 1
+  CC_OK=0
+  if xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1; then
+    xt4 -t mangle -A HETU_PROBE -m set --match-set hetu_probe dst -j RETURN >/dev/null 2>&1 && CC_OK=1
+    xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true
+  fi
+  cnip_ipset destroy hetu_probe >/dev/null 2>&1 || true
+  [ "$CC_OK" = 1 ]
+}
+cnip_file_sig(){ cksum < "$1" 2>/dev/null | awk '{print $1 ":" $2}'; }
+# Import one family into hetu_cn4/hetu_cn6. Unchanged data (same cksum as the stamp) and an
+# existing set are reused across starts; otherwise a fresh *_new set is restored and swapped in
+# atomically (or renamed on first use), so rules referencing the set never see a partial list.
+cnip_import(){
+  CI_F="$1"; CN_IMPORTED=0
+  if [ "$CI_F" = 6 ]; then CI_SET=$CN_SET6; CI_FAM=inet6; CI_FILE=$CN_FILE6; CI_MIN=500; CI_MAX=30000
+  else CI_SET=$CN_SET4; CI_FAM=inet; CI_FILE=$CN_FILE4; CI_MIN=1000; CI_MAX=20000; fi
+  [ -s "$CI_FILE" ] || { CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CI_F-data-missing"; return 1; }
+  CI_SIG=$(cnip_file_sig "$CI_FILE"); [ -n "$CI_SIG" ] || return 1
+  CI_STAMP="$RUN/state/cnip$CI_F.stamp"
+  if cnip_set_exists "$CI_SET" && [ "$(cat "$CI_STAMP" 2>/dev/null)" = "$CI_SIG" ]; then return 0; fi
+  CI_TMP="${CI_SET}_new"; CI_BATCH="$RUN/.cnip$CI_F.$$"
+  cnip_ipset destroy "$CI_TMP" >/dev/null 2>&1 || true
+  awk -v s="$CI_TMP" -v f="$CI_F" '
+    { sub(/\r$/, ""); sub(/[ \t]*#.*/, ""); gsub(/^[ \t]+|[ \t]+$/, ""); if ($0 == "") next
+      if (f == 4) { if ($0 !~ /^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+(\/[0-9]+)?$/) next
+        n = split($0, a, "/"); split(a[1], o, "."); for (i = 1; i <= 4; i++) if (o[i] + 0 > 255) next
+        if (n == 2 && (a[2] + 0 < 8 || a[2] + 0 > 32)) next }
+      else { if ($0 !~ /^[0-9A-Fa-f:]+(\/[0-9]+)?$/ || $0 !~ /:/) next
+        n = split($0, a, "/"); if (n == 2 && (a[2] + 0 < 16 || a[2] + 0 > 128)) next }
+      print "add " s " " $0 }' "$CI_FILE" > "$CI_BATCH.add" 2>/dev/null || { rm -f "$CI_BATCH.add"; return 1; }
+  CI_COUNT=$(wc -l < "$CI_BATCH.add" | tr -d ' ')
+  if [ "$CI_COUNT" -lt "$CI_MIN" ] || [ "$CI_COUNT" -gt "$CI_MAX" ]; then
+    rm -f "$CI_BATCH.add"; CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v$CI_F-data-invalid"; return 1
+  fi
+  { printf 'create %s hash:net family %s hashsize 4096 maxelem 65536\n' "$CI_TMP" "$CI_FAM"; cat "$CI_BATCH.add"; } > "$CI_BATCH"
+  rm -f "$CI_BATCH.add"
+  if ! cnip_ipset restore -exist < "$CI_BATCH" >/dev/null 2>&1; then
+    rm -f "$CI_BATCH"; cnip_ipset destroy "$CI_TMP" >/dev/null 2>&1 || true; return 1
+  fi
+  rm -f "$CI_BATCH"
+  if cnip_set_exists "$CI_SET"; then
+    cnip_ipset swap "$CI_TMP" "$CI_SET" >/dev/null 2>&1 || { cnip_ipset destroy "$CI_TMP" >/dev/null 2>&1 || true; return 1; }
+    cnip_ipset destroy "$CI_TMP" >/dev/null 2>&1 || true
+  else
+    cnip_ipset rename "$CI_TMP" "$CI_SET" >/dev/null 2>&1 || { cnip_ipset destroy "$CI_TMP" >/dev/null 2>&1 || true; return 1; }
+  fi
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  printf '%s\n' "$CI_SIG" > "$CI_STAMP" 2>/dev/null || true
+  CN_IMPORTED=1
+}
+# Start: decide which families bypass in the kernel. Never fails the start; degrades instead.
+cnip_prepare(){
+  CN4_ON=0; CN6_ON=0; CNIP_STATE=off; CNIP_REASON=""
+  cnip_load_policy || { CN_FORCE=""; return 0; }
+  case "$START_MODE" in tun|ebpf) CNIP_STATE=degraded; CNIP_REASON=mode-$START_MODE; CN_FORCE=""; return 0;; esac
+  if ! cnip_capable; then CNIP_STATE=degraded; CNIP_REASON=ipset-unavailable; CN_FORCE=""; return 0; fi
+  if [ "$CNP_V4" = 1 ]; then cnip_import 4 && CN4_ON=1; fi
+  if [ "$CNP_V6" = 1 ]; then
+    if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then cnip_import 6 && CN6_ON=1
+    else CNIP_REASON="${CNIP_REASON:+$CNIP_REASON,}v6-mode-$START_V6"; fi
+  fi
+  if [ "$CN4_ON" = 1 ] || [ "$CN6_ON" = 1 ]; then CNIP_STATE=ipset; else CNIP_STATE=degraded; CN_FORCE=""; fi
+}
+# After the bypass/LAN returns of a capture or guard chain: CN destinations RETURN (no proxy, no
+# guard). $4: owner = local chain, exempt UIDs jump with -g to "<chain>_T" which holds every
+# later rule (the caller appends to $CN_CHAIN); mark = PREROUTING, our own marked packets must
+# still reach TPROXY; plain = forwarded clients. $5 reuse: the tail may already exist (Kill Switch).
+cn_split(){
+  CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
+  case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
+  if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
+    CS_TAIL="${CS_C}_T"
+    if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
+    else "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" || return 1; fi
+    CS_OLDIFS=$IFS; IFS=,; set -- $CN_FORCE; IFS=$CS_OLDIFS
+    for CS_U in "$@"; do "$CS_BIN" -t "$CS_T" -A "$CS_C" -m owner --uid-owner "$CS_U" -g "$CS_TAIL" || return 1; done
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN || return 1
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" -g "$CS_TAIL" || return 1
+    CN_CHAIN="$CS_TAIL"; return 0
+  fi
+  if [ "$CS_KIND" = mark ] && [ -n "$MARK" ]; then
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
+  fi
+  "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN
+}
+# Per-chain fallback: an unreferenced "<chain>_T" left by a failed batch sweep.
+cn_drop_tail(){ cleanup_chain_absent "$1" "$2" "$3" && return 0; "$1" -t "$2" -F "$3" >/dev/null 2>&1 || true; "$1" -t "$2" -X "$3" >/dev/null 2>&1 || true; }
+cn_drop_tails(){
+  CDT_BIN="$1"
+  cn_drop_tail "$CDT_BIN" mangle "${MOUT}_T"; cn_drop_tail "$CDT_BIN" nat "${NOUT}_T"
+  cn_drop_tail "$CDT_BIN" filter "${WROUT}_T"; cn_drop_tail "$CDT_BIN" filter "${QUICOUT}_T"; cn_drop_tail "$CDT_BIN" filter "${V6OUT}_T"
+  if [ "$PRESERVE_KILL" != 1 ]; then cn_drop_tail "$CDT_BIN" filter "${KOUT}_T"; fi
+}
+# Rules no longer reference a hetu_ set once the sweep succeeded; only then may sets go.
+# keep: start-time cleanup keeps hetu_cn4/hetu_cn6 for reuse and drops temporary sets only.
+cnip_sweep_sets(){
+  has ipset || return 0
+  CSS_ALL="${1:-all}"
+  [ "$PRESERVE_KILL" != 1 ] || CSS_ALL=keep
+  for CSS_S in $(cnip_ipset list -n 2>/dev/null | grep -E '^hetu_(cn[46](_new)?|probe)$'); do
+    case "$CSS_ALL:$CSS_S" in keep:hetu_cn4|keep:hetu_cn6) continue;; esac
+    cnip_ipset destroy "$CSS_S" >/dev/null 2>&1 || CSS_LEFT=1
+  done
+}
+cnip_rules_reference_sets(){
+  for CRR_BIN in xt4q xt6q; do
+    if [ "$CRR_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    for CRR_T in mangle nat filter; do
+      "$CRR_BIN" -t "$CRR_T" -S 2>/dev/null | grep -q -- '--match-set hetu_' && return 0
+    done
+  done
+  return 1
+}
+cnip_set_size(){ cnip_ipset list "$1" -t 2>/dev/null | awk -F': *' '/^Number of entries/ {print $2; f=1} END {if (!f) print 0}'; }
+# Hot swap after the core refreshed its CN provider files (or the App deployed new ones). The
+# rules keep referencing the same set names, so only the set contents change. "auto" (the
+# watchdog) returns at once while both stamps still match.
+cnip_reload(){ (
+  trap 'release_lock' EXIT
+  cnip_load_session
+  if [ "$CNIP_STATE" != ipset ]; then printf '{"ok":true,"reloaded":false,"cnip":"%s","message":"内核 CNIP 未生效，数据已保存，下次启动使用"}\n' "$CNIP_STATE"; exit 0; fi
+  CR_DUE=0
+  if [ "$CN4_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE4")" != "$(cat "$RUN/state/cnip4.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CN6_ON" = 1 ] && [ "$(cnip_file_sig "$CN_FILE6")" != "$(cat "$RUN/state/cnip6.stamp" 2>/dev/null)" ]; then CR_DUE=1; fi
+  if [ "$CR_DUE" = 0 ]; then printf '{"ok":true,"reloaded":false,"cnip":"ipset","message":"CNIP 数据未变化"}\n'; exit 0; fi
+  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  CR_FAILED=0; CNIP_REASON=""
+  if [ "$CN4_ON" = 1 ]; then cnip_import 4 || CR_FAILED=1; fi
+  if [ "$CN6_ON" = 1 ]; then cnip_import 6 || CR_FAILED=1; fi
+  printf '%s cnip-reload failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
+  if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ipset","message":"CNIP ipset 已热更新"}\n'
+  else printf '{"ok":false,"reloaded":false,"cnip":"ipset","message":"CNIP 新数据无效或导入失败，继续使用原集合"}\n'; fi
+); }
+
 probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
 probe_tcp_ownership(){
@@ -1105,15 +1287,16 @@ install_mangle4(){
     xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
+  cn_split xt4 mangle "$MOUT" owner || return 1; MO4="$CN_CHAIN"; cn_split xt4 mangle "$MPRE" mark || return 1
   if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
-    preserve_existing_tcp xt4 "$MOUT" || return 1
+    preserve_existing_tcp xt4 "$MO4" || return 1
     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
   fi
   if [ "$M" = tproxy ]; then
-    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
-  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MOUT" || return 1; fi
+    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MO4" || return 1; fi
   xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
@@ -1135,27 +1318,28 @@ install_mangle6(){
     xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
   fi
   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
+  cn_split xt6 mangle "$MOUT" owner || return 1; MO6="$CN_CHAIN"; cn_split xt6 mangle "$MPRE" mark || return 1
   if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
-    preserve_existing_tcp xt6 "$MOUT" || return 1
+    preserve_existing_tcp xt6 "$MO6" || return 1
     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
   fi
   if [ "$M" = tproxy ]; then
-    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
-  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MOUT" || return 1; fi
+    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
+  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MO6" || return 1; fi
   xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
 }
 
 install_redirect4(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt4 nat "$NOUT" || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt4 "$NOUT" "$S" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt4 nat "$NOUT" || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; cn_split xt4 nat "$NOUT" owner || return 1; NO4="$CN_CHAIN"; scoped_redirect xt4 nat "$NO4" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt4 "$NO4" "$S" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; cn_split xt4 nat "$NPRE" plain || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 install_redirect6(){
   P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; v6supported || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
-  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt6 nat "$NOUT" || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt6 "$NOUT" "$S" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
+  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt6 nat "$NOUT" || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; cn_split xt6 nat "$NOUT" owner || return 1; NO6="$CN_CHAIN"; scoped_redirect xt6 nat "$NO6" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt6 "$NO6" "$S" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; cn_split xt6 nat "$NPRE" plain || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 }
 
 # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
@@ -1208,7 +1392,8 @@ install_udp_leak_guard4(){
   iface_out xt4 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
   bypass4 "$WROUT" filter "$CIDRS" || return 1
-  scoped_reject_unmarked_udp xt4 "$WROUT" "$S" "$UIDS" || return 1
+  cn_split xt4 filter "$WROUT" owner || return 1; WO4="$CN_CHAIN"
+  scoped_reject_unmarked_udp xt4 "$WO4" "$S" "$UIDS" || return 1
   xt4 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
   if [ "$SHARE" = 1 ]; then
     xt4 -t filter -N "$WRFWD" || return 1
@@ -1216,6 +1401,7 @@ install_udp_leak_guard4(){
     iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
     shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
     bypass4 "$WRFWD" filter "$CIDRS" || return 1
+    cn_split xt4 filter "$WRFWD" plain || return 1
     xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
   fi
@@ -1231,7 +1417,8 @@ install_udp_leak_guard6(){
   iface_out xt6 filter "$WROUT" "$IFACES" || return 1
   blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
   bypass6 "$WROUT" filter "$CIDRS" || return 1
-  scoped_reject_unmarked_udp xt6 "$WROUT" "$S" "$UIDS" || return 1
+  cn_split xt6 filter "$WROUT" owner || return 1; WO6="$CN_CHAIN"
+  scoped_reject_unmarked_udp xt6 "$WO6" "$S" "$UIDS" || return 1
   xt6 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
   if [ "$SHARE" = 1 ]; then
     xt6 -t filter -N "$WRFWD" || return 1
@@ -1239,23 +1426,24 @@ install_udp_leak_guard6(){
     iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
     shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
     bypass6 "$WRFWD" filter "$CIDRS" || return 1
+    cn_split xt6 filter "$WRFWD" plain || return 1
     xt6 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
     xt6 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
   fi
 }
 
 install_quic4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; cn_split xt4 filter "$QUICOUT" owner || return 1; QO4="$CN_CHAIN"; scoped_reject_quic xt4 "$QO4" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; cn_split xt4 filter "$QUICFWD" plain || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 install_quic6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt6 "$QUICOUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$QUICOUT" owner || return 1; QO6="$CN_CHAIN"; scoped_reject_quic xt6 "$QO6" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$QUICFWD" plain || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 }
 
 install_v6_strict(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$V6OUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$V6OUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$V6OUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$V6OUT" owner || return 1; VO6="$CN_CHAIN"; scoped_reject_all xt6 "$VO6" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$V6FWD" plain || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 }
 
 # Disable native IPv6 for applications, not the underlying Android network.
@@ -1340,12 +1528,12 @@ atomic_kill_guard(){ (
 ); }
 
 install_kill4(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt4 || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt4 || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; cn_split xt4 filter "$KOUT" owner reuse || return 1; KO4="$CN_CHAIN"; scoped_reject_all xt4 "$KO4" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; cn_split xt4 filter "$KFWD" plain || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 install_kill6(){
-  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt6 || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
+  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt6 || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$KOUT" owner reuse || return 1; KO6="$CN_CHAIN"; scoped_reject_all xt6 "$KO6" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$KFWD" plain || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 
 core_kind(){
@@ -1500,13 +1688,15 @@ watchdog(){
     WD_N=$((WD_N+1)); [ "$WD_N" -lt 40 ] || exit 0; sleep 0.025
   done
   load_session_fake_ip_policy || exit 0
+  cnip_load_session
   printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
   MISS=0; H_TICK=0
   while [ "$MISS" -lt 3 ]; do
     [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
-      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi
+      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
+        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; fi
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
   done
@@ -1832,8 +2022,8 @@ install_capture_rules(){
 capture_unwind(){
   # Only the chains install_capture_rules creates; the IPv6-disable guard installed before
   # the core launch and the Kill Switch guard stay untouched.
-  SWEEP_ONLY="$MOUT $MPRE $NOUT $NPRE $DNSOUT $DNSPRE $WROUT $WRFWD $QUICOUT $QUICFWD"
-  [ "$START_V6" != strict ] || SWEEP_ONLY="$SWEEP_ONLY $V6OUT $V6FWD"
+  SWEEP_ONLY="$MOUT $MPRE $NOUT $NPRE $DNSOUT $DNSPRE $WROUT $WRFWD $QUICOUT $QUICFWD ${MOUT}_T ${NOUT}_T ${WROUT}_T ${QUICOUT}_T"
+  [ "$START_V6" != strict ] || SWEEP_ONLY="$SWEEP_ONLY $V6OUT $V6FWD ${V6OUT}_T"
   cleanup_snapshot_begin; sweep_rules; CLEAN_SNAPSHOT_ACTIVE=0
   if [ -n "$MARK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
     for CU_F in 4 6; do
@@ -1904,6 +2094,9 @@ start(){
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "core-identity"
   core_identity_prepare
+  # Before the Kill Switch bootstrap guard: guards and capture rules reference the CN sets.
+  start_stage "cnip"
+  cnip_prepare
   if [ "$START_KILL" = 1 ] && [ -z "$CORE_RUNNER" ]; then
     fail "Kill Switch 启动缺少可验证的隔离核心身份，保留已有网络接管"
   fi
@@ -1977,12 +2170,13 @@ start(){
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
   transaction_current || fail "启动事务已撤销"
   if [ "$START_KILL" = 1 ]; then
     revoke_bootstrap || fail "无法撤销临时核心启动例外"
-    unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
-    if has ip6tables; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
+    unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; cn_drop_tail xt4 filter "${KOUT}_T"
+    if has ip6tables; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; cn_drop_tail xt6 filter "${KOUT}_T"; fi
     for GUARD_BIN in xt4 xt6; do
       if [ "$GUARD_BIN" = xt6 ] && ! has ip6tables; then continue; fi
       GUARD_RULES=$("$GUARD_BIN" -t filter -S) || fail "启动保护清理状态未知"
@@ -2200,13 +2394,20 @@ status(){
   if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG"
+  cnip_load_session; CNIPR=$(sed -n 's/^CNIP_REASON=//p' "$SESSION" 2>/dev/null | head -n 1 | tr -cd 'A-Za-z0-9,._-')
+  CNIP4N=0; CNIP6N=0
+  if [ "$CNIP_STATE" = ipset ] && has ipset; then
+    [ "$CN4_ON" != 1 ] || CNIP4N=$(cnip_set_size "$CN_SET4"); [ "$CN6_ON" != 1 ] || CNIP6N=$(cnip_set_size "$CN_SET6")
+    case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
+    if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
+  fi
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
 # iptables-restore --noflush commits only the named Hetu chains, never netd tables.
 health_owned(){
-  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
+  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD|MOUT_T|NOUT_T|WROUT_T|QUICOUT_T|V6OUT_T)$/ {print;next}
        $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
 }
 health_record(){ (
@@ -2379,16 +2580,18 @@ health_restore_table(){
   H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
   H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
   H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
-  H_CHANGED=0
+  H_CHANGED=0; H_REFILL=""
   for H_C in $(awk '$1=="-N" {print $2}' "$H_E"); do
     H_EXPECTED=$(awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c' "$H_E")
     H_ACTUAL=$(printf '%s\n' "$H_RAW" | awk -v c="$H_C" '($1=="-N" || $1=="-A") && $2==c')
     [ "$H_EXPECTED" != "$H_ACTUAL" ] || continue
     if printf '%s\n' "$H_RAW" | grep -Fqx -- "-N $H_C"; then printf -- '-F %s\n' "$H_C" >> "$H_BATCH"
     else printf -- '-N %s\n' "$H_C" >> "$H_BATCH"; fi
-    awk -v c="$H_C" '$1=="-A" && $2==c' "$H_E" >> "$H_BATCH"
+    H_REFILL="$H_REFILL $H_C"
     H_CHANGED=1
   done
+  # A CNIP head jumps (-g) to its "<chain>_T": declare every chain first, then refill them.
+  for H_C in $H_REFILL; do awk -v c="$H_C" '$1=="-A" && $2==c' "$H_E" >> "$H_BATCH"; done
   while IFS= read -r H_LINE; do
     case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
       H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
@@ -2504,6 +2707,8 @@ case "${1:-status}" in
   # Config check with the deployed core's own CLI (sing-box check, xray run -test, v2ray test).
   validate) [ "$#" = 3 ] || fail "参数错误"; root; validate_action "$2" "$3";;
   network-health) health_json;;
+  # Hot swap of the CN sets (App after deploying new lists; watchdog with "auto").
+  cnip-reload) { [ "$#" = 1 ] || [ "$#" = 2 ]; } || fail "参数错误"; root; cnip_reload;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
   watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
   *) fail "未知 Root 代理操作";;

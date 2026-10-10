@@ -76,6 +76,9 @@ AUTHORIZED_FILES = frozenset((
     # pre-start hook, deployment and hetu-root.sh start in one Root invocation. Only the pure-Java
     # shell-fragment builder (no Android API) is added.
     PACKAGE + 'StartPrelude.java',
+    # 2026-10-11 CNIP kernel-bypass authorization: the MIT notice of the CNIP data source
+    # (gaoyifan/china-operator-ip) that the built-in snapshots and ipset import already use.
+    'android-app/app/src/main/assets/licenses/china-operator-ip.txt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

@@ -217,18 +217,55 @@ internal fun ToolsCnIpScreen(
     onBack: () -> Unit,
     onEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
+    onKernelChange: ((v4: Boolean, v6: Boolean) -> Unit)? = null,
 ) {
     val stagger = rememberHomeStagger()
     ToolsPage(title = "CNIP 设置", onBack = onBack, modifier = modifier, subtitle = "中国大陆 IPv4 / IPv6 自动直连") {
         ToolsInfoCard("CNIP 只补充 IP 级直连，不替代 YAML 中已有的域名规则。修改后重启代理生效。", Modifier.homeEnter(stagger, 0))
         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 1)) {
             ToolsSwitchRow(
-                "绕过 CNIP", state.enabled, onEnabledChange,
-                icon = ToolsFeatureIcons.Globe, subtitle = "命中国内 IPv4 / IPv6 网段时直接连接", enabled = state.load is ToolsLoad.Ready,
+                "绕过 CNIP", state.enabled || state.kernelV4 || state.kernelV6, onEnabledChange,
+                icon = ToolsFeatureIcons.Globe, subtitle = if (state.kernelV4 || state.kernelV6) "内核绕过开启时，核心内规则同时保留作回退"
+                    else "命中国内 IPv4 / IPv6 网段时直接连接",
+                enabled = state.load is ToolsLoad.Ready && !state.kernelV4 && !state.kernelV6,
             )
         }
-        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
-            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database, subtitle = ht("内置离线快照 + Mihomo provider 运行时更新"))
+        if (onKernelChange != null) {
+            // Kernel-level bypass: the same glass card family as the rows above.
+            HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 2)) {
+                ToolsSwitchRow(
+                    "内核绕过 IPv4", state.kernelV4, { onKernelChange(it, state.kernelV6) },
+                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "国内 IPv4 直接放行，不经过核心（ipset）",
+                    enabled = state.load is ToolsLoad.Ready,
+                )
+                HomeRowDivider(start = HomeRowDims.textStart)
+                ToolsSwitchRow(
+                    "内核绕过 IPv6", state.kernelV6, { onKernelChange(state.kernelV4, it) },
+                    icon = ToolsFeatureIcons.ShieldCheck, subtitle = "仅 IPv6「启用 / 严格」模式生效",
+                    enabled = state.load is ToolsLoad.Ready,
+                )
+                HomeRowDivider(start = HomeRowDims.textStart)
+                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = ht(cnIpKernelStatusText(state)))
+            }
+        }
+        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
+            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database,
+                subtitle = ht("gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，内核集合随之热更新"))
         }
     }
+}
+
+internal fun cnIpKernelStatusText(state: ToolsCnIpState): String = when {
+    !state.kernelV4 && !state.kernelV6 -> "未开启"
+    state.kernelStatus == "ipset" -> buildString {
+        append("内核 ipset 生效")
+        if (state.kernelV4Entries > 0) append(" · IPv4 ").append(state.kernelV4Entries).append(" 段")
+        if (state.kernelV6Entries > 0) append(" · IPv6 ").append(state.kernelV6Entries).append(" 段")
+    }
+    state.kernelStatus == "degraded" -> when {
+        state.kernelReason.contains("ipset-unavailable") -> "设备不支持 ipset，已降级为核心内规则"
+        state.kernelReason.contains("mode-") -> "当前代理模式不支持内核绕过，已降级为核心内规则"
+        else -> "内核绕过未生效，已降级为核心内规则" + if (state.kernelReason.isBlank()) "" else "（" + state.kernelReason + "）"
+    }
+    else -> "重启代理后生效"
 }

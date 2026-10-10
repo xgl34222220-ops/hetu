@@ -1768,6 +1768,34 @@ final class RootProxyManager {
         return StartPrelude.privateDnsMode(mode);
     }
 
+    /**
+     * CNIP exempt apps ("pkg" or "user:pkg") as kernel UIDs: they still go through the proxy for
+     * China IPs. System UIDs are ignored; at most 256 entries.
+     */
+    private String cnipForceUids(){
+        Set<String> apps=prefs.getStringSet("proxyCnIpForceApps",Collections.emptySet());
+        TreeSet<Integer> uids=new TreeSet<>();
+        android.content.pm.PackageManager pm=context.getPackageManager();
+        for(String raw:apps==null?Collections.<String>emptySet():apps){
+            if(raw==null)continue;
+            String value=raw.trim();int user=0;
+            int colon=value.indexOf(':');
+            if(colon>0){
+                try{user=Integer.parseInt(value.substring(0,colon));}catch(NumberFormatException ignored){continue;}
+                value=value.substring(colon+1);
+            }
+            if(user<0||user>9999||!value.matches("[A-Za-z0-9_.]{1,255}"))continue;
+            try{
+                int app=pm.getApplicationInfo(value,0).uid%100000;
+                if(app>=10000&&app<=99999)uids.add(user*100000+app);
+            }catch(Exception ignored){}
+            if(uids.size()>=256)break;
+        }
+        StringBuilder out=new StringBuilder();
+        for(int uid:uids)out.append(out.length()==0?"":",").append(uid);
+        return out.toString();
+    }
+
     /** App IDs (uid % 100000) of GMS, Play Store and GSF; "0" when none is installed. */
     private String gmsAppIds(){
         StringBuilder out=new StringBuilder();
@@ -1890,6 +1918,15 @@ final class RootProxyManager {
         if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
         else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                 .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
+        // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
+        String cnipPolicy=policyDir+"/cnip";
+        boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
+        if(cnipV4||cnipV6){
+            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n";
+            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
+                    .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
+                    .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
+        }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
         if(deployCore){
             if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
                     .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");

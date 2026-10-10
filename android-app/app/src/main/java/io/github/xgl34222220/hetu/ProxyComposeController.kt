@@ -236,6 +236,16 @@ internal class ProxyComposeController(context: Context) {
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                         else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                     if (observedPid > 0) live.put("pid", observedPid)
+                    // CNIP kernel bypass as the running session reports it (ipset / degraded / off).
+                    if (live.has("cnip")) {
+                        val cnip = if (live.optBoolean("running", false)) live.optString("cnip", "off") else "off"
+                        val reason = live.optString("cnipReason", "")
+                        val v4 = live.optInt("cnipV4Entries", 0); val v6 = live.optInt("cnipV6Entries", 0)
+                        if (prefs.getString("proxyCnIpKernelStatus", "") != cnip || prefs.getString("proxyCnIpKernelReason", "") != reason ||
+                            prefs.getInt("proxyCnIpKernelV4Entries", -1) != v4 || prefs.getInt("proxyCnIpKernelV6Entries", -1) != v6)
+                            prefs.edit().putString("proxyCnIpKernelStatus", cnip).putString("proxyCnIpKernelReason", reason)
+                                .putInt("proxyCnIpKernelV4Entries", v4).putInt("proxyCnIpKernelV6Entries", v6).apply()
+                    }
                     freshStatus = true
                 }
             } catch (cancel: CancellationException) { throw cancel }

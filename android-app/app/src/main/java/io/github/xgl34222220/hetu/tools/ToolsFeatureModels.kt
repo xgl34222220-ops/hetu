@@ -180,7 +180,23 @@ internal data class ToolsShareState(
 
 /* ---------------------------- CNIP (39) ---------------------------- */
 
-internal data class ToolsCnIpState(val load: ToolsLoad = ToolsLoad.Loading, val enabled: Boolean = false)
+internal data class ToolsCnIpState(
+    val load: ToolsLoad = ToolsLoad.Loading,
+    val enabled: Boolean = false,
+    /** Kernel-level bypass (ipset): China IPs skip the core entirely, per family. */
+    val kernelV4: Boolean = false,
+    val kernelV6: Boolean = false,
+    /** Running session as status reports it: ipset / degraded / off ("" = not known yet). */
+    val kernelStatus: String = "",
+    val kernelReason: String = "",
+    val kernelV4Entries: Int = 0,
+    val kernelV6Entries: Int = 0,
+)
+
+/** What the CNIP kernel bypass page reads back. */
+internal data class ToolsCnIpKernel(
+    val v4: Boolean, val v6: Boolean, val status: String, val reason: String, val v4Entries: Int, val v6Entries: Int,
+)
 
 /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
@@ -383,6 +399,8 @@ internal class ToolsFeatureActions(
     /* CNIP */
     val loadCnIp: (suspend () -> Boolean)? = null,
     val setCnIp: suspend (Boolean) -> Unit = {},
+    val loadCnIpKernel: (suspend () -> ToolsCnIpKernel)? = null,
+    val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
 
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,

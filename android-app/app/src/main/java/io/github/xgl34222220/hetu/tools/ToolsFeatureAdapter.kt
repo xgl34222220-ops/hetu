@@ -59,6 +59,8 @@ private object Keys {
     const val SharedNetwork = "proxySharedNetwork"
     const val SharedMacs = "proxySharedBypassMacs"
     const val CnIp = "proxyCnIpDirect"
+    const val CnIpKernelV4 = "proxyCnIpKernelV4"
+    const val CnIpKernelV6 = "proxyCnIpKernelV6"
     const val AdblockChain = "proxyAdblockChain"
     const val AdblockFallback = "proxyAdblockFallbackEnabled"
     const val Cname = "cnameProtection"
@@ -214,6 +216,19 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             /* ------------------------------ CNIP ------------------------------ */
             loadCnIp = { prefs.getBoolean(Keys.CnIp, false) },
             setCnIp = { on -> prefs.edit().putBoolean(Keys.CnIp, on).apply(); dirty(Keys.CnIp) },
+            loadCnIpKernel = {
+                ToolsCnIpKernel(
+                    prefs.getBoolean(Keys.CnIpKernelV4, false), prefs.getBoolean(Keys.CnIpKernelV6, false),
+                    prefs.getString("proxyCnIpKernelStatus", "").orEmpty(), prefs.getString("proxyCnIpKernelReason", "").orEmpty(),
+                    prefs.getInt("proxyCnIpKernelV4Entries", 0), prefs.getInt("proxyCnIpKernelV6Entries", 0),
+                )
+            },
+            setCnIpKernel = { v4, v6 ->
+                prefs.edit().putBoolean(Keys.CnIpKernelV4, v4).putBoolean(Keys.CnIpKernelV6, v6).apply()
+                // Not a runtime-signature key: mark the restart notice explicitly.
+                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
