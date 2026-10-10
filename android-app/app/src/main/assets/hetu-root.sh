@@ -45,6 +45,10 @@ PRESERVE_KILL=0
 TXN_DEADLINE=0
 TXN_TIMER=""
 LOCK_HELD=0
+# The PID that owns the transaction lock. A shielded child replaces it with its own.
+SELF_PID=$$
+XT_BATCH=0
+XT_BATCH_DIR=""
 # xt_owner sees the credentials of the process that created a socket. Android resolves
 # names in netd, which is root, so "root sockets are the core" also exempts the system
 # resolver from DNS takeover. The core therefore runs as root with the net_admin group
@@ -86,13 +90,57 @@ root(){ [ "$(id -u)" = 0 ] || fail "需要 Root 权限"; }
 has(){ command -v "$1" >/dev/null 2>&1; }
 # Serialize with Android netd/other root firewalls on /system/etc/xtables.lock.
 # iptables itself owns the lock; -w avoids racy fail/rollback while preserving atomic rules.
+# Outside a start the wait stays at 2 s as well: stop/rollback/self-heal must finish inside
+# the App's bounded Root dispatcher instead of queueing ~100 commands behind a 15 s lock.
 xt4(){
   transaction_current || return 1
-  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 iptables -w 2 "$@"; else command iptables -w 15 "$@"; fi
+  if [ "$XT_BATCH" = 1 ]; then xt_record 4 "$@"; return; fi
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 iptables -w 2 "$@"; else command iptables -w 2 "$@"; fi
 }
 xt6(){
   transaction_current || return 1
-  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 ip6tables -w 2 "$@"; else command ip6tables -w 15 "$@"; fi
+  if [ "$XT_BATCH" = 1 ]; then xt_record 6 "$@"; return; fi
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 3 ip6tables -w 2 "$@"; else command ip6tables -w 2 "$@"; fi
+}
+# Batched rule installation: append-style rules are recorded per family/table and then
+# committed with one iptables-restore --noflush per table (a handful of processes instead of
+# one iptables process, one xtables lock and one full table read per rule).
+xt_record(){
+  XR_F="$1"; shift
+  if [ "${1:-}" = -t ] && [ -n "${2:-}" ]; then XR_T="$2"; else XR_T=""; fi
+  case "$XR_T:${3:-}" in mangle:-N|mangle:-A|mangle:-I|nat:-N|nat:-A|nat:-I|filter:-N|filter:-A|filter:-I) ;;
+    *)
+      # Anything else is not an append: commit what is pending, then run it for real.
+      xt_batch_commit || return 1
+      XT_BATCH=0; xt"$XR_F" "$@"; XR_RC=$?; XT_BATCH=1; xt_batch_begin || return 1; return "$XR_RC";;
+  esac
+  shift 2
+  XR_OLDIFS=$IFS; IFS=' '; XR_LINE="$*"; IFS=$XR_OLDIFS
+  printf '%s\n' "$XR_LINE" >> "$XT_BATCH_DIR/$XR_F-$XR_T"
+}
+xt_batch_begin(){
+  [ -n "$XT_BATCH_DIR" ] && [ -d "$XT_BATCH_DIR" ] && return 0
+  XT_BATCH_DIR="$RUN/.xt-batch.$SELF_PID"
+  rm -rf "$XT_BATCH_DIR" >/dev/null 2>&1 || true
+  mkdir -p "$XT_BATCH_DIR"
+}
+xt_restore(){
+  # $1 restore binary; rules on stdin.
+  if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 5 "$1" -w 2 --noflush; else "$1" -w 2 --noflush; fi
+}
+xt_batch_commit(){
+  [ -n "$XT_BATCH_DIR" ] && [ -d "$XT_BATCH_DIR" ] || return 0
+  XB_RC=0
+  for XB_F in 4 6; do
+    for XB_T in mangle nat filter; do
+      XB_FILE="$XT_BATCH_DIR/$XB_F-$XB_T"; [ -s "$XB_FILE" ] || continue
+      XB_RESTORE=iptables-restore; [ "$XB_F" = 4 ] || XB_RESTORE=ip6tables-restore
+      if ! has "$XB_RESTORE" || ! transaction_current; then XB_RC=1; break 2; fi
+      { printf '*%s\n' "$XB_T"; cat "$XB_FILE"; printf 'COMMIT\n'; } | xt_restore "$XB_RESTORE" >/dev/null 2>&1 || { XB_RC=1; break 2; }
+    done
+  done
+  rm -rf "$XT_BATCH_DIR" >/dev/null 2>&1 || true; XT_BATCH_DIR=""
+  return "$XB_RC"
 }
 # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
 xt4q(){ command iptables -w 1 "$@"; }
@@ -106,12 +154,41 @@ bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
 release_lock(){
   if [ "$LOCK_HELD" = 1 ]; then
-    [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" != "$$" ] || rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
+    [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" != "$SELF_PID" ] || rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true
     LOCK_HELD=0
   fi
 }
 trap 'finish_transaction' EXIT
 trap 'if [ "$START_ACTIVE" = 1 ]; then fail "启动事务已超时或被撤销"; else exit 0; fi' TERM INT HUP
+
+# The App dispatches every Root command as `timeout -s TERM -k 1 N ...`: TERM and, one second
+# later, SIGKILL go to this shell's PID only. Network restoration (stop, start rollback, status
+# self-heal) therefore runs in a child that ignores TERM/INT/HUP and owns the transaction lock
+# under its own PID; this shell only waits. Killing the waiter can no longer leave TPROXY/
+# REDIRECT/DNS rules half removed, and the lock is never reaped while the child still works.
+shield_run(){
+  trap '' TERM INT HUP
+  SH_PARENT_HELD="$LOCK_HELD"
+  (
+    trap - EXIT
+    trap '' TERM INT HUP
+    SH_SELF=""; read -r SH_SELF SH_UNUSED < /proc/self/stat 2>/dev/null || SH_SELF=""
+    case "$SH_SELF" in ''|*[!0-9]*) SH_SELF="$SELF_PID";; esac
+    SELF_PID="$SH_SELF"
+    if [ "$LOCK_HELD" = 1 ]; then printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid" 2>/dev/null || true; fi
+    "$@"; SH_RC=$?
+    if [ "$LOCK_HELD" = 1 ] && [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$SELF_PID" ]; then
+      if [ "$SH_PARENT_HELD" = 1 ] && kill -0 "$$" 2>/dev/null; then printf '%s\n' "$$" > "$LOCK_DIR/pid" 2>/dev/null || true
+      else rm -rf "$LOCK_DIR" >/dev/null 2>&1 || true; fi
+    fi
+    exit "$SH_RC"
+  ) </dev/null >/dev/null 2>&1 &
+  SH_CHILD=$!
+  wait "$SH_CHILD"; SH_RC=$?
+  # A wait interrupted by a (now ignored) signal is retried until the child really exits.
+  while kill -0 "$SH_CHILD" 2>/dev/null; do wait "$SH_CHILD"; SH_RC=$?; done
+  return "$SH_RC"
+}
 
 transaction_current(){
   [ "$START_ACTIVE" = 1 ] || return 0
@@ -159,7 +236,7 @@ transaction_deadline(){
   done
 }
 finish_transaction(){
-  if [ "$START_ACTIVE" = 1 ]; then rollback_start; fi
+  if [ "$START_ACTIVE" = 1 ]; then XT_BATCH=0; shield_run rollback_start; START_ACTIVE=0; fi
   if [ -n "$TXN_TIMER" ] && [ -n "${TXN_TIMER_BIRTH:-}" ] && [ "$TXN_TIMER_BIRTH" = "$(health_core_birth "$TXN_TIMER")" ]; then kill "$TXN_TIMER" 2>/dev/null || true; wait "$TXN_TIMER" 2>/dev/null || true; fi
   rm -f "$RUN/start-timer.$$"
   release_lock
@@ -206,7 +283,22 @@ acquire_lock(){
       fi;; esac
     N=$((N+1)); [ "$N" -lt 100 ] || return 1; sleep 0.05
   done
-  printf '%s\n' "$$" > "$LOCK_DIR/pid"; LOCK_HELD=1
+  printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid"; LOCK_HELD=1
+}
+# One attempt only (status polling must never wait): reap a lock whose owner is gone.
+try_lock_once(){
+  [ "$LOCK_HELD" != 1 ] || return 0
+  mkdir -p "$RUN" >/dev/null 2>&1 || return 1
+  if ! mkdir "$LOCK_DIR" >/dev/null 2>&1; then
+    TL_OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
+    case "$TL_OWNER" in ''|*[!0-9]*) return 1;; esac
+    ! kill -0 "$TL_OWNER" >/dev/null 2>&1 || return 1
+    mkdir "$RUN/.txn.reap" 2>/dev/null || return 1
+    if [ "$(cat "$LOCK_DIR/pid" 2>/dev/null || true)" = "$TL_OWNER" ] && ! kill -0 "$TL_OWNER" 2>/dev/null; then rm -rf "$LOCK_DIR"; fi
+    rmdir "$RUN/.txn.reap" 2>/dev/null || true
+    mkdir "$LOCK_DIR" >/dev/null 2>&1 || return 1
+  fi
+  printf '%s\n' "$SELF_PID" > "$LOCK_DIR/pid"; LOCK_HELD=1
 }
 
 # Shared by app recovery and service.d under the same native transaction lock.
@@ -384,18 +476,81 @@ cleanup6(){
     ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
   fi
 }
-cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; cleanup4; cleanup6; cleanlegacy; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+# Batch sweep: one -S snapshot per family/table, then ONE iptables-restore --noflush that
+# deletes every rule in a foreign chain (OUTPUT/PREROUTING/FORWARD or anything else) jumping to
+# a HETU_/BICHEN_ chain, including duplicated hooks, and flushes/deletes those chains. It needs
+# no net.state, so a lost journal or a killed transaction cannot leave capture behind.
+# PRESERVE_KILL=1 keeps HETU_KOUT/HETU_KFWD and their hooks. A failed restore leaves the old
+# snapshot in place, so the per-chain unhook fallback below still does the work.
+sweep_plan(){
+  awk -v keep="$PRESERVE_KILL" -v want="$1" -v only="${SWEEP_ONLY:-}" '
+    function own(c){ if (only != "") return index(" " only " ", " " c " ") > 0; return c ~ /^(HETU|BICHEN)_/ }
+    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD") }
+    function hook(   i){ for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1)) && !kept($(i+1))) return 1; return 0 }
+    $1 == "-N" && own($2) && !kept($2) { n++; chain[n] = $2; next }
+    $1 == "-A" && own($2) && !kept($2) { next }
+    $1 == "-A" && !own($2) && hook() { d++; line = $0; sub(/^-A /, "-D ", line); del[d] = line; next }
+    { if (want == "rest") print }
+    END { if (want == "plan") { for (i = 1; i <= d; i++) print del[i]; for (i = 1; i <= n; i++) print "-F " chain[i]; for (i = 1; i <= n; i++) print "-X " chain[i] } }'
+}
+sweep_table(){
+  # $1 snapshot variable, $2 xt4|xt6, $3 table
+  eval "SW_RULES=\${$1}"
+  [ "$SW_RULES" != '?' ] || return 1
+  SW_PLAN=$(printf '%s\n' "$SW_RULES" | sweep_plan plan)
+  [ -n "$SW_PLAN" ] || return 0
+  SW_RESTORE=iptables-restore; [ "$2" = xt4 ] || SW_RESTORE=ip6tables-restore
+  has "$SW_RESTORE" || return 1
+  transaction_current || return 1
+  { printf '*%s\n' "$3"; printf '%s\n' "$SW_PLAN"; printf 'COMMIT\n'; } | xt_restore "$SW_RESTORE" >/dev/null 2>&1 || return 1
+  SW_LEFT=$(printf '%s\n' "$SW_RULES" | sweep_plan rest)
+  eval "$1=\$SW_LEFT"
+}
+sweep_rules(){
+  sweep_table CLEAN4_MANGLE xt4 mangle || true; sweep_table CLEAN4_NAT xt4 nat || true; sweep_table CLEAN4_FILTER xt4 filter || true
+  if has ip6tables; then sweep_table CLEAN6_MANGLE xt6 mangle || true; sweep_table CLEAN6_NAT xt6 nat || true; sweep_table CLEAN6_FILTER xt6 filter || true; fi
+}
+# Policy routing owned by Hetu: fwmark rules looking up tables 20260..20299 (v4 and v6), and
+# the local routes inside those tables. Found from the kernel, not from net.state.
+owned_policy_rules(){
+  awk '/fwmark/ { p = $1; sub(/:$/, "", p); for (i = 2; i < NF; i++) if (($i == "lookup" || $i == "table") && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= 20260 && $(i+1) + 0 <= 20299) print p ":" $(i+1) }'
+}
+sweep_policy_routes(){
+  for SR_F in 4 6; do
+    if [ "$SR_F" = 6 ] && ! v6supported; then continue; fi
+    SR_TABLES=" "; [ -z "$TABLE" ] || SR_TABLES=" $TABLE "
+    SR_RULES=$(ip -"$SR_F" rule show 2>/dev/null) || SR_RULES=""
+    for SR_E in $(printf '%s\n' "$SR_RULES" | owned_policy_rules); do
+      SR_P=${SR_E%%:*}; SR_T=${SR_E#*:}
+      ip -"$SR_F" rule del pref "$SR_P" table "$SR_T" >/dev/null 2>&1 || true
+      case "$SR_TABLES" in *" $SR_T "*) ;; *) SR_TABLES="$SR_TABLES$SR_T ";; esac
+    done
+    for SR_T in $(ip -"$SR_F" route show table all 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "table" && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= 20260 && $(i+1) + 0 <= 20299) print $(i+1) }'); do
+      case "$SR_TABLES" in *" $SR_T "*) ;; *) SR_TABLES="$SR_TABLES$SR_T ";; esac
+    done
+    for SR_T in $SR_TABLES; do ip -"$SR_F" route flush table "$SR_T" >/dev/null 2>&1 || true; done
+  done
+}
+cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
 cleanup_verify(){
   for CC_BIN in xt4 xt6; do
     if [ "$CC_BIN" = xt6 ] && ! has ip6tables; then continue; fi
-    for CC_TABLE in mangle nat filter; do
-      CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_TABLE") || return 1
+    # Not CC_TABLE: that name holds the journaled routing table checked below.
+    for CC_XT in mangle nat filter; do
+      CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_XT") || return 1
       if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j )(HETU_|BICHEN_)'; then return 1; fi
     done
   done
+  # Independent of net.state: no fwmark rule may still point at a Hetu table.
+  for CC_FAMILY in 4 6; do
+    if [ "$CC_FAMILY" = 6 ] && ! v6supported; then continue; fi
+    CC_RULES=$(ip -"$CC_FAMILY" rule show 2>/dev/null) || return 1
+    [ -z "$(printf '%s\n' "$CC_RULES" | owned_policy_rules)" ] || return 1
+  done
   if [ -n "$CC_MARK" ] && [ -n "$CC_TABLE" ] && [ -n "$CC_PREF" ]; then
     for CC_FAMILY in 4 6; do
+      if [ "$CC_FAMILY" = 6 ] && ! v6supported; then continue; fi
       CC_RULES=$(ip -"$CC_FAMILY" rule show 2>/dev/null) || return 1
       if printf '%s\n' "$CC_RULES" | grep -E "^[[:space:]]*$CC_PREF:.*fwmark $CC_MARK/$CC_MASK.*(lookup|table) $CC_TABLE([[:space:]]|$)" >/dev/null; then return 1; fi
       CC_ROUTES=$(ip -"$CC_FAMILY" route show table "$CC_TABLE" 2>&1); CC_RC=$?
@@ -1305,6 +1460,8 @@ watchdog(){
   done
   acquire_lock || exit 0
   [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+  # Holding the lock: nothing may cut the capture removal off half-way.
+  trap '' TERM INT HUP
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     RESULT="network-restore-failed"
@@ -1527,6 +1684,59 @@ google_firewall_maintain(){ (
   google_firewall_cleanup
 ); }
 
+install_capture_rules(){
+  start_stage "install-ipv4-tproxy"
+  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
+  start_stage "install-ipv4-redirect"
+  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
+  start_stage "install-ipv4-dns"
+  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv4 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
+  start_stage "install-udp-leak-guard"
+  if [ "$START_UDP" = 1 ]; then
+    case "$START_MODE" in
+      tproxy|enhance)
+        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }
+        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }; fi
+        ;;
+    esac
+  fi
+  start_stage "install-ipv4-quic"
+  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
+  start_stage "install-ipv6"
+  if [ "$START_V6" = enable ]; then
+    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
+    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
+    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv6 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
+    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
+  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "严格 IPv4 防泄漏规则安装失败，启动未完成，请检查停止状态"; }; fi
+
+}
+# Undo a refused batch commit before the one-by-one fallback: own chains/hooks (Kill Switch
+# guard kept as configured) and this session's policy rule, which route4/route6 add again.
+capture_unwind(){
+  # Only the chains install_capture_rules creates; the IPv6-disable guard installed before
+  # the core launch and the Kill Switch guard stay untouched.
+  SWEEP_ONLY="$MOUT $MPRE $NOUT $NPRE $DNSOUT $DNSPRE $WROUT $WRFWD $QUICOUT $QUICFWD"
+  [ "$START_V6" != strict ] || SWEEP_ONLY="$SWEEP_ONLY $V6OUT $V6FWD"
+  cleanup_snapshot_begin; sweep_rules; CLEAN_SNAPSHOT_ACTIVE=0
+  if [ -n "$MARK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
+    for CU_F in 4 6; do
+      CU_N=0
+      while [ "$CU_N" -lt 4 ] && ip -"$CU_F" rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1; do CU_N=$((CU_N+1)); done
+    done
+  fi
+  for CU_BIN in xt4 xt6; do
+    if [ "$CU_BIN" = xt6 ] && ! has ip6tables; then continue; fi
+    for CU_T in mangle nat filter; do
+      CU_RULES=$(cleanup_snapshot_read "$CU_BIN" "$CU_T") || { SWEEP_ONLY=""; return 1; }
+      for CU_C in $SWEEP_ONLY; do
+        if printf '%s\n' "$CU_RULES" | grep -Fxq -- "-N $CU_C"; then SWEEP_ONLY=""; return 1; fi
+      done
+    done
+  done
+  SWEEP_ONLY=""
+}
+
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
   START_VENDOR_CLEAN="${30:-0}"
@@ -1610,31 +1820,17 @@ start(){
   fi
 
   core_tune "$START_PID"
-  start_stage "install-ipv4-tproxy"
-  install_mangle4 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
-  start_stage "install-ipv4-redirect"
-  install_redirect4 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
-  start_stage "install-ipv4-dns"
-  if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect4 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv4 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
-  start_stage "install-udp-leak-guard"
-  if [ "$START_UDP" = 1 ]; then
-    case "$START_MODE" in
-      tproxy|enhance)
-        install_udp_leak_guard4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }
-        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 UDP 防裸连规则安装失败，启动未完成，请检查停止状态"; }; fi
-        ;;
-    esac
+  # Capture rules are recorded and committed in one iptables-restore per family/table. If a
+  # commit is refused (old iptables-restore, missing match module, ...) the partial state is
+  # swept and the same rules are installed one by one, exactly as before.
+  start_stage "install-capture-batch"
+  xt_batch_begin || fail "无法准备防火墙批量规则"
+  XT_BATCH=1; install_capture_rules; XT_BATCH=0
+  if ! xt_batch_commit; then
+    start_stage "install-capture-fallback"
+    capture_unwind || fail "批量规则提交失败且无法撤销部分规则，请检查停止状态"
+    install_capture_rules
   fi
-  start_stage "install-ipv4-quic"
-  [ "$START_QUIC" = 0 ] || install_quic4 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv4 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
-  start_stage "install-ipv6"
-  if [ "$START_V6" = enable ]; then
-    install_mangle6 "$START_TP" "$START_MODE" "$START_TCP" "$START_UDP" "$START_DNS" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 TPROXY 规则安装失败，启动未完成，请检查停止状态"; }
-    install_redirect6 "$START_RP" "$START_MODE" "$START_TCP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 Redirect 规则安装失败，启动未完成，请检查停止状态"; }
-    if [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then install_dns_redirect6 "$START_DP" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_IFACES" "$START_SHARED_MACS" || { fail "IPv6 DNS 劫持安装失败，启动未完成，请检查停止状态"; }; fi
-    [ "$START_QUIC" = 0 ] || install_quic6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "IPv6 QUIC 策略安装失败，启动未完成，请检查停止状态"; }
-  elif [ "$START_V6" = strict ]; then install_v6_strict "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "严格 IPv4 防泄漏规则安装失败，启动未完成，请检查停止状态"; }; fi
-
   if [ "$START_V6" = disable ] && v6supported && [ "$START_MODE" != tun ] && [ "$START_MODE" != ebpf ] && [ "$START_DNS" != off ]; then
     install_disabled_dns6 || { fail "IPv6 DNS 防泄漏安装失败，未放行直连 DNS"; }
   fi
@@ -1677,6 +1873,56 @@ start(){
   START_ACTIVE=0
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
+}
+
+# Self-heal for a core that is gone while its capture rules stay (watchdog killed with the
+# App, a stop/rollback SIGKILLed half-way, a lost net.state): the phone would otherwise
+# have no network until a manual cleanup. Never for a Kill Switch session, never while a
+# transaction or the session's watchdog is still alive, and only when a hook really exists.
+watchdog_alive(){
+  WA_PID=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
+  case "$WA_PID" in ''|*[!0-9]*) return 1;; esac
+  kill -0 "$WA_PID" >/dev/null 2>&1 || return 1
+  WA_CMD=$(tr '\000' '\n' < "/proc/$WA_PID/cmdline" 2>/dev/null || true)
+  printf '%s\n' "$WA_CMD" | awk -v s="$BASE/hetu-root.sh" '$0==s {if(getline>0 && $0=="watchdog") found=1} END {exit !found}'
+}
+capture_hooks_present(){
+  # $@: tables to scan (default all three).
+  [ "$#" -gt 0 ] || set -- mangle nat filter
+  for CH_BIN in xt4q xt6q; do
+    if [ "$CH_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    for CH_T in "$@"; do
+      CH_RULES=$("$CH_BIN" -t "$CH_T" -S 2>/dev/null) || continue
+      if printf '%s\n' "$CH_RULES" | awk '$1=="-A" && $2 !~ /^(HETU|BICHEN)_/ { for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && $(i+1) ~ /^(HETU|BICHEN)_/ && $(i+1) !~ /^HETU_K(OUT|FWD)$/) found = 1 } END { exit !found }'; then return 0; fi
+    done
+  done
+  return 1
+}
+status_heal_body(){
+  PRESERVE_KILL=0; HB_FAILED=0
+  stopwatchdog
+  cleanup_confirmed || HB_FAILED=1
+  restorev6 || HB_FAILED=1
+  [ "$HB_FAILED" = 0 ] || return 1
+  rm -f "$MODEFILE" "$SESSION" "$PIDFILE"
+  date '+%Y-%m-%dT%H:%M:%S%z core exited; network-restored by status self-heal' > "$CRASH_STATE" 2>/dev/null || true
+  printf '%s status self-heal: core absent, capture rules removed\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$WATCHDOG_LOG" 2>/dev/null || true
+}
+status_self_heal(){
+  [ "$KILLV" != 1 ] && [ "$K4" = false ] && [ "$K6" = false ] || return 1
+  [ -d "$RUN" ] || return 1
+  ! watchdog_alive || return 1
+  # The -C probes status() already ran cover mangle/nat and the IPv6 guard; only the filter
+  # guards (UDP leak, QUIC, DoT) still need a snapshot, so an idle status stays cheap.
+  SHH_HOOK=false
+  for SHH_F in "$M4O" "$M4P" "$N4O" "$N4P" "$D4O" "$D4P" "$M6O" "$M6P" "$N6O" "$N6P" "$D6O" "$D6P" "$STRICT6"; do [ "$SHH_F" != true ] || SHH_HOOK=true; done
+  [ "$SHH_HOOK" = true ] || [ -f "$IPV6_STATE" ] || capture_hooks_present filter || return 1
+  try_lock_once || return 1
+  SHH_PID=$(cat "$PIDFILE" 2>/dev/null || true)
+  if { core_maybe_alive "$SHH_PID" && kill -0 "$SHH_PID" >/dev/null 2>&1; } || findcorepid >/dev/null 2>&1; then release_lock; return 1; fi
+  shield_run status_heal_body; SHH_RC=$?
+  release_lock
+  return "$SHH_RC"
 }
 
 status(){
@@ -1739,6 +1985,12 @@ status(){
   if has ip6tables && xt6q -t filter -C OUTPUT -j "$V6OUT" >/dev/null 2>&1; then
     STRICT6=true
     [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
+  fi
+  STATUS_HEALED=false
+  if [ "$STATUS_RUNNING" = false ] && status_self_heal; then
+    STATUS_HEALED=true; STATUS_MODE=none
+    M4O=false; M4P=false; N4O=false; N4P=false; D4O=false; D4P=false
+    M6O=false; M6P=false; N6O=false; N6P=false; D6O=false; D6P=false; STRICT6=false
   fi
 
   MODE4=false; MODE6=false
@@ -1820,7 +2072,7 @@ status(){
   if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
   SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
   SP=$(state_value PREF 2>/dev/null || true)
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -2109,7 +2361,7 @@ case "${1:-status}" in
     root; shift; start "$@";;
   txn-deadline) [ "$#" = 5 ] || exit 1; root; transaction_deadline "$2" "$3" "$4" "$5";;
   cancel-boot) root; cancel_boot || fail "无法撤销本次自动恢复"; ok "自动恢复已撤销";;
-  stop) root; stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
+  stop) root; trap '' TERM INT HUP; shield_run stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;

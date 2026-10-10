@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "bf00f541efdc0fbc982ee7e4b96dd086c78a6fdb93c35ca09e672b7b66c1a605",
+  "patchSha256": "8451d30301c5aa851209d6578f6ff38c7931dbe39898f7055ef5c686af8dae88",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/src/main/assets/hetu-autostart.sh",
@@ -304,7 +304,7 @@
   "changedOrAddedFiles": {
     "android-app/app/build.gradle.kts": "5b9cc72bc82c12bdccb2cc6f20d68bf9b0f11c0dedb30163ab3196ea8f637bac",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
-    "android-app/app/src/main/assets/hetu-root.sh": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
+    "android-app/app/src/main/assets/hetu-root.sh": "f60f9d23479f42e11851b8c4f2a6b7b33630dd34063367097a47de0ac51b2398",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "3d7d377a4cd660a98c09533c9a42aa2ede55f8f4c198674e4ad60edb0bcb8399",
@@ -751,12 +751,12 @@
     "android-app/app/src/main/jniLibs/x86_64/libhetu_core.so": "4da932c4f5e9c9c65ccbfe9d596906b6be1478b791f942e29f42ab54d3673b03"
   },
   "runtimePayloadCount": 23,
-  "rootScriptSha256": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581",
+  "rootScriptSha256": "f60f9d23479f42e11851b8c4f2a6b7b33630dd34063367097a47de0ac51b2398",
   "autostartScriptSha256": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
   "authorizedRootPayloadDeltas": {
     "android-app/app/src/main/assets/hetu-root.sh": {
       "before": "45060f812b6835bb405f230e043dd6f449faaa4f1e5fd22e32bb3aea8458aacd",
-      "after": "0be2f9c39db54d6b816bf8e2bae3829bf2cea75e66c81ca0a7773b3d34681581"
+      "after": "f60f9d23479f42e11851b8c4f2a6b7b33630dd34063367097a47de0ac51b2398"
     },
     "android-app/app/src/main/assets/hetu-autostart.sh": {
       "before": "3a1215f4e9093ae2298803020d697da0c14c35ee5cf28f84f2a81608093783f9",
@@ -824,13 +824,14 @@
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
     ".github/workflows/v2093-build.yml": "3ba19f9e8793ac253ee796886902371ae138b6b3b22902af6a2646eda16fde09",
+    "tools/qa/netfilter_model93.py": "a74b517bc29e817a27d35fda03cefddcb40ad3e5a1d19d5e5371320100bf4e3c",
     "tools/qa/test_app_recovery93.py": "50b807d008b6bdcb9a24e80ac0f34d2d316f07d32b34e8b5afb5c84acfb18f05",
     "tools/qa/test_core_identity_dns.py": "7b7af836fb41203a61d7791057d4b3fa96d83ccbe9534feeef114ed5d0eca26d",
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
     "tools/qa/test_network_recovery_stress.py": "0a2abc21457cc4936bdbbc5cec53ea71d12c8a2aaa356661890b94a51f2ff179",
     "tools/qa/test_root_autostart.py": "ceb85df4182eff2385db3c55447f21ffd12b3c95f4319c92577d00a84b9da44d",
     "tools/qa/test_root_health.py": "85be8d096212d55952ec7d495eff6c9bbab416094422868fc0032f19fce5a06d",
-    "tools/qa/test_root_safety93.py": "25d1d3232aa4cc482b208a4424d18d6f3eac31bbf9efa53b4d5640431aefa496"
+    "tools/qa/test_root_safety93.py": "ecd1c91d2e25b1c4038e006506c62ce3cad22d1f83740f2df6c437380f59f447"
   },
   "recoveredArtifactHashes": {
     "docs/qa/v2093-recovery-20261008/README.md": "b90f6e3f44bb13f8f6c82777294afb24e452aeeb671be843507ea61ac7f90813",
