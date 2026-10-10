@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -59,6 +60,10 @@ internal fun HomeRoute(
     var targets by remember { mutableStateOf(HomeTargetsConfig()) }
     var feedback by remember { mutableStateOf<HomeTargetsFeedback?>(null) }
 
+    // Navigation lambdas read the latest state instead of capturing it, so they stay the same
+    // instances across polls and the cards they are handed can skip recomposition.
+    val latestState by rememberUpdatedState(state)
+
     LaunchedEffect(destination) { onDetailVisibleChange(destination != HomeDestination.Main) }
     BackHandler(enabled = destination != HomeDestination.Main) { destination = HomeDestination.Main }
 
@@ -86,7 +91,7 @@ internal fun HomeRoute(
             HomeDestination.Main -> HomeScreen(
                 state = state,
                 actions = actions,
-                onOpenIpDetail = { ipSide = state.netSide; destination = HomeDestination.IpDetail },
+                onOpenIpDetail = { ipSide = latestState.netSide; destination = HomeDestination.IpDetail },
                 onOpenTargets = { targets = actions.loadTargets(); feedback = null; destination = HomeDestination.Targets },
                 onOpenResource = { destination = HomeDestination.Resource },
                 onOpenSpeedSource = { speedSheet = true },

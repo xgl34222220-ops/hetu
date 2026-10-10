@@ -380,7 +380,7 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                                 }
                                 if (!status.runtimeReady) {
                                     Spacer(Modifier.width(8.dp))
-                                    HxPill(ht("仅下载管理"), HxTone.Neutral)
+                                    HxPill(ht("暂不支持运行"), HxTone.Neutral)
                                 }
                             }
                             Text(
@@ -437,7 +437,8 @@ internal fun CoresScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null
                             },
                             icon = Icons.Rounded.FileOpen,
                             filled = false,
-                            enabled = working == null,
+                            // A core the Root runtime cannot start is not imported either; the card says why.
+                            enabled = working == null && status.runtimeReady,
                             modifier = Modifier.weight(1f),
                         )
                         if (status.downloaded) {
@@ -492,8 +493,11 @@ internal fun AboutScreen(vm: HetuViewModel) {
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
-    val revision = remember {
-        runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+    // Asset read stays off the main thread; the row simply shows the hash once it is known.
+    val revision by produceState("", context) {
+        value = withContext(Dispatchers.IO) {
+            runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
+        }
     }
 
     fun openAsset(title: String, path: String) {
@@ -578,6 +582,8 @@ internal fun AboutScreen(vm: HetuViewModel) {
                     SettingsNavRow("AdGuard DNS Filter", subtitle = "GPL-3.0", icon = HxIcons.Scale) { openAsset("AdGuard", "ADGUARD-LICENSE") }
                     SettingsDivider()
                     SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = HxIcons.Scale) { openAsset("Lucide", "licenses/lucide.txt") }
+                    SettingsDivider()
+                    SettingsNavRow("china-operator-ip", subtitle = "MIT · CNIP", icon = HxIcons.Scale) { openAsset("china-operator-ip", "licenses/china-operator-ip.txt") }
                 }
             }
         }

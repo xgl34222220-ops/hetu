@@ -180,7 +180,23 @@ internal data class ToolsShareState(
 
 /* ---------------------------- CNIP (39) ---------------------------- */
 
-internal data class ToolsCnIpState(val load: ToolsLoad = ToolsLoad.Loading, val enabled: Boolean = false)
+internal data class ToolsCnIpState(
+    val load: ToolsLoad = ToolsLoad.Loading,
+    val enabled: Boolean = false,
+    /** Kernel-level bypass (ipset): China IPs skip the core entirely, per family. */
+    val kernelV4: Boolean = false,
+    val kernelV6: Boolean = false,
+    /** Running session as status reports it: ipset / degraded / off ("" = not known yet). */
+    val kernelStatus: String = "",
+    val kernelReason: String = "",
+    val kernelV4Entries: Int = 0,
+    val kernelV6Entries: Int = 0,
+)
+
+/** What the CNIP kernel bypass page reads back. */
+internal data class ToolsCnIpKernel(
+    val v4: Boolean, val v6: Boolean, val status: String, val reason: String, val v4Entries: Int, val v6Entries: Int,
+)
 
 /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
@@ -203,6 +219,9 @@ internal sealed interface ToolsDiagOverlay {
 
     /** Page 42. */
     data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
+
+    /** 网络事件记录 / 修复运行记录: read-outs that used to live on a second 诊断与维护 page. */
+    data class Record(val title: String, val subtitle: String, val content: ToolsDiagText = ToolsDiagText()) : ToolsDiagOverlay
 }
 
 internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
@@ -217,6 +236,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
 
 /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
 internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
+
+/** One 实测拦截 request: [ok] is null when nothing could be concluded. */
+internal data class ToolsAdProbe(val ok: Boolean?, val detail: String)
 
 internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
@@ -241,13 +263,27 @@ internal data class ToolsAdblockState(
     val recent: List<String> = emptyList(),
     val startupInjected: Boolean = false,
     val controllerLoaded: Boolean = false,
+    /** What the core reported for the chain (position, rule counts); blank when unknown. */
+    val chainNote: String = "",
+    /** Last 实测拦截 result; null until the user runs one. */
+    val probe: ToolsAdProbe? = null,
+    val probing: Boolean = false,
     val standaloneDns: Boolean = false,
     val cnameProtection: Boolean = true,
     val updating: Boolean = false,
     val refreshing: Boolean = false,
     /** A toggle is being applied; switches and chips are inert meanwhile. */
     val busy: Boolean = false,
+    /** Label of the core the rules apply to (running, else next start). */
+    val coreLabel: String = "",
+    /** False for a core without rule routing (Hysteria 2): ad rules cannot take effect at all. */
+    val coreRoutesAds: Boolean = true,
+    /** False for cores other than Mihomo: no live chain verification and no hot rule refresh. */
+    val coreLiveVerify: Boolean = true,
 ) {
+    /** Running on a core that routes ads but cannot report its chain: shown as applied, not unverified. */
+    val coreManaged: Boolean get() = enabled && proxyRunning && coreRoutesAds && !coreLiveVerify
+
     val status: ToolsAdStatus
         get() = when {
             !enabled -> ToolsAdStatus.Off
@@ -363,10 +399,16 @@ internal class ToolsFeatureActions(
     /* CNIP */
     val loadCnIp: (suspend () -> Boolean)? = null,
     val setCnIp: suspend (Boolean) -> Unit = {},
+    val loadCnIpKernel: (suspend () -> ToolsCnIpKernel)? = null,
+    val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
 
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
     val onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    /** 网络事件记录 read-out; null falls back to [onOpenDiagnosticsDetails]. */
+    val networkEvents: (suspend () -> String)? = null,
+    /** 修复运行记录; null hides the row. */
+    val repairSessionRecord: (suspend () -> String)? = null,
     val startupConfig: suspend () -> String = { "" },
     val diagnostics: suspend () -> String = { "" },
     /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
@@ -385,6 +427,8 @@ internal class ToolsFeatureActions(
     val setCnameProtection: suspend (Boolean) -> Unit = {},
     /** “切到规则” on the wrong-mode warning; null hides the button. */
     val switchToRuleMode: (suspend () -> Unit)? = null,
+    /** 实测拦截: one request for a blocked host through the core; null hides the button. */
+    val probeAdblock: (suspend () -> ToolsAdProbe)? = null,
 
     val onMessage: (String) -> Unit = {},
 ) {

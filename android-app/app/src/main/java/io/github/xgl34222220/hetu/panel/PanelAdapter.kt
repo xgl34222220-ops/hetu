@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -39,6 +40,7 @@ import io.github.xgl34222220.hetu.RefPanelTab
 import io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.asHomeHaptics
 import io.github.xgl34222220.hetu.refParseLogs19
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
@@ -115,9 +117,11 @@ internal fun HetuPanelV2(
         }
     }
 
+    val coreGate = remember(state.running, state.core, state.controllerSupported) { io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(prefs) }
     // Load what the visible tab needs; the overview also needs providers and the rule count.
-    LaunchedEffect(tab, state.running) {
+    LaunchedEffect(tab, state.running, coreGate) {
         if (!state.running) { providers = emptyList(); rules = emptyList(); ruleSets = emptyList(); sampler.reset(); return@LaunchedEffect }
+        if (!coreGate.supports(tab)) return@LaunchedEffect
         try {
             when (tab) {
                 PanelTab.Overview -> { providers = repo.providers(); if (rules.isEmpty()) rules = repo.rules() }
@@ -145,7 +149,7 @@ internal fun HetuPanelV2(
         state = state, starting = starting, providers = providers, rules = rules, ruleSets = ruleSets, logs = logs,
         delays = delays, testing = testing, selectedLocal = selectedLocal,
         subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, traffic = sampler.snapshot(),
-    ).copy(refreshing = refreshing)
+    ).copy(refreshing = refreshing, core = if (state.running) coreGate else PanelCoreGate.Full)
     val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
     val actions = PanelActions(
@@ -253,23 +257,22 @@ internal fun HetuPanelV2(
         },
     )
 
+    // These locals are static: remembered values keep the 1 s traffic tick from recomposing every row.
+    val homeHaptics = remember(hetuHaptics) { hetuHaptics.asHomeHaptics() }
+    val appIcons = remember(icons) {
+        PanelAppIcons(
+            has = { it in icons },
+            draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
+        )
+    }
+    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
+        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
+    }
     HetuHomeThemeFromPrefs(prefs) {
         CompositionLocalProvider(
-            LocalHomeHaptics provides { kind ->
-                hetuHaptics.perform(
-                    when (kind) {
-                        HomeHaptic.Tap -> HetuHaptic.Tap
-                        HomeHaptic.Tick -> HetuHaptic.Tick
-                        HomeHaptic.Confirm -> HetuHaptic.Confirm
-                        HomeHaptic.Reject -> HetuHaptic.Reject
-                    },
-                )
-            },
-            LocalPanelAppIcons provides PanelAppIcons(
-                has = { it in icons },
-                draw = { packageName, m -> icons[packageName]?.let { AppIcon(it, m) } },
-            ),
-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
+            LocalHomeHaptics provides homeHaptics,
+            LocalPanelAppIcons provides appIcons,
+            LocalPanelGroupIcon provides groupIcon,
         ) {
             PanelRoute(
                 data = data,
@@ -291,7 +294,8 @@ internal fun HetuPanelV2(
 
 @Composable
 private fun AppIcon(bitmap: Bitmap, modifier: Modifier) {
-    Image(bitmap = bitmap.asImageBitmap(), contentDescription = null, modifier = modifier)
+    val image = remember(bitmap) { bitmap.asImageBitmap() }
+    Image(bitmap = image, contentDescription = null, modifier = modifier)
 }
 
 private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delays: MutableMap<String, Long>, testing: MutableMap<String, Boolean>) {
@@ -472,9 +476,14 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         else -> PanelTab.Groups
     }
     val visible = io.github.xgl34222220.hetu.home.rememberScreenVisible()
-    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible) {
+    // The running core decides which tabs have data: no request is made for a tab it cannot feed.
+    val coreGate = remember(vm.state.running, vm.state.core, vm.state.controllerSupported, vm.settingsRevision) {
+        io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(vm.prefs)
+    }
+    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible, coreGate) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
         if (vm.state.controllerReadFailed) return@LaunchedEffect
+        if (!coreGate.supports(tab)) return@LaunchedEffect
         // A stopped activity keeps its composition: never reload tabs or tail logs from the background.
         if (!visible) return@LaunchedEffect
         when (tab) {
@@ -516,9 +525,13 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         updatingAllSubscriptions = vm.providersUpdatingAll,
         updatingAllRuleSets = vm.ruleSetsUpdatingAll,
         syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
+        core = if (vm.state.running) coreGate else PanelCoreGate.Full,
     )
     val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
-    val actions = PanelActions(
+    // One actions instance per page: rebuilding it on every 1 s traffic sample handed each
+    // visible group/node card fresh lambdas and recomposed the whole list while scrolling.
+    val currentTab by rememberUpdatedState(tab)
+    val actions = remember(vm, context) { PanelActions(
         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
         onTestAll = vm::testAll,
@@ -535,31 +548,29 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
         onRefresh = {
-            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (tab) {
+            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (currentTab) {
                 PanelTab.Rules -> vm.loadRules()
                 PanelTab.RuleSets -> vm.loadRuleSets()
                 PanelTab.Logs -> vm.loadLogs()
                 else -> vm.pullRefresh()
             }
         },
-    )
+    ) }
     val icons = remember(vm.state.connections) {
         vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
     }
+    val appIcons = remember(icons) {
+        PanelAppIcons(has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } })
+    }
+    val groupIcon = remember<@Composable (PanelGroup, Modifier) -> Unit>(groupsByName) {
+        { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } }
+    }
+    val homeHaptics = remember(haptics) { haptics.asHomeHaptics() }
     HetuHomeThemeFromPrefs(vm.prefs) {
         CompositionLocalProvider(
-            LocalPanelAppIcons provides PanelAppIcons(
-                has = { it in icons }, draw = { name, m -> icons[name]?.let { AppIcon(it, m) } },
-            ),
-            LocalPanelGroupIcon provides { group, m -> groupsByName[group.name]?.let { ConfiguredGroupIcon(it, m) } },
-            LocalHomeHaptics provides { kind ->
-                haptics.perform(when (kind) {
-                    HomeHaptic.Tap -> HetuHaptic.Tap
-                    HomeHaptic.Tick -> HetuHaptic.Tick
-                    HomeHaptic.Confirm -> HetuHaptic.Confirm
-                    HomeHaptic.Reject -> HetuHaptic.Reject
-                })
-            },
+            LocalPanelAppIcons provides appIcons,
+            LocalPanelGroupIcon provides groupIcon,
+            LocalHomeHaptics provides homeHaptics,
         ) {
             PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
                 PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"

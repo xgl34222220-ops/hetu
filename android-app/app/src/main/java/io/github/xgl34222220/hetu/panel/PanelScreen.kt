@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -55,6 +56,7 @@ import io.github.xgl34222220.hetu.home.HomeBarBackdrop
 import io.github.xgl34222220.hetu.home.HomeBarGlass
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
@@ -118,9 +120,19 @@ internal fun PanelScreen(
     val running = data.running
     val configuration = LocalConfiguration.current
     val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
-    val displayView = view.copy(layout = effectiveLayout)
+    // Same instance while equal: group/node cards compare it by identity, so a fresh copy on
+    // every 1 s traffic sample recomposed every visible card while the list scrolled.
+    val displayView = remember(view, effectiveLayout) { view.copy(layout = effectiveLayout) }
     val motion = LocalHomeMotionEnabled.current
-    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, displayView) else emptyList() }
+    // The 策略 tab reads only these fields. Traffic, connections and logs change every second;
+    // keeping them out of the instance the cards receive lets those cards skip recomposition.
+    val groupData = remember(data.status, data.globalMode, data.groups, data.delays, data.settledDelays,
+        data.testingGroups, data.testingAll, data.switching) {
+        PanelData(status = data.status, globalMode = data.globalMode, groups = data.groups, delays = data.delays,
+            settledDelays = data.settledDelays, testingGroups = data.testingGroups, testingAll = data.testingAll,
+            switching = data.switching)
+    }
+    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(groupData, displayView) else emptyList() }
     val headerItems = panelHeaderItemCount(data, view)
     // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
     val stagger = key(view.tab) { rememberHomeStagger() }
@@ -152,6 +164,21 @@ internal fun PanelScreen(
                 }
                 return@LazyColumn
             }
+            // A tab the running core cannot feed is an explained state, not a read error or a toast.
+            data.core.features[view.tab]?.let { feature ->
+                item(key = "panel-core-unsupported") {
+                    val fallback = data.core.fallbackFor(view.tab)
+                    val way: (@Composable RowScope.() -> Unit)? = if (fallback == null) null else {
+                        { HomeButton("查看" + fallback.label, { onView(view.withTab(fallback)) }, kind = HomeButtonKind.Primary) }
+                    }
+                    HomeCoreUnsupportedCard(
+                        data.core.core, feature, data.core.details[view.tab].orEmpty(),
+                        Modifier.panelGutter().padding(top = 24.dp).then(hetuAnimateItem(motion)),
+                        actions = way,
+                    )
+                }
+                return@LazyColumn
+            }
             if (data.readError.isNotBlank()) {
                 item(key = "panel-read-error") {
                     PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError, verbatimSubtitle = true) {
@@ -176,14 +203,14 @@ internal fun PanelScreen(
             }
             when (view.tab) {
                 PanelTab.Groups -> panelGroupsTab(
-                    rows = rows, data = data, view = displayView, stagger = stagger,
+                    rows = rows, data = groupData, view = displayView, stagger = stagger,
                     onToggleGroup = { name ->
                         // Capture this card row before an accordion removes rows above it. The
                         // stable lazy key matches panelGroupsTab; an old numeric index does not.
                         val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
                         val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
                         val next = view.toggleGroup(name)
-                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                        val at = PanelLogic.groupRows(groupData, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
                         onView(next)
                         if (anchor != null && at >= 0) {
                             // Apply with the new rows on the next measure, retaining the tapped
@@ -213,7 +240,7 @@ internal fun PanelScreen(
         PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
 
         // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups }
+        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups && data.core.supports(PanelTab.Groups) }
         var lastOpen by remember { mutableStateOf("") }
         SideEffect { if (openGroup != null) lastOpen = openGroup }
         val shownGroup = openGroup ?: lastOpen
@@ -319,7 +346,7 @@ private fun BoxScope.PanelHeader(
             },
             color = c.t1, style = HomeType.barTitle, maxLines = 1,
         )
-        if (data.running && data.readError.isBlank()) {
+        if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
             val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                 Box {
                     HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)

@@ -21,6 +21,10 @@ final class RootProxyManager {
     private static final String BIN=ROOT+"/bin/core";
     private static final String CONFIG=ROOT+"/run/state/startup-config";
     private static final String CORE_TOKEN=ROOT+"/run/state/core.token";
+    /** Which CLI bin/core speaks (hetu-root.sh core_kind); absent = Mihomo. */
+    private static final String CORE_KIND=ROOT+"/run/state/core.kind";
+    /** Xray/V2Fly geoip.dat + geosite.dat (XRAY_LOCATION_ASSET / V2RAY_LOCATION_ASSET). */
+    private static final String CORE_ASSETS=ROOT+"/bin/assets";
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
@@ -39,6 +43,8 @@ final class RootProxyManager {
     private static final ThreadLocal<Long> AUTOMATIC_DEADLINE=new ThreadLocal<>();
     private static final ThreadLocal<Long> STOP_DEADLINE=new ThreadLocal<>();
     private static final ThreadLocal<Long> AUTOMATIC_RESERVE=new ThreadLocal<>();
+    /** Set only for the user's own Start: the pre-start hook rides on the single start command. */
+    private static final ThreadLocal<Boolean> PRE_START_HOOK=new ThreadLocal<>();
     private static final class StartIntent {
         final long generation; final boolean wanted,automatic; final java.util.function.BooleanSupplier current;
         boolean nativeDispatched;
@@ -275,7 +281,9 @@ final class RootProxyManager {
                     .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
                     .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
                     .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
+            appendCoreAssets(cmd,core);
         }
+        appendCoreKind(cmd,core);
         cmd.append("; rm -f ").append(RootBridge.quote(OLD_HETU_SCRIPT))
                 .append("; printf %s ").append(RootBridge.quote(infoText)).append(" > ").append(RootBridge.quote(info))
                 .append("; chmod 600 ").append(RootBridge.quote(info)).append("; chown 0:0 ").append(RootBridge.quote(info));
@@ -314,6 +322,9 @@ final class RootProxyManager {
             if(!prefs.getBoolean("proxyAdblockChain",true))return "广告过滤串联未开启";
             JSONObject state=status();
             if(!state.optBoolean("running",false))return "规则已保存；代理下次启动时自动使用新规则";
+            ProxyRuntimeProfile.Core running=ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore","mihomo"));
+            if(!ProxyCoreSupport.hotReload(running))
+                return "规则已保存；"+ProxyCoreSupport.unsupported(running,"运行中热更新过滤规则")+"，重启代理后生效";
             ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
             String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
             String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
@@ -367,10 +378,10 @@ final class RootProxyManager {
     private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
         RootBridge.requireWorkerThread();
         String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
-        if(profile.core!=ProxyRuntimeProfile.Core.MIHOMO&&profile.core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)
-            throw new IOException(profile.core.label+" 的运行后端还未接入");
         ProxyRuntimeProfile.Capability capability=profile.capability();
         if(!capability.available)throw new IOException(capability.reason.isEmpty()?profile.mode.label+" 暂不可用":capability.reason);
+        if(ProxyCoreConfig.kind(profile.core)!=ProxyCoreConfig.Kind.MIHOMO)
+            return prepareNativeCore(profile,fixedControllerPort,settingsSignature);
         if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE&&
                 profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
@@ -394,6 +405,125 @@ final class RootProxyManager {
         String startup=fakeIps.privateStartup(generated.yaml);
         writeStartupCopy(startup);
         return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
+    }
+
+
+    /**
+     * sing-box / Xray / V2Fly / Hysteria: a native config for that core when the user selected one,
+     * otherwise the selected Clash/Mihomo YAML converted by ProxyCoreConfig. The same TPROXY/Redirect
+     * ports, DNS port, controller/egress ports and fake-IP routing metadata as the Mihomo path.
+     */
+    private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
+        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
+        if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
+        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
+        String source=configs.read(selected);
+        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
+        if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
+        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
+        ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
+        int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
+        ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock);
+        ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,source,options,this::fetchProvider);
+        if(profile.adblockChain&&!built.adblockApplied){
+            profile=withoutAdblock(profile);
+            adblock=null;
+        }
+        prefs.edit().putString("proxyCoreConversionWarnings",built.warningText())
+                .putBoolean("proxyCoreConversionNative",built.nativeSource)
+                .putInt("proxyCoreConversionNodes",built.nodes)
+                .putString("proxyCoreConversionSource",selected.core.id+"/"+selected.name).apply();
+        RootFakeIpRanges fakeIps=nativeFakeIps(profile,built.fakeIpV4);
+        // The startup copy keeps the established protocol: native payload + the terminal
+        // fake-IP block, which hetu-root.sh strips again before the core reads its file.
+        String startup=built.config+(built.config.endsWith("\n")?"":"\n")
+                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
+                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
+        writeStartupCopy(startup);
+        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature);
+    }
+
+    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
+        ProxyCoreConfig.Options o=new ProxyCoreConfig.Options();
+        o.mode=profile.mode;
+        if(profile.mode==ProxyRuntimeProfile.Mode.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
+        else{
+            o.redirectPort=MihomoStartupConfig.REDIRECT_PORT;
+            if(profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.TPROXY)o.tproxyPort=MihomoStartupConfig.TPROXY_PORT;
+        }
+        o.dnsPort=profile.dnsHijack==ProxyRuntimeProfile.DnsHijack.OFF?0:MihomoStartupConfig.DNS_PORT;
+        o.controllerPort=controllerPort;
+        o.egressPort=MihomoStartupConfig.egressProbePort(controllerPort);
+        o.secret=controllerSecret();
+        o.ipv6=profile.ipv6==ProxyRuntimeProfile.Ipv6.ENABLE||profile.ipv6==ProxyRuntimeProfile.Ipv6.BYPASS;
+        o.tcp=profile.tcp;o.udp=profile.udp;
+        o.cnIpDirect=profile.cnIpDirect;
+        File geo=new File(cores.file(profile.core).getParentFile(),profile.core.id+".geosite.dat");
+        o.geoAssets=geo.isFile()&&geo.length()>0;
+        if(adblock!=null){
+            o.adblock=adblockDomains(adblock.file);
+            o.adblockAllow=adblockDomains(adblock.allowFile);
+        }
+        o.hostResolver=host->{
+            InetAddress[] all=InetAddress.getAllByName(host);
+            for(InetAddress a:all)if(a instanceof Inet4Address)return a.getHostAddress();
+            return all.length==0?null:all[0].getHostAddress();
+        };
+        return o;
+    }
+
+    private static List<String> adblockDomains(File file)throws IOException{
+        ArrayList<String> out=new ArrayList<>();
+        if(file==null||!file.isFile())return out;
+        for(String line:Files.readAllLines(file.toPath(),StandardCharsets.UTF_8)){
+            String d=line.trim();
+            if(d.startsWith("+."))d=d.substring(2);
+            if(!d.isEmpty()&&!d.startsWith("#"))out.add(d);
+        }
+        return out;
+    }
+
+    /** Same fake-IP routing projection as the Mihomo path, from the converted DNS range. */
+    private static RootFakeIpRanges nativeFakeIps(ProxyRuntimeProfile profile,String fakeIpV4)throws IOException{
+        ProxyRuntimeProfile projection=new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO,profile.mode,profile.ipv6,profile.appScope,
+                profile.dnsHijack,profile.autoOverwrite,profile.tcp,profile.udp,profile.quicBlocked,profile.cnIpDirect,profile.adblockChain);
+        String yaml=fakeIpV4==null||fakeIpV4.isEmpty()?"dns:\n  enable: false\n"
+                :"dns:\n  enable: true\n  enhanced-mode: fake-ip\n  fake-ip-range: "+fakeIpV4+"\n";
+        return RootFakeIpRanges.parse(yaml,projection);
+    }
+
+    /**
+     * proxy-providers / rule-providers for a conversion. Hetu's own UID is exempt from Root
+     * interception, so this is a direct fetch; the last good body is kept for offline restarts.
+     */
+    private String fetchProvider(String url)throws IOException{
+        if(url==null||!(url.startsWith("https://")||url.startsWith("http://")))return null;
+        File dir=new File(context.getCacheDir(),"core-provider-cache");
+        if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建订阅缓存目录");
+        File cache;
+        try{cache=new File(dir,hex(MessageDigest.getInstance("SHA-256").digest(url.getBytes(StandardCharsets.UTF_8))));}
+        catch(java.security.NoSuchAlgorithmException impossible){throw new IOException(impossible);}
+        HttpURLConnection connection=null;
+        try{
+            checkStartIntent();
+            connection=(HttpURLConnection)new URL(url).openConnection();
+            connection.setConnectTimeout(10000);connection.setReadTimeout(20000);
+            connection.setInstanceFollowRedirects(true);
+            connection.setRequestProperty("User-Agent","clash.meta");
+            int code=connection.getResponseCode();
+            if(code<200||code>299)throw new IOException("HTTP "+code);
+            ByteArrayOutputStream body=new ByteArrayOutputStream();
+            try(InputStream in=connection.getInputStream()){
+                byte[] b=new byte[32768];int n;
+                while((n=in.read(b))!=-1){body.write(b,0,n);if(body.size()>ProxyCoreConfig.MAX_PROVIDER_BYTES)throw new IOException("订阅内容过大");}
+            }
+            String text=new String(body.toByteArray(),StandardCharsets.UTF_8);
+            try(FileOutputStream out=new FileOutputStream(cache,false)){out.write(body.toByteArray());out.getFD().sync();}
+            return text;
+        }catch(IOException failed){
+            if(cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
+            return null;
+        }finally{if(connection!=null)connection.disconnect();}
     }
 
     private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
@@ -447,6 +577,9 @@ final class RootProxyManager {
             RootBridge.requireWorkerThread();
             if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
             ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+            ProxyRuntimeProfile.Core running=ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore",profile.core.id));
+            if(!ProxyCoreSupport.hotReload(running)||!ProxyCoreSupport.hotReload(profile.core))
+                throw new IOException(ProxyCoreSupport.unsupported(running,"热重载")+"；请使用「重启」应用配置");
             int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
             Prepared p=prepare(profile,port);
             String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
@@ -527,6 +660,12 @@ final class RootProxyManager {
     JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
     JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
     JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
+    /** The user's Start button: the pre-start hook runs inside the same Root invocation as the start. */
+    JSONObject startManual(ProxyRuntimeProfile profile,Progress progress,boolean preStartHook)throws Exception{
+        if(!preStartHook)return startOwned(profile,progress,false);
+        PRE_START_HOOK.set(Boolean.TRUE);
+        try{return startOwned(profile,progress,false);}finally{PRE_START_HOOK.remove();}
+    }
     JSONObject replaceRunningManually(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,true);}
     private JSONObject startOwned(ProxyRuntimeProfile profile,Progress progress,boolean replace)throws Exception{
         final long request=STOP_GENERATION.get();
@@ -640,7 +779,15 @@ final class RootProxyManager {
         try{
             checkStartIntent();
             trace.next("runtimeProbe");
-            RootStartupProbe.Result initial=probeStartupRuntime();
+            StartIntent entryIntent=START_INTENT.get();
+            boolean automaticEntry=entryIntent!=null&&entryIntent.automatic;
+            // A user/app start after a clean stop (nothing wanted, nothing recorded running) does not
+            // open a separate Root shell just to probe liveness and the installed core token: the
+            // single start command compares the token itself, and hetu-root.sh start still cleans up
+            // and stops any orphan core before it takes over the network.
+            boolean mergedProbe=!replaceRunning&&!automaticEntry
+                    &&!prefs.getBoolean("proxyRootRuntimeRunning",false)&&!prefs.getBoolean("proxyRootWanted",false);
+            RootStartupProbe.Result initial=mergedProbe?RootStartupProbe.parse(false,""):probeStartupRuntime();
             checkStartIntent();
             if(initial.process==ProxyContinuity.ProcessState.DEAD){
                 // Clear stale health only on confirmed absence, never on a probe
@@ -699,22 +846,31 @@ final class RootProxyManager {
             p=prepare(profile,restartControllerPort);
         }
         RootProxyPolicy policy=p.policy;
-        stage(progress,"部署必要运行文件…");
-        trace.next("deployment");
-        // The initial process probe also read the installed core token. Reuse that
-        // result instead of opening a second privileged shell just to read one file.
-        checkStartIntent();
-        installRuntimeFiles(p,true,initial.installedCoreToken);
-        checkStartIntent();
-
-        trace.next("validation");
+        // A core that cannot run the adblock chain (Hysteria) starts without it, explicitly.
+        if(profile.adblockChain&&!p.profile.adblockChain)profile=p.profile;
+        String conversionWarnings=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?"":prefs.getString("proxyCoreConversionWarnings","");
         String validationKey=validationFingerprint(p);
         boolean validationKnown=validationKey.equals(prefs.getString("proxyRootValidatedFingerprint",""));
         boolean preserveLiveNeedsValidation=replaceRunning&&existingRunning&&!validationKnown;
+        // Deployment rides on the native start command (one Root invocation) unless a live
+        // replacement must validate the new files first, or this is an automatic recovery start.
+        boolean mergedDeploy=!preserveLiveNeedsValidation&&!automaticEntry;
+        // The probe (when one ran) also read the installed core token; null lets the start
+        // command compare it itself.
+        String probedCoreToken=mergedProbe?null:initial.installedCoreToken;
+        stage(progress,"部署必要运行文件…");
+        trace.next("deployment");
+        checkStartIntent();
+        if(!mergedDeploy){
+            installRuntimeFiles(p,true,probedCoreToken);
+            checkStartIntent();
+        }
+
+        trace.next("validation");
         if(preserveLiveNeedsValidation){
             stage(progress,"配置有变化，先校验后再替换当前核心…");
             try{
-                validateRuntimeConfig();
+                validateRuntimeConfig(profile.core);
                 prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                 if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
             }catch(Exception fullFailure){
@@ -724,7 +880,7 @@ final class RootProxyManager {
                 Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                 installRuntimeFiles(fallback,true);
                 String fallbackValidationKey=validationFingerprint(fallback);
-                try{validateRuntimeConfig();}
+                try{validateRuntimeConfig(fallbackProfile.core);}
                 catch(Exception fallbackFailure){
                     throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                 }
@@ -784,8 +940,16 @@ final class RootProxyManager {
                 String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                 policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                 dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
+        String prelude=null;
+        if(mergedDeploy){
+            StringBuilder inline=new StringBuilder();
+            if(Boolean.TRUE.equals(PRE_START_HOOK.get()))
+                inline.append(StartPrelude.preStartHook(profile.mode.id,p.source==null?"":p.source.name));
+            inline.append(inlineDeployment(p,true,probedCoreToken));
+            prelude=inline.toString();
+        }
         checkStartIntent();
-        try{result=runJsonWithTimeout(145000L,prependStart(bootArgs));
+        try{result=runJsonWithTimeout(145000L,prelude,prependStart(bootArgs));
             if(!result.optBoolean("ok"))throw new IOException(result.optString("message","Root 代理启动失败"));
             nativeStartSucceeded=true;automaticStartCompleted();
         }catch(Exception startFailure){throw startFailure;}
@@ -825,6 +989,10 @@ final class RootProxyManager {
         if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
             warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
         }
+        if(conversionWarnings!=null&&!conversionWarnings.isEmpty()){
+            String shown=conversionWarnings.length()>900?conversionWarnings.substring(0,900)+"…":conversionWarnings;
+            warning=(warning.isEmpty()?"":warning+"；")+profile.core.label+" 配置："+shown;
+        }
         result.put("sourceConfig",p.source.name)
                 .put("core",profile.core.id)
                 .put("mode",profile.mode.id)
@@ -859,6 +1027,9 @@ final class RootProxyManager {
         prefs.edit()
                 .putBoolean("proxyRootWanted",true)
                 .putBoolean("proxyRootRuntimeRunning",true)
+                // Which core answers on this session's ports: the panel, latency tests and the
+                // adblock/hot-reload paths read their per-core capability from it.
+                .putString("proxyRootRuntimeCore",profile.core.id)
                 .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                 .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                 .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
@@ -1031,7 +1202,7 @@ final class RootProxyManager {
                     throw new IOException("代理设置已变化，请先启动或重启应用设置，再开启开机自启");
                 // A failed restart may have replaced CONFIG without publishing a
                 // successful settings snapshot. Validate the actual deployed bytes.
-                validateRuntimeConfig();
+                validateRuntimeConfig(bootCore);
                 installAutostart(p,autostartArgs(p));
             }else RootAutostart.remove(context);
             synchronized(INTENT_LOCK){
@@ -1275,7 +1446,7 @@ final class RootProxyManager {
             String cmd=String.join("\n",
                     "id",
                     "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
-                    "echo '--- core version ---'; "+RootBridge.quote(BIN)+" -v 2>&1 | head -n 3",
+                    "echo '--- core version ---'; cat "+RootBridge.quote(CORE_KIND)+" 2>/dev/null; echo; "+RootBridge.quote(BIN)+" "+ProxyCoreConfig.versionArgs(ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore",ProxyRuntimeProfile.load(prefs).core.id)))+" 2>&1 | head -n 3",
                     "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                     "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                     "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
@@ -1423,8 +1594,12 @@ final class RootProxyManager {
         catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
     }
 
-    private void validateRuntimeConfig()throws Exception{
+    private void validateRuntimeConfig(ProxyRuntimeProfile.Core core)throws Exception{
         RootBridge.requireWorkerThread();
+        if(ProxyCoreConfig.kind(core)!=ProxyCoreConfig.Kind.MIHOMO){
+            validateWithCoreCli(CONFIG,core,"最终启动配置");
+            return;
+        }
         String cmd="mkdir -p "+RootBridge.quote(ROOT+"/run")+" && "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(ROOT+"/run")+" -f "+RootBridge.quote(CONFIG);
         RootBridge.Result r=boundedRootShell(context,cmd,30000L);
         if(r.ok())return;
@@ -1440,6 +1615,10 @@ final class RootProxyManager {
         if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
         ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
         ensureRuntimeBase(profile.core);
+        if(ProxyCoreConfig.kind(profile.core)!=ProxyCoreConfig.Kind.MIHOMO){
+            validateNativeText(text,profile);
+            return;
+        }
         File stage=new File(context.getCacheDir(),"hetu-config-validator");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
         File source=File.createTempFile("editor-", ".yaml", stage);
@@ -1467,6 +1646,41 @@ final class RootProxyManager {
         }
     }
 
+
+    /**
+     * 配置选择 / editor check for sing-box, Xray, V2Fly and Hysteria: a native file is checked
+     * as written (plus Hetu's ingress); a Clash/Mihomo YAML is converted first, so the check
+     * answers "does this run under the selected core".
+     */
+    private void validateNativeText(String text,ProxyRuntimeProfile profile)throws Exception{
+        ProxyCoreConfig.Options options=nativeOptions(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT),null);
+        options.hostResolver=null;
+        ProxyCoreConfig.Result built=ProxyCoreConfig.build(profile.core,text,options,this::fetchProvider);
+        File stage=new File(context.getCacheDir(),"hetu-config-validator");
+        if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建配置校验缓存目录");
+        File source=File.createTempFile("editor-",".cfg",stage);
+        String token=Long.toHexString(System.nanoTime());
+        String rootFile=ROOT+"/run/state/editor-validation-"+token;
+        try{
+            try(FileOutputStream out=new FileOutputStream(source,false)){out.write(built.config.getBytes(StandardCharsets.UTF_8));out.getFD().sync();}
+            RootBridge.Result copied=boundedRootShell(context,"set -e; mkdir -p "+RootBridge.quote(ROOT+"/run/state")+"; cp "+RootBridge.quote(source.getAbsolutePath())
+                    +" "+RootBridge.quote(rootFile)+"; chmod 600 "+RootBridge.quote(rootFile),10000L);
+            if(!copied.ok())throw new IOException("无法写入校验文件："+copied.output.trim());
+            validateWithCoreCli(rootFile,profile.core,"配置");
+        }finally{
+            source.delete();
+            boundedRootShell(context,"rm -f "+RootBridge.quote(rootFile),3000L);
+        }
+    }
+
+    /** `hetu-root.sh validate FILE KIND`: sing-box check, xray run -test, v2ray test, Hysteria YAML. */
+    private void validateWithCoreCli(String file,ProxyRuntimeProfile.Core core,String what)throws Exception{
+        String cmd="exec "+RootBridge.quote(SCRIPT)+" validate "+RootBridge.quote(file)+" "+RootBridge.quote(ProxyCoreConfig.kind(core).id);
+        RootBridge.Result r=boundedRootShell(context,cmd,45000L);
+        JSONObject reply=RootCommandReply.read(r.code,r.output);
+        if(!reply.optBoolean("ok",false))throw new IOException(core.label+" "+what+"校验失败："+reply.optString("message",compactRootError(r.output)));
+    }
+
     private JSONObject runJsonAllowMissing(String action,JSONObject missing)throws Exception{
         RootBridge.requireWorkerThread();
         String cmd="if [ -x "+RootBridge.quote(SCRIPT)+" ]; then exec "+RootBridge.quote(SCRIPT)+" "+RootBridge.quote(action)+"; else printf '%s\\n' "+RootBridge.quote(missing.toString())+"; fi";
@@ -1485,12 +1699,25 @@ final class RootProxyManager {
     }
 
     private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
-    private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{
+    private JSONObject runJsonWithTimeout(long timeoutMs,String...args)throws Exception{return runJsonWithTimeout(timeoutMs,null,args);}
+    /**
+     * prelude (start only): shell run inside the same Root invocation before hetu-root.sh start.
+     * The cancellation receipt is then read in that shell first, before the hook and deployment,
+     * so a Stop during either still cancels natively. The prelude ends in a StartPrelude refusal
+     * line instead of JSON when it declines to dispatch the native transaction.
+     */
+    private JSONObject runJsonWithTimeout(long timeoutMs,String prelude,String...args)throws Exception{
         RootBridge.requireWorkerThread();
         boolean starting=args.length>0&&"start".equals(args[0]);
         boolean automaticStart=starting&&START_INTENT.get()!=null&&START_INTENT.get().automatic;
         StringBuilder cmd=new StringBuilder();
-        if(starting){
+        if(starting&&prelude!=null){
+            // Final Java intent check before the single privileged dispatch; the shell then reads
+            // the receipt as its very first step. A Stop racing in between is still caught by
+            // the post-native checkStartIntent in startInternal and rolled back exactly once.
+            checkStartIntent();
+            cmd.append(StartPrelude.cancelReceipt(ROOT+"/run/start-cancel-generation"));
+        }else if(starting){
             checkStartIntent();
             String marker=RootBridge.quote(ROOT+"/run/start-cancel-generation");
             RootBridge.Result capture=boundedRootShell(context,"if [ -e "+marker+" ]; then cat "+marker+"; else printf ''; fi",3000L);
@@ -1510,11 +1737,81 @@ final class RootProxyManager {
                 throw new IOException("恢复剩余时间不足以完成启动及回滚");
         }
         checkStartIntent();
+        if(starting){
+            if(prelude!=null)cmd.append(prelude);
+            // The App answers what `settings get global private_dns_mode` would (a Java process
+            // on the device, 0.3-0.8 s); boot/autostart starts without it still ask settings.
+            cmd.append("export HETU_PRIVATE_DNS_MODE=").append(RootBridge.quote(privateDnsMode())).append("; ");
+            // Vendor GMS firewall cleanup: app IDs from PackageManager instead of pm/cmd package.
+            if(prefs.getBoolean("proxyVendorFirewallCleanup",false))
+                cmd.append("export HETU_GMS_APPIDS=").append(RootBridge.quote(gmsAppIds())).append("; ");
+        }
         cmd.append("exec ").append(RootBridge.quote(SCRIPT));
         for(String a:args)cmd.append(' ').append(RootBridge.quote(a==null?"":a));
         if(args.length>0&&"start".equals(args[0])&&START_INTENT.get()!=null)START_INTENT.get().nativeDispatched=true;
         RootBridge.Result r=automaticStart?RootBridge.rootShell(context,cmd.toString(),timeoutMs):boundedRootShell(context,cmd.toString(),timeoutMs);
+        if(starting&&prelude!=null){
+            String refused=StartPrelude.refusal(r.output);
+            if(refused!=null){
+                // Nothing native ran: the hook, receipt or deployment stopped before exec.
+                if(START_INTENT.get()!=null)START_INTENT.get().nativeDispatched=false;
+                throw new IOException(refused);
+            }
+        }
         return RootCommandReply.read(r.code,r.output);
+    }
+
+    private String privateDnsMode(){
+        String mode=null;
+        try{mode=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");}
+        catch(RuntimeException ignored){}
+        return StartPrelude.privateDnsMode(mode);
+    }
+
+    /**
+     * CNIP exempt apps ("pkg" or "user:pkg") as kernel UIDs: they still go through the proxy for
+     * China IPs. System UIDs are ignored; at most 256 entries.
+     */
+    private String cnipForceUids(){
+        Set<String> apps=prefs.getStringSet("proxyCnIpForceApps",Collections.emptySet());
+        TreeSet<Integer> uids=new TreeSet<>();
+        android.content.pm.PackageManager pm=context.getPackageManager();
+        for(String raw:apps==null?Collections.<String>emptySet():apps){
+            if(raw==null)continue;
+            String value=raw.trim();int user=0;
+            int colon=value.indexOf(':');
+            if(colon>0){
+                try{user=Integer.parseInt(value.substring(0,colon));}catch(NumberFormatException ignored){continue;}
+                value=value.substring(colon+1);
+            }
+            if(user<0||user>9999||!value.matches("[A-Za-z0-9_.]{1,255}"))continue;
+            try{
+                int app=pm.getApplicationInfo(value,0).uid%100000;
+                if(app>=10000&&app<=99999)uids.add(user*100000+app);
+            }catch(Exception ignored){}
+            if(uids.size()>=256)break;
+        }
+        StringBuilder out=new StringBuilder();
+        for(int uid:uids)out.append(out.length()==0?"":",").append(uid);
+        return out.toString();
+    }
+
+    /** App IDs (uid % 100000) of GMS, Play Store and GSF; "0" when none is installed. */
+    private String gmsAppIds(){
+        StringBuilder out=new StringBuilder();
+        android.content.pm.PackageManager pm=context.getPackageManager();
+        for(String name:new String[]{"com.google.android.gms","com.android.vending","com.google.android.gsf"}){
+            try{
+                int app=pm.getApplicationInfo(name,0).uid%100000;
+                if(app>=10000&&app<=19999)out.append(out.length()==0?"":",").append(app);
+            }catch(Exception ignored){}
+        }
+        return out.length()==0?"0":out.toString();
+    }
+
+    /** installRuntimeFiles' commands, run by `sh -c` inside the start invocation (set -e intact). */
+    private String inlineDeployment(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
+        return StartPrelude.deployment(deploymentCommand(p,includeConfig,probedCoreToken));
     }
 
     private void quiesceLegacyRuntime(Progress progress){
@@ -1574,12 +1871,27 @@ final class RootProxyManager {
 
     private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
         RootBridge.requireWorkerThread();
+        if(probedCoreToken==null){
+            String expected=expectedCoreToken(p.profile.core);
+            probedCoreToken=runtimeCoreCurrent(expected)?expected:"";
+        }
+        RootBridge.Result r=boundedRootShell(context,deploymentCommand(p,includeConfig,probedCoreToken),45000L);
+        if(!r.ok())throw new IOException("无法安装 Root 运行文件："+r.output.trim());
+    }
+
+    /**
+     * probedCoreToken null: the command itself keeps bin/core when the installed token already
+     * matches (the merged start path, which skipped the separate probe).
+     */
+    private String deploymentCommand(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
+        RootBridge.requireWorkerThread();
         File stage=new File(context.getCacheDir(),"hetu-root-stage");
         if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建河图运行临时目录");
         File script=new File(stage,"hetu-root.sh");
         copyScriptAsset(script);
         String coreToken=expectedCoreToken(p.profile.core);
-        boolean deployCore=probedCoreToken==null?!runtimeCoreCurrent(coreToken):!coreToken.equals(probedCoreToken);
+        boolean shellDecidesCore=probedCoreToken==null;
+        boolean deployCore=shellDecidesCore||!coreToken.equals(probedCoreToken);
         File binary=deployCore?coreFile(p.profile.core,stage):null;
         File cfg=new File(stage,"startup-config");
         File adblock=p.adblock==null?null:p.adblock.file;
@@ -1606,13 +1918,27 @@ final class RootProxyManager {
         if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
         else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                 .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
+        // CNIP kernel bypass policy (ipset): a file, not start arguments, so boot plans keep it too.
+        String cnipPolicy=policyDir+"/cnip";
+        boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
+        if(cnipV4||cnipV6){
+            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n";
+            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
+                    .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
+                    .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
+        }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
         if(deployCore){
+            if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
+                    .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
             cmd.append("; cp ").append(RootBridge.quote(binary.getAbsolutePath())).append(' ').append(RootBridge.quote(binTmp))
                     .append("; chmod 700 ").append(RootBridge.quote(binTmp)).append("; chown 0:0 ").append(RootBridge.quote(binTmp))
                     .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
                     .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
                     .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
+            appendCoreAssets(cmd,p.profile.core);
+            if(shellDecidesCore)cmd.append("; fi");
         }
+        appendCoreKind(cmd,p.profile.core);
         if(adblock!=null){
             String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
             String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
@@ -1652,14 +1978,44 @@ final class RootProxyManager {
                     .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                     .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
         }
-        RootBridge.Result r=boundedRootShell(context,cmd.toString(),45000L);
-        if(!r.ok())throw new IOException("无法安装 Root 运行文件："+r.output.trim());
+        return cmd.toString();
+    }
+
+    /** hetu-root.sh reads which CLI bin/core speaks from this file (absent = Mihomo). */
+    private static void appendCoreKind(StringBuilder cmd,ProxyRuntimeProfile.Core core){
+        cmd.append("; printf '%s\\n' ").append(RootBridge.quote(ProxyCoreConfig.kind(core).id)).append(" > ").append(RootBridge.quote(CORE_KIND))
+                .append("; chmod 600 ").append(RootBridge.quote(CORE_KIND)).append("; chown 0:0 ").append(RootBridge.quote(CORE_KIND));
+    }
+
+    /** geoip.dat / geosite.dat extracted with Xray or V2Fly, deployed next to the binary. */
+    private void appendCoreAssets(StringBuilder cmd,ProxyRuntimeProfile.Core core){
+        cmd.append("; rm -rf ").append(RootBridge.quote(CORE_ASSETS)).append("; mkdir -p ").append(RootBridge.quote(CORE_ASSETS))
+                .append("; chmod 700 ").append(RootBridge.quote(CORE_ASSETS));
+        File dir=cores.file(core).getParentFile();
+        for(String name:new String[]{"geoip.dat","geosite.dat"}){
+            File asset=new File(dir,core.id+"."+name);
+            if(!asset.isFile()||asset.length()==0)continue;
+            String target=CORE_ASSETS+"/"+name;
+            cmd.append("; cp ").append(RootBridge.quote(asset.getAbsolutePath())).append(' ').append(RootBridge.quote(target))
+                    .append("; chmod 600 ").append(RootBridge.quote(target)).append("; chown 0:0 ").append(RootBridge.quote(target));
+        }
     }
 
     private File coreFile(ProxyRuntimeProfile.Core core,File stage)throws IOException{
         if(cores.installed(core))return cores.file(core);
         if(core!=ProxyRuntimeProfile.Core.MIHOMO)throw new IOException(core.label+" 尚未安装核心");
-        File out=new File(stage,"mihomo");copyAsset(rootBinaryAsset(),out,true);return out;
+        // The embedded binary is staged once per revision: the merged start command always needs
+        // a source path even when the installed token matches and nothing is copied.
+        File out=new File(stage,"mihomo"),stamp=new File(stage,"mihomo.token");
+        String token=expectedCoreToken(core);
+        try{
+            if(out.isFile()&&out.length()>0&&out.canExecute()&&stamp.isFile()
+                    &&token.equals(new String(Files.readAllBytes(stamp.toPath()),StandardCharsets.UTF_8)))return out;
+        }catch(IOException ignored){}
+        if(stamp.exists()&&!stamp.delete())throw new IOException("无法刷新内置核心暂存标记");
+        copyAsset(rootBinaryAsset(),out,true);
+        try(FileOutputStream target=new FileOutputStream(stamp,false)){target.write(token.getBytes(StandardCharsets.UTF_8));target.getFD().sync();}
+        return out;
     }
     private String rootBinaryAsset()throws IOException{
         for(String abi:Build.SUPPORTED_ABIS){

@@ -53,8 +53,14 @@ android {
         getByName("debug") {
             isDebuggable = true
         }
+        // Shipped build: R8 + non-debuggable ART (debuggable=true disables JIT/AOT optimisations and is
+        // the main cause of Compose jank). Same CI signing identity as debug, so it upgrades in place.
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = false
+            isDebuggable = false
+            signingConfig = signingConfigs.getByName("debug")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 
@@ -77,6 +83,8 @@ dependencies {
     implementation(composeBom)
     implementation("androidx.activity:activity-compose:1.13.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.10.0")
+    // Installs the bundled baseline profile (src/main/baseline-prof.txt) on sideloaded installs.
+    implementation("androidx.profileinstaller:profileinstaller:1.4.1")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.10.0")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.10.0")
     implementation("androidx.compose.foundation:foundation")

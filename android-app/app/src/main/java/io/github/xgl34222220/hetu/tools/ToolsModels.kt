@@ -10,7 +10,7 @@ import java.util.Locale
 /* ---------------------------- 工具 (tab root) ---------------------------- */
 
 /**
- * The 14 entries of the tools tab.
+ * The 15 entries of the tools tab.
  *
  * @param summary line under the title on the root list (concept page 1).
  * @param brief shorter line shown in search results (concept page 3).
@@ -30,6 +30,7 @@ internal enum class ToolsEntry(val title: String, val summary: String, val brief
     Cores("核心管理", "下载与更新", "下载与更新", "内核 mihomo xray sing-box"),
     Adblock("广告过滤", "规则与屏蔽", "规则与屏蔽", "去广告 adguard 拦截"),
     Diag("诊断工具", "网络与环境", "网络与环境", "预检 恢复网络 排查"),
+    NetTest("网络测试", "连通性与网速", "连通性与网速", "测速 解锁 延迟 speedtest cloudflare chatgpt netflix"),
     WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
 }
 
@@ -39,16 +40,19 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
 internal object ToolsCatalog {
     /** Concept layout (03A page 1): six untitled cards. This is the default. */
     val concept: List<ToolsGroupSpec> = listOf(
-        ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
+        // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
+        // 配置管理 still sits fully above the floating dock without scrolling.
+        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest, ToolsEntry.Files)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
     val titled: List<ToolsGroupSpec> = listOf(
+        ToolsGroupSpec("网络测试", listOf(ToolsEntry.NetTest)),
         ToolsGroupSpec("配置与订阅", listOf(ToolsEntry.Configs, ToolsEntry.SubStore)),
         ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
         ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),

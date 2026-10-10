@@ -205,6 +205,11 @@ def main():
    checked=subprocess.run([sys.executable,str(Path(__file__).with_name('smoke_hetu_apk.py'))],timeout=3600,env=smoke_env)
    report['smoke_exit']=checked.returncode
    if checked.returncode:raise RuntimeError('Installed APK smoke failed; inspect original evidence')
+   if os.environ.get('HETU_RELEASE_SMOKE')=='1':
+    # The shipped release APK: in-place upgrade over the test APK, then the changed screens.
+    released=subprocess.run([sys.executable,str(Path(__file__).with_name('smoke_release_continuity93.py'))],timeout=1800,env=smoke_env)
+    report['release_smoke_exit']=released.returncode
+    if released.returncode:raise RuntimeError('Release APK install smoke failed; inspect release evidence')
    report['result']='PASS'
  except Exception as error:report['error']=str(error)
  finally:

@@ -44,12 +44,23 @@ final class ProxyRuntimeProfile {
     ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked,boolean cnIpDirect){this(core,mode,ipv6,appScope,dnsHijack,autoOverwrite,tcp,udp,quicBlocked,cnIpDirect,false);}
     ProxyRuntimeProfile(Core core,Mode mode,Ipv6 ipv6,AppScope appScope,DnsHijack dnsHijack,boolean autoOverwrite,boolean tcp,boolean udp,boolean quicBlocked,boolean cnIpDirect,boolean adblockChain){this.core=core;this.mode=mode;this.ipv6=ipv6;this.appScope=appScope;this.dnsHijack=dnsHijack;this.autoOverwrite=autoOverwrite;this.tcp=tcp;this.udp=udp;this.quicBlocked=quicBlocked;this.cnIpDirect=cnIpDirect;this.adblockChain=adblockChain;}
 
-    static ProxyRuntimeProfile load(SharedPreferences p){return new ProxyRuntimeProfile(Core.from(p.getString("proxyBaseCore","mihomo")),Mode.from(p.getString("proxyBaseMode","tproxy")),Ipv6.from(p.getString("proxyBaseIpv6","enable")),AppScope.from(p.getString("proxyAppScope","blacklist")),DnsHijack.from(p.getString("proxyDnsHijack","tproxy")),p.getBoolean("proxyBaseAutoOverwrite",true),p.getBoolean("proxyTcp",true),p.getBoolean("proxyUdp",true),p.getBoolean("proxyQuicBlocked",false),p.getBoolean("proxyCnIpDirect",false),p.getBoolean("proxyAdblockChain",true));}
+    // The core CN RULE-SET stays on whenever the kernel CNIP bypass is on: it is the fallback when
+    // ipset is unavailable (status cnip=degraded) and covers fake-IP answers the kernel cannot match.
+    static ProxyRuntimeProfile load(SharedPreferences p){return new ProxyRuntimeProfile(Core.from(p.getString("proxyBaseCore","mihomo")),Mode.from(p.getString("proxyBaseMode","tproxy")),Ipv6.from(p.getString("proxyBaseIpv6","enable")),AppScope.from(p.getString("proxyAppScope","blacklist")),DnsHijack.from(p.getString("proxyDnsHijack","tproxy")),p.getBoolean("proxyBaseAutoOverwrite",true),p.getBoolean("proxyTcp",true),p.getBoolean("proxyUdp",true),p.getBoolean("proxyQuicBlocked",false),p.getBoolean("proxyCnIpDirect",false)||p.getBoolean("proxyCnIpKernelV4",false)||p.getBoolean("proxyCnIpKernelV6",false),p.getBoolean("proxyAdblockChain",true));}
 
     Capability capability(){return capability(core,mode);}
     static Capability capability(Core core,Mode mode){
         boolean mihomo=core==Core.MIHOMO||core==Core.MIHOMO_SMART;
-        if(!mihomo)return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 已进入核心/配置模型，但运行后端正在接入，当前不会假报可用");
+        if(!mihomo){
+            // sing-box / Xray / V2Fly / Hysteria run behind the same Root netfilter capture:
+            // a TPROXY (TCP+UDP) or Redirect (TCP) inbound plus Hetu's DNS port. App scope, shared
+            // network, CIDR/interface bypass and QUIC control are netfilter features, core-independent.
+            switch(mode){
+                case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
+                case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
+                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY 与 Redirect；"+mode.label+" 仅 Mihomo 可用");
+            }
+        }
         switch(mode){
             case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
             case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");

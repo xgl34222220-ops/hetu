@@ -273,6 +273,10 @@ internal class HomeActions(
     val onOpenBasicSettings: () -> Unit = {},
     /** Config tag: opens 工具 › 配置管理. */
     val onOpenConfigs: () -> Unit = {},
+    /** WebUI shortcut under 启动: the existing 工具 › WebUI page (external panels / built-in dashboard). */
+    val onOpenWebUi: () -> Unit = {},
+    /** 日志 shortcut under 启动: the existing log viewer (工具 › 日志文件). */
+    val onOpenLogs: () -> Unit = {},
     /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
     val onViewConfig: () -> Unit = {},
     val onDismissStartFailure: () -> Unit = {},

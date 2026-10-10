@@ -54,6 +54,8 @@ internal fun ToolsRoute(
     features: ToolsFeatureActions? = null,
     appIcon: (@Composable (ToolsApp, Modifier) -> Unit)? = null,
     onDestinationChanged: (ToolsDestination) -> Unit = {},
+    requestedEntry: ToolsEntry? = null,
+    onRequestConsumed: () -> Unit = {},
 ) {
     val act by rememberUpdatedState(actions)
     val scope = rememberCoroutineScope()
@@ -336,6 +338,24 @@ internal fun ToolsRoute(
             ToolsDestination.Editor -> leaveEditor()
             else -> pop()
         }
+    }
+
+    // Another tab asked for one of these pages: open it on top of the root, once.
+    val consumeRequest by rememberUpdatedState(onRequestConsumed)
+    LaunchedEffect(requestedEntry) {
+        val entry = requestedEntry ?: return@LaunchedEffect
+        val feature = entry.featureDestination()
+        when {
+            entry == ToolsEntry.Configs -> {
+                if (top != ToolsDestination.Configs) {
+                    stackNames = listOf(ToolsDestination.Root.name, ToolsDestination.Configs.name)
+                }
+                refreshConfigs(showSpinner = configs.load !is ToolsLoad.Ready)
+            }
+            feature != null && features?.hosts(entry) == true -> stackNames = listOf(ToolsDestination.Root.name, feature.name)
+            else -> act.onOpenEntry(entry)
+        }
+        consumeRequest()
     }
 
     /* ------------------------------ 页面 ------------------------------ */

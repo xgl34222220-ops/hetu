@@ -57,6 +57,14 @@ class Continuity93EvidenceTests(unittest.TestCase):
         scope.validate_version(before, after)
         with self.assertRaises(AssertionError):
             scope.validate_version(before, after + '\nimplementation("new:dependency:1")\n')
+        # The release-build delta is pinned exactly: no other minify, signing or dependency change.
+        for invalid in (after.replace('isMinifyEnabled = true', 'isMinifyEnabled = false'),
+                        after.replace('isDebuggable = false', 'isDebuggable = true'),
+                        after.replace('signingConfig = signingConfigs.getByName("debug")', 'signingConfig = signingConfigs.getByName("release")'),
+                        after.replace('profileinstaller:1.4.1', 'profileinstaller:1.4.0')):
+            self.assertNotEqual(invalid, after)
+            with self.assertRaises(AssertionError):
+                scope.validate_version(before, invalid)
         before = scope.committed_bytes(scope.REVISION_TEST).decode()
         after = (scope.ROOT / scope.REVISION_TEST).read_text()
         scope.validate_revision_test(before, after)
@@ -104,7 +112,9 @@ class Continuity93EvidenceTests(unittest.TestCase):
                       'transport_continuity93_failures.py',
                       'run_continuity93_baseline_hosts.py --historical-before-output',
                       '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5faad',
-                      'Reproduce V20.74 custom palette crash on API 36'):
+                      'Reproduce V20.74 custom palette crash on API 36',
+                      ':app:assembleRelease', 'verify_release_continuity93.py', "HETU_RELEASE_SMOKE: '1'",
+                      'test_core_support93.py', 'test_fast_start93.py', 'test_cnip93.py', 'name: Hetu-V20.93-debug-test-APK'):
             self.assertIn(token, text)
         self.assertNotIn('continue-on-error:', text)
         old = (scope.ROOT / '.github/workflows/v2092-build.yml').read_text()

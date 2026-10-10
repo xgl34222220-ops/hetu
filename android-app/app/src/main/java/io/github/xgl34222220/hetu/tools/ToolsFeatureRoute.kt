@@ -328,7 +328,9 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
     LaunchedEffect(Unit) {
         val loader = actions.loadCnIp ?: return@LaunchedEffect
         state = try {
-            ToolsCnIpState(ToolsLoad.Ready, loader())
+            val kernel = actions.loadCnIpKernel?.invoke()
+            if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
+            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -346,6 +348,14 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             }
         },
         modifier = modifier,
+        onKernelChange = if (actions.loadCnIpKernel == null) null else { v4, v6 ->
+            val previous = state
+            state = state.copy(kernelV4 = v4, kernelV6 = v6)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpKernel(v4, v6)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
     )
 }
 
@@ -388,7 +398,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
         onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
         onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
-        onOpenDiagnosticsDetails = actions.onOpenDiagnosticsDetails,
+        onOpenDiagnosticsDetails = actions.networkEvents?.let { read ->
+            { open(ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留"), read) { ToolsDiagOverlay.Record("网络事件记录", "切网与错误编号；满额暂停，历史保留", it) } }
+        } ?: actions.onOpenDiagnosticsDetails,
+        onRepairRecord = actions.repairSessionRecord?.let { repair ->
+            { open(ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接"), repair) { ToolsDiagOverlay.Record("修复运行记录", "核对原会话基线、规则、DNS 与守护进程；保留现有连接", it) } }
+        },
         modifier = modifier,
     )
 
@@ -398,6 +413,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         }
         is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
             ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
+        }
+        is ToolsDiagOverlay.Record -> HomeModalSheet(onDismiss = { overlay = null }) {
+            ToolsRecordSheetContent(current.title, current.subtitle, current.content, onCopy = { actions.onCopy(current.title, it) })
         }
         is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
             ToolsRestoreNetworkDialogCard(
@@ -427,7 +445,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
     suspend fun read() {
         val snapshot = (actions.loadAdblock ?: return)()
-        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false)
+        // A re-read keeps the last 实测 result; it is the user's evidence, not part of the snapshot.
+        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, probing = state.probing)
     }
 
     fun reload(announce: String? = null) {
@@ -508,6 +527,19 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
         onRetry = { state = ToolsAdblockState(); reload() },
         modifier = modifier,
+        onProbe = actions.probeAdblock?.let { probeOnce ->
+            {
+                if (!state.probing) {
+                    state = state.copy(probing = true)
+                    scope.launch {
+                        val result = try { probeOnce() } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { ToolsAdProbe(null, error.reason("实测失败")) }
+                        state = state.copy(probing = false, probe = result)
+                        reload()
+                    }
+                }
+            }
+        },
     )
 
     when (val current = overlay) {

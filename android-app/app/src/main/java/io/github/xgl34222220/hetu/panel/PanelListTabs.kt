@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +21,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -187,12 +188,12 @@ internal fun LazyListScope.panelConnectionsTab(
                 }
             }
             if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
-                ConnectionCard(group.connections[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
+                ConnectionCard(group.connections[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)), onOpen)
             }
         }
     } else {
         items(count = list.size, key = { "conn:" + list[it].id }) {
-            ConnectionCard(list[it], data, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
+            ConnectionCard(list[it], data.groups, ListCard.then(hetuAnimateItem(LocalHomeMotionEnabled.current)).homeEnter(stagger, it), onOpen)
         }
     }
 }
@@ -206,8 +207,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
     }
 }
 
+// Takes the memoized group list, not the whole PanelData: an idle connection skips the 1 s traffic tick.
 @Composable
-private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Modifier, onOpen: (String) -> Unit) {
+private fun ConnectionCard(conn: PanelConnection, groups: List<PanelGroup>, modifier: Modifier, onOpen: (String) -> Unit) {
     val c = LocalHomeColors.current
     HomeCard(modifier, onClick = { onOpen(conn.id) }, clickLabel = "连接详情", shape = PanelDims.groupShape) {
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
@@ -222,7 +224,7 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
                     Text(conn.app, Modifier.weight(1f, fill = false), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     Text("/", color = c.t3, style = HomeType.rowSub)
                 }
-                ChainMark(conn, data)
+                ChainMark(conn, groups)
                 Text(
                     conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
                     color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -238,10 +240,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
 
 /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
 @Composable
-private fun ChainMark(conn: PanelConnection, data: PanelData) {
+private fun ChainMark(conn: PanelConnection, groups: List<PanelGroup>) {
     val slot = LocalPanelGroupIcon.current ?: return
     val head = conn.chain.firstOrNull() ?: return
-    val group = data.groups.firstOrNull { it.name == head } ?: return
+    val group = groups.firstOrNull { it.name == head } ?: return
     slot(group, Modifier.size(16.dp))
 }
 
@@ -278,10 +280,23 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, 
         val rule = items[index]
         val c = LocalHomeColors.current
         HomeCard(ListCard.homeEnter(stagger, index).testTag("panel-rule:$index"), shape = PanelDims.groupShape) {
-            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp)) {
+            // Plain layout pass instead of BoxWithConstraints: a subcomposition per row made fast
+            // scrolling through thousands of rules stutter. The row width is recorded during
+            // measure and caps the policy at the same 45 %.
+            val rowWidth = remember { IntArray(1) }
+            Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp).layout { measurable, constraints ->
+                rowWidth[0] = constraints.maxWidth
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }) {
                 // Reserve content space, but measure short policies at their actual width.
                 // The weighted content consumes the remainder, pinning the policy to the end.
-                val policyMaxWidth = maxWidth * .45f
+                val policyMaxWidth = Modifier.layout { measurable, constraints ->
+                    val cap = (rowWidth[0] * .45f).roundToInt().coerceAtLeast(0)
+                    val capped = if (constraints.maxWidth > cap) constraints.copy(minWidth = minOf(constraints.minWidth, cap), maxWidth = cap) else constraints
+                    val placeable = measurable.measure(capped)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 42.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -291,7 +306,7 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, 
                         if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Text(
-                        panelHighlight(rule.policy, query), Modifier.widthIn(max = policyMaxWidth).testTag("panel-rule-policy:$index"),
+                        panelHighlight(rule.policy, query), policyMaxWidth.testTag("panel-rule-policy:$index"),
                         color = policyColor(rule.policy), style = PanelType.policy, textAlign = TextAlign.End,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )

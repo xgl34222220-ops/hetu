@@ -57,8 +57,6 @@ import top.yukonga.miuix.kmp.blur.colorControls
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.squircle.squircleClip
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
@@ -113,9 +111,10 @@ fun HetuGlassDock(
     // Never render a translucent glass shell without a real blur/backdrop behind it.
     // That fallback was the source of the opaque white slab when either appearance switch was disabled.
     val renderGlass = rememberHetuGlassEnabled()
-    val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
-    val activeHaze = renderGlass && !runtimeLiquid
-    val dockSurfaceBackdrop = rememberLayerBackdrop()
+    // Liquid-glass pass: the capsule is faked (translucent gradient, bright rim, soft shadow), so
+    // no page content is recorded or blurred per frame while lists scroll beneath it.
+    val runtimeLiquid = false
+    val activeHaze = false
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
             blurRadius = 32.dp
@@ -124,10 +123,10 @@ fun HetuGlassDock(
     } else Modifier
     val glassBrush = when {
         renderGlass && dark -> Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .085f), Color(0xFF60A5FA).copy(alpha = .035f)),
+            listOf(Color(0xFF2A3342).copy(alpha = .90f), Color(0xFF1B222D).copy(alpha = .88f)),
         )
         renderGlass -> Brush.verticalGradient(
-            listOf(Color.White.copy(alpha = .22f), Color(0xFFE8E9F5).copy(alpha = .08f)),
+            listOf(Color.White.copy(alpha = .86f), Color(0xFFE9EEF5).copy(alpha = .80f)),
         )
         else -> Brush.verticalGradient(
             if (dark) listOf(Color(0xFF1A2230), Color(0xFF151C27))
@@ -193,6 +192,11 @@ fun HetuGlassDock(
             }
     }
 
+    val rimBrush = Brush.verticalGradient(listOf(
+        Color.White.copy(alpha = if (dark) .22f else .95f),
+        Color.White.copy(alpha = if (dark) .05f else .40f),
+    ))
+    val shadowTint = if (dark) Color.Black.copy(alpha = .34f) else Color(0xFF4A5A74).copy(alpha = .12f)
     Box(
         modifier = modifier
             .onSizeChanged { onHeightChanged(with(density) { it.height.toDp() }) }
@@ -201,12 +205,19 @@ fun HetuGlassDock(
             .fillMaxWidth()
             .height(bodyHeight + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
+        // Static glass capsule: soft shadow (two offset translucent outlines), frosted fill, bright rim.
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .drawBehind {
+                    if (!renderGlass) return@drawBehind
+                    val r = if (floating) CornerRadius(31.dp.toPx()) else CornerRadius(0f)
+                    drawRoundRect(shadowTint, Offset(0f, 3.dp.toPx()), size, r)
+                    drawRoundRect(shadowTint.copy(alpha = shadowTint.alpha * .5f), Offset(0f, 7.dp.toPx()), size, r)
+                }
                 .clip(shape)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
-                .then(liquidShellModifier),
+                .then(liquidShellModifier)
+                .border(1.dp, rimBrush, shape),
         )
 
         DockItems(
@@ -217,13 +228,13 @@ fun HetuGlassDock(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = if (floating) 4.dp else bottomInset + 4.dp),
-            indicatorColor = if (dark) Color.White.copy(alpha = .10f) else Color(0xFFB7B9C9).copy(alpha = .24f),
-            indicatorBorderColor = if (dark) Color.White.copy(alpha = .18f) else Color.White.copy(alpha = .82f),
+            indicatorColor = if (dark) Color.White.copy(alpha = .13f) else Color.White.copy(alpha = .92f),
+            indicatorBorderColor = if (dark) Color.White.copy(alpha = .22f) else Color.White,
             indicatorShadow = 0.dp,
             selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF1267D6),
-            unselectedColor = scheme.onSurface,
+            unselectedColor = if (dark) Color(0xFFC9D1DC) else Color(0xFF3A4352),
             liquidGlass = renderGlass,
-            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
+            indicatorBackdrop = null,
             dark = dark,
         )
     }
@@ -272,7 +283,14 @@ private fun DockItems(
             val x = lensLeft.value + (width - w) / 2f
             val y = (size.height - h) / 2f
             val r = CornerRadius(h / 2f)
+            // Raised lens: a soft shadow under it, then a frosted fill that is brighter at the top.
+            drawRoundRect(Color.Black.copy(alpha = if (dark) .28f else .07f), Offset(x, y + 2.dp.toPx()), androidx.compose.ui.geometry.Size(w, h), r)
+            drawRoundRect(Color.Black.copy(alpha = if (dark) .12f else .035f), Offset(x, y + 5.dp.toPx()), androidx.compose.ui.geometry.Size(w, h), r)
             drawRoundRect(indicatorColor, Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r)
+            drawRoundRect(
+                Brush.verticalGradient(listOf(Color.White.copy(alpha = if (dark) .10f else .55f), Color.Transparent), startY = y, endY = y + h),
+                Offset(x, y), androidx.compose.ui.geometry.Size(w, h), r,
+            )
             // Specular rim: bright top edge fading down, like the reference lens.
             drawRoundRect(
                 Brush.verticalGradient(listOf(highlight, Color.Transparent), startY = y, endY = y + h * .55f),
@@ -319,7 +337,12 @@ private fun DockItems(
                 }
                 Column(
                     Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
-                        .onPlaced { c -> if (index < slots.size) slots[index] = c.positionInParent().x to c.size.width.toFloat() }
+                        .onPlaced { c ->
+                            // Placement repeats on every frame the dock slides; write only real changes
+                            // so a moving dock does not recompose its items each frame.
+                            val placed = c.positionInParent().x to c.size.width.toFloat()
+                            if (index < slots.size && slots[index] != placed) slots[index] = placed
+                        }
                         .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
                         .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
                             onClick = { if (!active) haptics.perform(HetuHaptic.Tick); onSelect(index) })

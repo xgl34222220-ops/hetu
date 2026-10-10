@@ -101,9 +101,12 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.flow.collectLatest
@@ -161,10 +164,8 @@ class HetuActivity : ComponentActivity() {
             "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
             "connections" -> vm.openPanel("conn")
             "providers", "subscriptions" -> vm.openPanel("providers")
-            "configs" -> {
-                vm.tab = HxTab.Tools
-                requestedRoute = HxRoute.Configs
-            }
+            // One config page: 工具 › 配置管理.
+            "configs" -> vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
             "rules" -> vm.openPanel("rules")
             "home" -> vm.tab = HxTab.Home
         }
@@ -186,16 +187,10 @@ internal sealed class HxRoute(val key: String) {
     data object Providers : HxRoute("providers")
     data object Adblock : HxRoute("adblock")
     data object Network : HxRoute("network")
-    data object Apps : HxRoute("apps")
-    data object Cores : HxRoute("cores")
     data object About : HxRoute("about")
-    data object Bypass : HxRoute("bypass")
     data object Files : HxRoute("files")
-    data object SharedNet : HxRoute("shared-net")
-    data object CnIp : HxRoute("cnip")
     data object Logs : HxRoute("logs")
     data object NetMatch : HxRoute("net-match")
-    data object Diagnostics : HxRoute("diagnostics")
     data object Notifications : HxRoute("notifications")
     data object Theme : HxRoute("theme")
     data object DefaultPanelSettings : HxRoute("default-panel-settings")
@@ -203,6 +198,7 @@ internal sealed class HxRoute(val key: String) {
     data object StartupDownloadSettings : HxRoute("startup-download-settings")
     data object PublicIp : HxRoute("public-ip")
     data object Resources : HxRoute("resources")
+    data object NetTest : HxRoute("net-test")
 }
 
 internal class HxNav {
@@ -341,16 +337,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.Providers -> ProvidersScreen(vm)
                             HxRoute.Adblock -> AdblockScreen(vm)
                             HxRoute.Network -> NetworkSettingsScreen(vm)
-                            HxRoute.Apps -> AppListScreen(vm)
-                            HxRoute.Cores -> CoresScreen(vm)
                             HxRoute.About -> AboutScreen(vm)
-                            HxRoute.Bypass -> BypassRulesScreen(vm) { nav.pop() }
                             HxRoute.Files -> FileManagerScreen(vm) { nav.pop() }
-                            HxRoute.SharedNet -> SharedNetworkScreen(vm) { nav.pop() }
-                            HxRoute.CnIp -> CnIpScreen(vm) { nav.pop() }
                             HxRoute.Logs -> HxLogFilesScreen(vm) { nav.pop() }
                             HxRoute.NetMatch -> HxNetworkMatchScreen(vm) { nav.pop() }
-                            HxRoute.Diagnostics -> DiagnosticsScreen(vm) { nav.pop() }
                             HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                             HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                             HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
@@ -358,6 +348,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                             HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                             HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                             HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
+                            HxRoute.NetTest -> NetworkTestScreen { nav.pop() }
                         }
                     }
                 }
@@ -367,6 +358,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             HxToastHost(vm, extraBottom = if (nav.stack.size == 1 && dockOccupiedHeight > 0.dp)
                 (dockOccupiedHeight - navBottom).coerceAtLeast(0.dp) + 12.dp else 24.dp)
+            HxCoreNoticeHost(vm)
         }
 
         vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
@@ -416,13 +408,17 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
         }
     }
     // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
-    val items = dockTabs.map { tab ->
-        val label = ht(tab.label)
-        when (tab) {
-            HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
-            HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
-            HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
-            HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+    // One list instance per tab set/language: the dock skips recomposition while pages scroll.
+    val labels = dockTabs.map { ht(it.label) }
+    val items = remember(dockTabs, labels) {
+        dockTabs.mapIndexed { index, tab ->
+            val label = labels[index]
+            when (tab) {
+                HxTab.Home -> DockItem(label, io.github.xgl34222220.hetu.ui.HetuLucideIcons.House, 1f) // monochrome outline, like the other three
+                HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
+                HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
+                HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+            }
         }
     }
     val floatingDock = remember(settingsTick) { vm.prefs.getBoolean("floatingBottomBar", true) }
@@ -447,11 +443,13 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
     }
-    Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
+    // Every tab page paints its own opaque canvas and HetuRoot keeps one beneath them for
+    // transitions, so this host adds no third full-screen gradient (overdraw per frame).
+    Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize()
-                .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(liquidBackdrop) else Modifier)
+                // The dock's glass is static (no backdrop blur), so the tab page is not recorded
+                // into an offscreen layer on every scroll frame.
                 .nestedScroll(dockScroll),
         ) {
             AnimatedContent(
@@ -484,7 +482,8 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
         val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
-        val dockShift by animateDpAsState(
+        // Read only in the placement lambda: hiding/showing the dock never recomposes the shell.
+        val dockShift = animateDpAsState(
             if (dockVisible) 0.dp else dockHeight + 16.dp,
             if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(),
             label = "dockShift",
@@ -499,10 +498,38 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
                 if (next == vm.tab) vm.reselect++ else vm.tab = next
             },
             hazeState = dockHaze,
-            backdrop = liquidBackdrop.takeIf { runtimeLiquid },
-            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
+            backdrop = null,
+            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
             onHeightChanged = { measuredDockHeight = it },
         )
+    }
+}
+
+/**
+ * 「当前核心（X）不支持此功能」 for an action the running core lacks (热重载, 流量模式, 测速):
+ * the same glass card as the panel's degraded tabs, in a dialog, instead of an error toast.
+ */
+@Composable
+internal fun HxCoreNoticeHost(vm: HetuViewModel) {
+    val notice = vm.coreNotice ?: return
+    val dismiss = { vm.coreNotice = null }
+    io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs(vm.prefs) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
+            io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard(
+                notice.core, notice.feature, notice.detail,
+                Modifier.widthIn(max = 360.dp), raised = true,
+            ) {
+                if (notice.offerRestart && vm.state.running) {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Soft)
+                    io.github.xgl34222220.hetu.home.HomeButton("重启代理", { vm.coreNotice = null; vm.restart() }, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                } else {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.fillMaxWidth(),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                }
+            }
+        }
     }
 }
 
@@ -551,6 +578,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                 Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                     content(vm)
                     HxToastHost(vm)
+                    HxCoreNoticeHost(vm)
                 }
             }
         }

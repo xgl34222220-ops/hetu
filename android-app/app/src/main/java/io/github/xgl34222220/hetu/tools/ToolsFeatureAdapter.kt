@@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
+import io.github.xgl34222220.hetu.AdblockVerification
 import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
 import io.github.xgl34222220.hetu.ProxyComposeController
 import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
@@ -58,6 +59,8 @@ private object Keys {
     const val SharedNetwork = "proxySharedNetwork"
     const val SharedMacs = "proxySharedBypassMacs"
     const val CnIp = "proxyCnIpDirect"
+    const val CnIpKernelV4 = "proxyCnIpKernelV4"
+    const val CnIpKernelV6 = "proxyCnIpKernelV6"
     const val AdblockChain = "proxyAdblockChain"
     const val AdblockFallback = "proxyAdblockFallbackEnabled"
     const val Cname = "cnameProtection"
@@ -213,9 +216,28 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             /* ------------------------------ CNIP ------------------------------ */
             loadCnIp = { prefs.getBoolean(Keys.CnIp, false) },
             setCnIp = { on -> prefs.edit().putBoolean(Keys.CnIp, on).apply(); dirty(Keys.CnIp) },
+            loadCnIpKernel = {
+                ToolsCnIpKernel(
+                    prefs.getBoolean(Keys.CnIpKernelV4, false), prefs.getBoolean(Keys.CnIpKernelV6, false),
+                    prefs.getString("proxyCnIpKernelStatus", "").orEmpty(), prefs.getString("proxyCnIpKernelReason", "").orEmpty(),
+                    prefs.getInt("proxyCnIpKernelV4Entries", 0), prefs.getInt("proxyCnIpKernelV6Entries", 0),
+                )
+            },
+            setCnIpKernel = { v4, v6 ->
+                prefs.edit().putBoolean(Keys.CnIpKernelV4, v4).putBoolean(Keys.CnIpKernelV6, v6).apply()
+                // Not a runtime-signature key: mark the restart notice explicitly.
+                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
+            networkEvents = { proxy.networkEvents() },
+            repairSessionRecord = {
+                try { proxy.repairSessionRecord() }
+                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
+                catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
+            },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)
                 if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
@@ -234,6 +256,10 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             loadAdblock = {
                 val snapshot = rules.rulesSnapshot()
                 val chain = ToolsRuntimeBridge.adblockChain(app)
+                // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
+                val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
+                // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
+                val report = if (chain.running && coreLiveVerify) AdblockVerification.chain(app) else null
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -263,11 +289,19 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                         recent = chain.recent,
                         startupInjected = chain.startupInjected,
-                        controllerLoaded = chain.controllerLoaded,
+                        controllerLoaded = report?.let { it.loaded && it.ordered && it.providersLoaded } ?: chain.controllerLoaded,
+                        chainNote = report?.detail().orEmpty(),
                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
+                        coreLabel = coreLabel,
+                        coreRoutesAds = coreRoutesAds,
+                        coreLiveVerify = coreLiveVerify,
                     ),
                 )
+            },
+            probeAdblock = {
+                val result = AdblockVerification.probe(app)
+                ToolsAdProbe(result.ok, result.detail)
             },
             setAdblockEnabled = { on ->
                 val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
@@ -340,10 +374,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
 /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
 @Composable
 private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
-    var bitmap by remember(app.packageName) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(app.packageName) { bitmap = controller.appIcon(app.packageName) }
+    // A row scrolled back into view shows its cached icon on the first frame instead of a
+    // letter avatar followed by an IO hop and a second composition.
+    var bitmap by remember(app.packageName) { mutableStateOf(controller.cachedAppIcon(app.packageName)) }
+    LaunchedEffect(app.packageName) { if (bitmap == null) bitmap = controller.appIcon(app.packageName) }
     val loaded = bitmap
-    if (loaded != null) Image(loaded.asImageBitmap(), null, modifier) else ToolsAvatar(app.label, modifier)
+    if (loaded != null) {
+        val image = remember(loaded) { loaded.asImageBitmap() }
+        Image(image, null, modifier)
+    } else ToolsAvatar(app.label, modifier)
 }
 
 /**

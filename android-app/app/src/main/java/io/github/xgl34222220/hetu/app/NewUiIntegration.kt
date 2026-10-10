@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.unit.Dp
 import io.github.xgl34222220.hetu.home.HetuHomeV2
 import io.github.xgl34222220.hetu.home.HomeWanExtras
@@ -9,7 +10,8 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
 @Composable
 internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Unit) {
     val nav = LocalNav.current
-    val tracked = vm.providers.filter { it.hasSubscriptionInfo && it.total > 0L }
+    val providers = vm.providers
+    val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
     val rt = vm.runtime
     HetuHomeV2(
         data = CompactHomeData(
@@ -41,7 +43,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
         onOpenSubscription = { vm.openPanel("providers") },
         onOpenBasicSettings = { nav.push(HxRoute.Network) },
-        onOpenConfigs = { nav.push(HxRoute.Configs) },
+        onOpenConfigs = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs) },
         onViewConfig = { nav.push(HxRoute.ConfigEditor) },
         onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
         cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
@@ -53,8 +55,9 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         ),
         operationText = vm.operationText,
         connection = io.github.xgl34222220.hetu.home.HomeConnectionObservation(
-            controllerReady = vm.state.panelReady,
-            controllerReadFailed = vm.state.controllerReadFailed,
+            // A core without a Clash controller has nothing to read: that is not a controller fault.
+            controllerReady = vm.state.panelReady || !vm.state.controllerSupported,
+            controllerReadFailed = vm.state.controllerReadFailed && vm.state.controllerSupported,
             controllerError = vm.state.controllerError,
             takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
             runtimeMessage = vm.state.message,

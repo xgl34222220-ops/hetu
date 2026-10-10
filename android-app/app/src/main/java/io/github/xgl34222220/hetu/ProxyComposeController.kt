@@ -122,6 +122,11 @@ internal data class ProxyComposeState(
     val continuityObservationTicket: Long = -1L,
     val continuityObservationSession: String = "",
     val continuityObservationNetworkEpoch: Long = 0L,
+    /**
+     * False while the running core has no Clash controller (Xray / V2Fly / Hysteria 2) and no external
+     * API is configured: there is nothing to read, so no controller read is made or reported as failed.
+     */
+    val controllerSupported: Boolean = true,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -231,6 +236,16 @@ internal class ProxyComposeController(context: Context) {
                     val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                         else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                     if (observedPid > 0) live.put("pid", observedPid)
+                    // CNIP kernel bypass as the running session reports it (ipset / degraded / off).
+                    if (live.has("cnip")) {
+                        val cnip = if (live.optBoolean("running", false)) live.optString("cnip", "off") else "off"
+                        val reason = live.optString("cnipReason", "")
+                        val v4 = live.optInt("cnipV4Entries", 0); val v6 = live.optInt("cnipV6Entries", 0)
+                        if (prefs.getString("proxyCnIpKernelStatus", "") != cnip || prefs.getString("proxyCnIpKernelReason", "") != reason ||
+                            prefs.getInt("proxyCnIpKernelV4Entries", -1) != v4 || prefs.getInt("proxyCnIpKernelV6Entries", -1) != v6)
+                            prefs.edit().putString("proxyCnIpKernelStatus", cnip).putString("proxyCnIpKernelReason", reason)
+                                .putInt("proxyCnIpKernelV4Entries", v4).putInt("proxyCnIpKernelV6Entries", v6).apply()
+                    }
                     freshStatus = true
                 }
             } catch (cancel: CancellationException) { throw cancel }
@@ -322,8 +337,10 @@ internal class ProxyComposeController(context: Context) {
         var trafficMode = ""
         var controllerReadFailed = false
         var controllerError = ""
+        val controllerSupported = prefs.getBoolean("proxyCustomApiEnabled", false) ||
+            ProxyCoreSupport.clashApi(ProxyCoreSupport.running(prefs))
 
-        if (running) {
+        if (running && controllerSupported) {
             try {
                 // Independent reads overlap, but publication still requires every
                 // response and the original runtime observation ownership below.
@@ -409,6 +426,7 @@ internal class ProxyComposeController(context: Context) {
                 else -> ""
             },
             panelReady = panelReady,
+            controllerSupported = controllerSupported,
             controllerReadFailed = controllerReadFailed,
             controllerError = controllerError,
             groups = groups,
@@ -470,9 +488,9 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) {
             error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
         }
-        onProgress("执行服务启动前脚本…")
-        ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected.name)
-        root.startManual(profile) { onProgress(it) }
+        // The pre-start hook runs inside the single Root start invocation (no extra su when
+        // no hook exists); a failing hook still refuses the start before the network changes.
+        root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {
@@ -585,7 +603,14 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
-        configs.select(ProxyRuntimeProfile.load(prefs).core, name)
+        val core = ProxyRuntimeProfile.load(prefs).core
+        if (ProxyCoreConfig.kind(core) != ProxyCoreConfig.Kind.MIHOMO) {
+            // A sing-box / Xray / V2Fly / Hysteria config is checked by that core's own CLI
+            // (sing-box check, xray run -test, v2ray test, Hysteria YAML) before it becomes current.
+            val entry = configs.list(core).firstOrNull { it.name == name } ?: error("配置不存在")
+            root.validateConfigText(configs.read(entry))
+        }
+        configs.select(core, name)
     }
 
     suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {

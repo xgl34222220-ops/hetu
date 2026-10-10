@@ -1,0 +1,118 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "inbounds": [
+    {
+      "tag": "hetu-tproxy",
+      "listen": "::",
+      "port": 19898,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "network": "tcp,udp",
+        "followRedirect": true
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tproxy": "tproxy"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic"],
+        "routeOnly": true
+      }
+    },
+    {
+      "tag": "hetu-dns-in",
+      "listen": "::",
+      "port": 11053,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "1.1.1.1",
+        "port": 53,
+        "network": "tcp,udp"
+      }
+    },
+    {
+      "tag": "hetu-egress-probe",
+      "listen": "127.0.0.1",
+      "port": 29150,
+      "protocol": "http"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "proxy",
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "203.0.113.30",
+            "port": 443,
+            "users": [
+              {
+                "id": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3",
+                "alterId": 0,
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "example.com"
+        },
+        "wsSettings": {
+          "path": "/ws"
+        },
+        "sockopt": {}
+      }
+    },
+    {
+      "tag": "direct",
+      "protocol": "freedom"
+    },
+    {
+      "tag": "hetu-dns-out",
+      "protocol": "dns"
+    },
+    {
+      "tag": "hetu-adblock",
+      "protocol": "blackhole"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "AsIs",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["hetu-dns-in"],
+        "outboundTag": "hetu-dns-out"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["hetu-tproxy", "hetu-redirect"],
+        "port": 53,
+        "outboundTag": "hetu-dns-out"
+      },
+      {
+        "type": "field",
+        "domain": ["domain:ads.example.net", "domain:tracker.example.org"],
+        "outboundTag": "hetu-adblock"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:cn"],
+        "outboundTag": "direct"
+      }
+    ]
+  },
+  "dns": {
+    "servers": ["1.1.1.1", "223.5.5.5"],
+    "queryStrategy": "UseIP"
+  }
+}

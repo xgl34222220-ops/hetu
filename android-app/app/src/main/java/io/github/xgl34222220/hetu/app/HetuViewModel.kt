@@ -75,6 +75,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         get() = tabState
         set(value) { tabState = value }
 
+    /** A tools page another tab asked to open (e.g. 首页 › 打开配置管理); the tools tab consumes it once. */
+    var toolsRequest by mutableStateOf<io.github.xgl34222220.hetu.tools.ToolsEntry?>(null)
+
+    /** Opens [entry] inside 工具, so every feature has one page wherever it is reached from. */
+    fun openTools(entry: io.github.xgl34222220.hetu.tools.ToolsEntry) {
+        toolsRequest = entry
+        tab = HxTab.Tools
+    }
+
     /** Open a live panel section from home cards, tools or deep links. */
     fun openPanel(section: String) {
         val requested = section.ifBlank { "overview" }
@@ -215,6 +224,12 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     val providerTasks = mutableStateMapOf<String, HxTask>()
     var providersUpdatingAll by mutableStateOf(false)
         private set
+
+    /* ---------------- per-core degraded state ---------------- */
+    /** A feature the running core lacks: shown as the glass 「当前核心（X）不支持此功能」 card, never a toast. */
+    var coreNotice by mutableStateOf<CoreFeatureNotice?>(null)
+
+    private fun runningCore(): ProxyRuntimeProfile.Core = ProxyCoreSupport.running(prefs)
 
     /* ---------------- messages ---------------- */
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
@@ -763,9 +778,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             operationText = if (stopping) "正在停止…" else "正在启动…"
             try {
-                if (stopping) controller.stop { operationText = it } else controller.start { operationText = it }
-                state = controller.state()
-                if (!stopping) toast("代理已启动")
+                if (stopping) {
+                    controller.stop { operationText = it }
+                    state = controller.state()
+                } else {
+                    val started = controller.start { operationText = it }
+                    // hetu-root.sh answers ok only after the core is alive, every listener is up,
+                    // rules, health baseline and watchdog are in place: show 运行中 now. The
+                    // status/network-health read follows in the background (refreshNow below),
+                    // and the watchdog/status self-heal cadence is unchanged.
+                    state = state.copy(running = true, healthObserved = false,
+                        message = started.optString("message", state.message))
+                    toast("代理已启动")
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -832,6 +857,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun reload() {
         if (operation != null || !state.running) return
+        // sing-box / Xray / V2Fly / Hysteria apply config changes on restart: an explicit state, not an error.
+        val core = runningCore()
+        if (!ProxyCoreSupport.hotReload(core)) {
+            coreNotice = CoreFeatureNotice(core.label, "热重载",
+                "${core.label} 不能在运行中重新加载配置。使用「重启」即可应用修改，网络会短暂中断几秒。", offerRestart = true)
+            return
+        }
         invalidateRuntimeRequests()
         operation = HxRunOp.Reload
         viewModelScope.launch {
@@ -850,8 +882,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    /**
+     * Hot-reloads the running core for a config transaction and hands the result (or failure) back to
+     * the caller, which decides whether to roll its source back. Same operation slot as [reload].
+     */
+    suspend fun reloadNow(): String {
+        if (!state.running) throw java.io.IOException("代理未运行，无法热重载")
+        if (operation != null) throw java.io.IOException("代理正在执行其他操作，请稍后重启代理应用配置")
+        invalidateRuntimeRequests()
+        operation = HxRunOp.Reload
+        operationText = "正在重载配置…"
+        try {
+            return controller.reload()
+        } finally {
+            operation = null
+            operationText = ""
+            try { refreshNow() } catch (_: Exception) { }
+        }
+    }
+
     fun setTrafficMode(mode: String) {
         if (!state.running) return
+        val core = runningCore()
+        if (!ProxyCoreSupport.trafficMode(core) && !prefs.getBoolean("proxyCustomApiEnabled", false)) {
+            coreNotice = CoreFeatureNotice(core.label, "规则 / 全局 / 直连 切换",
+                if (ProxyCoreSupport.clashApi(core)) "${core.label} 的 clash_api 只在配置含 clash_mode 规则时切换模式，河图写入的配置固定按规则分流。"
+                else "${core.label} 没有 Clash 兼容控制接口，无法在运行中切换流量模式；代理按配置中的规则分流。")
+            return
+        }
         viewModelScope.launch {
             try {
                 repo.setTrafficMode(mode)
@@ -862,6 +920,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 toast(errorText(error, "切换模式失败"))
             }
         }
+    }
+
+    /** 测速 / 延迟 needs a Clash controller; without one the action shows the per-core card. */
+    private fun latencyUnsupported(): Boolean {
+        if (state.controllerSupported) return false
+        val core = runningCore()
+        coreNotice = CoreFeatureNotice(core.label, "节点测速 / 延迟",
+            "${core.label} 没有 Clash 兼容控制接口，无法逐个节点测速。首页的站点延迟经代理实测，仍可使用。")
+        return true
     }
 
     fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
@@ -924,6 +991,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun testNode(node: String) {
         if (refuseRestoredGroups()) return
+        if (latencyUnsupported()) return
         val request = activeRuntimeRequest() ?: return
         if (testingNodes[node] == true) return
         val owner = ++requestSequence
@@ -935,6 +1003,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun testGroup(group: ProxyGroupUi) {
         if (refuseRestoredGroups()) return
+        if (latencyUnsupported()) return
         val request = activeRuntimeRequest() ?: return
         if (testingGroups[group.name] == true) return
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
@@ -989,6 +1058,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun testAll() {
         if (refuseRestoredGroups()) return
+        if (latencyUnsupported()) return
         val request = activeRuntimeRequest() ?: return
         if (testingAll) return
         val owner = ++requestSequence
@@ -1391,6 +1461,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             toast("$savedMessage，下次启动生效")
             return
         }
+        val core = runningCore()
+        if (!ProxyCoreSupport.hotReload(core)) {
+            coreNotice = CoreFeatureNotice(core.label, "热重载",
+                "$savedMessage。${core.label} 不能在运行中重新加载配置，重启代理后生效。", offerRestart = true)
+            return
+        }
         reload()
     }
 }
+
+/** The per-core degraded state of one action: 「当前核心（[core]）不支持此功能」, [feature], [detail]. */
+internal data class CoreFeatureNotice(
+    val core: String,
+    val feature: String,
+    val detail: String,
+    /** Offer 「重启代理」, which applies what a hot reload would have applied. */
+    val offerRestart: Boolean = false,
+)

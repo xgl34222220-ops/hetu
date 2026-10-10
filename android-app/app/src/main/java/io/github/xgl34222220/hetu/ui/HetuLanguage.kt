@@ -593,6 +593,26 @@ API 设置|API settings|API 設定|Настройки API
 // 工具: the tool pages rebuilt on the shared kit, and what their components say themselves.
 // "\n" in a line stands for a line break, so a two-line message can be a key.
 private val vocabularyTools = """
+网络测试|Network test|網路測試|Тест сети
+连通性|Connectivity|連通性|Доступность
+连通性与网速|Connectivity and speed|連通性與網速|Доступность и скорость
+开始测速|Start test|開始測速|Начать тест
+停止测速|Stop test|停止測速|Остановить тест
+测试中|Testing|測試中|Проверка
+未解锁|Blocked|未解鎖|Недоступно
+实时速率|Live rate|即時速率|Скорость в реальном времени
+测速结果|Results|測速結果|Результаты
+出口|Exit|出口|Выход
+重新测试|Test again|重新測試|Повторить
+可用|available|可用|доступно
+AI 服务|AI services|AI 服務|ИИ-сервисы
+社交媒体|Social|社群媒體|Соцсети
+影音娱乐|Streaming|影音娛樂|Видео и музыка
+工具与服务|Tools and services|工具與服務|Инструменты и сервисы
+尚未测速|Not tested yet|尚未測速|Тест не выполнялся
+下载速率|Download rate|下載速率|Скорость загрузки
+测速失败|Speed test failed|測速失敗|Тест не удался
+失败|Failed|失敗|Ошибка
 切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
 上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
 下一个匹配|Next match|下一個相符項目|Следующее совпадение
@@ -972,6 +992,16 @@ private val vocabularyConnection = """
 接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
 接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
 接管检查通过 · 出口已验证|Local takeover checked · Internet verified|接管檢查通過 · 出口已驗證|Локальный перехват проверен · Интернет проверен
+配置选择|Configurations|設定選擇|Конфигурации
+当前配置 · 长按查看或编辑|Current · hold to view or edit|目前設定 · 長按檢視或編輯|Текущая · удерживайте для просмотра
+内置模板 · 需要填写订阅|Bundled template · needs a subscription|內建範本 · 需要填寫訂閱|Встроенный шаблон · нужна подписка
+尚无配置|No configurations yet|尚無設定|Конфигураций пока нет
+在 工具 › 配置管理 导入配置后会显示在这里|Configurations imported in Tools › Configurations appear here|在 工具 › 設定管理 匯入設定後會顯示在這裡|Импортированные в «Инструменты › Конфигурации» появятся здесь
+只读查看 · 点右上角编辑|Read-only · tap edit at the top right|唯讀檢視 · 點右上角編輯|Только чтение · нажмите «Изменить» справа вверху
+正在读取配置|Reading configuration|正在讀取設定|Чтение конфигурации
+暂不支持运行|Not runnable yet|暫不支援執行|Пока не запускается
+暂不支持：|Not supported: |暫不支援：|Не поддерживается: 
+Web 界面|Web interface|Web 介面|Веб-интерфейс
 """.trimIndent()
 
 private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")

@@ -11,6 +11,8 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -26,37 +28,33 @@ internal fun Modifier.homeDiffuseCanvas(background: Color? = null): Modifier {
     val c = LocalHomeColors.current
     val base = background ?: c.bg
     if (c.dark && c.bg == Color.Black && base == c.bg) return this.background(base)
-    val cool = lerp(c.accent, if (c.dark) Color(0xFF8E93CC) else Color(0xFFAFA9EB), .62f)
-    val warm = if (c.dark) Color(0xFF947D9F) else Color(0xFFD8BCD6)
+    // Restrained liquid-glass canvas: a calm gray-blue wash with one faint vertical gradient and a
+    // soft light at the top. No coloured blobs; cached per size, nothing animates.
+    val mist = if (c.dark) Color(0xFF243042) else Color(0xFFC9D5E6)
     val material = remember(c, base) { Modifier.drawWithCache {
-        val extent = max(size.width, size.height).coerceAtLeast(1f)
-        val top = Brush.radialGradient(
-            listOf(cool.copy(alpha = if (c.dark) .13f else .19f), Color.Transparent),
-            center = Offset(size.width * .08f, size.height * .05f), radius = extent * .67f,
-        )
-        val side = Brush.radialGradient(
-            listOf(warm.copy(alpha = if (c.dark) .08f else .17f), Color.Transparent),
-            center = Offset(size.width * 1.05f, size.height * .49f), radius = extent * .57f,
-        )
-        val foot = Brush.radialGradient(
-            listOf(c.accent.copy(alpha = if (c.dark) .06f else .065f), Color.Transparent),
-            center = Offset(size.width * .22f, size.height * 1.08f), radius = extent * .61f,
+        val wash = Brush.verticalGradient(listOf(
+            lerp(base, if (c.dark) Color(0xFF1B2330) else Color.White, if (c.dark) .30f else .42f),
+            base,
+            lerp(base, mist, if (c.dark) .28f else .34f),
+        ))
+        val light = Brush.radialGradient(
+            listOf(Color.White.copy(alpha = if (c.dark) .035f else .28f), Color.Transparent),
+            center = Offset(size.width * .5f, 0f), radius = max(size.width, 1f) * .95f,
         )
         onDrawBehind {
             drawRect(base)
-            drawRect(top)
-            drawRect(side)
-            drawRect(foot)
+            drawRect(wash)
+            drawRect(light)
         }
     } }
     return this.then(material)
 }
 
 /**
- * Lightweight glass material for content and overlays. The high-opacity fill protects small
- * text from the canvas; raised surfaces are opaque so underlying text cannot show through a
- * menu or dialog. One physical-pixel edge gives definition without a resting shadow.
- * Existing shapes and hit targets are supplied by the caller and do not change.
+ * Restrained iOS liquid-glass material, faked without any blur so it costs nothing while lists
+ * scroll: a frosted translucent fill (a cached vertical gradient, opaque enough for small text),
+ * a thin bright edge that is strongest along the top, and a soft low shadow drawn once per size.
+ * Raised surfaces (menus, dialogs) stay opaque. Shapes and hit targets come from the caller.
  */
 @Composable
 internal fun Modifier.homeGlassPanel(
@@ -65,22 +63,34 @@ internal fun Modifier.homeGlassPanel(
     raised: Boolean = false,
 ): Modifier {
     val c = LocalHomeColors.current
+    val dark = c.dark
+    val black = dark && c.bg == Color.Black
     val pixel = (1f / LocalDensity.current.density).dp
-    val top = lerp(background, Color.White, if (c.dark) .025f else .16f)
-        .copy(alpha = if (raised) 1f else if (c.dark) .98f else .96f)
-    val bottom = lerp(background, c.accent, if (c.dark) .014f else .016f)
-        .copy(alpha = if (raised) 1f else if (c.dark) .96f else .90f)
+    val top = lerp(background, Color.White, if (dark) .05f else .34f)
+        .copy(alpha = if (raised) 1f else if (dark) .92f else .86f)
+    val bottom = lerp(background, if (dark) Color(0xFF2A3546) else Color(0xFFD7E0EC), if (dark) .10f else .22f)
+        .copy(alpha = if (raised) 1f else if (dark) .90f else .80f)
     val fill = remember(top, background, bottom, raised) {
-        Brush.verticalGradient(listOf(top, background.copy(alpha = if (raised) 1f else .95f), bottom))
+        Brush.verticalGradient(listOf(top, background.copy(alpha = if (raised) 1f else if (dark) .91f else .84f), bottom))
     }
-    val rim = remember(c.dark, c.line) {
-        Brush.linearGradient(listOf(
-            Color.White.copy(alpha = if (c.dark) .13f else .82f),
-            c.line.copy(alpha = if (c.dark) .55f else .74f),
+    val rim = remember(dark, c.line) {
+        Brush.verticalGradient(listOf(
+            Color.White.copy(alpha = if (dark) .20f else .95f),
+            Color.White.copy(alpha = if (dark) .06f else .45f),
+            c.line.copy(alpha = if (dark) .45f else .55f),
         ))
     }
-    val material = remember(shape, fill, rim, pixel) {
-        Modifier.clip(shape).background(fill).border(pixel, rim, shape)
+    val shadowTint = if (dark) Color.Black.copy(alpha = .30f) else Color(0xFF51617A).copy(alpha = .10f)
+    val material = remember(shape, fill, rim, pixel, shadowTint, black) {
+        val shadow = if (black) Modifier else Modifier.drawWithCache {
+            // Two offset translucent copies of the outline read as a soft contact shadow.
+            val near = shape.createOutline(size, layoutDirection, this)
+            onDrawBehind {
+                translate(0f, 2.dp.toPx()) { drawOutline(near, shadowTint) }
+                translate(0f, 5.dp.toPx()) { drawOutline(near, shadowTint.copy(alpha = shadowTint.alpha * .45f)) }
+            }
+        }
+        shadow.clip(shape).background(fill).border(pixel * 1.5f, rim, shape)
     }
     return this.then(material)
 }

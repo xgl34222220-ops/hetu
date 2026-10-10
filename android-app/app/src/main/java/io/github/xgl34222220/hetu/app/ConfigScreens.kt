@@ -99,11 +99,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
 import io.github.xgl34222220.hetu.ui.ht
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.IOException
-import java.net.HttpURLConnection
-import java.net.URL
 
 /* ------------------------------------------------------------------ */
 /*  Config library + subscriptions                                      */
@@ -178,10 +177,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
     }
 
     if (form == "import") {
-        ConfigImportPage(vm, onBack = { form = null }) {
+        ConfigImportPage(vm, onBack = { form = null }) { message ->
             revision++
             scope.launch { vm.refreshNow() }
-            vm.applyConfigChange("配置已导入并设为当前")
+            vm.toast(message)
             form = null
         }
         return
@@ -387,7 +386,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
 }
 
 @Composable
-private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: () -> Unit) {
+internal fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: (String) -> Unit) {
     val context = LocalContext.current
     val c = LocalHomeColors.current
     val scope = rememberCoroutineScope()
@@ -395,26 +394,57 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: 
     var uri by remember { mutableStateOf<Uri?>(null) }
     var fileName by remember { mutableStateOf("") }
     var url by remember { mutableStateOf("") }
+    var pasted by remember { mutableStateOf("") }
     var name by remember { mutableStateOf("") }
     var attempted by remember { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var problem by remember { mutableStateOf<String?>(null) }
     var discard by remember { mutableStateOf(false) }
-    val dirty = uri != null || url.isNotBlank() || name.isNotBlank()
+    val dirty = uri != null || url.isNotBlank() || pasted.isNotBlank() || name.isNotBlank()
     val chooser = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { selected ->
         if (selected != null) { uri = selected; fileName = displayName(context, selected); problem = null }
     }
     fun leave() { if (!busy) { if (dirty) discard = true else onBack() } }
+    fun pasteClipboard() {
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? android.content.ClipboardManager
+        val clip = runCatching { clipboard?.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(context)?.toString() }.getOrNull()
+        if (clip.isNullOrBlank()) problem = "剪贴板中没有文本" else { pasted = clip; problem = null }
+    }
     fun import() {
         attempted = true
-        if (busy || (mode == "link" && !hxConfigHttpUrl(url)) || (mode == "file" && uri == null)) return
+        if (busy || (mode == "link" && !hxConfigHttpUrl(url)) || (mode == "file" && uri == null) || (mode == "clipboard" && pasted.isBlank())) return
+        if (vm.state.running && vm.operation != null) { problem = "代理正在启动或重启，请稍后再导入"; return }
         busy = true
         problem = null
         scope.launch {
             try {
-                if (mode == "file") vm.controller.importConfig(requireNotNull(uri), fileName)
-                else downloadConfig(context, url.trim(), name.trim())
-                onImported()
+                // 1. Read and strictly decode; 2. validate with Mihomo before anything is stored.
+                val (bytes, suggested) = when (mode) {
+                    "file" -> HxConfigTransaction.readUri(context, requireNotNull(uri)) to fileName
+                    "link" -> HxConfigTransaction.download(url.trim()).let { (body, header) ->
+                        body to name.trim().ifBlank { header.ifBlank { Uri.parse(url.trim()).host.orEmpty().ifBlank { "subscription" } } }
+                    }
+                    else -> pasted.toByteArray(Charsets.UTF_8) to name.trim().ifBlank { "clipboard.yaml" }
+                }
+                val text = HxConfigTransaction.decode(bytes)
+                vm.controller.validateConfigText(text)
+                // 3. Store atomically and select; 4. apply, switching back to the previous config if the core rejects it.
+                val core = ProxyRuntimeProfile.load(vm.prefs).core
+                val message = withContext(NonCancellable) {
+                    val (previous, stored) = withContext(Dispatchers.IO) {
+                        val library = ProxyConfigLibrary(context)
+                        val before = library.selected(core)?.name
+                        before to library.importConfig(core, normalizeConfigName(suggested), text.toByteArray(Charsets.UTF_8).inputStream()).name
+                    }
+                    val outcome = HxConfigTransaction.apply(vm.state.running, { vm.reloadNow() }) {
+                        withContext(Dispatchers.IO) { if (previous != null) ProxyConfigLibrary(context).select(core, previous) else throw IOException("没有可切回的配置") }
+                    }
+                    when (outcome) {
+                        is HxApplyOutcome.RolledBack -> "已导入 $stored，但应用失败，已切回「$previous」：${outcome.reason}"
+                        else -> HxConfigTransaction.describe(outcome, "已导入并设为当前：$stored")
+                    }
+                }
+                onImported(message)
             } catch (cancel: CancellationException) { throw cancel }
             catch (failure: Exception) { problem = failure.message ?: "配置导入失败" }
             finally { busy = false }
@@ -425,10 +455,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: 
         item("mode") {
             HxSection {
                 HomeSegmented(
-                    listOf("file" to ht("从文件导入"), "link" to ht("从链接导入")), mode,
+                    listOf("file" to ht("文件"), "link" to ht("链接"), "clipboard" to ht("剪贴板")), mode,
                     { mode = it; attempted = false; problem = null },
                     Modifier.fillMaxWidth(), enabled = !busy, style = HomeSegmentStyle.Soft, track = c.surface, height = 56.dp, corner = 20.dp,
-                    textStyle = HomeType.button, icons = mapOf("file" to ToolsIcons.FileText, "link" to ToolsIcons.Link), inset = 5.dp,
+                    textStyle = HomeType.button, icons = mapOf("file" to ToolsIcons.FileText, "link" to ToolsIcons.Link, "clipboard" to HomeIcons.Copy), inset = 5.dp,
                 )
             }
         }
@@ -443,6 +473,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: 
                         )
                         Spacer(Modifier.height(22.dp))
                         HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 旅行.yaml", enabled = !busy)
+                    } else if (mode == "clipboard") {
+                        Text(ht("剪贴板内容"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
+                        Spacer(Modifier.height(8.dp))
+                        // Only a summary is drawn: a multi-megabyte YAML never enters a text field.
+                        val pasteSource = remember { MutableInteractionSource() }
+                        val lines = remember(pasted) { if (pasted.isEmpty()) 0 else pasted.count { it == '\n' } + 1 }
+                        val pastedSize = remember(pasted) { pasted.toByteArray(Charsets.UTF_8).size.toLong() }
+                        val firstLine = remember(pasted) { pasted.lineSequence().firstOrNull { it.isNotBlank() }.orEmpty().trim().take(60) }
+                        Row(
+                            Modifier.fillMaxWidth().heightIn(min = 64.dp).clip(HomeDims.controlShape).background(if (pasted.isEmpty()) c.sunken else c.accentSoft)
+                                .homeRowPressTint(pasteSource)
+                                .clickable(interactionSource = pasteSource, indication = null, enabled = !busy, role = Role.Button) { pasteClipboard() }
+                                .padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(HomeIcons.Copy, null, Modifier.size(24.dp), tint = if (pasted.isEmpty()) c.t2 else c.accent)
+                            Spacer(Modifier.width(14.dp))
+                            Column(Modifier.weight(1f)) {
+                                if (pasted.isNotEmpty()) Text(firstLine.ifBlank { ht("YAML 文本") }, color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                Text(if (pasted.isEmpty()) ht("读取剪贴板") else "$lines ${ht("行")} · ${HxFormat.bytes(pastedSize)} · ${ht("重新读取")}",
+                                    color = if (pasted.isEmpty()) c.t1 else c.accent,
+                                    style = if (pasted.isEmpty()) HomeType.cardLabel else HomeType.caption.copy(fontWeight = FontWeight.SemiBold))
+                            }
+                            HxChevron()
+                        }
+                        HomeReveal(attempted && pasted.isBlank()) {
+                            Row(Modifier.padding(start = 2.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Icon(HomeIcons.CircleAlert, null, Modifier.size(16.dp), tint = c.bad)
+                                Text(ht("请先读取剪贴板"), color = c.badText, style = HomeType.note.copy(fontWeight = FontWeight.Medium))
+                            }
+                        }
+                        Spacer(Modifier.height(22.dp))
+                        HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 剪贴板.yaml", enabled = !busy)
                     } else {
                         Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
                         Spacer(Modifier.height(8.dp))
@@ -475,7 +538,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported: 
                     }
                     Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.t3)
-                        Text(ht("导入后设为当前配置。支持 UTF-8，最大 4 MiB。") + if (mode == "link") ht("链接需直接返回 YAML 文件。") else "", color = c.t2, style = HomeType.note)
+                        Text(ht("导入前先用 Mihomo 校验，通过后设为当前配置；代理运行中会热重载，失败自动切回原配置。支持 UTF-8，最大 4 MiB。") + if (mode == "link") ht("链接需直接返回 YAML 文件。") else "", color = c.t2, style = HomeType.note)
                     }
                     HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
                 }
@@ -530,46 +593,6 @@ private fun normalizeConfigName(raw: String): String {
     if (name.length > 120) name = name.takeLast(120)
     if (name.length < 3) name = "config.yaml"
     return name
-}
-
-/** Downloads a full Clash/Mihomo YAML subscription and stores it as a new config. */
-private suspend fun downloadConfig(context: Context, url: String, requestedName: String) = withContext(Dispatchers.IO) {
-    val connection = (URL(url).openConnection() as HttpURLConnection).apply {
-        connectTimeout = 15_000
-        readTimeout = 30_000
-        instanceFollowRedirects = true
-        setRequestProperty("User-Agent", "clash.meta")
-        setRequestProperty("Accept", "*/*")
-    }
-    try {
-        val code = connection.responseCode
-        if (code !in 200..299) throw IOException("下载失败：HTTP $code")
-        val disposition = connection.getHeaderField("Content-Disposition").orEmpty()
-        val fromHeader = Regex("filename\\*?=(?:UTF-8'')?\"?([^\";]+)\"?", RegexOption.IGNORE_CASE)
-            .find(disposition)?.groupValues?.getOrNull(1)?.let { Uri.decode(it) }.orEmpty()
-        val name = normalizeConfigName(
-            requestedName.ifBlank { fromHeader.ifBlank { Uri.parse(url).host.orEmpty().ifBlank { "subscription" } } },
-        )
-        val bytes = connection.inputStream.use { input ->
-            val output = java.io.ByteArrayOutputStream()
-            val buffer = ByteArray(8192)
-            while (true) {
-                val read = input.read(buffer)
-                if (read < 0) break
-                if (output.size() + read > 4 * 1024 * 1024) throw IOException("配置超过 4 MiB")
-                output.write(buffer, 0, read)
-            }
-            output.toByteArray()
-        }
-        val text = String(bytes, Charsets.UTF_8)
-        if (!text.contains("proxies") && !text.contains("proxy-providers")) {
-            throw IOException("下载内容不是 Clash/Mihomo YAML 配置（可能是 Base64 节点列表，请改用「添加订阅」）")
-        }
-        val profile = ProxyRuntimeProfile.load(context.getSharedPreferences("hetu", Context.MODE_PRIVATE))
-        ProxyConfigLibrary(context).importConfig(profile.core, name, bytes.inputStream())
-    } finally {
-        connection.disconnect()
-    }
 }
 
 /* ------------------------------------------------------------------ */
@@ -634,18 +657,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 
 private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
 
-private suspend fun hxReadConfigSource(context: Context): HxConfigSource = withContext(Dispatchers.IO) {
+/**
+ * The config an editor works on: the current config, or the named one ([target]) when a page opens
+ * a specific file from its list (设置 › 基础代理配置 › 配置选择).
+ */
+private fun hxConfigEntry(library: ProxyConfigLibrary, core: ProxyRuntimeProfile.Core, target: String?): ProxyConfigLibrary.Entry =
+    if (target == null) library.selected(core) ?: error("尚未选择配置")
+    else library.list(core).firstOrNull { it.name == target } ?: error("配置不存在：$target")
+
+private suspend fun hxReadConfigSource(context: Context, target: String? = null): HxConfigSource = withContext(Dispatchers.IO) {
     val prefs = context.getSharedPreferences("hetu", Context.MODE_PRIVATE)
     val core = ProxyRuntimeProfile.load(prefs).core
     val library = ProxyConfigLibrary(context)
-    val entry = library.selected(core) ?: error("尚未选择配置")
+    val entry = hxConfigEntry(library, core, target)
     HxConfigSource(core, entry.name, library.read(entry))
 }
 
 private class HxConfigSourceConflict(val selectionChanged: Boolean, val selectedName: String) : IOException()
 
 @Composable
-internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)? = null) {
+internal fun ConfigEditorScreen(
+    vm: HetuViewModel,
+    target: String? = null,
+    startReadOnly: Boolean = false,
+    // Last, so existing `ConfigEditorScreen(vm) { … }` callers keep binding their trailing lambda here.
+    onBackOverride: (() -> Unit)? = null,
+) {
     val nav = if (onBackOverride == null) LocalNav.current else null
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -663,6 +700,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmReload by remember { mutableStateOf(false) }
     var showOutline by remember { mutableStateOf(false) }
+    // 查看 opens the same editor read-only; «编辑» in its bar unlocks it in place.
+    var readOnly by remember { mutableStateOf(startReadOnly) }
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
     val editorColors = remember(c.dark, c.surface) {
         HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
@@ -678,7 +717,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         loadFailure = null
         source = null
         try {
-            source = hxReadConfigSource(context)
+            source = hxReadConfigSource(context, target)
             dirty = false
             problem = null
         } catch (cancel: CancellationException) { throw cancel }
@@ -705,7 +744,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                 val expected = source
                 if (expected != null && !loading && !saving) scope.launch {
                     try {
-                        val latest = hxReadConfigSource(context)
+                        val latest = hxReadConfigSource(context, target)
                         if (latest.core != expected.core || latest.name != expected.name)
                             conflict = HxConfigSourceConflict(true, latest.name)
                         else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
@@ -734,26 +773,66 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         val expected = source ?: return
         val current = editor?.text?.toString() ?: return
         if (saving || validating) return
+        // A start/restart owns the runtime; saving now could not be applied or rolled back cleanly.
+        if (vm.state.running && vm.operation != null) { problem = "代理正在启动或重启，请稍后再保存"; return }
         saving = true
         scope.launch {
             try {
-                val latest = hxReadConfigSource(context)
+                val latest = hxReadConfigSource(context, target)
                 if (latest.core != expected.core || latest.name != expected.name) throw HxConfigSourceConflict(true, latest.name)
                 if (latest.text != expected.text) throw HxConfigSourceConflict(false, latest.name)
                 vm.controller.validateConfigText(current)
-                withContext(Dispatchers.IO) {
-                    // Validation may take time. Recheck identity and contents immediately before writing.
-                    val library = ProxyConfigLibrary(context)
-                    val core = ProxyRuntimeProfile.load(vm.prefs).core
-                    val entry = library.selected(core) ?: error("尚未选择配置")
-                    if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
-                    if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
-                    library.write(entry, current)
+                // Write, apply and (on rejection) restore as one transaction: leaving the page must not strand it.
+                val outcome = withContext(NonCancellable) {
+                    val isCurrent = withContext(Dispatchers.IO) {
+                        // Validation may take time. Recheck identity and contents immediately before writing.
+                        val library = ProxyConfigLibrary(context)
+                        val core = ProxyRuntimeProfile.load(vm.prefs).core
+                        val entry = hxConfigEntry(library, core, target)
+                        if (core != expected.core || entry.name != expected.name) throw HxConfigSourceConflict(true, entry.name)
+                        if (library.read(entry) != expected.text) throw HxConfigSourceConflict(false, entry.name)
+                        library.write(entry, current)
+                        library.selected(core)?.name == entry.name
+                    }
+                    // Only the current config runs: another file from the list is just saved.
+                    if (!isCurrent) return@withContext null
+                    HxConfigTransaction.apply(vm.state.running, { vm.reloadNow() }) {
+                        withContext(Dispatchers.IO) {
+                            val library = ProxyConfigLibrary(context)
+                            val entry = if (target == null) library.selected(expected.core)
+                                else library.list(expected.core).firstOrNull { it.name == expected.name }
+                            // Only undo our own write; a newer edit from elsewhere is never overwritten.
+                            if (entry == null || entry.name != expected.name || library.read(entry) != current)
+                                throw IOException("配置已被其他操作修改，未自动回滚")
+                            library.write(entry, expected.text)
+                        }
+                    }
                 }
-                source = expected.copy(text = current)
-                dirty = editor?.text?.toString() != current
-                problem = null
-                vm.applyConfigChange("配置已保存")
+                when (outcome) {
+                    null -> {
+                        source = expected.copy(text = current)
+                        dirty = editor?.text?.toString() != current
+                        problem = null
+                        vm.toast("配置已保存（非当前配置，切换为当前配置后生效）")
+                    }
+                    is HxApplyOutcome.RolledBack -> {
+                        // The file is back to what this page loaded; the draft stays on screen to fix and retry.
+                        source = expected
+                        dirty = editor?.text?.toString() != expected.text
+                        problem = HxConfigTransaction.describe(outcome, "配置已保存")
+                    }
+                    is HxApplyOutcome.RollbackFailed -> {
+                        source = expected.copy(text = current)
+                        dirty = editor?.text?.toString() != current
+                        problem = HxConfigTransaction.describe(outcome, "配置已保存")
+                    }
+                    else -> {
+                        source = expected.copy(text = current)
+                        dirty = editor?.text?.toString() != current
+                        problem = if (outcome is HxApplyOutcome.NeedsRestart) HxConfigTransaction.describe(outcome, "配置已保存") else null
+                        vm.toast(HxConfigTransaction.describe(outcome, "配置已保存"))
+                    }
+                }
             } catch (cancel: CancellationException) { throw cancel }
             catch (changed: HxConfigSourceConflict) { conflict = changed }
             catch (error: Exception) { problem = error.message ?: "保存失败" }
@@ -765,8 +844,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
     Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
         Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
             HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
-            Text(ht("编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
-            HomeIconButton(
+            Text(ht(if (readOnly) "查看配置" else "编辑配置"), Modifier.align(Alignment.Center).semantics { heading() }, color = c.t1, style = HomeType.barTitle)
+            if (readOnly) HomeIconButton(
+                ToolsIcons.Pencil, "编辑", { readOnly = false }, Modifier.align(Alignment.CenterEnd),
+                enabled = source != null && !loading, tint = c.accent,
+            ) else HomeIconButton(
                 HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
                 enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
             )
@@ -775,7 +857,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
         Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
             HomeRowLayout(
                 AnnotatedString(source?.name ?: ht("读取配置")),
-                subtitle = ht(when { loading -> "正在读取当前配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; else -> "已保存 · 当前配置" }),
+                subtitle = ht(when { loading -> "正在读取配置"; loadFailure != null -> "读取配置失败，保存操作已禁用"; dirty -> "未保存 · 草稿仅保留在本页"; readOnly -> "只读查看 · 点右上角编辑"; else -> "已保存" }),
                 icon = ToolsIcons.FileCog,
                 iconTint = if (source == null) c.t3 else c.t1,
                 subtitleColor = if (dirty) c.warnText else c.t2,
@@ -786,8 +868,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
             Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready) { editor?.let { if (it.canUndo()) it.undo() } }
-            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready) { editor?.let { if (it.canRedo()) it.redo() } }
+            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
+            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
             ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
             ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
         }
@@ -811,7 +893,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                             CodeEditor(viewContext).apply {
                                 setEditorLanguage(HetuYamlLanguage())
                                 setText(initial.text)
-                                setEditable(true)
+                                setEditable(!readOnly)
                                 setSoftKeyboardEnabled(true)
                                 typefaceText = Typeface.MONOSPACE
                                 setTextSize(14f)
@@ -829,14 +911,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                             }
                         },
                         modifier = Modifier.fillMaxSize().padding(vertical = 10.dp),
-                        update = { native -> if (native.colorScheme !== editorColors) native.colorScheme = editorColors },
+                        update = { native ->
+                            if (native.colorScheme !== editorColors) native.colorScheme = editorColors
+                            if (native.isEditable == readOnly) native.setEditable(!readOnly)
+                        },
                         onRelease = { native -> if (editor === native) editor = null; native.release() },
                     )
                 }
             }
         }
         // The characters YAML needs and a phone keyboard hides, one tap each.
-        Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
+        if (!readOnly) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
             .clip(HomeDims.cardShape).background(c.surface)
             .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HxYamlSymbols.forEach { symbol ->

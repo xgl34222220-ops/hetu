@@ -196,6 +196,8 @@ class CoreIdentity(Harness):
     def prepare(self, env=None, before='', v6='bypass'):
         body = ('magisk(){ printf "%s\\n" ' + shlex.quote(str(self.magisk)) + '; }\n' +
                 'has(){ [ \"$1\" != ip6tables ] && command -v \"$1\" >/dev/null 2>&1; }\n' +
+                # Each call models its own kernel/boot: the per-boot identity cache must not carry over.
+                'rm -f "$RUN/state/identity.cache"\n' +
                 f'START_V6={v6}\n' + before + 'core_identity_prepare\n'
                 'printf "runner=%s spec=%s dns=%s\\n" "$CORE_RUNNER" "$CORE_SPEC" "$SYSTEM_DNS"\n')
         result = self.sh(body, env)

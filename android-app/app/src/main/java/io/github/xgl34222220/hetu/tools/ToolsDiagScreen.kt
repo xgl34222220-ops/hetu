@@ -51,6 +51,7 @@ internal fun ToolsDiagScreen(
     onRestore: () -> Unit,
     modifier: Modifier = Modifier,
     onOpenDiagnosticsDetails: (() -> Unit)? = null,
+    onRepairRecord: (() -> Unit)? = null,
 ) {
     val c = LocalHomeColors.current
     val checking = state.preflight is ToolsPreflight.Running
@@ -94,9 +95,16 @@ internal fun ToolsDiagScreen(
             ToolsCardTitle("运行记录")
             ToolsRow(
                 AnnotatedString(ht("网络事件记录")), icon = ToolsIcons.Activity,
-                subtitle = ht("事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
+                subtitle = ht(if (onRepairRecord != null) "切网与错误编号；满额暂停，历史保留" else "事件与错误 ID、脱敏报告、运行记录修复与恢复诊断"),
                 onClick = onOpenDiagnosticsDetails, trailing = { ToolsChevron() },
             )
+            if (onRepairRecord != null) {
+                HomeRowDivider(start = HomeRowDims.textStart)
+                ToolsRow(
+                    AnnotatedString(ht("修复运行记录")), icon = ToolsFeatureIcons.ShieldCheck,
+                    subtitle = ht("核对原会话基线、规则、DNS 与守护进程；保留现有连接"), onClick = onRepairRecord, trailing = { ToolsChevron() },
+                )
+            }
         }
         HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
             ToolsCardTitle("紧急")
@@ -124,6 +132,12 @@ internal fun ToolsStartupConfigSheetContent(content: ToolsDiagText, onCopy: (Str
             Modifier.clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg).padding(horizontal = 16.dp, vertical = 14.dp),
             annotated = annotate) },
     ) { AnnotatedString(it) }
+}
+
+/** 网络事件记录 / 修复运行记录, with 复制. */
+@Composable
+internal fun ToolsRecordSheetContent(title: String, subtitle: String, content: ToolsDiagText, onCopy: (String) -> Unit, modifier: Modifier = Modifier) {
+    DiagTextSheet(title, subtitle, content, onCopy, modifier) { AnnotatedString(it) }
 }
 
 /** The plain-text report, with 复制. */
