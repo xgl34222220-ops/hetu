@@ -5692,10 +5692,10 @@ index 0000000..4bf546b
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
 new file mode 100644
-index 0000000..360e5cb
+index 0000000..6c667a6
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
-@@ -0,0 +1,495 @@
+@@ -0,0 +1,502 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -6048,6 +6048,10 @@ index 0000000..360e5cb
 +    const val SAMPLE_MS = 250L
 +    const val PHASE_MS = 8_000L
 +    const val STREAMS = 3
++    /** Per-request connect/read budget; matches the 8 s budget of every 连通性 check. */
++    const val REQUEST_TIMEOUT_MS = 8_000
++    /** The latency phase stops sampling once this much time has passed (at least one sample kept). */
++    const val LATENCY_BUDGET_MS = 8_000L
 +    private const val DOWN_CHUNK = 25_000_000L
 +    internal const val UP_CHUNK = 4_000_000
 +
@@ -6074,8 +6078,8 @@ index 0000000..360e5cb
 +        val opened = if (port == null) target.openConnection() else target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
 +        return (opened as HttpURLConnection).apply {
 +            useCaches = false
-+            connectTimeout = 10_000
-+            readTimeout = 10_000
++            connectTimeout = REQUEST_TIMEOUT_MS
++            readTimeout = REQUEST_TIMEOUT_MS
 +            setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Hetu-SpeedTest")
 +        }
 +    }
@@ -6151,7 +6155,10 @@ index 0000000..360e5cb
 +
 +            send(SpeedEvent.Phase(SpeedPhase.Latency))
 +            val samples = ArrayList<Long>()
-+            repeat(6) {
++            val latencyStarted = System.nanoTime()
++            while (samples.size < 6) {
++                // A slow path must not stretch the phase: keep what was measured once the budget is spent.
++                if (samples.isNotEmpty() && (System.nanoTime() - latencyStarted) / 1_000_000 > LATENCY_BUDGET_MS) break
 +                val started = System.nanoTime()
 +                val connection = open("$base/__down?bytes=0", port)
 +                guarded(connection) {
@@ -6193,10 +6200,10 @@ index 0000000..360e5cb
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..2655f62
+index 0000000..99cb927
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,455 @@
+@@ -0,0 +1,548 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -6267,10 +6274,20 @@ index 0000000..2655f62
 +import java.util.Locale
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.launch
 +import kotlinx.coroutines.withContext
 +
-+/** What a 连通性 row shows; [result] is null until its requests finish. */
-+internal data class NetRowState(val testing: Boolean = false, val result: NetSiteResult? = null)
++/**
++ * What a 连通性 row shows; [result] is null until its requests finish. [unlock] is the row's
++ * unlock/region check (only for services that have one), which finishes independently.
++ */
++internal data class NetRowState(
++    val testing: Boolean = false,
++    val result: NetSiteResult? = null,
++    val unlocking: Boolean = false,
++    val unlock: UnlockResult? = null,
++)
 +
 +/** Live and final readings of 网速, kept by the page so switching tabs does not lose them. */
 +internal class SpeedUiState {
@@ -6335,26 +6352,49 @@ index 0000000..2655f62
 +    var testing by remember { mutableStateOf(false) }
 +    var viaProxy by remember { mutableStateOf<Boolean?>(null) }
 +    var summary by remember { mutableStateOf("") }
++    var exits by remember { mutableStateOf<ExitIps?>(null) }
++    var exitTesting by remember { mutableStateOf(false) }
 +    val availableLabel = ht("可用")
++    val unlockIds = remember { NetworkUnlock.checkIds }
 +
 +    LaunchedEffect(runId) {
 +        if (runId == 0) return@LaunchedEffect
 +        testing = true
 +        summary = ""
-+        rows.values.forEach { it.value = NetRowState(testing = true) }
++        rows.forEach { (id, holder) -> holder.value = NetRowState(testing = true, unlocking = id in unlockIds) }
++        exits = null
++        exitTesting = true
 +        val results = ArrayList<NetSiteResult>()
 +        try {
-+            val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
-+            viaProxy = port != null
-+            NetworkTest.run(port).collect { result ->
-+                results += result
-+                rows[result.id]?.value = NetRowState(testing = false, result = result)
++            coroutineScope {
++                // Unlock checks and exit IPs go through the system network and run beside the latency rows.
++                launch {
++                    try {
++                        NetworkUnlock.run().collect { unlock ->
++                            rows[unlock.id]?.let { it.value = it.value.copy(unlocking = false, unlock = unlock) }
++                        }
++                    } finally {
++                        rows.values.forEach { if (it.value.unlocking) it.value = it.value.copy(unlocking = false) }
++                    }
++                }
++                launch {
++                    try { exits = NetworkUnlock.exits() } finally { exitTesting = false }
++                }
++                val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
++                viaProxy = port != null
++                NetworkTest.run(port).collect { result ->
++                    results += result
++                    rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
++                }
++                NetworkTest.regions(context, results, port).forEach { result ->
++                    rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
++                }
 +            }
-+            NetworkTest.regions(context, results, port).forEach { result -> rows[result.id]?.value = NetRowState(false, result) }
 +        } catch (cancel: CancellationException) {
 +            throw cancel
 +        } catch (_: Exception) {
-+            rows.values.forEach { if (it.value.testing) it.value = NetRowState() }
++            rows.values.forEach { if (it.value.testing || it.value.unlocking) it.value = it.value.copy(testing = false, unlocking = false) }
++            exitTesting = false
 +        } finally {
 +            testing = false
 +            val done = rows.values.mapNotNull { it.value.result }
@@ -6428,6 +6468,7 @@ index 0000000..2655f62
 +                    if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
 +                }
 +            }
++            item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
 +            byCategory.forEach { (category, sites) ->
 +                item(key = "cat-${category.name}") {
 +                    HxSection(ht(category.title)) {
@@ -6442,7 +6483,7 @@ index 0000000..2655f62
 +            }
 +            item(key = "conn-foot") {
 +                Text(
-+                    ht("延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。"),
++                    ht("延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。解锁检测经系统网络（代理规则透明生效）向各服务实测，每项最长 8 秒：解锁、受限（如仅自制剧）、不可用，或失败及原因；有服务自报地区时以其为准。"),
 +                    Modifier.padding(horizontal = HomeRowDims.start + 14.dp).padding(bottom = 8.dp),
 +                    color = c.t3, style = HomeType.caption,
 +                )
@@ -6483,7 +6524,8 @@ index 0000000..2655f62
 +    val c = LocalHomeColors.current
 +    val state = holder.value
 +    val result = state.result
-+    val region = result?.region
++    val unlock = state.unlock
++    val region = mergeUnlockRegion(result?.region, unlock)
 +    val status: String
 +    val statusColor: Color
 +    when {
@@ -6501,14 +6543,21 @@ index 0000000..2655f62
 +        }
 +    }
 +    val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
++    val unlockText = unlock?.let { unlockChipText(it) }.orEmpty()
 +    Row(
 +        Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = HomeRowDims.start, end = HomeRowDims.end, top = 9.dp, bottom = 9.dp)
-+            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
++            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, unlockText, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
 +        verticalAlignment = Alignment.CenterVertically,
 +    ) {
 +        BrandTile(site)
 +        Spacer(Modifier.width(14.dp))
-+        Text(site.name, Modifier.weight(1f), color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
++            Text(site.name, color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            if (state.unlocking || unlock != null) {
++                Spacer(Modifier.height(4.dp))
++                UnlockChip(unlock, state.unlocking)
++            }
++        }
 +        Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
 +            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
 +            if (state.testing) {
@@ -6518,6 +6567,57 @@ index 0000000..2655f62
 +                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
 +                }
 +            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++        }
++    }
++}
++
++@Composable
++private fun unlockChipText(unlock: UnlockResult): String =
++    if (unlock.detail.isBlank()) ht(unlock.state.label) else ht(unlock.state.label) + " · " + ht(unlock.detail)
++
++/** Unlock state pill under the service name: 解锁 / 受限 · 仅自制剧 / 不可用 / 失败 · 超时. */
++@Composable
++private fun UnlockChip(unlock: UnlockResult?, checking: Boolean) {
++    val c = LocalHomeColors.current
++    val tone = when (unlock?.state) {
++        UnlockState.Unlocked -> c.goodText
++        UnlockState.Restricted -> c.warnText
++        UnlockState.Unavailable -> c.badText
++        UnlockState.Failed -> c.t2
++        null -> c.t3
++    }
++    val text = if (unlock == null) (if (checking) ht("检测解锁…") else "") else unlockChipText(unlock)
++    if (text.isEmpty()) return
++    Box(
++        Modifier.clip(RoundedCornerShape(50)).background(tone.copy(alpha = if (c.dark) .18f else .12f)).padding(horizontal = 7.dp, vertical = 2.dp),
++    ) {
++        Text(text, color = tone, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
++    }
++}
++
++private fun exitLine(exit: ExitIp): String =
++    listOf((NetworkTest.flag(exit.region) + " " + exit.region.orEmpty()).trim(), exit.ip).filter { it.isNotBlank() }.joinToString(" · ")
++
++/** Overseas and domestic exit IPs side by side; each side reports its own failure. */
++@Composable
++private fun ExitIpCard(exits: ExitIps?, testing: Boolean) {
++    HxSection(ht("出口 IP")) {
++        HxGroup {
++            val overseas = exits?.overseas
++            val domestic = exits?.domestic
++            SpeedLine(ht("境外"), when {
++                overseas != null -> exitLine(overseas)
++                testing -> ht("测试中")
++                exits != null -> ht(exits.overseasError.ifBlank { "失败" })
++                else -> "—"
++            }, overseas?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
++            HxDivider(0.dp)
++            SpeedLine(ht("境内"), when {
++                domestic != null -> exitLine(domestic)
++                testing -> ht("测试中")
++                exits != null -> ht(exits.domesticError.ifBlank { "失败" })
++                else -> "—"
++            }, domestic?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
 +        }
 +    }
 +}
@@ -6652,6 +6752,617 @@ index 0000000..2655f62
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt
+new file mode 100644
+index 0000000..078ba90
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt
+@@ -0,0 +1,605 @@
++package io.github.xgl34222220.hetu
++
++import java.io.ByteArrayOutputStream
++import java.io.IOException
++import java.net.ConnectException
++import java.net.HttpURLConnection
++import java.net.SocketTimeoutException
++import java.net.URI
++import java.net.URL
++import java.net.UnknownHostException
++import java.util.Locale
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++import javax.net.ssl.SSLException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.async
++import kotlinx.coroutines.coroutineScope
++import kotlinx.coroutines.flow.Flow
++import kotlinx.coroutines.flow.channelFlow
++import kotlinx.coroutines.flow.flowOn
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runInterruptible
++import kotlinx.coroutines.sync.Semaphore
++import kotlinx.coroutines.sync.withPermit
++import kotlinx.coroutines.withTimeoutOrNull
++
++/* ------------------------------------------------------------------ */
++/*  网络测试 · 解锁与地区检测                                             */
++/*                                                                      */
++/*  Every request goes through the system network: no explicit proxy is */
++/*  set, so whatever the Root proxy does to this app's traffic applies   */
++/*  transparently, exactly as it would for the service's own app.        */
++/* ------------------------------------------------------------------ */
++
++/** Outcome of one service's unlock check. */
++internal enum class UnlockState(val label: String) {
++    Unlocked("解锁"),
++    /** Reachable, but only part of the catalogue (Netflix originals only, Bilibili one area). */
++    Restricted("受限"),
++    Unavailable("不可用"),
++    /** The check itself could not decide; [UnlockResult.detail] carries the concrete reason. */
++    Failed("失败"),
++}
++
++/**
++ * [region] is an ISO 3166 alpha-2 code when the service reported one, otherwise a plain place name
++ * (Bilibili reports Chinese names). [detail] qualifies the state: 仅自制剧, 港澳台, a currency, or the
++ * reason a check failed.
++ */
++internal data class UnlockResult(val id: String, val state: UnlockState, val region: String? = null, val detail: String = "") {
++    /** Chip text: 解锁, 受限 · 仅自制剧, 失败 · 超时. */
++    val chip: String get() = if (detail.isBlank()) state.label else state.label + " · " + detail
++}
++
++/** One HTTP answer, headers keyed in lower case. [url] is the last URL after any followed redirects. */
++internal data class UnlockReply(val code: Int, val headers: Map<String, List<String>>, val body: String, val url: String) {
++    fun header(name: String): String? = headers[name.lowercase(Locale.ROOT)]?.firstOrNull()
++    fun headerValues(name: String): List<String> = headers[name.lowercase(Locale.ROOT)].orEmpty()
++    val location: String? get() = header("location")
++}
++
++/**
++ * A single request. [bodyLimit] bounds what is read (0 reads no body); reading also stops as soon
++ * as the body contains one of [stopAt], so a region marker early in a large page costs only that far.
++ */
++internal data class UnlockRequest(
++    val url: String,
++    val headers: Map<String, String> = emptyMap(),
++    val bodyLimit: Int = 64 * 1024,
++    val stopAt: List<String> = emptyList(),
++)
++
++/** Raw transport; [timeoutMs] is the remaining budget of the check this request belongs to. */
++internal fun interface UnlockTransport {
++    @Throws(IOException::class)
++    fun fetch(request: UnlockRequest, timeoutMs: Int): UnlockReply
++}
++
++/** Thrown when a check has used its whole budget before the next request could start. */
++internal class UnlockDeadline : SocketTimeoutException("deadline")
++
++/** Service reported a human-verification page (Cloudflare challenge, Google "sorry", HTTP 429). */
++internal class UnlockChallenge : IOException("challenge")
++
++/**
++ * The view a detector gets: same transport, one shared deadline for all of the check's requests,
++ * and redirects followed by hand (so a region in a redirect path is never lost).
++ */
++internal class UnlockHttp(private val transport: UnlockTransport, private val deadlineNanos: Long) {
++    fun remainingMs(): Int = ((deadlineNanos - System.nanoTime()) / 1_000_000).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
++
++    fun get(
++        url: String,
++        headers: Map<String, String> = emptyMap(),
++        bodyLimit: Int = 64 * 1024,
++        stopAt: List<String> = emptyList(),
++        follow: Boolean = false,
++    ): UnlockReply {
++        var current = url
++        var hops = 0
++        while (true) {
++            val left = remainingMs()
++            if (left < 200) throw UnlockDeadline()
++            val reply = transport.fetch(UnlockRequest(current, NetworkUnlock.baseHeaders + headers, bodyLimit, stopAt), left)
++            val next = reply.location
++            if (!follow || reply.code !in 300..399 || next.isNullOrBlank() || hops >= MAX_REDIRECTS) return reply
++            current = try { URI(current).resolve(next.trim()).toString() } catch (_: Exception) { return reply }
++            hops++
++        }
++    }
++
++    companion object { const val MAX_REDIRECTS = 5 }
++}
++
++/** The production transport: [HttpURLConnection] on the system network, no explicit proxy. */
++internal object SystemUnlockTransport : UnlockTransport {
++    /** Closes a connection still open at its deadline, so a stalled socket cannot outlive the budget. */
++    private val reaper = Executors.newSingleThreadScheduledExecutor { task -> Thread(task, "hetu-unlock-reaper").apply { isDaemon = true } }
++
++    override fun fetch(request: UnlockRequest, timeoutMs: Int): UnlockReply {
++        val connection = URL(request.url).openConnection() as HttpURLConnection
++        val reap = reaper.schedule({ connection.disconnect() }, timeoutMs.toLong().coerceAtLeast(1L), TimeUnit.MILLISECONDS)
++        try {
++            connection.instanceFollowRedirects = false
++            connection.useCaches = false
++            connection.connectTimeout = timeoutMs.coerceAtLeast(1)
++            connection.readTimeout = timeoutMs.coerceAtLeast(1)
++            request.headers.forEach { (name, value) -> connection.setRequestProperty(name, value) }
++            val started = System.nanoTime()
++            val code = connection.responseCode
++            val headers = HashMap<String, List<String>>()
++            connection.headerFields.forEach { (name, values) -> if (name != null) headers[name.lowercase(Locale.ROOT)] = values.orEmpty() }
++            val body = if (request.bodyLimit <= 0) "" else {
++                val stream = try { if (code < 400) connection.inputStream else connection.errorStream } catch (_: IOException) { connection.errorStream }
++                stream?.use { readBounded(it, request.bodyLimit, request.stopAt, started + timeoutMs * 1_000_000L) }.orEmpty()
++            }
++            return UnlockReply(code, headers, body, request.url)
++        } finally {
++            reap.cancel(false)
++            connection.disconnect()
++        }
++    }
++
++    /** Reads at most [limit] bytes, stopping at the first [stopAt] marker or when the budget is spent. */
++    internal fun readBounded(input: java.io.InputStream, limit: Int, stopAt: List<String>, deadlineNanos: Long): String {
++        val out = ByteArrayOutputStream(minOf(limit, 64 * 1024))
++        val buffer = ByteArray(16 * 1024)
++        var scanned = 0
++        val longest = stopAt.maxOfOrNull { it.length } ?: 0
++        while (out.size() < limit) {
++            if (System.nanoTime() > deadlineNanos) throw UnlockDeadline()
++            val n = input.read(buffer, 0, minOf(buffer.size, limit - out.size()))
++            if (n < 0) break
++            out.write(buffer, 0, n)
++            if (stopAt.isNotEmpty()) {
++                // Re-scan only the new bytes plus an overlap long enough for a marker split across reads.
++                val text = out.toString(Charsets.UTF_8.name())
++                val from = (scanned - longest).coerceAtLeast(0)
++                if (stopAt.any { text.indexOf(it, from) >= 0 }) return text
++                scanned = text.length
++            }
++        }
++        return out.toString(Charsets.UTF_8.name())
++    }
++}
++
++/** One service's check; [run] may make several requests, all inside one budget. */
++internal class UnlockCheck(val id: String, val run: (UnlockHttp) -> UnlockResult)
++
++/** Overseas or domestic exit as reported by an IP service. */
++internal data class ExitIp(val ip: String, val region: String?, val place: String = "", val org: String = "")
++
++internal data class ExitIps(val overseas: ExitIp?, val domestic: ExitIp?, val overseasError: String = "", val domesticError: String = "")
++
++internal object NetworkUnlock {
++    const val TIMEOUT_MS = 8_000L
++    /** Checks in flight at once; each makes one to three requests. */
++    const val PARALLEL = 6
++
++    val baseHeaders: Map<String, String> = mapOf(
++        "User-Agent" to "Mozilla/5.0 (Linux; Android 15) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140 Mobile Safari/537.36",
++        "Accept-Language" to "en-US,en;q=0.9",
++        "Cache-Control" to "no-cache",
++        "Connection" to "close",
++    )
++
++    /** Regions OpenAI, Anthropic and Google Gemini do not serve (same list the latency rows use). */
++    val aiUnsupported: Set<String> = setOf("CN", "HK", "MO", "RU", "BY", "IR", "KP", "SY", "CU")
++
++    /* ---------------- shared parsing ---------------- */
++
++    fun failure(error: Throwable): String = when (error) {
++        is UnlockDeadline -> "超时"
++        is UnlockChallenge -> "需人机验证"
++        is SocketTimeoutException -> "超时"
++        is UnknownHostException -> "解析失败"
++        is ConnectException -> "连接被拒绝"
++        is SSLException -> "TLS 失败"
++        is IOException -> "连接失败"
++        else -> "失败"
++    }
++
++    fun code2(value: String?): String? = value?.trim()?.uppercase(Locale.ROOT)?.takeIf { it.length == 2 && it.all { c -> c in 'A'..'Z' } && it != "XX" }
++
++    private val iso3: Map<String, String> by lazy {
++        Locale.getISOCountries().mapNotNull { code ->
++            try { Locale("", code).isO3Country.uppercase(Locale.ROOT) to code } catch (_: Exception) { null }
++        }.toMap()
++    }
++
++    /** USA → US; null for anything that is not a known alpha-3 code. */
++    fun fromIso3(value: String?): String? = value?.trim()?.uppercase(Locale.ROOT)?.let { iso3[it] }
++
++    /** First JSON string value of [key] anywhere in [body] (no full parse: pages embed JSON in HTML). */
++    fun jsonString(body: String, key: String): String? {
++        val match = Regex("\"" + Regex.escape(key) + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"").find(body) ?: return null
++        return unescape(match.groupValues[1])
++    }
++
++    fun jsonNumber(body: String, key: String): Long? =
++        Regex("\"" + Regex.escape(key) + "\"\\s*:\\s*(-?\\d+)").find(body)?.groupValues?.get(1)?.toLongOrNull()
++
++    private fun unescape(raw: String): String {
++        if ('\\' !in raw) return raw
++        val out = StringBuilder(raw.length)
++        var i = 0
++        while (i < raw.length) {
++            val c = raw[i]
++            if (c != '\\' || i + 1 >= raw.length) { out.append(c); i++; continue }
++            when (val n = raw[i + 1]) {
++                'u' -> if (i + 5 < raw.length) { raw.substring(i + 2, i + 6).toIntOrNull(16)?.let { out.append(it.toChar()) }; i += 6; continue } else out.append(n)
++                'x' -> if (i + 3 < raw.length) { raw.substring(i + 2, i + 4).toIntOrNull(16)?.let { out.append(it.toChar()) }; i += 4; continue } else out.append(n)
++                'n' -> out.append('\n')
++                't' -> out.append('\t')
++                else -> out.append(n)
++            }
++            i += 2
++        }
++        return out.toString()
++    }
++
++    /** Country of a Cloudflare trace body: `loc=` when the body really is a trace (has colo= or fl=). */
++    fun traceField(body: String, field: String): String? {
++        val lines = body.lineSequence().mapNotNull { line ->
++            val at = line.indexOf('=')
++            if (at <= 0) null else line.substring(0, at).trim() to line.substring(at + 1).trim()
++        }.toMap()
++        if (!lines.containsKey("colo") && !lines.containsKey("fl")) return null
++        return lines[field]?.takeIf { it.isNotBlank() }
++    }
++
++    /** Country headers some CDNs add for the requesting client. */
++    private val countryHeaders = listOf("x-aka-user-geo", "region", "physical-location", "cf-ipcountry", "x-country-code", "x-geo-country", "x-client-country", "x-vercel-ip-country")
++
++    fun headerRegion(reply: UnlockReply): String? = countryHeaders.firstNotNullOfOrNull { name -> code2(reply.header(name)?.substringBefore(',')) }
++
++    /** `name=VALUE` from any Set-Cookie header. */
++    fun cookie(reply: UnlockReply, name: String): String? = reply.headerValues("set-cookie").firstNotNullOfOrNull { header ->
++        header.split(';').firstNotNullOfOrNull { part ->
++            val at = part.indexOf('=')
++            if (at > 0 && part.substring(0, at).trim() == name) part.substring(at + 1).trim() else null
++        }
++    }
++
++    /** Region segment of a localized path: /us/…, /hk-en/…, /en-gb/ is ignored unless it names a country first. */
++    fun pathRegion(url: String?): String? {
++        val path = try { URI(url ?: return null).path } catch (_: Exception) { return null } ?: return null
++        val first = path.trim('/').substringBefore('/')
++        val match = Regex("^([a-zA-Z]{2})(?:-[a-zA-Z]{2,4})?$").find(first) ?: return null
++        return code2(match.groupValues[1])
++    }
++
++    /** Azure-style edge regions (GitHub's x-github-edge-region) → country. */
++    private val azureRegions: Map<String, String> = mapOf(
++        "eastus" to "US", "eastus2" to "US", "westus" to "US", "westus2" to "US", "westus3" to "US", "centralus" to "US",
++        "northcentralus" to "US", "southcentralus" to "US", "westcentralus" to "US",
++        "canadacentral" to "CA", "canadaeast" to "CA", "brazilsouth" to "BR",
++        "northeurope" to "IE", "westeurope" to "NL", "uksouth" to "GB", "ukwest" to "GB", "francecentral" to "FR",
++        "germanywestcentral" to "DE", "swedencentral" to "SE", "switzerlandnorth" to "CH", "norwayeast" to "NO", "polandcentral" to "PL", "italynorth" to "IT",
++        "eastasia" to "HK", "southeastasia" to "SG", "japaneast" to "JP", "japanwest" to "JP", "koreacentral" to "KR", "koreasouth" to "KR",
++        "centralindia" to "IN", "southindia" to "IN", "westindia" to "IN", "australiaeast" to "AU", "australiasoutheast" to "AU",
++        "uaenorth" to "AE", "southafricanorth" to "ZA",
++    )
++
++    fun azureRegion(value: String?): String? = value?.trim()?.lowercase(Locale.ROOT)?.let { azureRegions[it] }
++
++    /** Chinese country names domestic IP services return → alpha-2; unknown names are kept as text by callers. */
++    private val chineseCountries: Map<String, String> = mapOf(
++        "中国" to "CN", "香港" to "HK", "中国香港" to "HK", "澳门" to "MO", "中国澳门" to "MO", "台湾" to "TW", "中国台湾" to "TW",
++        "日本" to "JP", "韩国" to "KR", "新加坡" to "SG", "美国" to "US", "英国" to "GB", "德国" to "DE", "法国" to "FR",
++        "加拿大" to "CA", "澳大利亚" to "AU", "俄罗斯" to "RU", "印度" to "IN", "马来西亚" to "MY", "泰国" to "TH",
++        "越南" to "VN", "菲律宾" to "PH", "印度尼西亚" to "ID", "荷兰" to "NL", "土耳其" to "TR", "阿联酋" to "AE",
++    )
++
++    fun fromChinese(name: String?): String? = name?.trim()?.let { chineseCountries[it] }
++
++    private fun challenged(reply: UnlockReply): Boolean =
++        reply.code == 429 || reply.header("cf-mitigated").equals("challenge", ignoreCase = true) ||
++            (reply.url.contains("sorry.google.com") || reply.url.contains("/sorry/"))
++
++    private fun httpFailure(reply: UnlockReply) = "HTTP ${reply.code}"
++
++    /* ---------------- detectors ---------------- */
++
++    /** Non-original title: available only where the catalogue is licensed. Original: everywhere Netflix runs. */
++    const val NETFLIX_LICENSED_TITLE = "70143836"
++    const val NETFLIX_ORIGINAL_TITLE = "81280792"
++    private val netflixCountry = Regex("\"requestCountry\"\\s*:\\s*\\{[^}]*?\"id\"\\s*:\\s*\"([A-Za-z]{2})\"")
++
++    fun netflix(http: UnlockHttp): UnlockResult {
++        val licensed = http.get("https://www.netflix.com/title/$NETFLIX_LICENSED_TITLE", bodyLimit = 2_500_000, stopAt = listOf("\"requestCountry\""), follow = true)
++        val region = (netflixCountry.find(licensed.body)?.groupValues?.get(1)?.let(::code2)) ?: pathRegion(licensed.url)
++        if (licensed.code == 200) return UnlockResult("netflix", UnlockState.Unlocked, region)
++        if (licensed.code == 403) return UnlockResult("netflix", UnlockState.Unavailable, region, "拒绝访问")
++        if (licensed.code != 404) return UnlockResult("netflix", UnlockState.Failed, region, httpFailure(licensed))
++        val original = http.get("https://www.netflix.com/title/$NETFLIX_ORIGINAL_TITLE", bodyLimit = 0, follow = true)
++        val where = region ?: pathRegion(original.url)
++        return when (original.code) {
++            200 -> UnlockResult("netflix", UnlockState.Restricted, where, "仅自制剧")
++            403, 404 -> UnlockResult("netflix", UnlockState.Unavailable, where)
++            else -> UnlockResult("netflix", UnlockState.Failed, where, httpFailure(original))
++        }
++    }
++
++    private val youtubeGl = listOf("\"INNERTUBE_CONTEXT_GL\":\"", "\"countryCode\":\"")
++
++    fun youtube(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://www.youtube.com/premium", bodyLimit = 1_200_000, stopAt = listOf("\"INNERTUBE_CONTEXT_GL\""), follow = true)
++        if (challenged(reply)) return UnlockResult("youtube", UnlockState.Failed, null, "需人机验证")
++        if (reply.code != 200) return UnlockResult("youtube", UnlockState.Failed, null, httpFailure(reply))
++        val region = code2(jsonString(reply.body, "INNERTUBE_CONTEXT_GL")) ?: code2(jsonString(reply.body, "countryCode"))
++        if (reply.body.contains("Premium is not available in your country", ignoreCase = true)) return UnlockResult("youtube", UnlockState.Unavailable, region)
++        return if (region != null) UnlockResult("youtube", UnlockState.Unlocked, region, "Premium")
++        else UnlockResult("youtube", UnlockState.Failed, null, "未返回地区")
++    }
++
++    fun disney(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://www.disneyplus.com/", bodyLimit = 0, follow = true)
++        val region = headerRegion(reply) ?: pathRegion(reply.url)
++        val lost = reply.url.lowercase(Locale.ROOT).let { "unavailable" in it || "unsupported" in it || "not-available" in it }
++        return when {
++            lost || reply.code == 403 || reply.code == 451 -> UnlockResult("disney", UnlockState.Unavailable, region)
++            reply.code in 200..299 && region != null -> UnlockResult("disney", UnlockState.Unlocked, region)
++            reply.code in 200..299 -> UnlockResult("disney", UnlockState.Failed, null, "未返回地区")
++            else -> UnlockResult("disney", UnlockState.Failed, region, httpFailure(reply))
++        }
++    }
++
++    private fun traceRegion(http: UnlockHttp, host: String): Pair<String?, Throwable?> = try {
++        val reply = http.get("https://$host/cdn-cgi/trace", bodyLimit = 4_096)
++        (if (reply.code == 200) code2(traceField(reply.body, "loc")) else null) to null
++    } catch (error: IOException) {
++        null to error
++    }
++
++    fun chatgpt(http: UnlockHttp): UnlockResult {
++        val (region, traceError) = traceRegion(http, "chatgpt.com")
++        val compliance = try {
++            http.get("https://api.openai.com/compliance/cookie_requirements", mapOf("Authorization" to "Bearer null"), bodyLimit = 8_192)
++        } catch (error: IOException) {
++            if (region == null) return UnlockResult("chatgpt", UnlockState.Failed, null, failure(traceError ?: error))
++            null
++        }
++        return when {
++            compliance != null && compliance.body.contains("unsupported_country") -> UnlockResult("chatgpt", UnlockState.Unavailable, region)
++            region != null && region in aiUnsupported -> UnlockResult("chatgpt", UnlockState.Unavailable, region)
++            region != null -> UnlockResult("chatgpt", UnlockState.Unlocked, region)
++            compliance != null && compliance.code == 200 -> UnlockResult("chatgpt", UnlockState.Unlocked, null)
++            compliance != null -> UnlockResult("chatgpt", UnlockState.Failed, null, httpFailure(compliance))
++            else -> UnlockResult("chatgpt", UnlockState.Failed, null, failure(traceError ?: IOException()))
++        }
++    }
++
++    fun claude(http: UnlockHttp): UnlockResult {
++        val (region, traceError) = traceRegion(http, "claude.ai")
++        val home = try { http.get("https://claude.ai/", bodyLimit = 0) } catch (error: IOException) {
++            if (region == null) return UnlockResult("claude", UnlockState.Failed, null, failure(traceError ?: error))
++            null
++        }
++        val refused = home?.location?.contains("unavailable-in-region") == true
++        return when {
++            refused -> UnlockResult("claude", UnlockState.Unavailable, region)
++            region != null && region in aiUnsupported -> UnlockResult("claude", UnlockState.Unavailable, region)
++            region != null -> UnlockResult("claude", UnlockState.Unlocked, region)
++            home != null && challenged(home) -> UnlockResult("claude", UnlockState.Failed, null, "需人机验证")
++            else -> UnlockResult("claude", UnlockState.Failed, null, home?.let(::httpFailure) ?: "未返回地区")
++        }
++    }
++
++    private val geminiRegion = Regex(",2,1,200,\"([A-Z]{3})\"")
++
++    fun gemini(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://gemini.google.com/", bodyLimit = 1_500_000, stopAt = listOf(",2,1,200,\""), follow = true)
++        if (challenged(reply)) return UnlockResult("gemini", UnlockState.Failed, null, "需人机验证")
++        if (reply.code != 200) return UnlockResult("gemini", UnlockState.Failed, null, httpFailure(reply))
++        val region = fromIso3(geminiRegion.find(reply.body)?.groupValues?.get(1))
++        val text = reply.body
++        val refused = text.contains("not supported in your country", true) || text.contains("isn't currently supported in your country", true) ||
++            text.contains("not available in your country", true)
++        return when {
++            refused -> UnlockResult("gemini", UnlockState.Unavailable, region)
++            region != null && region in aiUnsupported -> UnlockResult("gemini", UnlockState.Unavailable, region)
++            region != null -> UnlockResult("gemini", UnlockState.Unlocked, region)
++            else -> UnlockResult("gemini", UnlockState.Failed, null, "未返回地区")
++        }
++    }
++
++    fun tiktok(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://www.tiktok.com/", bodyLimit = 600_000, stopAt = listOf("\"region\":\""), follow = true)
++        val region = code2(jsonString(reply.body, "region")) ?: headerRegion(reply)
++        return when {
++            reply.code == 403 || reply.code == 451 -> UnlockResult("tiktok", UnlockState.Unavailable, region)
++            challenged(reply) -> UnlockResult("tiktok", UnlockState.Failed, region, "需人机验证")
++            reply.code in 200..299 && region != null -> UnlockResult("tiktok", UnlockState.Unlocked, region)
++            reply.code in 200..299 -> UnlockResult("tiktok", UnlockState.Failed, null, "未返回地区")
++            else -> UnlockResult("tiktok", UnlockState.Failed, region, httpFailure(reply))
++        }
++    }
++
++    /** Bangumi episodes licensed for 港澳台 together and for 台湾 alone; the play-url API answers -10403 elsewhere. */
++    const val BILIBILI_HKMOTW_EP = "183799"
++    const val BILIBILI_TW_EP = "307247"
++
++    private fun bilibiliPlayable(http: UnlockHttp, ep: String): Boolean? {
++        val reply = http.get("https://api.bilibili.com/pgc/player/web/playurl?ep_id=$ep&fnval=16", mapOf("Referer" to "https://www.bilibili.com/"), bodyLimit = 32_768)
++        return when (jsonNumber(reply.body, "code")) {
++            0L -> true
++            -10403L -> false
++            else -> null
++        }
++    }
++
++    fun bilibili(http: UnlockHttp): UnlockResult {
++        val zone = try { http.get("https://api.bilibili.com/x/web-interface/zone", bodyLimit = 8_192) } catch (_: IOException) { null }
++        val country = zone?.body?.let { jsonString(it, "country") }?.takeIf { it.isNotBlank() }
++        val region = fromChinese(country) ?: country
++        val area = bilibiliPlayable(http, BILIBILI_HKMOTW_EP)
++        val taiwan = bilibiliPlayable(http, BILIBILI_TW_EP)
++        return when {
++            area == true && taiwan == true -> UnlockResult("bilibili", UnlockState.Unlocked, region, "港澳台")
++            area == true -> UnlockResult("bilibili", UnlockState.Restricted, region, "仅港澳")
++            taiwan == true -> UnlockResult("bilibili", UnlockState.Restricted, region, "仅台湾")
++            area == false && taiwan == false -> UnlockResult("bilibili", UnlockState.Unavailable, region, "港澳台")
++            else -> UnlockResult("bilibili", UnlockState.Failed, region, "接口异常")
++        }
++    }
++
++    fun apple(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://gspe1-ssl.ls.apple.com/pep/gcc", bodyLimit = 256)
++        val region = code2(reply.body.trim())
++        return when {
++            reply.code == 200 && region != null -> UnlockResult("apple", UnlockState.Unlocked, region)
++            reply.code == 200 -> UnlockResult("apple", UnlockState.Failed, null, "未返回地区")
++            else -> UnlockResult("apple", UnlockState.Failed, null, httpFailure(reply))
++        }
++    }
++
++    fun spotify(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://www.spotify.com/signup", bodyLimit = 200_000, stopAt = listOf("in your country"))
++        val target = reply.location?.let { location -> try { URI("https://www.spotify.com/signup").resolve(location.trim()).toString() } catch (_: Exception) { null } }
++        val region = pathRegion(target)
++        val refused = reply.body.contains("not available in your country", true) || reply.body.contains("isn't available in your country", true) ||
++            target?.contains("select-your-country", true) == true || reply.code == 403 || reply.code == 451
++        return when {
++            refused -> UnlockResult("spotify", UnlockState.Unavailable, region)
++            reply.code in 300..399 && region != null -> UnlockResult("spotify", UnlockState.Unlocked, region)
++            reply.code == 200 -> UnlockResult("spotify", UnlockState.Unlocked, null)
++            else -> UnlockResult("spotify", UnlockState.Failed, region, httpFailure(reply))
++        }
++    }
++
++    /** A paid game whose price Steam quotes in the store currency of the requesting region. */
++    const val STEAM_PRICED_APP = "1086940"
++
++    fun steam(http: UnlockHttp): UnlockResult {
++        val store = http.get("https://store.steampowered.com/", bodyLimit = 0)
++        val region = code2(cookie(store, "steamCountry")?.substringBefore('%')?.substringBefore('|'))
++        val currency = try {
++            val price = http.get("https://store.steampowered.com/api/appdetails?appids=$STEAM_PRICED_APP&filters=price_overview", bodyLimit = 8_192)
++            jsonString(price.body, "currency")?.takeIf { it.length == 3 }
++        } catch (_: IOException) { null }
++        return when {
++            store.code == 403 || store.code == 451 -> UnlockResult("steam", UnlockState.Unavailable, region)
++            region != null -> UnlockResult("steam", UnlockState.Unlocked, region, currency.orEmpty())
++            store.code in 200..399 -> UnlockResult("steam", UnlockState.Unlocked, null, currency.orEmpty())
++            else -> UnlockResult("steam", UnlockState.Failed, null, httpFailure(store))
++        }
++    }
++
++    /** Reachable services that only tell where they think you are, through a header or cookie. */
++    private fun headerOnly(id: String, url: String, http: UnlockHttp, region: (UnlockReply) -> String?): UnlockResult {
++        val reply = http.get(url, bodyLimit = 0)
++        val where = region(reply) ?: headerRegion(reply)
++        return when {
++            reply.code == 403 || reply.code == 451 -> UnlockResult(id, UnlockState.Unavailable, where)
++            challenged(reply) -> UnlockResult(id, UnlockState.Failed, where, "需人机验证")
++            reply.code in 200..399 -> UnlockResult(id, UnlockState.Unlocked, where)
++            else -> UnlockResult(id, UnlockState.Failed, where, httpFailure(reply))
++        }
++    }
++
++    fun github(http: UnlockHttp): UnlockResult =
++        headerOnly("github", "https://github.com/", http) { azureRegion(it.header("x-github-edge-region")) }
++
++    fun twitch(http: UnlockHttp): UnlockResult =
++        headerOnly("twitch", "https://www.twitch.tv/", http) { code2(cookie(it, "twitch.lohp.countryCode")) }
++
++    /** Hulu streams in the United States only. */
++    fun hulu(http: UnlockHttp): UnlockResult {
++        val reply = http.get("https://www.hulu.com/", bodyLimit = 0)
++        val region = headerRegion(reply)
++        val lost = reply.location?.lowercase(Locale.ROOT)?.let { "unavailable" in it || "not-available" in it || "unsupported" in it } == true
++        return when {
++            lost || reply.code == 403 || reply.code == 451 -> UnlockResult("hulu", UnlockState.Unavailable, region)
++            reply.code !in 200..399 -> UnlockResult("hulu", UnlockState.Failed, region, httpFailure(reply))
++            region == "US" -> UnlockResult("hulu", UnlockState.Unlocked, region)
++            region != null -> UnlockResult("hulu", UnlockState.Unavailable, region, "仅限美国")
++            else -> UnlockResult("hulu", UnlockState.Failed, null, "未返回地区")
++        }
++    }
++
++    val checks: List<UnlockCheck> = listOf(
++        UnlockCheck("chatgpt", ::chatgpt), UnlockCheck("claude", ::claude), UnlockCheck("gemini", ::gemini),
++        UnlockCheck("tiktok", ::tiktok),
++        UnlockCheck("bilibili", ::bilibili), UnlockCheck("disney", ::disney), UnlockCheck("hulu", ::hulu),
++        UnlockCheck("netflix", ::netflix), UnlockCheck("spotify", ::spotify), UnlockCheck("twitch", ::twitch), UnlockCheck("youtube", ::youtube),
++        UnlockCheck("apple", ::apple), UnlockCheck("github", ::github), UnlockCheck("steam", ::steam),
++    )
++
++    val checkIds: Set<String> get() = checks.mapTo(HashSet()) { it.id }
++
++    /**
++     * Runs one check inside its own [timeoutMs] budget: every request shares the deadline, and the
++     * coroutine returns at the deadline even if a socket is still stuck. Never throws except cancellation.
++     */
++    suspend fun runOne(check: UnlockCheck, transport: UnlockTransport, timeoutMs: Long = TIMEOUT_MS): UnlockResult {
++        val deadline = System.nanoTime() + timeoutMs * 1_000_000
++        val result = withTimeoutOrNull(timeoutMs) {
++            runInterruptible(Dispatchers.IO) {
++                try {
++                    check.run(UnlockHttp(transport, deadline))
++                } catch (error: Exception) {
++                    UnlockResult(check.id, UnlockState.Failed, null, failure(error))
++                }
++            }
++        }
++        return result ?: UnlockResult(check.id, UnlockState.Failed, null, "超时")
++    }
++
++    /** Emits each check the moment it finishes; at most [parallel] run at once. */
++    fun run(transport: UnlockTransport = SystemUnlockTransport, list: List<UnlockCheck> = checks, parallel: Int = PARALLEL, timeoutMs: Long = TIMEOUT_MS): Flow<UnlockResult> = channelFlow {
++        val gate = Semaphore(parallel)
++        list.forEach { check -> launch { send(gate.withPermit { runOne(check, transport, timeoutMs) }) } }
++    }.flowOn(Dispatchers.IO)
++
++    /* ---------------- exit IPs ---------------- */
++
++    /** Overseas exit: Cloudflare trace for IP and country, ip.sb for place and network (optional). */
++    fun overseasExit(http: UnlockHttp, detail: UnlockHttp = http): ExitIp {
++        val trace = http.get("https://www.cloudflare.com/cdn-cgi/trace", bodyLimit = 4_096)
++        val ip = traceField(trace.body, "ip") ?: throw IOException("trace")
++        val region = code2(traceField(trace.body, "loc"))
++        val geo = try { detail.get("https://api.ip.sb/geoip", bodyLimit = 8_192).body } catch (_: IOException) { "" }
++        val sameIp = jsonString(geo, "ip") == ip
++        val place = if (sameIp) listOfNotNull(jsonString(geo, "city"), jsonString(geo, "region")).filter { it.isNotBlank() }.distinct().joinToString(" ") else ""
++        val org = if (sameIp) (jsonString(geo, "asn_organization") ?: jsonString(geo, "organization")).orEmpty() else ""
++        return ExitIp(ip, region, place, org)
++    }
++
++    /** Domestic exit: NetEase locate, else Tencent ip2city. Both report in Chinese. */
++    fun domesticExit(http: UnlockHttp): ExitIp {
++        val netease = try { http.get("https://ipservice.ws.126.net/locate/api/getLocByIp", bodyLimit = 8_192).body } catch (_: IOException) { "" }
++        jsonString(netease, "ip")?.takeIf { it.isNotBlank() }?.let { ip ->
++            val country = jsonString(netease, "country")
++            val region = code2(jsonString(netease, "countrySymbol")) ?: fromChinese(country)
++            val place = listOfNotNull(jsonString(netease, "province"), jsonString(netease, "city")).filter { it.isNotBlank() }.distinct().joinToString(" ")
++            return ExitIp(ip, region, place, jsonString(netease, "operator").orEmpty())
++        }
++        val qq = http.get("https://r.inews.qq.com/api/ip2city", bodyLimit = 8_192).body
++        val ip = jsonString(qq, "ip")?.takeIf { it.isNotBlank() } ?: throw IOException("ip2city")
++        val country = jsonString(qq, "country")
++        val place = listOfNotNull(jsonString(qq, "province"), jsonString(qq, "city")).filter { it.isNotBlank() }.distinct().joinToString(" ")
++        return ExitIp(ip, fromChinese(country) ?: country?.takeIf { it.isNotBlank() }, place, jsonString(qq, "isp").orEmpty())
++    }
++
++    /** Both exits at once, each in its own budget; a failure leaves its side null with the reason. */
++    suspend fun exits(transport: UnlockTransport = SystemUnlockTransport, timeoutMs: Long = TIMEOUT_MS): ExitIps = coroutineScope {
++        suspend fun side(block: (UnlockHttp) -> ExitIp): Pair<ExitIp?, String> {
++            val deadline = System.nanoTime() + timeoutMs * 1_000_000
++            return withTimeoutOrNull(timeoutMs) {
++                runInterruptible(Dispatchers.IO) {
++                    try { block(UnlockHttp(transport, deadline)) to "" } catch (error: Exception) { null to failure(error) }
++                }
++            } ?: (null to "超时")
++        }
++        val overseas = async { side { overseasExit(it) } }
++        val domestic = async { side { domesticExit(it) } }
++        val o = overseas.await()
++        val d = domestic.await()
++        ExitIps(o.first, d.first, o.second, d.second)
++    }
++}
++
++/** Joins row state: the latency row and the unlock check of the same service finish independently. */
++internal fun mergeUnlockRegion(traceRegion: String?, unlock: UnlockResult?): String? = unlock?.region ?: traceRegion
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 index df92493..daf9bf2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
@@ -12609,6 +13320,313 @@ index 0000000..ba49c1b
 +
 +        val stuck = HxConfigTransaction.apply(true, { throw IOException("bad") }) { throw IOException("磁盘只读") }
 +        assertEquals(HxApplyOutcome.RollbackFailed("bad", "磁盘只读"), stuck)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt
+new file mode 100644
+index 0000000..cd3ad28
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt
+@@ -0,0 +1,301 @@
++package io.github.xgl34222220.hetu
++
++import java.io.ByteArrayInputStream
++import java.io.IOException
++import java.net.SocketTimeoutException
++import java.net.UnknownHostException
++import java.util.Collections
++import java.util.concurrent.atomic.AtomicInteger
++import kotlinx.coroutines.flow.toList
++import kotlinx.coroutines.runBlocking
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/**
++ * 网络测试 · 解锁与地区检测：每个检测器只用假 HTTP 响应判定（不访问外网），
++ * 另核查每项预算、并发上限与境内外出口 IP 解析。
++ */
++class NetworkUnlock101Test {
++
++    /** Answers by exact URL; anything unlisted fails like an unreachable host. */
++    private class FakeHttp(private val routes: Map<String, () -> UnlockReply>) : UnlockTransport {
++        val seen: MutableList<UnlockRequest> = Collections.synchronizedList(ArrayList())
++        override fun fetch(request: UnlockRequest, timeoutMs: Int): UnlockReply {
++            seen += request
++            val route = routes[request.url] ?: throw UnknownHostException(request.url)
++            return route().copy(url = request.url)
++        }
++    }
++
++    private fun reply(code: Int, body: String = "", headers: Map<String, List<String>> = emptyMap()): () -> UnlockReply =
++        { UnlockReply(code, headers.mapKeys { it.key.lowercase() }, body, "") }
++
++    private fun fail(error: IOException): () -> UnlockReply = { throw error }
++
++    private fun check(id: String, routes: Map<String, () -> UnlockReply>): UnlockResult = runBlocking {
++        NetworkUnlock.runOne(NetworkUnlock.checks.single { it.id == id }, FakeHttp(routes))
++    }
++
++    private val trace = { loc: String -> reply(200, "fl=1\nh=x\nip=203.0.113.9\nts=1\ncolo=NRT\nloc=$loc\n") }
++
++    /* ------------------------------ Netflix ------------------------------ */
++
++    private val nfLicensed = "https://www.netflix.com/title/${NetworkUnlock.NETFLIX_LICENSED_TITLE}"
++    private val nfOriginal = "https://www.netflix.com/title/${NetworkUnlock.NETFLIX_ORIGINAL_TITLE}"
++
++    @Test fun netflixLicensedTitleMeansFullUnlockWithRequestCountry() {
++        val body = "<html>" + "x".repeat(5000) + "\"requestCountry\":{\"supportedLocales\":[\"en\"],\"id\":\"SG\",\"status\":\"ALLOW\"}"
++        val result = check("netflix", mapOf(nfLicensed to reply(200, body)))
++        assertEquals(UnlockState.Unlocked, result.state)
++        assertEquals("SG", result.region)
++        assertEquals("解锁", result.chip)
++    }
++
++    @Test fun netflixOriginalsOnlyIsRestrictedAndRegionComesFromTheRedirect() {
++        val result = check("netflix", mapOf(
++            nfLicensed to reply(302, headers = mapOf("Location" to listOf("/jp-en/title/${NetworkUnlock.NETFLIX_LICENSED_TITLE}"))),
++            "https://www.netflix.com/jp-en/title/${NetworkUnlock.NETFLIX_LICENSED_TITLE}" to reply(404),
++            nfOriginal to reply(200),
++        ))
++        assertEquals(UnlockState.Restricted, result.state)
++        assertEquals("JP", result.region)
++        assertEquals("受限 · 仅自制剧", result.chip)
++    }
++
++    @Test fun netflixWithNeitherTitleIsUnavailable() {
++        val result = check("netflix", mapOf(nfLicensed to reply(404), nfOriginal to reply(404)))
++        assertEquals(UnlockState.Unavailable, result.state)
++        assertEquals(UnlockState.Unavailable, check("netflix", mapOf(nfLicensed to reply(403))).state)
++        val broken = check("netflix", mapOf(nfLicensed to reply(502)))
++        assertEquals(UnlockState.Failed, broken.state)
++        assertEquals("失败 · HTTP 502", broken.chip)
++    }
++
++    /* ------------------------------ YouTube ------------------------------ */
++
++    private val ytPremium = "https://www.youtube.com/premium"
++
++    @Test fun youtubePremiumReadsInnertubeCountry() {
++        val ok = check("youtube", mapOf(ytPremium to reply(200, "ytcfg.set({\"INNERTUBE_CONTEXT_GL\":\"HK\",\"x\":1})")))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("HK", ok.region)
++        val no = check("youtube", mapOf(ytPremium to reply(200, "\"INNERTUBE_CONTEXT_GL\":\"CN\" … YouTube Premium is not available in your country")))
++        assertEquals(UnlockState.Unavailable, no.state)
++        assertEquals("CN", no.region)
++    }
++
++    @Test fun youtubeGoogleSorryPageIsAVerificationFailureNotABlock() {
++        val result = check("youtube", mapOf(
++            ytPremium to reply(302, headers = mapOf("Location" to listOf("https://www.google.com/sorry/index?continue=x"))),
++            "https://www.google.com/sorry/index?continue=x" to reply(429),
++        ))
++        assertEquals(UnlockState.Failed, result.state)
++        assertEquals("需人机验证", result.detail)
++    }
++
++    /* ------------------------------ Disney+ ------------------------------ */
++
++    @Test fun disneyRegionFromHeaderAndUnavailableRedirect() {
++        val ok = check("disney", mapOf("https://www.disneyplus.com/" to reply(200, headers = mapOf("Region" to listOf("us"), "physical-location" to listOf("US")))))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("US", ok.region)
++        val no = check("disney", mapOf(
++            "https://www.disneyplus.com/" to reply(302, headers = mapOf("location" to listOf("https://www.disneyplus.com/unavailable"))),
++            "https://www.disneyplus.com/unavailable" to reply(200),
++        ))
++        assertEquals(UnlockState.Unavailable, no.state)
++    }
++
++    /* ------------------------------ ChatGPT / Claude / Gemini ------------------------------ */
++
++    private val openAiCompliance = "https://api.openai.com/compliance/cookie_requirements"
++
++    @Test fun chatgptSupportedCountryFromTraceAndCompliance() {
++        val ok = check("chatgpt", mapOf("https://chatgpt.com/cdn-cgi/trace" to trace("JP"), openAiCompliance to reply(200, "{\"cookie_consent_required\":false}")))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("JP", ok.region)
++        val refused = check("chatgpt", mapOf("https://chatgpt.com/cdn-cgi/trace" to trace("JP"), openAiCompliance to reply(403, "{\"error\":{\"code\":\"unsupported_country\"}}")))
++        assertEquals(UnlockState.Unavailable, refused.state)
++        val hk = check("chatgpt", mapOf("https://chatgpt.com/cdn-cgi/trace" to trace("HK"), openAiCompliance to reply(200, "{}")))
++        assertEquals(UnlockState.Unavailable, hk.state)
++        assertEquals("HK", hk.region)
++        val down = check("chatgpt", mapOf("https://chatgpt.com/cdn-cgi/trace" to fail(SocketTimeoutException()), openAiCompliance to fail(SocketTimeoutException())))
++        assertEquals("失败 · 超时", down.chip)
++    }
++
++    @Test fun claudeRegionRedirectAndChallenge() {
++        val ok = check("claude", mapOf("https://claude.ai/cdn-cgi/trace" to trace("US"), "https://claude.ai/" to reply(403, headers = mapOf("cf-mitigated" to listOf("challenge")))))
++        assertEquals("A browser challenge does not hide a supported exit", UnlockState.Unlocked, ok.state)
++        assertEquals("US", ok.region)
++        val refused = check("claude", mapOf("https://claude.ai/cdn-cgi/trace" to trace("US"), "https://claude.ai/" to reply(307, headers = mapOf("Location" to listOf("/app-unavailable-in-region")))))
++        assertEquals(UnlockState.Unavailable, refused.state)
++        val ru = check("claude", mapOf("https://claude.ai/cdn-cgi/trace" to trace("RU"), "https://claude.ai/" to reply(200)))
++        assertEquals(UnlockState.Unavailable, ru.state)
++        val challenged = check("claude", mapOf("https://claude.ai/" to reply(403, headers = mapOf("cf-mitigated" to listOf("challenge")))))
++        assertEquals("失败 · 需人机验证", challenged.chip)
++    }
++
++    @Test fun geminiAlpha3RegionAndUnsupportedText() {
++        val ok = check("gemini", mapOf("https://gemini.google.com/" to reply(200, "[[\"x\",2,1,200,\"SGP\"]]")))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("SG", ok.region)
++        val hk = check("gemini", mapOf("https://gemini.google.com/" to reply(200, "[[\"x\",2,1,200,\"HKG\"]]")))
++        assertEquals(UnlockState.Unavailable, hk.state)
++        assertEquals("HK", hk.region)
++        val text = check("gemini", mapOf("https://gemini.google.com/" to reply(200, "Gemini isn't currently supported in your country.")))
++        assertEquals(UnlockState.Unavailable, text.state)
++        assertEquals("失败 · 未返回地区", check("gemini", mapOf("https://gemini.google.com/" to reply(200, "<html></html>"))).chip)
++    }
++
++    /* ------------------------------ TikTok / Bilibili ------------------------------ */
++
++    @Test fun tiktokRegionFromPageState() {
++        val ok = check("tiktok", mapOf("https://www.tiktok.com/" to reply(200, "{\"appContext\":{\"region\":\"TW\",\"language\":\"en\"}}")))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("TW", ok.region)
++        assertEquals(UnlockState.Unavailable, check("tiktok", mapOf("https://www.tiktok.com/" to reply(451))).state)
++    }
++
++    private fun bili(ep: String) = "https://api.bilibili.com/pgc/player/web/playurl?ep_id=$ep&fnval=16"
++    private val biliZone = "https://api.bilibili.com/x/web-interface/zone"
++    private val playable = reply(200, "{\"code\":0,\"message\":\"success\",\"result\":{}}")
++    private val refusedArea = reply(200, "{\"code\":-10403,\"message\":\"抱歉您所在地区不可观看！\"}")
++
++    @Test fun bilibiliDistinguishesHongKongMacauTaiwanAndTaiwanOnly() {
++        val all = check("bilibili", mapOf(biliZone to reply(200, "{\"code\":0,\"data\":{\"country\":\"中国\",\"province\":\"台湾\"}}"),
++            bili(NetworkUnlock.BILIBILI_HKMOTW_EP) to playable, bili(NetworkUnlock.BILIBILI_TW_EP) to playable))
++        assertEquals(UnlockState.Unlocked, all.state)
++        assertEquals("解锁 · 港澳台", all.chip)
++        val hk = check("bilibili", mapOf(biliZone to reply(200, "{\"code\":0,\"data\":{\"country\":\"香港\"}}"),
++            bili(NetworkUnlock.BILIBILI_HKMOTW_EP) to playable, bili(NetworkUnlock.BILIBILI_TW_EP) to refusedArea))
++        assertEquals("受限 · 仅港澳", hk.chip)
++        assertEquals("HK", hk.region)
++        val tw = check("bilibili", mapOf(bili(NetworkUnlock.BILIBILI_HKMOTW_EP) to refusedArea, bili(NetworkUnlock.BILIBILI_TW_EP) to playable))
++        assertEquals("受限 · 仅台湾", tw.chip)
++        val none = check("bilibili", mapOf(biliZone to reply(200, "{\"data\":{\"country\":\"美国\"}}"),
++            bili(NetworkUnlock.BILIBILI_HKMOTW_EP) to refusedArea, bili(NetworkUnlock.BILIBILI_TW_EP) to refusedArea))
++        assertEquals(UnlockState.Unavailable, none.state)
++        assertEquals("US", none.region)
++    }
++
++    /* ------------------------------ Apple / Spotify / Steam ------------------------------ */
++
++    @Test fun appleCountryCodeEndpoint() {
++        val ok = check("apple", mapOf("https://gspe1-ssl.ls.apple.com/pep/gcc" to reply(200, "JP\n")))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("JP", ok.region)
++        assertEquals("失败 · 解析失败", check("apple", emptyMap()).chip)
++    }
++
++    @Test fun spotifySignupRedirectCarriesTheCountry() {
++        val ok = check("spotify", mapOf("https://www.spotify.com/signup" to reply(302, headers = mapOf("Location" to listOf("https://www.spotify.com/hk-en/signup/")))))
++        assertEquals(UnlockState.Unlocked, ok.state)
++        assertEquals("HK", ok.region)
++        val no = check("spotify", mapOf("https://www.spotify.com/signup" to reply(200, "Spotify is currently not available in your country.")))
++        assertEquals(UnlockState.Unavailable, no.state)
++    }
++
++    @Test fun steamCountryCookieAndStoreCurrency() {
++        val result = check("steam", mapOf(
++            "https://store.steampowered.com/" to reply(200, headers = mapOf("Set-Cookie" to listOf("browserid=1; path=/", "steamCountry=TR%7C4a65f845; path=/; secure"))),
++            "https://store.steampowered.com/api/appdetails?appids=${NetworkUnlock.STEAM_PRICED_APP}&filters=price_overview" to
++                reply(200, "{\"1086940\":{\"success\":true,\"data\":{\"price_overview\":{\"currency\":\"USD\",\"final\":5999}}}}"),
++        ))
++        assertEquals(UnlockState.Unlocked, result.state)
++        assertEquals("TR", result.region)
++        assertEquals("解锁 · USD", result.chip)
++    }
++
++    /* ------------------------------ GitHub / Twitch / Hulu ------------------------------ */
++
++    @Test fun headerRegionsForGithubTwitchHulu() {
++        val gh = check("github", mapOf("https://github.com/" to reply(200, headers = mapOf("X-GitHub-Edge-Region" to listOf("japaneast")))))
++        assertEquals(UnlockState.Unlocked, gh.state)
++        assertEquals("JP", gh.region)
++        val tw = check("twitch", mapOf("https://www.twitch.tv/" to reply(200, headers = mapOf("set-cookie" to listOf("twitch.lohp.countryCode=DE; domain=.twitch.tv")))))
++        assertEquals("DE", tw.region)
++        val us = check("hulu", mapOf("https://www.hulu.com/" to reply(301, headers = mapOf("location" to listOf("https://www.hulu.com/welcome"), "x-aka-user-geo" to listOf("US")))))
++        assertEquals(UnlockState.Unlocked, us.state)
++        val jp = check("hulu", mapOf("https://www.hulu.com/" to reply(301, headers = mapOf("x-aka-user-geo" to listOf("JP")))))
++        assertEquals("不可用 · 仅限美国", jp.chip)
++        assertEquals("JP", jp.region)
++    }
++
++    /* ------------------------------ budget, concurrency, exits ------------------------------ */
++
++    @Test fun everyCheckIsBoundedByItsBudgetAndConcurrencyIsCapped() = runBlocking {
++        val active = AtomicInteger()
++        val peak = AtomicInteger()
++        val slow = UnlockTransport { request, timeoutMs ->
++            val now = active.incrementAndGet()
++            peak.accumulateAndGet(now) { a, b -> maxOf(a, b) }
++            try {
++                // A stalled socket: blocks past the budget unless interrupted.
++                Thread.sleep(maxOf(timeoutMs.toLong(), 1L) + 5_000)
++                UnlockReply(200, emptyMap(), "", request.url)
++            } catch (_: InterruptedException) {
++                throw SocketTimeoutException("interrupted")
++            } finally {
++                active.decrementAndGet()
++            }
++        }
++        val checks = (1..8).map { n -> UnlockCheck("s$n") { http -> http.get("https://example.invalid/$n"); UnlockResult("s$n", UnlockState.Unlocked) } }
++        val started = System.nanoTime()
++        val results = NetworkUnlock.run(slow, checks, parallel = 3, timeoutMs = 400).toList()
++        val elapsed = (System.nanoTime() - started) / 1_000_000
++        assertEquals(8, results.size)
++        assertTrue(results.all { it.state == UnlockState.Failed && it.detail == "超时" })
++        assertTrue("never more than 3 checks at once: ${peak.get()}", peak.get() <= 3)
++        assertTrue("3 waves of 400 ms, not 8 × 5 s: $elapsed ms", elapsed < 4_000)
++    }
++
++    @Test fun boundedReaderStopsAtMarkerAndAtLimit() {
++        val page = "a".repeat(40_000) + "\"INNERTUBE_CONTEXT_GL\":\"US\"" + "b".repeat(400_000)
++        val read = SystemUnlockTransport.readBounded(ByteArrayInputStream(page.toByteArray()), 1_000_000, listOf("\"INNERTUBE_CONTEXT_GL\""), System.nanoTime() + 5_000_000_000L)
++        assertTrue(read.contains("INNERTUBE_CONTEXT_GL"))
++        assertTrue("stopped soon after the marker: ${read.length}", read.length < 80_000)
++        assertEquals(1000, SystemUnlockTransport.readBounded(ByteArrayInputStream(page.toByteArray()), 1000, emptyList(), System.nanoTime() + 5_000_000_000L).length)
++    }
++
++    @Test fun overseasAndDomesticExitsAreReadTogether() = runBlocking {
++        val http = FakeHttp(mapOf(
++            "https://www.cloudflare.com/cdn-cgi/trace" to reply(200, "fl=1\nip=203.0.113.9\ncolo=NRT\nloc=JP\n"),
++            "https://api.ip.sb/geoip" to reply(200, "{\"ip\":\"203.0.113.9\",\"city\":\"Tokyo\",\"region\":\"Tokyo\",\"asn_organization\":\"Example Net\"}"),
++            "https://ipservice.ws.126.net/locate/api/getLocByIp" to reply(200,
++                "{\"status\":200,\"result\":{\"city\":\"赣州\",\"country\":\"中国\",\"countrySymbol\":\"CN\",\"ip\":\"198.51.100.7\",\"operator\":\"电信\",\"province\":\"江西\"}}"),
++        ))
++        val exits = NetworkUnlock.exits(http)
++        assertEquals(ExitIp("203.0.113.9", "JP", "Tokyo", "Example Net"), exits.overseas)
++        assertEquals(ExitIp("198.51.100.7", "CN", "江西 赣州", "电信"), exits.domestic)
++        assertTrue("both sides were asked", http.seen.any { "126.net" in it.url } && http.seen.any { "cloudflare" in it.url })
++    }
++
++    @Test fun domesticExitFallsBackToTencentAndFailuresCarryReasons() = runBlocking {
++        val exits = NetworkUnlock.exits(FakeHttp(mapOf(
++            "https://ipservice.ws.126.net/locate/api/getLocByIp" to fail(IOException("reset")),
++            "https://r.inews.qq.com/api/ip2city" to reply(200, "{\"ret\":0,\"ip\":\"198.51.100.8\",\"country\":\"中国\",\"province\":\"广东省\",\"city\":\"深圳市\",\"isp\":\"\"}"),
++        )))
++        assertEquals(ExitIp("198.51.100.8", "CN", "广东省 深圳市", ""), exits.domestic)
++        assertNull(exits.overseas)
++        assertEquals("解析失败", exits.overseasError)
++    }
++
++    @Test fun parsingHelpers() {
++        assertEquals("US", NetworkUnlock.fromIso3("USA"))
++        assertEquals("HK", NetworkUnlock.fromIso3("hkg"))
++        assertNull(NetworkUnlock.fromIso3("ZZZ"))
++        assertEquals("HK", NetworkUnlock.pathRegion("https://www.spotify.com/hk-en/signup/"))
++        assertNull(NetworkUnlock.pathRegion("https://www.spotify.com/select-your-country-region/"))
++        assertEquals("United States", NetworkUnlock.jsonString("{\"countryName\":\"United\\x20States\"}", "countryName"))
++        assertEquals("US", NetworkUnlock.azureRegion("westus2"))
++        assertEquals(-10403L, NetworkUnlock.jsonNumber("{\"code\":-10403}", "code"))
++        assertNull("not a trace", NetworkUnlock.traceField("<html>loc=JP</html>", "loc"))
++        assertEquals("TW", mergeUnlockRegion("JP", UnlockResult("x", UnlockState.Unlocked, "TW")))
++        assertEquals("JP", mergeUnlockRegion("JP", null))
++        // Every detector belongs to a row of the existing catalogue (grouped as before).
++        val rows = setOf("chatgpt", "claude", "gemini", "tiktok", "bilibili", "disney", "hulu", "netflix", "spotify", "twitch", "youtube", "apple", "github", "steam")
++        assertEquals(rows, NetworkUnlock.checkIds)
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt

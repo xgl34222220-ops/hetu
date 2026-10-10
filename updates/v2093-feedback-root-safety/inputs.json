@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "c127b2739e37ef55090ebdcf556619a931e09d4d01ce325b48ec82d84be50d7f",
+  "patchSha256": "dbf46262def9b73416703acca64d0dec1046c1a96fb5602b5fd729a7393331f3",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -247,6 +247,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt",
@@ -298,6 +299,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt",
@@ -345,8 +347,9 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "f6bb5c1d68438be89c0882104e8604ae9d59648e9bff3eb548567c8497d09bd6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt": "07aa0e69ef099c1afb1fc0ea5e942c533af5ad046ca426e08df5814e412cb27c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetBrandIcons.kt": "727b32098a2b502ac31b10f06e354c1f4dacc2fc92842b000c37c6f2cab7e738",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt": "36debcbe0c8b87d484ef46327da3df4983806a0042fade4e0e85344fa9199326",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt": "dbce54415e0f9dd2ab2d731660d9baf5406c5dcc3c23a2221c7455cc36001648",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt": "1eb75b3c66aa02d9540cff2a9d863f10d1ff2388eaae6985cedb35624b057d1d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt": "4068eed98229d4c517f1ece0c0188178a0dae52f7dd7d850ab859b6bfefefecb",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkUnlockEngine.kt": "8468dbecc573c47140089ea890f3ab494e29480860a0981d9f7b8f543fa41ccd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt": "7311c0284342d03a179cb64493d05418b943b4d6c5894797e5cf06249421ceea",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt": "0ff61317c9385fb15a43c51eedb1e9b366e2f6b824305623eb741bb02777ea79",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt": "78377156ad3719399c3fea862b071ebc68b160159507e15e3bf34f4221751e07",
@@ -398,6 +401,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt": "c906754a2eceb61b3270e2bedaaea6e6c43bf4738e2dd7534da63387835dece8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt": "93916facbd7b66f9348abb19dd06e4754e0c210326c5be4df49e2172bd277900",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt": "b18170e72fa75012fcee1e6a3e956221440663c7959cb0e847558db528e3b78a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt": "1abe5f3286a4c739b2475842606ebfa3ed931a2a59f6bf91ce5e6e605aa09f46",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCompactAlignment94Test.kt": "675096999660fe3849184ef6b402d4775b9bcd1ac97abdde120493c5172d7b7c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt": "e7d5a636be25ad909d3a95298807e54896b5f2c9fb87382179fddbb9f544505b",
@@ -2444,6 +2448,31 @@
         "wantedCancellationStopsRealServiceUnknownCoreBootRetry"
       ]
     },
+    "io.github.xgl34222220.hetu.NetworkUnlock101Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt",
+      "methods": [
+        "netflixLicensedTitleMeansFullUnlockWithRequestCountry",
+        "netflixOriginalsOnlyIsRestrictedAndRegionComesFromTheRedirect",
+        "netflixWithNeitherTitleIsUnavailable",
+        "youtubePremiumReadsInnertubeCountry",
+        "youtubeGoogleSorryPageIsAVerificationFailureNotABlock",
+        "disneyRegionFromHeaderAndUnavailableRedirect",
+        "chatgptSupportedCountryFromTraceAndCompliance",
+        "claudeRegionRedirectAndChallenge",
+        "geminiAlpha3RegionAndUnsupportedText",
+        "tiktokRegionFromPageState",
+        "bilibiliDistinguishesHongKongMacauTaiwanAndTaiwanOnly",
+        "appleCountryCodeEndpoint",
+        "spotifySignupRedirectCarriesTheCountry",
+        "steamCountryCookieAndStoreCurrency",
+        "headerRegionsForGithubTwitchHulu",
+        "everyCheckIsBoundedByItsBudgetAndConcurrencyIsCapped",
+        "boundedReaderStopsAtMarkerAndAtLimit",
+        "overseasAndDomesticExitsAreReadTogether",
+        "domesticExitFallsBackToTencentAndFailuresCarryReasons",
+        "parsingHelpers"
+      ]
+    },
     "io.github.xgl34222220.hetu.NewHomePanelInteractionTest": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/NewHomePanelInteractionTest.kt",
       "methods": [
@@ -3168,8 +3197,8 @@
       ]
     }
   },
-  "expectedUnitTests": 789,
-  "expectedTestXmlFiles": 89,
+  "expectedUnitTests": 809,
+  "expectedTestXmlFiles": 90,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
   "signingUnchanged": true,

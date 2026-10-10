@@ -350,6 +350,10 @@ internal object SpeedTest {
     const val SAMPLE_MS = 250L
     const val PHASE_MS = 8_000L
     const val STREAMS = 3
+    /** Per-request connect/read budget; matches the 8 s budget of every 连通性 check. */
+    const val REQUEST_TIMEOUT_MS = 8_000
+    /** The latency phase stops sampling once this much time has passed (at least one sample kept). */
+    const val LATENCY_BUDGET_MS = 8_000L
     private const val DOWN_CHUNK = 25_000_000L
     internal const val UP_CHUNK = 4_000_000
 
@@ -376,8 +380,8 @@ internal object SpeedTest {
         val opened = if (port == null) target.openConnection() else target.openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port)))
         return (opened as HttpURLConnection).apply {
             useCaches = false
-            connectTimeout = 10_000
-            readTimeout = 10_000
+            connectTimeout = REQUEST_TIMEOUT_MS
+            readTimeout = REQUEST_TIMEOUT_MS
             setRequestProperty("User-Agent", "Mozilla/5.0 (Linux; Android) Hetu-SpeedTest")
         }
     }
@@ -453,7 +457,10 @@ internal object SpeedTest {
 
             send(SpeedEvent.Phase(SpeedPhase.Latency))
             val samples = ArrayList<Long>()
-            repeat(6) {
+            val latencyStarted = System.nanoTime()
+            while (samples.size < 6) {
+                // A slow path must not stretch the phase: keep what was measured once the budget is spent.
+                if (samples.isNotEmpty() && (System.nanoTime() - latencyStarted) / 1_000_000 > LATENCY_BUDGET_MS) break
                 val started = System.nanoTime()
                 val connection = open("$base/__down?bytes=0", port)
                 guarded(connection) {

@@ -68,10 +68,20 @@ import io.github.xgl34222220.hetu.ui.ht
 import java.util.Locale
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** What a 连通性 row shows; [result] is null until its requests finish. */
-internal data class NetRowState(val testing: Boolean = false, val result: NetSiteResult? = null)
+/**
+ * What a 连通性 row shows; [result] is null until its requests finish. [unlock] is the row's
+ * unlock/region check (only for services that have one), which finishes independently.
+ */
+internal data class NetRowState(
+    val testing: Boolean = false,
+    val result: NetSiteResult? = null,
+    val unlocking: Boolean = false,
+    val unlock: UnlockResult? = null,
+)
 
 /** Live and final readings of 网速, kept by the page so switching tabs does not lose them. */
 internal class SpeedUiState {
@@ -136,26 +146,49 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
     var testing by remember { mutableStateOf(false) }
     var viaProxy by remember { mutableStateOf<Boolean?>(null) }
     var summary by remember { mutableStateOf("") }
+    var exits by remember { mutableStateOf<ExitIps?>(null) }
+    var exitTesting by remember { mutableStateOf(false) }
     val availableLabel = ht("可用")
+    val unlockIds = remember { NetworkUnlock.checkIds }
 
     LaunchedEffect(runId) {
         if (runId == 0) return@LaunchedEffect
         testing = true
         summary = ""
-        rows.values.forEach { it.value = NetRowState(testing = true) }
+        rows.forEach { (id, holder) -> holder.value = NetRowState(testing = true, unlocking = id in unlockIds) }
+        exits = null
+        exitTesting = true
         val results = ArrayList<NetSiteResult>()
         try {
-            val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
-            viaProxy = port != null
-            NetworkTest.run(port).collect { result ->
-                results += result
-                rows[result.id]?.value = NetRowState(testing = false, result = result)
+            coroutineScope {
+                // Unlock checks and exit IPs go through the system network and run beside the latency rows.
+                launch {
+                    try {
+                        NetworkUnlock.run().collect { unlock ->
+                            rows[unlock.id]?.let { it.value = it.value.copy(unlocking = false, unlock = unlock) }
+                        }
+                    } finally {
+                        rows.values.forEach { if (it.value.unlocking) it.value = it.value.copy(unlocking = false) }
+                    }
+                }
+                launch {
+                    try { exits = NetworkUnlock.exits() } finally { exitTesting = false }
+                }
+                val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
+                viaProxy = port != null
+                NetworkTest.run(port).collect { result ->
+                    results += result
+                    rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
+                }
+                NetworkTest.regions(context, results, port).forEach { result ->
+                    rows[result.id]?.let { it.value = it.value.copy(testing = false, result = result) }
+                }
             }
-            NetworkTest.regions(context, results, port).forEach { result -> rows[result.id]?.value = NetRowState(false, result) }
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (_: Exception) {
-            rows.values.forEach { if (it.value.testing) it.value = NetRowState() }
+            rows.values.forEach { if (it.value.testing || it.value.unlocking) it.value = it.value.copy(testing = false, unlocking = false) }
+            exitTesting = false
         } finally {
             testing = false
             val done = rows.values.mapNotNull { it.value.result }
@@ -229,6 +262,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
                     if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
                 }
             }
+            item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
             byCategory.forEach { (category, sites) ->
                 item(key = "cat-${category.name}") {
                     HxSection(ht(category.title)) {
@@ -243,7 +277,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
             }
             item(key = "conn-foot") {
                 Text(
-                    ht("延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。"),
+                    ht("延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。解锁检测经系统网络（代理规则透明生效）向各服务实测，每项最长 8 秒：解锁、受限（如仅自制剧）、不可用，或失败及原因；有服务自报地区时以其为准。"),
                     Modifier.padding(horizontal = HomeRowDims.start + 14.dp).padding(bottom = 8.dp),
                     color = c.t3, style = HomeType.caption,
                 )
@@ -284,7 +318,8 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
     val c = LocalHomeColors.current
     val state = holder.value
     val result = state.result
-    val region = result?.region
+    val unlock = state.unlock
+    val region = mergeUnlockRegion(result?.region, unlock)
     val status: String
     val statusColor: Color
     when {
@@ -302,14 +337,21 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
         }
     }
     val regionText = if (region == null) "" else (NetworkTest.flag(region) + " " + region).trim()
+    val unlockText = unlock?.let { unlockChipText(it) }.orEmpty()
     Row(
         Modifier.fillMaxWidth().heightIn(min = 62.dp).padding(start = HomeRowDims.start, end = HomeRowDims.end, top = 9.dp, bottom = 9.dp)
-            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
+            .semantics(mergeDescendants = true) { contentDescription = listOf(site.name, unlockText, regionText, status).filter { it.isNotBlank() }.joinToString("，") },
         verticalAlignment = Alignment.CenterVertically,
     ) {
         BrandTile(site)
         Spacer(Modifier.width(14.dp))
-        Text(site.name, Modifier.weight(1f), color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.Center) {
+            Text(site.name, color = c.t1, style = HomeType.cardLabel, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (state.unlocking || unlock != null) {
+                Spacer(Modifier.height(4.dp))
+                UnlockChip(unlock, state.unlocking)
+            }
+        }
         Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
             if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
             if (state.testing) {
@@ -319,6 +361,57 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
                     Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
                 }
             } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
+        }
+    }
+}
+
+@Composable
+private fun unlockChipText(unlock: UnlockResult): String =
+    if (unlock.detail.isBlank()) ht(unlock.state.label) else ht(unlock.state.label) + " · " + ht(unlock.detail)
+
+/** Unlock state pill under the service name: 解锁 / 受限 · 仅自制剧 / 不可用 / 失败 · 超时. */
+@Composable
+private fun UnlockChip(unlock: UnlockResult?, checking: Boolean) {
+    val c = LocalHomeColors.current
+    val tone = when (unlock?.state) {
+        UnlockState.Unlocked -> c.goodText
+        UnlockState.Restricted -> c.warnText
+        UnlockState.Unavailable -> c.badText
+        UnlockState.Failed -> c.t2
+        null -> c.t3
+    }
+    val text = if (unlock == null) (if (checking) ht("检测解锁…") else "") else unlockChipText(unlock)
+    if (text.isEmpty()) return
+    Box(
+        Modifier.clip(RoundedCornerShape(50)).background(tone.copy(alpha = if (c.dark) .18f else .12f)).padding(horizontal = 7.dp, vertical = 2.dp),
+    ) {
+        Text(text, color = tone, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
+    }
+}
+
+private fun exitLine(exit: ExitIp): String =
+    listOf((NetworkTest.flag(exit.region) + " " + exit.region.orEmpty()).trim(), exit.ip).filter { it.isNotBlank() }.joinToString(" · ")
+
+/** Overseas and domestic exit IPs side by side; each side reports its own failure. */
+@Composable
+private fun ExitIpCard(exits: ExitIps?, testing: Boolean) {
+    HxSection(ht("出口 IP")) {
+        HxGroup {
+            val overseas = exits?.overseas
+            val domestic = exits?.domestic
+            SpeedLine(ht("境外"), when {
+                overseas != null -> exitLine(overseas)
+                testing -> ht("测试中")
+                exits != null -> ht(exits.overseasError.ifBlank { "失败" })
+                else -> "—"
+            }, overseas?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
+            HxDivider(0.dp)
+            SpeedLine(ht("境内"), when {
+                domestic != null -> exitLine(domestic)
+                testing -> ht("测试中")
+                exits != null -> ht(exits.domesticError.ifBlank { "失败" })
+                else -> "—"
+            }, domestic?.let { listOf(it.place, it.org).filter(String::isNotBlank).joinToString(" · ") })
         }
     }
 }
