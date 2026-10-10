@@ -7605,7 +7605,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..f996da9 100644
+index e31ca99..bfd5286 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -90,6 +90,12 @@ internal fun HomeScreen(
@@ -7630,7 +7630,7 @@ index e31ca99..f996da9 100644
                              1f to glow.copy(alpha = 0f),
                              startY = 0f, endY = reach,
                          ),
-@@ -137,8 +143,9 @@ internal fun HomeScreen(
+@@ -137,8 +143,8 @@ internal fun HomeScreen(
                  .padding(contentPadding)
                  .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
          ) {
@@ -7638,11 +7638,10 @@ index e31ca99..f996da9 100644
 -            HomeControlCard(state, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
 +            HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
 +            HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
-+            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
              if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                  HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                      Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
-@@ -167,21 +174,21 @@ internal fun HomeScreen(
+@@ -167,23 +173,26 @@ internal fun HomeScreen(
                  )
              }
 
@@ -7667,8 +7666,13 @@ index e31ca99..f996da9 100644
 +                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
                  HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
              }
++            // WebUI · 日志 close the page: above the metrics they pushed 资源占用 under the floating dock
++            // on a 393×852 dp phone, where a tap on it lands on the dock instead.
++            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 5))
              Spacer(Modifier.height(8.dp))
-@@ -201,6 +208,22 @@ internal fun HomeScreen(
+         }
+
+@@ -201,6 +210,22 @@ internal fun HomeScreen(
 
  internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
@@ -7691,7 +7695,7 @@ index e31ca99..f996da9 100644
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -288,7 +311,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -288,7 +313,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
      return when (connection.health) {
@@ -7700,11 +7704,11 @@ index e31ca99..f996da9 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +370,26 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +372,26 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
-+/** WebUI and 日志, side by side under the control card. Both reuse the existing pages. */
++/** WebUI and 日志, side by side at the end of the page. Both reuse the existing pages. */
 +@Composable
 +private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
 +    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
@@ -9639,7 +9643,7 @@ index 6e1e067..cedcda6 100644
 
      when (val current = overlay) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
-index 60a38ad..ba9a3fa 100644
+index 60a38ad..1cdba86 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsModels.kt
 @@ -10,7 +10,7 @@ import java.util.Locale
@@ -9659,16 +9663,21 @@ index 60a38ad..ba9a3fa 100644
      WebUi("WebUI", "外部面板", "外部面板", "zashboard 面板 dashboard"),
  }
 
-@@ -39,6 +40,8 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
+@@ -39,16 +40,19 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
  internal object ToolsCatalog {
      /** Concept layout (03A page 1): six untitled cards. This is the default. */
      val concept: List<ToolsGroupSpec> = listOf(
-+        // 网络测试 is the most used tool: it opens the list on its own card.
-+        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest)),
-         ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
+-        ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
++        // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
++        // 配置管理 still sits fully above the floating dock without scrolling.
++        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest, ToolsEntry.Files)),
          ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
          ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
-@@ -49,6 +52,7 @@ internal object ToolsCatalog {
+         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
+         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
+-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
++        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
+     )
 
      /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
      val titled: List<ToolsGroupSpec> = listOf(

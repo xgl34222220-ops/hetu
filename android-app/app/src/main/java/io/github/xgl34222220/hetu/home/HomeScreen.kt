@@ -145,7 +145,6 @@ internal fun HomeScreen(
         ) {
             HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
             HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
-            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                     Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
@@ -191,6 +190,9 @@ internal fun HomeScreen(
                 HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
             }
+            // WebUI · 日志 close the page: above the metrics they pushed 资源占用 under the floating dock
+            // on a 393×852 dp phone, where a tap on it lands on the dock instead.
+            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 5))
             Spacer(Modifier.height(8.dp))
         }
 
@@ -370,7 +372,7 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier: 
     }
 }
 
-/** WebUI and 日志, side by side under the control card. Both reuse the existing pages. */
+/** WebUI and 日志, side by side at the end of the page. Both reuse the existing pages. */
 @Composable
 private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
