@@ -49,7 +49,16 @@ final class ProxyRuntimeProfile {
     Capability capability(){return capability(core,mode);}
     static Capability capability(Core core,Mode mode){
         boolean mihomo=core==Core.MIHOMO||core==Core.MIHOMO_SMART;
-        if(!mihomo)return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 已进入核心/配置模型，但运行后端正在接入，当前不会假报可用");
+        if(!mihomo){
+            // sing-box / Xray / V2Fly / Hysteria run behind the same Root netfilter capture:
+            // a TPROXY (TCP+UDP) or Redirect (TCP) inbound plus Hetu's DNS port. App scope, shared
+            // network, CIDR/interface bypass and QUIC control are netfilter features, core-independent.
+            switch(mode){
+                case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
+                case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");
+                default:return new Capability(false,false,false,false,false,false,false,false,false,core.label+" 在河图 Root 运行链中支持 TPROXY 与 Redirect；"+mode.label+" 仅 Mihomo 可用");
+            }
+        }
         switch(mode){
             case TPROXY:return new Capability(true,true,true,true,true,true,true,true,true,"");
             case REDIRECT:return new Capability(true,true,false,true,true,true,true,true,true,"");

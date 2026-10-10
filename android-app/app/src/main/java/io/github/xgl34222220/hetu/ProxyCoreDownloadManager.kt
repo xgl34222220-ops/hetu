@@ -36,28 +36,73 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
 }
 
 /**
- * Which downloadable cores can actually run in Hetu's Root runtime.
+ * What each downloadable core can do in Hetu's Root runtime.
  *
- * The whole runtime is built on the Mihomo CLI and its Clash-compatible controller:
- * MihomoStartupConfig generates the startup YAML (tproxy/redir ports, DNS, controller, adblock
- * rule-set), hetu-root.sh validates and launches `bin/core -t -d RUN -f CFG` / `-d RUN -f CFG`, and
- * start-up readiness, the panel, latency tests, adblock verification and hot reload all talk to the
- * Clash API. Mihomo and Mihomo Smart share that CLI and API. The other cores need their own config
- * generator, launch arguments and (missing) controller, so they are shown disabled with the reason
- * instead of being downloadable and then failing to start.
+ * Every core runs behind the same Root TPROXY / Redirect capture (hetu-root.sh launches it with its own
+ * CLI from run/state/core.kind; ProxyCoreConfig writes its native config or converts the Clash/Mihomo
+ * profile). Features that need Mihomo's Clash controller degrade per core with an explicit
+ * "此核心不支持" state instead of a connection error:
+ *  - panel / policy groups / node switching / latency test: Mihomo, Mihomo Smart, sing-box (clash_api);
+ *  - hot reload and live adblock refresh: Mihomo family only (others apply changes on restart);
+ *  - rule routing and the adblock chain: every core except Hysteria (single-server client).
  */
 internal object ProxyCoreSupport {
-    fun runtimeSupported(core: ProxyRuntimeProfile.Core): Boolean =
+    private fun mihomo(core: ProxyRuntimeProfile.Core) =
         core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART
 
-    fun unsupportedReason(core: ProxyRuntimeProfile.Core): String = when (core) {
-        ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART -> ""
-        ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND ->
-            "河图的 Root TPROXY 运行链（启动配置生成、启动校验、面板/测速、广告过滤与热重载）基于 Mihomo 配置与 Clash 控制接口；sing-box 使用 JSON 配置与 run -c 启动参数，尚未接入"
-        ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY ->
-            "${core.label} 没有 Clash 兼容控制接口，河图的启动就绪检查、面板、测速与广告过滤无法工作；其 JSON 配置与启动参数也尚未接入"
-        ProxyRuntimeProfile.Core.HYSTERIA ->
-            "Hysteria 是单服务器客户端，没有河图需要的规则分流、策略组与 Clash 控制接口"
+    @JvmStatic fun runtimeSupported(core: ProxyRuntimeProfile.Core): Boolean = true
+    @JvmStatic fun clashApi(core: ProxyRuntimeProfile.Core): Boolean = ProxyCoreConfig.clashApi(core)
+    @JvmStatic fun panel(core: ProxyRuntimeProfile.Core): Boolean = clashApi(core)
+    @JvmStatic fun latencyTest(core: ProxyRuntimeProfile.Core): Boolean = clashApi(core)
+    @JvmStatic fun hotReload(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+    @JvmStatic fun adblockLiveRefresh(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+    @JvmStatic fun ruleRouting(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
+    @JvmStatic fun adblock(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
+    @JvmStatic fun singleServer(core: ProxyRuntimeProfile.Core): Boolean = core == ProxyRuntimeProfile.Core.HYSTERIA
+    /**
+     * Proxy / rule providers (订阅、规则集 tabs). sing-box's clash_api answers /providers/proxies with
+     * `{"providers":{}}` and /providers/rules with `[]`, and every refresh / healthcheck is 404
+     * (verified against sing-box 1.14.3): subscriptions are expanded to plain outbounds at start.
+     */
+    @JvmStatic fun providers(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+    /**
+     * 规则 / 全局 / 直连 switching. sing-box accepts PATCH /configs but only switches between the
+     * modes of its `clash_mode` rules; converted configs have none, so its mode list is just `rule`.
+     */
+    @JvmStatic fun trafficMode(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+
+    /** What the 面板 tabs can show for the running core; an external Clash API is never gated. */
+    @JvmStatic fun panelGate(prefs: android.content.SharedPreferences): io.github.xgl34222220.hetu.panel.PanelCoreGate {
+        val core = running(prefs)
+        return io.github.xgl34222220.hetu.panel.PanelCoreGate.of(core.label, clashApi(core), providers(core), singleServer(core),
+            prefs.getBoolean("proxyCustomApiEnabled", false))
+    }
+
+    /**
+     * 广告过滤 page: (core label, ads are routed by this core, live chain verification + hot refresh).
+     * The running core while the proxy runs, otherwise the one the next start will use.
+     */
+    @JvmStatic fun adblockCore(prefs: android.content.SharedPreferences, proxyRunning: Boolean): Triple<String, Boolean, Boolean> {
+        val core = if (proxyRunning) running(prefs) else ProxyRuntimeProfile.load(prefs).core
+        return Triple(core.label, adblock(core), adblockLiveRefresh(core))
+    }
+
+    /** The core that is actually running (written at start), else the selected one. */
+    @JvmStatic fun running(prefs: android.content.SharedPreferences): ProxyRuntimeProfile.Core =
+        ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", null) ?: ProxyRuntimeProfile.load(prefs).core.id)
+
+    /** The explicit degraded-state text shown instead of an error. */
+    @JvmStatic fun unsupported(core: ProxyRuntimeProfile.Core, feature: String): String = "此核心不支持$feature（${core.label}）"
+
+    /** Kept for callers of the previous download policy: every core runs, so there is no reason. */
+    @JvmStatic fun unsupportedReason(core: ProxyRuntimeProfile.Core): String = ""
+
+    /** One line for the core picker: modes and which panel features work. */
+    @JvmStatic fun featureSummary(core: ProxyRuntimeProfile.Core): String = when {
+        mihomo(core) -> ""
+        core == ProxyRuntimeProfile.Core.HYSTERIA -> "TPROXY / Redirect · 单服务器（仅用一个 Hysteria 2 节点）· 无规则分流、面板与测速"
+        clashApi(core) -> "TPROXY / Redirect · 面板与测速经 clash_api · 不支持热重载"
+        else -> "TPROXY / Redirect · 规则分流 · 无 Clash 控制接口：面板、测速与热重载不可用"
     }
 }
 
@@ -145,8 +190,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
         ),
         Source(
             ProxyRuntimeProfile.Core.HYSTERIA,
-            "HyNetworks/hysteria",
-            "https://api.github.com/repos/HyNetworks/hysteria/releases/latest",
+            "apernet/hysteria",
+            "https://api.github.com/repos/apernet/hysteria/releases/latest",
             Archive.RAW,
             "hysteria",
         ),
@@ -169,8 +214,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
     }
 
     suspend fun status(core: ProxyRuntimeProfile.Core, network: Boolean = true): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
-        // A core the runtime cannot start is never offered for download (and costs no GitHub request).
-        if (!ProxyCoreSupport.runtimeSupported(core)) return@withContext localStatus(core, "暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val local = localStatus(core)
         val source = sources.firstOrNull { it.core == core }
             ?: return@withContext local.copy(message = "暂未配置可信下载源")
@@ -191,7 +234,11 @@ internal class ProxyCoreDownloadManager(context: Context) {
             updateAvailable = update,
             canDownload = true,
             source = source.repo,
-            message = if (core == ProxyRuntimeProfile.Core.MIHOMO && !downloaded) "当前使用 App 内置 Mihomo，可在线下载最新版覆盖；删除下载版会自动回退内置核心" else local.message,
+            message = when {
+                core == ProxyRuntimeProfile.Core.MIHOMO && !downloaded -> "当前使用 App 内置 Mihomo，可在线下载最新版覆盖；删除下载版会自动回退内置核心"
+                asset.name.lowercase(Locale.ROOT).contains("-linux-") -> "该架构没有官方 Android 构建，使用 Linux 静态构建（河图已为其配置内置 DNS）"
+                else -> local.message
+            },
         )
     }
 
@@ -199,7 +246,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
         core: ProxyRuntimeProfile.Core,
         onProgress: (String) -> Unit = {},
     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
-        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val source = sources.firstOrNull { it.core == core }
             ?: throw IOException("${core.label} 暂未配置下载源")
         onProgress("检查 ${core.label} 最新版本…")
@@ -209,11 +255,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
             onProgress(coreDownloadProgressText(done, total))
         }
         val extracted = File(app.cacheDir, "proxy-core-${core.id}-${System.nanoTime()}.bin")
+        // Xray / V2Fly ship geoip.dat + geosite.dat in the same zip (geoip:/geosite: rules).
+        val geo = GEO_ASSETS.associateWith { File(app.cacheDir, "proxy-core-${core.id}-${System.nanoTime()}-$it") }
         try {
             onProgress("校验并解压 ${core.label}…")
-            extract(asset, archive, extracted)
+            extract(asset, archive, extracted, geo)
             verifyElf(extracted)
             FileInputStream(extracted).use { store.importCore(core, it) }
+            installGeoAssets(core, geo)
             prefs.edit()
                 .putString("version_${core.id}", asset.version)
                 .putString("source_${core.id}", asset.source.repo)
@@ -224,13 +273,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
         } finally {
             archive.delete()
             extracted.delete()
+            geo.values.forEach { it.delete() }
         }
         status(core, false).copy(
             latestVersion = asset.version,
             updateAvailable = false,
             canDownload = true,
             source = asset.source.repo,
-            message = if (runtimeReady(core)) "已就绪" else "核心已下载；当前运行后端尚未接入",
+            message = ProxyCoreSupport.featureSummary(core).let { if (it.isEmpty()) "已就绪" else "已就绪 · $it" },
         )
     }
 
@@ -239,7 +289,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
         uri: Uri,
         displayName: String,
     ): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
-        if (!ProxyCoreSupport.runtimeSupported(core)) throw IOException("${core.label} 暂不支持：" + ProxyCoreSupport.unsupportedReason(core))
         val temp = File(app.cacheDir, "proxy-core-import-${core.id}-${System.nanoTime()}.bin")
         try {
             val input = app.contentResolver.openInputStream(uri) ?: throw IOException("无法读取核心文件")
@@ -260,6 +309,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
 
     suspend fun removeDownloaded(core: ProxyRuntimeProfile.Core): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
         if (store.installed(core)) store.remove(core)
+        GEO_ASSETS.forEach { geoFile(core, it).delete() }
         prefs.edit()
             .remove("version_${core.id}")
             .remove("source_${core.id}")
@@ -286,7 +336,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
             installedVersion = installed,
             latestVersion = "",
             updateAvailable = false,
-            canDownload = ProxyCoreSupport.runtimeSupported(core) && sources.any { it.core == core },
+            canDownload = sources.any { it.core == core },
             runtimeReady = runtimeReady(core),
             source = source,
             message = message,
@@ -382,31 +432,52 @@ internal class ProxyCoreDownloadManager(context: Context) {
         }
     }
 
-    private fun extract(asset: Asset, archive: File, out: File) {
+    private fun extract(asset: Asset, archive: File, out: File, geo: Map<String, File> = emptyMap()) {
         when (asset.source.archive) {
             Archive.RAW -> FileInputStream(archive).use { input -> writeLimited(input, out) }
             Archive.GZIP -> FileInputStream(archive).use { raw -> GZIPInputStream(BufferedInputStream(raw)).use { writeLimited(it, out) } }
-            Archive.ZIP -> extractZip(archive, out, asset.source.executableName)
+            Archive.ZIP -> extractZip(archive, out, asset.source.executableName, geo)
             Archive.TAR_GZIP -> extractTarGzip(archive, out, asset.source.executableName)
         }
     }
 
-    private fun extractZip(archive: File, out: File, executable: String) {
+    private fun geoFile(core: ProxyRuntimeProfile.Core, name: String): File = File(store.file(core).parentFile, "${core.id}.$name")
+
+    /** Kept beside the binary; RootProxyManager deploys them to /data/adb/hetu/bin/assets. */
+    private fun installGeoAssets(core: ProxyRuntimeProfile.Core, geo: Map<String, File>) {
+        for ((name, temp) in geo) {
+            val target = geoFile(core, name)
+            if (temp.isFile && temp.length() > 0L) {
+                if (!temp.renameTo(target)) { temp.copyTo(target, overwrite = true); temp.delete() }
+            } else target.delete()
+        }
+    }
+
+    private fun extractZip(archive: File, out: File, executable: String, geo: Map<String, File> = emptyMap()) {
         ZipInputStream(BufferedInputStream(FileInputStream(archive))).use { zip ->
             var fallback: ByteArray? = null
+            var found = false
             while (true) {
                 val entry = zip.nextEntry ?: break
                 if (entry.isDirectory) continue
                 val base = entry.name.substringAfterLast('/').lowercase(Locale.ROOT)
-                if (base == executable.lowercase(Locale.ROOT) || base == "$executable.exe".lowercase(Locale.ROOT)) {
+                if (!found && (base == executable.lowercase(Locale.ROOT) || base == "$executable.exe".lowercase(Locale.ROOT))) {
                     writeLimited(zip, out)
-                    return
+                    found = true
+                    continue
                 }
+                val geoTarget = geo[base]
+                if (geoTarget != null && !entry.name.contains('/')) {
+                    writeLimited(zip, geoTarget)
+                    continue
+                }
+                if (found) continue
                 if (fallback == null && !base.endsWith(".dat") && !base.endsWith(".json") && !base.endsWith(".txt")) {
                     val bytes = readLimited(zip, 4L * 1024L * 1024L)
                     if (bytes.size >= 4 && bytes[0] == 0x7f.toByte() && bytes[1] == 'E'.code.toByte()) fallback = bytes
                 }
             }
+            if (found) return
             fallback?.let {
                 FileOutputStream(out, false).use { stream -> stream.write(it); stream.fd.sync() }
                 return
@@ -562,42 +633,38 @@ internal class ProxyCoreDownloadManager(context: Context) {
         /** Release asset naming per core, for one ABI tag (see [abiTag]). Pure, so it is unit tested. */
         internal fun matchesAsset(core: ProxyRuntimeProfile.Core, rawName: String, abi: String): Boolean {
             val name = rawName.lowercase(Locale.ROOT)
+            if (abi !in ABI_TAGS) return false
             return when (core) {
                 ProxyRuntimeProfile.Core.MIHOMO,
                 ProxyRuntimeProfile.Core.MIHOMO_SMART -> {
                     // mihomo-android-arm64-v8-v1.19.32.gz, mihomo-android-armv7-alpha-smart-8d4c8c7.gz …
-                    name.startsWith("mihomo-android-") && name.endsWith(".gz") && when (abi) {
-                        "arm64", "armv7", "amd64", "386" -> name.startsWith("mihomo-android-$abi-")
-                        else -> false
-                    }
+                    name.startsWith("mihomo-android-$abi-") && name.endsWith(".gz")
                 }
                 ProxyRuntimeProfile.Core.SING_BOX,
                 ProxyRuntimeProfile.Core.SING_BOX_REF1ND -> {
-                    abi != "unknown" && name.contains("android-$abi") && name.endsWith(".tar.gz") && !name.contains("sfa")
+                    // sing-box-1.14.3-android-arm64.tar.gz; ARMv7 is published as "-android-arm".
+                    name.startsWith("sing-box-") && name.endsWith("-android-${singBoxArch(abi)}.tar.gz")
                 }
-                ProxyRuntimeProfile.Core.XRAY -> {
-                    name.endsWith(".zip") && when (abi) {
-                        "arm64" -> name == "xray-android-arm64-v8a.zip"
-                        "armv7" -> name == "xray-android-arm32-v7a.zip" || name == "xray-android-arm32-v7.zip"
-                        "amd64" -> name == "xray-android-amd64.zip"
-                        "386" -> name == "xray-android-386.zip"
-                        else -> false
-                    }
-                }
-                ProxyRuntimeProfile.Core.V2FLY -> {
-                    name.endsWith(".zip") && when (abi) {
-                        "arm64" -> name == "v2ray-android-arm64-v8a.zip"
-                        "armv7" -> name == "v2ray-android-arm32-v7a.zip" || name == "v2ray-android-arm32-v7.zip"
-                        "amd64" -> name == "v2ray-android-amd64.zip"
-                        "386" -> name == "v2ray-android-386.zip"
-                        else -> false
-                    }
-                }
-                ProxyRuntimeProfile.Core.HYSTERIA -> abi != "unknown" && name == "hysteria-android-$abi"
+                ProxyRuntimeProfile.Core.XRAY -> name in goZipNames("xray", abi)
+                ProxyRuntimeProfile.Core.V2FLY -> name in goZipNames("v2ray", abi)
+                ProxyRuntimeProfile.Core.HYSTERIA -> name == "hysteria-android-$abi"
             }
         }
 
-        /** Prefer the most compatible Mihomo build when a release offers several for one ABI. */
+        private val ABI_TAGS = setOf("arm64", "armv7", "amd64", "386")
+
+        private fun singBoxArch(abi: String) = if (abi == "armv7") "arm" else abi
+
+        /** Android build first; the static Linux build only where no Android build is published. */
+        private fun goZipNames(prefix: String, abi: String): List<String> = when (abi) {
+            "arm64" -> listOf("$prefix-android-arm64-v8a.zip", "$prefix-linux-arm64-v8a.zip")
+            "armv7" -> listOf("$prefix-android-arm32-v7a.zip", "$prefix-linux-arm32-v7a.zip")
+            "amd64" -> listOf("$prefix-android-amd64.zip", "$prefix-linux-64.zip")
+            "386" -> listOf("$prefix-android-386.zip", "$prefix-linux-32.zip")
+            else -> emptyList()
+        }
+
+        /** Prefer the most compatible build when a release offers several for one ABI. */
         internal fun assetRank(core: ProxyRuntimeProfile.Core, rawName: String): Int {
             val name = rawName.lowercase(Locale.ROOT)
             if (core == ProxyRuntimeProfile.Core.MIHOMO || core == ProxyRuntimeProfile.Core.MIHOMO_SMART) {
@@ -608,7 +675,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
                     else -> 3
                 }
             }
-            return 0
+            return if (name.contains("-linux-")) 1 else 0
         }
 
         /** Release ABI tag of the first supported device ABI: arm64, armv7, amd64, 386 or unknown. */
@@ -630,6 +697,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
          * otherwise a new Smart build would never show as an update.
          */
         internal fun assetVersion(core: ProxyRuntimeProfile.Core, tag: String, assetName: String): String {
+            // apernet/hysteria tags its app releases "app/v2.13.0".
+            if (core == ProxyRuntimeProfile.Core.HYSTERIA) return tag.removePrefix("app/")
             if (core != ProxyRuntimeProfile.Core.MIHOMO_SMART) return tag
             val build = assetName.lowercase(Locale.ROOT).removeSuffix(".gz")
                 .replace(Regex("^mihomo-android-(arm64|armv7|amd64|386)-"), "")
@@ -637,6 +706,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
             return if (build.isBlank() || build == tag.lowercase(Locale.ROOT)) tag else "$tag · $build"
         }
 
+        /** Geo databases extracted with Xray / V2Fly. */
+        internal val GEO_ASSETS = listOf("geoip.dat", "geosite.dat")
         private const val PREFS = "hetu_core_updates"
         private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
         private const val MAX_EXTRACTED = 128L * 1024L * 1024L

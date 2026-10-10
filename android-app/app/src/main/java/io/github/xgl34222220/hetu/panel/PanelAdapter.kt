@@ -117,9 +117,11 @@ internal fun HetuPanelV2(
         }
     }
 
+    val coreGate = remember(state.running, state.core, state.controllerSupported) { io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(prefs) }
     // Load what the visible tab needs; the overview also needs providers and the rule count.
-    LaunchedEffect(tab, state.running) {
+    LaunchedEffect(tab, state.running, coreGate) {
         if (!state.running) { providers = emptyList(); rules = emptyList(); ruleSets = emptyList(); sampler.reset(); return@LaunchedEffect }
+        if (!coreGate.supports(tab)) return@LaunchedEffect
         try {
             when (tab) {
                 PanelTab.Overview -> { providers = repo.providers(); if (rules.isEmpty()) rules = repo.rules() }
@@ -147,7 +149,7 @@ internal fun HetuPanelV2(
         state = state, starting = starting, providers = providers, rules = rules, ruleSets = ruleSets, logs = logs,
         delays = delays, testing = testing, selectedLocal = selectedLocal,
         subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, traffic = sampler.snapshot(),
-    ).copy(refreshing = refreshing)
+    ).copy(refreshing = refreshing, core = if (state.running) coreGate else PanelCoreGate.Full)
     val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
     val actions = PanelActions(
@@ -474,9 +476,14 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         else -> PanelTab.Groups
     }
     val visible = io.github.xgl34222220.hetu.home.rememberScreenVisible()
-    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible) {
+    // The running core decides which tabs have data: no request is made for a tab it cannot feed.
+    val coreGate = remember(vm.state.running, vm.state.core, vm.state.controllerSupported, vm.settingsRevision) {
+        io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(vm.prefs)
+    }
+    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible, coreGate) {
         if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
         if (vm.state.controllerReadFailed) return@LaunchedEffect
+        if (!coreGate.supports(tab)) return@LaunchedEffect
         // A stopped activity keeps its composition: never reload tabs or tail logs from the background.
         if (!visible) return@LaunchedEffect
         when (tab) {
@@ -518,6 +525,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         updatingAllSubscriptions = vm.providersUpdatingAll,
         updatingAllRuleSets = vm.ruleSetsUpdatingAll,
         syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
+        core = if (vm.state.running) coreGate else PanelCoreGate.Full,
     )
     val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
     // One actions instance per page: rebuilding it on every 1 s traffic sample handed each

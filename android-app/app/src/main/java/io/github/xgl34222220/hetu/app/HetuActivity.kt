@@ -101,6 +101,8 @@ import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -356,6 +358,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
             val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
             HxToastHost(vm, extraBottom = if (nav.stack.size == 1 && dockOccupiedHeight > 0.dp)
                 (dockOccupiedHeight - navBottom).coerceAtLeast(0.dp) + 12.dp else 24.dp)
+            HxCoreNoticeHost(vm)
         }
 
         vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
@@ -502,6 +505,34 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
     }
 }
 
+/**
+ * 「当前核心（X）不支持此功能」 for an action the running core lacks (热重载, 流量模式, 测速):
+ * the same glass card as the panel's degraded tabs, in a dialog, instead of an error toast.
+ */
+@Composable
+internal fun HxCoreNoticeHost(vm: HetuViewModel) {
+    val notice = vm.coreNotice ?: return
+    val dismiss = { vm.coreNotice = null }
+    io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs(vm.prefs) {
+        androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
+            io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard(
+                notice.core, notice.feature, notice.detail,
+                Modifier.widthIn(max = 360.dp), raised = true,
+            ) {
+                if (notice.offerRestart && vm.state.running) {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Soft)
+                    io.github.xgl34222220.hetu.home.HomeButton("重启代理", { vm.coreNotice = null; vm.restart() }, Modifier.weight(1f),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                } else {
+                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.fillMaxWidth(),
+                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
+                }
+            }
+        }
+    }
+}
+
 /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
 @Composable
 internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -547,6 +578,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                 Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                     content(vm)
                     HxToastHost(vm)
+                    HxCoreNoticeHost(vm)
                 }
             }
         }

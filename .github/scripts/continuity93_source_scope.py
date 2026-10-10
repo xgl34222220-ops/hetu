@@ -68,6 +68,10 @@ AUTHORIZED_FILES = frozenset((
     # baseline profile. Only these three inputs are added; the Gradle delta is pinned below.
     PACKAGE + 'ProxyCoreDownloadManager.kt',
     RELEASE_RULES, BASELINE_PROFILE,
+    # 2026-10-11 multi-core authorization: sing-box, sing-box reF1nd, Xray, V2Fly and Hysteria 2
+    # run in Root TPROXY/Redirect. Only the core/mode capability model and the new pure-Java
+    # config writer/converter (no Android API) are added to the runtime scope.
+    PACKAGE + 'ProxyRuntimeProfile.java', PACKAGE + 'ProxyCoreConfig.java', PACKAGE + 'CoreJson.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

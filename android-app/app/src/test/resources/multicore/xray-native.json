@@ -1,0 +1,10 @@
+{
+  "log": {"loglevel": "warning"},
+  "inbounds": [{"tag": "socks", "port": 10808, "listen": "127.0.0.1", "protocol": "socks"}],
+  "outbounds": [
+    {"tag": "proxy", "protocol": "vmess", "settings": {"vnext": [{"address": "203.0.113.30", "port": 443, "users": [{"id": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3", "alterId": 0, "security": "auto"}]}]},
+     "streamSettings": {"network": "ws", "security": "tls", "tlsSettings": {"serverName": "example.com"}, "wsSettings": {"path": "/ws"}, "sockopt": {"mark": 255}}},
+    {"tag": "direct", "protocol": "freedom"}
+  ],
+  "routing": {"domainStrategy": "AsIs", "rules": [{"type": "field", "domain": ["geosite:cn"], "outboundTag": "direct"}]}
+}

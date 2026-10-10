@@ -242,7 +242,9 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                 val snapshot = rules.rulesSnapshot()
                 val chain = ToolsRuntimeBridge.adblockChain(app)
                 // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
-                val report = if (chain.running) AdblockVerification.chain(app) else null
+                val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
+                // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
+                val report = if (chain.running && coreLiveVerify) AdblockVerification.chain(app) else null
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -276,6 +278,9 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         chainNote = report?.detail().orEmpty(),
                         standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                         cnameProtection = prefs.getBoolean(Keys.Cname, true),
+                        coreLabel = coreLabel,
+                        coreRoutesAds = coreRoutesAds,
+                        coreLiveVerify = coreLiveVerify,
                     ),
                 )
             },

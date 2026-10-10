@@ -222,6 +222,8 @@ internal data class PanelData(
     val updatingAllRuleSets: Boolean = false,
     /** Cards still show the last complete snapshot while the first fresh controller read is pending. */
     val syncing: Boolean = false,
+    /** Tabs the running core cannot feed show 「当前核心（X）不支持此功能」 instead of an error. */
+    val core: PanelCoreGate = PanelCoreGate.Full,
 ) {
     val running: Boolean get() = status == PanelStatus.Running
 

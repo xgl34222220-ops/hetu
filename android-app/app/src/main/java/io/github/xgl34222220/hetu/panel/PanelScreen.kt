@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
@@ -55,6 +56,7 @@ import io.github.xgl34222220.hetu.home.HomeBarBackdrop
 import io.github.xgl34222220.hetu.home.HomeBarGlass
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeIcons
@@ -162,6 +164,21 @@ internal fun PanelScreen(
                 }
                 return@LazyColumn
             }
+            // A tab the running core cannot feed is an explained state, not a read error or a toast.
+            data.core.features[view.tab]?.let { feature ->
+                item(key = "panel-core-unsupported") {
+                    val fallback = data.core.fallbackFor(view.tab)
+                    val way: (@Composable RowScope.() -> Unit)? = if (fallback == null) null else {
+                        { HomeButton("查看" + fallback.label, { onView(view.withTab(fallback)) }, kind = HomeButtonKind.Primary) }
+                    }
+                    HomeCoreUnsupportedCard(
+                        data.core.core, feature, data.core.details[view.tab].orEmpty(),
+                        Modifier.panelGutter().padding(top = 24.dp).then(hetuAnimateItem(motion)),
+                        actions = way,
+                    )
+                }
+                return@LazyColumn
+            }
             if (data.readError.isNotBlank()) {
                 item(key = "panel-read-error") {
                     PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError, verbatimSubtitle = true) {
@@ -223,7 +240,7 @@ internal fun PanelScreen(
         PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
 
         // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups }
+        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups && data.core.supports(PanelTab.Groups) }
         var lastOpen by remember { mutableStateOf("") }
         SideEffect { if (openGroup != null) lastOpen = openGroup }
         val shownGroup = openGroup ?: lastOpen
@@ -329,7 +346,7 @@ private fun BoxScope.PanelHeader(
             },
             color = c.t1, style = HomeType.barTitle, maxLines = 1,
         )
-        if (data.running && data.readError.isBlank()) {
+        if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
             val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
                 Box {
                     HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)
