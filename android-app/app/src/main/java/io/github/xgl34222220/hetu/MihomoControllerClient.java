@@ -74,6 +74,14 @@ final class MihomoControllerClient {
             secret=string(snapshot,customApi?"proxyCustomApiSecret":"proxyControllerSecret","");
             if(secret.indexOf('\r')>=0||secret.indexOf('\n')>=0)throw new IOException("Clash API Secret 包含非法换行");
             if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
+            // Xray / V2Fly / Hysteria have no Clash-compatible controller: report the explicit
+            // unsupported state instead of a refused connection on the local port.
+            if(!customApi){
+                Object running=snapshot.get("proxyRootRuntimeCore");
+                ProxyRuntimeProfile.Core core=ProxyRuntimeProfile.Core.from(running instanceof String?(String)running:"mihomo");
+                if(!ProxyCoreConfig.clashApi(core))
+                    throw new IOException(ProxyCoreSupport.unsupported(core,"面板、策略组与测速（没有 Clash 控制接口）"));
+            }
         }
 
         private static String string(Map<String,?> values,String key,String fallback)throws IOException {

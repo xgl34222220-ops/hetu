@@ -491,7 +491,8 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 val installed = core == ProxyRuntimeProfile.Core.MIHOMO || ProxyCoreStore(context).installed(core)
                 when {
                     !supported -> HxChoice(core.id, core.label, ht("暂不支持：") + ProxyCoreSupport.unsupportedReason(core), enabled = false)
-                    installed -> HxChoice(core.id, core.label, null)
+                    // Non-Mihomo cores run too; say up front which panel features they lack.
+                    installed -> HxChoice(core.id, core.label, ProxyCoreSupport.featureSummary(core).takeIf { it.isNotEmpty() })
                     else -> HxChoice(core.id, core.label, ht("尚未安装，请先在核心管理下载"), enabled = false)
                 }
             },

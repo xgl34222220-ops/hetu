@@ -841,6 +841,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun reload() {
         if (operation != null || !state.running) return
+        // sing-box / Xray / V2Fly / Hysteria apply config changes on restart: an explicit state, not an error.
+        val core = ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", ProxyRuntimeProfile.load(prefs).core.id))
+        if (!ProxyCoreSupport.hotReload(core)) { toast(ProxyCoreSupport.unsupported(core, "热重载") + "，请使用「重启」应用配置"); return }
         invalidateRuntimeRequests()
         operation = HxRunOp.Reload
         viewModelScope.launch {
@@ -1417,6 +1420,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun applyConfigChange(savedMessage: String) {
         if (!state.running) {
             toast("$savedMessage，下次启动生效")
+            return
+        }
+        val core = ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", ProxyRuntimeProfile.load(prefs).core.id))
+        if (!ProxyCoreSupport.hotReload(core)) {
+            toast("$savedMessage；" + ProxyCoreSupport.unsupported(core, "热重载") + "，重启代理后生效")
             return
         }
         reload()

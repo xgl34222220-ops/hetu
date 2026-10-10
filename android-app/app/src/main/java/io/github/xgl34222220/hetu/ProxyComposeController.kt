@@ -585,7 +585,14 @@ internal class ProxyComposeController(context: Context) {
     }
 
     suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
-        configs.select(ProxyRuntimeProfile.load(prefs).core, name)
+        val core = ProxyRuntimeProfile.load(prefs).core
+        if (ProxyCoreConfig.kind(core) != ProxyCoreConfig.Kind.MIHOMO) {
+            // A sing-box / Xray / V2Fly / Hysteria config is checked by that core's own CLI
+            // (sing-box check, xray run -test, v2ray test, Hysteria YAML) before it becomes current.
+            val entry = configs.list(core).firstOrNull { it.name == name } ?: error("配置不存在")
+            root.validateConfigText(configs.read(entry))
+        }
+        configs.select(core, name)
     }
 
     suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {

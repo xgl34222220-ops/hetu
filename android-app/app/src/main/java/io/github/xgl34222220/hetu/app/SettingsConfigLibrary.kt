@@ -97,6 +97,9 @@ internal fun SettingsConfigPicker(
     SettingsGroup(ht("配置选择")) {
         when {
             loading && configs.isEmpty() -> Box(Modifier.fillMaxWidth().padding(vertical = 22.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
+            configs.isEmpty() && ProxyCoreConfig.kind(ProxyRuntimeProfile.load(vm.prefs).core) != ProxyCoreConfig.Kind.MIHOMO ->
+                // Without a native file the selected Mihomo profile is converted for this core at start.
+                SettingsRow(ht("尚无该核心的原生配置"), subtitle = ht("启动时自动转换 Mihomo 当前配置；也可在 工具 › 配置管理 导入原生配置"), icon = ToolsIcons.FileText)
             configs.isEmpty() -> SettingsRow(ht("尚无配置"), subtitle = ht("在 工具 › 配置管理 导入配置后会显示在这里"), icon = ToolsIcons.FileText)
             else -> configs.forEachIndexed { index, config ->
                 if (index > 0) SettingsDivider()

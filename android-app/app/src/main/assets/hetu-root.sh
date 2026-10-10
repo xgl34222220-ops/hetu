@@ -20,6 +20,12 @@ START_STATE="$RUN/start-state"
 START_ERROR="$RUN/last-start-error"
 START_TIMING="$RUN/startup-timing"
 LOCK_DIR="$RUN/.txn.lock"
+# Which private core $BASE/bin/core is (the App writes it together with the binary). Absent or
+# unknown means Mihomo, so every existing deployment and stored boot plan keeps its exact CLI.
+CORE_KIND_FILE="$RUN/state/core.kind"
+CORE_ASSETS="$BASE/bin/assets"
+CORE_KIND_OVERRIDE=""
+VC_DIR="$RUN"
 CLEAN_SNAPSHOT_ACTIVE=0
 FAKE_IP_V4=""
 FAKE_IP_V6=""
@@ -1342,8 +1348,54 @@ install_kill6(){
   if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 }
 
+core_kind(){
+  CK="$CORE_KIND_OVERRIDE"; [ -n "$CK" ] || CK=$(head -n 1 "$CORE_KIND_FILE" 2>/dev/null || true)
+  case "$CK" in sing-box|xray|v2ray|hysteria) printf '%s' "$CK";; *) printf mihomo;; esac
+}
+# Only Mihomo and sing-box (experimental.clash_api) answer on the controller port.
+kind_has_api(){ case "$1" in mihomo|sing-box) return 0;; *) return 1;; esac; }
+kind_label(){ case "$1" in sing-box) printf sing-box;; xray) printf Xray;; v2ray) printf V2Fly;; hysteria) printf Hysteria;; *) printf Mihomo;; esac; }
+# The native config the core reads: the private startup copy minus Hetu's terminal fake-IP
+# metadata block (JSON has no comments), with the extension the core picks its parser by.
+core_payload(){
+  CP_SRC="$1"; CP_KIND="$2"; CP_DIR="$3"
+  case "$CP_KIND" in hysteria) CP_EXT=yaml;; sing-box|xray|v2ray) CP_EXT=json;; *) printf '%s' "$CP_SRC"; return 0;; esac
+  mkdir -p "$CP_DIR" || return 1
+  CP_OUT="$CP_DIR/hetu-core.$CP_EXT"
+  if [ "$(tail -n 5 "$CP_SRC" 2>/dev/null | sed -n '1p')" = '# HETU_FAKE_IP_POLICY=1' ]; then
+    CP_LINES=$(wc -l < "$CP_SRC") || return 1
+    head -n $((CP_LINES-5)) "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }
+  else cat "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }; fi
+  chmod 600 "$CP_OUT.new.$$" 2>/dev/null || true
+  mv -f "$CP_OUT.new.$$" "$CP_OUT" || return 1
+  printf '%s' "$CP_OUT"
+}
+# Geo databases shipped next to Xray/V2Fly; harmless for the other cores.
+core_env(){ XRAY_LOCATION_ASSET="$CORE_ASSETS"; V2RAY_LOCATION_ASSET="$CORE_ASSETS"; export XRAY_LOCATION_ASSET V2RAY_LOCATION_ASSET; }
+validate_native(){
+  VN_BIN="$1"; VN_KIND="$3"
+  VN_CFG=$(core_payload "$2" "$VN_KIND" "$VC_DIR") || { printf '%s\n' "无法准备 $(kind_label "$VN_KIND") 配置" >> "$CHECKLOG"; return 1; }
+  case "$VN_KIND" in
+    sing-box) set -- check -c "$VN_CFG" -D "$VC_DIR" --disable-color;;
+    xray) set -- run -test -c "$VN_CFG";;
+    v2ray) set -- test -c "$VN_CFG";;
+    # The Hysteria client has no check command; the App validates the YAML before deployment.
+    hysteria) if [ -s "$VN_CFG" ] && grep -q '^server:' "$VN_CFG"; then return 0; fi; printf '%s\n' "Hysteria 配置缺少 server" >> "$CHECKLOG"; return 1;;
+    *) return 1;;
+  esac
+  core_env
+  if [ "$START_ACTIVE" = 1 ]; then
+    transaction_current || return 1
+    read -r VC_NOW VC_UNUSED < /proc/uptime || return 1
+    VC_NOW=${VC_NOW%%.*}; VC_LEFT=$((TXN_DEADLINE-VC_NOW))
+    [ "$VC_LEFT" -gt 0 ] || return 1
+    timeout -s TERM -k 1 "$VC_LEFT" "$VN_BIN" "$@" >>"$CHECKLOG" 2>&1
+  else "$VN_BIN" "$@" >>"$CHECKLOG" 2>&1; fi
+}
 validatecfg(){
   BIN="$1"; CFG="$2"; : > "$CHECKLOG"
+  VC_KIND=$(core_kind)
+  if [ "$VC_KIND" != mihomo ]; then validate_native "$BIN" "$CFG" "$VC_KIND"; return $?; fi
   if [ "$START_ACTIVE" = 1 ]; then
     transaction_current || return 1
     read -r VC_NOW VC_UNUSED < /proc/uptime || return 1
@@ -1382,7 +1434,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
 ready(){
   listen_snapshot || return 1
-  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; tcp_listen "$CP" || return 1
+  PID="$1"; M="$2"; TP="$3"; RP="$4"; TCP="$5"; UDP="$6"; DNS="$7"; DP="$8"; CP="$9"; core_maybe_alive "$PID" && kill -0 "$PID" >/dev/null 2>&1 || return 1; { [ "${START_API:-1}" = 0 ] || tcp_listen "$CP"; } || return 1
   case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
 }
@@ -1519,11 +1571,24 @@ core_identity_prepare(){
   if v6supported && has ip6tables && ! probe_core_owner xt6; then CORE_RUNNER=""; CORE_SPEC=""; fi
   return 0
 }
+core_launch_native(){
+  case "$1" in
+    sing-box) set -- run -c "$2" -D "$RUN" --disable-color;;
+    xray|v2ray) set -- run -c "$2";;
+    hysteria) set -- client -c "$2" --disable-update-check;;
+    *) return 1;;
+  esac
+  core_env
+  if [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" "$@" >>"$LOG" 2>&1 &
+  else "$START_BIN" "$@" >>"$LOG" 2>&1 & fi
+  START_PID=$!
+}
 core_launch(){
   [ -z "${START_MEM_BYTES:-}" ] || { GOMEMLIMIT="$START_MEM_BYTES"; export GOMEMLIMIT; }
-  if [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 &
+  if [ "${START_KIND:-mihomo}" != mihomo ]; then core_launch_native "$START_KIND" "${START_PAYLOAD:-$START_CFG}" || return 1
+  elif [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 &
   else "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & fi
-  START_PID=$!
+  [ "${START_KIND:-mihomo}" != mihomo ] || START_PID=$!
   [ -n "$CORE_RUNNER" ] || return 0
   # setuidgid replaces itself with the core; identity checks wait for that, briefly.
   CL_N=0
@@ -1773,8 +1838,13 @@ start(){
   fi
   start_stage "ipv6-dns-capability"
   select_dns6_policy
-  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "Mihomo 配置校验失败，当前网络未被接管"; fi
+  [ -x "$START_BIN" ] || fail "核心文件不存在或不可执行"; [ -r "$START_CFG" ] || fail "启动配置不存在"; mkdir -p "$RUN" || fail "无法创建运行目录"; START_KIND=$(core_kind); START_LABEL=$(kind_label "$START_KIND"); START_API=1; kind_has_api "$START_KIND" || START_API=0
+  if [ "$START_PREVALIDATED" != 1 ]; then validatecfg "$START_BIN" "$START_CFG" || fail "$START_LABEL 配置校验失败，当前网络未被接管"; fi
   load_start_fake_ip_policy "$START_CFG" || fail "启动配置的 fake-IP 路由投影无效，当前网络未被接管"
+  START_PAYLOAD="$START_CFG"
+  if [ "$START_KIND" != mihomo ]; then START_PAYLOAD=$(core_payload "$START_CFG" "$START_KIND" "$RUN") || fail "无法准备 $START_LABEL 运行配置，当前网络未被接管"; fi
+  # A core without a controller publishes no controller port: health and the App skip it.
+  START_SESSION_CP="$START_CP"; [ "$START_API" = 1 ] || START_SESSION_CP=0
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   start_stage "core-identity"
   core_identity_prepare
@@ -1803,12 +1873,12 @@ start(){
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
+  : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
   core_identity_confirm "$START_PID" || fail "核心隔离身份验证失败"
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
   if [ "$READY_RC" -ne 0 ]; then
-    if [ "$READY_RC" -eq 2 ]; then READY_MSG="Mihomo 启动后提前退出，请查看核心日志"; else READY_MSG="Mihomo 初始化超过 90 秒，代理入站/DNS/API 监听仍未就绪；首次加载大量远程订阅或规则时请检查网络与核心日志"; fi
+    if [ "$READY_RC" -eq 2 ]; then READY_MSG="$START_LABEL 启动后提前退出，请查看核心日志"; else READY_MSG="$START_LABEL 初始化超过 90 秒，代理入站/DNS/API 监听仍未就绪；首次加载大量远程订阅或规则时请检查网络与核心日志"; fi
     fail "$READY_MSG"
   fi
 
@@ -2342,6 +2412,16 @@ health_json(){ (
   printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
 ); }
 
+validate_action(){
+  case "$2" in mihomo|sing-box|xray|v2ray|hysteria) ;; *) fail "未知核心类型";; esac
+  [ -x "$BASE/bin/core" ] || fail "核心文件不存在或不可执行"; [ -r "$1" ] || fail "配置文件不存在"
+  CORE_KIND_OVERRIDE="$2"; VC_DIR="$RUN/validate.$$"; CHECKLOG="$VC_DIR.log"; mkdir -p "$VC_DIR" || fail "无法创建校验目录"
+  if [ "$2" = mihomo ]; then validatecfg_rc(){ "$BASE/bin/core" -t -d "$VC_DIR" -f "$1" > "$CHECKLOG" 2>&1; }; else validatecfg_rc(){ validatecfg "$BASE/bin/core" "$1"; }; fi
+  if validatecfg_rc "$1"; then rm -rf "$VC_DIR" "$CHECKLOG"; ok "$(kind_label "$2") 配置校验通过"; return 0; fi
+  VA_MSG=$(tail -c 900 "$CHECKLOG" 2>/dev/null | tr -d '\033\000' | tr '\n\r\t"\\' '     ')
+  rm -rf "$VC_DIR" "$CHECKLOG"
+  fail "$(kind_label "$2") 配置校验失败：$VA_MSG"
+}
 case "${1:-status}" in
   repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
   preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
@@ -2363,6 +2443,8 @@ case "${1:-status}" in
   cancel-boot) root; cancel_boot || fail "无法撤销本次自动恢复"; ok "自动恢复已撤销";;
   stop) root; trap '' TERM INT HUP; shield_run stop_transaction || fail "停止未完成：核心或网络清理尚未确认，请重试停止"; ok "Root 代理已停止并恢复网络状态";;
   status) status;;
+  # Config check with the deployed core's own CLI (sing-box check, xray run -test, v2ray test).
+  validate) [ "$#" = 3 ] || fail "参数错误"; root; validate_action "$2" "$3";;
   network-health) health_json;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
   watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;

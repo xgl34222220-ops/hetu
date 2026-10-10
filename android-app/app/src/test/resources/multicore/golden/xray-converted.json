@@ -1,0 +1,343 @@
+{
+  "log": {
+    "loglevel": "warning"
+  },
+  "dns": {
+    "servers": ["fakedns", "https://1.1.1.1/dns-query", "223.5.5.5"],
+    "queryStrategy": "UseIP",
+    "tag": "hetu-dns"
+  },
+  "fakedns": [
+    {
+      "ipPool": "198.18.0.0/16",
+      "poolSize": 65535
+    }
+  ],
+  "inbounds": [
+    {
+      "tag": "hetu-tproxy",
+      "listen": "::",
+      "port": 19898,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "network": "tcp,udp",
+        "followRedirect": true
+      },
+      "streamSettings": {
+        "sockopt": {
+          "tproxy": "tproxy"
+        }
+      },
+      "sniffing": {
+        "enabled": true,
+        "destOverride": ["http", "tls", "quic", "fakedns"],
+        "routeOnly": true
+      }
+    },
+    {
+      "tag": "hetu-dns-in",
+      "listen": "::",
+      "port": 11053,
+      "protocol": "dokodemo-door",
+      "settings": {
+        "address": "1.1.1.1",
+        "port": 53,
+        "network": "tcp,udp"
+      }
+    },
+    {
+      "tag": "hetu-egress-probe",
+      "listen": "127.0.0.1",
+      "port": 29150,
+      "protocol": "http"
+    }
+  ],
+  "outbounds": [
+    {
+      "tag": "0001 HK SS",
+      "protocol": "shadowsocks",
+      "settings": {
+        "servers": [
+          {
+            "address": "ss.example.com",
+            "port": 8388,
+            "method": "aes-128-gcm",
+            "password": "pw1"
+          }
+        ]
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "0002 HK SS2022",
+      "protocol": "shadowsocks",
+      "settings": {
+        "servers": [
+          {
+            "address": "203.0.113.10",
+            "port": 8389,
+            "method": "2022-blake3-aes-128-gcm",
+            "password": "AAAAAAAAAAAAAAAAAAAAAA=="
+          }
+        ]
+      },
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "0004 JP VMess WS",
+      "protocol": "vmess",
+      "settings": {
+        "vnext": [
+          {
+            "address": "vmess.example.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "2b4a8a52-6f1e-4c4f-9b8a-1d3a2b4c5d6e",
+                "alterId": 0,
+                "security": "auto"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "ws",
+        "wsSettings": {
+          "path": "/ws",
+          "host": "vmess.example.com"
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "vmess.example.com"
+        },
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "0005 US VLESS Reality",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "198.51.100.7",
+            "port": 443,
+            "users": [
+              {
+                "id": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b3",
+                "encryption": "none",
+                "flow": "xtls-rprx-vision"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "reality",
+        "realitySettings": {
+          "serverName": "www.microsoft.com",
+          "fingerprint": "chrome",
+          "publicKey": "iGs2kqIGPj4a8Qw0bJ7XyKm6E3p0vN5rT9uS1cD4fHg",
+          "shortId": "6ba85179e30d4fc2",
+          "spiderX": ""
+        },
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "0006 SG VLESS gRPC",
+      "protocol": "vless",
+      "settings": {
+        "vnext": [
+          {
+            "address": "grpc.example.com",
+            "port": 443,
+            "users": [
+              {
+                "id": "6f2a1c4e-8b3d-4e5f-a6b7-c8d9e0f1a2b4",
+                "encryption": "none"
+              }
+            ]
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "grpc",
+        "grpcSettings": {
+          "serviceName": "gun"
+        },
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "grpc.example.com"
+        },
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "0007 TW Trojan",
+      "protocol": "trojan",
+      "settings": {
+        "servers": [
+          {
+            "address": "trojan.example.com",
+            "port": 443,
+            "password": "tpw"
+          }
+        ]
+      },
+      "streamSettings": {
+        "network": "tcp",
+        "security": "tls",
+        "tlsSettings": {
+          "serverName": "trojan.example.com"
+        },
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "DIRECT",
+      "protocol": "freedom",
+      "streamSettings": {
+        "sockopt": {
+          "domainStrategy": "UseIP"
+        }
+      }
+    },
+    {
+      "tag": "REJECT",
+      "protocol": "blackhole"
+    },
+    {
+      "tag": "hetu-dns-out",
+      "protocol": "dns"
+    }
+  ],
+  "routing": {
+    "domainStrategy": "IPIfNonMatch",
+    "rules": [
+      {
+        "type": "field",
+        "inboundTag": ["hetu-dns-in"],
+        "outboundTag": "hetu-dns-out"
+      },
+      {
+        "type": "field",
+        "inboundTag": ["hetu-tproxy", "hetu-redirect"],
+        "port": 53,
+        "outboundTag": "hetu-dns-out"
+      },
+      {
+        "type": "field",
+        "domain": ["domain:ads.example.net", "domain:tracker.example.org"],
+        "outboundTag": "REJECT"
+      },
+      {
+        "type": "field",
+        "domain": ["domain:doubleclick.net", "full:ads.example.org"],
+        "outboundTag": "REJECT"
+      },
+      {
+        "type": "field",
+        "domain": ["full:api.example.com"],
+        "balancerTag": "balancer-Auto"
+      },
+      {
+        "type": "field",
+        "domain": ["domain:google.com"],
+        "balancerTag": "balancer-Auto"
+      },
+      {
+        "type": "field",
+        "domain": ["youtube"],
+        "balancerTag": "balancer-Auto"
+      },
+      {
+        "type": "field",
+        "domain": ["regexp:^.*\\.netflix\\.com$"],
+        "balancerTag": "balancer-Auto"
+      },
+      {
+        "type": "field",
+        "domain": ["geosite:cn"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "ip": ["192.168.0.0/16"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "ip": ["10.0.0.0/8"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "ip": ["fd00::/8"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "port": "123",
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "network": "udp",
+        "port": "443",
+        "outboundTag": "REJECT"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:private"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "ip": ["geoip:cn"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "source": ["192.168.50.0/24"],
+        "outboundTag": "DIRECT"
+      },
+      {
+        "type": "field",
+        "network": "tcp,udp",
+        "balancerTag": "balancer-Auto"
+      }
+    ],
+    "balancers": [
+      {
+        "tag": "balancer-Auto",
+        "selector": ["0001 HK SS", "0004 JP VMess WS", "0007 TW Trojan"],
+        "strategy": {
+          "type": "leastPing"
+        }
+      }
+    ]
+  },
+  "observatory": {
+    "subjectSelector": ["0001 HK SS", "0004 JP VMess WS", "0007 TW Trojan"],
+    "probeURL": "https://www.gstatic.com/generate_204",
+    "probeInterval": "5m"
+  }
+}
