@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "f6f134729aebd125a256c644f36db5697c7c2ee380f7d93a42e843c44abaf99f",
+  "patchSha256": "236be4373e244b54fda1d5c20b02f5d57320c53d72f50e656fdf3b8d584a1f0e",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -358,7 +358,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt": "7f24ed0ea36e3e2a790d335abc16b27d845e9657149a7111f1c744de3b6026a7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt": "a2d6dec7cce0618ca99f318cd109a44259ce5db3276c9be645f5252f197696ca",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt": "171c9f8504d9d5d1d71045b5b4dcf9cc56dd7118898e496cc8ad8b6e00d98ddb",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt": "347fea1577d3a2e13a70e7de6d79351f524117d251a9abb165bda95ecb773bd2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt": "b725937462de1849d8f3bf9efb60094bdd4aded3efa6937a3ae3a0a446873dcc",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt": "f3a1c32e0a7287435e58b1702e0ef2e618fd401d73a0139808fe88d3db15f366",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt": "1deb50ca311673a56c0c2ea01cd237cc9764b8b47798b4345d460b7d280331df",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeVisibility.kt": "79b7c1aaeee9a06dfd767133ed3c2c5daffe0ff82e210168869e64b30e452e96",

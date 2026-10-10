@@ -382,7 +382,8 @@ private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier)
 private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onClick: () -> Unit, modifier: Modifier) {
     val c = LocalHomeColors.current
     HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
-        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
+        // 11 dp keeps the row at the 64 dp the 当前节点 row it replaces had, so nothing below moves.
+        Column(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = 18.dp, vertical = 11.dp)) {
             Text(title, color = c.t1, style = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
             Text(subtitle, color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }

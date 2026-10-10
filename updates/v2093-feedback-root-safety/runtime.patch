@@ -7607,7 +7607,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..5666f8f 100644
+index e31ca99..eb37e34 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
@@ -7719,7 +7719,7 @@ index e31ca99..5666f8f 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +369,26 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +369,27 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
@@ -7736,7 +7736,8 @@ index e31ca99..5666f8f 100644
 +private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onClick: () -> Unit, modifier: Modifier) {
 +    val c = LocalHomeColors.current
 +    HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
-+        Column(Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 16.dp)) {
++        // 11 dp keeps the row at the 64 dp the 当前节点 row it replaces had, so nothing below moves.
++        Column(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = 18.dp, vertical = 11.dp)) {
 +            Text(title, color = c.t1, style = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
 +            Text(subtitle, color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
@@ -7746,7 +7747,7 @@ index e31ca99..5666f8f 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -382,63 +424,6 @@ private fun RowScope.ControlAction(
+@@ -382,63 +425,6 @@ private fun RowScope.ControlAction(
      }
  }
 
