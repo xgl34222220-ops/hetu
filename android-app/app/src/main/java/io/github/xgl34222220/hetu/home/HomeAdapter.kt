@@ -178,7 +178,9 @@ internal fun HetuHomeV2(
             onOpenConfigs = { openConfigs() },
             onViewConfig = { viewConfig() },
             onOpenWebUi = {
-                context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyWebPanelsActivity::class.java))
+                // Straight to the default dashboard (河图本地面板 per 本地面板模式, or the panel marked 默认);
+                // its own screen shows the controller error when the core is not running.
+                io.github.xgl34222220.hetu.HetuWebPanels.openSelected(context)
             },
             onOpenLogs = {
                 context.startActivity(android.content.Intent(context, io.github.xgl34222220.hetu.ProxyLogViewerActivity::class.java))

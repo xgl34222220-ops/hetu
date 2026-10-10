@@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
-import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
@@ -70,7 +69,7 @@ import java.util.Locale
  * [actions] or one of the navigation lambdas.
  *
  * Top to bottom, as in the concept: status card with the large ring, run controls, traffic mode
- * (while running), pending-restart notice, current node, direct probe, then a 2 × 2 grid of
+ * (while running), pending-restart notice, WebUI · 日志 shortcuts, direct probe, then a 2 × 2 grid of
  * WAN / speed / subscription / resources. A soft glow in the status colour sits behind the
  * top of the page and cross-fades when the proxy changes state.
  *
@@ -173,7 +172,8 @@ internal fun HomeScreen(
                 )
             }
 
-            HomeNodeCard(calm, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
+            // WebUI · 日志 take the place the 当前节点 row used to hold.
+            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
             HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 
             Row(
@@ -190,9 +190,6 @@ internal fun HomeScreen(
                 HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
             }
-            // WebUI · 日志 close the page: above the metrics they pushed 资源占用 under the floating dock
-            // on a 393×852 dp phone, where a tap on it lands on the dock instead.
-            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 5))
             Spacer(Modifier.height(8.dp))
         }
 
@@ -372,7 +369,7 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier: 
     }
 }
 
-/** WebUI and 日志, side by side at the end of the page. Both reuse the existing pages. */
+/** WebUI and 日志, side by side where 当前节点 used to sit. WebUI opens the default dashboard; 日志 the log page. */
 @Composable
 private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
@@ -424,63 +421,6 @@ private fun RowScope.ControlAction(
         if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
         Text(text, color = tint, style = HomeType.control, maxLines = 1)
         if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
-    }
-}
-
-/* ------------------------------------------------------------------ */
-/*  Current node                                                        */
-/* ------------------------------------------------------------------ */
-
-@Composable
-private fun HomeNodeCard(state: HomeUiState, onOpen: () -> Unit, modifier: Modifier = Modifier) {
-    val c = LocalHomeColors.current
-    val live = state.status.isLive
-    val direct = live && state.proxyMode == HomeProxyMode.Direct
-    val node = state.node.takeIf { live && !direct }
-    val subtitle = when {
-        direct -> ht("直连模式，流量不经过节点")
-        node != null -> "${node.group} · ${node.name}"
-        else -> ht("节点信息未确认")
-    }
-    val clickable = node != null || state.status is HomeStatus.Starting
-    HomeCard(modifier.fillMaxWidth(), onClick = if (clickable) onOpen else null, clickLabel = "查看策略与节点") {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(start = 16.dp, end = 12.dp, top = 9.dp, bottom = 9.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HomeServerGlyph(Modifier.size(26.dp), if (node != null || direct) c.t1 else c.t2)
-            Spacer(Modifier.width(14.dp))
-            Column(Modifier.weight(1f)) {
-                Text(ht("当前节点"), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    if (node != null) HomeFlag(HomeRegions.codeOf(node.name), height = 14.dp)
-                    Text(subtitle, Modifier.weight(1f, fill = false), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
-            }
-            if (node != null) {
-                Spacer(Modifier.width(8.dp))
-                HomeDelayText(node.delayMs)
-            }
-            if (clickable) Icon(HomeIcons.ChevronRight, null, Modifier.padding(start = 4.dp).size(22.dp), tint = c.t2)
-        }
-    }
-}
-
-/** The concept's solid server mark: two rounded slabs, each with a status light and a slot. */
-@Composable
-internal fun HomeServerGlyph(modifier: Modifier = Modifier, color: Color = LocalHomeColors.current.t1) {
-    val cut = LocalHomeColors.current.surface
-    Canvas(modifier) {
-        val slab = size.height * .40f
-        val gap = size.height * .12f
-        val top = (size.height - slab * 2f - gap) / 2f
-        val radius = CornerRadius(slab * .34f, slab * .34f)
-        for (i in 0..1) {
-            val y = top + i * (slab + gap)
-            drawRoundRect(color, Offset(0f, y), Size(size.width, slab), radius)
-            drawCircle(cut, slab * .15f, Offset(size.width * .19f, y + slab / 2f))
-            drawRoundRect(cut, Offset(size.width * .36f, y + slab * .40f), Size(size.width * .46f, slab * .20f), CornerRadius(slab * .1f, slab * .1f))
-        }
     }
 }
 
