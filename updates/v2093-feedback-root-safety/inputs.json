@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "70da2b9f616f8cdbbb954f030d5439b6eb3be8642bfa19f715dde99f0370663e",
+  "patchSha256": "e68188f31a8ac444979b5085c467216c3164c7abad123159212f69c44977e42e",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -341,7 +341,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "f555a2b912c94f76f39aa150c0ebf42d9808219f3daa546f0c9c2dc2e8163bdb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "0c2e02ead19fc1e182a9b7db63f8e232a4490a6268405a753d916fddfa6725b5",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "0675b18b03aac21b31172e51cf80b49e4ed2546df26b1f5e1b381b7f5f112ac2",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "6d52221f519e64805d335cf68c1099641a7bf5475a2cb610d5a12e68c1e02f2e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "cc35489799857354fca2280bf2bc64a93efbc585f485fa99c1e09c3bde0ded58",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "0d7d1884c75dde624828a02fe1859818ab35189052ae9e70238c4f5255ff8e7c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java": "97a8991aea71ebdef3bfed0292d6c0448ef8866a885921857c66137132ac5c95",

@@ -76,11 +76,11 @@ final class MihomoControllerClient {
             if(!customApi&&secret.isEmpty())throw new IOException("策略控制接口尚未初始化");
             // Xray / V2Fly / Hysteria have no Clash-compatible controller: report the explicit
             // unsupported state instead of a refused connection on the local port.
+            // Kept free of other app classes: the network soak harness compiles this file standalone.
             if(!customApi){
                 Object running=snapshot.get("proxyRootRuntimeCore");
-                ProxyRuntimeProfile.Core core=ProxyRuntimeProfile.Core.from(running instanceof String?(String)running:"mihomo");
-                if(!ProxyCoreConfig.clashApi(core))
-                    throw new IOException(ProxyCoreSupport.unsupported(core,"面板、策略组与测速（没有 Clash 控制接口）"));
+                String label="xray".equals(running)?"Xray":"v2fly".equals(running)?"V2Fly":"hysteria".equals(running)?"Hysteria":null;
+                if(label!=null)throw new IOException("此核心不支持面板、策略组与测速（没有 Clash 控制接口）（"+label+"）");
             }
         }
 
