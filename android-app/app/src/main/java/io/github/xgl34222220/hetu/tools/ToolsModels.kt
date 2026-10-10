@@ -40,14 +40,14 @@ internal data class ToolsGroupSpec(val title: String?, val entries: List<ToolsEn
 internal object ToolsCatalog {
     /** Concept layout (03A page 1): six untitled cards. This is the default. */
     val concept: List<ToolsGroupSpec> = listOf(
-        // 网络测试 is the most used tool: it opens the list on its own card.
-        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Files, ToolsEntry.Scripts)),
+        // 网络测试 is the most used tool: it opens the first card (approved concept c2), and
+        // 配置管理 still sits fully above the floating dock without scrolling.
+        ToolsGroupSpec(null, listOf(ToolsEntry.NetTest, ToolsEntry.Files)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Logs)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Apps)),
         ToolsGroupSpec(null, listOf(ToolsEntry.NetMatch, ToolsEntry.Share, ToolsEntry.Bypass)),
         ToolsGroupSpec(null, listOf(ToolsEntry.Configs, ToolsEntry.SubStore, ToolsEntry.CnIp)),
-        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Diag, ToolsEntry.WebUi)),
+        ToolsGroupSpec(null, listOf(ToolsEntry.Cores, ToolsEntry.Adblock, ToolsEntry.Scripts, ToolsEntry.Diag, ToolsEntry.WebUi)),
     )
 
     /** Prototype layout (artifact «工具»): the same 14 entries in five titled groups. */
