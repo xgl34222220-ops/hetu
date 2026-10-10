@@ -122,6 +122,11 @@ internal data class ProxyComposeState(
     val continuityObservationTicket: Long = -1L,
     val continuityObservationSession: String = "",
     val continuityObservationNetworkEpoch: Long = 0L,
+    /**
+     * False while the running core has no Clash controller (Xray / V2Fly / Hysteria 2) and no external
+     * API is configured: there is nothing to read, so no controller read is made or reported as failed.
+     */
+    val controllerSupported: Boolean = true,
 )
 
 internal class ProxyComposeController(context: Context) {
@@ -322,8 +327,10 @@ internal class ProxyComposeController(context: Context) {
         var trafficMode = ""
         var controllerReadFailed = false
         var controllerError = ""
+        val controllerSupported = prefs.getBoolean("proxyCustomApiEnabled", false) ||
+            ProxyCoreSupport.clashApi(ProxyCoreSupport.running(prefs))
 
-        if (running) {
+        if (running && controllerSupported) {
             try {
                 // Independent reads overlap, but publication still requires every
                 // response and the original runtime observation ownership below.
@@ -409,6 +416,7 @@ internal class ProxyComposeController(context: Context) {
                 else -> ""
             },
             panelReady = panelReady,
+            controllerSupported = controllerSupported,
             controllerReadFailed = controllerReadFailed,
             controllerError = controllerError,
             groups = groups,

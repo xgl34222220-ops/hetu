@@ -1857,10 +1857,22 @@ index f104cef..a14e5ae 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..d29e534 100644
+index 4f004b9..cb0a73d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-@@ -151,11 +151,34 @@ internal class ProxyComposeController(context: Context) {
+@@ -122,6 +122,11 @@ internal data class ProxyComposeState(
+     val continuityObservationTicket: Long = -1L,
+     val continuityObservationSession: String = "",
+     val continuityObservationNetworkEpoch: Long = 0L,
++    /**
++     * False while the running core has no Clash controller (Xray / V2Fly / Hysteria 2) and no external
++     * API is configured: there is nothing to read, so no controller read is made or reported as failed.
++     */
++    val controllerSupported: Boolean = true,
+ )
+
+ internal class ProxyComposeController(context: Context) {
+@@ -151,11 +156,34 @@ internal class ProxyComposeController(context: Context) {
              observation.continuityObservationTicket, observation.continuityObservationSession,
              observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
@@ -1896,9 +1908,15 @@ index 4f004b9..d29e534 100644
          } catch (cancel: CancellationException) { throw cancel }
          catch (_: Exception) { emptyMap() }
 
-@@ -302,10 +325,34 @@ internal class ProxyComposeController(context: Context) {
+@@ -299,13 +327,39 @@ internal class ProxyComposeController(context: Context) {
+         var trafficMode = ""
+         var controllerReadFailed = false
+         var controllerError = ""
++        val controllerSupported = prefs.getBoolean("proxyCustomApiEnabled", false) ||
++            ProxyCoreSupport.clashApi(ProxyCoreSupport.running(prefs))
 
-         if (running) {
+-        if (running) {
++        if (running && controllerSupported) {
              try {
 -                val freshMode = api.configs().optString("mode", "")
 -                val freshGroups = parseGroups(mergeProxySnapshots(api.proxies(), api.proxyProviders()), iconMap)
@@ -1935,7 +1953,15 @@ index 4f004b9..d29e534 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -538,7 +585,14 @@ internal class ProxyComposeController(context: Context) {
+@@ -362,6 +416,7 @@ internal class ProxyComposeController(context: Context) {
+                 else -> ""
+             },
+             panelReady = panelReady,
++            controllerSupported = controllerSupported,
+             controllerReadFailed = controllerReadFailed,
+             controllerError = controllerError,
+             groups = groups,
+@@ -538,7 +593,14 @@ internal class ProxyComposeController(context: Context) {
      }
 
      suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
@@ -1951,7 +1977,7 @@ index 4f004b9..d29e534 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -683,6 +737,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +745,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -1962,7 +1988,7 @@ index 4f004b9..d29e534 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -813,6 +871,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +879,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -3899,10 +3925,10 @@ index 0000000..5e3645f
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
-index b914f23..59dfcb6 100644
+index b914f23..2793b39 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt
-@@ -35,6 +35,46 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
+@@ -35,6 +35,77 @@ internal fun coreDownloadProgressText(done: Long, total: Long): String {
      return "正在下载 · " + if (total > 0L) "$transferred / ${bytes(total)}" else transferred
  }
 
@@ -3930,6 +3956,37 @@ index b914f23..59dfcb6 100644
 +    @JvmStatic fun ruleRouting(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
 +    @JvmStatic fun adblock(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
 +    @JvmStatic fun singleServer(core: ProxyRuntimeProfile.Core): Boolean = core == ProxyRuntimeProfile.Core.HYSTERIA
++    /**
++     * Proxy / rule providers (订阅、规则集 tabs). sing-box's clash_api answers /providers/proxies with
++     * `{"providers":{}}` and /providers/rules with `[]`, and every refresh / healthcheck is 404
++     * (verified against sing-box 1.14.3): subscriptions are expanded to plain outbounds at start.
++     */
++    @JvmStatic fun providers(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
++    /**
++     * 规则 / 全局 / 直连 switching. sing-box accepts PATCH /configs but only switches between the
++     * modes of its `clash_mode` rules; converted configs have none, so its mode list is just `rule`.
++     */
++    @JvmStatic fun trafficMode(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
++
++    /** What the 面板 tabs can show for the running core; an external Clash API is never gated. */
++    @JvmStatic fun panelGate(prefs: android.content.SharedPreferences): io.github.xgl34222220.hetu.panel.PanelCoreGate {
++        val core = running(prefs)
++        return io.github.xgl34222220.hetu.panel.PanelCoreGate.of(core.label, clashApi(core), providers(core), singleServer(core),
++            prefs.getBoolean("proxyCustomApiEnabled", false))
++    }
++
++    /**
++     * 广告过滤 page: (core label, ads are routed by this core, live chain verification + hot refresh).
++     * The running core while the proxy runs, otherwise the one the next start will use.
++     */
++    @JvmStatic fun adblockCore(prefs: android.content.SharedPreferences, proxyRunning: Boolean): Triple<String, Boolean, Boolean> {
++        val core = if (proxyRunning) running(prefs) else ProxyRuntimeProfile.load(prefs).core
++        return Triple(core.label, adblock(core), adblockLiveRefresh(core))
++    }
++
++    /** The core that is actually running (written at start), else the selected one. */
++    @JvmStatic fun running(prefs: android.content.SharedPreferences): ProxyRuntimeProfile.Core =
++        ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", null) ?: ProxyRuntimeProfile.load(prefs).core.id)
 +
 +    /** The explicit degraded-state text shown instead of an error. */
 +    @JvmStatic fun unsupported(core: ProxyRuntimeProfile.Core, feature: String): String = "此核心不支持$feature（${core.label}）"
@@ -3949,7 +4006,7 @@ index b914f23..59dfcb6 100644
  internal data class ProxyCoreRemoteStatus(
      val id: String,
      val label: String,
-@@ -119,8 +159,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -119,8 +190,8 @@ internal class ProxyCoreDownloadManager(context: Context) {
          ),
          Source(
              ProxyRuntimeProfile.Core.HYSTERIA,
@@ -3960,7 +4017,7 @@ index b914f23..59dfcb6 100644
              Archive.RAW,
              "hysteria",
          ),
-@@ -163,7 +203,11 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -163,7 +234,11 @@ internal class ProxyCoreDownloadManager(context: Context) {
              updateAvailable = update,
              canDownload = true,
              source = source.repo,
@@ -3973,7 +4030,7 @@ index b914f23..59dfcb6 100644
          )
      }
 
-@@ -180,11 +224,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -180,11 +255,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
              onProgress(coreDownloadProgressText(done, total))
          }
          val extracted = File(app.cacheDir, "proxy-core-${core.id}-${System.nanoTime()}.bin")
@@ -3989,7 +4046,7 @@ index b914f23..59dfcb6 100644
              prefs.edit()
                  .putString("version_${core.id}", asset.version)
                  .putString("source_${core.id}", asset.source.repo)
-@@ -195,13 +242,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -195,13 +273,14 @@ internal class ProxyCoreDownloadManager(context: Context) {
          } finally {
              archive.delete()
              extracted.delete()
@@ -4005,7 +4062,7 @@ index b914f23..59dfcb6 100644
          )
      }
 
-@@ -230,6 +278,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -230,6 +309,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
 
      suspend fun removeDownloaded(core: ProxyRuntimeProfile.Core): ProxyCoreRemoteStatus = withContext(Dispatchers.IO) {
          if (store.installed(core)) store.remove(core)
@@ -4013,7 +4070,7 @@ index b914f23..59dfcb6 100644
          prefs.edit()
              .remove("version_${core.id}")
              .remove("source_${core.id}")
-@@ -266,8 +315,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -266,8 +346,7 @@ internal class ProxyCoreDownloadManager(context: Context) {
      private fun installedVersion(core: ProxyRuntimeProfile.Core): String =
          prefs.getString("version_${core.id}", "") ?: ""
 
@@ -4023,7 +4080,7 @@ index b914f23..59dfcb6 100644
 
      private fun resolve(source: Source): Asset? {
          val root = readJson(source.endpoint)
-@@ -280,16 +328,17 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -280,16 +359,17 @@ internal class ProxyCoreDownloadManager(context: Context) {
          } ?: return null
          val tag = release.optString("tag_name", release.optString("name", "latest"))
          val assets = release.optJSONArray("assets") ?: return null
@@ -4043,7 +4100,7 @@ index b914f23..59dfcb6 100644
              name = chosen.optString("name", "core"),
              url = url,
              digest = chosen.optString("digest", ""),
-@@ -298,71 +347,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -298,71 +378,6 @@ internal class ProxyCoreDownloadManager(context: Context) {
          )
      }
 
@@ -4115,7 +4172,7 @@ index b914f23..59dfcb6 100644
      private fun abiLabel(): String = Build.SUPPORTED_ABIS.joinToString("/")
 
      private fun readJson(url: String): Any {
-@@ -417,31 +401,52 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -417,31 +432,52 @@ internal class ProxyCoreDownloadManager(context: Context) {
          }
      }
 
@@ -4173,7 +4230,7 @@ index b914f23..59dfcb6 100644
              fallback?.let {
                  FileOutputStream(out, false).use { stream -> stream.write(it); stream.fd.sync() }
                  return
-@@ -594,6 +599,84 @@ internal class ProxyCoreDownloadManager(context: Context) {
+@@ -594,6 +630,84 @@ internal class ProxyCoreDownloadManager(context: Context) {
      }
 
      companion object {
@@ -7493,7 +7550,7 @@ index 2243235..afee729 100644
          Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..00667b9 100644
+index 2b1a624..e7569dc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -7517,7 +7574,7 @@ index 2b1a624..00667b9 100644
  import androidx.compose.animation.core.animateFloat
  import androidx.compose.animation.core.animateDpAsState
  import androidx.compose.ui.draw.drawWithContent
-@@ -89,6 +96,7 @@ import androidx.compose.runtime.getValue
+@@ -89,13 +96,17 @@ import androidx.compose.runtime.getValue
  import androidx.compose.runtime.mutableStateListOf
  import androidx.compose.runtime.mutableStateOf
  import androidx.compose.runtime.remember
@@ -7525,7 +7582,9 @@ index 2b1a624..00667b9 100644
  import androidx.compose.runtime.saveable.rememberSaveableStateHolder
  import androidx.compose.runtime.setValue
  import androidx.compose.runtime.staticCompositionLocalOf
-@@ -96,6 +104,7 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Alignment
++import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.layout.fillMaxWidth
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.unit.Density
  import androidx.compose.ui.unit.Dp
@@ -7533,7 +7592,7 @@ index 2b1a624..00667b9 100644
  import androidx.compose.ui.unit.dp
  import androidx.lifecycle.ViewModelProvider
  import kotlinx.coroutines.flow.collectLatest
-@@ -153,10 +162,8 @@ class HetuActivity : ComponentActivity() {
+@@ -153,10 +164,8 @@ class HetuActivity : ComponentActivity() {
              "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
              "connections" -> vm.openPanel("conn")
              "providers", "subscriptions" -> vm.openPanel("providers")
@@ -7546,7 +7605,7 @@ index 2b1a624..00667b9 100644
              "rules" -> vm.openPanel("rules")
              "home" -> vm.tab = HxTab.Home
          }
-@@ -178,16 +185,10 @@ internal sealed class HxRoute(val key: String) {
+@@ -178,16 +187,10 @@ internal sealed class HxRoute(val key: String) {
      data object Providers : HxRoute("providers")
      data object Adblock : HxRoute("adblock")
      data object Network : HxRoute("network")
@@ -7563,7 +7622,7 @@ index 2b1a624..00667b9 100644
      data object Notifications : HxRoute("notifications")
      data object Theme : HxRoute("theme")
      data object DefaultPanelSettings : HxRoute("default-panel-settings")
-@@ -195,6 +196,7 @@ internal sealed class HxRoute(val key: String) {
+@@ -195,6 +198,7 @@ internal sealed class HxRoute(val key: String) {
      data object StartupDownloadSettings : HxRoute("startup-download-settings")
      data object PublicIp : HxRoute("public-ip")
      data object Resources : HxRoute("resources")
@@ -7571,7 +7630,7 @@ index 2b1a624..00667b9 100644
  }
 
  internal class HxNav {
-@@ -232,6 +234,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -232,6 +236,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -7580,7 +7639,7 @@ index 2b1a624..00667b9 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +247,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +249,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -7602,7 +7661,7 @@ index 2b1a624..00667b9 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +268,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +270,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -7610,7 +7669,7 @@ index 2b1a624..00667b9 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +277,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +279,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -7623,7 +7682,7 @@ index 2b1a624..00667b9 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +293,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +295,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -7639,7 +7698,7 @@ index 2b1a624..00667b9 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +316,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +318,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -7648,7 +7707,7 @@ index 2b1a624..00667b9 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,22 +329,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,22 +331,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -7672,7 +7731,7 @@ index 2b1a624..00667b9 100644
                              HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                              HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                              HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
-@@ -336,13 +346,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -336,13 +348,17 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                              HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                              HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
@@ -7687,10 +7746,11 @@ index 2b1a624..00667b9 100644
 +            val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
 +            HxToastHost(vm, extraBottom = if (nav.stack.size == 1 && dockOccupiedHeight > 0.dp)
 +                (dockOccupiedHeight - navBottom).coerceAtLeast(0.dp) + 12.dp else 24.dp)
++            HxCoreNoticeHost(vm)
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +364,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +367,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -7700,7 +7760,7 @@ index 2b1a624..00667b9 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +386,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +389,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -7717,7 +7777,7 @@ index 2b1a624..00667b9 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -389,17 +405,24 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -389,17 +408,24 @@ private fun MainTabs(vm: HetuViewModel) {
          }
      }
      // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
@@ -7751,7 +7811,7 @@ index 2b1a624..00667b9 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -417,16 +440,22 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -417,16 +443,22 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
      }
@@ -7777,7 +7837,7 @@ index 2b1a624..00667b9 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +464,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +467,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -7785,7 +7845,7 @@ index 2b1a624..00667b9 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -449,12 +479,14 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -449,12 +482,14 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
@@ -7803,7 +7863,7 @@ index 2b1a624..00667b9 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -463,8 +495,9 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -463,15 +498,45 @@ private fun MainTabs(vm: HetuViewModel) {
                  if (next == vm.tab) vm.reselect++ else vm.tab = next
              },
              hazeState = dockHaze,
@@ -7815,7 +7875,35 @@ index 2b1a624..00667b9 100644
          )
      }
  }
-@@ -472,6 +505,7 @@ private fun MainTabs(vm: HetuViewModel) {
+
++/**
++ * 「当前核心（X）不支持此功能」 for an action the running core lacks (热重载, 流量模式, 测速):
++ * the same glass card as the panel's degraded tabs, in a dialog, instead of an error toast.
++ */
++@Composable
++internal fun HxCoreNoticeHost(vm: HetuViewModel) {
++    val notice = vm.coreNotice ?: return
++    val dismiss = { vm.coreNotice = null }
++    io.github.xgl34222220.hetu.home.HetuHomeThemeFromPrefs(vm.prefs) {
++        androidx.compose.ui.window.Dialog(onDismissRequest = dismiss) {
++            io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard(
++                notice.core, notice.feature, notice.detail,
++                Modifier.widthIn(max = 360.dp), raised = true,
++            ) {
++                if (notice.offerRestart && vm.state.running) {
++                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.weight(1f),
++                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Soft)
++                    io.github.xgl34222220.hetu.home.HomeButton("重启代理", { vm.coreNotice = null; vm.restart() }, Modifier.weight(1f),
++                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
++                } else {
++                    io.github.xgl34222220.hetu.home.HomeButton("知道了", dismiss, Modifier.fillMaxWidth(),
++                        kind = io.github.xgl34222220.hetu.home.HomeButtonKind.Primary)
++                }
++            }
++        }
++    }
++}
++
  /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
  @Composable
  internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -7823,7 +7911,7 @@ index 2b1a624..00667b9 100644
      var floatingMessage by remember { mutableStateOf<String?>(null) }
      var shownMessage by remember { mutableStateOf("") }
      val haptics = rememberHetuHaptics()
-@@ -489,12 +523,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,12 +554,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -7840,8 +7928,16 @@ index 2b1a624..00667b9 100644
      ) {
          HxToast(shownMessage, onDismiss = { floatingMessage = null })
      }
+@@ -513,6 +578,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
+                 Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
+                     content(vm)
+                     HxToastHost(vm)
++                    HxCoreNoticeHost(vm)
+                 }
+             }
+         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..34af361 100644
+index 250b8a8..1809539 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -7880,7 +7976,20 @@ index 250b8a8..34af361 100644
      var state by mutableStateOf(initialState())
          private set
      var runtime by mutableStateOf(initialRuntime())
-@@ -398,7 +411,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -212,6 +225,12 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     var providersUpdatingAll by mutableStateOf(false)
+         private set
+
++    /* ---------------- per-core degraded state ---------------- */
++    /** A feature the running core lacks: shown as the glass 「当前核心（X）不支持此功能」 card, never a toast. */
++    var coreNotice by mutableStateOf<CoreFeatureNotice?>(null)
++
++    private fun runningCore(): ProxyRuntimeProfile.Core = ProxyCoreSupport.running(prefs)
++
+     /* ---------------- messages ---------------- */
+     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
+     val messages: SharedFlow<String> = _messages
+@@ -398,7 +417,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -7892,7 +8001,7 @@ index 250b8a8..34af361 100644
                  delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
              }
          }
-@@ -412,19 +428,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,19 +434,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -7966,7 +8075,7 @@ index 250b8a8..34af361 100644
      private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,15 +517,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +523,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -8002,7 +8111,7 @@ index 250b8a8..34af361 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +594,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +600,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -8030,7 +8139,7 @@ index 250b8a8..34af361 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +664,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +670,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -8048,7 +8157,7 @@ index 250b8a8..34af361 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +672,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +678,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -8056,7 +8165,7 @@ index 250b8a8..34af361 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +683,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +689,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -8067,17 +8176,21 @@ index 250b8a8..34af361 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -746,6 +841,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +847,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
 +        // sing-box / Xray / V2Fly / Hysteria apply config changes on restart: an explicit state, not an error.
-+        val core = ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", ProxyRuntimeProfile.load(prefs).core.id))
-+        if (!ProxyCoreSupport.hotReload(core)) { toast(ProxyCoreSupport.unsupported(core, "热重载") + "，请使用「重启」应用配置"); return }
++        val core = runningCore()
++        if (!ProxyCoreSupport.hotReload(core)) {
++            coreNotice = CoreFeatureNotice(core.label, "热重载",
++                "${core.label} 不能在运行中重新加载配置。使用「重启」即可应用修改，网络会短暂中断几秒。", offerRestart = true)
++            return
++        }
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -764,6 +862,25 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +872,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -8102,8 +8215,33 @@ index 250b8a8..34af361 100644
 +
      fun setTrafficMode(mode: String) {
          if (!state.running) return
++        val core = runningCore()
++        if (!ProxyCoreSupport.trafficMode(core) && !prefs.getBoolean("proxyCustomApiEnabled", false)) {
++            coreNotice = CoreFeatureNotice(core.label, "规则 / 全局 / 直连 切换",
++                if (ProxyCoreSupport.clashApi(core)) "${core.label} 的 clash_api 只在配置含 clash_mode 规则时切换模式，河图写入的配置固定按规则分流。"
++                else "${core.label} 没有 Clash 兼容控制接口，无法在运行中切换流量模式；代理按配置中的规则分流。")
++            return
++        }
          viewModelScope.launch {
-@@ -785,6 +902,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             try {
+                 repo.setTrafficMode(mode)
+@@ -778,6 +912,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         }
+     }
+
++    /** 测速 / 延迟 needs a Clash controller; without one the action shows the per-core card. */
++    private fun latencyUnsupported(): Boolean {
++        if (state.controllerSupported) return false
++        val core = runningCore()
++        coreNotice = CoreFeatureNotice(core.label, "节点测速 / 延迟",
++            "${core.label} 没有 Clash 兼容控制接口，无法逐个节点测速。首页的站点延迟经代理实测，仍可使用。")
++        return true
++    }
++
+     fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
+
+     fun bumpSettings() { syncRequestSettings(); settingsRevision++ }
+@@ -785,6 +928,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -8111,7 +8249,7 @@ index 250b8a8..34af361 100644
          val request = activeRuntimeRequest() ?: return
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +945,16 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,12 +971,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -8127,18 +8265,20 @@ index 250b8a8..34af361 100644
 
      fun testNode(node: String) {
 +        if (refuseRestoredGroups()) return
++        if (latencyUnsupported()) return
          val request = activeRuntimeRequest() ?: return
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
-@@ -843,6 +965,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,6 +992,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
 +        if (refuseRestoredGroups()) return
++        if (latencyUnsupported()) return
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +975,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -852,10 +1003,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -8164,7 +8304,7 @@ index 250b8a8..34af361 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +998,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,11 +1026,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -8182,15 +8322,16 @@ index 250b8a8..34af361 100644
                  releaseNodeProbes(owner, targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +1019,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,6 +1047,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
 +        if (refuseRestoredGroups()) return
++        if (latencyUnsupported()) return
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +1030,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +1059,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -8227,18 +8368,28 @@ index 250b8a8..34af361 100644
                  releaseNodeProbes(owner, targets)
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
-@@ -1263,6 +1422,11 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1451,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
-+        val core = ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", ProxyRuntimeProfile.load(prefs).core.id))
++        val core = runningCore()
 +        if (!ProxyCoreSupport.hotReload(core)) {
-+            toast("$savedMessage；" + ProxyCoreSupport.unsupported(core, "热重载") + "，重启代理后生效")
++            coreNotice = CoreFeatureNotice(core.label, "热重载",
++                "$savedMessage。${core.label} 不能在运行中重新加载配置，重启代理后生效。", offerRestart = true)
 +            return
 +        }
          reload()
      }
  }
++
++/** The per-core degraded state of one action: 「当前核心（[core]）不支持此功能」, [feature], [detail]. */
++internal data class CoreFeatureNotice(
++    val core: String,
++    val feature: String,
++    val detail: String,
++    /** Offer 「重启代理」, which applies what a hot reload would have applied. */
++    val offerRestart: Boolean = false,
++)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
 index 241408e..465541e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
@@ -9400,7 +9551,7 @@ index 0000000..2655f62
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-index df92493..daf9bf2 100644
+index df92493..134c3e9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 @@ -1,6 +1,7 @@
@@ -9430,7 +9581,15 @@ index df92493..daf9bf2 100644
          onViewConfig = { nav.push(HxRoute.ConfigEditor) },
          onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
          cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
-@@ -58,6 +60,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+@@ -53,11 +55,13 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+         ),
+         operationText = vm.operationText,
+         connection = io.github.xgl34222220.hetu.home.HomeConnectionObservation(
+-            controllerReady = vm.state.panelReady,
+-            controllerReadFailed = vm.state.controllerReadFailed,
++            // A core without a Clash controller has nothing to read: that is not a controller fault.
++            controllerReady = vm.state.panelReady || !vm.state.controllerSupported,
++            controllerReadFailed = vm.state.controllerReadFailed && vm.state.controllerSupported,
              controllerError = vm.state.controllerError,
              takeoverHealthy = vm.state.dataPlaneHealthy.takeIf { vm.state.healthObserved },
              runtimeMessage = vm.state.message,
@@ -10149,6 +10308,87 @@ index 9afc132..ca3dd97 100644
      val progressive = haze != null && LocalHomeBarProgressive.current
      val surface = if (haze != null) {
          Modifier
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt
+new file mode 100644
+index 0000000..6e10b86
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt
+@@ -0,0 +1,75 @@
++package io.github.xgl34222220.hetu.home
++
++import androidx.compose.foundation.background
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.RowScope
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.shape.CircleShape
++import androidx.compose.material3.Icon
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.graphics.vector.ImageVector
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.semantics.heading
++import androidx.compose.ui.text.style.TextAlign
++import androidx.compose.ui.unit.dp
++
++/** Title of every per-core degraded state: 「当前核心（sing-box）不支持此功能」. */
++internal fun homeCoreUnsupportedTitle(core: String): String = "当前核心（$core）不支持此功能"
++
++/**
++ * The explicit per-core degraded state, drawn as the same glass card as the rest of the app:
++ * a feature the running core does not provide is a calm, explained empty state, never an error
++ * card or a toast. [feature] names what is missing; [detail] says why and what still works.
++ * [raised] uses the dialog surface (inside a popup) instead of the page card surface.
++ */
++@Composable
++internal fun HomeCoreUnsupportedCard(
++    core: String,
++    feature: String,
++    detail: String,
++    modifier: Modifier = Modifier,
++    icon: ImageVector = HomeIcons.Info,
++    raised: Boolean = false,
++    actions: (@Composable RowScope.() -> Unit)? = null,
++) {
++    val c = LocalHomeColors.current
++    Column(
++        modifier.fillMaxWidth()
++            .homeGlassPanel(HomeDims.cardShape, if (raised) c.raised else c.surface, raised = raised)
++            .padding(start = 22.dp, end = 22.dp, top = 26.dp, bottom = 22.dp),
++        horizontalAlignment = Alignment.CenterHorizontally,
++    ) {
++        Box(Modifier.size(60.dp).background(c.accentSoft, CircleShape), contentAlignment = Alignment.Center) {
++            Icon(icon, null, Modifier.size(30.dp), tint = c.accent)
++        }
++        Spacer(Modifier.height(16.dp))
++        // Core names and feature names are data, not vocabulary: only the fixed frame is translated.
++        Text(
++            homeCoreUnsupportedTitle(core), Modifier.semantics { heading() },
++            color = c.t1, style = HomeType.rowTitle, textAlign = TextAlign.Center,
++        )
++        if (feature.isNotBlank()) {
++            Text(
++                feature, Modifier.padding(top = 8.dp).background(c.sunken, HomeDims.pillShape).padding(horizontal = 12.dp, vertical = 4.dp),
++                color = c.t2, style = HomeType.badge, textAlign = TextAlign.Center,
++            )
++        }
++        if (detail.isNotBlank()) {
++            Text(detail, Modifier.padding(top = 12.dp), color = c.t2, style = HomeType.bodySmall, textAlign = TextAlign.Center)
++        }
++        if (actions != null) {
++            Spacer(Modifier.height(18.dp))
++            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterHorizontally), content = actions)
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
 index 36f72fa..c751c37 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
@@ -10565,7 +10805,7 @@ index 0000000..bcd5c0c
 +    return state.isAtLeast(Lifecycle.State.STARTED)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..feeb781 100644
+index 9f66ac0..8965c73 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 @@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
@@ -10603,7 +10843,20 @@ index 9f66ac0..feeb781 100644
      val initialView = remember { loadView(prefs, selectorPrefs) }
      var latestView by remember { mutableStateOf(initialView) }
      val tab = PanelTab.entries.firstOrNull { it.name == selectedTab.name } ?: PanelTab.Groups
-@@ -144,10 +143,10 @@ internal fun HetuPanelV2(
+@@ -118,9 +117,11 @@ internal fun HetuPanelV2(
+         }
+     }
+
++    val coreGate = remember(state.running, state.core, state.controllerSupported) { io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(prefs) }
+     // Load what the visible tab needs; the overview also needs providers and the rule count.
+-    LaunchedEffect(tab, state.running) {
++    LaunchedEffect(tab, state.running, coreGate) {
+         if (!state.running) { providers = emptyList(); rules = emptyList(); ruleSets = emptyList(); sampler.reset(); return@LaunchedEffect }
++        if (!coreGate.supports(tab)) return@LaunchedEffect
+         try {
+             when (tab) {
+                 PanelTab.Overview -> { providers = repo.providers(); if (rules.isEmpty()) rules = repo.rules() }
+@@ -144,11 +145,11 @@ internal fun HetuPanelV2(
      LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
 
      val icons = remember(state.connections) { state.connections.mapNotNull { c -> c.appIcon?.let { c.packageName to it } }.toMap() }
@@ -10612,11 +10865,13 @@ index 9f66ac0..feeb781 100644
          state = state, starting = starting, providers = providers, rules = rules, ruleSets = ruleSets, logs = logs,
          delays = delays, testing = testing, selectedLocal = selectedLocal,
 -        subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, sampler = sampler,
+-    ).copy(refreshing = refreshing)
 +        subscriptionUpdates = subscriptionUpdates, ruleSetUpdates = ruleSetUpdates, traffic = sampler.snapshot(),
-     ).copy(refreshing = refreshing)
++    ).copy(refreshing = refreshing, core = if (state.running) coreGate else PanelCoreGate.Full)
      val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
-@@ -256,23 +255,22 @@ internal fun HetuPanelV2(
+     val actions = PanelActions(
+@@ -256,23 +257,22 @@ internal fun HetuPanelV2(
          },
      )
 
@@ -10654,7 +10909,7 @@ index 9f66ac0..feeb781 100644
          ) {
              PanelRoute(
                  data = data,
-@@ -294,7 +292,8 @@ internal fun HetuPanelV2(
+@@ -294,7 +294,8 @@ internal fun HetuPanelV2(
 
  @Composable
  private fun AppIcon(bitmap: Bitmap, modifier: Modifier) {
@@ -10664,7 +10919,7 @@ index 9f66ac0..feeb781 100644
  }
 
  private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delays: MutableMap<String, Long>, testing: MutableMap<String, Boolean>) {
-@@ -310,180 +309,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
+@@ -310,180 +311,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
      }
  }
 
@@ -10845,7 +11100,7 @@ index 9f66ac0..feeb781 100644
  /* ------------------------------------------------------------------ */
  /*  Traffic sampling                                                    */
  /* ------------------------------------------------------------------ */
-@@ -526,6 +351,8 @@ private class PanelTrafficSampler {
+@@ -526,6 +353,8 @@ private class PanelTrafficSampler {
          lastConnections = connections.associate { it.id to (it.upload to it.download) }
      }
 
@@ -10854,7 +11109,7 @@ index 9f66ac0..feeb781 100644
      fun reset() {
          upload = 0L; download = 0L; connectionRates = emptyMap(); uploadTrend.clear(); downloadTrend.clear()
          lastAt = 0L; lastConnections = emptyMap()
-@@ -636,6 +463,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -636,6 +465,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
      }
      var view by remember { mutableStateOf(initial) }
      val sampler = remember { PanelTrafficSampler() }
@@ -10862,21 +11117,26 @@ index 9f66ac0..feeb781 100644
      val tab = when (vm.panelSection) {
          "overview" -> PanelTab.Overview
          "providers" -> PanelTab.Subscriptions
-@@ -645,9 +473,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -645,9 +475,17 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          "logs" -> PanelTab.Logs
          else -> PanelTab.Groups
      }
 -    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision) {
 +    val visible = io.github.xgl34222220.hetu.home.rememberScreenVisible()
-+    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible) {
++    // The running core decides which tabs have data: no request is made for a tab it cannot feed.
++    val coreGate = remember(vm.state.running, vm.state.core, vm.state.controllerSupported, vm.settingsRevision) {
++        io.github.xgl34222220.hetu.ProxyCoreSupport.panelGate(vm.prefs)
++    }
++    LaunchedEffect(tab, vm.state.running, vm.state.controllerReadFailed, vm.contentRevision, visible, coreGate) {
          if (!vm.state.running) { sampler.reset(); return@LaunchedEffect }
          if (vm.state.controllerReadFailed) return@LaunchedEffect
++        if (!coreGate.supports(tab)) return@LaunchedEffect
 +        // A stopped activity keeps its composition: never reload tabs or tail logs from the background.
 +        if (!visible) return@LaunchedEffect
          when (tab) {
              PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
              PanelTab.Subscriptions -> vm.loadProviders()
-@@ -660,8 +491,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -660,8 +498,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
              else -> Unit
          }
      }
@@ -10887,7 +11147,7 @@ index 9f66ac0..feeb781 100644
          while (true) {
              if (vm.state.panelReady && !vm.state.controllerReadFailed) {
                  sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
-@@ -672,9 +504,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -672,9 +511,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
      fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
          if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
      }
@@ -10899,11 +11159,12 @@ index 9f66ac0..feeb781 100644
          testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
          switching = vm.pendingSelection.toMap()).copy(
          refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
-@@ -685,9 +517,13 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -685,9 +524,14 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          },
          updatingAllSubscriptions = vm.providersUpdatingAll,
          updatingAllRuleSets = vm.ruleSetsUpdatingAll,
 +        syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
++        core = if (vm.state.running) coreGate else PanelCoreGate.Full,
      )
      val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
 -    val actions = PanelActions(
@@ -10914,7 +11175,7 @@ index 9f66ac0..feeb781 100644
          onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
          onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
          onTestAll = vm::testAll,
-@@ -704,29 +540,29 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -704,29 +548,29 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
          onCopy = { label, text -> copyToClipboard(context, label, text) },
          onRefresh = {
@@ -11083,6 +11344,83 @@ index b187a2f..62dacb2 100644
          Spacer(Modifier.weight(1f))
          if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
          if (trailing != null) trailing()
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelCoreGate.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelCoreGate.kt
+new file mode 100644
+index 0000000..28a7c8a
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelCoreGate.kt
+@@ -0,0 +1,71 @@
++package io.github.xgl34222220.hetu.panel
++
++/**
++ * Which panel tabs the running core can feed. Pure: no Compose or Android types.
++ *
++ * Mihomo / Mihomo Smart: everything. sing-box / reF1nd (clash_api, checked against 1.14.3):
++ * /proxies, /group/{name}/delay, /proxies/{name}/delay, /connections, /rules, PUT /proxies/{group}
++ * and DELETE /connections work; /providers/proxies is `{}` and /providers/rules `[]` with every
++ * refresh/healthcheck 404, so 订阅 and 规则集 are unsupported. Xray / V2Fly / Hysteria 2 have no
++ * Clash controller at all: every controller tab is unsupported, 日志 (read from the runtime log)
++ * still works. A user-configured external Clash API is not gated: it is not the local core.
++ */
++internal data class PanelCoreGate(
++    /** Label of the running core, for 「当前核心（X）不支持此功能」. */
++    val core: String = "",
++    /** Unsupported tab → feature name shown on the card. */
++    val features: Map<PanelTab, String> = emptyMap(),
++    /** Unsupported tab → why, and what still works. */
++    val details: Map<PanelTab, String> = emptyMap(),
++    /** False when the core has no Clash controller: 测速 / 延迟 has nothing to ask. */
++    val latency: Boolean = true,
++) {
++    fun supports(tab: PanelTab): Boolean = tab !in features
++
++    /** A tab that the core does support, for the card's way out. */
++    fun fallbackFor(tab: PanelTab): PanelTab? = when {
++        tab == PanelTab.Subscriptions && supports(PanelTab.Groups) -> PanelTab.Groups
++        tab == PanelTab.RuleSets && supports(PanelTab.Rules) -> PanelTab.Rules
++        tab != PanelTab.Logs && supports(PanelTab.Logs) -> PanelTab.Logs
++        else -> null
++    }
++
++    companion object {
++        val Full = PanelCoreGate()
++
++        private val featureNames = mapOf(
++            PanelTab.Overview to "概览 · 流量与连接排行",
++            PanelTab.Groups to "策略组 · 节点切换与测速",
++            PanelTab.Subscriptions to "订阅 · 代理集合",
++            PanelTab.Connections to "连接列表",
++            PanelTab.Rules to "规则列表",
++            PanelTab.RuleSets to "规则集",
++        )
++
++        /**
++         * @param label running core label; [clashApi] / [providers] / [singleServer] from ProxyCoreSupport
++         * (built by `ProxyCoreSupport.panelGate`, the core model is package-private Java).
++         */
++        fun of(label: String, clashApi: Boolean, providers: Boolean, singleServer: Boolean, customApi: Boolean): PanelCoreGate {
++            if (customApi || providers) return Full
++            if (!clashApi) {
++                val why = if (singleServer)
++                    "$label 是单服务器客户端，没有策略组，也没有 Clash 兼容控制接口，河图无法读取这部分数据。代理本身照常运行，日志仍可查看。"
++                else
++                    "$label 没有 Clash 兼容控制接口，河图无法读取这部分数据。代理与规则分流照常运行，日志仍可查看；需要面板时可在 设置 › 基础代理配置 换用 Mihomo 或 sing-box。"
++                return PanelCoreGate(label, featureNames, featureNames.mapValues { why }, latency = false)
++            }
++            // sing-box family: the clash_api has no provider endpoints.
++            val unsupported = listOf(PanelTab.Subscriptions, PanelTab.RuleSets)
++            return PanelCoreGate(
++                label,
++                featureNames.filterKeys { it in unsupported },
++                mapOf(
++                    PanelTab.Subscriptions to "$label 的 clash_api 不提供代理集合（proxy providers）接口。订阅节点在启动时已展开为普通出站，可在「策略」中查看、切换与测速。",
++                    PanelTab.RuleSets to "$label 的 clash_api 不提供规则集（rule providers）接口。规则集由核心自行下载并缓存，重启代理即可更新；生效的规则可在「规则」中查看。",
++                ),
++                latency = true,
++            )
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelDataProjector.kt
 new file mode 100644
 index 0000000..15ff606
@@ -11706,7 +12044,7 @@ index 253b603..c2bed70 100644
          val c = LocalHomeColors.current
          val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
-index 3e938c4..01066a3 100644
+index 3e938c4..b7f017b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 @@ -38,9 +38,17 @@ internal sealed interface PanelDelay {
@@ -11739,16 +12077,18 @@ index 3e938c4..01066a3 100644
      /** Groups whose 测速 is in flight. */
      val testingGroups: Set<String> = emptySet(),
      /** A whole-profile latency test is in flight. */
-@@ -207,6 +220,8 @@ internal data class PanelData(
+@@ -207,6 +220,10 @@ internal data class PanelData(
      /** “全部更新” is running for subscriptions / rule sets, including while single items have already finished. */
      val updatingAllSubscriptions: Boolean = false,
      val updatingAllRuleSets: Boolean = false,
 +    /** Cards still show the last complete snapshot while the first fresh controller read is pending. */
 +    val syncing: Boolean = false,
++    /** Tabs the running core cannot feed show 「当前核心（X）不支持此功能」 instead of an error. */
++    val core: PanelCoreGate = PanelCoreGate.Full,
  ) {
      val running: Boolean get() = status == PanelStatus.Running
 
-@@ -221,8 +236,22 @@ internal data class PanelData(
+@@ -221,8 +238,22 @@ internal data class PanelData(
      /** Latency to show next to [node]; null when a figure makes no sense (DIRECT). */
      fun delayOf(node: String): PanelDelay? {
          if (node.equals("DIRECT", ignoreCase = true) || node.equals("REJECT", ignoreCase = true)) return null
@@ -11771,7 +12111,7 @@ index 3e938c4..01066a3 100644
  }
 
  /* ------------------------------------------------------------------ */
-@@ -385,7 +414,9 @@ internal object PanelLogic {
+@@ -385,7 +416,9 @@ internal object PanelLogic {
          val groupWidth = (widthDp - 32f - 8f) / 2f
          val nodeWidth = (widthDp - 32f - 16f - 8f) / 2f
          return layout.copy(
@@ -11783,10 +12123,18 @@ index 3e938c4..01066a3 100644
          )
      }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-index fb308a8..da3c1a3 100644
+index fb308a8..5931531 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-@@ -45,6 +45,10 @@ import androidx.compose.ui.graphics.graphicsLayer
+@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.BoxScope
+ import androidx.compose.foundation.layout.Column
+ import androidx.compose.foundation.layout.PaddingValues
+ import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.RowScope
+ import androidx.compose.foundation.layout.Spacer
+ import androidx.compose.foundation.layout.WindowInsets
+ import androidx.compose.foundation.layout.asPaddingValues
+@@ -45,18 +46,24 @@ import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.platform.LocalConfiguration
  import androidx.compose.ui.platform.LocalDensity
@@ -11797,7 +12145,13 @@ index fb308a8..da3c1a3 100644
  import androidx.compose.ui.unit.Dp
  import androidx.compose.ui.unit.dp
  import io.github.xgl34222220.hetu.home.HomeBarBackdrop
-@@ -57,6 +61,7 @@ import io.github.xgl34222220.hetu.home.HomeIcons
+ import io.github.xgl34222220.hetu.home.HomeBarGlass
+ import io.github.xgl34222220.hetu.home.HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
++import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
+ import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.home.HomeIconButton
+ import io.github.xgl34222220.hetu.home.HomeIcons
  import io.github.xgl34222220.hetu.home.HomeModalSheet
  import io.github.xgl34222220.hetu.home.HomePop
  import io.github.xgl34222220.hetu.home.HomeRefreshBox
@@ -11805,7 +12159,7 @@ index fb308a8..da3c1a3 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.LocalHomeColors
  import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
-@@ -113,9 +118,19 @@ internal fun PanelScreen(
+@@ -113,9 +120,19 @@ internal fun PanelScreen(
      val running = data.running
      val configuration = LocalConfiguration.current
      val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
@@ -11827,7 +12181,29 @@ index fb308a8..da3c1a3 100644
      val headerItems = panelHeaderItemCount(data, view)
      // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
      val stagger = key(view.tab) { rememberHomeStagger() }
-@@ -171,14 +186,14 @@ internal fun PanelScreen(
+@@ -147,6 +164,21 @@ internal fun PanelScreen(
+                 }
+                 return@LazyColumn
+             }
++            // A tab the running core cannot feed is an explained state, not a read error or a toast.
++            data.core.features[view.tab]?.let { feature ->
++                item(key = "panel-core-unsupported") {
++                    val fallback = data.core.fallbackFor(view.tab)
++                    val way: (@Composable RowScope.() -> Unit)? = if (fallback == null) null else {
++                        { HomeButton("查看" + fallback.label, { onView(view.withTab(fallback)) }, kind = HomeButtonKind.Primary) }
++                    }
++                    HomeCoreUnsupportedCard(
++                        data.core.core, feature, data.core.details[view.tab].orEmpty(),
++                        Modifier.panelGutter().padding(top = 24.dp).then(hetuAnimateItem(motion)),
++                        actions = way,
++                    )
++                }
++                return@LazyColumn
++            }
+             if (data.readError.isNotBlank()) {
+                 item(key = "panel-read-error") {
+                     PanelEmptyState(PanelIcons.CircleX, "无法读取面板", data.readError, verbatimSubtitle = true) {
+@@ -171,14 +203,14 @@ internal fun PanelScreen(
              }
              when (view.tab) {
                  PanelTab.Groups -> panelGroupsTab(
@@ -11844,7 +12220,16 @@ index fb308a8..da3c1a3 100644
                          onView(next)
                          if (anchor != null && at >= 0) {
                              // Apply with the new rows on the next measure, retaining the tapped
-@@ -281,7 +296,13 @@ private fun BoxScope.PanelHeader(
+@@ -208,7 +240,7 @@ internal fun PanelScreen(
+         PanelHeader(data, view, overlay, actions, glass, collapse, titleHeight, statusTop, listState, onView, onOverlay, menu)
+
+         // 策略: once a group is open, “定位当前节点” and a collapse capsule float above the dock.
+-        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups }
++        val openGroup = view.expandedGroups.lastOrNull()?.takeIf { running && data.readError.isBlank() && !data.loading && view.tab == PanelTab.Groups && data.core.supports(PanelTab.Groups) }
+         var lastOpen by remember { mutableStateOf("") }
+         SideEffect { if (openGroup != null) lastOpen = openGroup }
+         val shownGroup = openGroup ?: lastOpen
+@@ -281,7 +313,13 @@ private fun BoxScope.PanelHeader(
              alpha = (1f - moved / (titlePx * .62f)).coerceIn(0f, 1f)
          },
          contentAlignment = Alignment.CenterStart,
@@ -11859,7 +12244,16 @@ index fb308a8..da3c1a3 100644
 
      // The strip floats above the list, so a vertical drag that starts on it is handed to the
      // list by hand; horizontal drags still scroll the strip itself.
-@@ -413,3 +434,19 @@ private fun PanelInlineOverlay(
+@@ -308,7 +346,7 @@ private fun BoxScope.PanelHeader(
+             },
+             color = c.t1, style = HomeType.barTitle, maxLines = 1,
+         )
+-        if (data.running && data.readError.isBlank()) {
++        if (data.running && data.readError.isBlank() && data.core.supports(tab)) {
+             val anchored: @Composable (ImageVector, String, PanelOverlay, Color) -> Unit = { icon, label, target, tint ->
+                 Box {
+                     HomeIconButton(icon, label, { onOverlay(if (overlay == target) null else target) }, tint = tint, glyph = 26.dp)
+@@ -413,3 +451,19 @@ private fun PanelInlineOverlay(
          }
      }
  }
@@ -11993,10 +12387,18 @@ index 800055c..d43d597 100644
 -    }
 -}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index d256004..fa05457 100644
+index d256004..b88ab5e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-@@ -52,6 +52,7 @@ import io.github.xgl34222220.hetu.home.HomeRollingText
+@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
+ import io.github.xgl34222220.hetu.home.HomeCard
++import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
+ import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.home.HomeDivider
+ import io.github.xgl34222220.hetu.home.HomeIconButton
+@@ -52,6 +53,7 @@ import io.github.xgl34222220.hetu.home.HomeRollingText
  import io.github.xgl34222220.hetu.home.HomeRowDims
  import io.github.xgl34222220.hetu.home.HomeRowDivider
  import io.github.xgl34222220.hetu.home.HomeRowSubStyle
@@ -12004,7 +12406,7 @@ index d256004..fa05457 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.HomeVerticalDivider
  import io.github.xgl34222220.hetu.home.LocalHomeColors
-@@ -93,6 +94,7 @@ internal fun ToolsAdblockScreen(
+@@ -93,6 +95,7 @@ internal fun ToolsAdblockScreen(
      onRetry: () -> Unit,
      modifier: Modifier = Modifier,
      scroll: ScrollState = rememberScrollState(),
@@ -12012,16 +12414,72 @@ index d256004..fa05457 100644
  ) {
      val ready = state.load is ToolsLoad.Ready
      val idle = ready && !state.busy
-@@ -117,7 +119,7 @@ internal fun ToolsAdblockScreen(
+@@ -115,9 +118,23 @@ internal fun ToolsAdblockScreen(
+             is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.ShieldBan, "广告过滤状态读取失败", subtitle = load.message) {
+                 ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
              }
-             ToolsLoad.Ready -> {
+-            ToolsLoad.Ready -> {
++            ToolsLoad.Ready -> if (!state.coreRoutesAds) {
++                // A core without rule routing (Hysteria 2): ad rules cannot apply, so the page says so
++                // once instead of showing switches that do nothing. The proxy-off DNS filter still works.
++                HomeCoreUnsupportedCard(
++                    state.coreLabel, "广告过滤 · 规则拦截",
++                    "${state.coreLabel} 是单服务器客户端，所有流量直接发往同一台服务器，没有规则分流，广告规则无法生效。代理关闭时的独立 DNS 过滤不受影响。",
++                    Modifier.homeEnter(stagger, 0), icon = ToolsFeatureIcons.ShieldOff,
++                )
++                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 1))
++            } else {
                  StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
 -                ChainCard(state, Modifier.homeEnter(stagger, 1))
-+                ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
++                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
++                else HomeCoreUnsupportedCard(
++                    state.coreLabel, "运行链验证 · 热更新过滤规则",
++                    "广告规则在启动时写入 ${state.coreLabel} 配置并按规则拦截；${state.coreLabel} 不提供 Mihomo 的规则读取接口，无法实时验证运行链，修改规则在重启代理后生效。",
++                    Modifier.homeEnter(stagger, 1), icon = ToolsFeatureIcons.ShieldAlert,
++                )
                  Column(Modifier.homeEnter(stagger, 2)) {
                      // 最近拦截 brings its own gap, so it can unfold without a jump.
                      HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
-@@ -213,7 +215,7 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
+@@ -126,22 +143,32 @@ internal fun ToolsAdblockScreen(
+                 SourcesCard(state, idle, onUpdate, onSourceChange, Modifier.homeEnter(stagger, 3))
+                 DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, stagger, 4, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
+                 DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, stagger, 5, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
+-                HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 6)) {
+-                    ToolsCardTitle("代理关闭时")
+-                    ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
+-                    HomeRowDivider(start = HomeRowDims.textStart)
+-                    ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
+-                }
++                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 6))
+             }
+         }
+     }
+ }
+
++@Composable
++private fun ProxyOffCard(state: ToolsAdblockState, idle: Boolean, onStandaloneDnsChange: (Boolean) -> Unit, onCnameChange: (Boolean) -> Unit, modifier: Modifier) {
++    HomeCard(modifier.fillMaxWidth()) {
++        ToolsCardTitle("代理关闭时")
++        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
++        HomeRowDivider(start = HomeRowDims.textStart)
++        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
++    }
++}
++
+ private class StatusLook(val icon: ImageVector, val tint: Color, val text: Color, val soft: Color, val title: String, val body: String)
+
+ @Composable
+ private fun statusLook(state: ToolsAdblockState): StatusLook {
+     val c = LocalHomeColors.current
++    // Applied by a core that cannot report its chain: say what is known, not 「运行链未确认」.
++    if (state.coreManaged) return StatusLook(
++        ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("已随核心启动"),
++        ht("广告域名在 ${state.coreLabel} 中按规则拦截；\n该核心不支持实时验证。"),
++    )
+     return when (state.status) {
+         ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("保护中"), ht("广告域名直接 REJECT，\n其余流量照常分流。"))
+         ToolsAdStatus.WrongMode -> StatusLook(
+@@ -213,7 +240,7 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
  }
 
  @Composable
@@ -12030,7 +12488,7 @@ index d256004..fa05457 100644
      val running = state.enabled && state.proxyRunning
      HomeCard(modifier.fillMaxWidth()) {
          ToolsCardTitle("运行链验证")
-@@ -221,8 +223,29 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
+@@ -221,8 +248,29 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
          HomeRowDivider(start = HomeRowDims.textStart)
          CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
          HomeRowDivider(start = HomeRowDims.textStart)
@@ -12194,7 +12652,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..33241e9 100644
+index f575100..0a0502f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -12228,16 +12686,18 @@ index f575100..33241e9 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +241,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +241,10 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
 +                // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
-+                val report = if (chain.running) AdblockVerification.chain(app) else null
++                val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
++                // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
++                val report = if (chain.running && coreLiveVerify) AdblockVerification.chain(app) else null
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -262,12 +272,17 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +274,20 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -12246,6 +12706,9 @@ index f575100..33241e9 100644
 +                        chainNote = report?.detail().orEmpty(),
                          standaloneDns = prefs.getBoolean(Keys.AdblockFallback, prefs.getBoolean("vpnWanted", false)),
                          cnameProtection = prefs.getBoolean(Keys.Cname, true),
++                        coreLabel = coreLabel,
++                        coreRoutesAds = coreRoutesAds,
++                        coreLiveVerify = coreLiveVerify,
                      ),
                  )
              },
@@ -12256,7 +12719,7 @@ index f575100..33241e9 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -339,10 +354,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -339,10 +359,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
  /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
  @Composable
  private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
@@ -12276,7 +12739,7 @@ index f575100..33241e9 100644
 
  /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..eecb30c 100644
+index 40111ed..14b540c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 @@ -203,6 +203,9 @@ internal sealed interface ToolsDiagOverlay {
@@ -12299,7 +12762,7 @@ index 40111ed..eecb30c 100644
  internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
  internal data class ToolsAdblockState(
-@@ -241,6 +247,11 @@ internal data class ToolsAdblockState(
+@@ -241,13 +247,27 @@ internal data class ToolsAdblockState(
      val recent: List<String> = emptyList(),
      val startupInjected: Boolean = false,
      val controllerLoaded: Boolean = false,
@@ -12311,7 +12774,23 @@ index 40111ed..eecb30c 100644
      val standaloneDns: Boolean = false,
      val cnameProtection: Boolean = true,
      val updating: Boolean = false,
-@@ -367,6 +378,10 @@ internal class ToolsFeatureActions(
+     val refreshing: Boolean = false,
+     /** A toggle is being applied; switches and chips are inert meanwhile. */
+     val busy: Boolean = false,
++    /** Label of the core the rules apply to (running, else next start). */
++    val coreLabel: String = "",
++    /** False for a core without rule routing (Hysteria 2): ad rules cannot take effect at all. */
++    val coreRoutesAds: Boolean = true,
++    /** False for cores other than Mihomo: no live chain verification and no hot rule refresh. */
++    val coreLiveVerify: Boolean = true,
+ ) {
++    /** Running on a core that routes ads but cannot report its chain: shown as applied, not unverified. */
++    val coreManaged: Boolean get() = enabled && proxyRunning && coreRoutesAds && !coreLiveVerify
++
+     val status: ToolsAdStatus
+         get() = when {
+             !enabled -> ToolsAdStatus.Off
+@@ -367,6 +387,10 @@ internal class ToolsFeatureActions(
      /* 诊断与维护 */
      val runPreflight: (suspend () -> ToolsPreflight)? = null,
      val onOpenDiagnosticsDetails: (() -> Unit)? = null,
@@ -12322,7 +12801,7 @@ index 40111ed..eecb30c 100644
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +400,8 @@ internal class ToolsFeatureActions(
+@@ -385,6 +409,8 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -13666,10 +14145,10 @@ index 0000000..c0a9ffb
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
 new file mode 100644
-index 0000000..22e6ed1
+index 0000000..0ae5f90
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt
-@@ -0,0 +1,150 @@
+@@ -0,0 +1,193 @@
 +package io.github.xgl34222220.hetu
 +
 +import org.junit.Assert.assertEquals
@@ -13813,6 +14292,49 @@ index 0000000..22e6ed1
 +        assertTrue(ProxyCoreSupport.featureSummary(hy).contains("单服务器"))
 +        assertEquals("此核心不支持热重载（Xray）", ProxyCoreSupport.unsupported(ProxyRuntimeProfile.Core.XRAY, "热重载"))
 +        assertTrue(ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.TUN).reason.contains("TPROXY"))
++    }
++
++    private fun gate(core: ProxyRuntimeProfile.Core, customApi: Boolean = false) = io.github.xgl34222220.hetu.panel.PanelCoreGate.of(
++        core.label, ProxyCoreSupport.clashApi(core), ProxyCoreSupport.providers(core), ProxyCoreSupport.singleServer(core), customApi)
++
++    @Test fun panelTabsDegradePerCoreWithTheUnsupportedState() {
++        val tabs = io.github.xgl34222220.hetu.panel.PanelTab.entries
++        listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).forEach { core ->
++            assertTrue(tabs.all { gate(core).supports(it) }); assertTrue(gate(core).latency)
++            assertTrue(ProxyCoreSupport.providers(core)); assertTrue(ProxyCoreSupport.trafficMode(core))
++        }
++        // sing-box clash_api (1.14.3): proxies, group delay, connections and rules work; providers do not.
++        listOf(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND).forEach { core ->
++            val g = gate(core)
++            assertEquals(setOf(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions, io.github.xgl34222220.hetu.panel.PanelTab.RuleSets), g.features.keys)
++            assertTrue(g.latency)
++            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Groups, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions))
++            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Rules, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.RuleSets))
++            assertFalse(ProxyCoreSupport.trafficMode(core))
++        }
++        // No Clash controller: every controller tab is gated, 日志 still works, no latency.
++        listOf(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA).forEach { core ->
++            val g = gate(core)
++            assertEquals(tabs.filter { it != io.github.xgl34222220.hetu.panel.PanelTab.Logs }.toSet(), g.features.keys)
++            assertTrue(g.supports(io.github.xgl34222220.hetu.panel.PanelTab.Logs))
++            assertFalse(g.latency)
++            assertEquals(core.label, g.core)
++            assertTrue(g.details.values.all { it.startsWith(core.label) })
++            // An external Clash API is not the local core: never gated.
++            assertEquals(io.github.xgl34222220.hetu.panel.PanelCoreGate.Full, gate(core, customApi = true))
++        }
++        assertTrue(gate(ProxyRuntimeProfile.Core.HYSTERIA).details.values.first().contains("单服务器"))
++        assertEquals("当前核心（Xray）不支持此功能", io.github.xgl34222220.hetu.home.homeCoreUnsupportedTitle("Xray"))
++    }
++
++    @Test fun adblockStateFollowsTheCoreThatAppliesTheRules() {
++        val base = io.github.xgl34222220.hetu.tools.ToolsAdblockState(enabled = true, proxyRunning = true, ruleMode = true, modeKnown = true)
++        assertFalse(base.coreManaged)
++        val singBox = base.copy(coreLabel = "Sing-Box", coreLiveVerify = false)
++        assertTrue(singBox.coreManaged)
++        assertFalse(singBox.copy(enabled = false).coreManaged)
++        assertFalse(singBox.copy(proxyRunning = false).coreManaged)
++        assertFalse(base.copy(coreLabel = "Hysteria", coreRoutesAds = false, coreLiveVerify = false).coreManaged)
 +    }
 +
 +    @Test fun settingsConfigMenuOpensViewAndEditInPlace() {
@@ -15626,6 +16148,87 @@ index 0000000..f1f8f8a
 +
 +    @Test fun rulePoliciesAlignAtTheRightEdgeForShortAndLongContent() = rules(1f)
 +    @Test fun largeFontRulesKeepContentAndPolicySeparateAndInsideTheirCards() = rules(2f)
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCoreUnsupported93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCoreUnsupported93Test.kt
+new file mode 100644
+index 0000000..4e304a0
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelCoreUnsupported93Test.kt
+@@ -0,0 +1,75 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.test.assertIsDisplayed
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.panel.PanelActions
++import io.github.xgl34222220.hetu.panel.PanelCoreGate
++import io.github.xgl34222220.hetu.panel.PanelData
++import io.github.xgl34222220.hetu.panel.PanelRoute
++import io.github.xgl34222220.hetu.panel.PanelStatus
++import io.github.xgl34222220.hetu.panel.PanelTab
++import org.junit.Assert.assertEquals
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/** A tab the running core cannot feed shows 「当前核心（X）不支持此功能」, never a read error. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class PanelCoreUnsupported93Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++
++    private fun gate(core: ProxyRuntimeProfile.Core) = PanelCoreGate.of(
++        core.label, ProxyCoreSupport.clashApi(core), ProxyCoreSupport.providers(core), ProxyCoreSupport.singleServer(core), false)
++
++    @Test fun coreWithoutControllerShowsTheCardOnEveryControllerTab() {
++        val tab = mutableStateOf(PanelTab.Groups)
++        val g = gate(ProxyRuntimeProfile.Core.XRAY)
++        rule.setContent {
++            HetuHomeTheme(dark = false) {
++                PanelRoute(PanelData(status = PanelStatus.Running, core = g), tab.value, { tab.value = it }, PanelActions(),
++                    contentPadding = PaddingValues(bottom = 96.dp))
++            }
++        }
++        PanelTab.entries.filter { it != PanelTab.Logs }.forEach { next ->
++            rule.runOnIdle { tab.value = next }
++            rule.onNodeWithText("当前核心（Xray）不支持此功能").assertIsDisplayed()
++            rule.onNodeWithText("无法读取面板").assertDoesNotExist()
++            rule.onNodeWithText("全部更新").assertDoesNotExist()
++        }
++        // The way out lands on a tab the core does support.
++        rule.runOnIdle { tab.value = PanelTab.Rules }
++        rule.onNodeWithText("查看日志").performClick()
++        rule.runOnIdle { assertEquals(PanelTab.Logs, tab.value) }
++        rule.onNodeWithText("当前核心（Xray）不支持此功能").assertDoesNotExist()
++    }
++
++    @Test fun singBoxGatesOnlyProviderTabsAndPointsToTheirLiveCounterpart() {
++        val tab = mutableStateOf(PanelTab.Subscriptions)
++        rule.setContent {
++            HetuHomeTheme(dark = false) {
++                PanelRoute(PanelData(status = PanelStatus.Running, core = gate(ProxyRuntimeProfile.Core.SING_BOX)), tab.value,
++                    { tab.value = it }, PanelActions(), contentPadding = PaddingValues(bottom = 96.dp))
++            }
++        }
++        rule.onNodeWithText("当前核心（Sing-Box）不支持此功能").assertIsDisplayed()
++        rule.onNodeWithText("查看策略").performClick()
++        rule.runOnIdle { assertEquals(PanelTab.Groups, tab.value) }
++        rule.onNodeWithText("当前核心（Sing-Box）不支持此功能").assertDoesNotExist()
++        rule.runOnIdle { tab.value = PanelTab.RuleSets }
++        rule.onNodeWithText("当前核心（Sing-Box）不支持此功能").assertIsDisplayed()
++        rule.onNodeWithText("查看规则").assertIsDisplayed()
++    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelProjectionPerformance95Test.kt
 new file mode 100644

@@ -143,6 +143,49 @@ class CoreRuntimeSupport93Test {
         assertTrue(ProxyRuntimeProfile.capability(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Mode.TUN).reason.contains("TPROXY"))
     }
 
+    private fun gate(core: ProxyRuntimeProfile.Core, customApi: Boolean = false) = io.github.xgl34222220.hetu.panel.PanelCoreGate.of(
+        core.label, ProxyCoreSupport.clashApi(core), ProxyCoreSupport.providers(core), ProxyCoreSupport.singleServer(core), customApi)
+
+    @Test fun panelTabsDegradePerCoreWithTheUnsupportedState() {
+        val tabs = io.github.xgl34222220.hetu.panel.PanelTab.entries
+        listOf(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Core.MIHOMO_SMART).forEach { core ->
+            assertTrue(tabs.all { gate(core).supports(it) }); assertTrue(gate(core).latency)
+            assertTrue(ProxyCoreSupport.providers(core)); assertTrue(ProxyCoreSupport.trafficMode(core))
+        }
+        // sing-box clash_api (1.14.3): proxies, group delay, connections and rules work; providers do not.
+        listOf(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND).forEach { core ->
+            val g = gate(core)
+            assertEquals(setOf(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions, io.github.xgl34222220.hetu.panel.PanelTab.RuleSets), g.features.keys)
+            assertTrue(g.latency)
+            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Groups, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.Subscriptions))
+            assertEquals(io.github.xgl34222220.hetu.panel.PanelTab.Rules, g.fallbackFor(io.github.xgl34222220.hetu.panel.PanelTab.RuleSets))
+            assertFalse(ProxyCoreSupport.trafficMode(core))
+        }
+        // No Clash controller: every controller tab is gated, 日志 still works, no latency.
+        listOf(ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA).forEach { core ->
+            val g = gate(core)
+            assertEquals(tabs.filter { it != io.github.xgl34222220.hetu.panel.PanelTab.Logs }.toSet(), g.features.keys)
+            assertTrue(g.supports(io.github.xgl34222220.hetu.panel.PanelTab.Logs))
+            assertFalse(g.latency)
+            assertEquals(core.label, g.core)
+            assertTrue(g.details.values.all { it.startsWith(core.label) })
+            // An external Clash API is not the local core: never gated.
+            assertEquals(io.github.xgl34222220.hetu.panel.PanelCoreGate.Full, gate(core, customApi = true))
+        }
+        assertTrue(gate(ProxyRuntimeProfile.Core.HYSTERIA).details.values.first().contains("单服务器"))
+        assertEquals("当前核心（Xray）不支持此功能", io.github.xgl34222220.hetu.home.homeCoreUnsupportedTitle("Xray"))
+    }
+
+    @Test fun adblockStateFollowsTheCoreThatAppliesTheRules() {
+        val base = io.github.xgl34222220.hetu.tools.ToolsAdblockState(enabled = true, proxyRunning = true, ruleMode = true, modeKnown = true)
+        assertFalse(base.coreManaged)
+        val singBox = base.copy(coreLabel = "Sing-Box", coreLiveVerify = false)
+        assertTrue(singBox.coreManaged)
+        assertFalse(singBox.copy(enabled = false).coreManaged)
+        assertFalse(singBox.copy(proxyRunning = false).coreManaged)
+        assertFalse(base.copy(coreLabel = "Hysteria", coreRoutesAds = false, coreLiveVerify = false).coreManaged)
+    }
+
     @Test fun settingsConfigMenuOpensViewAndEditInPlace() {
         assertEquals(listOf("查看", "编辑", "导出", "重命名", "删除"), settingsConfigMenu(ProxyConfigUi("自用_tproxy.yaml", selected = true, bundled = false)))
         assertEquals(listOf("查看", "编辑", "导出"), settingsConfigMenu(ProxyConfigUi("config.yaml", selected = false, bundled = true)))

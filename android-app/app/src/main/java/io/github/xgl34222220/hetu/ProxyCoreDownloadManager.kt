@@ -59,6 +59,37 @@ internal object ProxyCoreSupport {
     @JvmStatic fun ruleRouting(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
     @JvmStatic fun adblock(core: ProxyRuntimeProfile.Core): Boolean = core != ProxyRuntimeProfile.Core.HYSTERIA
     @JvmStatic fun singleServer(core: ProxyRuntimeProfile.Core): Boolean = core == ProxyRuntimeProfile.Core.HYSTERIA
+    /**
+     * Proxy / rule providers (订阅、规则集 tabs). sing-box's clash_api answers /providers/proxies with
+     * `{"providers":{}}` and /providers/rules with `[]`, and every refresh / healthcheck is 404
+     * (verified against sing-box 1.14.3): subscriptions are expanded to plain outbounds at start.
+     */
+    @JvmStatic fun providers(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+    /**
+     * 规则 / 全局 / 直连 switching. sing-box accepts PATCH /configs but only switches between the
+     * modes of its `clash_mode` rules; converted configs have none, so its mode list is just `rule`.
+     */
+    @JvmStatic fun trafficMode(core: ProxyRuntimeProfile.Core): Boolean = mihomo(core)
+
+    /** What the 面板 tabs can show for the running core; an external Clash API is never gated. */
+    @JvmStatic fun panelGate(prefs: android.content.SharedPreferences): io.github.xgl34222220.hetu.panel.PanelCoreGate {
+        val core = running(prefs)
+        return io.github.xgl34222220.hetu.panel.PanelCoreGate.of(core.label, clashApi(core), providers(core), singleServer(core),
+            prefs.getBoolean("proxyCustomApiEnabled", false))
+    }
+
+    /**
+     * 广告过滤 page: (core label, ads are routed by this core, live chain verification + hot refresh).
+     * The running core while the proxy runs, otherwise the one the next start will use.
+     */
+    @JvmStatic fun adblockCore(prefs: android.content.SharedPreferences, proxyRunning: Boolean): Triple<String, Boolean, Boolean> {
+        val core = if (proxyRunning) running(prefs) else ProxyRuntimeProfile.load(prefs).core
+        return Triple(core.label, adblock(core), adblockLiveRefresh(core))
+    }
+
+    /** The core that is actually running (written at start), else the selected one. */
+    @JvmStatic fun running(prefs: android.content.SharedPreferences): ProxyRuntimeProfile.Core =
+        ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore", null) ?: ProxyRuntimeProfile.load(prefs).core.id)
 
     /** The explicit degraded-state text shown instead of an error. */
     @JvmStatic fun unsupported(core: ProxyRuntimeProfile.Core, feature: String): String = "此核心不支持$feature（${core.label}）"

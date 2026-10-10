@@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeButtonKind
 import io.github.xgl34222220.hetu.home.HomeCard
+import io.github.xgl34222220.hetu.home.HomeCoreUnsupportedCard
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeDivider
 import io.github.xgl34222220.hetu.home.HomeIconButton
@@ -117,9 +118,23 @@ internal fun ToolsAdblockScreen(
             is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.ShieldBan, "广告过滤状态读取失败", subtitle = load.message) {
                 ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
             }
-            ToolsLoad.Ready -> {
+            ToolsLoad.Ready -> if (!state.coreRoutesAds) {
+                // A core without rule routing (Hysteria 2): ad rules cannot apply, so the page says so
+                // once instead of showing switches that do nothing. The proxy-off DNS filter still works.
+                HomeCoreUnsupportedCard(
+                    state.coreLabel, "广告过滤 · 规则拦截",
+                    "${state.coreLabel} 是单服务器客户端，所有流量直接发往同一台服务器，没有规则分流，广告规则无法生效。代理关闭时的独立 DNS 过滤不受影响。",
+                    Modifier.homeEnter(stagger, 0), icon = ToolsFeatureIcons.ShieldOff,
+                )
+                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 1))
+            } else {
                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
-                ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
+                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
+                else HomeCoreUnsupportedCard(
+                    state.coreLabel, "运行链验证 · 热更新过滤规则",
+                    "广告规则在启动时写入 ${state.coreLabel} 配置并按规则拦截；${state.coreLabel} 不提供 Mihomo 的规则读取接口，无法实时验证运行链，修改规则在重启代理后生效。",
+                    Modifier.homeEnter(stagger, 1), icon = ToolsFeatureIcons.ShieldAlert,
+                )
                 Column(Modifier.homeEnter(stagger, 2)) {
                     // 最近拦截 brings its own gap, so it can unfold without a jump.
                     HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
@@ -128,14 +143,19 @@ internal fun ToolsAdblockScreen(
                 SourcesCard(state, idle, onUpdate, onSourceChange, Modifier.homeEnter(stagger, 3))
                 DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, stagger, 4, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
                 DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, stagger, 5, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
-                HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 6)) {
-                    ToolsCardTitle("代理关闭时")
-                    ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
-                    HomeRowDivider(start = HomeRowDims.textStart)
-                    ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
-                }
+                ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 6))
             }
         }
+    }
+}
+
+@Composable
+private fun ProxyOffCard(state: ToolsAdblockState, idle: Boolean, onStandaloneDnsChange: (Boolean) -> Unit, onCnameChange: (Boolean) -> Unit, modifier: Modifier) {
+    HomeCard(modifier.fillMaxWidth()) {
+        ToolsCardTitle("代理关闭时")
+        ToolsSwitchRow("独立 DNS 过滤", state.standaloneDns, onStandaloneDnsChange, icon = ToolsFeatureIcons.Globe, subtitle = "代理未运行时用本地 VPN 继续过滤广告", enabled = idle)
+        HomeRowDivider(start = HomeRowDims.textStart)
+        ToolsSwitchRow("CNAME 追踪防护", state.cnameProtection, onCnameChange, icon = ToolsFeatureIcons.Shield, subtitle = "拦截伪装成正常域名的追踪 CNAME", enabled = idle)
     }
 }
 
@@ -144,6 +164,11 @@ private class StatusLook(val icon: ImageVector, val tint: Color, val text: Color
 @Composable
 private fun statusLook(state: ToolsAdblockState): StatusLook {
     val c = LocalHomeColors.current
+    // Applied by a core that cannot report its chain: say what is known, not 「运行链未确认」.
+    if (state.coreManaged) return StatusLook(
+        ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("已随核心启动"),
+        ht("广告域名在 ${state.coreLabel} 中按规则拦截；\n该核心不支持实时验证。"),
+    )
     return when (state.status) {
         ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("保护中"), ht("广告域名直接 REJECT，\n其余流量照常分流。"))
         ToolsAdStatus.WrongMode -> StatusLook(

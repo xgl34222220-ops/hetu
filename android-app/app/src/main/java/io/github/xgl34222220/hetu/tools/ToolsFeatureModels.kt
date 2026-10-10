@@ -258,7 +258,16 @@ internal data class ToolsAdblockState(
     val refreshing: Boolean = false,
     /** A toggle is being applied; switches and chips are inert meanwhile. */
     val busy: Boolean = false,
+    /** Label of the core the rules apply to (running, else next start). */
+    val coreLabel: String = "",
+    /** False for a core without rule routing (Hysteria 2): ad rules cannot take effect at all. */
+    val coreRoutesAds: Boolean = true,
+    /** False for cores other than Mihomo: no live chain verification and no hot rule refresh. */
+    val coreLiveVerify: Boolean = true,
 ) {
+    /** Running on a core that routes ads but cannot report its chain: shown as applied, not unverified. */
+    val coreManaged: Boolean get() = enabled && proxyRunning && coreRoutesAds && !coreLiveVerify
+
     val status: ToolsAdStatus
         get() = when {
             !enabled -> ToolsAdStatus.Off
