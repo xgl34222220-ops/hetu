@@ -59,6 +59,11 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.layout.FirstBaseline
+import androidx.compose.ui.layout.AlignmentLine
+import androidx.compose.ui.layout.layout
+import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.ht
@@ -384,10 +389,21 @@ private fun HomeShortcutCard(title: String, subtitle: String, tag: String, onCli
     HomeCard(modifier.testTag(tag), onClick = onClick, clickLabel = title) {
         // 11 dp keeps the row at the 64 dp the 当前节点 row it replaces had, so nothing below moves.
         Column(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeight).padding(horizontal = 18.dp, vertical = 11.dp)) {
-            Text(title, color = c.t1, style = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(subtitle, color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            // Latin (WebUI / Web 界面) and CJK (日志 / 查看) fall back to fonts with different ascent/descent,
+            // so the same style put their baselines 3–5 px apart. Pin both lines to fixed baselines instead.
+            Text(title, Modifier.homeBaselineSlot(22.dp, 18.dp), color = c.t1, style = HomeShortcutTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(subtitle, Modifier.homeBaselineSlot(20.dp, 15.dp), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
+}
+
+private val HomeShortcutTitle = HomeType.cardLabel.copy(fontSize = 19.sp, fontWeight = FontWeight.SemiBold)
+
+/** A [height]-tall slot whose child's first baseline sits exactly [baseline] below the slot top, whatever font drew it. */
+private fun Modifier.homeBaselineSlot(height: Dp, baseline: Dp): Modifier = layout { measurable, constraints ->
+    val placeable = measurable.measure(constraints.copy(minHeight = 0, maxHeight = Constraints.Infinity))
+    val first = placeable[FirstBaseline].takeIf { it != AlignmentLine.Unspecified } ?: placeable.height
+    layout(placeable.width, height.roundToPx()) { placeable.placeRelative(0, baseline.roundToPx() - first) }
 }
 
 @Composable
