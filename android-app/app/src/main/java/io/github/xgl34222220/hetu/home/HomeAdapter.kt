@@ -140,16 +140,30 @@ internal fun HetuHomeV2(
         ),
     )
 
-    // Rebuilt on every recomposition on purpose: the lambdas close over the caller's latest callbacks.
-    val actions = run {
+    // One instance for the life of the page. Each lambda reads the caller's latest callback,
+    // so a 1 s traffic sample or 2 s poll never hands every card a new actions object (which
+    // recomposed the whole home tree, scrolling included).
+    val toggle by rememberUpdatedState(onToggle)
+    val reload by rememberUpdatedState(onReload)
+    val restart by rememberUpdatedState(onRestart)
+    val trafficModeChange by rememberUpdatedState(onTrafficMode)
+    val openNode by rememberUpdatedState(onOpenNode)
+    val probe by rememberUpdatedState(onDelay)
+    val refreshIp by rememberUpdatedState(onRefresh)
+    val openSubscription by rememberUpdatedState(onOpenSubscription)
+    val openBasicSettings by rememberUpdatedState(onOpenBasicSettings)
+    val openConfigs by rememberUpdatedState(onOpenConfigs)
+    val viewConfig by rememberUpdatedState(onViewConfig)
+    val dismissStartupError by rememberUpdatedState(onDismissStartupError)
+    val actions = remember(context, prefs) {
         HomeActions(
-            onStart = onToggle,
-            onStop = onToggle,
-            onReload = onReload,
-            onRestart = onRestart,
-            onProxyModeChange = { onTrafficMode(it.id) },
-            onOpenNode = onOpenNode,
-            onProbe = onDelay,
+            onStart = { toggle() },
+            onStop = { toggle() },
+            onReload = { reload() },
+            onRestart = { restart() },
+            onProxyModeChange = { trafficModeChange(it.id) },
+            onOpenNode = { openNode() },
+            onProbe = { probe() },
             onNetSideChange = { side ->
                 netSide = side
                 prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
@@ -158,12 +172,12 @@ internal fun HetuHomeV2(
                 speedSource = source
                 prefs.edit().putString(PrefSpeedSource, source.id).apply()
             },
-            onRefreshIp = onRefresh,
-            onOpenSubscription = onOpenSubscription,
-            onOpenBasicSettings = onOpenBasicSettings,
-            onOpenConfigs = onOpenConfigs,
-            onViewConfig = onViewConfig,
-            onDismissStartFailure = onDismissStartupError,
+            onRefreshIp = { refreshIp() },
+            onOpenSubscription = { openSubscription() },
+            onOpenBasicSettings = { openBasicSettings() },
+            onOpenConfigs = { openConfigs() },
+            onViewConfig = { viewConfig() },
+            onDismissStartFailure = { dismissStartupError() },
             onCopy = { label, text -> copyToClipboard(context, label, text) },
             loadTargets = { loadTargets(prefs) },
             saveTargets = { config -> saveTargets(prefs, config) },

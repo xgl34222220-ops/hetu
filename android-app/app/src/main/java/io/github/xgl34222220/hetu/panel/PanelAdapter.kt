@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
@@ -291,7 +292,8 @@ internal fun HetuPanelV2(
 
 @Composable
 private fun AppIcon(bitmap: Bitmap, modifier: Modifier) {
-    Image(bitmap = bitmap.asImageBitmap(), contentDescription = null, modifier = modifier)
+    val image = remember(bitmap) { bitmap.asImageBitmap() }
+    Image(bitmap = image, contentDescription = null, modifier = modifier)
 }
 
 private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delays: MutableMap<String, Long>, testing: MutableMap<String, Boolean>) {
@@ -518,7 +520,10 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
     )
     val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
-    val actions = PanelActions(
+    // One actions instance per page: rebuilding it on every 1 s traffic sample handed each
+    // visible group/node card fresh lambdas and recomposed the whole list while scrolling.
+    val currentTab by rememberUpdatedState(tab)
+    val actions = remember(vm, context) { PanelActions(
         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
         onTestAll = vm::testAll,
@@ -535,14 +540,14 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
         onCopy = { label, text -> copyToClipboard(context, label, text) },
         onRefresh = {
-            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (tab) {
+            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (currentTab) {
                 PanelTab.Rules -> vm.loadRules()
                 PanelTab.RuleSets -> vm.loadRuleSets()
                 PanelTab.Logs -> vm.loadLogs()
                 else -> vm.pullRefresh()
             }
         },
-    )
+    ) }
     val icons = remember(vm.state.connections) {
         vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
     }

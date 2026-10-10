@@ -90,6 +90,12 @@ internal fun HomeScreen(
     motion: Boolean = true,
 ) {
     val c = LocalHomeColors.current
+    // The 1 s traffic sample and the resource samples only feed two cards. Every other card
+    // gets this view without them (and with uptime at the minute it displays), kept as the same
+    // instance while it is equal, so those cards skip the per-second recomposition — the main
+    // source of periodic frame drops while scrolling 首页.
+    val calmValue = state.withoutLiveSamples()
+    val calm = remember(calmValue) { calmValue }
     val scroll = rememberScrollState()
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
@@ -137,8 +143,8 @@ internal fun HomeScreen(
                 .padding(contentPadding)
                 .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
         ) {
-            HomeHeroCard(state, actions, animate, Modifier.homeEnter(stagger, 0))
-            HomeControlCard(state, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
+            HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
+            HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                     Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
@@ -167,21 +173,21 @@ internal fun HomeScreen(
                 )
             }
 
-            HomeNodeCard(state, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
-            HomeProbeCard(state, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
+            HomeNodeCard(calm, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
+            HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 
             Row(
                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 4),
                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
             ) {
-                HomeNetworkCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
+                HomeNetworkCard(calm, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
                 HomeSpeedCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenSpeedSource)
             }
             Row(
                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 5),
                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
             ) {
-                HomeSubscriptionCard(state, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
+                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
             }
             Spacer(Modifier.height(8.dp))
@@ -200,6 +206,22 @@ internal fun HomeScreen(
 /* ------------------------------------------------------------------ */
 
 internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
+
+/**
+ * [HomeUiState] without the values that change every second (throughput, resource samples)
+ * and with uptime floored to the minute [homeUptimeText] shows. Every text drawn from it is
+ * identical to the full state; only 网速 and 资源占用 read the live values.
+ */
+internal fun HomeUiState.withoutLiveSamples(): HomeUiState = copy(
+    status = when (val s = status) {
+        is HomeStatus.Running -> HomeStatus.Running(s.uptimeSeconds / 60L * 60L)
+        is HomeStatus.PendingRestart -> HomeStatus.PendingRestart(s.uptimeSeconds / 60L * 60L)
+        else -> s
+    },
+    uploadBytesPerSecond = null,
+    downloadBytesPerSecond = null,
+    resource = HomeResource(),
+)
 
 /** [HomeFormat.uptime] in the app language. */
 @Composable

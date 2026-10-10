@@ -104,6 +104,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.ViewModelProvider
 import kotlinx.coroutines.flow.collectLatest
@@ -404,13 +405,17 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
         }
     }
     // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
-    val items = dockTabs.map { tab ->
-        val label = ht(tab.label)
-        when (tab) {
-            HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
-            HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
-            HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
-            HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+    // One list instance per tab set/language: the dock skips recomposition while pages scroll.
+    val labels = dockTabs.map { ht(it.label) }
+    val items = remember(dockTabs, labels) {
+        dockTabs.mapIndexed { index, tab ->
+            val label = labels[index]
+            when (tab) {
+                HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
+                HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
+                HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
+                HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+            }
         }
     }
     val floatingDock = remember(settingsTick) { vm.prefs.getBoolean("floatingBottomBar", true) }
@@ -435,7 +440,9 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
     }
-    Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
+    // Every tab page paints its own opaque canvas and HetuRoot keeps one beneath them for
+    // transitions, so this host adds no third full-screen gradient (overdraw per frame).
+    Box(Modifier.fillMaxSize()) {
         Box(
             Modifier.fillMaxSize()
                 .then(if (glassEnabled && !runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
@@ -472,7 +479,8 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             }
         }
         val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
-        val dockShift by animateDpAsState(
+        // Read only in the placement lambda: hiding/showing the dock never recomposes the shell.
+        val dockShift = animateDpAsState(
             if (dockVisible) 0.dp else dockHeight + 16.dp,
             if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(),
             label = "dockShift",
@@ -488,7 +496,7 @@ private fun MainTabs(vm: HetuViewModel, onDockOccupancyChanged: (Dp) -> Unit) {
             },
             hazeState = dockHaze,
             backdrop = liquidBackdrop.takeIf { runtimeLiquid },
-            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
+            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
             onHeightChanged = { measuredDockHeight = it },
         )
     }

@@ -354,10 +354,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
 /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
 @Composable
 private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
-    var bitmap by remember(app.packageName) { mutableStateOf<Bitmap?>(null) }
-    LaunchedEffect(app.packageName) { bitmap = controller.appIcon(app.packageName) }
+    // A row scrolled back into view shows its cached icon on the first frame instead of a
+    // letter avatar followed by an IO hop and a second composition.
+    var bitmap by remember(app.packageName) { mutableStateOf(controller.cachedAppIcon(app.packageName)) }
+    LaunchedEffect(app.packageName) { if (bitmap == null) bitmap = controller.appIcon(app.packageName) }
     val loaded = bitmap
-    if (loaded != null) Image(loaded.asImageBitmap(), null, modifier) else ToolsAvatar(app.label, modifier)
+    if (loaded != null) {
+        val image = remember(loaded) { loaded.asImageBitmap() }
+        Image(image, null, modifier)
+    } else ToolsAvatar(app.label, modifier)
 }
 
 /**

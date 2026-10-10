@@ -1,6 +1,7 @@
 package io.github.xgl34222220.hetu.home
 
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
@@ -47,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.derivedStateOf
@@ -313,15 +315,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
  */
 @Composable
 internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
-    val tint by animateColorAsState(color, HomeMotion.fade(LocalHomeMotionEnabled.current, 320), label = "home-dot")
-    val wave = if (pulse && LocalHomeMotionEnabled.current) {
-        val transition = rememberInfiniteTransition(label = "home-dot-pulse")
-        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate), RepeatMode.Restart), label = "home-dot-wave")
-    } else null
+    val motion = LocalHomeMotionEnabled.current
+    val tint by animateColorAsState(color, HomeMotion.fade(motion, 320), label = "home-dot")
+    // A few rings announce the change to “live”, then the dot rests. A never-ending pulse kept
+    // the whole page (and the glass dock sampling it) redrawing on every frame.
+    val wave = remember { Animatable(1f) }
+    LaunchedEffect(pulse, motion) {
+        if (!pulse || !motion) { wave.snapTo(1f); return@LaunchedEffect }
+        repeat(3) {
+            wave.snapTo(0f)
+            wave.animateTo(1f, tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate))
+        }
+    }
     Canvas(modifier.size(size)) {
         val radius = this.size.minDimension / 2f
-        val phase = wave?.value
-        if (phase != null) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
+        val phase = wave.value
+        if (phase < 1f) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
         drawCircle(tint, radius)
     }
 }

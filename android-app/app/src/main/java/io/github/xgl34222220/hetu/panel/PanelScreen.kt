@@ -118,9 +118,19 @@ internal fun PanelScreen(
     val running = data.running
     val configuration = LocalConfiguration.current
     val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
-    val displayView = view.copy(layout = effectiveLayout)
+    // Same instance while equal: group/node cards compare it by identity, so a fresh copy on
+    // every 1 s traffic sample recomposed every visible card while the list scrolled.
+    val displayView = remember(view, effectiveLayout) { view.copy(layout = effectiveLayout) }
     val motion = LocalHomeMotionEnabled.current
-    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, displayView) else emptyList() }
+    // The 策略 tab reads only these fields. Traffic, connections and logs change every second;
+    // keeping them out of the instance the cards receive lets those cards skip recomposition.
+    val groupData = remember(data.status, data.globalMode, data.groups, data.delays, data.settledDelays,
+        data.testingGroups, data.testingAll, data.switching) {
+        PanelData(status = data.status, globalMode = data.globalMode, groups = data.groups, delays = data.delays,
+            settledDelays = data.settledDelays, testingGroups = data.testingGroups, testingAll = data.testingAll,
+            switching = data.switching)
+    }
+    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(groupData, displayView) else emptyList() }
     val headerItems = panelHeaderItemCount(data, view)
     // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
     val stagger = key(view.tab) { rememberHomeStagger() }
@@ -176,14 +186,14 @@ internal fun PanelScreen(
             }
             when (view.tab) {
                 PanelTab.Groups -> panelGroupsTab(
-                    rows = rows, data = data, view = displayView, stagger = stagger,
+                    rows = rows, data = groupData, view = displayView, stagger = stagger,
                     onToggleGroup = { name ->
                         // Capture this card row before an accordion removes rows above it. The
                         // stable lazy key matches panelGroupsTab; an old numeric index does not.
                         val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
                         val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
                         val next = view.toggleGroup(name)
-                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                        val at = PanelLogic.groupRows(groupData, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
                         onView(next)
                         if (anchor != null && at >= 0) {
                             // Apply with the new rows on the next measure, retaining the tapped

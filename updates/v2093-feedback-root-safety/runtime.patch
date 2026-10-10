@@ -4268,7 +4268,7 @@ index 0000000..6c1130f
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..d420621 100644
+index 2b1a624..651c3d2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -4300,7 +4300,15 @@ index 2b1a624..d420621 100644
  import androidx.compose.runtime.saveable.rememberSaveableStateHolder
  import androidx.compose.runtime.setValue
  import androidx.compose.runtime.staticCompositionLocalOf
-@@ -153,10 +161,8 @@ class HetuActivity : ComponentActivity() {
+@@ -96,6 +104,7 @@ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.unit.Density
+ import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.IntOffset
+ import androidx.compose.ui.unit.dp
+ import androidx.lifecycle.ViewModelProvider
+ import kotlinx.coroutines.flow.collectLatest
+@@ -153,10 +162,8 @@ class HetuActivity : ComponentActivity() {
              "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
              "connections" -> vm.openPanel("conn")
              "providers", "subscriptions" -> vm.openPanel("providers")
@@ -4313,7 +4321,7 @@ index 2b1a624..d420621 100644
              "rules" -> vm.openPanel("rules")
              "home" -> vm.tab = HxTab.Home
          }
-@@ -178,16 +184,10 @@ internal sealed class HxRoute(val key: String) {
+@@ -178,16 +185,10 @@ internal sealed class HxRoute(val key: String) {
      data object Providers : HxRoute("providers")
      data object Adblock : HxRoute("adblock")
      data object Network : HxRoute("network")
@@ -4330,7 +4338,7 @@ index 2b1a624..d420621 100644
      data object Notifications : HxRoute("notifications")
      data object Theme : HxRoute("theme")
      data object DefaultPanelSettings : HxRoute("default-panel-settings")
-@@ -195,6 +195,7 @@ internal sealed class HxRoute(val key: String) {
+@@ -195,6 +196,7 @@ internal sealed class HxRoute(val key: String) {
      data object StartupDownloadSettings : HxRoute("startup-download-settings")
      data object PublicIp : HxRoute("public-ip")
      data object Resources : HxRoute("resources")
@@ -4338,7 +4346,7 @@ index 2b1a624..d420621 100644
  }
 
  internal class HxNav {
-@@ -232,6 +233,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -232,6 +234,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -4347,7 +4355,7 @@ index 2b1a624..d420621 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +246,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +247,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -4369,7 +4377,7 @@ index 2b1a624..d420621 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +267,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +268,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -4377,7 +4385,7 @@ index 2b1a624..d420621 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +276,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +277,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -4390,7 +4398,7 @@ index 2b1a624..d420621 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +292,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +293,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -4406,7 +4414,7 @@ index 2b1a624..d420621 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +315,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +316,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -4415,7 +4423,7 @@ index 2b1a624..d420621 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,22 +328,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,22 +329,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -4439,7 +4447,7 @@ index 2b1a624..d420621 100644
                              HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                              HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                              HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
-@@ -336,13 +345,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -336,13 +346,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                              HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                              HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
@@ -4457,7 +4465,7 @@ index 2b1a624..d420621 100644
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +363,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +364,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -4467,7 +4475,7 @@ index 2b1a624..d420621 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +385,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +386,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -4484,8 +4492,28 @@ index 2b1a624..d420621 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -398,8 +413,11 @@ private fun MainTabs(vm: HetuViewModel) {
-             HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
+@@ -389,17 +405,24 @@ private fun MainTabs(vm: HetuViewModel) {
+         }
+     }
+     // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
+-    val items = dockTabs.map { tab ->
+-        val label = ht(tab.label)
+-        when (tab) {
+-            HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
+-            HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
+-            HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
+-            HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
++    // One list instance per tab set/language: the dock skips recomposition while pages scroll.
++    val labels = dockTabs.map { ht(it.label) }
++    val items = remember(dockTabs, labels) {
++        dockTabs.mapIndexed { index, tab ->
++            val label = labels[index]
++            when (tab) {
++                HxTab.Home -> DockItem(label, Icons.Rounded.Home, 1.12f)
++                HxTab.Panel -> DockItem(label, ConceptDockIcons.Chain, 1f)
++                HxTab.Tools -> DockItem(label, ConceptDockIcons.Grid, 1f)
++                HxTab.Settings -> DockItem(label, ConceptDockIcons.Settings, 1f)
++            }
          }
      }
 -    val navInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
@@ -4498,8 +4526,14 @@ index 2b1a624..d420621 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -420,13 +438,17 @@ private fun MainTabs(vm: HetuViewModel) {
-     Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
+@@ -417,16 +440,22 @@ private fun MainTabs(vm: HetuViewModel) {
+             }
+         }
+     }
+-    Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
++    // Every tab page paints its own opaque canvas and HetuRoot keeps one beneath them for
++    // transitions, so this host adds no third full-screen gradient (overdraw per frame).
++    Box(Modifier.fillMaxSize()) {
          Box(
              Modifier.fillMaxSize()
 -                .then(if (!runtimeLiquid) Modifier.hazeSource(dockHaze) else Modifier)
@@ -4517,7 +4551,7 @@ index 2b1a624..d420621 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +457,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +464,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -4525,12 +4559,15 @@ index 2b1a624..d420621 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -450,11 +473,12 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -449,12 +479,14 @@ private fun MainTabs(vm: HetuViewModel) {
+             }
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
-         val dockShift by animateDpAsState(
+-        val dockShift by animateDpAsState(
 -            if (dockVisible) 0.dp else 92.dp,
 -            spring(dampingRatio = .88f, stiffness = 420f),
++        // Read only in the placement lambda: hiding/showing the dock never recomposes the shell.
++        val dockShift = animateDpAsState(
 +            if (dockVisible) 0.dp else dockHeight + 16.dp,
 +            if (motion) spring(dampingRatio = .88f, stiffness = 420f) else snap(),
              label = "dockShift",
@@ -4540,15 +4577,17 @@ index 2b1a624..d420621 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -465,6 +489,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -464,7 +496,8 @@ private fun MainTabs(vm: HetuViewModel) {
+             },
              hazeState = dockHaze,
              backdrop = liquidBackdrop.takeIf { runtimeLiquid },
-             modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
+-            modifier = Modifier.align(Alignment.BottomCenter).offset(y = dockShift),
++            modifier = Modifier.align(Alignment.BottomCenter).offset { IntOffset(0, dockShift.value.roundToPx()) },
 +            onHeightChanged = { measuredDockHeight = it },
          )
      }
  }
-@@ -472,6 +497,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -472,6 +505,7 @@ private fun MainTabs(vm: HetuViewModel) {
  /** Bottom toast pill for [vm]'s messages; used by the main activity and hosted tool pages. */
  @Composable
  internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
@@ -4556,7 +4595,7 @@ index 2b1a624..d420621 100644
      var floatingMessage by remember { mutableStateOf<String?>(null) }
      var shownMessage by remember { mutableStateOf("") }
      val haptics = rememberHetuHaptics()
-@@ -489,12 +515,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+@@ -489,12 +523,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -6418,10 +6457,69 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..f0b0246 100644
+index 0ceaa23..c0a7a1f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-@@ -171,18 +171,11 @@ internal fun HetuHomeV2(
+@@ -140,16 +140,30 @@ internal fun HetuHomeV2(
+         ),
+     )
+
+-    // Rebuilt on every recomposition on purpose: the lambdas close over the caller's latest callbacks.
+-    val actions = run {
++    // One instance for the life of the page. Each lambda reads the caller's latest callback,
++    // so a 1 s traffic sample or 2 s poll never hands every card a new actions object (which
++    // recomposed the whole home tree, scrolling included).
++    val toggle by rememberUpdatedState(onToggle)
++    val reload by rememberUpdatedState(onReload)
++    val restart by rememberUpdatedState(onRestart)
++    val trafficModeChange by rememberUpdatedState(onTrafficMode)
++    val openNode by rememberUpdatedState(onOpenNode)
++    val probe by rememberUpdatedState(onDelay)
++    val refreshIp by rememberUpdatedState(onRefresh)
++    val openSubscription by rememberUpdatedState(onOpenSubscription)
++    val openBasicSettings by rememberUpdatedState(onOpenBasicSettings)
++    val openConfigs by rememberUpdatedState(onOpenConfigs)
++    val viewConfig by rememberUpdatedState(onViewConfig)
++    val dismissStartupError by rememberUpdatedState(onDismissStartupError)
++    val actions = remember(context, prefs) {
+         HomeActions(
+-            onStart = onToggle,
+-            onStop = onToggle,
+-            onReload = onReload,
+-            onRestart = onRestart,
+-            onProxyModeChange = { onTrafficMode(it.id) },
+-            onOpenNode = onOpenNode,
+-            onProbe = onDelay,
++            onStart = { toggle() },
++            onStop = { toggle() },
++            onReload = { reload() },
++            onRestart = { restart() },
++            onProxyModeChange = { trafficModeChange(it.id) },
++            onOpenNode = { openNode() },
++            onProbe = { probe() },
+             onNetSideChange = { side ->
+                 netSide = side
+                 prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
+@@ -158,12 +172,12 @@ internal fun HetuHomeV2(
+                 speedSource = source
+                 prefs.edit().putString(PrefSpeedSource, source.id).apply()
+             },
+-            onRefreshIp = onRefresh,
+-            onOpenSubscription = onOpenSubscription,
+-            onOpenBasicSettings = onOpenBasicSettings,
+-            onOpenConfigs = onOpenConfigs,
+-            onViewConfig = onViewConfig,
+-            onDismissStartFailure = onDismissStartupError,
++            onRefreshIp = { refreshIp() },
++            onOpenSubscription = { openSubscription() },
++            onOpenBasicSettings = { openBasicSettings() },
++            onOpenConfigs = { openConfigs() },
++            onViewConfig = { viewConfig() },
++            onDismissStartFailure = { dismissStartupError() },
+             onCopy = { label, text -> copyToClipboard(context, label, text) },
+             loadTargets = { loadTargets(prefs) },
+             saveTargets = { config -> saveTargets(prefs, config) },
+@@ -171,18 +185,11 @@ internal fun HetuHomeV2(
          )
      }
 
@@ -6443,7 +6541,7 @@ index 0ceaa23..f0b0246 100644
          ) {
              HomeRoute(
                  state = state.copy(ipRefreshing = data.refreshing),
-@@ -290,8 +283,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+@@ -290,8 +297,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
      var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
@@ -6456,7 +6554,7 @@ index 0ceaa23..f0b0246 100644
          var lastTx = TrafficStats.getTotalTxBytes()
          var lastRx = TrafficStats.getTotalRxBytes()
          var lastAt = SystemClock.elapsedRealtime()
-@@ -321,8 +317,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+@@ -321,8 +331,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
      val memoryPoints = remember { mutableStateListOf<Float?>() }
      val latestCpu by rememberUpdatedState(cpu)
      val latestMemory by rememberUpdatedState(memoryBytes)
@@ -6469,7 +6567,7 @@ index 0ceaa23..f0b0246 100644
          while (true) {
              cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
              memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
-@@ -418,3 +417,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
+@@ -418,3 +431,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
  }
 
  private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
@@ -6486,10 +6584,56 @@ index 0ceaa23..f0b0246 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..0881179 100644
+index 9afc132..f8a658a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-@@ -724,7 +724,7 @@ internal class HomeBarGlass internal constructor(
+@@ -1,6 +1,7 @@
+ package io.github.xgl34222220.hetu.home
+
+ import androidx.compose.animation.animateColorAsState
++import androidx.compose.animation.core.Animatable
+ import androidx.compose.animation.core.LinearEasing
+ import androidx.compose.animation.core.RepeatMode
+ import androidx.compose.animation.core.animateFloat
+@@ -47,6 +48,7 @@ import androidx.compose.foundation.verticalScroll
+ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
++import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.Stable
+ import androidx.compose.runtime.State
+ import androidx.compose.runtime.derivedStateOf
+@@ -313,15 +315,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+  */
+ @Composable
+ internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
+-    val tint by animateColorAsState(color, HomeMotion.fade(LocalHomeMotionEnabled.current, 320), label = "home-dot")
+-    val wave = if (pulse && LocalHomeMotionEnabled.current) {
+-        val transition = rememberInfiniteTransition(label = "home-dot-pulse")
+-        transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate), RepeatMode.Restart), label = "home-dot-wave")
+-    } else null
++    val motion = LocalHomeMotionEnabled.current
++    val tint by animateColorAsState(color, HomeMotion.fade(motion, 320), label = "home-dot")
++    // A few rings announce the change to “live”, then the dot rests. A never-ending pulse kept
++    // the whole page (and the glass dock sampling it) redrawing on every frame.
++    val wave = remember { Animatable(1f) }
++    LaunchedEffect(pulse, motion) {
++        if (!pulse || !motion) { wave.snapTo(1f); return@LaunchedEffect }
++        repeat(3) {
++            wave.snapTo(0f)
++            wave.animateTo(1f, tween(HomeMotion.BreathMs, easing = HomeMotion.Decelerate))
++        }
++    }
+     Canvas(modifier.size(size)) {
+         val radius = this.size.minDimension / 2f
+-        val phase = wave?.value
+-        if (phase != null) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
++        val phase = wave.value
++        if (phase < 1f) drawCircle(tint.copy(alpha = tint.alpha * .34f * (1f - phase)), radius * (1f + 1.5f * phase))
+         drawCircle(tint, radius)
+     }
+ }
+@@ -724,7 +733,7 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
  internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
@@ -6547,11 +6691,116 @@ index 108ce15..550a4f6 100644
  }
 
  internal data class HomeUiState(
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
+index a6f5728..59d48c7 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
+@@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
+ import androidx.compose.runtime.getValue
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.saveable.rememberSaveable
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+@@ -59,6 +60,10 @@ internal fun HomeRoute(
+     var targets by remember { mutableStateOf(HomeTargetsConfig()) }
+     var feedback by remember { mutableStateOf<HomeTargetsFeedback?>(null) }
+
++    // Navigation lambdas read the latest state instead of capturing it, so they stay the same
++    // instances across polls and the cards they are handed can skip recomposition.
++    val latestState by rememberUpdatedState(state)
++
+     LaunchedEffect(destination) { onDetailVisibleChange(destination != HomeDestination.Main) }
+     BackHandler(enabled = destination != HomeDestination.Main) { destination = HomeDestination.Main }
+
+@@ -86,7 +91,7 @@ internal fun HomeRoute(
+             HomeDestination.Main -> HomeScreen(
+                 state = state,
+                 actions = actions,
+-                onOpenIpDetail = { ipSide = state.netSide; destination = HomeDestination.IpDetail },
++                onOpenIpDetail = { ipSide = latestState.netSide; destination = HomeDestination.IpDetail },
+                 onOpenTargets = { targets = actions.loadTargets(); feedback = null; destination = HomeDestination.Targets },
+                 onOpenResource = { destination = HomeDestination.Resource },
+                 onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..243edd5 100644
+index e31ca99..d36736f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-@@ -288,7 +288,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -90,6 +90,12 @@ internal fun HomeScreen(
+     motion: Boolean = true,
+ ) {
+     val c = LocalHomeColors.current
++    // The 1 s traffic sample and the resource samples only feed two cards. Every other card
++    // gets this view without them (and with uptime at the minute it displays), kept as the same
++    // instance while it is equal, so those cards skip the per-second recomposition — the main
++    // source of periodic frame drops while scrolling 首页.
++    val calmValue = state.withoutLiveSamples()
++    val calm = remember(calmValue) { calmValue }
+     val scroll = rememberScrollState()
+     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+     val lifted by remember(scroll) { derivedStateOf { scroll.value > 6 } }
+@@ -137,8 +143,8 @@ internal fun HomeScreen(
+                 .padding(contentPadding)
+                 .padding(start = HomeDims.gutter, end = HomeDims.gutter, top = statusTop + HomeDims.barHeight),
+         ) {
+-            HomeHeroCard(state, actions, animate, Modifier.homeEnter(stagger, 0))
+-            HomeControlCard(state, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
++            HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
++            HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
+             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
+                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
+                     Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
+@@ -167,21 +173,21 @@ internal fun HomeScreen(
+                 )
+             }
+
+-            HomeNodeCard(state, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
+-            HomeProbeCard(state, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
++            HomeNodeCard(calm, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
++            HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
+
+             Row(
+                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 4),
+                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
+             ) {
+-                HomeNetworkCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
++                HomeNetworkCard(calm, Modifier.weight(1f).fillMaxHeight(), onOpenIpDetail, actions.onNetSideChange)
+                 HomeSpeedCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenSpeedSource)
+             }
+             Row(
+                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 5),
+                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
+             ) {
+-                HomeSubscriptionCard(state, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
++                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
+                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
+             }
+             Spacer(Modifier.height(8.dp))
+@@ -201,6 +207,22 @@ internal fun HomeScreen(
+
+ internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
+
++/**
++ * [HomeUiState] without the values that change every second (throughput, resource samples)
++ * and with uptime floored to the minute [homeUptimeText] shows. Every text drawn from it is
++ * identical to the full state; only 网速 and 资源占用 read the live values.
++ */
++internal fun HomeUiState.withoutLiveSamples(): HomeUiState = copy(
++    status = when (val s = status) {
++        is HomeStatus.Running -> HomeStatus.Running(s.uptimeSeconds / 60L * 60L)
++        is HomeStatus.PendingRestart -> HomeStatus.PendingRestart(s.uptimeSeconds / 60L * 60L)
++        else -> s
++    },
++    uploadBytesPerSecond = null,
++    downloadBytesPerSecond = null,
++    resource = HomeResource(),
++)
++
+ /** [HomeFormat.uptime] in the app language. */
+ @Composable
+ internal fun homeUptimeText(seconds: Long): String = when {
+@@ -288,7 +310,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
      return when (connection.health) {
@@ -6560,6 +6809,45 @@ index e31ca99..243edd5 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
+index 552f3dd..cad6ae2 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
+@@ -56,7 +56,7 @@ internal fun HomeStatus.glyphMode(): HomeGlyphMode = when (this) {
+  * - colour cross-fades between accent, amber and grey;
+  * - the power glyph hands over to the check by fading out while the check strokes itself in;
+  * - while busy the ring dims and a 250° arc travels around it;
+- * - while running a soft halo breathes behind the ring.
++ * - while running a soft halo rests behind the ring.
+  *
+  * The caller sizes it (the concept uses 116 dp) and lets the card clip the part that overflows.
+  */
+@@ -78,20 +78,20 @@ internal fun HomeStatusGlyph(mode: HomeGlyphMode, modifier: Modifier = Modifier,
+     val haloBlend by animateFloatAsState(if (mode == HomeGlyphMode.On) 1f else 0f, HomeMotion.fade(motion, 520), label = "home-glyph-halo")
+
+     // Perpetual values are read in the draw phase only, so they never recompose the card.
++    // Only a real transition keeps the arc travelling. A healthy, idle proxy rests on a
++    // static halo: a perpetual breath re-rendered the page backdrop and the glass dock
++    // every frame for as long as 首页 was open, which cost scroll smoothness and battery.
+     val spinState: State<Float>?
+-    val breathState: State<Float>?
+-    if (motion && (busy || mode == HomeGlyphMode.On)) {
++    if (motion && busy) {
+         val transition = rememberInfiniteTransition(label = "home-glyph")
+         spinState = transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1150, easing = LinearEasing), RepeatMode.Restart), label = "home-glyph-spin")
+-        breathState = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Emphasized), RepeatMode.Reverse), label = "home-glyph-breath")
+     } else {
+         spinState = null
+-        breathState = null
+     }
+
+     Canvas(modifier) {
+         val spin = spinState?.value ?: 0f
+-        val breath = breathState?.value ?: .5f
++        val breath = .5f
+         val radius = size.minDimension / 2f
+         val centre = Offset(size.width / 2f, size.height / 2f)
+         val stroke = radius * .215f
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
 index 256be3e..512e1e8 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeTokens.kt
@@ -6608,10 +6896,18 @@ index 0000000..bcd5c0c
 +    return state.isAtLeast(Lifecycle.State.STARTED)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..fbac1da 100644
+index 9f66ac0..feeb781 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-@@ -35,17 +35,14 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
+@@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
+ import androidx.compose.runtime.mutableStateOf
+ import androidx.compose.runtime.remember
+ import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.graphics.asImageBitmap
+@@ -35,17 +36,14 @@ import io.github.xgl34222220.hetu.ProxyPolicyIconsActivity
  import io.github.xgl34222220.hetu.ProxyRuleUi
  import io.github.xgl34222220.hetu.ProxyRuntimeInspector
  import io.github.xgl34222220.hetu.RefLogEntry
@@ -6630,7 +6926,7 @@ index 9f66ac0..fbac1da 100644
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.CoroutineScope
  import kotlinx.coroutines.async
-@@ -107,6 +104,7 @@ internal fun HetuPanelV2(
+@@ -107,6 +105,7 @@ internal fun HetuPanelV2(
      val subscriptionUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
      val ruleSetUpdates = remember { mutableStateMapOf<String, PanelUpdate>() }
      val sampler = remember { PanelTrafficSampler() }
@@ -6638,7 +6934,7 @@ index 9f66ac0..fbac1da 100644
      val initialView = remember { loadView(prefs, selectorPrefs) }
      var latestView by remember { mutableStateOf(initialView) }
      val tab = PanelTab.entries.firstOrNull { it.name == selectedTab.name } ?: PanelTab.Groups
-@@ -144,10 +142,10 @@ internal fun HetuPanelV2(
+@@ -144,10 +143,10 @@ internal fun HetuPanelV2(
      LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
 
      val icons = remember(state.connections) { state.connections.mapNotNull { c -> c.appIcon?.let { c.packageName to it } }.toMap() }
@@ -6651,7 +6947,7 @@ index 9f66ac0..fbac1da 100644
      ).copy(refreshing = refreshing)
      val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
-@@ -256,23 +254,22 @@ internal fun HetuPanelV2(
+@@ -256,23 +255,22 @@ internal fun HetuPanelV2(
          },
      )
 
@@ -6689,7 +6985,17 @@ index 9f66ac0..fbac1da 100644
          ) {
              PanelRoute(
                  data = data,
-@@ -310,180 +307,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
+@@ -294,7 +292,8 @@ internal fun HetuPanelV2(
+
+ @Composable
+ private fun AppIcon(bitmap: Bitmap, modifier: Modifier) {
+-    Image(bitmap = bitmap.asImageBitmap(), contentDescription = null, modifier = modifier)
++    val image = remember(bitmap) { bitmap.asImageBitmap() }
++    Image(bitmap = image, contentDescription = null, modifier = modifier)
+ }
+
+ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delays: MutableMap<String, Long>, testing: MutableMap<String, Boolean>) {
+@@ -310,180 +309,6 @@ private suspend fun testNode(repo: ProxyDashboardRepository, node: String, delay
      }
  }
 
@@ -6870,7 +7176,7 @@ index 9f66ac0..fbac1da 100644
  /* ------------------------------------------------------------------ */
  /*  Traffic sampling                                                    */
  /* ------------------------------------------------------------------ */
-@@ -526,6 +349,8 @@ private class PanelTrafficSampler {
+@@ -526,6 +351,8 @@ private class PanelTrafficSampler {
          lastConnections = connections.associate { it.id to (it.upload to it.download) }
      }
 
@@ -6879,7 +7185,7 @@ index 9f66ac0..fbac1da 100644
      fun reset() {
          upload = 0L; download = 0L; connectionRates = emptyMap(); uploadTrend.clear(); downloadTrend.clear()
          lastAt = 0L; lastConnections = emptyMap()
-@@ -636,6 +461,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -636,6 +463,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
      }
      var view by remember { mutableStateOf(initial) }
      val sampler = remember { PanelTrafficSampler() }
@@ -6887,7 +7193,7 @@ index 9f66ac0..fbac1da 100644
      val tab = when (vm.panelSection) {
          "overview" -> PanelTab.Overview
          "providers" -> PanelTab.Subscriptions
-@@ -645,9 +471,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -645,9 +473,12 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          "logs" -> PanelTab.Logs
          else -> PanelTab.Groups
      }
@@ -6901,7 +7207,7 @@ index 9f66ac0..fbac1da 100644
          when (tab) {
              PanelTab.Overview -> { vm.loadProviders(); if (vm.rules.isEmpty()) vm.loadRules() }
              PanelTab.Subscriptions -> vm.loadProviders()
-@@ -660,8 +489,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -660,8 +491,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
              else -> Unit
          }
      }
@@ -6912,7 +7218,7 @@ index 9f66ac0..fbac1da 100644
          while (true) {
              if (vm.state.panelReady && !vm.state.controllerReadFailed) {
                  sampler.sample(SystemClock.elapsedRealtime(), vm.state.uploadTotal, vm.state.downloadTotal, vm.state.connections)
-@@ -672,9 +502,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -672,9 +504,9 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
      fun updates(tasks: Map<String, io.github.xgl34222220.hetu.HxTask>) = tasks.mapValues { (_, t) ->
          if (t.running) PanelUpdate.Updating else if (t.ok == false) PanelUpdate.Failed(t.message) else PanelUpdate.Idle
      }
@@ -6924,19 +7230,36 @@ index 9f66ac0..fbac1da 100644
          testingGroups = vm.testingGroups.filterValues { it }.keys, testingAll = vm.testingAll,
          switching = vm.pendingSelection.toMap()).copy(
          refreshing = if (vm.state.controllerReadFailed) vm.refreshing else when (tab) {
-@@ -685,6 +515,7 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+@@ -685,9 +517,13 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
          },
          updatingAllSubscriptions = vm.providersUpdatingAll,
          updatingAllRuleSets = vm.ruleSetsUpdatingAll,
 +        syncing = vm.state.running && !vm.state.panelReady && !vm.state.controllerReadFailed && vm.state.groups.isNotEmpty(),
      )
      val groupsByName = remember(vm.state.groups) { vm.state.groups.associateBy { it.name } }
-     val actions = PanelActions(
-@@ -712,21 +543,21 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+-    val actions = PanelActions(
++    // One actions instance per page: rebuilding it on every 1 s traffic sample handed each
++    // visible group/node card fresh lambdas and recomposed the whole list while scrolling.
++    val currentTab by rememberUpdatedState(tab)
++    val actions = remember(vm, context) { PanelActions(
+         onStart = vm::toggle, onSelectNode = vm::select, onTestNode = vm::testNode,
+         onTestGroup = { name -> vm.state.groups.firstOrNull { it.name == name }?.let(vm::testGroup) },
+         onTestAll = vm::testAll,
+@@ -704,29 +540,29 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
+         onOpenPolicyIcons = { context.startActivity(Intent(context, ProxyPolicyIconsActivity::class.java)) },
+         onCopy = { label, text -> copyToClipboard(context, label, text) },
+         onRefresh = {
+-            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (tab) {
++            if (vm.state.controllerReadFailed) vm.pullRefresh() else when (currentTab) {
+                 PanelTab.Rules -> vm.loadRules()
+                 PanelTab.RuleSets -> vm.loadRuleSets()
+                 PanelTab.Logs -> vm.loadLogs()
+                 else -> vm.pullRefresh()
              }
          },
-     )
+-    )
 -    val icons = vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
++    ) }
 +    val icons = remember(vm.state.connections) {
 +        vm.state.connections.mapNotNull { it.appIcon?.let { icon -> it.packageName to icon } }.toMap()
 +    }
@@ -7583,19 +7906,20 @@ index c95890c..5099f52 100644
 +    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..1bdf4d8 100644
+index 253b603..c2bed70 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-@@ -6,6 +6,8 @@ import androidx.compose.foundation.background
- import androidx.compose.foundation.horizontalScroll
- import androidx.compose.foundation.layout.Arrangement
- import androidx.compose.foundation.layout.Box
-+import androidx.compose.foundation.layout.BoxWithConstraints
-+import androidx.compose.foundation.layout.widthIn
- import androidx.compose.foundation.layout.Column
- import androidx.compose.foundation.layout.Row
- import androidx.compose.foundation.layout.Spacer
-@@ -28,6 +30,8 @@ import androidx.compose.ui.graphics.Color
+@@ -21,6 +21,9 @@ import androidx.compose.material3.Icon
+ import androidx.compose.material3.Text
+ import androidx.compose.runtime.Composable
+ import androidx.compose.runtime.getValue
++import androidx.compose.runtime.remember
++import androidx.compose.ui.layout.layout
++import kotlin.math.roundToInt
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
+@@ -28,6 +31,8 @@ import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.semantics.Role
@@ -7604,7 +7928,7 @@ index 253b603..1bdf4d8 100644
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.dp
-@@ -183,12 +187,12 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -183,12 +188,12 @@ internal fun LazyListScope.panelConnectionsTab(
                  }
              }
              if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
@@ -7619,7 +7943,7 @@ index 253b603..1bdf4d8 100644
          }
      }
  }
-@@ -202,8 +206,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
+@@ -202,8 +207,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
      }
  }
 
@@ -7630,7 +7954,7 @@ index 253b603..1bdf4d8 100644
      val c = LocalHomeColors.current
      HomeCard(modifier, onClick = { onOpen(conn.id) }, clickLabel = "连接详情", shape = PanelDims.groupShape) {
          Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
-@@ -211,14 +216,14 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+@@ -211,14 +217,14 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
                  Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
                  if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
              }
@@ -7647,7 +7971,7 @@ index 253b603..1bdf4d8 100644
                  Text(
                      conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
                      color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
-@@ -234,10 +239,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+@@ -234,10 +240,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
 
  /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
  @Composable
@@ -7660,7 +7984,7 @@ index 253b603..1bdf4d8 100644
      slot(group, Modifier.size(16.dp))
  }
 
-@@ -273,19 +278,29 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
+@@ -273,19 +279,42 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
      items(count = items.size, contentType = { "rule" }) { index ->
          val rule = items[index]
          val c = LocalHomeColors.current
@@ -7673,10 +7997,23 @@ index 253b603..1bdf4d8 100644
 -                    Text(rule.type, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
 -                    if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        HomeCard(ListCard.homeEnter(stagger, index).testTag("panel-rule:$index"), shape = PanelDims.groupShape) {
-+            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp)) {
++            // Plain layout pass instead of BoxWithConstraints: a subcomposition per row made fast
++            // scrolling through thousands of rules stutter. The row width is recorded during
++            // measure and caps the policy at the same 45 %.
++            val rowWidth = remember { IntArray(1) }
++            Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp).layout { measurable, constraints ->
++                rowWidth[0] = constraints.maxWidth
++                val placeable = measurable.measure(constraints)
++                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
++            }) {
 +                // Reserve content space, but measure short policies at their actual width.
 +                // The weighted content consumes the remainder, pinning the policy to the end.
-+                val policyMaxWidth = maxWidth * .45f
++                val policyMaxWidth = Modifier.layout { measurable, constraints ->
++                    val cap = (rowWidth[0] * .45f).roundToInt().coerceAtLeast(0)
++                    val capped = if (constraints.maxWidth > cap) constraints.copy(minWidth = minOf(constraints.minWidth, cap), maxWidth = cap) else constraints
++                    val placeable = measurable.measure(capped)
++                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
++                }
 +                Row(
 +                    Modifier.fillMaxWidth().heightIn(min = 42.dp),
 +                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -7686,7 +8023,7 @@ index 253b603..1bdf4d8 100644
 +                        if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
 +                    }
 +                    Text(
-+                        panelHighlight(rule.policy, query), Modifier.widthIn(max = policyMaxWidth).testTag("panel-rule-policy:$index"),
++                        panelHighlight(rule.policy, query), policyMaxWidth.testTag("panel-rule-policy:$index"),
 +                        color = policyColor(rule.policy), style = PanelType.policy, textAlign = TextAlign.End,
 +                        maxLines = 2, overflow = TextOverflow.Ellipsis,
 +                    )
@@ -7766,7 +8103,7 @@ index 3e938c4..f76c9eb 100644
 
  /* ------------------------------------------------------------------ */
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
-index fb308a8..250c025 100644
+index fb308a8..da3c1a3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 @@ -45,6 +45,10 @@ import androidx.compose.ui.graphics.graphicsLayer
@@ -7788,7 +8125,46 @@ index fb308a8..250c025 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.LocalHomeColors
  import io.github.xgl34222220.hetu.home.LocalHomeMotionEnabled
-@@ -281,7 +286,13 @@ private fun BoxScope.PanelHeader(
+@@ -113,9 +118,19 @@ internal fun PanelScreen(
+     val running = data.running
+     val configuration = LocalConfiguration.current
+     val effectiveLayout = PanelLogic.layoutForViewport(view.layout, configuration.screenWidthDp, density.fontScale)
+-    val displayView = view.copy(layout = effectiveLayout)
++    // Same instance while equal: group/node cards compare it by identity, so a fresh copy on
++    // every 1 s traffic sample recomposed every visible card while the list scrolled.
++    val displayView = remember(view, effectiveLayout) { view.copy(layout = effectiveLayout) }
+     val motion = LocalHomeMotionEnabled.current
+-    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(data, displayView) else emptyList() }
++    // The 策略 tab reads only these fields. Traffic, connections and logs change every second;
++    // keeping them out of the instance the cards receive lets those cards skip recomposition.
++    val groupData = remember(data.status, data.globalMode, data.groups, data.delays, data.settledDelays,
++        data.testingGroups, data.testingAll, data.switching) {
++        PanelData(status = data.status, globalMode = data.globalMode, groups = data.groups, delays = data.delays,
++            settledDelays = data.settledDelays, testingGroups = data.testingGroups, testingAll = data.testingAll,
++            switching = data.switching)
++    }
++    val rows = remember(data.groups, data.delays, data.globalMode, displayView, running) { if (running && view.tab == PanelTab.Groups) PanelLogic.groupRows(groupData, displayView) else emptyList() }
+     val headerItems = panelHeaderItemCount(data, view)
+     // A fresh cascade for every tab: its first screenful of cards rises in, later ones just appear.
+     val stagger = key(view.tab) { rememberHomeStagger() }
+@@ -171,14 +186,14 @@ internal fun PanelScreen(
+             }
+             when (view.tab) {
+                 PanelTab.Groups -> panelGroupsTab(
+-                    rows = rows, data = data, view = displayView, stagger = stagger,
++                    rows = rows, data = groupData, view = displayView, stagger = stagger,
+                     onToggleGroup = { name ->
+                         // Capture this card row before an accordion removes rows above it. The
+                         // stable lazy key matches panelGroupsTab; an old numeric index does not.
+                         val cardRow = rows.firstOrNull { it is PanelGroupRow.Cards && it.groups.any { group -> group.name == name } } as? PanelGroupRow.Cards
+                         val anchor = cardRow?.let { row -> listState.layoutInfo.visibleItemsInfo.firstOrNull { it.key == "g:" + row.groups.first().name } }
+                         val next = view.toggleGroup(name)
+-                        val at = PanelLogic.groupRows(data, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
++                        val at = PanelLogic.groupRows(groupData, next.copy(layout = effectiveLayout)).indexOfFirst { it is PanelGroupRow.Cards && it.groups.any { g -> g.name == name } }
+                         onView(next)
+                         if (anchor != null && at >= 0) {
+                             // Apply with the new rows on the next measure, retaining the tapped
+@@ -281,7 +296,13 @@ private fun BoxScope.PanelHeader(
              alpha = (1f - moved / (titlePx * .62f)).coerceIn(0f, 1f)
          },
          contentAlignment = Alignment.CenterStart,
@@ -7803,7 +8179,7 @@ index fb308a8..250c025 100644
 
      // The strip floats above the list, so a vertical drag that starts on it is handed to the
      // list by hand; horizontal drags still scroll the strip itself.
-@@ -413,3 +424,19 @@ private fun PanelInlineOverlay(
+@@ -413,3 +434,19 @@ private fun PanelInlineOverlay(
          }
      }
  }
@@ -8125,7 +8501,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..ff6d15e 100644
+index f575100..33241e9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -8187,6 +8563,25 @@ index f575100..ff6d15e 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
+@@ -339,10 +354,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+ /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
+ @Composable
+ private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
+-    var bitmap by remember(app.packageName) { mutableStateOf<Bitmap?>(null) }
+-    LaunchedEffect(app.packageName) { bitmap = controller.appIcon(app.packageName) }
++    // A row scrolled back into view shows its cached icon on the first frame instead of a
++    // letter avatar followed by an IO hop and a second composition.
++    var bitmap by remember(app.packageName) { mutableStateOf(controller.cachedAppIcon(app.packageName)) }
++    LaunchedEffect(app.packageName) { if (bitmap == null) bitmap = controller.appIcon(app.packageName) }
+     val loaded = bitmap
+-    if (loaded != null) Image(loaded.asImageBitmap(), null, modifier) else ToolsAvatar(app.label, modifier)
++    if (loaded != null) {
++        val image = remember(loaded) { loaded.asImageBitmap() }
++        Image(image, null, modifier)
++    } else ToolsAvatar(app.label, modifier)
+ }
+
+ /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 index 40111ed..eecb30c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
@@ -8389,8 +8784,22 @@ index af5a645..065d546 100644
      ToolsEntry.WebUi -> ToolsIcons.Monitor
  }
 
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt
+index 1265384..25902d4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt
+@@ -196,6 +196,9 @@ internal class HetuComposeController(private val context: Context) {
+         items.toList().also { appCache = it }
+     }
+
++    /** Memory-cache hit only; never touches PackageManager, safe to call during composition. */
++    fun cachedAppIcon(packageName: String): Bitmap? = iconCache.get(packageName)
++
+     suspend fun appIcon(packageName: String): Bitmap? = withContext(Dispatchers.IO) {
+         iconCache.get(packageName)?.let { return@withContext it }
+         try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
-index fa7fa0d..1772502 100644
+index fa7fa0d..bdb1b3a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt
 @@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.graphicsLayer
@@ -8412,7 +8821,13 @@ index fa7fa0d..1772502 100644
  import androidx.compose.ui.unit.sp
  import dev.chrisbanes.haze.HazeState
  import dev.chrisbanes.haze.hazeEffect
-@@ -60,6 +63,14 @@ import top.yukonga.miuix.kmp.squircle.squircleClip
+@@ -54,12 +57,18 @@ import top.yukonga.miuix.kmp.blur.colorControls
+ import top.yukonga.miuix.kmp.blur.drawBackdrop
+ import top.yukonga.miuix.kmp.blur.highlight.Highlight
+ import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
+-import top.yukonga.miuix.kmp.blur.layerBackdrop
+-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
+ import top.yukonga.miuix.kmp.squircle.squircleClip
 
  data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
 
@@ -8427,7 +8842,7 @@ index fa7fa0d..1772502 100644
  /**
   * V20.45: real MIUIX drawBackdrop liquid dock. Uses miuix-blur drawBackdrop/blur/highlight
   * plus the runtime refraction lens instead of an opaque Card/textureBlur shell.
-@@ -77,23 +88,22 @@ fun HetuGlassDock(
+@@ -77,23 +86,22 @@ fun HetuGlassDock(
      hazeState: HazeState,
      backdrop: LayerBackdrop?,
      modifier: Modifier = Modifier,
@@ -8454,7 +8869,7 @@ index fa7fa0d..1772502 100644
              }
          }
          prefs.registerOnSharedPreferenceChangeListener(listener)
-@@ -102,7 +112,7 @@ fun HetuGlassDock(
+@@ -102,10 +110,9 @@ fun HetuGlassDock(
      val shape = if (floating) RoundedCornerShape(31.dp) else RoundedCornerShape(topStart = 31.dp, topEnd = 31.dp)
      // Never render a translucent glass shell without a real blur/backdrop behind it.
      // That fallback was the source of the opaque white slab when either appearance switch was disabled.
@@ -8462,8 +8877,11 @@ index fa7fa0d..1772502 100644
 +    val renderGlass = rememberHetuGlassEnabled()
      val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
      val activeHaze = renderGlass && !runtimeLiquid
-     val dockSurfaceBackdrop = rememberLayerBackdrop()
-@@ -134,7 +144,7 @@ fun HetuGlassDock(
+-    val dockSurfaceBackdrop = rememberLayerBackdrop()
+     val hazeModifier = if (activeHaze) {
+         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
+             blurRadius = 32.dp
+@@ -134,7 +141,7 @@ fun HetuGlassDock(
                  colorControls(
                      brightness = if (dark) -.015f else .025f,
                      contrast = 1.05f,
@@ -8472,7 +8890,7 @@ index fa7fa0d..1772502 100644
                  )
                  blur(26.dp.toPx(), 26.dp.toPx())
                  liquidGlassLens(
-@@ -185,21 +195,15 @@ fun HetuGlassDock(
+@@ -185,23 +192,18 @@ fun HetuGlassDock(
 
      Box(
          modifier = modifier
@@ -8483,6 +8901,8 @@ index fa7fa0d..1772502 100644
 -            .height(64.dp + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
 +            .height(bodyHeight + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
      ) {
++        // The shell samples the page backdrop only. It no longer records itself into a second
++        // offscreen layer every frame: nothing reads that layer (the lens is drawn in DockItems).
          Box(
              modifier = Modifier
                  .fillMaxSize()
@@ -8494,9 +8914,11 @@ index fa7fa0d..1772502 100644
 -                    spotColor = Color(0xFF12161A).copy(alpha = if (dark) .16f else .075f),
 -                )
                  .clip(shape)
-                 .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
+-                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                  .then(liquidShellModifier),
-@@ -209,7 +213,7 @@ fun HetuGlassDock(
+         )
+
+@@ -209,7 +211,7 @@ fun HetuGlassDock(
              items = items,
              selected = selected,
              onSelect = onSelect,
@@ -8505,7 +8927,16 @@ index fa7fa0d..1772502 100644
              modifier = Modifier
                  .fillMaxSize()
                  .padding(start = 4.dp, top = 4.dp, end = 4.dp, bottom = if (floating) 4.dp else bottomInset + 4.dp),
-@@ -288,7 +292,8 @@ private fun DockItems(
+@@ -219,7 +221,7 @@ fun HetuGlassDock(
+             selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF1267D6),
+             unselectedColor = scheme.onSurface,
+             liquidGlass = renderGlass,
+-            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
++            indicatorBackdrop = null,
+             dark = dark,
+         )
+     }
+@@ -288,7 +290,8 @@ private fun DockItems(
                      if (motion) tween(200) else snap(), label = "dock-tint-$index")
                  val iconPop = remember { Animatable(1f) }
                  var wasActive by remember { mutableStateOf(active) }
@@ -8515,7 +8946,7 @@ index fa7fa0d..1772502 100644
                      if (active && !wasActive && motion) {
                          iconPop.snapTo(1f)
                          iconPop.animateTo(1.14f, tween(120, easing = HetuMotion.Standard))
-@@ -298,6 +303,7 @@ private fun DockItems(
+@@ -298,6 +301,7 @@ private fun DockItems(
                  }
                  // Pressing the active slot squeezes the lens itself (tactile "glass" feel).
                  LaunchedEffect(interaction, active, motion) {
@@ -8523,7 +8954,21 @@ index fa7fa0d..1772502 100644
                      if (!active || !motion) return@LaunchedEffect
                      interaction.interactions.collect { event ->
                          when (event) {
-@@ -325,7 +331,7 @@ private fun DockItems(
+@@ -313,7 +317,12 @@ private fun DockItems(
+                 }
+                 Column(
+                     Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
+-                        .onPlaced { c -> if (index < slots.size) slots[index] = c.positionInParent().x to c.size.width.toFloat() }
++                        .onPlaced { c ->
++                            // Placement repeats on every frame the dock slides; write only real changes
++                            // so a moving dock does not recompose its items each frame.
++                            val placed = c.positionInParent().x to c.size.width.toFloat()
++                            if (index < slots.size && slots[index] != placed) slots[index] = placed
++                        }
+                         .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
+                         .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
+                             onClick = { if (!active) haptics.perform(HetuHaptic.Tick); onSelect(index) })
+@@ -325,7 +334,7 @@ private fun DockItems(
                          scaleX = item.opticalScale * iconPop.value; scaleY = item.opticalScale * iconPop.value
                      }, tint = color)
                      Spacer(Modifier.height(1.dp))
@@ -8580,6 +9025,28 @@ index 578ce9d..358b8ed 100644
  """.trimIndent()
 
  private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
+index af5647d..18e1fce 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
+@@ -201,11 +201,12 @@ internal fun Modifier.hetuStaggerIn(
+     distance: androidx.compose.ui.unit.Dp = 12.dp,
+ ): Modifier {
+     val animate = remember { motion && !state.settled }
+-    val progress = remember { Animatable(if (animate) 0f else 1f) }
+-    if (animate) {
+-        LaunchedEffect(Unit) {
+-            progress.animateTo(1f, HetuMotion.enter(true, durationMs = 300, delayMs = index.coerceIn(0, 7) * 38))
+-        }
++    // Rows composed after the first cascade (most rows while scrolling a long list) never
++    // animate: give them no Animatable and no extra render layer at all.
++    if (!animate) return this
++    val progress = remember { Animatable(0f) }
++    LaunchedEffect(Unit) {
++        progress.animateTo(1f, HetuMotion.enter(true, durationMs = 300, delayMs = index.coerceIn(0, 7) * 38))
+     }
+     return graphicsLayer {
+         val p = progress.value.coerceIn(0f, 1f)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt
 index c5d6deb..8ea577d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt

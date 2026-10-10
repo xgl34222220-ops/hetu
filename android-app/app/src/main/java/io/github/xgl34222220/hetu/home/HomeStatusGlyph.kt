@@ -56,7 +56,7 @@ internal fun HomeStatus.glyphMode(): HomeGlyphMode = when (this) {
  * - colour cross-fades between accent, amber and grey;
  * - the power glyph hands over to the check by fading out while the check strokes itself in;
  * - while busy the ring dims and a 250° arc travels around it;
- * - while running a soft halo breathes behind the ring.
+ * - while running a soft halo rests behind the ring.
  *
  * The caller sizes it (the concept uses 116 dp) and lets the card clip the part that overflows.
  */
@@ -78,20 +78,20 @@ internal fun HomeStatusGlyph(mode: HomeGlyphMode, modifier: Modifier = Modifier,
     val haloBlend by animateFloatAsState(if (mode == HomeGlyphMode.On) 1f else 0f, HomeMotion.fade(motion, 520), label = "home-glyph-halo")
 
     // Perpetual values are read in the draw phase only, so they never recompose the card.
+    // Only a real transition keeps the arc travelling. A healthy, idle proxy rests on a
+    // static halo: a perpetual breath re-rendered the page backdrop and the glass dock
+    // every frame for as long as 首页 was open, which cost scroll smoothness and battery.
     val spinState: State<Float>?
-    val breathState: State<Float>?
-    if (motion && (busy || mode == HomeGlyphMode.On)) {
+    if (motion && busy) {
         val transition = rememberInfiniteTransition(label = "home-glyph")
         spinState = transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1150, easing = LinearEasing), RepeatMode.Restart), label = "home-glyph-spin")
-        breathState = transition.animateFloat(0f, 1f, infiniteRepeatable(tween(HomeMotion.BreathMs, easing = HomeMotion.Emphasized), RepeatMode.Reverse), label = "home-glyph-breath")
     } else {
         spinState = null
-        breathState = null
     }
 
     Canvas(modifier) {
         val spin = spinState?.value ?: 0f
-        val breath = breathState?.value ?: .5f
+        val breath = .5f
         val radius = size.minDimension / 2f
         val centre = Offset(size.width / 2f, size.height / 2f)
         val stroke = radius * .215f

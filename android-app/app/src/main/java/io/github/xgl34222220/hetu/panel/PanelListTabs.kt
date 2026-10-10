@@ -6,8 +6,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,6 +21,9 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
+import androidx.compose.ui.layout.layout
+import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -279,10 +280,23 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, 
         val rule = items[index]
         val c = LocalHomeColors.current
         HomeCard(ListCard.homeEnter(stagger, index).testTag("panel-rule:$index"), shape = PanelDims.groupShape) {
-            BoxWithConstraints(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp)) {
+            // Plain layout pass instead of BoxWithConstraints: a subcomposition per row made fast
+            // scrolling through thousands of rules stutter. The row width is recorded during
+            // measure and caps the policy at the same 45 %.
+            val rowWidth = remember { IntArray(1) }
+            Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.cardPadding, vertical = 9.dp).layout { measurable, constraints ->
+                rowWidth[0] = constraints.maxWidth
+                val placeable = measurable.measure(constraints)
+                layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+            }) {
                 // Reserve content space, but measure short policies at their actual width.
                 // The weighted content consumes the remainder, pinning the policy to the end.
-                val policyMaxWidth = maxWidth * .45f
+                val policyMaxWidth = Modifier.layout { measurable, constraints ->
+                    val cap = (rowWidth[0] * .45f).roundToInt().coerceAtLeast(0)
+                    val capped = if (constraints.maxWidth > cap) constraints.copy(minWidth = minOf(constraints.minWidth, cap), maxWidth = cap) else constraints
+                    val placeable = measurable.measure(capped)
+                    layout(placeable.width, placeable.height) { placeable.place(0, 0) }
+                }
                 Row(
                     Modifier.fillMaxWidth().heightIn(min = 42.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -292,7 +306,7 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, 
                         if (rule.payload.isNotBlank()) Text(panelHighlight(rule.payload, query), color = c.t2, style = PanelType.groupSummary, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                     Text(
-                        panelHighlight(rule.policy, query), Modifier.widthIn(max = policyMaxWidth).testTag("panel-rule-policy:$index"),
+                        panelHighlight(rule.policy, query), policyMaxWidth.testTag("panel-rule-policy:$index"),
                         color = policyColor(rule.policy), style = PanelType.policy, textAlign = TextAlign.End,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )

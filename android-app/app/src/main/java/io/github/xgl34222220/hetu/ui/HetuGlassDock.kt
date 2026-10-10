@@ -57,8 +57,6 @@ import top.yukonga.miuix.kmp.blur.colorControls
 import top.yukonga.miuix.kmp.blur.drawBackdrop
 import top.yukonga.miuix.kmp.blur.highlight.Highlight
 import top.yukonga.miuix.kmp.blur.isRuntimeShaderSupported
-import top.yukonga.miuix.kmp.blur.layerBackdrop
-import top.yukonga.miuix.kmp.blur.rememberLayerBackdrop
 import top.yukonga.miuix.kmp.squircle.squircleClip
 
 data class DockItem(val label: String, val icon: ImageVector, val opticalScale: Float = 1f)
@@ -115,7 +113,6 @@ fun HetuGlassDock(
     val renderGlass = rememberHetuGlassEnabled()
     val runtimeLiquid = renderGlass && backdrop != null && isRuntimeShaderSupported()
     val activeHaze = renderGlass && !runtimeLiquid
-    val dockSurfaceBackdrop = rememberLayerBackdrop()
     val hazeModifier = if (activeHaze) {
         Modifier.hazeEffect(state = hazeState, style = HazeMaterials.ultraThin()) {
             blurRadius = 32.dp
@@ -201,11 +198,12 @@ fun HetuGlassDock(
             .fillMaxWidth()
             .height(bodyHeight + if (floating) 0.dp else bottomInset).testTag("hetu-dock"),
     ) {
+        // The shell samples the page backdrop only. It no longer records itself into a second
+        // offscreen layer every frame: nothing reads that layer (the lens is drawn in DockItems).
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .clip(shape)
-                .then(if (runtimeLiquid) Modifier.layerBackdrop(dockSurfaceBackdrop) else Modifier)
                 .then(liquidShellModifier),
         )
 
@@ -223,7 +221,7 @@ fun HetuGlassDock(
             selectedColor = if (dark) Color(0xFF8AB4FF) else Color(0xFF1267D6),
             unselectedColor = scheme.onSurface,
             liquidGlass = renderGlass,
-            indicatorBackdrop = dockSurfaceBackdrop.takeIf { runtimeLiquid },
+            indicatorBackdrop = null,
             dark = dark,
         )
     }
@@ -319,7 +317,12 @@ private fun DockItems(
                 }
                 Column(
                     Modifier.weight(1f).height(itemHeight).testTag("dock-tab-$index")
-                        .onPlaced { c -> if (index < slots.size) slots[index] = c.positionInParent().x to c.size.width.toFloat() }
+                        .onPlaced { c ->
+                            // Placement repeats on every frame the dock slides; write only real changes
+                            // so a moving dock does not recompose its items each frame.
+                            val placed = c.positionInParent().x to c.size.width.toFloat()
+                            if (index < slots.size && slots[index] != placed) slots[index] = placed
+                        }
                         .hetuPressScale(interaction, pressedScale = .92f, motion = motion && !active)
                         .selectable(active, role = Role.Tab, interactionSource = interaction, indication = null,
                             onClick = { if (!active) haptics.perform(HetuHaptic.Tick); onSelect(index) })
