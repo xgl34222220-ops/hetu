@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "8bf07340c1d3d877c4d2202d5a8a5355b772c8d1ef6b562b757b8dc19681bfa4",
+  "patchSha256": "90b041c8c5e3a23e1c69c6dfc00c43b6d2c03c3a61d90f96b07fecc48f4c8c3b",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -372,7 +372,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java": "47ce0f0006a5e9696437d14182290d850c2396e70fbc51ebf75d5c00ef6008e1",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt": "c97c66a7f7e45920fafd9ea5d5d7da0741d500c0bf770ea3889f439cad57a9c1",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "89b8a2bece7226bc729d35105bb6ca7907380a5b1219ed6aaf9a2d03b3831af8",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "2ceeb841054f717f25409bfd4f19a5be3ccead97e850899aa4a7ac1f42aec78f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt": "227d0e04ea02a1ee52b457cb6a602989b906ddb60cd1956560dc13303327626c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "21d2f28b8be1738c7fa26235050c258c83434daeddb2df74525ddeae871aac83",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt": "9640bff23128a1daa0c51979a254a26e6116e4d370fca5e1c45a5abd0846891a",
@@ -898,7 +898,7 @@
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
     ".github/workflows/v2093-build.yml": "3086a292dd4489632837ff6c3a8673cc3549e550a6213610e0ce02600c084fc4",
     "tools/qa/netfilter_model93.py": "a74b517bc29e817a27d35fda03cefddcb40ad3e5a1d19d5e5371320100bf4e3c",
-    "tools/qa/test_adblock93.py": "405dd2be7d44adb347821ca236b18a8366e6684ae6ca50c1c37e075c38767ffb",
+    "tools/qa/test_adblock93.py": "3b44d2d6d62bb5035827180ccc7dc8af5a212e5b841dcdee39305dc2347270b5",
     "tools/qa/test_app_recovery93.py": "d315f66ce2f8717b010fbd6b6021765238fb5d422cda26f604d26bbd08366e9a",
     "tools/qa/test_cnip93.py": "50870a1963f664c5eb24125e073c2a7747344d24b80177a716034a11a9402be6",
     "tools/qa/test_core_identity_dns.py": "033f03fe73e3f1d32f7f9ba87f3b413256806fa230e46968da0dfd357b4fc451",

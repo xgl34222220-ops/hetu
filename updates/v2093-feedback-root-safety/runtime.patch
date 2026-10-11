@@ -8260,7 +8260,7 @@ index e4053e5..72b8798 100644
      }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
-index 4722bed..1bf72fc 100644
+index 4722bed..075399f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 @@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
@@ -8272,7 +8272,7 @@ index 4722bed..1bf72fc 100644
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
  import kotlinx.coroutines.launch
-@@ -93,7 +95,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -93,7 +95,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
      var whitelistCandidate by remember { mutableStateOf<String?>(null) }
      val running = vm.state.running
      var injected by remember { mutableStateOf<Boolean?>(null) }
@@ -8280,38 +8280,25 @@ index 4722bed..1bf72fc 100644
 +    var chain by remember { mutableStateOf<AdblockChainReport?>(null) }
 +    var probe by remember { mutableStateOf<AdblockProbe?>(null) }
 +    var dnsProbe by remember { mutableStateOf<AdblockProbe?>(null) }
-+    var unified by remember { mutableStateOf<ToolsAdblockChain?>(null) }
 +    var probing by remember { mutableStateOf(false) }
      var showHelp by remember { mutableStateOf(false) }
 
      LaunchedEffect(revision, running) {
-@@ -105,18 +111,24 @@ internal fun AdblockScreen(vm: HetuViewModel) {
-             vm.toast(error.message ?: "规则读取失败")
-         }
-         if (running) {
--            stats = try { vm.inspector.adblockRuntimeStats() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { stats }
--            injected = try {
--                AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
--            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+@@ -109,14 +114,16 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+             injected = try {
+                 AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
+             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
 -            loadedInCore = try {
 -                vm.controller.rules().any {
 -                    it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
 -                }
 -            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-+            // One data source with 工具 › 广告过滤: controller hitCount/missCount, strict chain, startup copy.
-+            val live = try { ToolsRuntimeBridge.adblockChain(context) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-+            unified = live
-+            if (live != null) {
-+                stats = AdblockRuntimeStats(count = live.hits, recentDomains = live.recent, logAvailable = true)
-+                injected = live.startupInjected
-+                // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
-+                chain = live.report
-+            } else {
-+                injected = null
-+                chain = null
-+            }
++            // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
++            chain = AdblockVerification.chain(context)
++            // Same counter as 工具 › 广告过滤 (ToolsRuntimeBridge.adblockChain): the controller's in-memory
++            // hitCount of the strict REJECT rule wins over the log-derived count while the core answers.
++            chain?.takeIf { it.loaded }?.let { live -> stats = stats.copy(count = live.hitCount) }
          } else {
-+            unified = null
              injected = null
 -            loadedInCore = null
 +            chain = null
@@ -8320,7 +8307,7 @@ index 4722bed..1bf72fc 100644
          }
      }
 
-@@ -169,8 +181,25 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -169,8 +176,25 @@ internal fun AdblockScreen(vm: HetuViewModel) {
          if (prepare != null) vpnPermission.launch(prepare) else vm.filters.startVpn()
      }
 
@@ -8347,7 +8334,7 @@ index 4722bed..1bf72fc 100644
      val actualMode = vm.state.trafficMode.lowercase()
      val wrongMode = running && enabled && actualMode in listOf("global", "direct")
      val snapshot = rules
-@@ -280,9 +309,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -280,9 +304,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                      HxDivider(44.dp)
                      VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                      HxDivider(44.dp)
@@ -8365,7 +8352,7 @@ index 4722bed..1bf72fc 100644
 +                        when {
 +                            probing -> "正在向广告域名发送一次实测请求…"
 +                            probed != null -> probed.detail + (dnsProbe?.let { "\nDNS 接管：" + it.detail } ?: "")
-+                            running -> "${stats.count} 次" + (unified?.takeIf { it.hitsFromController }?.let { " · 已检查 ${it.missCount + it.hits} 个连接" } ?: "")
++                            running -> "${stats.count} 次" + (chain?.takeIf { it.loaded }?.let { " · 已检查 ${it.missCount + it.hitCount} 个连接" } ?: "")
 +                            else -> "代理启动后统计"
 +                        },
 +                        neutralFalse = probed?.ok == null,
@@ -8377,7 +8364,7 @@ index 4722bed..1bf72fc 100644
                  }
              }
          }
-@@ -504,7 +551,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
+@@ -504,7 +546,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
      }
  }
  @Composable
@@ -8387,7 +8374,7 @@ index 4722bed..1bf72fc 100644
      val c = Hx.colors
      val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
      Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-@@ -528,6 +576,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
+@@ -528,6 +571,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
              Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
              Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
          }

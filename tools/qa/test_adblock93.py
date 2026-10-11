@@ -255,7 +255,12 @@ class AdblockSourceGuards93(unittest.TestCase):
         self.assertIn('if(controllerHits>=0&&!prefs.getBoolean("proxyAdblockUiVisible",false))return;', body)
 
     def test_both_pages_share_one_data_source(self):
-        self.assertIn('ToolsRuntimeBridge.adblockChain(context)', self.read('app/AdblockScreen.kt'))
+        # Both pages read the same strict controller report (AdblockVerification.inspect over /rules):
+        # the hitCount of the REJECT rule replaces the log-derived count while the core answers.
+        legacy = self.read('app/AdblockScreen.kt')
+        self.assertIn('chain = AdblockVerification.chain(context)', legacy)
+        self.assertIn('stats = stats.copy(count = live.hitCount)', legacy)
+        self.assertIn('AdblockVerification.inspect(mode, rules, providers)', self.read('ToolsRuntimeBridge.kt'))
         self.assertIn('ToolsRuntimeBridge.adblockChain(app)', self.read('tools/ToolsFeatureAdapter.kt'))
         self.assertIn('chain.report', self.read('tools/ToolsFeatureAdapter.kt'))
         bridge = self.read('ToolsRuntimeBridge.kt')
