@@ -1747,6 +1747,246 @@ index 0000000..b577946
 +Lcoil3/**;
 +HSPLkotlinx/coroutines/**;->**(**)**
 +Lkotlinx/coroutines/**;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java
+new file mode 100644
+index 0000000..c7473f3
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java
+@@ -0,0 +1,234 @@
++package io.github.xgl34222220.hetu;
++
++/**
++ * Built-in starter configs for the non-Mihomo cores, the counterpart of Mihomo's 河图内置-TPROXY.yaml.
++ *
++ * <p>Each template is a minimal native config for its core: the TPROXY / Redirect / DNS ingress on
++ * hetu-root.sh's ports (19898 / 19797 / 11053, see {@link MihomoStartupConfig}), split DNS, China
++ * direct rules, the clash_api controller where the core has one, and one placeholder node on the
++ * reserved {@code example.invalid} domain. No real server, password or UUID is shipped.
++ * {@link ProxyCoreConfig} still replaces the ingress and controller it owns at start, exactly as for a
++ * user's own native file, so the ports here only document what the runtime uses.
++ *
++ * <p>Pure JVM (no Android API): the host template test reads this file directly.
++ */
++final class BundledCoreTemplates {
++    private BundledCoreTemplates() {}
++
++    /** The reserved host of every placeholder node; its presence means the template is still unedited. */
++    static final String PLACEHOLDER_HOST = "example.invalid";
++
++    static final String SING_BOX_NAME = "河图内置-sing-box.json";
++    static final String XRAY_NAME = "河图内置-Xray.json";
++    static final String V2FLY_NAME = "河图内置-V2Fly.json";
++    static final String HYSTERIA_NAME = "河图内置-Hysteria.yaml";
++
++    /** File name of the built-in template for {@code core}, or null for the Mihomo family (own bundled YAML). */
++    static String name(ProxyRuntimeProfile.Core core) {
++        switch (core) {
++            case SING_BOX: case SING_BOX_REF1ND: return SING_BOX_NAME;
++            case XRAY: return XRAY_NAME;
++            case V2FLY: return V2FLY_NAME;
++            case HYSTERIA: return HYSTERIA_NAME;
++            default: return null;
++        }
++    }
++
++    /** Template text for {@code core}, or null for the Mihomo family. */
++    static String text(ProxyRuntimeProfile.Core core) {
++        switch (core) {
++            case SING_BOX: case SING_BOX_REF1ND: return SING_BOX;
++            case XRAY: return XRAY;
++            case V2FLY: return V2FLY;
++            case HYSTERIA: return HYSTERIA;
++            default: return null;
++        }
++    }
++
++    /** True for a non-Mihomo built-in template name: like Mihomo's built-in, it cannot be renamed or deleted. */
++    static boolean isBundledName(String name) {
++        return SING_BOX_NAME.equals(name) || XRAY_NAME.equals(name) || V2FLY_NAME.equals(name) || HYSTERIA_NAME.equals(name);
++    }
++
++    /** The source still holds the shipped placeholder node instead of the user's own server. */
++    static boolean hasPlaceholderNode(String source) {
++        return source != null && source.contains(PLACEHOLDER_HOST);
++    }
++
++    // sing-box 1.12+ schema (new DNS server objects, rule actions), checked with `sing-box check` 1.14.3.
++    static final String SING_BOX = """
++{
++  "log": { "level": "info", "timestamp": true },
++  "dns": {
++    "servers": [
++      { "type": "udp", "tag": "dns-direct", "server": "223.5.5.5" },
++      { "type": "https", "tag": "dns-remote", "server": "1.1.1.1", "detour": "PROXY" }
++    ],
++    "rules": [
++      { "rule_set": ["geosite-cn"], "action": "route", "server": "dns-direct" }
++    ],
++    "final": "dns-remote"
++  },
++  "inbounds": [
++    { "type": "tproxy", "tag": "hetu-tproxy", "listen": "::", "listen_port": 19898 },
++    { "type": "redirect", "tag": "hetu-redirect", "listen": "::", "listen_port": 19797 },
++    { "type": "direct", "tag": "hetu-dns-in", "listen": "::", "listen_port": 11053 }
++  ],
++  "outbounds": [
++    { "type": "selector", "tag": "PROXY", "outbounds": ["示例节点-VLESS", "示例节点-Shadowsocks", "DIRECT"], "default": "示例节点-VLESS" },
++    {
++      "type": "vless", "tag": "示例节点-VLESS",
++      "server": "example.invalid", "server_port": 443,
++      "uuid": "00000000-0000-0000-0000-000000000000",
++      "tls": { "enabled": true, "server_name": "example.invalid" }
++    },
++    {
++      "type": "shadowsocks", "tag": "示例节点-Shadowsocks",
++      "server": "example.invalid", "server_port": 8388,
++      "method": "2022-blake3-aes-128-gcm", "password": "AAAAAAAAAAAAAAAAAAAAAA=="
++    },
++    { "type": "direct", "tag": "DIRECT" }
++  ],
++  "route": {
++    "rules": [
++      { "inbound": ["hetu-tproxy", "hetu-redirect", "hetu-dns-in"], "action": "sniff" },
++      { "protocol": "dns", "action": "hijack-dns" },
++      { "ip_is_private": true, "action": "route", "outbound": "DIRECT" },
++      { "rule_set": ["geosite-cn", "geoip-cn"], "action": "route", "outbound": "DIRECT" }
++    ],
++    "rule_set": [
++      { "type": "remote", "tag": "geosite-cn", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geosite/rule-set/geosite-cn.srs", "download_detour": "PROXY", "update_interval": "72h" },
++      { "type": "remote", "tag": "geoip-cn", "format": "binary", "url": "https://raw.githubusercontent.com/SagerNet/sing-geoip/rule-set/geoip-cn.srs", "download_detour": "PROXY", "update_interval": "72h" }
++    ],
++    "final": "PROXY",
++    "auto_detect_interface": true,
++    "default_domain_resolver": "dns-direct"
++  },
++  "experimental": {
++    "clash_api": { "external_controller": "127.0.0.1:29090", "secret": "", "default_mode": "rule" },
++    "cache_file": { "enabled": true, "path": "cache.db", "store_fakeip": true }
++  }
++}
++""";
++
++    // Xray JSON (v4 schema), checked with `xray run -test` 26.3.27. geoip.dat/geosite.dat ship in the core zip.
++    static final String XRAY = """
++{
++  "log": { "loglevel": "warning" },
++  "dns": {
++    "servers": [
++      { "address": "223.5.5.5", "domains": ["geosite:cn"], "expectIPs": ["geoip:cn"] },
++      "1.1.1.1"
++    ],
++    "queryStrategy": "UseIP"
++  },
++  "inbounds": [
++    {
++      "tag": "hetu-tproxy", "listen": "::", "port": 19898, "protocol": "dokodemo-door",
++      "settings": { "network": "tcp,udp", "followRedirect": true },
++      "streamSettings": { "sockopt": { "tproxy": "tproxy" } },
++      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true }
++    },
++    {
++      "tag": "hetu-redirect", "listen": "::", "port": 19797, "protocol": "dokodemo-door",
++      "settings": { "network": "tcp", "followRedirect": true },
++      "streamSettings": { "sockopt": { "tproxy": "redirect" } },
++      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true }
++    },
++    {
++      "tag": "hetu-dns-in", "listen": "::", "port": 11053, "protocol": "dokodemo-door",
++      "settings": { "address": "1.1.1.1", "port": 53, "network": "tcp,udp" }
++    }
++  ],
++  "outbounds": [
++    {
++      "tag": "PROXY", "protocol": "vless",
++      "settings": { "vnext": [ { "address": "example.invalid", "port": 443,
++        "users": [ { "id": "00000000-0000-0000-0000-000000000000", "encryption": "none" } ] } ] },
++      "streamSettings": { "network": "tcp", "security": "tls", "tlsSettings": { "serverName": "example.invalid" } }
++    },
++    { "tag": "DIRECT", "protocol": "freedom" },
++    { "tag": "REJECT", "protocol": "blackhole" },
++    { "tag": "hetu-dns-out", "protocol": "dns" }
++  ],
++  "routing": {
++    "domainStrategy": "IPIfNonMatch",
++    "rules": [
++      { "type": "field", "ip": ["geoip:private"], "outboundTag": "DIRECT" },
++      { "type": "field", "domain": ["geosite:cn"], "outboundTag": "DIRECT" },
++      { "type": "field", "ip": ["geoip:cn"], "outboundTag": "DIRECT" },
++      { "type": "field", "network": "tcp,udp", "outboundTag": "PROXY" }
++    ]
++  }
++}
++""";
++
++    // V2Fly v5 binary reading the v4 JSON schema, checked with `v2ray test` 5.40.0.
++    static final String V2FLY = """
++{
++  "log": { "loglevel": "warning" },
++  "dns": {
++    "servers": [
++      { "address": "223.5.5.5", "domains": ["geosite:cn"], "expectIPs": ["geoip:cn"] },
++      "1.1.1.1"
++    ],
++    "queryStrategy": "UseIP"
++  },
++  "inbounds": [
++    {
++      "tag": "hetu-tproxy", "listen": "::", "port": 19898, "protocol": "dokodemo-door",
++      "settings": { "network": "tcp,udp", "followRedirect": true },
++      "streamSettings": { "sockopt": { "tproxy": "tproxy" } },
++      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true }
++    },
++    {
++      "tag": "hetu-redirect", "listen": "::", "port": 19797, "protocol": "dokodemo-door",
++      "settings": { "network": "tcp", "followRedirect": true },
++      "streamSettings": { "sockopt": { "tproxy": "redirect" } },
++      "sniffing": { "enabled": true, "destOverride": ["http", "tls", "quic"], "routeOnly": true }
++    },
++    {
++      "tag": "hetu-dns-in", "listen": "::", "port": 11053, "protocol": "dokodemo-door",
++      "settings": { "address": "1.1.1.1", "port": 53, "network": "tcp,udp" }
++    }
++  ],
++  "outbounds": [
++    {
++      "tag": "PROXY", "protocol": "vmess",
++      "settings": { "vnext": [ { "address": "example.invalid", "port": 443,
++        "users": [ { "id": "00000000-0000-0000-0000-000000000000", "alterId": 0, "security": "auto" } ] } ] },
++      "streamSettings": { "network": "ws", "security": "tls",
++        "tlsSettings": { "serverName": "example.invalid" }, "wsSettings": { "path": "/" } }
++    },
++    { "tag": "DIRECT", "protocol": "freedom" },
++    { "tag": "REJECT", "protocol": "blackhole" },
++    { "tag": "hetu-dns-out", "protocol": "dns" }
++  ],
++  "routing": {
++    "domainStrategy": "IPIfNonMatch",
++    "rules": [
++      { "type": "field", "ip": ["geoip:private"], "outboundTag": "DIRECT" },
++      { "type": "field", "domain": ["geosite:cn"], "outboundTag": "DIRECT" },
++      { "type": "field", "ip": ["geoip:cn"], "outboundTag": "DIRECT" },
++      { "type": "field", "network": "tcp,udp", "outboundTag": "PROXY" }
++    ]
++  }
++}
++""";
++
++    // Hysteria 2 client YAML. Single server: no rule routing or controller (Hetu adds the TPROXY,
++    // Redirect and DNS forwarding listeners plus the resolver at start).
++    static final String HYSTERIA = """
++# 河图内置 Hysteria 2 客户端模板：把 server / auth / tls.sni 换成你自己的节点后启动。
++# 入站由河图在启动时写入（TPROXY 19898 / Redirect 19797 / DNS 11053），这里无需填写。
++server: example.invalid:443
++auth: replace-with-your-password
++tls:
++  sni: example.invalid
++  insecure: false
++bandwidth:
++  up: 20 mbps
++  down: 100 mbps
++fastOpen: true
++""";
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java
 new file mode 100644
 index 0000000..14f2211
@@ -1999,10 +2239,10 @@ index 0000000..14f2211
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
-index 0000000..3477da1
+index 0000000..3d9f572
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
-@@ -0,0 +1,83 @@
+@@ -0,0 +1,108 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
@@ -2015,6 +2255,31 @@ index 0000000..3477da1
 +/** One monotonic budget for metadata, queueing, fallback URLs and every leaf in a wave. */
 +final class LatencyProbeBudget implements AutoCloseable {
 +    static final long DEFAULT_TIMEOUT_MS = 20_000;
++    /** Per-node core timeout passed as ?timeout= to /proxies/{name}/delay and /group/{name}/delay. */
++    static final long NODE_TIMEOUT_MS = 5_000;
++    /** Leaf probes in flight per wave (pinned by the V20.95 scheduling contract). */
++    static final int WAVE_CONCURRENCY = 6;
++    /** Upper bound of one wave, however many nodes it holds. */
++    static final long MAX_WAVE_TIMEOUT_MS = 150_000;
++    // One leaf slot: the core's 5 s timeout plus the controller response margin.
++    private static final long LEAF_SLOT_MS = NODE_TIMEOUT_MS + 1_500;
++    // Snapshot reads (/proxies + /providers/proxies) before the first leaf starts.
++    private static final long METADATA_MS = 4_000;
++
++    /**
++     * Total budget of one wave over {@code targets} leaves. The old fixed 20 s budget let only
++     * ~22 dead nodes (6 in flight x 5 s each) finish before the whole test reported 已到时限,
++     * so large subscriptions always ended as a partial wave. A wave now gets one full slot per
++     * round of {@link #WAVE_CONCURRENCY} leaves, plus half again for one retry of transport
++     * failures; small waves keep the established 20 s floor.
++     */
++    static long waveTimeoutMs(int targets) {
++        if (targets <= 0) return DEFAULT_TIMEOUT_MS;
++        long rounds = (targets + WAVE_CONCURRENCY - 1) / WAVE_CONCURRENCY;
++        long firstPass = METADATA_MS + rounds * LEAF_SLOT_MS;
++        long retry = Math.max(LEAF_SLOT_MS, firstPass / 2);
++        return Math.max(DEFAULT_TIMEOUT_MS, Math.min(MAX_WAVE_TIMEOUT_MS, firstPass + retry));
++    }
 +    static final ThreadLocal<LatencyProbeBudget> CURRENT = new ThreadLocal<>();
 +    private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
 +        Thread t = new Thread(r, "hetu-probe-deadline"); t.setDaemon(true); return t;
@@ -2088,10 +2353,10 @@ index 0000000..3477da1
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
 new file mode 100644
-index 0000000..244568f
+index 0000000..a77eeba
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt
-@@ -0,0 +1,75 @@
+@@ -0,0 +1,83 @@
 +package io.github.xgl34222220.hetu
 +
 +import kotlinx.coroutines.CoroutineScope
@@ -2109,8 +2374,16 @@ index 0000000..244568f
 +import kotlinx.coroutines.ensureActive
 +import java.io.IOException
 +
-+internal class IncompleteLatencyProbe(val results: Map<String, Long> = emptyMap()) :
-+    IOException("本轮测速已到时限，部分结果未返回，已保留已有读数")
++/**
++ * The whole wave's budget ran out (「已到时限」), as opposed to a node timeout, which is a
++ * per-node -1 measurement. [total] is the number of leaves the wave was asked to measure.
++ */
++internal class IncompleteLatencyProbe(val results: Map<String, Long> = emptyMap(), val total: Int = 0) :
++    IOException(incompleteLatencyMessage(results.size, total))
++
++internal fun incompleteLatencyMessage(completed: Int, total: Int): String =
++    if (total <= 0) "本轮测速已到时限，部分结果未返回，已保留已有读数"
++    else "本轮测速已到总时限：已完成 ${completed.coerceAtMost(total)} / $total 个节点，部分结果未返回，其余保留上次读数"
 +
 +/** Cancellation closes real sockets, rather than merely timing out a blocked IO coroutine. */
 +internal suspend fun <T> latencyProbeOperation(
@@ -2168,7 +2441,7 @@ index 0000000..244568f
 +    } finally { if (inherited == null) budget.close() }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
-index f104cef..b473a20 100644
+index f104cef..2380e94 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 @@ -74,6 +74,14 @@ final class MihomoControllerClient {
@@ -2314,7 +2587,19 @@ index f104cef..b473a20 100644
              OutputStream raw=socket.getOutputStream();
              StringBuilder head=new StringBuilder();
              head.append(method).append(' ').append(path).append(" HTTP/1.1\r\n")
-@@ -281,8 +333,12 @@ final class MihomoControllerClient {
+@@ -265,7 +317,10 @@ final class MihomoControllerClient {
+             raw.flush();
+
+             BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
+-            String status=readLine(in);if(status==null||!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
++            String status=readLine(in);
++            // A connection closed before any reply byte is a lost reply (retryable), not a malformed one.
++            if(status==null)throw new EOFException("Mihomo 控制接口返回无效 HTTP 响应");
++            if(!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
+             String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
+             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
+             HashMap<String,String> headers=new HashMap<>();String line;
+@@ -281,8 +336,12 @@ final class MihomoControllerClient {
              }else bytes=readToEnd(in);
              String text=new String(bytes,StandardCharsets.UTF_8);
              if(code<200||code>=300)throw new ControllerHttpException(code,text.trim(),endpoint.customApi);
@@ -2329,7 +2614,7 @@ index f104cef..b473a20 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..3b6a5fd 100644
+index 4f004b9..88c792b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -122,6 +122,11 @@ internal data class ProxyComposeState(
@@ -2463,7 +2748,14 @@ index 4f004b9..3b6a5fd 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -538,7 +603,14 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +597,20 @@ internal class ProxyComposeController(context: Context) {
+             ProxyConfigUi(
+                 name = it.name,
+                 selected = it.name == selected,
+-                bundled = it.name == ProxyConfigLibrary.BUNDLED_NAME,
++                bundled = ProxyConfigLibrary.isBundled(it.name),
+             )
+         }
      }
 
      suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
@@ -2509,6 +2801,58 @@ index 4f004b9..3b6a5fd 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
+index 34aa171..522f9d4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
+@@ -36,7 +36,7 @@ final class ProxyConfigLibrary {
+     private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
+
+     private void ensureBundled(ProxyRuntimeProfile.Core core){
+-        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)return;
++        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART){ensureCoreTemplate(core);return;}
+         try{
+             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
+             if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
+@@ -44,6 +44,21 @@ final class ProxyConfigLibrary {
+         }catch(Exception ignored){}
+     }
+
++    /**
++     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable, but never
++     * selected implicitly. Without a selection the start keeps converting the selected Mihomo profile
++     * (RootProxyManager.prepareNativeCore), so existing users do not silently move to placeholder nodes.
++     */
++    private void ensureCoreTemplate(ProxyRuntimeProfile.Core core){
++        String name=BundledCoreTemplates.name(core),text=BundledCoreTemplates.text(core);
++        if(name==null||text==null)return;
++        try{
++            File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,name);
++            if(!target.isFile())writeStreamAtomic(target,new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
++        }catch(Exception ignored){}
++    }
++    static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
++
+     List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
+     Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
+     void select(ProxyRuntimeProfile.Core core,String name)throws IOException{ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();}
+@@ -64,14 +79,14 @@ final class ProxyConfigLibrary {
+     void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
+     void delete(Entry e)throws IOException{
+         if(e==null)return;
+-        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
++        if(isBundled(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
+         if(e.file.exists()&&!e.file.delete())throw new IOException("无法删除配置");
+         if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();
+         ensureBundled(e.core);
+     }
+     Entry rename(Entry e,String requestedName)throws IOException{
+         if(e==null||!e.file.isFile())throw new IOException("配置不存在");
+-        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能重命名");
++        if(isBundled(e.name))throw new IOException("内置配置不能重命名");
+         String n=safeName(requestedName);
+         if(!coreAccepts(e.core,n))throw new IOException(e.core.label+" 不支持该配置格式");
+         if(n.equals(e.name))return e;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
 index 76318e4..618767e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java
@@ -2548,10 +2892,10 @@ index 76318e4..618767e 100644
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
 new file mode 100644
-index 0000000..5e3645f
+index 0000000..0b3b0d4
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
-@@ -0,0 +1,1874 @@
+@@ -0,0 +1,1877 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
@@ -2723,6 +3067,9 @@ index 0000000..5e3645f
 +            throw new IOException(core.label + " 仅支持 Root TPROXY / Redirect 模式");
 +        List<String> warnings = new ArrayList<>();
 +        if (isNativeFor(core, source)) {
++            // The built-in starter template (BundledCoreTemplates) ships placeholder nodes on example.invalid.
++            if (BundledCoreTemplates.hasPlaceholderNode(source))
++                warnings.add("配置仍含内置模板的占位节点（example.invalid），请先在配置编辑器中填入你自己的服务器");
 +            switch (k) {
 +                case SING_BOX: return nativeSingBox(source, o, warnings);
 +                case XRAY: return nativeXray(source, o, warnings, false);
@@ -4818,7 +5165,7 @@ index b914f23..2793b39 100644
          private const val MAX_DOWNLOAD = 128L * 1024L * 1024L
          private const val MAX_EXTRACTED = 128L * 1024L * 1024L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
-index 5ae93b3..0ba493d 100644
+index 5ae93b3..6c9b708 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyDashboardRepository.kt
 @@ -53,34 +53,50 @@ internal class ProxyDashboardRepository(context: Context) {
@@ -4917,12 +5264,13 @@ index 5ae93b3..0ba493d 100644
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().mapNotNull { name ->
              if (name == "GLOBAL") null else snapshot.proxies.optJSONObject(name)
-@@ -325,30 +350,49 @@ internal class ProxyDashboardRepository(context: Context) {
+@@ -325,30 +350,65 @@ internal class ProxyDashboardRepository(context: Context) {
      }
 
      /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
 -    suspend fun globalDelay(): Map<String, Long> = withContext(Dispatchers.IO) {
-+    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
++    suspend fun globalDelay(targetHint: Int = 0, onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
++        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targetHint)) {
          val snapshot = probeSnapshot(force = true)
          val targets = snapshot.proxies.keys().asSequence().filter { name ->
              val node = snapshot.proxies.optJSONObject(name)
@@ -4938,46 +5286,62 @@ index 5ae93b3..0ba493d 100644
 +        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
          val results = LinkedHashMap<String, Long>()
 -        for (chunk in targets.distinct().chunked(6)) {
--            coroutineScope {
--                chunk.map { node -> async {
--                    try { node to measuredProbe(node, snapshot) }
 +        val pending = targets.distinct()
-+        val next = java.util.concurrent.atomic.AtomicInteger()
++        val transient = java.util.Collections.synchronizedList(mutableListOf<String>())
 +        // A fixed worker pool keeps the six-request limit without a batch barrier:
 +        // each free worker can reach later healthy nodes while a sibling is slow.
-+        coroutineScope {
-+            List(minOf(6, pending.size)) { async {
-+                while (true) {
-+                    coroutineContext.ensureActive()
-+                    if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
-+                    val index = next.getAndIncrement()
-+                    if (index >= pending.size) break
-+                    val node = pending[index]
-+                    try {
-+                        val value = measuredProbe(node, snapshot)
-+                        coroutineContext.ensureActive()
-+                        synchronized(results) { results[node] = value }
-+                        // Each leaf can be shown as soon as it lands, but only while the
-+                        // wave's identity is still current; the final map keeps its guard.
-+                        if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
-+                            onResult(node, value)
-+                    }
-                     catch (cancel: CancellationException) { throw cancel }
-                     // A controller/transport error has no new node measurement. Keep
-                     // successful siblings and let callers retain this node's old value.
++        suspend fun pass(nodes: List<String>, retry: Boolean) {
++            val next = java.util.concurrent.atomic.AtomicInteger()
+             coroutineScope {
+-                chunk.map { node -> async {
+-                    try { node to measuredProbe(node, snapshot) }
+-                    catch (cancel: CancellationException) { throw cancel }
+-                    // A controller/transport error has no new node measurement. Keep
+-                    // successful siblings and let callers retain this node's old value.
 -                    catch (_: IOException) { node to null }
--                } }.awaitAll()
++                List(minOf(LatencyProbeBudget.WAVE_CONCURRENCY, nodes.size)) { async {
++                    while (true) {
++                        coroutineContext.ensureActive()
++                        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
++                        val index = next.getAndIncrement()
++                        if (index >= nodes.size) break
++                        val node = nodes[index]
++                        try {
++                            val value = measuredProbe(node, snapshot)
++                            coroutineContext.ensureActive()
++                            synchronized(results) { results[node] = value }
++                            // Each leaf can be shown as soon as it lands, but only while the
++                            // wave's identity is still current; the final map keeps its guard.
++                            if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
++                                onResult(node, value)
++                        }
++                        catch (cancel: CancellationException) { throw cancel }
++                        // A controller/transport error has no new node measurement. Keep
++                        // successful siblings and let callers retain this node's old value.
++                        // A lost reply (socket timeout/reset while the core was busy) gets one
++                        // retry after the first pass; core answers (504/503/401) never do.
++                        catch (error: IOException) {
++                            if (!retry && transientProbeFailure(error) &&
++                                LatencyProbeBudget.CURRENT.get()?.expired() != true) transient += node
++                        }
++                    }
+                 } }.awaitAll()
 -            }.forEach { (node, value) -> if (value != null) results[node] = value }
-+                    catch (_: IOException) { }
-+                }
-+            } }.awaitAll()
++            }
          }
++        pass(pending, retry = false)
          requireCurrentProbe(snapshot.identity)
-+        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())
++        // Only an unfinished first pass is 「已到时限」; a retry cut short keeps the first answers.
++        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap(), pending.size)
++        val again = synchronized(transient) { transient.filter { it !in results } }
++        if (again.isNotEmpty()) {
++            pass(again, retry = true)
++            requireCurrentProbe(snapshot.identity)
++        }
          return results
      }
 
-@@ -366,35 +410,103 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -366,35 +426,104 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }.toList()
  }
 
@@ -4999,7 +5363,8 @@ index 5ae93b3..0ba493d 100644
 -    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>): Map<String, Long> = withContext(Dispatchers.IO) {
 -        if (group.type.equals("Selector", ignoreCase = true)) return@withContext groupDelay(group.name)
 +    suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
-+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
++        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
++        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targets.distinct().size)) {
 +        if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
          val snapshot = probeSnapshot(force = true)
 +        if (coreGroupWaveKeepsSelection(snapshot.proxies.optJSONObject(group.name)))
@@ -5050,20 +5415,22 @@ index 5ae93b3..0ba493d 100644
 +                coroutineContext.ensureActive()
 +                val landed = synchronized(results) { results.keys.toSet() }
 +                freshCoreWaveResults(live, url, baseline.filterKeys { it !in landed }).forEach { (node, value) -> land(node, value) }
-+            }
-+        }
+             }
+-            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
+         }
 +        val outcome = wave.await()
 +        poller?.cancel()
 +        val raw = outcome.getOrElse { error ->
 +            when {
 +                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 504 -> JSONObject()
 +                error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
-+                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() })
++                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() }, pending.size)
 +                else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
 +            }
 +        }
 +        val allFailed = outcome.isFailure
-+        requireCurrentProbe(snapshot.identity)
+         requireCurrentProbe(snapshot.identity)
+-        results
 +        val keys = raw.keys()
 +        while (keys.hasNext()) {
 +            val name = keys.next()
@@ -5072,8 +5439,7 @@ index 5ae93b3..0ba493d 100644
 +            when (val value = raw.opt(name)) {
 +                is Int -> if (value > 0) land(name, value.toLong())
 +                is Long -> if (value > 0L) land(name, value)
-             }
--            measured.forEach { (node, delay) -> if (delay != null) results[node] = delay }
++            }
 +        }
 +        // Members the core answered without a success (dead nodes, expected-status misses)
 +        // have a fresh failure record. One read settles them; anything still unknown keeps
@@ -5083,9 +5449,8 @@ index 5ae93b3..0ba493d 100644
 +            val live = try { api.proxies() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
 +            if (live != null) freshCoreWaveResults(live, url, unsettled, failure = if (allFailed) -1L else -2L)
 +                .forEach { (node, value) -> land(node, value) }
-         }
-         requireCurrentProbe(snapshot.identity)
--        results
++        }
++        requireCurrentProbe(snapshot.identity)
 +        synchronized(results) { results.toMap() }
      }
 
@@ -5095,7 +5460,7 @@ index 5ae93b3..0ba493d 100644
          // The Selector endpoint returns one complete wave. A successful selection
          // or provider update can supersede it without changing the API/settings.
          readCurrentProbe(probeIdentity()) {
-@@ -414,7 +526,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -414,7 +543,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          }
      }
 
@@ -5104,7 +5469,7 @@ index 5ae93b3..0ba493d 100644
          val snapshot = probeSnapshot()
          val leaf = selectedProxyName(snapshot.proxies, node)
          readCurrentProbe(snapshot) {
-@@ -423,7 +535,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -423,7 +552,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      }
 
      suspend fun siteLatencies(): Map<String, Long> = withContext(Dispatchers.IO) {
@@ -5113,7 +5478,7 @@ index 5ae93b3..0ba493d 100644
          requireCurrentProbe(identity)
          val sites = ProxyLatencyTargets.load(app)
          // Hetu's UID is exempt from transparent Root interception. Explicitly enter
-@@ -444,6 +556,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+@@ -444,6 +573,64 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
          measured
      }
 
@@ -5178,6 +5543,22 @@ index 5ae93b3..0ba493d 100644
      suspend fun refreshProvider(name: String, ticket: SelectionTicket = captureSelection()): DashboardProviderUi? = withContext(Dispatchers.IO) {
          requireCurrentOrigin(ticket.identity)
          val operationApi = ticket.client(app)
+@@ -564,3 +751,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
+     }
+
+ }
++
++/**
++ * A request that produced no core answer because the reply was lost in transport (read timeout,
++ * reset, refused while the core was saturated). Core answers, credential errors, superseded
++ * runtimes and the wave's own deadline are never retried.
++ */
++internal fun transientProbeFailure(error: IOException): Boolean =
++    error !is MihomoControllerClient.ControllerHttpException &&
++        error !is MihomoControllerClient.DelayFailure &&
++        error !is IncompleteLatencyProbe &&
++        (error is java.net.SocketTimeoutException || error is java.net.SocketException ||
++            error is java.io.EOFException || error.cause is java.net.SocketTimeoutException)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
 index 48280df..b453abf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLatencyHistory.kt
@@ -8741,7 +9122,7 @@ index 2b1a624..e7569dc 100644
              }
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..dc68665 100644
+index 250b8a8..adead59 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -9158,7 +9539,7 @@ index 250b8a8..dc68665 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +1069,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -888,17 +1069,36 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -9172,14 +9553,16 @@ index 250b8a8..dc68665 100644
 +            }
              try {
 -                val result = repo.globalDelay()
-+                val result = repo.globalDelay { node, value -> landed.trySend(node to value) }
++                val result = repo.globalDelay(targets.size) { node, value -> landed.trySend(node to value) }
                  val stamp = SystemClock.elapsedRealtime()
                  result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                  val ok = result.values.count { it > 0L }
 -                if (currentRuntimeRequest(request)) toast("测速完成：$ok / ${result.size} 个节点可用")
++                // A per-node 超时 is that node's own reading (-1), never the whole test's 已到时限.
++                val timedOut = result.values.count { it == -1L }
 +                if (currentRuntimeRequest(request)) {
 +                    if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
-+                    else toast("测速完成：$ok / ${result.size} 个节点可用")
++                    else toast("测速完成：$ok / ${result.size} 个节点可用" + if (timedOut > 0) "，$timedOut 个节点超时" else "")
 +                }
 +            } catch (partial: IncompleteLatencyProbe) {
 +                val stamp = SystemClock.elapsedRealtime()
@@ -9195,7 +9578,7 @@ index 250b8a8..dc68665 100644
                  releaseNodeProbes(owner, targets)
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
-@@ -1263,6 +1461,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1463,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -20833,6 +21216,270 @@ index 0000000..26fe85b
 +        release.countDown()
 +        eventually("Confirmed snapshot follows") { job.isCompleted && vm.state.panelReady }
 +        assertEquals("other", vm.state.groups.single().now)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedtestCoreTemplates102Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedtestCoreTemplates102Test.kt
+new file mode 100644
+index 0000000..0f3ff13
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedtestCoreTemplates102Test.kt
+@@ -0,0 +1,258 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.runBlocking
++import okhttp3.mockwebserver.Dispatcher
++import okhttp3.mockwebserver.MockResponse
++import okhttp3.mockwebserver.MockWebServer
++import okhttp3.mockwebserver.RecordedRequest
++import okhttp3.mockwebserver.SocketPolicy
++import org.json.JSONArray
++import org.json.JSONObject
++import org.junit.Assert.*
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.yaml.snakeyaml.LoaderOptions
++import org.yaml.snakeyaml.Yaml
++import org.yaml.snakeyaml.constructor.SafeConstructor
++import java.io.EOFException
++import java.io.File
++import java.io.IOException
++import java.net.SocketTimeoutException
++import java.util.Collections
++import java.util.concurrent.atomic.AtomicInteger
++
++/**
++ * 测速「已到时限」与非 Mihomo 内核内置模板：真实回环 HTTP 与 ProxyCoreConfig 实际启动转换。
++ * 模板另经 sing-box 1.14.3 check / xray 26.3.27 run -test / v2ray 5.40.0 test / Hysteria 2.6.4 客户端解析，
++ * 见 tools/qa/test_core_templates93.py。
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class SpeedtestCoreTemplates102Test {
++    private val context: Context = ApplicationProvider.getApplicationContext()
++    private val prefs get() = context.getSharedPreferences("hetu", 0)
++    private val nonMihomo = listOf(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND,
++        ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA)
++
++    @Before fun reset() {
++        prefs.edit().clear().commit()
++        File(context.filesDir, "hetu/configs").deleteRecursively()
++    }
++
++    /* ---------------- 测速预算 ---------------- */
++
++    @Test fun waveBudgetKeepsTheSmallWaveFloorAndScalesWithNodeCount() {
++        assertEquals(LatencyProbeBudget.DEFAULT_TIMEOUT_MS, LatencyProbeBudget.waveTimeoutMs(0))
++        assertEquals(LatencyProbeBudget.DEFAULT_TIMEOUT_MS, LatencyProbeBudget.waveTimeoutMs(2))
++        assertEquals(LatencyProbeBudget.DEFAULT_TIMEOUT_MS, LatencyProbeBudget.waveTimeoutMs(6))
++        // 60 dead nodes, six in flight, 5 s core timeout each: the first pass alone needs ~50 s,
++        // which the old fixed 20 s budget always cut into a partial 已到时限 wave.
++        val sixty = LatencyProbeBudget.waveTimeoutMs(60)
++        val firstPass = 10 * LatencyProbeBudget.NODE_TIMEOUT_MS
++        assertTrue("budget $sixty must cover every round of dead nodes", sixty > firstPass)
++        assertTrue(LatencyProbeBudget.waveTimeoutMs(30) < sixty)
++        assertEquals(LatencyProbeBudget.MAX_WAVE_TIMEOUT_MS, LatencyProbeBudget.waveTimeoutMs(10_000))
++        assertEquals(6, LatencyProbeBudget.WAVE_CONCURRENCY)
++    }
++
++    @Test fun wholeWaveDeadlineMessageNamesProgressAndStaysDistinctFromNodeTimeout() {
++        val partial = IncompleteLatencyProbe(mapOf("a" to 20L, "b" to -1L, "c" to 31L), total = 10)
++        val text = partial.message.orEmpty()
++        assertTrue(text, text.contains("时限"))
++        assertTrue(text, text.contains("3 / 10"))
++        assertTrue(text, text.contains("部分结果未返回"))
++        assertTrue(IncompleteLatencyProbe().message.orEmpty().contains("部分结果未返回"))
++        // A node timeout is the node's own failure, never the wave deadline.
++        val node = MihomoControllerClient.DelayFailure(true)
++        assertEquals("节点测速超时", node.message)
++        assertFalse(node.message.orEmpty().contains("时限"))
++    }
++
++    @Test fun onlyLostRepliesAreRetryable() {
++        assertTrue(transientProbeFailure(SocketTimeoutException("read timed out")))
++        assertTrue(transientProbeFailure(java.net.SocketException("reset")))
++        assertTrue(transientProbeFailure(EOFException("closed")))
++        assertFalse(transientProbeFailure(MihomoControllerClient.DelayFailure(true)))
++        assertFalse(transientProbeFailure(MihomoControllerClient.DelayFailure(false)))
++        assertFalse(transientProbeFailure(IOException("代理或控制接口已变化，请重新测速")))
++        assertFalse(transientProbeFailure(IOException("测速请求已取消或达到总时限，已保留完成的结果，请重试")))
++        assertFalse(transientProbeFailure(IncompleteLatencyProbe()))
++    }
++
++    private fun controller(server: MockWebServer, nodes: List<String>, delay: (String, Int) -> MockResponse): List<String> {
++        val paths = Collections.synchronizedList(mutableListOf<String>())
++        val counts = java.util.concurrent.ConcurrentHashMap<String, AtomicInteger>()
++        val proxies = JSONObject()
++        nodes.forEach { proxies.put(it, JSONObject().put("name", it).put("type", "Shadowsocks")) }
++        proxies.put("Auto", JSONObject().put("name", "Auto").put("type", "URLTest").put("all", JSONArray(nodes))
++            .put("now", nodes.first()).put("fixed", nodes.first()).put("testUrl", "https://www.gstatic.com/generate_204"))
++        server.dispatcher = object : Dispatcher() {
++            override fun dispatch(request: RecordedRequest): MockResponse {
++                val path = request.requestUrl!!.encodedPath
++                paths += path
++                return when {
++                    path == "/proxies" -> MockResponse().setBody(JSONObject().put("proxies", proxies).toString())
++                    path == "/providers/proxies" -> MockResponse().setBody("{\"providers\":{}}")
++                    path.startsWith("/proxies/") && path.endsWith("/delay") -> {
++                        val node = request.requestUrl!!.pathSegments[1]
++                        delay(node, counts.getOrPut(node) { AtomicInteger() }.incrementAndGet())
++                    }
++                    else -> MockResponse().setResponseCode(404)
++                }
++            }
++        }
++        server.start()
++        prefs.edit().putBoolean("proxyCustomApiEnabled", true).putString("proxyCustomApiHost", "127.0.0.1")
++            .putInt("proxyCustomApiPort", server.port).commit()
++        return paths
++    }
++
++    @Test fun lostReplyIsRetriedOnceWhileCoreTimeoutsAndFailuresAreNot() = runBlocking {
++        MockWebServer().use { server ->
++            val nodes = listOf("flaky", "dead", "broken", "ok-a", "ok-b", "ok-c", "ok-d", "ok-e")
++            val paths = controller(server, nodes) { node, attempt ->
++                when (node) {
++                    "flaky" -> if (attempt == 1) MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
++                        else MockResponse().setBody("{\"delay\":88}")
++                    "dead" -> MockResponse().setResponseCode(504).setBody("{\"message\":\"Timeout\"}")
++                    "broken" -> MockResponse().setResponseCode(503).setBody("{\"message\":\"failed\"}")
++                    else -> MockResponse().setBody("{\"delay\":40}")
++                }
++            }
++            val landed = Collections.synchronizedMap(LinkedHashMap<String, Long>())
++            val result = ProxyDashboardRepository(context).globalDelay(nodes.size) { node, value -> landed[node] = value }
++            assertEquals(88L, result["flaky"])
++            assertEquals(-1L, result["dead"])
++            assertEquals(-2L, result["broken"])
++            listOf("ok-a", "ok-b", "ok-c", "ok-d", "ok-e").forEach { assertEquals(40L, result[it]) }
++            // Progressive results reached the caller as they landed, including the retried node.
++            assertEquals(result, landed.toMap())
++            assertEquals(2, paths.count { it == "/proxies/flaky/delay" })
++            assertEquals("A core-confirmed timeout is never re-spent", 1, paths.count { it == "/proxies/dead/delay" })
++        }
++    }
++
++    @Test fun unfinishedFirstPassReportsWholeWaveDeadlineWithCompletedLeaves() = runBlocking {
++        MockWebServer().use { server ->
++            val nodes = listOf("fast", "hang")
++            controller(server, nodes) { node, _ ->
++                if (node == "hang") MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE)
++                else MockResponse().setBody("{\"delay\":22}")
++            }
++            val partial = try {
++                latencyProbeOperation(600) { ProxyDashboardRepository(context).globalDelay(nodes.size) }
++                null
++            } catch (error: IncompleteLatencyProbe) { error }
++            assertNotNull("A wave cut by its total budget must not report full success", partial)
++            assertEquals(mapOf("fast" to 22L), partial!!.results)
++            assertEquals(2, partial.total)
++            assertTrue(partial.message.orEmpty().contains("1 / 2"))
++        }
++    }
++
++    /* ---------------- 内置模板 ---------------- */
++
++    private fun options(mode: ProxyRuntimeProfile.Mode) = ProxyCoreConfig.Options().apply {
++        this.mode = mode
++        if (mode == ProxyRuntimeProfile.Mode.TPROXY) tproxyPort = MihomoStartupConfig.TPROXY_PORT
++        else redirectPort = MihomoStartupConfig.REDIRECT_PORT
++        dnsPort = MihomoStartupConfig.DNS_PORT; controllerPort = MihomoStartupConfig.CONTROLLER_PORT
++        egressPort = MihomoStartupConfig.egressProbePort(MihomoStartupConfig.CONTROLLER_PORT); secret = "fixture-secret"
++    }
++
++    @Test fun everyNonMihomoCoreHasAParseableNativeTemplateOnHetuPorts() {
++        for (core in nonMihomo) {
++            val name = BundledCoreTemplates.name(core)!!
++            val text = BundledCoreTemplates.text(core)!!
++            assertTrue("$name extension belongs to ${core.label}", core.extensions.contains(name.substringAfterLast('.')))
++            assertTrue(ProxyCoreConfig.isNativeFor(core, text))
++            assertTrue(BundledCoreTemplates.hasPlaceholderNode(text))
++            if (core == ProxyRuntimeProfile.Core.HYSTERIA) {
++                val yaml = Yaml(SafeConstructor(LoaderOptions())).load<Map<String, Any>>(text)
++                assertEquals("example.invalid:443", yaml["server"])
++                assertFalse(ProxyCoreConfig.isMihomoYaml(text))
++                continue
++            }
++            val root = JSONObject(text)
++            val ports = (0 until root.getJSONArray("inbounds").length()).map { index ->
++                root.getJSONArray("inbounds").getJSONObject(index).let { it.optInt("listen_port", it.optInt("port")) }
++            }.toSet()
++            assertEquals(setOf(MihomoStartupConfig.TPROXY_PORT, MihomoStartupConfig.REDIRECT_PORT, MihomoStartupConfig.DNS_PORT), ports)
++            assertTrue("$name keeps China traffic direct", text.contains("geosite-cn") || text.contains("geosite:cn"))
++        }
++        val singBox = JSONObject(BundledCoreTemplates.SING_BOX)
++        assertEquals("127.0.0.1:${MihomoStartupConfig.CONTROLLER_PORT}",
++            singBox.getJSONObject("experimental").getJSONObject("clash_api").getString("external_controller"))
++    }
++
++    @Test fun templatesShipNoRealServerOrCredential() {
++        for (core in nonMihomo) {
++            val text = BundledCoreTemplates.text(core)!!
++            Regex("\"(?:server|address)\"\\s*:\\s*\"([^\"]+)\"").findAll(text).forEach { match ->
++                val host = match.groupValues[1]
++                // "dns-direct" is a sing-box DNS rule naming its server tag, not a host.
++                assertTrue("unexpected server $host", host == "example.invalid" || host in setOf("223.5.5.5", "1.1.1.1", "dns-direct"))
++            }
++            Regex("\"(?:uuid|id)\"\\s*:\\s*\"([^\"]+)\"").findAll(text).forEach {
++                assertEquals("00000000-0000-0000-0000-000000000000", it.groupValues[1])
++            }
++        }
++    }
++
++    @Test fun hetuStartupConversionAcceptsEachTemplateInTproxyAndRedirect() {
++        for (core in nonMihomo) for (mode in listOf(ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.Mode.REDIRECT)) {
++            val result = ProxyCoreConfig.build(core, BundledCoreTemplates.text(core)!!, options(mode)) { null }
++            assertTrue("${core.label} $mode stays native", result.nativeSource)
++            assertTrue(result.warnings.first().contains("占位节点"))
++            val port = if (mode == ProxyRuntimeProfile.Mode.TPROXY) MihomoStartupConfig.TPROXY_PORT else MihomoStartupConfig.REDIRECT_PORT
++            assertTrue("${core.label} $mode listens on $port", result.config.contains(port.toString()))
++            assertTrue(result.config.contains(MihomoStartupConfig.DNS_PORT.toString()))
++            if (ProxyCoreConfig.clashApi(core)) assertTrue(result.config.contains("fixture-secret"))
++        }
++        // The converted Mihomo built-in (placeholder subscription URLs) is not mistaken for a template.
++        val converted = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX,
++            "proxies:\n  - {name: a, type: ss, server: 192.0.2.1, port: 8388, cipher: aes-128-gcm, password: p}\n" +
++                "proxy-providers:\n  sub: {type: http, url: 'https://example.invalid/hetu-subscription-1', path: ./p/sub.yaml}\n" +
++                "rules:\n  - MATCH,a\n", options(ProxyRuntimeProfile.Mode.TPROXY)) { null }
++        assertFalse(converted.warnings.any { it.contains("占位节点") })
++    }
++
++    @Test fun libraryListsTheTemplateForItsCoreWithoutSelectingItOrTouchingMihomo() {
++        val library = ProxyConfigLibrary(context)
++        for (core in nonMihomo) {
++            val name = BundledCoreTemplates.name(core)!!
++            val entry = library.list(core).single { it.name == name }
++            assertEquals(BundledCoreTemplates.text(core), library.read(entry))
++            assertTrue(ProxyConfigLibrary.isBundled(name))
++            // No implicit selection: the start keeps converting the selected Mihomo profile.
++            assertNull(library.selected(core))
++            assertEquals("", prefs.getString("proxySelectedConfig.${core.id}", ""))
++            try { library.delete(entry); fail("built-in template must not be deleted") } catch (expected: IOException) { }
++            try { library.rename(entry, "mine.json"); fail("built-in template must not be renamed") } catch (expected: IOException) { }
++            assertTrue(entry.file.isFile)
++            library.select(core, name)
++            assertEquals(name, library.selected(core)!!.name)
++        }
++        val mihomo = library.list(ProxyRuntimeProfile.Core.MIHOMO).map { it.name }
++        assertEquals(listOf(ProxyConfigLibrary.BUNDLED_NAME), mihomo)
++        assertEquals(ProxyConfigLibrary.BUNDLED_NAME, library.selected(ProxyRuntimeProfile.Core.MIHOMO)!!.name)
++    }
++
++    @Test fun editedTemplateIsKeptAndLosesThePlaceholderWarning() {
++        val library = ProxyConfigLibrary(context)
++        val core = ProxyRuntimeProfile.Core.XRAY
++        val entry = library.list(core).single { it.name == BundledCoreTemplates.XRAY_NAME }
++        library.write(entry, BundledCoreTemplates.XRAY.replace("example.invalid", "node.example.com"))
++        val again = library.list(core).single { it.name == BundledCoreTemplates.XRAY_NAME }
++        val text = library.read(again)
++        assertFalse(BundledCoreTemplates.hasPlaceholderNode(text))
++        val result = ProxyCoreConfig.build(core, text, options(ProxyRuntimeProfile.Mode.TPROXY)) { null }
++        assertFalse(result.warnings.any { it.contains("占位节点") })
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt

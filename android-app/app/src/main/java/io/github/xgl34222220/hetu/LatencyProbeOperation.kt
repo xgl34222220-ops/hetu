@@ -15,8 +15,16 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import java.io.IOException
 
-internal class IncompleteLatencyProbe(val results: Map<String, Long> = emptyMap()) :
-    IOException("本轮测速已到时限，部分结果未返回，已保留已有读数")
+/**
+ * The whole wave's budget ran out (「已到时限」), as opposed to a node timeout, which is a
+ * per-node -1 measurement. [total] is the number of leaves the wave was asked to measure.
+ */
+internal class IncompleteLatencyProbe(val results: Map<String, Long> = emptyMap(), val total: Int = 0) :
+    IOException(incompleteLatencyMessage(results.size, total))
+
+internal fun incompleteLatencyMessage(completed: Int, total: Int): String =
+    if (total <= 0) "本轮测速已到时限，部分结果未返回，已保留已有读数"
+    else "本轮测速已到总时限：已完成 ${completed.coerceAtMost(total)} / $total 个节点，部分结果未返回，其余保留上次读数"
 
 /** Cancellation closes real sockets, rather than merely timing out a blocked IO coroutine. */
 internal suspend fun <T> latencyProbeOperation(

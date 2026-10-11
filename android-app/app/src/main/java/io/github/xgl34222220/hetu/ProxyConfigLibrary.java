@@ -36,13 +36,28 @@ final class ProxyConfigLibrary {
     private String key(ProxyRuntimeProfile.Core core){return "proxySelectedConfig."+core.id;}
 
     private void ensureBundled(ProxyRuntimeProfile.Core core){
-        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART)return;
+        if(core!=ProxyRuntimeProfile.Core.MIHOMO&&core!=ProxyRuntimeProfile.Core.MIHOMO_SMART){ensureCoreTemplate(core);return;}
         try{
             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
             if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
             String selected=prefs.getString(key(core),"");if(selected.isEmpty()||!new File(d,selected).isFile())prefs.edit().putString(key(core),BUNDLED_NAME).apply();
         }catch(Exception ignored){}
     }
+
+    /**
+     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable, but never
+     * selected implicitly. Without a selection the start keeps converting the selected Mihomo profile
+     * (RootProxyManager.prepareNativeCore), so existing users do not silently move to placeholder nodes.
+     */
+    private void ensureCoreTemplate(ProxyRuntimeProfile.Core core){
+        String name=BundledCoreTemplates.name(core),text=BundledCoreTemplates.text(core);
+        if(name==null||text==null)return;
+        try{
+            File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,name);
+            if(!target.isFile())writeStreamAtomic(target,new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
+        }catch(Exception ignored){}
+    }
+    static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
 
     List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
     Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
@@ -64,14 +79,14 @@ final class ProxyConfigLibrary {
     void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
     void delete(Entry e)throws IOException{
         if(e==null)return;
-        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
+        if(isBundled(e.name))throw new IOException("内置配置不能删除，可以切换到其他配置");
         if(e.file.exists()&&!e.file.delete())throw new IOException("无法删除配置");
         if(e.name.equals(prefs.getString(key(e.core),"")))prefs.edit().remove(key(e.core)).apply();
         ensureBundled(e.core);
     }
     Entry rename(Entry e,String requestedName)throws IOException{
         if(e==null||!e.file.isFile())throw new IOException("配置不存在");
-        if(BUNDLED_NAME.equals(e.name))throw new IOException("内置配置不能重命名");
+        if(isBundled(e.name))throw new IOException("内置配置不能重命名");
         String n=safeName(requestedName);
         if(!coreAccepts(e.core,n))throw new IOException(e.core.label+" 不支持该配置格式");
         if(n.equals(e.name))return e;
