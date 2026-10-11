@@ -46,6 +46,8 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
     var busy by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("") }
     var copyFailed by remember { mutableStateOf(false) }
+    // 启动诊断: reference cleanup and where ports / DNS / fake-IP came from, recorded at prepare.
+    var diagnostics by remember { mutableStateOf(prefs.getString("proxyStartupDiagnostics", "").orEmpty()) }
     val c = LocalHomeColors.current
 
     fun copy() {
@@ -73,6 +75,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                     manager.startupConfig()
                 }
                 message = if (regenerate) "启动配置已重新生成（未重启代理）" else ""
+                diagnostics = prefs.getString("proxyStartupDiagnostics", "").orEmpty()
             } catch (cancel: CancellationException) { throw cancel }
             catch (error: Exception) { message = error.message ?: "尚未生成启动配置" }
             finally { busy = false }
@@ -111,6 +114,17 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
         // What the last action did, where it can be seen without scrolling past the whole file.
         if (message.isNotBlank()) item(key = "message") {
             HxBanner(message, tone = if (copyFailed) HxTone.Bad else HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
+        }
+        if (diagnostics.isNotBlank()) item(key = "diagnostics") {
+            SettingsSection {
+                Box(Modifier.fillMaxWidth().homeGlassPanel().padding(horizontal = 18.dp, vertical = 16.dp)) {
+                    androidx.compose.foundation.layout.Column {
+                        androidx.compose.material3.Text(ht("启动诊断"), color = c.t1, style = HomeType.label)
+                        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
+                        androidx.compose.material3.Text(diagnostics.trimEnd(), color = c.t2, style = HomeType.caption)
+                    }
+                }
+            }
         }
         item(key = "config") {
             SettingsSection {

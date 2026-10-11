@@ -79,6 +79,11 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-11 CNIP kernel-bypass authorization: the MIT notice of the CNIP data source
     # (gaoyifan/china-operator-ip) that the built-in snapshots and ipset import already use.
     'android-app/app/src/main/assets/licenses/china-operator-ip.txt',
+    # 2026-10-12 parity batch A authorization: dangling proxy-reference cleanup, startup source
+    # diagnostics and the opt-in cgroup limit argument (three pure-Java helpers, no Android API),
+    # plus the 资源限制 switch for the cgroup limit on the advanced proxy settings page.
+    PACKAGE + 'ConfigReferenceCleaner.java', PACKAGE + 'StartupDiagnostics.java', PACKAGE + 'CoreResourceLimits.java',
+    PACKAGE + 'ProxyAdvancedSettingsActivity.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

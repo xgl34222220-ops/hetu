@@ -93,6 +93,9 @@ internal class SpeedUiState {
     var down by mutableStateOf<Pair<Double, Long>?>(null)
     var up by mutableStateOf<Pair<Double, Long>?>(null)
     var error by mutableStateOf<String?>(null)
+    /** Bytes moved so far in each direction (from live samples), for the history of a stopped run. */
+    var liveBytesDown = 0L
+    var liveBytesUp = 0L
     val downSamples: SnapshotStateList<Float> = mutableStateListOf()
     val upSamples: SnapshotStateList<Float> = mutableStateListOf()
 
@@ -100,7 +103,7 @@ internal class SpeedUiState {
 
     fun reset() {
         phase = SpeedPhase.Meta; meta = null; metaKnown = false; latency = -1L; live = 0.0
-        down = null; up = null; error = null; downSamples.clear(); upSamples.clear()
+        down = null; up = null; error = null; downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
     }
 
     fun accept(event: SpeedEvent) {
@@ -110,6 +113,7 @@ internal class SpeedUiState {
             is SpeedEvent.Latency -> latency = event.millis
             is SpeedEvent.Live -> {
                 live = event.mbps
+                if (event.upload) liveBytesUp = event.bytes else liveBytesDown = event.bytes
                 val list = if (event.upload) upSamples else downSamples
                 list.add(event.mbps.toFloat())
                 if (list.size > SAMPLE_CAP) list.removeAt(0)
@@ -203,6 +207,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
     val speed = remember { SpeedUiState() }
     var speedRun by remember { mutableIntStateOf(0) }
     var speedActive by remember { mutableStateOf(false) }
+    var historyVersion by remember { mutableIntStateOf(0) }
     LaunchedEffect(speedRun, speedActive) {
         if (!speedActive) {
             if (speed.running) speed.phase = if (speed.down != null) SpeedPhase.Done else SpeedPhase.Idle
@@ -214,6 +219,12 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
             val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
             SpeedTest.run(port).collect { speed.accept(it) }
         } finally {
+            // 测速历史: keep this run (complete or stopped), additive to the test itself.
+            if (speed.down != null || speed.latency >= 0 || speed.error != null) {
+                SpeedTestHistory.add(context, SpeedTestHistory.bandwidthRecord("网速测试", speed.latency, speed.down, speed.up,
+                    speed.liveBytesDown, speed.liveBytesUp, speed.error, System.currentTimeMillis()))
+                historyVersion++
+            }
             // A late finish of an older run must not stop the one that replaced it.
             if (speedRun == generation) speedActive = false
         }
@@ -287,6 +298,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
             item(key = "speed-exit") { SpeedExitCard(speed) }
             item(key = "speed-result") { SpeedResultCard(speed) }
             item(key = "speed-chart") { SpeedChartCard(speed) }
+            item(key = "speed-history") { SpeedTestHistorySection(historyVersion) }
         }
     }
 }

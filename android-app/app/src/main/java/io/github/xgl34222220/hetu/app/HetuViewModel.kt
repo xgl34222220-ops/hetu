@@ -388,6 +388,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             latestNodeProbe[node] = owner
             delays[node] = value
             measuredAt[node] = stamp
+            probeRunReadings[owner]?.put(node, value)
+        }
+    }
+
+    /** 测速历史: the readings each group / 全部 probe run (by owner) applied. Main thread only. */
+    private val probeRunReadings = HashMap<Long, MutableMap<String, Long>>()
+
+    /** Keeps one finished probe run in the speed-test history; observing only, never changes the probe. */
+    private fun recordProbeRun(owner: Long, title: String, targets: List<String>) {
+        val readings = probeRunReadings.remove(owner) ?: return
+        if (targets.isEmpty()) return
+        try {
+            SpeedTestHistory.add(getApplication(), SpeedTestHistory.latencyRecord(title, targets, readings, System.currentTimeMillis()))
+        } catch (cancel: CancellationException) {
+            throw cancel
+        } catch (_: Exception) {
+            // History is best effort.
         }
     }
 
@@ -1009,6 +1026,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
         if (targets.isEmpty()) return
         val owner = ++requestSequence
+        probeRunReadings[owner] = LinkedHashMap()
         groupProbeOwners[group.name] = owner
         testingGroups[group.name] = true
         holdNodeProbes(owner, targets)
@@ -1048,6 +1066,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 landed.close()
                 progress.cancel()
                 releaseNodeProbes(owner, targets)
+                recordProbeRun(owner, "策略组 ${group.name}", targets)
                 if (groupProbeOwners[group.name] == owner) {
                     groupProbeOwners.remove(group.name)
                     testingGroups.remove(group.name)
@@ -1066,6 +1085,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             providers.flatMap { it.nodes } + delays.keys).distinct()
             .filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }
         allProbeOwner = owner
+        probeRunReadings[owner] = LinkedHashMap()
         holdNodeProbes(owner, targets)
         testingAll = true
         viewModelScope.launch {
@@ -1098,6 +1118,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 landed.close()
                 progress.cancel()
                 releaseNodeProbes(owner, targets)
+                recordProbeRun(owner, "全部节点", targets)
                 if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
             }
         }

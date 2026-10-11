@@ -128,6 +128,8 @@ final class ProxyCoreConfig {
             this.nodes = nodes; this.fakeIpV4 = fakeIpV4; this.fakeIpV6 = fakeIpV6; this.adblockApplied = adblockApplied;
         }
         String warningText() { return String.join("；", warnings); }
+        /** Dangling group/outbound references removed before start (also contained in warnings). */
+        List<String> cleanupNotices = Collections.emptyList();
     }
 
     // ------------------------------------------------------------------ source classification
@@ -151,9 +153,46 @@ final class ProxyCoreConfig {
         return text != null && !looksJson(text) && hasTopLevelKey(text, "server") && !isMihomoYaml(text);
     }
 
+    /** sing-box written in YAML: top-level sing-box sections and none of the Clash/Mihomo keys. */
+    static boolean isSingBoxYaml(String text) {
+        if (text == null || looksJson(text) || isMihomoYaml(text)) return false;
+        if (!hasTopLevelKey(text, "outbounds") && !hasTopLevelKey(text, "endpoints")) return false;
+        return true;
+    }
+
+    /** A sing-box YAML document converted to the JSON the core reads (sing-box itself accepts only JSON). */
+    static String singBoxYamlToJson(String text) throws IOException {
+        Object root;
+        try {
+            root = ConfigReferenceCleaner.loader().load(text);
+        } catch (YAMLException invalid) {
+            throw new IOException("sing-box YAML 无法解析：" + invalid.getMessage());
+        }
+        if (!(root instanceof Map)) throw new IOException("sing-box YAML 顶层必须是映射");
+        return CoreJson.write(jsonSafe(root, 0));
+    }
+
+    private static Object jsonSafe(Object v, int depth) throws IOException {
+        if (depth > CoreJson.MAX_DEPTH) throw new IOException("sing-box YAML 嵌套过深");
+        if (v instanceof Map) {
+            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
+            for (Map.Entry<?, ?> e : ((Map<?, ?>) v).entrySet()) out.put(String.valueOf(e.getKey()), jsonSafe(e.getValue(), depth + 1));
+            return out;
+        }
+        if (v instanceof List) {
+            List<Object> out = new ArrayList<>();
+            for (Object o : (List<?>) v) out.add(jsonSafe(o, depth + 1));
+            return out;
+        }
+        if (v == null || v instanceof String || v instanceof Boolean || v instanceof Number) return v;
+        if (v instanceof byte[]) throw new IOException("sing-box YAML 不支持二进制值");
+        return String.valueOf(v);
+    }
+
     static boolean isNativeFor(ProxyRuntimeProfile.Core core, String text) {
         switch (kind(core)) {
-            case SING_BOX: case XRAY: case V2RAY: return looksJson(text);
+            case SING_BOX: return looksJson(text) || isSingBoxYaml(text);
+            case XRAY: case V2RAY: return looksJson(text);
             case HYSTERIA: return isHysteriaYaml(text);
             default: return true;
         }
@@ -170,7 +209,14 @@ final class ProxyCoreConfig {
         List<String> warnings = new ArrayList<>();
         if (isNativeFor(core, source)) {
             switch (k) {
-                case SING_BOX: return nativeSingBox(source, o, warnings);
+                case SING_BOX: {
+                    String json = source;
+                    if (!looksJson(source)) {
+                        json = singBoxYamlToJson(source);
+                        warnings.add("sing-box 配置为 YAML 写法，已在校验和启动前转换为 JSON");
+                    }
+                    return nativeSingBox(json, o, warnings);
+                }
                 case XRAY: return nativeXray(source, o, warnings, false);
                 case V2RAY: return nativeXray(source, o, warnings, true);
                 case HYSTERIA: return nativeHysteria(source, o, warnings);
@@ -181,14 +227,19 @@ final class ProxyCoreConfig {
             String expected = k == Kind.HYSTERIA ? "Hysteria 2 客户端 YAML" : core.label + " JSON";
             throw new IOException("配置既不是 " + expected + "，也不是可转换的 Clash/Mihomo YAML");
         }
-        Profile profile = Profile.parse(source, fetcher, warnings);
+        ConfigReferenceCleaner.Result cleaned = ConfigReferenceCleaner.mihomo(source);
+        warnings.addAll(cleaned.notices);
+        Profile profile = Profile.parse(cleaned.text, fetcher, warnings);
+        Result converted;
         switch (k) {
-            case SING_BOX: return SingBox.convert(profile, o, warnings);
-            case XRAY: return XrayConv.convert(profile, o, warnings, false);
-            case V2RAY: return XrayConv.convert(profile, o, warnings, true);
-            case HYSTERIA: return Hysteria.convert(profile, o, warnings);
+            case SING_BOX: converted = SingBox.convert(profile, o, warnings); break;
+            case XRAY: converted = XrayConv.convert(profile, o, warnings, false); break;
+            case V2RAY: converted = XrayConv.convert(profile, o, warnings, true); break;
+            case HYSTERIA: converted = Hysteria.convert(profile, o, warnings); break;
             default: throw new IOException("未知核心");
         }
+        if (cleaned.changed) converted.cleanupNotices = cleaned.notices;
+        return converted;
     }
 
     // ------------------------------------------------------------------ helpers
@@ -1789,6 +1840,8 @@ final class ProxyCoreConfig {
 
     static Result nativeSingBox(String source, Options o, List<String> warnings) throws IOException {
         Map<String, Object> root = CoreJson.parseObject(source);
+        List<String> cleanup = ConfigReferenceCleaner.singBox(root);
+        warnings.addAll(cleanup);
         if (root.containsKey("inbounds")) warnings.add("已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
         root.put("inbounds", SingBox.inbounds(o));
         List<Object> outbounds = asList(root.get("outbounds"));
@@ -1818,7 +1871,9 @@ final class ProxyCoreConfig {
         if (experimental == null) { experimental = new LinkedHashMap<>(); root.put("experimental", experimental); }
         experimental.put("clash_api", map("external_controller", "127.0.0.1:" + o.controllerPort, "secret", o.secret, "default_mode", "rule"));
         if (!experimental.containsKey("cache_file")) experimental.put("cache_file", map("enabled", true, "path", "cache.db", "store_fakeip", true));
-        return new Result(CoreJson.write(root), true, warnings, outbounds.size(), "", "", adblock);
+        Result result = new Result(CoreJson.write(root), true, warnings, outbounds.size(), "", "", adblock);
+        result.cleanupNotices = cleanup;
+        return result;
     }
 
     static Result nativeXray(String source, Options o, List<String> warnings, boolean v2ray) throws IOException {
