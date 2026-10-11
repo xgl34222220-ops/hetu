@@ -175,7 +175,7 @@ index 4d17a16..303e13a 100644
    fi
    N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..8c01424 100755
+index ae832da..7de18cc 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -513,7 +513,7 @@ index ae832da..8c01424 100755
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
 -  unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"
 +  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; fi
-+  cn_drop_tails xt4
++  cn_drop_tails xt4; share_drop_tails xt4
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -523,7 +523,7 @@ index ae832da..8c01424 100755
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
 -  unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"
 +  if [ "$PRESERVE_KILL" != 1 ]; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; fi
-+  cn_drop_tails xt6
++  cn_drop_tails xt6; share_drop_tails xt6
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip -6 rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip -6 route del local ::/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
@@ -539,7 +539,7 @@ index ae832da..8c01424 100755
 +sweep_plan(){
 +  awk -v keep="$PRESERVE_KILL" -v want="$1" -v only="${SWEEP_ONLY:-}" '
 +    function own(c){ if (only != "") return index(" " only " ", " " c " ") > 0; return c ~ /^(HETU|BICHEN)_/ }
-+    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T") }
++    function kept(c){ return keep == "1" && (c == "HETU_KOUT" || c == "HETU_KFWD" || c == "HETU_KOUT_T" || c == "HETU_KFWD_S") }
 +    function hook(   i){ for (i = 3; i < NF; i++) if (($i == "-j" || $i == "-g") && own($(i+1)) && !kept($(i+1))) return 1; return 0 }
 +    $1 == "-N" && own($2) && !kept($2) { n++; chain[n] = $2; next }
 +    $1 == "-A" && own($2) && !kept($2) { next }
@@ -702,7 +702,105 @@ index ae832da..8c01424 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -542,6 +930,167 @@ bypass6(){
+@@ -456,6 +844,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+ iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
+ iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
+ shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
++# ---------------------------------------------------------------- shared network ingress scope
++# The App writes $BASE/policy/share (IFACES=tether interfaces, MODE=direct|only, MACS=only-list).
++# Without it (or with an empty list in direct mode) the shared chains keep the legacy, unscoped
++# form. Scoped: every shared PREROUTING/FORWARD chain dispatches only its tether ingress (and lo
++# for the local TPROXY re-route) with -g into "<chain>_S"; everything else RETURNs, so upstream
++# replies (wlan0/rmnet IPv6 without NAT) and foreign ingress never reach TPROXY or a guard.
++SHR_IFACES=""; SHR_IFACES_W=""; SHR_MODE=direct; SHR_ONLY=""; SHR_ONLY_W=""; SHR_DROPPED=""; SHR_SCOPED=0; SHR_CHAIN=""
++share_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/share" 2>/dev/null | head -n 1; }
++# Interfaces carrying the default route right now (v4/v6). Never a shared ingress.
++share_upstream_ifaces(){
++  for SHU_F in 4 6; do
++    ip -"$SHU_F" route get "$( [ "$SHU_F" = 4 ] && echo 8.8.8.8 || echo 2001:4860:4860::8888 )" 2>/dev/null |
++      awk '{ for (i = 1; i < NF; i++) if ($i == "dev") print $(i+1) }'
++  done | sort -u | tr '\n' ' '
++}
++share_iface_upstream(){
++  SHI_X="$1"
++  for SHI_U in $2; do
++    [ "$SHI_X" != "$SHI_U" ] || return 0
++    case "$SHI_X" in *+) case "$SHI_U" in "${SHI_X%+}"*) return 0;; esac;; esac
++  done
++  return 1
++}
++share_apply(){
++  SHR_IFACES="$1"; SHR_MODE="${2:-direct}"; SHR_ONLY="$3"; SHR_SCOPED="${4:-0}"
++  SHR_IFACES_W=$(printf '%s' "$SHR_IFACES" | tr ',' ' '); SHR_ONLY_W=$(printf '%s' "$SHR_ONLY" | tr ',' ' ')
++}
++# Start: read and validate the policy. Upstream, cellular, loopback and virtual interfaces are
++# dropped (reported, never captured). A whitelist that this iptables cannot match fails the start:
++# degrading would proxy every client instead of the listed ones.
++share_prepare(){
++  share_apply "" direct "" 0; SHR_DROPPED=""
++  [ "$START_SHARE" = 1 ] && [ -r "$BASE/policy/share" ] || return 0
++  SHP_I=$(share_policy_value IFACES); SHP_M=$(share_policy_value MODE); SHP_O=$(share_policy_value MACS)
++  split_safe_ifaces "$SHP_I" || fail "共享接口列表无效"
++  split_safe_macs "$SHP_O" || fail "共享网络 MAC 白名单无效"
++  case "$SHP_M" in ''|direct) SHP_M=direct;; only) ;; *) fail "共享网络 MAC 模式无效";; esac
++  SHP_UP=$(share_upstream_ifaces); SHP_KEEP=""
++  for SHP_X in $(printf '%s' "$SHP_I" | tr ',' ' '); do
++    case "$SHP_X" in lo*|rmnet*|ccmni*|dummy*|tun*|hetu*|ifb*) SHR_DROPPED="${SHR_DROPPED:+$SHR_DROPPED,}$SHP_X"; continue;; esac
++    if share_iface_upstream "$SHP_X" "$SHP_UP"; then SHR_DROPPED="${SHR_DROPPED:+$SHR_DROPPED,}$SHP_X"; continue; fi
++    case ",$SHP_KEEP," in *",$SHP_X,"*) ;; *) SHP_KEEP="${SHP_KEEP:+$SHP_KEEP,}$SHP_X";; esac
++  done
++  SHP_SCOPED=0; if [ -n "$SHP_I" ] || [ "$SHP_M" = only ]; then SHP_SCOPED=1; fi
++  if [ "$SHP_M" = only ]; then
++    # The direct list has no meaning in whitelist mode.
++    START_SHARED_MACS=""
++    if [ -n "$SHP_O" ]; then probemac "$(first_mac "$SHP_O")" || fail "当前 iptables 不支持按 MAC 匹配，共享网络白名单模式无法安全启用"; fi
++  fi
++  share_apply "$SHP_KEEP" "$SHP_M" "$SHP_O" "$SHP_SCOPED"
++  [ -z "$SHR_DROPPED" ] || printf '%s share dropped=%s upstream=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$SHR_DROPPED" "$SHP_UP" >> "$RUN/share.log" 2>/dev/null || true
++}
++share_load_session(){
++  share_apply "$(sed -n 's/^SHARE_IFACES=//p' "$SESSION" 2>/dev/null | head -n 1)" \
++    "$(sed -n 's/^SHARE_MAC_MODE=//p' "$SESSION" 2>/dev/null | head -n 1)" \
++    "$(sed -n 's/^SHARE_ONLY_MACS=//p' "$SESSION" 2>/dev/null | head -n 1)" \
++    "$(sed -n 's/^SHARE_SCOPED=//p' "$SESSION" 2>/dev/null | head -n 1)"
++  SHR_DROPPED=$(sed -n 's/^SHARE_DROPPED=//p' "$SESSION" 2>/dev/null | head -n 1)
++  split_safe_ifaces "$SHR_IFACES" && split_safe_macs "$SHR_ONLY" || share_apply "" direct "" 1
++  case "$SHR_MODE" in direct|only) ;; *) SHR_MODE=direct;; esac
++  [ "$SHR_SCOPED" = 1 ] || SHR_SCOPED=0
++}
++# In a shared chain, after its bypass RETURNs: legacy = the direct MAC RETURNs only. Scoped =
++# dispatch to "<chain>_S" (caller appends the rest to $SHR_CHAIN). $5 reuse: Kill Switch guard.
++share_scope(){
++  SHS_BIN="$1"; SHS_T="$2"; SHS_C="$3"; SHS_MACS="$4"; SHR_CHAIN="$SHS_C"
++  if [ "$SHR_SCOPED" != 1 ]; then shared_mac_returns "$SHS_BIN" "$SHS_T" "$SHS_C" "$SHS_MACS"; return; fi
++  SHS_TAIL="${SHS_C}_S"
++  if [ "${5:-}" = reuse ]; then "$SHS_BIN" -t "$SHS_T" -N "$SHS_TAIL" >/dev/null 2>&1 || true; "$SHS_BIN" -t "$SHS_T" -F "$SHS_TAIL" || return 1
++  else "$SHS_BIN" -t "$SHS_T" -N "$SHS_TAIL" || return 1; fi
++  # PREROUTING chains also carry this device's own re-routed (marked) traffic on lo.
++  if [ "$SHS_T" != filter ]; then "$SHS_BIN" -t "$SHS_T" -A "$SHS_C" -i lo -g "$SHS_TAIL" || return 1; fi
++  if [ "$SHR_MODE" = only ]; then
++    for SHS_M in $SHR_ONLY_W; do
++      if [ -n "$SHR_IFACES_W" ]; then
++        for SHS_X in $SHR_IFACES_W; do "$SHS_BIN" -t "$SHS_T" -A "$SHS_C" -i "$SHS_X" -m mac --mac-source "$SHS_M" -g "$SHS_TAIL" || return 1; done
++      else "$SHS_BIN" -t "$SHS_T" -A "$SHS_C" -m mac --mac-source "$SHS_M" -g "$SHS_TAIL" || return 1; fi
++    done
++  else
++    shared_mac_returns "$SHS_BIN" "$SHS_T" "$SHS_C" "$SHS_MACS" || return 1
++    for SHS_X in $SHR_IFACES_W; do "$SHS_BIN" -t "$SHS_T" -A "$SHS_C" -i "$SHS_X" -g "$SHS_TAIL" || return 1; done
++  fi
++  "$SHS_BIN" -t "$SHS_T" -A "$SHS_C" -j RETURN || return 1
++  SHR_CHAIN="$SHS_TAIL"
++}
++share_drop_tails(){
++  SDT_BIN="$1"
++  cn_drop_tail "$SDT_BIN" mangle "${MPRE}_S"; cn_drop_tail "$SDT_BIN" nat "${NPRE}_S"; cn_drop_tail "$SDT_BIN" nat "${DNSPRE}_S"
++  cn_drop_tail "$SDT_BIN" filter "${WRFWD}_S"; cn_drop_tail "$SDT_BIN" filter "${QUICFWD}_S"; cn_drop_tail "$SDT_BIN" filter "${V6FWD}_S"
++  if [ "$PRESERVE_KILL" != 1 ]; then cn_drop_tail "$SDT_BIN" filter "${KFWD}_S"; fi
++}
+ # Once the system resolver is answered by the core, any process can be handed an address
+ # from the fake-IP range, and such an address exists only inside the core. An owner-based
+ # exemption therefore keeps its direct path for every real address and lets these through.
+@@ -542,6 +1021,167 @@ bypass6(){
    [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
  }
 
@@ -870,46 +968,68 @@ index ae832da..8c01424 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -738,15 +1287,16 @@ install_mangle4(){
+@@ -731,22 +1371,23 @@ install_mangle4(){
+   direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
+   iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
+   xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
+-  [ "$SHARE" = 0 ] || shared_mac_returns xt4 mangle "$MPRE" "$MACS" || return 1
+-  [ "$SHARE" = 0 ] || local_destination_return xt4 "$MPRE" -4 || return 1
++  MP4="$MPRE"; if [ "$SHARE" = 1 ]; then share_scope xt4 mangle "$MPRE" "$MACS" || return 1; MP4="$SHR_CHAIN"; fi
++  [ "$SHARE" = 0 ] || local_destination_return xt4 "$MP4" -4 || return 1
+   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
+     xt4 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
      xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
-   bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
-+  cn_split xt4 mangle "$MOUT" owner || return 1; MO4="$CN_CHAIN"; cn_split xt4 mangle "$MPRE" mark || return 1
+-  bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
++  bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MP4" mangle "$CIDRS" || return 1
++  cn_split xt4 mangle "$MOUT" owner || return 1; MO4="$CN_CHAIN"; cn_split xt4 mangle "$MP4" mark || return 1
    if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
 -    preserve_existing_tcp xt4 "$MOUT" || return 1
+-    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
 +    preserve_existing_tcp xt4 "$MO4" || return 1
-     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MPRE" || return 1; remember_shared_tcp xt4 "$MPRE" || return 1; fi
++    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt4 "$MP4" || return 1; remember_shared_tcp xt4 "$MP4" || return 1; fi
    fi
    if [ "$M" = tproxy ]; then
 -    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
 -    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
 -  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
 -  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MOUT" || return 1; fi
-+    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-+    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
++    [ "$TCP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MP4" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MP4" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++    [ "$UDP" = 0 ] || { scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MP4" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MP4" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt4 mangle "$MO4" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt4 "$MO4" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt4 -t mangle -A "$MP4" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt4 -t mangle -A "$MP4" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
 +  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt4 "$MO4" || return 1; fi
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -768,27 +1318,28 @@ install_mangle6(){
+@@ -761,34 +1402,35 @@ install_mangle6(){
+   direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
+   iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
+   xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
+-  [ "$SHARE" = 0 ] || shared_mac_returns xt6 mangle "$MPRE" "$MACS" || return 1
+-  [ "$SHARE" = 0 ] || local_destination_return xt6 "$MPRE" -6 || return 1
++  MP6="$MPRE"; if [ "$SHARE" = 1 ]; then share_scope xt6 mangle "$MPRE" "$MACS" || return 1; MP6="$SHR_CHAIN"; fi
++  [ "$SHARE" = 0 ] || local_destination_return xt6 "$MP6" -6 || return 1
+   if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then
+     xt6 -t mangle -A "$MOUT" -p tcp --dport 53 -j RETURN || return 1
      xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
-   bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
-+  cn_split xt6 mangle "$MOUT" owner || return 1; MO6="$CN_CHAIN"; cn_split xt6 mangle "$MPRE" mark || return 1
+-  bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
++  bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MP6" mangle "$CIDRS" || return 1
++  cn_split xt6 mangle "$MOUT" owner || return 1; MO6="$CN_CHAIN"; cn_split xt6 mangle "$MP6" mark || return 1
    if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then
 -    preserve_existing_tcp xt6 "$MOUT" || return 1
+-    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
 +    preserve_existing_tcp xt6 "$MO6" || return 1
-     if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MPRE" || return 1; remember_shared_tcp xt6 "$MPRE" || return 1; fi
++    if [ "$SHARE" = 1 ]; then preserve_existing_tcp xt6 "$MP6" || return 1; remember_shared_tcp xt6 "$MP6" || return 1; fi
    fi
    if [ "$M" = tproxy ]; then
 -    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
 -    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
 -  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MOUT" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MOUT" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
 -  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MOUT" || return 1; fi
-+    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-+    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
-+  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MPRE" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MPRE" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
++    [ "$TCP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" tcp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" tcp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MP6" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MP6" -m mark --mark "$MARK/$MASK" -p tcp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++    [ "$UDP" = 0 ] || { scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MP6" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MP6" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; }
++  elif [ "$M" = enhance ] && [ "$UDP" = 1 ]; then scoped_mark xt6 mangle "$MO6" "$S" "$UIDS" udp "" "$MARK/$MASK" || return 1; fake_mark xt6 "$MO6" "$S" udp || return 1; if [ "$SHARE" = 1 ]; then xt6 -t mangle -A "$MP6" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; else xt6 -t mangle -A "$MP6" -m mark --mark "$MARK/$MASK" -p udp -j TPROXY --on-port "$P" --tproxy-mark "$MARK/$MASK" || return 1; fi; fi
 +  if [ "$M" = tproxy ] && [ "$TCP" = 1 ]; then remember_local_tcp xt6 "$MO6" || return 1; fi
    xt6 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt6 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
@@ -919,18 +1039,33 @@ index ae832da..8c01424 100755
 -  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt4 nat "$NOUT" || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt4 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt4 "$NOUT" "$S" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 +  xt4 -t nat -N "$NOUT" || return 1; xt4 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt4 nat "$NOUT" || return 1; system_uid_return xt4 nat "$NOUT" "$S" || return 1; direct_uid_returns xt4 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt4 nat "$NOUT" "$DGIDS" || return 1; iface_out xt4 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$NOUT" "$S" "$UIDS" || return 1; bypass4 "$NOUT" nat "$CIDRS" || return 1; cn_split xt4 nat "$NOUT" owner || return 1; NO4="$CN_CHAIN"; scoped_redirect xt4 nat "$NO4" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt4 "$NO4" "$S" "$P" || return 1; xt4 -t nat -A OUTPUT -j "$NOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$NPRE" nat "$CIDRS" || return 1; cn_split xt4 nat "$NPRE" plain || return 1; xt4 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$NPRE" || return 1; xt4 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 nat "$NPRE" "$IFACES" || return 1; share_scope xt4 nat "$NPRE" "$MACS" || return 1; bypass4 "$SHR_CHAIN" nat "$CIDRS" || return 1; cn_split xt4 nat "$SHR_CHAIN" plain || return 1; xt4 -t nat -A "$SHR_CHAIN" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt4 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
  }
  install_redirect6(){
    P="$1"; M="$2"; TCP="$3"; S="$4"; UIDS="$5"; SHARE="$6"; CIDRS="$7"; IFACES="$8"; DUIDS="$9"; DGIDS="${10:-}"; MACS="${11:-}"; v6supported || return 0; [ "$TCP" = 1 ] || return 0; case "$M" in redirect|enhance) ;; *) return 0;; esac
 -  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt6 nat "$NOUT" || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; scoped_redirect xt6 nat "$NOUT" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt6 "$NOUT" "$S" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
 +  xt6 -t nat -N "$NOUT" || return 1; xt6 -t nat -A "$NOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; core_return xt6 nat "$NOUT" || return 1; system_uid_return xt6 nat "$NOUT" "$S" || return 1; direct_uid_returns xt6 nat "$NOUT" "$DUIDS" || return 1; direct_gid_returns xt6 nat "$NOUT" "$DGIDS" || return 1; iface_out xt6 nat "$NOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$NOUT" "$S" "$UIDS" || return 1; bypass6 "$NOUT" nat "$CIDRS" || return 1; cn_split xt6 nat "$NOUT" owner || return 1; NO6="$CN_CHAIN"; scoped_redirect xt6 nat "$NO6" "$S" "$UIDS" tcp "" "$P" || return 1; fake_redirect xt6 "$NO6" "$S" "$P" || return 1; xt6 -t nat -A OUTPUT -j "$NOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$NPRE" nat "$CIDRS" || return 1; cn_split xt6 nat "$NPRE" plain || return 1; xt6 -t nat -A "$NPRE" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$NPRE" || return 1; xt6 -t nat -A "$NPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 nat "$NPRE" "$IFACES" || return 1; share_scope xt6 nat "$NPRE" "$MACS" || return 1; bypass6 "$SHR_CHAIN" nat "$CIDRS" || return 1; cn_split xt6 nat "$SHR_CHAIN" plain || return 1; xt6 -t nat -A "$SHR_CHAIN" -p tcp -j REDIRECT --to-ports "$P" || return 1; xt6 -t nat -A PREROUTING -j "$NPRE" || return 1; fi
  }
 
  # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
-@@ -841,7 +1392,8 @@ install_udp_leak_guard4(){
+@@ -822,12 +1464,12 @@ remove_dot_guard(){
+ install_dns_redirect4(){
+   P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
+   for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+-  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt4 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt4 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt4 -t nat -N "$DNSPRE" || return 1; iface_in xt4 nat "$DNSPRE" "$IFACES" || return 1; share_scope xt4 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt4 -t nat -A "$SHR_CHAIN" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt4 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+ }
+ install_dns_redirect6(){
+   P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; v6supported || return 0; xt6 -t nat -N "$DNSOUT" || return 1; xt6 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt6 || return 1; iface_out xt6 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt6 nat "$DNSOUT" "$S" "$UIDS" || return 1
+   for X in $DNS_PROTOS; do scoped_redirect xt6 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt6 "$S" "$X" "$P" || return 1; done; xt6 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
+-  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; shared_mac_returns xt6 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt6 -t nat -A "$DNSPRE" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt6 -t nat -N "$DNSPRE" || return 1; iface_in xt6 nat "$DNSPRE" "$IFACES" || return 1; share_scope xt6 nat "$DNSPRE" "$MACS" || return 1; for X in $DNS_PROTOS; do xt6 -t nat -A "$SHR_CHAIN" -p "$X" --dport 53 -j REDIRECT --to-ports "$P" || return 1; done; xt6 -t nat -I PREROUTING 1 -j "$DNSPRE" || return 1; fi
+ }
+
+ install_udp_leak_guard4(){
+@@ -841,15 +1483,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -940,15 +1075,19 @@ index ae832da..8c01424 100755
    xt4 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt4 -t filter -N "$WRFWD" || return 1
-@@ -849,6 +1401,7 @@ install_udp_leak_guard4(){
+     if [ -n "$MARK" ]; then xt4 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
      iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
-     shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
-     bypass4 "$WRFWD" filter "$CIDRS" || return 1
-+    cn_split xt4 filter "$WRFWD" plain || return 1
-     xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
+-    shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
+-    bypass4 "$WRFWD" filter "$CIDRS" || return 1
+-    xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
++    share_scope xt4 filter "$WRFWD" "$MACS" || return 1
++    bypass4 "$SHR_CHAIN" filter "$CIDRS" || return 1
++    cn_split xt4 filter "$SHR_CHAIN" plain || return 1
++    xt4 -t filter -A "$SHR_CHAIN" -p udp -j REJECT || return 1
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
-@@ -864,7 +1417,8 @@ install_udp_leak_guard6(){
+ }
+@@ -864,31 +1508,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -958,12 +1097,15 @@ index ae832da..8c01424 100755
    xt6 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt6 -t filter -N "$WRFWD" || return 1
-@@ -872,23 +1426,24 @@ install_udp_leak_guard6(){
+     if [ -n "$MARK" ]; then xt6 -t filter -A "$WRFWD" -m mark --mark "$MARK/$MASK" -j RETURN || return 1; fi
      iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
-     shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
-     bypass6 "$WRFWD" filter "$CIDRS" || return 1
-+    cn_split xt6 filter "$WRFWD" plain || return 1
-     xt6 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
+-    shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
+-    bypass6 "$WRFWD" filter "$CIDRS" || return 1
+-    xt6 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
++    share_scope xt6 filter "$WRFWD" "$MACS" || return 1
++    bypass6 "$SHR_CHAIN" filter "$CIDRS" || return 1
++    cn_split xt6 filter "$SHR_CHAIN" plain || return 1
++    xt6 -t filter -A "$SHR_CHAIN" -p udp -j REJECT || return 1
      xt6 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
@@ -972,24 +1114,24 @@ index ae832da..8c01424 100755
 -  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt4 "$QUICOUT" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 +  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$QUICOUT" || return 1; xt4 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt4 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt4 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt4 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt4 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass4 "$QUICOUT" filter "$CIDRS" || return 1; cn_split xt4 filter "$QUICOUT" owner || return 1; QO4="$CN_CHAIN"; scoped_reject_quic xt4 "$QO4" "$S" "$UIDS" || return 1; xt4 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$QUICFWD" filter "$CIDRS" || return 1; cn_split xt4 filter "$QUICFWD" plain || return 1; xt4 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$QUICFWD" || return 1; iface_in xt4 filter "$QUICFWD" "$IFACES" || return 1; share_scope xt4 filter "$QUICFWD" "$MACS" || return 1; bypass4 "$SHR_CHAIN" filter "$CIDRS" || return 1; cn_split xt4 filter "$SHR_CHAIN" plain || return 1; xt4 -t filter -A "$SHR_CHAIN" -p udp --dport 443 -j REJECT || return 1; xt4 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
  }
  install_quic6(){
 -  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; scoped_reject_quic xt6 "$QUICOUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
 +  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$QUICOUT" || return 1; xt6 -t filter -A "$QUICOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; system_uid_return xt6 filter "$QUICOUT" "$S" || return 1; direct_uid_returns xt6 filter "$QUICOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$QUICOUT" "$DGIDS" || return 1; iface_out xt6 filter "$QUICOUT" "$IFACES" || return 1; blacklist_returns xt6 filter "$QUICOUT" "$S" "$UIDS" || return 1; bypass6 "$QUICOUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$QUICOUT" owner || return 1; QO6="$CN_CHAIN"; scoped_reject_quic xt6 "$QO6" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$QUICOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$QUICFWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$QUICFWD" plain || return 1; xt6 -t filter -A "$QUICFWD" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$QUICFWD" || return 1; iface_in xt6 filter "$QUICFWD" "$IFACES" || return 1; share_scope xt6 filter "$QUICFWD" "$MACS" || return 1; bypass6 "$SHR_CHAIN" filter "$CIDRS" || return 1; cn_split xt6 filter "$SHR_CHAIN" plain || return 1; xt6 -t filter -A "$SHR_CHAIN" -p udp --dport 443 -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$QUICFWD" || return 1; fi
  }
 
  install_v6_strict(){
 -  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$V6OUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$V6OUT" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
 +  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; xt6 -t filter -N "$V6OUT" || return 1; xt6 -t filter -A "$V6OUT" -o lo -j RETURN || return 1; xt6 -t filter -A "$V6OUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_out xt6 filter "$V6OUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$V6OUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$V6OUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$V6OUT" "$S" "$UIDS" || return 1; bypass6 "$V6OUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$V6OUT" owner || return 1; VO6="$CN_CHAIN"; scoped_reject_all xt6 "$VO6" "$S" "$UIDS" || return 1; xt6 -t filter -A OUTPUT -j "$V6OUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$V6FWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$V6FWD" plain || return 1; xt6 -t filter -A "$V6FWD" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$V6FWD" || return 1; iface_in xt6 filter "$V6FWD" "$IFACES" || return 1; share_scope xt6 filter "$V6FWD" "$MACS" || return 1; bypass6 "$SHR_CHAIN" filter "$CIDRS" || return 1; cn_split xt6 filter "$SHR_CHAIN" plain || return 1; xt6 -t filter -A "$SHR_CHAIN" -j REJECT || return 1; xt6 -t filter -A FORWARD -j "$V6FWD" || return 1; fi
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1476,122 @@ v6_disable_guard_ready(){
+@@ -921,16 +1567,122 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -1048,13 +1190,13 @@ index ae832da..8c01424 100755
 -  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt4 "$KOUT" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 +  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; xt4 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt4 -t filter -F "$KOUT" || return 1; xt4 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt4 || return 1; iface_out xt4 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt4 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt4 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt4 filter "$KOUT" "$S" "$UIDS" || return 1; bypass4 "$KOUT" filter "$CIDRS" || return 1; cn_split xt4 filter "$KOUT" owner reuse || return 1; KO4="$CN_CHAIN"; scoped_reject_all xt4 "$KO4" "$S" "$UIDS" || return 1; xt4 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt4 filter "$KFWD" "$MACS" || return 1; bypass4 "$KFWD" filter "$CIDRS" || return 1; cn_split xt4 filter "$KFWD" plain || return 1; xt4 -t filter -A "$KFWD" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt4 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt4 -t filter -F "$KFWD" || return 1; iface_in xt4 filter "$KFWD" "$IFACES" || return 1; share_scope xt4 filter "$KFWD" "$MACS" reuse || return 1; bypass4 "$SHR_CHAIN" filter "$CIDRS" || return 1; cn_split xt4 filter "$SHR_CHAIN" plain || return 1; xt4 -t filter -A "$SHR_CHAIN" -j REJECT || return 1; xt4 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
  }
  install_kill6(){
 -  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; scoped_reject_all xt6 "$KOUT" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
 -  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
 +  S="$1"; UIDS="$2"; SHARE="$3"; CIDRS="$4"; IFACES="$5"; DUIDS="$6"; DGIDS="${7:-}"; MACS="${8:-}"; v6supported || return 0; has ip6tables || return 1; xt6 -t filter -N "$KOUT" >/dev/null 2>&1 || true; xt6 -t filter -F "$KOUT" || return 1; xt6 -t filter -A "$KOUT" -o lo -j RETURN || return 1; startup_core_return xt6 || return 1; iface_out xt6 filter "$KOUT" "$IFACES" || return 1; direct_uid_returns xt6 filter "$KOUT" "$DUIDS" || return 1; direct_gid_returns xt6 filter "$KOUT" "$DGIDS" || return 1; blacklist_returns xt6 filter "$KOUT" "$S" "$UIDS" || return 1; bypass6 "$KOUT" filter "$CIDRS" || return 1; cn_split xt6 filter "$KOUT" owner reuse || return 1; KO6="$CN_CHAIN"; scoped_reject_all xt6 "$KO6" "$S" "$UIDS" || return 1; xt6 -t filter -I OUTPUT 1 -j "$KOUT" || return 1
-+  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; shared_mac_returns xt6 filter "$KFWD" "$MACS" || return 1; bypass6 "$KFWD" filter "$CIDRS" || return 1; cn_split xt6 filter "$KFWD" plain || return 1; xt6 -t filter -A "$KFWD" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
++  if [ "$SHARE" = 1 ]; then xt6 -t filter -N "$KFWD" >/dev/null 2>&1 || true; xt6 -t filter -F "$KFWD" || return 1; iface_in xt6 filter "$KFWD" "$IFACES" || return 1; share_scope xt6 filter "$KFWD" "$MACS" reuse || return 1; bypass6 "$SHR_CHAIN" filter "$CIDRS" || return 1; cn_split xt6 filter "$SHR_CHAIN" plain || return 1; xt6 -t filter -A "$SHR_CHAIN" -j REJECT || return 1; xt6 -t filter -I FORWARD 1 -j "$KFWD" || return 1; fi
  }
 
 -validatecfg(){ BIN="$1"; CFG="$2"; : > "$CHECKLOG"; "$BIN" -t -d "$RUN" -f "$CFG" >>"$CHECKLOG" 2>&1; }
@@ -1117,7 +1259,7 @@ index ae832da..8c01424 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +1622,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +1713,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -1126,7 +1268,7 @@ index ae832da..8c01424 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1020,19 +1681,58 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1020,19 +1772,59 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
  watchdog(){
@@ -1140,6 +1282,7 @@ index ae832da..8c01424 100755
    load_session_fake_ip_policy || exit 0
 -  mkdir -p "$RUN" || exit 0; printf '%s\n' "$$" > "$WATCHDOG_PID"; MISS=0; H_TICK=0; while [ "$MISS" -lt 3 ]; do if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then MISS=0; H_TICK=$((H_TICK+1)); if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; fi; sleep 2; else MISS=$((MISS+1)); sleep 0.20; fi; done; acquire_lock || exit 0
 +  cnip_load_session
++  share_load_session
 +  printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
 +  MISS=0; H_TICK=0
 +  while [ "$MISS" -lt 3 ]; do
@@ -1193,7 +1336,7 @@ index ae832da..8c01424 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +1745,45 @@ probe_core_owner(){
+@@ -1045,9 +1837,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -1240,7 +1383,7 @@ index ae832da..8c01424 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +1794,27 @@ core_identity_prepare(){
+@@ -1058,14 +1886,27 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -1271,7 +1414,7 @@ index ae832da..8c01424 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +1828,9 @@ core_launch(){
+@@ -1079,8 +1920,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -1283,7 +1426,7 @@ index ae832da..8c01424 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +1897,21 @@ core_tune(){
+@@ -1147,6 +1989,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -1305,7 +1448,7 @@ index ae832da..8c01424 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,9 +1990,67 @@ google_firewall_maintain(){ (
+@@ -1225,9 +2082,67 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -1341,8 +1484,8 @@ index ae832da..8c01424 100755
 +capture_unwind(){
 +  # Only the chains install_capture_rules creates; the IPv6-disable guard installed before
 +  # the core launch and the Kill Switch guard stay untouched.
-+  SWEEP_ONLY="$MOUT $MPRE $NOUT $NPRE $DNSOUT $DNSPRE $WROUT $WRFWD $QUICOUT $QUICFWD ${MOUT}_T ${NOUT}_T ${WROUT}_T ${QUICOUT}_T"
-+  [ "$START_V6" != strict ] || SWEEP_ONLY="$SWEEP_ONLY $V6OUT $V6FWD ${V6OUT}_T"
++  SWEEP_ONLY="$MOUT $MPRE $NOUT $NPRE $DNSOUT $DNSPRE $WROUT $WRFWD $QUICOUT $QUICFWD ${MOUT}_T ${NOUT}_T ${WROUT}_T ${QUICOUT}_T ${MPRE}_S ${NPRE}_S ${DNSPRE}_S ${WRFWD}_S ${QUICFWD}_S"
++  [ "$START_V6" != strict ] || SWEEP_ONLY="$SWEEP_ONLY $V6OUT $V6FWD ${V6OUT}_T ${V6FWD}_S"
 +  cleanup_snapshot_begin; sweep_rules; CLEAN_SNAPSHOT_ACTIVE=0
 +  if [ -n "$MARK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
 +    for CU_F in 4 6; do
@@ -1373,7 +1516,7 @@ index ae832da..8c01424 100755
    START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
    bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
    tuning_valid || fail "$TUNE_ERROR"
-@@ -1242,8 +2065,16 @@ start(){
+@@ -1242,8 +2157,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -1391,7 +1534,7 @@ index ae832da..8c01424 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2084,80 @@ start(){
+@@ -1253,75 +2176,82 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -1409,6 +1552,8 @@ index ae832da..8c01424 100755
 +  # Before the Kill Switch bootstrap guard: guards and capture rules reference the CN sets.
 +  start_stage "cnip"
 +  cnip_prepare
++  start_stage "share-scope"
++  share_prepare
 +  if [ "$START_KILL" = 1 ] && [ -z "$CORE_RUNNER" ]; then
 +    fail "Kill Switch 启动缺少可验证的隔离核心身份，保留已有网络接管"
 +  fi
@@ -1510,7 +1655,7 @@ index ae832da..8c01424 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2169,84 @@ start(){
+@@ -1333,19 +2263,85 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -1518,12 +1663,13 @@ index ae832da..8c01424 100755
 -  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
 +  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
++  printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
 +  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  transaction_current || fail "启动事务已撤销"
 +  if [ "$START_KILL" = 1 ]; then
 +    revoke_bootstrap || fail "无法撤销临时核心启动例外"
-+    unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; cn_drop_tail xt4 filter "${KOUT}_T"
-+    if has ip6tables; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; cn_drop_tail xt6 filter "${KOUT}_T"; fi
++    unhook xt4 filter OUTPUT "$KOUT"; unhook xt4 filter FORWARD "$KFWD"; cn_drop_tail xt4 filter "${KOUT}_T"; cn_drop_tail xt4 filter "${KFWD}_S"
++    if has ip6tables; then unhook xt6 filter OUTPUT "$KOUT"; unhook xt6 filter FORWARD "$KFWD"; cn_drop_tail xt6 filter "${KOUT}_T"; cn_drop_tail xt6 filter "${KFWD}_S"; fi
 +    for GUARD_BIN in xt4 xt6; do
 +      if [ "$GUARD_BIN" = xt6 ] && ! has ip6tables; then continue; fi
 +      GUARD_RULES=$("$GUARD_BIN" -t filter -S) || fail "启动保护清理状态未知"
@@ -1541,8 +1687,9 @@ index ae832da..8c01424 100755
 +  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
 +  transaction_current || fail "启动事务已撤销"
    rm -f "$START_ERROR"; start_stage "running"
+-  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
 +  START_ACTIVE=0
-   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
++  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE"
    if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
  }
 
@@ -1599,7 +1746,7 @@ index ae832da..8c01424 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +2308,12 @@ status(){
+@@ -1407,6 +2403,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -1612,11 +1759,12 @@ index ae832da..8c01424 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +2394,20 @@ status(){
+@@ -1487,13 +2489,21 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
 -  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":false,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG"
++  share_load_session; split_safe_ifaces "$SHR_DROPPED" || SHR_DROPPED=""
 +  cnip_load_session; CNIPR=$(sed -n 's/^CNIP_REASON=//p' "$SESSION" 2>/dev/null | head -n 1 | tr -cd 'A-Za-z0-9,._-')
 +  CNIP4N=0; CNIP6N=0
 +  if [ "$CNIP_STATE" = ipset ] && has ipset; then
@@ -1624,18 +1772,18 @@ index ae832da..8c01424 100755
 +    case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
 +    if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
 +  fi
-+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N"
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED"
  }
 
  # Session-bound network integrity. No remote reachability failure restarts the core.
  # iptables-restore --noflush commits only the named Hetu chains, never netd tables.
  health_owned(){
 -  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print;next}
-+  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD|MOUT_T|NOUT_T|WROUT_T|QUICOUT_T|V6OUT_T)$/ {print;next}
++  awk '($1=="-N" || $1=="-A") && $2 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD|MOUT_T|NOUT_T|WROUT_T|QUICOUT_T|V6OUT_T|MPRE_S|NPRE_S|DNSPRE_S|WRFWD_S|QUICFWD_S|V6FWD_S)$/ {print;next}
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1666,16 +2580,18 @@ health_restore_table(){
+@@ -1666,16 +2676,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -1656,7 +1804,7 @@ index ae832da..8c01424 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1757,6 +2673,16 @@ health_json(){ (
+@@ -1757,6 +2769,16 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -1673,7 +1821,7 @@ index ae832da..8c01424 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +2700,16 @@ case "${1:-status}" in
+@@ -1774,10 +2796,16 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -2328,6 +2476,237 @@ index f104cef..b473a20 100644
      }
 
      private static String readLine(InputStream in)throws IOException{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java
+new file mode 100644
+index 0000000..fe1a275
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java
+@@ -0,0 +1,225 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.ArrayDeque;
++import java.util.Collection;
++import java.util.Collections;
++import java.util.HashMap;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++import java.util.TreeSet;
++import java.util.regex.Pattern;
++
++/**
++ * Pure rules of network-match automation (no Android API, host-tested): conditions, the action
++ * encoding, the Root command of the "run script" action and the debounce/loop limiter.
++ *
++ * Conditions: the historical Wi-Fi rule (SSID set AND BSSID set, empty = any) OR "any cellular",
++ * plus SIM slot ("the default data SIM sits in slot N and the device is on cellular") and MCC+MNC
++ * ("on cellular and the default data SIM operator or the registered network operator is one of
++ * them"). The SIM facts come from permission-free APIs (SubscriptionManager default data
++ * subscription, TelephonyManager#getSimOperator/#getNetworkOperator) or Root getprop
++ * gsm.sim.operator.numeric / gsm.operator.numeric; READ_PHONE_STATE is never needed.
++ *
++ * Actions: start | stop | none | switch_config:&lt;config name&gt; | run_script:&lt;managed script&gt;.
++ */
++final class NetworkMatchRules {
++    private NetworkMatchRules() {}
++
++    static final String SCRIPTS_ROOT = "/data/adb/hetu/scripts";
++    static final String SCRIPTS_LOG = "/data/adb/hetu/run/scripts.log";
++    static final int SCRIPT_TIMEOUT_SECONDS = 12;
++    static final int MAX_MCC_MNC = 32;
++    private static final Pattern MCC_MNC = Pattern.compile("[0-9]{5,6}");
++    private static final Pattern SCRIPT_NAME = Pattern.compile("[A-Za-z0-9._-]{1,75}");
++
++    // ------------------------------------------------------------------ actions
++    static final class Action {
++        final String kind;   // start | stop | none | switch | script
++        final String target; // config or script name for switch/script, else ""
++        Action(String kind, String target) { this.kind = kind; this.target = target; }
++        boolean background() { return "switch".equals(kind) || "script".equals(kind); }
++        String encode() {
++            if ("switch".equals(kind)) return "switch_config:" + target;
++            if ("script".equals(kind)) return "run_script:" + target;
++            return kind;
++        }
++    }
++
++    /** Unknown or malformed values decay to "none" so a bad preference never acts. */
++    static Action parseAction(String raw) {
++        String value = raw == null ? "" : raw.trim();
++        if (value.equals("start") || value.equals("stop") || value.equals("none")) return new Action(value, "");
++        if (value.startsWith("switch_config:")) {
++            String name = value.substring("switch_config:".length());
++            return validConfigName(name) ? new Action("switch", name) : new Action("none", "");
++        }
++        if (value.startsWith("run_script:")) {
++            String name = value.substring("run_script:".length());
++            return validScriptName(name) ? new Action("script", name) : new Action("none", "");
++        }
++        return new Action("none", "");
++    }
++
++    static boolean validConfigName(String name) {
++        if (name == null) return false;
++        String n = name.trim();
++        return n.equals(name) && n.length() >= 3 && n.length() <= 120 && n.indexOf('/') < 0 && n.indexOf('\\') < 0
++                && n.indexOf('\u0000') < 0 && n.indexOf('\n') < 0 && n.indexOf('\r') < 0 && !n.equals(".") && !n.equals("..");
++    }
++
++    static boolean validScriptName(String name) {
++        return name != null && SCRIPT_NAME.matcher(name).matches() && name.toLowerCase(Locale.ROOT).endsWith(".sh")
++                && !name.equals("pre-start.sh") && !name.equals("post-stop.sh") && !name.equals(".sh") && !name.startsWith(".");
++    }
++
++    // ------------------------------------------------------------------ conditions
++    static final class Observation {
++        final boolean wifi, cellular;
++        final String ssid, bssid;
++        /** 1-based slot of the default data SIM, or -1 when unknown. */
++        final int dataSlot;
++        final String simOperator, networkOperator;
++        Observation(boolean wifi, boolean cellular, String ssid, String bssid, int dataSlot, String simOperator, String networkOperator) {
++            this.wifi = wifi; this.cellular = cellular; this.ssid = ssid == null ? "" : ssid; this.bssid = bssid == null ? "" : bssid;
++            this.dataSlot = dataSlot; this.simOperator = normalizeMccMnc(simOperator); this.networkOperator = normalizeMccMnc(networkOperator);
++        }
++    }
++
++    static final class Conditions {
++        final Set<String> ssids, bssids, slots, mccMncs;
++        final boolean mobile;
++        Conditions(Collection<String> ssids, Collection<String> bssids, boolean mobile, Collection<String> slots, Collection<String> mccMncs) {
++            this.ssids = copy(ssids); this.bssids = copy(bssids); this.mobile = mobile;
++            this.slots = sanitizeSlots(slots); this.mccMncs = sanitizeMccMncs(mccMncs);
++        }
++        boolean needsOperator() { return !mccMncs.isEmpty(); }
++        boolean needsSlot() { return !slots.isEmpty(); }
++    }
++
++    static boolean matched(Observation o, Conditions c) {
++        boolean wifi = o.wifi && member(o.ssid, c.ssids, false) && member(o.bssid, c.bssids, true);
++        boolean anyCellular = o.cellular && c.mobile;
++        boolean slot = o.cellular && o.dataSlot >= 1 && c.slots.contains(Integer.toString(o.dataSlot));
++        boolean operator = o.cellular && !c.mccMncs.isEmpty()
++                && ((!o.simOperator.isEmpty() && c.mccMncs.contains(o.simOperator))
++                || (!o.networkOperator.isEmpty() && c.mccMncs.contains(o.networkOperator)));
++        return wifi || anyCellular || slot || operator;
++    }
++
++    static String label(Observation o) {
++        if (o.wifi) return "Wi‑Fi" + (o.ssid.isEmpty() ? "" : " · " + o.ssid) + (o.bssid.isEmpty() ? "" : " · " + o.bssid);
++        if (!o.cellular) return "其他/离线";
++        StringBuilder out = new StringBuilder("移动数据");
++        if (o.dataSlot >= 1) out.append(" · 卡").append(o.dataSlot);
++        String op = !o.simOperator.isEmpty() ? o.simOperator : o.networkOperator;
++        if (!op.isEmpty()) out.append(" · ").append(op);
++        if (!o.networkOperator.isEmpty() && !o.simOperator.isEmpty() && !o.networkOperator.equals(o.simOperator))
++            out.append(" · 漫游 ").append(o.networkOperator);
++        return out.toString();
++    }
++
++    private static boolean member(String value, Set<String> set, boolean ignoreCase) {
++        if (set.isEmpty()) return true;
++        for (String x : set) if (ignoreCase ? x.equalsIgnoreCase(value) : x.equals(value)) return true;
++        return false;
++    }
++
++    private static Set<String> copy(Collection<String> values) {
++        if (values == null || values.isEmpty()) return Collections.emptySet();
++        TreeSet<String> out = new TreeSet<>();
++        for (String v : values) if (v != null && !v.trim().isEmpty()) out.add(v.trim());
++        return out;
++    }
++
++    static Set<String> sanitizeSlots(Collection<String> values) {
++        TreeSet<String> out = new TreeSet<>();
++        if (values != null) for (String v : values) if ("1".equals(v == null ? "" : v.trim()) || "2".equals(v == null ? "" : v.trim())) out.add(v.trim());
++        return out;
++    }
++
++    static Set<String> sanitizeMccMncs(Collection<String> values) {
++        TreeSet<String> out = new TreeSet<>();
++        if (values != null) for (String v : values) {
++            String n = normalizeMccMnc(v);
++            if (!n.isEmpty() && out.size() < MAX_MCC_MNC) out.add(n);
++        }
++        return out;
++    }
++
++    /** "460-00", "460 00", "46000" -> "46000"; anything that is not 5-6 digits -> "". */
++    static String normalizeMccMnc(String raw) {
++        if (raw == null) return "";
++        String digits = raw.trim().replace("-", "").replace(" ", "").replace("_", "");
++        return MCC_MNC.matcher(digits).matches() ? digits : "";
++    }
++
++    /** One slot of a getprop list ("46000,46011"; empty fields for an empty slot). 1-based. */
++    static String operatorForSlot(String propValue, int slot) {
++        if (propValue == null || slot < 1) return "";
++        String[] parts = propValue.trim().split(",", -1);
++        return slot <= parts.length ? normalizeMccMnc(parts[slot - 1]) : "";
++    }
++
++    // ------------------------------------------------------------------ run script
++    /**
++     * Root command for a managed script under {@link #SCRIPTS_ROOT}: bounded by timeout(1), stdout/
++     * stderr and the exit code appended to scripts.log, exit code preserved (124 = timeout, 44 =
++     * missing). The script never runs inside a start/stop transaction lock.
++     */
++    static String scriptCommand(String name, String event, String network, String mode, String config) {
++        if (!validScriptName(name)) throw new IllegalArgumentException("脚本文件名无效");
++        if (!"network-match".equals(event) && !"network-unmatch".equals(event)) throw new IllegalArgumentException("未知事件");
++        String path = SCRIPTS_ROOT + "/" + name;
++        StringBuilder out = new StringBuilder();
++        out.append("test -f ").append(q(path)).append(" || exit 44; ");
++        out.append("export HETU_HOOK=network; ");
++        out.append("export HETU_EVENT=").append(q(event)).append("; ");
++        out.append("export HETU_NETWORK=").append(q(clean(network))).append("; ");
++        out.append("export HETU_MODE=").append(q(clean(mode))).append("; ");
++        out.append("export HETU_CONFIG=").append(q(clean(config))).append("; ");
++        out.append("export HETU_BASE=/data/adb/hetu; export HETU_RUN_DIR=/data/adb/hetu/run; ");
++        out.append("export HETU_SCRIPT_DIR=").append(q(SCRIPTS_ROOT)).append("; ");
++        out.append("mkdir -p /data/adb/hetu/run; ");
++        out.append("{ printf '\\n[%s] network-match event=%s script=%s network=%s\\n' \"$(date '+%Y-%m-%d %H:%M:%S')\" ")
++                .append(q(event)).append(' ').append(q(name)).append(' ').append(q(clean(network))).append("; ");
++        out.append("if command -v timeout >/dev/null 2>&1; then timeout ").append(SCRIPT_TIMEOUT_SECONDS).append(" sh ").append(q(path))
++                .append("; else sh ").append(q(path)).append("; fi; HETU_RC=$?; ");
++        out.append("printf '[network-match] exit=%s\\n' \"$HETU_RC\"; } >> ").append(q(SCRIPTS_LOG)).append(" 2>&1; ");
++        out.append("exit $HETU_RC");
++        return out.toString();
++    }
++
++    private static String clean(String value) {
++        if (value == null) return "";
++        StringBuilder out = new StringBuilder();
++        for (char c : value.toCharArray()) if (c >= 32 && c != 127) out.append(c);
++        return out.length() > 160 ? out.substring(0, 160) : out.toString();
++    }
++
++    static String q(String value) { return "'" + value.replace("'", "'\\''") + "'"; }
++
++    // ------------------------------------------------------------------ debounce / loop limiter
++    /**
++     * Background actions (switch config, run script) wait for a stable network and are rate
++     * limited: the same decision never re-runs inside {@code repeatMs}, and at most {@code burst}
++     * background actions run inside {@code windowMs}. A script or restart that itself flips the
++     * network therefore cannot drive an endless switch/script loop.
++     */
++    static final class Limiter {
++        final long repeatMs, windowMs; final int burst;
++        private final ArrayDeque<Long> recent = new ArrayDeque<>();
++        private final Map<String, Long> last = new HashMap<>();
++        Limiter(long repeatMs, long windowMs, int burst) { this.repeatMs = repeatMs; this.windowMs = windowMs; this.burst = burst; }
++        synchronized boolean allow(String decision, long nowMs) {
++            Long previous = last.get(decision);
++            if (previous != null && nowMs - previous < repeatMs) return false;
++            while (!recent.isEmpty() && nowMs - recent.peekFirst() >= windowMs) recent.pollFirst();
++            if (recent.size() >= burst) return false;
++            recent.addLast(nowMs); last.put(decision, nowMs);
++            return true;
++        }
++    }
++
++    static final long STABLE_DELAY_MS = 2500L;
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 index 4f004b9..3b6a5fd 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
@@ -5243,8 +5622,166 @@ index 48280df..b453abf 100644
 +        if (record.time != before) put(name, if (record.delay > 0L) record.delay else failure)
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+index 9aa0aba..3c138b8 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
+@@ -343,8 +343,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
+     val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
+     val bssids = remember(bssidOriginal) { mutableStateListOf<HxEditEntry>().apply { bssidOriginal.forEach { add(HxEditEntry(it)) } } }
++    // SIM conditions (no READ_PHONE_STATE: default data SIM slot + operator codes, see NetworkMatchRules).
++    val simSlots = remember(revision) { prefs.getStringSet("networkMatchSimSlots", emptySet()).orEmpty().toSet() }
++    val mccOriginal = remember(revision) { prefs.getStringSet("networkMatchMccMnc", emptySet()).orEmpty().sorted() }
++    val mccs = remember(mccOriginal) { mutableStateListOf<HxEditEntry>().apply { mccOriginal.forEach { add(HxEditEntry(it)) } } }
++    val lastActionResult = remember(revision) { prefs.getString("networkMatchLastActionResult", "").orEmpty() }
++    var targetPick by remember { mutableStateOf<Pair<String, String>?>(null) }
++    var targetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
+     fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
+-    val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal
++    val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal || values(mccs) != mccOriginal
+
+     fun refresh() { revision++ }
+     fun service(action: String) {
+@@ -370,10 +377,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         }
+         if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
+     }
+-    fun actionLabel(key: String, def: String): String = when (prefs.getString(key, def)) {
+-        "start" -> "启动代理"
+-        "stop" -> "停止代理"
+-        else -> "不操作"
++    fun actionLabel(key: String, def: String): String {
++        val action = NetworkMatchRules.parseAction(prefs.getString(key, def))
++        return when (action.kind) {
++            "start" -> "启动代理"
++            "stop" -> "停止代理"
++            "switch" -> "切换配置 · " + action.target
++            "script" -> "运行脚本 · " + action.target
++            else -> "不操作"
++        }
++    }
++    fun toggleSlot(slot: String, on: Boolean) {
++        val next = (if (on) simSlots + slot else simSlots - slot).toSortedSet()
++        prefs.edit().putStringSet("networkMatchSimSlots", next).apply()
++        refresh()
++        evaluate()
++    }
++    fun openTargets(key: String, kind: String) {
++        scope.launch {
++            val names = runCatching {
++                if (kind == "switch") {
++                    val core = ProxyRuntimeProfile.load(prefs).core
++                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ProxyConfigLibrary(context).list(core).map { it.name } }
++                } else ProxyScriptHooks.listManaged(context).map { it.name }
++            }.getOrElse { emptyList() }.filter { if (kind == "switch") NetworkMatchRules.validConfigName(it) else NetworkMatchRules.validScriptName(it) }
++            if (names.isEmpty()) {
++                vm.toast(if (kind == "switch") "当前核心没有可切换的配置" else "没有可运行的脚本，请先在「脚本」中导入 .sh")
++            } else {
++                targetChoices = names
++                targetPick = key to kind
++            }
++        }
+     }
+     fun save() {
+         val bad = values(bssids).firstOrNull { !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) }
+@@ -381,9 +415,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             vm.toast("BSSID 格式无效：$bad")
+             return
+         }
++        val badMcc = values(mccs).firstOrNull { NetworkMatchRules.normalizeMccMnc(it).isEmpty() }
++        if (badMcc != null) {
++            vm.toast("MCC+MNC 应为 5–6 位数字，例如 46000：$badMcc")
++            return
++        }
+         prefs.edit()
+             .putStringSet("networkMatchSsids", values(ssids).toSet())
+             .putStringSet("networkMatchBssids", values(bssids).map { it.uppercase() }.toSet())
++            .putStringSet("networkMatchMccMnc", NetworkMatchRules.sanitizeMccMncs(values(mccs)))
+             .apply()
+         vm.toast("匹配条件已保存")
+         refresh()
+@@ -435,6 +475,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         refresh()
+                         evaluate()
+                     }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
++                    SettingsDivider()
++                    SettingsSwitchRow(ht("卡1 · 蜂窝数据"), "1" in simSlots, { toggleSlot("1", it) },
++                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
++                    SettingsDivider()
++                    SettingsSwitchRow(ht("卡2 · 蜂窝数据"), "2" in simSlots, { toggleSlot("2", it) },
++                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
+                 }
+             }
+         }
+@@ -448,6 +494,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                     SettingsNavRow(ht("条件失配"), compact = true, icon = HxIcons.CircleStop, value = ht(actionLabel("networkUnmatchAction", "none")), dropdown = true) {
+                         actionKey = "networkUnmatchAction"
+                     }
++                    if (lastActionResult.isNotBlank()) {
++                        SettingsDivider()
++                        SettingsNavRow(ht("最近动作"), subtitle = lastActionResult, compact = true, icon = HxIcons.Radio) { refresh() }
++                    }
+                 }
+             }
+         }
+@@ -457,6 +507,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         item(key = "bssid") {
+             SettingsSection { HxEditableList("Wi‑Fi BSSID（留空不限）", "BSSID", "AA:BB:CC:DD:EE:FF", bssids) }
+         }
++        item(key = "mccmnc") {
++            SettingsSection { HxEditableList("MCC+MNC（蜂窝网络时，默认数据卡或注册网络匹配即满足）", "MCC+MNC", "例如 46000", mccs) }
++        }
+         item(key = "note") {
+             HxBanner(
+                 ht("部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。"),
+@@ -471,15 +524,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
+             referenceRadios = true,
+             trailingReferenceRadios = key == "networkUnmatchAction",
+-            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理"))),
+-            selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
++            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理")),
++                HxChoice("switch", ht("切换配置…")), HxChoice("script", ht("运行脚本…"))),
++            selected = NetworkMatchRules.parseAction(prefs.getString(key, if (key == "networkMatchAction") "start" else "none")).kind,
+             onPick = { value ->
+-                prefs.edit().putString(key, value).apply()
+                 actionKey = null
++                if (value == "switch" || value == "script") {
++                    openTargets(key, value)
++                } else {
++                    prefs.edit().putString(key, value).apply()
++                    refresh()
++                    evaluate()
++                }
++            },
++            onDismiss = { actionKey = null },
++        )
++    }
++
++    targetPick?.let { (key, kind) ->
++        val current = NetworkMatchRules.parseAction(prefs.getString(key, ""))
++        HxChoiceSheet(
++            title = if (kind == "switch") ht("请选择匹配时使用的配置") else ht("请选择匹配时运行的脚本"),
++            referenceRadios = true,
++            choices = targetChoices.map { HxChoice(it, it) },
++            selected = if (current.kind == kind) current.target else null,
++            maxVisibleChoices = 8,
++            footer = if (kind == "script") ht("脚本以 Root 运行，最长 12 秒，输出与退出码写入 scripts.log；环境变量 HETU_EVENT / HETU_NETWORK。") else ht("运行中会校验新配置后重启核心；失败时恢复原配置。"),
++            onPick = { name ->
++                val encoded = NetworkMatchRules.Action(kind, name).encode()
++                prefs.edit().putString(key, encoded).apply()
++                targetPick = null
+                 refresh()
+                 evaluate()
+             },
+-            onDismiss = { actionKey = null },
++            onDismiss = { targetPick = null },
+         )
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-index 56b04c2..7289454 100644
+index 56b04c2..de41dc5 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 @@ -45,8 +45,20 @@ public final class ProxyNetworkMatchService extends Service {
@@ -5310,7 +5847,7 @@ index 56b04c2..7289454 100644
          evaluate();
          return START_STICKY;
      }
-@@ -123,56 +144,259 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -123,57 +144,260 @@ public final class ProxyNetworkMatchService extends Service {
          bootRestores.request(delayMs);
      }
 
@@ -5411,9 +5948,9 @@ index 56b04c2..7289454 100644
 -                    .apply();
 -            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
 +            return deferBootRecovery("Root 代理开机恢复失败："+detail);
-+        }
-+    }
-+
+         }
+     }
+
 +    private boolean bootAutoEnabled(){
 +        return prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartRevoked",false);
 +    }
@@ -5464,8 +6001,8 @@ index 56b04c2..7289454 100644
 +                .remove("proxyRecoveryTerminalReason").remove("proxyRecoveryCompletedAfterBudget").commit())
 +            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
 +        nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;
-         }
-     }
++        }
++    }
 +    }
 +
 +    private long remainingRecoveryTime(){
@@ -5598,9 +6135,10 @@ index 56b04c2..7289454 100644
 +            nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;lastAutoRecoveryElapsed=-1L;
 +        });
 +    }
-
++
      @Override public void onDestroy(){
          destroyed=true;
+         evaluations.close();
 @@ -188,6 +412,27 @@ public final class ProxyNetworkMatchService extends Service {
      }
      @Override public android.os.IBinder onBind(Intent i){return null;}
@@ -5649,7 +6187,119 @@ index 56b04c2..7289454 100644
                  try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
                          2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
              }
-@@ -482,16 +727,31 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -397,6 +642,9 @@ public final class ProxyNetworkMatchService extends Service {
+                         }
+                     }else if("stop".equals(action)&&running&&"automation".equals(owner)){
+                         scheduleAutomaticStop(automaticStopGeneration);
++                    }else{
++                        NetworkMatchRules.Action background=NetworkMatchRules.parseAction(action);
++                        if(background.background())scheduleBackgroundAction(automaticStopGeneration,environment,background);
+                     }
+                     // A failed start must remain eligible for the next callback.
+                     prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
+@@ -435,6 +683,45 @@ public final class ProxyNetworkMatchService extends Service {
+         },3500L);
+     }
+
++    // Switch-config / run-script: debounced (stable network for 2.5 s, same decision) and rate limited
++    // (the same decision not again within 30 s, at most 3 background actions per minute).
++    private final NetworkMatchRules.Limiter backgroundLimiter=new NetworkMatchRules.Limiter(30000L,60000L,3);
++    private void scheduleBackgroundAction(long generation,Environment decided,NetworkMatchRules.Action action){
++        final String decision=decided.label+"|"+decided.matched+"|"+action.encode();
++        scheduleWorker(()->{
++            if(generation!=automaticStopGeneration||!prefs.getBoolean("networkMatchEnabled",false))return;
++            Environment current=readEnvironment();
++            if(!action.encode().equals(current.action)||!current.label.equals(decided.label))return;
++            if(!backgroundLimiter.allow(decision,SystemClock.elapsedRealtime())){
++                prefs.edit().putString("networkMatchLastActionResult","已限流，跳过："+actionText(action)).apply();
++                return;
++            }
++            String result;
++            try{
++                if("switch".equals(action.kind)){
++                    JSONObject out=new RootProxyManager(getApplicationContext()).switchConfigForAutomation(action.target,
++                            ()->!destroyed&&generation==automaticStopGeneration&&action.encode().equals(readEnvironment().action));
++                    if(out.optBoolean("cancelled",false))return;
++                    if(out.optBoolean("unchanged",false))result="已是目标配置："+action.target;
++                    else if(!out.optBoolean("ok",false))result="切换配置失败："+out.optString("message","未知错误");
++                    else result="已切换配置 "+out.optString("from","")+" → "+action.target+(out.optBoolean("restarted",false)?"（已重启核心）":"（下次启动生效）");
++                }else{
++                    String command=NetworkMatchRules.scriptCommand(action.target,current.matched?"network-match":"network-unmatch",current.label,
++                            prefs.getString("proxyBaseMode",""),prefs.getString("proxyUiLastConfig",""));
++                    RootBridge.Result out=RootBridge.rootShell(getApplicationContext(),command,(NetworkMatchRules.SCRIPT_TIMEOUT_SECONDS+6)*1000L);
++                    result=out.ok()?"脚本已执行："+action.target:out.code==124?"脚本超时已停止："+action.target
++                            :out.code==44?"脚本不存在："+action.target:"脚本退出码 "+out.code+"："+action.target+"（见 scripts.log）";
++                }
++            }catch(Exception error){
++                result=actionText(action)+"失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());
++            }
++            prefs.edit().putString("networkMatchLastActionResult",result).putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
++        },NetworkMatchRules.STABLE_DELAY_MS);
++    }
++    private static String actionText(NetworkMatchRules.Action action){
++        return "switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
++    }
++
+     private static final class Environment{
+         final String label;
+         final boolean matched;
+@@ -453,11 +740,50 @@ public final class ProxyNetworkMatchService extends Service {
+             WifiInfo info=wm==null?null:wm.getConnectionInfo();
+             if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
+         }catch(SecurityException ignored){}
+-        boolean matched=(wifi&&matches(ssid,set("networkMatchSsids"),false)&&matches(bssid,set("networkMatchBssids"),true))
+-                ||(mobile&&prefs.getBoolean("networkMatchMobile",false));
+-        String action=prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none");
+-        String label=wifi?("Wi‑Fi"+(ssid.isEmpty()?"":" · "+ssid)+(bssid.isEmpty()?"":" · "+bssid)):(mobile?"移动数据":"其他/离线");
+-        return new Environment(label,matched,action);
++        NetworkMatchRules.Conditions conditions=new NetworkMatchRules.Conditions(set("networkMatchSsids"),set("networkMatchBssids"),
++                prefs.getBoolean("networkMatchMobile",false),set("networkMatchSimSlots"),set("networkMatchMccMnc"));
++        int slot=-1;String simOperator="",networkOperator="";
++        if(mobile){
++            int[] slotHolder={-1};String[] operators=readSimOperators(slotHolder,conditions);
++            slot=slotHolder[0];simOperator=operators[0];networkOperator=operators[1];
++        }
++        NetworkMatchRules.Observation observation=new NetworkMatchRules.Observation(wifi,mobile,ssid,bssid,slot,simOperator,networkOperator);
++        boolean matched=NetworkMatchRules.matched(observation,conditions);
++        String action=NetworkMatchRules.parseAction(prefs.getString(matched?"networkMatchAction":"networkUnmatchAction",matched?"start":"none")).encode();
++        return new Environment(NetworkMatchRules.label(observation),matched,action);
++    }
++
++    // Default data SIM without READ_PHONE_STATE: SubscriptionManager#getDefaultDataSubscriptionId and
++    // #getSlotIndex (API 29+) and TelephonyManager#getSimOperator/#getNetworkOperator need no
++    // permission. Only when those are empty and an MCC+MNC condition exists, Root getprop
++    // gsm.sim.operator.numeric / gsm.operator.numeric (per slot, comma separated) fills them,
++    // cached for 30 s so network callbacks do not spawn a Root shell each.
++    private volatile long simPropAt=-60000L;private volatile String simProp="",netProp="";
++    private String[] readSimOperators(int[] slotOut,NetworkMatchRules.Conditions conditions){
++        String sim="",net="";int slot=-1;
++        try{
++            int sub=android.telephony.SubscriptionManager.getDefaultDataSubscriptionId();
++            if(sub!=android.telephony.SubscriptionManager.INVALID_SUBSCRIPTION_ID){
++                if(Build.VERSION.SDK_INT>=29){int index=android.telephony.SubscriptionManager.getSlotIndex(sub);if(index>=0)slot=index+1;}
++                android.telephony.TelephonyManager tm=(android.telephony.TelephonyManager)getSystemService(TELEPHONY_SERVICE);
++                if(tm!=null){tm=tm.createForSubscriptionId(sub);sim=tm.getSimOperator();net=tm.getNetworkOperator();}
++            }
++        }catch(RuntimeException ignored){}
++        sim=NetworkMatchRules.normalizeMccMnc(sim);net=NetworkMatchRules.normalizeMccMnc(net);
++        if(conditions.needsOperator()&&slot>=1&&(sim.isEmpty()||net.isEmpty())){
++            long now=SystemClock.elapsedRealtime();
++            if(now-simPropAt>30000L&&RootProxyManager.observationTicket()>=0L){
++                simPropAt=now;
++                try{
++                    RootBridge.Result r=RootBridge.rootShell(getApplicationContext(),"getprop gsm.sim.operator.numeric; getprop gsm.operator.numeric",3000L);
++                    if(r.ok()){String[] lines=r.output.split("\\r?\\n",-1);simProp=lines.length>0?lines[0]:"";netProp=lines.length>1?lines[1]:"";}
++                }catch(Exception ignored){}
++            }
++            if(sim.isEmpty())sim=NetworkMatchRules.operatorForSlot(simProp,slot);
++            if(net.isEmpty())net=NetworkMatchRules.operatorForSlot(netProp,slot);
++        }
++        slotOut[0]=slot;
++        return new String[]{sim,net};
+     }
+
+     private boolean coreAlive(){
+@@ -482,16 +808,31 @@ public final class ProxyNetworkMatchService extends Service {
          }
      }
 
@@ -5684,7 +6334,7 @@ index 56b04c2..7289454 100644
                  probeEgressIfPending();
                  return;
              }
-@@ -500,53 +760,60 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -500,53 +841,60 @@ public final class ProxyNetworkMatchService extends Service {
                  prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                  return;
              }
@@ -5855,6 +6505,101 @@ index e5290b9..d48b8a5 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt
+index 190ce6c..4f03ba6 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt
+@@ -7,6 +7,10 @@ import kotlinx.coroutines.withContext
+ internal data class SharedInterfaceUi(
+     val name: String,
+     val state: String,
++    /** A tether ingress candidate (reported tethered, or a tether-like name), never the upstream. */
++    val tether: Boolean = false,
++    /** Carries the default route right now: never offered as a shared interface. */
++    val upstream: Boolean = false,
+ )
+
+ internal data class SharedClientUi(
+@@ -14,12 +18,15 @@ internal data class SharedClientUi(
+     val mac: String,
+     val iface: String,
+     val state: String,
++    /** From the DHCP lease (dnsmasq) when readable. */
++    val hostname: String = "",
+ )
+
+ internal data class SharedNetworkSnapshot(
+     val interfaces: List<SharedInterfaceUi> = emptyList(),
+     val clients: List<SharedClientUi> = emptyList(),
+     val error: String = "",
++    val upstream: List<String> = emptyList(),
+ )
+
+ internal object ProxySharedNetworkInspector {
+@@ -48,6 +55,15 @@ internal object ProxySharedNetworkInspector {
+                   if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
+                 }'
+             fi
++            for a in 8.8.8.8 2001:4860:4860::8888; do
++              d=${'$'}(ip route get "${'$'}a" 2>/dev/null | awk '{for(i=1;i<NF;i++) if(${'$'}i=="dev"){print ${'$'}(i+1); exit}}')
++              [ -z "${'$'}d" ] || printf 'U\t%s\n' "${'$'}d"
++            done
++            { dumpsys tethering 2>/dev/null || dumpsys connectivity 2>/dev/null; } | head -n 600 | grep -i 'tethered' | head -n 40 | awk '{print "T\t" ${'$'}0}'
++            for f in /data/misc/dhcp/dnsmasq.leases /data/misc/dhcp/dnsmasq.leases.* /data/vendor/dhcp/dnsmasq.leases; do
++              [ -r "${'$'}f" ] && head -n 128 "${'$'}f" | awk '{print "L\t" ${'$'}0}'
++            done
++            exit 0
+         """.trimIndent()
+         val result = RootBridge.rootShell(context.applicationContext, command, 8_000L)
+         if (!result.ok()) {
+@@ -55,13 +71,29 @@ internal object ProxySharedNetworkInspector {
+         }
+         val interfaces = LinkedHashMap<String, SharedInterfaceUi>()
+         val clients = LinkedHashMap<String, SharedClientUi>()
++        val upstream = LinkedHashSet<String>()
++        val tetherText = StringBuilder()
++        val leaseText = StringBuilder()
++        result.output.lineSequence().forEach { line ->
++            when {
++                line.startsWith("U\t") -> line.removePrefix("U\t").trim().takeIf { ifaceSafe.matches(it) }?.let { upstream += it }
++                line.startsWith("T\t") -> tetherText.append(line.removePrefix("T\t")).append('\n')
++                line.startsWith("L\t") -> leaseText.append(line.removePrefix("L\t")).append('\n')
++            }
++        }
++        val tethered = SharedNetworkRules.tetheredInterfaces(tetherText.toString())
++        val leases = SharedNetworkRules.parseLeases(leaseText.toString()).associateBy { it.mac }
+         result.output.lineSequence().forEach { line ->
+             val parts = line.split('\t')
+             when (parts.firstOrNull()) {
+                 "I" -> if (parts.size >= 3) {
+                     val name = parts[1].trim()
+                     if (ifaceSafe.matches(name)) {
+-                        interfaces[name] = SharedInterfaceUi(name, parts[2].trim().ifBlank { "unknown" })
++                        interfaces[name] = SharedInterfaceUi(
++                            name, parts[2].trim().ifBlank { "unknown" },
++                            tether = SharedNetworkRules.tetherCandidate(name, upstream, tethered),
++                            upstream = name in upstream,
++                        )
+                     }
+                 }
+                 "C" -> if (parts.size >= 5) {
+@@ -72,7 +104,7 @@ internal object ProxySharedNetworkInspector {
+                     if (ipSafe.matches(ip) && macSafe.matches(mac) && ifaceSafe.matches(iface) &&
+                         mac != "00:00:00:00:00:00" && mac != "ff:ff:ff:ff:ff:ff"
+                     ) {
+-                        clients["$mac|$iface"] = SharedClientUi(ip, mac, iface, state)
++                        clients["$mac|$iface"] = SharedClientUi(ip, mac, iface, state, leases[mac]?.hostname.orEmpty())
+                     }
+                 }
+             }
+@@ -80,6 +112,7 @@ internal object ProxySharedNetworkInspector {
+         SharedNetworkSnapshot(
+             interfaces = interfaces.values.sortedWith(compareByDescending<SharedInterfaceUi> { it.state == "up" }.thenBy { it.name }),
+             clients = clients.values.sortedWith(compareBy<SharedClientUi> { it.iface }.thenBy { it.ip }),
++            upstream = upstream.toList(),
+         )
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
 index 93a3d3d..3462cef 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java
@@ -5928,7 +6673,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..cc009be 100644
+index 9cd82da..a51f877 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -6350,7 +7095,44 @@ index 9cd82da..cc009be 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -505,24 +751,44 @@ final class RootProxyManager {
+@@ -501,28 +747,81 @@ final class RootProxyManager {
+             return stop();
+         }finally{CONTROL_LOCK.unlock();}
+     }
++    /**
++     * Network-match "切换配置": select the named config of the current core and, when the proxy is
++     * running, replace it through the existing validate-then-swap restart transaction. The session
++     * owner is unchanged. A refused restart restores the previous selection. Cancelled when the
++     * match is disabled or the decision is no longer current (network changed again).
++     */
++    JSONObject switchConfigForAutomation(String name,java.util.function.BooleanSupplier currentDecision)throws Exception{
++        final long request=STOP_GENERATION.get();
++        CONTROL_LOCK.lock();
++        StartIntent previous=START_INTENT.get();
++        try{
++            if(!prefs.getBoolean("networkMatchEnabled",false)||!currentDecision.getAsBoolean())
++                return new JSONObject().put("ok",true).put("cancelled",true);
++            ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
++            ProxyConfigLibrary.Entry current=configs.selected(profile.core);
++            String from=current==null?"":current.name;
++            if(from.equals(name))
++                return new JSONObject().put("ok",true).put("unchanged",true).put("from",from).put("to",name).put("message","已是目标配置");
++            configs.select(profile.core,name);
++            boolean running=prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false);
++            if(!running)
++                return new JSONObject().put("ok",true).put("restarted",false).put("from",from).put("to",name).put("message","已切换配置，下次启动生效");
++            START_INTENT.set(new StartIntent(request,false,false,currentDecision));
++            JSONObject result;
++            try{result=startInternal(profile,null,true);}
++            catch(Exception error){
++                if(!from.isEmpty())try{configs.select(profile.core,from);}catch(Exception ignored){}
++                throw error;
++            }
++            if(!result.optBoolean("ok",false)&&!from.isEmpty())try{configs.select(profile.core,from);}catch(Exception ignored){}
++            return result.put("restarted",true).put("from",from).put("to",name);
++        }finally{if(previous==null)START_INTENT.remove();else START_INTENT.set(previous);CONTROL_LOCK.unlock();}
++    }
+     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
          return startIfWanted(profile,()->true);
      }
      JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
@@ -6403,7 +7185,7 @@ index 9cd82da..cc009be 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +801,11 @@ final class RootProxyManager {
+@@ -535,7 +834,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -6416,7 +7198,7 @@ index 9cd82da..cc009be 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +814,8 @@ final class RootProxyManager {
+@@ -544,7 +847,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -6426,7 +7208,7 @@ index 9cd82da..cc009be 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +823,7 @@ final class RootProxyManager {
+@@ -552,7 +856,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -6435,7 +7217,7 @@ index 9cd82da..cc009be 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -575,20 +846,31 @@ final class RootProxyManager {
+@@ -575,20 +879,31 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -6474,7 +7256,7 @@ index 9cd82da..cc009be 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +880,7 @@ final class RootProxyManager {
+@@ -598,7 +913,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -6483,7 +7265,7 @@ index 9cd82da..cc009be 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +905,6 @@ final class RootProxyManager {
+@@ -623,7 +938,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -6491,7 +7273,7 @@ index 9cd82da..cc009be 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -659,15 +940,26 @@ final class RootProxyManager {
+@@ -659,15 +973,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -6520,7 +7302,7 @@ index 9cd82da..cc009be 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,6 +989,10 @@ final class RootProxyManager {
+@@ -697,6 +1022,10 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -6531,7 +7313,7 @@ index 9cd82da..cc009be 100644
          result.put("sourceConfig",p.source.name)
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
-@@ -723,10 +1019,17 @@ final class RootProxyManager {
+@@ -723,10 +1052,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -6549,7 +7331,7 @@ index 9cd82da..cc009be 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -749,11 +1052,18 @@ final class RootProxyManager {
+@@ -749,11 +1085,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -6568,15 +7350,15 @@ index 9cd82da..cc009be 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1071,49 @@ final class RootProxyManager {
+@@ -761,10 +1104,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
 -            }finally{CONTROL_LOCK.unlock();}
 +            }finally{if(ownIntent)START_INTENT.remove();CONTROL_LOCK.unlock();}
-+        }
-+    }
-+
+         }
+     }
+
 +    private void recoverFailedHandoff(boolean nativeSucceeded,boolean nativeAttempted,boolean coordinatorEntered)throws Exception{
 +        if(nativeSucceeded){
 +            rollbackUnpublishedStart();
@@ -6590,9 +7372,9 @@ index 9cd82da..cc009be 100644
 +                prefs.edit().putString("proxyAutoRecoveryError","启动结果未确认，已保留代理与过滤接管现场；请检查后停止")
 +                        .putString("proxyNetworkIntegrity","unknown").apply();
 +            }
-         }
-     }
-
++        }
++    }
++
 +    private void rollbackUnpublishedStart()throws Exception{
 +        // Still owns CONTROL_LOCK: a newer start cannot be destroyed by this cleanup.
 +        Long previousStop=STOP_DEADLINE.get();
@@ -6619,7 +7401,7 @@ index 9cd82da..cc009be 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -789,10 +1138,12 @@ final class RootProxyManager {
+@@ -789,10 +1171,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -6634,7 +7416,7 @@ index 9cd82da..cc009be 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1153,40 @@ final class RootProxyManager {
+@@ -802,20 +1186,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -6680,7 +7462,7 @@ index 9cd82da..cc009be 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1196,26 @@ final class RootProxyManager {
+@@ -825,19 +1229,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -6711,7 +7493,7 @@ index 9cd82da..cc009be 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1223,40 @@ final class RootProxyManager {
+@@ -845,31 +1256,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -6768,7 +7550,7 @@ index 9cd82da..cc009be 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1266,7 @@ final class RootProxyManager {
+@@ -879,7 +1299,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -6777,7 +7559,7 @@ index 9cd82da..cc009be 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1326,7 @@ final class RootProxyManager {
+@@ -939,7 +1359,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -6786,7 +7568,7 @@ index 9cd82da..cc009be 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1408,7 @@ final class RootProxyManager {
+@@ -1021,7 +1441,7 @@ final class RootProxyManager {
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -6795,7 +7577,7 @@ index 9cd82da..cc009be 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1446,7 @@ final class RootProxyManager {
+@@ -1059,7 +1479,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -6804,7 +7586,7 @@ index 9cd82da..cc009be 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1458,22 @@ final class RootProxyManager {
+@@ -1071,22 +1491,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -6832,7 +7614,7 @@ index 9cd82da..cc009be 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1486,7 @@ final class RootProxyManager {
+@@ -1099,7 +1519,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -6841,7 +7623,7 @@ index 9cd82da..cc009be 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1534,7 @@ final class RootProxyManager {
+@@ -1147,7 +1567,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -6850,7 +7632,7 @@ index 9cd82da..cc009be 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1544,7 @@ final class RootProxyManager {
+@@ -1157,7 +1577,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -6859,7 +7641,7 @@ index 9cd82da..cc009be 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1207,10 +1594,14 @@ final class RootProxyManager {
+@@ -1207,10 +1627,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -6876,7 +7658,7 @@ index 9cd82da..cc009be 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1615,10 @@ final class RootProxyManager {
+@@ -1224,6 +1648,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -6887,7 +7669,7 @@ index 9cd82da..cc009be 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1636,7 @@ final class RootProxyManager {
+@@ -1241,7 +1669,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -6896,7 +7678,7 @@ index 9cd82da..cc009be 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1646,46 @@ final class RootProxyManager {
+@@ -1251,11 +1679,46 @@ final class RootProxyManager {
          }
      }
 
@@ -6944,7 +7726,7 @@ index 9cd82da..cc009be 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1699,121 @@ final class RootProxyManager {
+@@ -1269,14 +1732,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -7069,7 +7851,7 @@ index 9cd82da..cc009be 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +1826,7 @@ final class RootProxyManager {
+@@ -1289,7 +1859,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -7078,7 +7860,7 @@ index 9cd82da..cc009be 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +1850,7 @@ final class RootProxyManager {
+@@ -1313,7 +1883,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -7087,7 +7869,7 @@ index 9cd82da..cc009be 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +1870,28 @@ final class RootProxyManager {
+@@ -1333,13 +1903,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -7117,7 +7899,7 @@ index 9cd82da..cc009be 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +1918,27 @@ final class RootProxyManager {
+@@ -1366,13 +1951,38 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -7130,6 +7912,17 @@ index 9cd82da..cc009be 100644
 +                    .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
 +                    .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
 +        }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
++        // Shared-network ingress scope + MAC whitelist: a policy file as well (boot plans keep it).
++        // Empty body = legacy unscoped shared chains (no interface listed, blacklist mode).
++        String sharePolicy=policyDir+"/share";
++        String shareBody=prefs.getBoolean("proxySharedNetwork",false)?SharedNetworkRules.policyBody(
++                prefs.getStringSet("proxySharedInterfaces",Collections.emptySet()),prefs.getString("proxySharedMacMode","direct"),
++                prefs.getStringSet("proxySharedOnlyMacs",Collections.emptySet())):"";
++        if(!shareBody.isEmpty()){
++            cmd.append("; printf %s ").append(RootBridge.quote(shareBody)).append(" > ").append(RootBridge.quote(sharePolicy+".new"))
++                    .append("; chmod 600 ").append(RootBridge.quote(sharePolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(sharePolicy+".new"))
++                    .append("; mv -f ").append(RootBridge.quote(sharePolicy+".new")).append(' ').append(RootBridge.quote(sharePolicy));
++        }else cmd.append("; rm -f ").append(RootBridge.quote(sharePolicy));
          if(deployCore){
 +            if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
 +                    .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
@@ -7145,7 +7938,7 @@ index 9cd82da..cc009be 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1412,14 +1978,44 @@ final class RootProxyManager {
+@@ -1412,14 +2022,44 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -7193,6 +7986,149 @@ index 9cd82da..cc009be 100644
      }
      private String rootBinaryAsset()throws IOException{
          for(String abi:Build.SUPPORTED_ABIS){
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java
+new file mode 100644
+index 0000000..829bbef
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java
+@@ -0,0 +1,137 @@
++package io.github.xgl34222220.hetu;
++
++import java.io.IOException;
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.LinkedHashSet;
++import java.util.List;
++import java.util.Locale;
++import java.util.Set;
++import java.util.TreeSet;
++import java.util.regex.Pattern;
++
++/**
++ * Pure rules of the shared network page and its Root policy file (no Android API, host-tested).
++ *
++ * Shared interfaces are the tether ingress the Root script scopes the shared chains to; they are
++ * stored apart from the bypass interfaces ("proxyBypassInterfaces"), so ticking an upstream like
++ * wlan0 can no longer silently make this device's own Wi-Fi traffic direct. MAC mode "direct"
++ * (blacklist, "proxySharedBypassMacs") or "only" (whitelist, "proxySharedOnlyMacs").
++ */
++final class SharedNetworkRules {
++    private SharedNetworkRules() {}
++
++    static final int MAX_INTERFACES = 16;
++    static final int MAX_MACS = 64;
++    private static final Pattern IFACE_SAFE = Pattern.compile("[A-Za-z0-9_.:@-]{1,31}\\+?");
++    private static final Pattern MAC_SAFE = Pattern.compile("(?i)[0-9a-f]{2}(?::[0-9a-f]{2}){5}");
++    /** Typical Android tether interfaces (Wi-Fi AP, USB RNDIS/NCM, Bluetooth PAN, Ethernet). */
++    private static final Pattern TETHER_NAME = Pattern.compile("(ap|swlan|softap|wlan[1-9]|rndis|ncm|bt-pan|usb|eth|wigig)[0-9A-Za-z_.:-]*\\+?");
++    /** Never a tether ingress: cellular, loopback and virtual links (also the Root script refuses them). */
++    private static final Pattern NEVER_SHARED = Pattern.compile("(lo|rmnet|ccmni|dummy|tun|hetu|ifb|ip6tnl|sit).*");
++
++    static String mode(String raw) { return "only".equals(raw == null ? "" : raw.trim()) ? "only" : "direct"; }
++
++    static String sanitizeInterfaces(Collection<String> values) throws IOException {
++        if (values == null || values.isEmpty()) return "";
++        LinkedHashSet<String> out = new LinkedHashSet<>();
++        TreeSet<String> sorted = new TreeSet<>();
++        for (String raw : nonNull(values)) sorted.add(raw.trim());
++        for (String value : sorted) {
++            if (value.isEmpty()) continue;
++            if (!IFACE_SAFE.matcher(value).matches()) throw new IOException("共享接口名无效：" + value);
++            if (NEVER_SHARED.matcher(value).matches()) throw new IOException("不能把 " + value + " 作为共享接口：蜂窝 / 回环 / 虚拟接口不是热点入口");
++            out.add(value);
++        }
++        if (out.size() > MAX_INTERFACES) throw new IOException("共享接口最多 " + MAX_INTERFACES + " 个");
++        return String.join(",", out);
++    }
++
++    static String sanitizeMacs(Collection<String> values) throws IOException {
++        if (values == null || values.isEmpty()) return "";
++        TreeSet<String> out = new TreeSet<>();
++        for (String raw : nonNull(values)) {
++            String value = raw.trim().toLowerCase(Locale.ROOT);
++            if (value.isEmpty()) continue;
++            if (!MAC_SAFE.matcher(value).matches()) throw new IOException("MAC 地址无效：" + value);
++            if (value.equals("00:00:00:00:00:00") || value.equals("ff:ff:ff:ff:ff:ff")) throw new IOException("不能使用全零或广播 MAC：" + value);
++            out.add(value);
++        }
++        if (out.size() > MAX_MACS) throw new IOException("共享网络 MAC 白名单超过 " + MAX_MACS + " 项");
++        return String.join(",", out);
++    }
++
++    /**
++     * Body of $BASE/policy/share, or "" when nothing is scoped (no interface and blacklist mode):
++     * the Root script then keeps the legacy, unscoped shared chains.
++     */
++    static String policyBody(Collection<String> interfaces, String macMode, Collection<String> onlyMacs) throws IOException {
++        String ifaces = sanitizeInterfaces(interfaces);
++        String mode = mode(macMode);
++        String macs = "only".equals(mode) ? sanitizeMacs(onlyMacs) : "";
++        if (ifaces.isEmpty() && "direct".equals(mode)) return "";
++        return "IFACES=" + ifaces + "\nMODE=" + mode + "\nMACS=" + macs + "\n";
++    }
++
++    /** A candidate for the shared-interface list: tether-like name, not cellular/virtual, not the upstream. */
++    static boolean tetherCandidate(String name, Collection<String> upstream, Collection<String> tethered) {
++        if (name == null || name.isEmpty() || NEVER_SHARED.matcher(name).matches()) return false;
++        if (upstream != null && upstream.contains(name)) return false;
++        if (tethered != null && tethered.contains(name)) return true;
++        return TETHER_NAME.matcher(name).matches();
++    }
++
++    /** `ip route get` output -> the "dev" interface (upstream), or "". */
++    static String routeDevice(String output) {
++        if (output == null) return "";
++        String[] words = output.trim().split("\\s+");
++        for (int i = 0; i + 1 < words.length; i++) if (words[i].equals("dev")) return words[i + 1];
++        return "";
++    }
++
++    /** Interfaces reported as tethered by `dumpsys tethering` / `dumpsys connectivity` (best effort). */
++    static Set<String> tetheredInterfaces(String dumpsys) {
++        TreeSet<String> out = new TreeSet<>();
++        if (dumpsys == null) return out;
++        for (String line : dumpsys.split("\\r?\\n")) {
++            String t = line.trim();
++            // "wlan2 - TetheredState - lastError = 0" / "rndis0 - TETHERED" / "Tethered: [ap0, rndis0]"
++            int dash = t.indexOf(" - ");
++            if (dash > 0 && t.substring(dash).toLowerCase(Locale.ROOT).contains("tethered") && !t.toLowerCase(Locale.ROOT).contains("untethered")) {
++                String name = t.substring(0, dash).trim();
++                if (IFACE_SAFE.matcher(name).matches()) out.add(name);
++            }
++            if (t.startsWith("Tethered") && t.contains("[")) {
++                String inner = t.substring(t.indexOf('[') + 1, t.indexOf(']') > 0 ? t.indexOf(']') : t.length());
++                for (String n : inner.split("[,\\s]+")) if (IFACE_SAFE.matcher(n.trim()).matches()) out.add(n.trim());
++            }
++        }
++        return out;
++    }
++
++    /** One DHCP lease: dnsmasq format "expiry mac ip hostname client-id". */
++    static final class Lease {
++        final String mac, ip, hostname;
++        Lease(String mac, String ip, String hostname) { this.mac = mac; this.ip = ip; this.hostname = hostname; }
++    }
++
++    static List<Lease> parseLeases(String text) {
++        ArrayList<Lease> out = new ArrayList<>();
++        if (text == null) return out;
++        for (String line : text.split("\\r?\\n")) {
++            String[] w = line.trim().split("\\s+");
++            if (w.length < 3 || !w[0].matches("[0-9]+")) continue;
++            String mac = w[1].toLowerCase(Locale.ROOT);
++            if (!MAC_SAFE.matcher(mac).matches() || !w[2].matches("[0-9A-Fa-f:.]{2,64}")) continue;
++            String host = w.length > 3 && !w[3].equals("*") ? w[3].replaceAll("[^A-Za-z0-9._-]", "") : "";
++            out.add(new Lease(mac, w[2], host.length() > 63 ? host.substring(0, 63) : host));
++        }
++        return out;
++    }
++
++    private static List<String> nonNull(Collection<String> values) {
++        ArrayList<String> out = new ArrayList<>();
++        for (String v : values) if (v != null) out.add(v);
++        return out;
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java
 new file mode 100644
 index 0000000..bb43799
@@ -11640,6 +12576,53 @@ index 0000000..65065ca
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+index b41cf98..e1fa2eb 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -238,7 +238,8 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     var refresh by remember { mutableIntStateOf(0) }
+     var loading by remember { mutableStateOf(true) }
+     var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
+-    var ifaceBypass by remember { mutableStateOf(prefs.getStringSet("proxyBypassInterfaces", emptySet()).orEmpty().toSortedSet()) }
++    // Shared (scoped) interfaces have their own key; 绕过规则 (proxyBypassInterfaces) is not written here.
++    var ifaceShared by remember { mutableStateOf(prefs.getStringSet("proxySharedInterfaces", emptySet()).orEmpty().toSortedSet()) }
+     val macOriginal = remember { prefs.getStringSet("proxySharedBypassMacs", emptySet()).orEmpty().map { it.lowercase() }.sorted() }
+     var macSaved by remember { mutableStateOf(macOriginal) }
+     val macs = remember { hxEntries(macOriginal) }
+@@ -263,9 +264,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     }
+
+     fun saveIfaces(next: Set<String>) {
+-        ifaceBypass = next.toSortedSet()
+-        prefs.edit().putStringSet("proxyBypassInterfaces", ifaceBypass).apply()
+-        changed("proxyBypassInterfaces")
++        ifaceShared = next.toSortedSet()
++        prefs.edit().putStringSet("proxySharedInterfaces", ifaceShared).putBoolean("proxyRootSettingsDirty", true).apply()
++        vm.bumpSettings()
+     }
+
+     fun saveMacs(values: List<String>): Boolean {
+@@ -321,14 +322,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                     when {
+                         loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
+                         snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
+-                        else -> snapshot.interfaces.forEachIndexed { index, item ->
++                        else -> snapshot.interfaces.filter { (it.tether && !it.upstream) || it.name in ifaceShared }.forEachIndexed { index, item ->
+                             if (index > 0) SettingsDivider()
+-                            val direct = item.name in ifaceBypass
++                            val scoped = item.name in ifaceShared
+                             SettingsSwitchRow(
+                                 item.name,
+-                                direct,
+-                                { on -> saveIfaces(if (on) ifaceBypass + item.name else ifaceBypass - item.name) },
+-                                subtitle = (if (direct) "直连 · " else "接管 · ") + "状态 " + item.state,
++                                scoped,
++                                { on -> saveIfaces(if (on) ifaceShared + item.name else ifaceShared - item.name) },
++                                subtitle = (if (item.upstream) "上行网络 · " else if (scoped) "接管 · " else "不接管 · ") + "状态 " + item.state,
+                                 icon = Icons.Rounded.Router,
+                             )
+                         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 index 0ceaa23..42638f4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
@@ -14306,7 +15289,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..afb915d 100644
+index f575100..f8b3d22 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -14317,16 +15300,81 @@ index f575100..afb915d 100644
  import io.github.xgl34222220.hetu.ProxyAdblockRuntimeBridge
  import io.github.xgl34222220.hetu.ProxyComposeController
  import io.github.xgl34222220.hetu.ProxyCoreDownloadManager
-@@ -58,6 +59,8 @@ private object Keys {
+@@ -57,7 +58,12 @@ private object Keys {
+     const val BypassInterfaces = "proxyBypassInterfaces"
      const val SharedNetwork = "proxySharedNetwork"
      const val SharedMacs = "proxySharedBypassMacs"
++    const val SharedInterfaces = "proxySharedInterfaces"
++    const val SharedMacMode = "proxySharedMacMode"
++    const val SharedOnlyMacs = "proxySharedOnlyMacs"
      const val CnIp = "proxyCnIpDirect"
 +    const val CnIpKernelV4 = "proxyCnIpKernelV4"
 +    const val CnIpKernelV6 = "proxyCnIpKernelV6"
      const val AdblockChain = "proxyAdblockChain"
      const val AdblockFallback = "proxyAdblockFallbackEnabled"
      const val Cname = "cnameProtection"
-@@ -213,9 +216,28 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -183,39 +189,76 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+             /* ------------------------------ 共享网络 ------------------------------ */
+             loadShare = {
+                 val live = ProxySharedNetworkInspector.inspect(app)
+-                val names = live.interfaces.map { it.name }.toSet()
++                val shared = prefs.strings(Keys.SharedInterfaces)
++                // Only tether ingress is offered (never the upstream / cellular link); a saved name
++                // that is not up right now stays visible so it can be switched off.
++                val offered = live.interfaces.filter { (it.tether && !it.upstream) || it.name in shared }
++                    .map { ToolsShareInterface(it.name, it.state, it.tether, it.upstream) } +
++                    (shared - live.interfaces.map { it.name }.toSet()).sorted().map { ToolsShareInterface(it, "未连接") }
++                // 绕过规则 interfaces that carry the default route make this device's own traffic direct.
++                val upstreamBypass = prefs.strings(Keys.BypassInterfaces).filter { name ->
++                    live.upstream.any { up -> up == name || (name.endsWith("+") && up.startsWith(name.dropLast(1))) }
++                }
++                val note = listOf(
++                    live.error,
++                    if (upstreamBypass.isEmpty()) "" else "绕过规则中的 " + upstreamBypass.joinToString("、") + " 是当前上行网络：本机经它的流量全部直连。请在「绕过规则」中确认。",
++                ).filter { it.isNotBlank() }.joinToString("\n")
+                 ToolsShareSnapshot(
+                     settings = ToolsShareSettings(
+                         enabled = prefs.getBoolean(Keys.SharedNetwork, false),
+-                        // The interface set is shared with 绕过规则; only names that are being shared show up here.
+-                        directInterfaces = prefs.strings(Keys.BypassInterfaces).intersect(names),
+                         macs = prefs.strings(Keys.SharedMacs).sorted(),
++                        sharedInterfaces = shared,
++                        macMode = if (prefs.getString(Keys.SharedMacMode, "direct") == "only") "only" else "direct",
++                        onlyMacs = prefs.strings(Keys.SharedOnlyMacs).sorted(),
+                     ),
+-                    interfaces = live.interfaces.map { ToolsShareInterface(it.name, it.state) },
+-                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state) },
+-                    note = live.error,
++                    interfaces = offered,
++                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state, it.hostname) },
++                    note = note,
+                 )
+             },
+             saveShare = { value ->
+-                val live = ProxySharedNetworkInspector.inspect(app).interfaces.map { it.name }.toSet()
+-                // Keep the bypass interfaces that are not shared interfaces: they belong to 绕过规则.
+-                val interfaces = TreeSet((prefs.strings(Keys.BypassInterfaces) - live) + value.directInterfaces)
++                // Shared interfaces live in their own key. 绕过规则 (proxyBypassInterfaces) is never
++                // written here any more: an upstream such as wlan0 ticked as "shared" used to make
++                // this device's own Wi-Fi traffic direct.
++                val normalized = value.normalized()
+                 prefs.edit()
+-                    .putBoolean(Keys.SharedNetwork, value.enabled)
+-                    .putStringSet(Keys.BypassInterfaces, interfaces)
+-                    .putStringSet(Keys.SharedMacs, TreeSet(value.macs))
++                    .putBoolean(Keys.SharedNetwork, normalized.enabled)
++                    .putStringSet(Keys.SharedMacs, TreeSet(normalized.macs))
++                    .putStringSet(Keys.SharedInterfaces, TreeSet(normalized.sharedInterfaces))
++                    .putString(Keys.SharedMacMode, normalized.macMode)
++                    .putStringSet(Keys.SharedOnlyMacs, TreeSet(normalized.onlyMacs))
+                     .apply()
+                 dirty(Keys.SharedNetwork)
+-                dirty(Keys.BypassInterfaces)
+                 dirty(Keys.SharedMacs)
++                // Not runtime-signature keys: mark the restart notice explicitly (as CNIP does).
++                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
+             },
+
              /* ------------------------------ CNIP ------------------------------ */
              loadCnIp = { prefs.getBoolean(Keys.CnIp, false) },
              setCnIp = { on -> prefs.edit().putBoolean(Keys.CnIp, on).apply(); dirty(Keys.CnIp) },
@@ -14355,7 +15403,7 @@ index f575100..afb915d 100644
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
                  if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
-@@ -225,7 +247,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -225,7 +268,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -14365,7 +15413,7 @@ index f575100..afb915d 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +256,10 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +277,10 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
@@ -14376,7 +15424,7 @@ index f575100..afb915d 100644
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -262,12 +289,20 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -262,12 +310,20 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -14398,7 +15446,7 @@ index f575100..afb915d 100644
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -339,10 +374,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -339,10 +395,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
  /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
  @Composable
  private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
@@ -14418,10 +15466,44 @@ index f575100..afb915d 100644
 
  /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..95fa80f 100644
+index 40111ed..ae6a3ad 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-@@ -180,7 +180,23 @@ internal data class ToolsShareState(
+@@ -144,17 +144,28 @@ internal data class ToolsBypassState(
+
+ /* ---------------------------- 共享网络 (38) ---------------------------- */
+
+-internal data class ToolsShareInterface(val name: String, val state: String = "")
+-internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "")
++internal data class ToolsShareInterface(val name: String, val state: String = "", val tether: Boolean = true, val upstream: Boolean = false)
++internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "", val hostname: String = "")
+
+ internal data class ToolsShareSettings(
+     val enabled: Boolean = false,
+-    /** Shared interfaces that bypass the proxy. */
++    /** Legacy: shared interfaces that bypassed the proxy through 绕过规则. No longer written by this page. */
+     val directInterfaces: Set<String> = emptySet(),
+-    /** Downstream devices that bypass the proxy, lower-case MACs. */
++    /** Downstream devices that bypass the proxy (blacklist mode), lower-case MACs. */
+     val macs: List<String> = emptyList(),
++    /** Tether ingress the shared interception is scoped to; empty = every forwarded ingress (legacy). */
++    val sharedInterfaces: Set<String> = emptySet(),
++    /** "direct" = listed devices bypass (blacklist); "only" = only listed devices are proxied (whitelist). */
++    val macMode: String = "direct",
++    /** Whitelist, lower-case MACs. Kept apart from [macs] so switching mode loses neither list. */
++    val onlyMacs: List<String> = emptyList(),
+ ) {
+-    fun normalized(): ToolsShareSettings = copy(macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean())
++    fun normalized(): ToolsShareSettings = copy(
++        macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
++        onlyMacs = onlyMacs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
++        macMode = if (macMode == "only") "only" else "direct",
++    )
++    val whitelist: Boolean get() = macMode == "only"
+ }
+
+ internal class ToolsShareSnapshot(
+@@ -180,7 +191,23 @@ internal data class ToolsShareState(
 
  /* ---------------------------- CNIP (39) ---------------------------- */
 
@@ -14446,7 +15528,7 @@ index 40111ed..95fa80f 100644
 
  /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
-@@ -203,6 +219,9 @@ internal sealed interface ToolsDiagOverlay {
+@@ -203,6 +230,9 @@ internal sealed interface ToolsDiagOverlay {
 
      /** Page 42. */
      data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
@@ -14456,7 +15538,7 @@ index 40111ed..95fa80f 100644
  }
 
  internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
-@@ -218,6 +237,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
+@@ -218,6 +248,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
  /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
  internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
 
@@ -14466,7 +15548,7 @@ index 40111ed..95fa80f 100644
  internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
  internal data class ToolsAdblockState(
-@@ -241,13 +263,27 @@ internal data class ToolsAdblockState(
+@@ -241,13 +274,27 @@ internal data class ToolsAdblockState(
      val recent: List<String> = emptyList(),
      val startupInjected: Boolean = false,
      val controllerLoaded: Boolean = false,
@@ -14494,7 +15576,17 @@ index 40111ed..95fa80f 100644
      val status: ToolsAdStatus
          get() = when {
              !enabled -> ToolsAdStatus.Off
-@@ -363,10 +399,16 @@ internal class ToolsFeatureActions(
+@@ -312,6 +359,9 @@ internal object ToolsFeatureRules {
+     fun shareError(settings: ToolsShareSettings): String? {
+         settings.macs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
+         if (settings.macs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
++        settings.onlyMacs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
++        if (settings.onlyMacs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
++        if (settings.sharedInterfaces.size > 16) return "共享接口最多 16 个"
+         return null
+     }
+
+@@ -363,10 +413,16 @@ internal class ToolsFeatureActions(
      /* CNIP */
      val loadCnIp: (suspend () -> Boolean)? = null,
      val setCnIp: suspend (Boolean) -> Unit = {},
@@ -14511,7 +15603,7 @@ index 40111ed..95fa80f 100644
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +427,8 @@ internal class ToolsFeatureActions(
+@@ -385,6 +441,8 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
@@ -14648,10 +15740,128 @@ index 60a38ad..1cdba86 100644
          ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
          ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-index 4bdee7e..01d2607 100644
+index 4bdee7e..c01d8cb 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-@@ -217,18 +217,55 @@ internal fun ToolsCnIpScreen(
+@@ -105,9 +105,10 @@ internal fun ToolsDiscardChangesDialogCard(onConfirm: () -> Unit, onCancel: () -
+ /**
+  * 共享网络 (工具 › 共享网络). Stateless: edits go to the draft in [state], ✓ saves it.
+  *
+- * Every switch below the master switch means “direct”: an interface or a downstream device
+- * that is switched on bypasses the proxy. Device switches and the MAC list edit the same set.
+- * With the master switch off the three lower cards fade back and are inert.
++ * Interface switches choose the tether ingress the Root rules are scoped to (stored apart from
++ * 绕过规则; the upstream is never offered). MAC mode: blacklist (listed devices direct) or
++ * whitelist (only listed devices proxied); device switches and the MAC list edit the list of the
++ * current mode. With the master switch off the lower cards fade back and are inert.
+  */
+ @Composable
+ internal fun ToolsShareScreen(
+@@ -123,7 +124,6 @@ internal fun ToolsShareScreen(
+     val draft = state.draft
+     val ready = state.load is ToolsLoad.Ready
+     val editable = ready && !state.saving
+-    val macs = draft.macs.map { it.trim().lowercase() }
+     val stagger = rememberHomeStagger()
+     ToolsPage(
+         title = "共享网络",
+@@ -143,30 +143,49 @@ internal fun ToolsShareScreen(
+                 ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
+             }
+             ToolsLoad.Ready -> {
+-                ToolsInfoCard("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。", Modifier.homeEnter(stagger, 0))
++                ToolsInfoCard("开启后河图只接管所选共享接口（热点 / USB / 以太网共享）进入的流量；上行网络不会被当作共享入口。接口与 MAC 名单在 Root 层生效，修改后重启代理。", Modifier.homeEnter(stagger, 0))
+                 HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 1)) {
+                     ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = "将共享流量纳入透明代理", enabled = editable)
+                 }
+                 val lower = editable && draft.enabled
++                val whitelist = draft.whitelist
++                val listed = (if (whitelist) draft.onlyMacs else draft.macs).map { it.trim().lowercase() }
++                fun setListed(next: List<String>) = onDraftChange(if (whitelist) draft.copy(onlyMacs = next) else draft.copy(macs = next))
+                 val presence = .5f + .5f * homeAnimatedFraction(if (draft.enabled) 1f else 0f, "tools-share-lower")
+                 Column(Modifier.alpha(presence).homeEnter(stagger, 2), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
+                     HomeCard(Modifier.fillMaxWidth()) {
+                         ToolsCardTitle("共享网络接口")
+                         if (state.interfaces.isEmpty()) {
+                             Text(state.note.ifBlank { ht("没有检测到正在共享的接口。") }, Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, bottom = 16.dp), color = c.t2, style = HomeType.note)
++                        } else if (state.note.isNotBlank()) {
++                            Text(state.note, Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, bottom = 10.dp), color = c.t2, style = HomeType.note)
+                         }
+                         state.interfaces.forEachIndexed { index, item ->
+                             if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
+-                            val direct = item.name in draft.directInterfaces
++                            val scoped = item.name in draft.sharedInterfaces
+                             ToolsSwitchRow(
+-                                item.name, direct,
+-                                { on -> onDraftChange(draft.copy(directInterfaces = if (on) draft.directInterfaces + item.name else draft.directInterfaces - item.name)) },
++                                item.name, scoped,
++                                { on -> onDraftChange(draft.copy(sharedInterfaces = if (on) draft.sharedInterfaces + item.name else draft.sharedInterfaces - item.name)) },
+                                 rawContent = true,
+                                 icon = ToolsIcons.Link,
+-                                subtitle = ht(if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
+-                                enabled = lower,
++                                subtitle = ht(if (item.upstream) "上行网络，不能作为共享入口" else if (scoped) "接管" else "不接管") +
++                                    if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
++                                enabled = lower && (!item.upstream || scoped),
+                             )
+                         }
++                        if (draft.sharedInterfaces.isEmpty()) {
++                            Text(ht("未指定接口时兼容旧行为：接管所有转发入口。建议勾选实际的共享接口。"), Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, top = 6.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
++                        }
++                    }
++                    HomeCard(Modifier.fillMaxWidth()) {
++                        ToolsCardTitle("MAC 名单模式")
++                        ToolsSwitchRow(
++                            "仅代理名单内设备", whitelist,
++                            { on -> onDraftChange(draft.copy(macMode = if (on) "only" else "direct")) },
++                            icon = ToolsFeatureIcons.ShieldCheck,
++                            subtitle = if (whitelist) "白名单：名单外设备直连；名单为空时不代理任何共享设备" else "黑名单：名单内设备直连，其余设备走代理",
++                            enabled = lower,
++                        )
+                     }
+                     HomeCard(Modifier.fillMaxWidth()) {
+                         ToolsCardTitle("下游设备")
+@@ -177,28 +196,30 @@ internal fun ToolsShareScreen(
+                             if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
+                             val mac = client.mac.lowercase()
+                             ToolsSwitchRow(
+-                                client.ip, mac in macs,
+-                                { on -> onDraftChange(draft.copy(macs = if (on) draft.macs + mac else draft.macs.filter { it.trim().lowercase() != mac })) },
++                                client.hostname.ifBlank { client.ip }, mac in listed,
++                                { on -> setListed(if (on) (if (whitelist) draft.onlyMacs else draft.macs) + mac else (if (whitelist) draft.onlyMacs else draft.macs).filter { it.trim().lowercase() != mac }) },
+                                 rawContent = true,
+                                 icon = ToolsFeatureIcons.Laptop,
+-                                subtitle = listOf(client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
++                                subtitle = listOf(if (client.hostname.isBlank()) "" else client.ip, client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
+                                 monospaceSubtitle = true,
+                                 enabled = lower,
+                             )
+                         }
+                     }
+                     HomeCard(Modifier.fillMaxWidth()) {
+-                        ToolsCardTitle("MAC 列表")
++                        ToolsCardTitle(if (whitelist) "MAC 白名单" else "MAC 直连名单")
++                        val values = if (whitelist) draft.onlyMacs else draft.macs
+                         ToolsListEditor(
+-                            label = "MAC 地址", values = draft.macs, placeholder = "aa:bb:cc:dd:ee:ff", enabled = lower,
+-                            onChange = { index, value -> onDraftChange(draft.copy(macs = draft.macs.replaced(index, value))) },
+-                            onRemove = { index -> onDraftChange(draft.copy(macs = draft.macs.without(index))) },
+-                            onAdd = { onDraftChange(draft.copy(macs = draft.macs + "")) },
++                            label = "MAC 地址", values = values, placeholder = "aa:bb:cc:dd:ee:ff", enabled = lower,
++                            onChange = { index, value -> setListed(values.replaced(index, value)) },
++                            onRemove = { index -> setListed(values.without(index)) },
++                            onAdd = { setListed(values + "") },
+                         )
+                     }
+                 }
+                 ToolsNote(
+-                    ht("名单内设备在 TPROXY、Redirect、DNS、UDP 防泄漏与 QUIC 链中优先直连。") + ht("最多 %d 个 MAC。").replace("%d", ToolsFeatureRules.MaxMacs.toString()),
++                    ht(if (whitelist) "白名单设备在 TPROXY、Redirect、DNS、UDP 防泄漏、QUIC 与 Kill Switch 链中走代理，其余共享设备直连。" else "名单内设备在 TPROXY、Redirect、DNS、UDP 防泄漏与 QUIC 链中优先直连。") +
++                        ht("最多 %d 个 MAC。").replace("%d", ToolsFeatureRules.MaxMacs.toString()),
+                     Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+                 )
+             }
+@@ -217,18 +238,55 @@ internal fun ToolsCnIpScreen(
      onBack: () -> Unit,
      onEnabledChange: (Boolean) -> Unit,
      modifier: Modifier = Modifier,

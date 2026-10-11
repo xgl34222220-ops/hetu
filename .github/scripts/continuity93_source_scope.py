@@ -79,6 +79,11 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-11 CNIP kernel-bypass authorization: the MIT notice of the CNIP data source
     # (gaoyifan/china-operator-ip) that the built-in snapshots and ipset import already use.
     'android-app/app/src/main/assets/licenses/china-operator-ip.txt',
+    # 2026-10-12 network-match / shared-network parity authorization: the network-match page and
+    # the shared-network inspector, plus two pure-Java rule classes (no Android API) for the
+    # SIM/MCC+MNC conditions, switch-config/run-script actions and the shared ingress policy.
+    PACKAGE + 'ProxyNetworkAutomationActivity.kt', PACKAGE + 'ProxySharedNetworkInspector.kt',
+    PACKAGE + 'NetworkMatchRules.java', PACKAGE + 'SharedNetworkRules.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
