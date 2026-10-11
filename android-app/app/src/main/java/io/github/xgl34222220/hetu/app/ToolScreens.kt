@@ -238,7 +238,8 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var refresh by remember { mutableIntStateOf(0) }
     var loading by remember { mutableStateOf(true) }
     var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
-    var ifaceBypass by remember { mutableStateOf(prefs.getStringSet("proxyBypassInterfaces", emptySet()).orEmpty().toSortedSet()) }
+    // Shared (scoped) interfaces have their own key; 绕过规则 (proxyBypassInterfaces) is not written here.
+    var ifaceShared by remember { mutableStateOf(prefs.getStringSet("proxySharedInterfaces", emptySet()).orEmpty().toSortedSet()) }
     val macOriginal = remember { prefs.getStringSet("proxySharedBypassMacs", emptySet()).orEmpty().map { it.lowercase() }.sorted() }
     var macSaved by remember { mutableStateOf(macOriginal) }
     val macs = remember { hxEntries(macOriginal) }
@@ -263,9 +264,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
     }
 
     fun saveIfaces(next: Set<String>) {
-        ifaceBypass = next.toSortedSet()
-        prefs.edit().putStringSet("proxyBypassInterfaces", ifaceBypass).apply()
-        changed("proxyBypassInterfaces")
+        ifaceShared = next.toSortedSet()
+        prefs.edit().putStringSet("proxySharedInterfaces", ifaceShared).putBoolean("proxyRootSettingsDirty", true).apply()
+        vm.bumpSettings()
     }
 
     fun saveMacs(values: List<String>): Boolean {
@@ -321,14 +322,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     when {
                         loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
                         snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
-                        else -> snapshot.interfaces.forEachIndexed { index, item ->
+                        else -> snapshot.interfaces.filter { (it.tether && !it.upstream) || it.name in ifaceShared }.forEachIndexed { index, item ->
                             if (index > 0) SettingsDivider()
-                            val direct = item.name in ifaceBypass
+                            val scoped = item.name in ifaceShared
                             SettingsSwitchRow(
                                 item.name,
-                                direct,
-                                { on -> saveIfaces(if (on) ifaceBypass + item.name else ifaceBypass - item.name) },
-                                subtitle = (if (direct) "直连 · " else "接管 · ") + "状态 " + item.state,
+                                scoped,
+                                { on -> saveIfaces(if (on) ifaceShared + item.name else ifaceShared - item.name) },
+                                subtitle = (if (item.upstream) "上行网络 · " else if (scoped) "接管 · " else "不接管 · ") + "状态 " + item.state,
                                 icon = Icons.Rounded.Router,
                             )
                         }

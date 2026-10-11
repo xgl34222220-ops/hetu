@@ -747,6 +747,39 @@ final class RootProxyManager {
             return stop();
         }finally{CONTROL_LOCK.unlock();}
     }
+    /**
+     * Network-match "切换配置": select the named config of the current core and, when the proxy is
+     * running, replace it through the existing validate-then-swap restart transaction. The session
+     * owner is unchanged. A refused restart restores the previous selection. Cancelled when the
+     * match is disabled or the decision is no longer current (network changed again).
+     */
+    JSONObject switchConfigForAutomation(String name,java.util.function.BooleanSupplier currentDecision)throws Exception{
+        final long request=STOP_GENERATION.get();
+        CONTROL_LOCK.lock();
+        StartIntent previous=START_INTENT.get();
+        try{
+            if(!prefs.getBoolean("networkMatchEnabled",false)||!currentDecision.getAsBoolean())
+                return new JSONObject().put("ok",true).put("cancelled",true);
+            ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
+            ProxyConfigLibrary.Entry current=configs.selected(profile.core);
+            String from=current==null?"":current.name;
+            if(from.equals(name))
+                return new JSONObject().put("ok",true).put("unchanged",true).put("from",from).put("to",name).put("message","已是目标配置");
+            configs.select(profile.core,name);
+            boolean running=prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false);
+            if(!running)
+                return new JSONObject().put("ok",true).put("restarted",false).put("from",from).put("to",name).put("message","已切换配置，下次启动生效");
+            START_INTENT.set(new StartIntent(request,false,false,currentDecision));
+            JSONObject result;
+            try{result=startInternal(profile,null,true);}
+            catch(Exception error){
+                if(!from.isEmpty())try{configs.select(profile.core,from);}catch(Exception ignored){}
+                throw error;
+            }
+            if(!result.optBoolean("ok",false)&&!from.isEmpty())try{configs.select(profile.core,from);}catch(Exception ignored){}
+            return result.put("restarted",true).put("from",from).put("to",name);
+        }finally{if(previous==null)START_INTENT.remove();else START_INTENT.set(previous);CONTROL_LOCK.unlock();}
+    }
     JSONObject startIfWanted(ProxyRuntimeProfile profile)throws Exception{
         return startIfWanted(profile,()->true);
     }
@@ -1927,6 +1960,17 @@ final class RootProxyManager {
                     .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
                     .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
         }else cmd.append("; rm -f ").append(RootBridge.quote(cnipPolicy));
+        // Shared-network ingress scope + MAC whitelist: a policy file as well (boot plans keep it).
+        // Empty body = legacy unscoped shared chains (no interface listed, blacklist mode).
+        String sharePolicy=policyDir+"/share";
+        String shareBody=prefs.getBoolean("proxySharedNetwork",false)?SharedNetworkRules.policyBody(
+                prefs.getStringSet("proxySharedInterfaces",Collections.emptySet()),prefs.getString("proxySharedMacMode","direct"),
+                prefs.getStringSet("proxySharedOnlyMacs",Collections.emptySet())):"";
+        if(!shareBody.isEmpty()){
+            cmd.append("; printf %s ").append(RootBridge.quote(shareBody)).append(" > ").append(RootBridge.quote(sharePolicy+".new"))
+                    .append("; chmod 600 ").append(RootBridge.quote(sharePolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(sharePolicy+".new"))
+                    .append("; mv -f ").append(RootBridge.quote(sharePolicy+".new")).append(' ').append(RootBridge.quote(sharePolicy));
+        }else cmd.append("; rm -f ").append(RootBridge.quote(sharePolicy));
         if(deployCore){
             if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
                     .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");

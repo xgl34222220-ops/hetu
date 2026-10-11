@@ -343,8 +343,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
     val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
     val bssids = remember(bssidOriginal) { mutableStateListOf<HxEditEntry>().apply { bssidOriginal.forEach { add(HxEditEntry(it)) } } }
+    // SIM conditions (no READ_PHONE_STATE: default data SIM slot + operator codes, see NetworkMatchRules).
+    val simSlots = remember(revision) { prefs.getStringSet("networkMatchSimSlots", emptySet()).orEmpty().toSet() }
+    val mccOriginal = remember(revision) { prefs.getStringSet("networkMatchMccMnc", emptySet()).orEmpty().sorted() }
+    val mccs = remember(mccOriginal) { mutableStateListOf<HxEditEntry>().apply { mccOriginal.forEach { add(HxEditEntry(it)) } } }
+    val lastActionResult = remember(revision) { prefs.getString("networkMatchLastActionResult", "").orEmpty() }
+    var targetPick by remember { mutableStateOf<Pair<String, String>?>(null) }
+    var targetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
-    val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal
+    val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal || values(mccs) != mccOriginal
 
     fun refresh() { revision++ }
     fun service(action: String) {
@@ -370,10 +377,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
         if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
     }
-    fun actionLabel(key: String, def: String): String = when (prefs.getString(key, def)) {
-        "start" -> "启动代理"
-        "stop" -> "停止代理"
-        else -> "不操作"
+    fun actionLabel(key: String, def: String): String {
+        val action = NetworkMatchRules.parseAction(prefs.getString(key, def))
+        return when (action.kind) {
+            "start" -> "启动代理"
+            "stop" -> "停止代理"
+            "switch" -> "切换配置 · " + action.target
+            "script" -> "运行脚本 · " + action.target
+            else -> "不操作"
+        }
+    }
+    fun toggleSlot(slot: String, on: Boolean) {
+        val next = (if (on) simSlots + slot else simSlots - slot).toSortedSet()
+        prefs.edit().putStringSet("networkMatchSimSlots", next).apply()
+        refresh()
+        evaluate()
+    }
+    fun openTargets(key: String, kind: String) {
+        scope.launch {
+            val names = runCatching {
+                if (kind == "switch") {
+                    val core = ProxyRuntimeProfile.load(prefs).core
+                    kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { ProxyConfigLibrary(context).list(core).map { it.name } }
+                } else ProxyScriptHooks.listManaged(context).map { it.name }
+            }.getOrElse { emptyList() }.filter { if (kind == "switch") NetworkMatchRules.validConfigName(it) else NetworkMatchRules.validScriptName(it) }
+            if (names.isEmpty()) {
+                vm.toast(if (kind == "switch") "当前核心没有可切换的配置" else "没有可运行的脚本，请先在「脚本」中导入 .sh")
+            } else {
+                targetChoices = names
+                targetPick = key to kind
+            }
+        }
     }
     fun save() {
         val bad = values(bssids).firstOrNull { !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) }
@@ -381,9 +415,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
             vm.toast("BSSID 格式无效：$bad")
             return
         }
+        val badMcc = values(mccs).firstOrNull { NetworkMatchRules.normalizeMccMnc(it).isEmpty() }
+        if (badMcc != null) {
+            vm.toast("MCC+MNC 应为 5–6 位数字，例如 46000：$badMcc")
+            return
+        }
         prefs.edit()
             .putStringSet("networkMatchSsids", values(ssids).toSet())
             .putStringSet("networkMatchBssids", values(bssids).map { it.uppercase() }.toSet())
+            .putStringSet("networkMatchMccMnc", NetworkMatchRules.sanitizeMccMncs(values(mccs)))
             .apply()
         vm.toast("匹配条件已保存")
         refresh()
@@ -435,6 +475,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         refresh()
                         evaluate()
                     }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
+                    SettingsDivider()
+                    SettingsSwitchRow(ht("卡1 · 蜂窝数据"), "1" in simSlots, { toggleSlot("1", it) },
+                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
+                    SettingsDivider()
+                    SettingsSwitchRow(ht("卡2 · 蜂窝数据"), "2" in simSlots, { toggleSlot("2", it) },
+                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
                 }
             }
         }
@@ -448,6 +494,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     SettingsNavRow(ht("条件失配"), compact = true, icon = HxIcons.CircleStop, value = ht(actionLabel("networkUnmatchAction", "none")), dropdown = true) {
                         actionKey = "networkUnmatchAction"
                     }
+                    if (lastActionResult.isNotBlank()) {
+                        SettingsDivider()
+                        SettingsNavRow(ht("最近动作"), subtitle = lastActionResult, compact = true, icon = HxIcons.Radio) { refresh() }
+                    }
                 }
             }
         }
@@ -456,6 +506,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
         item(key = "bssid") {
             SettingsSection { HxEditableList("Wi‑Fi BSSID（留空不限）", "BSSID", "AA:BB:CC:DD:EE:FF", bssids) }
+        }
+        item(key = "mccmnc") {
+            SettingsSection { HxEditableList("MCC+MNC（蜂窝网络时，默认数据卡或注册网络匹配即满足）", "MCC+MNC", "例如 46000", mccs) }
         }
         item(key = "note") {
             HxBanner(
@@ -471,15 +524,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
             title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
             referenceRadios = true,
             trailingReferenceRadios = key == "networkUnmatchAction",
-            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理"))),
-            selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
+            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理")),
+                HxChoice("switch", ht("切换配置…")), HxChoice("script", ht("运行脚本…"))),
+            selected = NetworkMatchRules.parseAction(prefs.getString(key, if (key == "networkMatchAction") "start" else "none")).kind,
             onPick = { value ->
-                prefs.edit().putString(key, value).apply()
                 actionKey = null
+                if (value == "switch" || value == "script") {
+                    openTargets(key, value)
+                } else {
+                    prefs.edit().putString(key, value).apply()
+                    refresh()
+                    evaluate()
+                }
+            },
+            onDismiss = { actionKey = null },
+        )
+    }
+
+    targetPick?.let { (key, kind) ->
+        val current = NetworkMatchRules.parseAction(prefs.getString(key, ""))
+        HxChoiceSheet(
+            title = if (kind == "switch") ht("请选择匹配时使用的配置") else ht("请选择匹配时运行的脚本"),
+            referenceRadios = true,
+            choices = targetChoices.map { HxChoice(it, it) },
+            selected = if (current.kind == kind) current.target else null,
+            maxVisibleChoices = 8,
+            footer = if (kind == "script") ht("脚本以 Root 运行，最长 12 秒，输出与退出码写入 scripts.log；环境变量 HETU_EVENT / HETU_NETWORK。") else ht("运行中会校验新配置后重启核心；失败时恢复原配置。"),
+            onPick = { name ->
+                val encoded = NetworkMatchRules.Action(kind, name).encode()
+                prefs.edit().putString(key, encoded).apply()
+                targetPick = null
                 refresh()
                 evaluate()
             },
-            onDismiss = { actionKey = null },
+            onDismiss = { targetPick = null },
         )
     }
 }
