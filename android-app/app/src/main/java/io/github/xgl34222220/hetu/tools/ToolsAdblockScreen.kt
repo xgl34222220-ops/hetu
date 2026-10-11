@@ -96,6 +96,7 @@ internal fun ToolsAdblockScreen(
     modifier: Modifier = Modifier,
     scroll: ScrollState = rememberScrollState(),
     onProbe: (() -> Unit)? = null,
+    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
 ) {
     val ready = state.load is ToolsLoad.Ready
     val idle = ready && !state.busy
@@ -129,7 +130,7 @@ internal fun ToolsAdblockScreen(
                 ProxyOffCard(state, idle, onStandaloneDnsChange, onCnameChange, Modifier.homeEnter(stagger, 1))
             } else {
                 StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
-                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
+                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe, idle, onRecommendedDnsChange)
                 else HomeCoreUnsupportedCard(
                     state.coreLabel, "运行链验证 · 热更新过滤规则",
                     "广告规则在启动时写入 ${state.coreLabel} 配置并按规则拦截；${state.coreLabel} 不提供 Mihomo 的规则读取接口，无法实时验证运行链，修改规则在重启代理后生效。",
@@ -240,7 +241,13 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
 }
 
 @Composable
-private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onProbe: (() -> Unit)? = null) {
+private fun ChainCard(
+    state: ToolsAdblockState,
+    modifier: Modifier,
+    onProbe: (() -> Unit)? = null,
+    idle: Boolean = true,
+    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
+) {
     val running = state.enabled && state.proxyRunning
     HomeCard(modifier.fillMaxWidth()) {
         ToolsCardTitle("运行链验证")
@@ -251,6 +258,10 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onProbe: (()
         CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), state.chainNote.takeIf { running && it.isNotBlank() }
             ?: ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
         HomeRowDivider(start = HomeRowDims.textStart)
+        if (running && state.dnsPath.isNotBlank()) {
+            CheckRow(state.dnsPathOk, ht("DNS 路径"), state.dnsPath, maxLines = 4)
+            HomeRowDivider(start = HomeRowDims.textStart)
+        }
         if (onProbe != null) {
             val probe = state.probe
             ToolsRow(
@@ -270,20 +281,52 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onProbe: (()
                 },
             )
             HomeRowDivider(start = HomeRowDims.textStart)
+            val dnsProbe = state.dnsProbe
+            if (state.probing || dnsProbe != null) {
+                ToolsRow(
+                    AnnotatedString(ht("DNS 接管实测")),
+                    icon = if (dnsProbe?.ok == true && !state.probing) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+                    iconTint = if (dnsProbe?.ok == true && !state.probing) LocalHomeColors.current.good else if (dnsProbe?.ok == false && !state.probing) LocalHomeColors.current.bad else LocalHomeColors.current.t3,
+                    subtitle = if (state.probing) ht("用系统解析器解析一个已拦截域名…") else dnsProbe?.detail.orEmpty(),
+                    compact = true, subtitleMaxLines = 4,
+                )
+                HomeRowDivider(start = HomeRowDims.textStart)
+            }
         }
-        CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
+        // Controller hitCount (in-memory, independent of the log level) and missCount: a rule that
+        // was never checked (miss 0) and one that sees hostless connections (miss > 0) differ.
+        CheckRow(
+            state.effective && state.hits > 0, ht("实际拦截"),
+            "%,d ".format(state.shownHits) + ht("次") + when {
+                !running -> ""
+                state.hitsFromController -> " · " + ht("已检查") + " %,d ".format(state.missCount + state.hits) + ht("个连接")
+                else -> " · " + ht("日志计数")
+            },
+        )
+        if (state.hints.isNotEmpty()) {
+            Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                state.hints.forEach { hint -> HomeNotice(ht(hint), HomeIcons.TriangleAlert, Modifier.fillMaxWidth()) }
+            }
+        }
+        if (state.offerRecommendedDns && onRecommendedDnsChange != null) {
+            HomeRowDivider(start = HomeRowDims.textStart)
+            ToolsSwitchRow(
+                "河图推荐 DNS", state.recommendedDns, onRecommendedDnsChange, icon = ToolsFeatureIcons.Globe,
+                subtitle = "订阅没有 dns: 时启用 fake-ip + 国内 DoH；默认关闭，重启代理后生效", enabled = idle,
+            )
+        }
     }
 }
 
 @Composable
-private fun CheckRow(ok: Boolean, title: String, detail: String) {
+private fun CheckRow(ok: Boolean, title: String, detail: String, maxLines: Int = 2) {
     val c = LocalHomeColors.current
     val tint by animateColorAsState(if (ok) c.good else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current, 260), label = "tools-ad-check")
     ToolsRow(
         AnnotatedString(title),
         icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
         iconTint = tint,
-        subtitle = detail, compact = true,
+        subtitle = detail, compact = true, subtitleMaxLines = maxLines,
     )
 }
 

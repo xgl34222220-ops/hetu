@@ -218,6 +218,7 @@ internal fun ToolsCnIpScreen(
     onEnabledChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
     onKernelChange: ((v4: Boolean, v6: Boolean) -> Unit)? = null,
+    onTcpOnlyChange: ((Boolean) -> Unit)? = null,
 ) {
     val stagger = rememberHomeStagger()
     ToolsPage(title = "CNIP 设置", onBack = onBack, modifier = modifier, subtitle = "中国大陆 IPv4 / IPv6 自动直连") {
@@ -245,6 +246,16 @@ internal fun ToolsCnIpScreen(
                     enabled = state.load is ToolsLoad.Ready,
                 )
                 HomeRowDivider(start = HomeRowDims.textStart)
+                if (onTcpOnlyChange != null) {
+                    // Ad blocking: CN-resolved ad hosts bypass the core entirely; keeping UDP/QUIC in
+                    // the core lets its rules still see those flows. Default off.
+                    ToolsSwitchRow(
+                        "仅 TCP 旁路", state.kernelTcpOnly, onTcpOnlyChange,
+                        icon = ToolsFeatureIcons.Shield, subtitle = "只让国内 TCP 连接绕过核心，UDP / QUIC 仍经核心规则（含去广告）",
+                        enabled = state.load is ToolsLoad.Ready && (state.kernelV4 || state.kernelV6),
+                    )
+                    HomeRowDivider(start = HomeRowDims.textStart)
+                }
                 ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = ht(cnIpKernelStatusText(state)))
             }
         }

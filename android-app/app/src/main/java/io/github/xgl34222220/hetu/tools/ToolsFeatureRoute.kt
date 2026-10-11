@@ -330,7 +330,8 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
         state = try {
             val kernel = actions.loadCnIpKernel?.invoke()
             if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
-            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries)
+            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries,
+                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false)
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
@@ -353,6 +354,14 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
             state = state.copy(kernelV4 = v4, kernelV6 = v6)
             scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
                 actions.setCnIpKernel(v4, v6)
+                actions.onMessage("已保存；重启代理后生效")
+            }
+        },
+        onTcpOnlyChange = if (actions.loadCnIpTcpOnly == null) null else { on ->
+            val previous = state
+            state = state.copy(kernelTcpOnly = on)
+            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
+                actions.setCnIpTcpOnly(on)
                 actions.onMessage("已保存；重启代理后生效")
             }
         },
@@ -446,7 +455,7 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
     suspend fun read() {
         val snapshot = (actions.loadAdblock ?: return)()
         // A re-read keeps the last 实测 result; it is the user's evidence, not part of the snapshot.
-        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, probing = state.probing)
+        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, dnsProbe = state.dnsProbe, probing = state.probing)
     }
 
     fun reload(announce: String? = null) {
@@ -525,6 +534,7 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
         },
         onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
         onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
+        onRecommendedDnsChange = { on -> change(state.copy(recommendedDns = on), "保存失败") { actions.setRecommendedDns(on) } },
         onRetry = { state = ToolsAdblockState(); reload() },
         modifier = modifier,
         onProbe = actions.probeAdblock?.let { probeOnce ->
@@ -534,7 +544,11 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
                     scope.launch {
                         val result = try { probeOnce() } catch (cancel: CancellationException) { throw cancel }
                             catch (error: Exception) { ToolsAdProbe(null, error.reason("实测失败")) }
-                        state = state.copy(probing = false, probe = result)
+                        val dns = actions.probeAdblockDns?.let { dnsOnce ->
+                            try { dnsOnce() } catch (cancel: CancellationException) { throw cancel }
+                            catch (error: Exception) { ToolsAdProbe(null, error.reason("DNS 实测失败")) }
+                        }
+                        state = state.copy(probing = false, probe = result, dnsProbe = dns)
                         reload()
                     }
                 }

@@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
     val size: Int = -1,
     val disabled: Boolean = false,
     val hitCount: Long = 0L,
+    /** Mihomo RuleWrapper: connections this rule was checked against and did not match. */
+    val missCount: Long = 0L,
 )
 
 internal data class ProxyRuleProviderUi(
@@ -319,6 +321,8 @@ internal class ProxyComposeController(context: Context) {
                     .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
                     .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
                     .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
+                    .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
+                    .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                     .putString("proxyRootTuning", status.optString("tuning", ""))
@@ -865,6 +869,7 @@ internal class ProxyComposeController(context: Context) {
                 size = r.optInt("size", -1),
                 disabled = extra?.optBoolean("disabled", false) ?: false,
                 hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
+                missCount = extra?.optLong("missCount", 0L) ?: 0L,
             )
         }
         return out

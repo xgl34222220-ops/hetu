@@ -191,6 +191,8 @@ internal data class ToolsCnIpState(
     val kernelReason: String = "",
     val kernelV4Entries: Int = 0,
     val kernelV6Entries: Int = 0,
+    /** Optional (default off): only TCP to CN addresses skips the core; UDP/QUIC still reaches it. */
+    val kernelTcpOnly: Boolean = false,
 )
 
 /** What the CNIP kernel bypass page reads back. */
@@ -267,6 +269,19 @@ internal data class ToolsAdblockState(
     val chainNote: String = "",
     /** Last 实测拦截 result; null until the user runs one. */
     val probe: ToolsAdProbe? = null,
+    /** Last DNS 接管实测 result (system resolver for a blocked host); null until run. */
+    val dnsProbe: ToolsAdProbe? = null,
+    /** Controller missCount of the REJECT rule; [hitsFromController] says [hits] is its hitCount. */
+    val missCount: Long = 0,
+    val hitsFromController: Boolean = false,
+    /** 运行链验证 › DNS 路径 (DNS mode, takeover, Private DNS, IPv6 DNS, CNIP, DNS layer). */
+    val dnsPath: String = "",
+    val dnsPathOk: Boolean = false,
+    /** Reasons the chain may miss ads (Private DNS hostname, sniffer, CNIP, app scope, counters). */
+    val hints: List<String> = emptyList(),
+    /** Subscription without dns: — the opt-in 河图推荐 DNS switch is offered. */
+    val offerRecommendedDns: Boolean = false,
+    val recommendedDns: Boolean = false,
     val probing: Boolean = false,
     val standaloneDns: Boolean = false,
     val cnameProtection: Boolean = true,
@@ -401,6 +416,8 @@ internal class ToolsFeatureActions(
     val setCnIp: suspend (Boolean) -> Unit = {},
     val loadCnIpKernel: (suspend () -> ToolsCnIpKernel)? = null,
     val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
+    val loadCnIpTcpOnly: (suspend () -> Boolean)? = null,
+    val setCnIpTcpOnly: suspend (Boolean) -> Unit = {},
 
     /* 诊断与维护 */
     val runPreflight: (suspend () -> ToolsPreflight)? = null,
@@ -429,6 +446,10 @@ internal class ToolsFeatureActions(
     val switchToRuleMode: (suspend () -> Unit)? = null,
     /** 实测拦截: one request for a blocked host through the core; null hides the button. */
     val probeAdblock: (suspend () -> ToolsAdProbe)? = null,
+    /** DNS 接管实测, run together with [probeAdblock]; null hides its row. */
+    val probeAdblockDns: (suspend () -> ToolsAdProbe)? = null,
+    /** 河图推荐 DNS (default off): only offered for subscriptions without dns:. */
+    val setRecommendedDns: suspend (Boolean) -> String = { "" },
 
     val onMessage: (String) -> Unit = {},
 ) {

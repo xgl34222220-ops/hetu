@@ -229,6 +229,11 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                 prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
                 changed()
             },
+            loadCnIpTcpOnly = { prefs.getBoolean("proxyCnIpKernelTcpOnly", false) },
+            setCnIpTcpOnly = { on ->
+                prefs.edit().putBoolean("proxyCnIpKernelTcpOnly", on).putBoolean("proxyRootSettingsDirty", true).apply()
+                changed()
+            },
 
             /* ------------------------------ 诊断与维护 ------------------------------ */
             onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
@@ -259,7 +264,9 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                 // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
                 val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
                 // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
-                val report = if (chain.running && coreLiveVerify) AdblockVerification.chain(app) else null
+                // The same controller reading feeds 广告过滤 here and in the legacy page (ToolsRuntimeBridge).
+                val report = if (chain.running && coreLiveVerify) chain.report else null
+                val (dnsPathOk, dnsPath) = AdblockVerification.dnsPath(chain)
                 val now = System.currentTimeMillis()
                 ToolsAdblockSnapshot(
                     ToolsAdblockState(
@@ -270,6 +277,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                         modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
                         ruleCount = snapshot.count,
                         hits = chain.hits,
+                        missCount = chain.missCount,
+                        hitsFromController = chain.hitsFromController,
+                        dnsPath = if (coreLiveVerify) dnsPath else "",
+                        dnsPathOk = dnsPathOk,
+                        hints = if (prefs.getBoolean(Keys.AdblockChain, true) && coreRoutesAds) AdblockVerification.hints(chain) else emptyList(),
+                        offerRecommendedDns = !chain.sourceHasDns || chain.recommendedDns,
+                        recommendedDns = chain.recommendedDns,
                         allow = snapshot.allow,
                         block = snapshot.block,
                         sources = snapshot.sources.map { source ->
@@ -302,6 +316,15 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             probeAdblock = {
                 val result = AdblockVerification.probe(app)
                 ToolsAdProbe(result.ok, result.detail)
+            },
+            probeAdblockDns = {
+                val result = AdblockVerification.dnsProbe(app)
+                ToolsAdProbe(result.ok, result.detail)
+            },
+            setRecommendedDns = { on ->
+                prefs.edit().putBoolean("proxyRecommendedDns", on).apply()
+                dirty("proxyRecommendedDns")
+                "已保存，重启代理后生效"
             },
             setAdblockEnabled = { on ->
                 val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }

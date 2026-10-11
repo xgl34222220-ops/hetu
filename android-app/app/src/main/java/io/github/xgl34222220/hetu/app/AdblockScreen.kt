@@ -97,6 +97,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
     var injected by remember { mutableStateOf<Boolean?>(null) }
     var chain by remember { mutableStateOf<AdblockChainReport?>(null) }
     var probe by remember { mutableStateOf<AdblockProbe?>(null) }
+    var dnsProbe by remember { mutableStateOf<AdblockProbe?>(null) }
+    var unified by remember { mutableStateOf<ToolsAdblockChain?>(null) }
     var probing by remember { mutableStateOf(false) }
     var showHelp by remember { mutableStateOf(false) }
 
@@ -109,16 +111,24 @@ internal fun AdblockScreen(vm: HetuViewModel) {
             vm.toast(error.message ?: "规则读取失败")
         }
         if (running) {
-            stats = try { vm.inspector.adblockRuntimeStats() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { stats }
-            injected = try {
-                AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
-            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-            // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
-            chain = AdblockVerification.chain(context)
+            // One data source with 工具 › 广告过滤: controller hitCount/missCount, strict chain, startup copy.
+            val live = try { ToolsRuntimeBridge.adblockChain(context) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+            unified = live
+            if (live != null) {
+                stats = AdblockRuntimeStats(count = live.hits, recentDomains = live.recent, logAvailable = true)
+                injected = live.startupInjected
+                // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
+                chain = live.report
+            } else {
+                injected = null
+                chain = null
+            }
         } else {
+            unified = null
             injected = null
             chain = null
             probe = null
+            dnsProbe = null
         }
     }
 
@@ -178,6 +188,9 @@ internal fun AdblockScreen(vm: HetuViewModel) {
             probe = try { AdblockVerification.probe(context) }
                 catch (cancel: CancellationException) { throw cancel }
                 catch (error: Exception) { AdblockProbe(null, "", error.message ?: "实测失败") }
+            dnsProbe = try { AdblockVerification.dnsProbe(context) }
+                catch (cancel: CancellationException) { throw cancel }
+                catch (error: Exception) { AdblockProbe(null, "", error.message ?: "DNS 实测失败") }
             probing = false
             revision++
         }
@@ -307,8 +320,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                         when { probing -> null; probed?.ok != null -> probed.ok; running -> stats.count > 0; else -> null },
                         when {
                             probing -> "正在向广告域名发送一次实测请求…"
-                            probed != null -> probed.detail
-                            running -> "${stats.count} 次"
+                            probed != null -> probed.detail + (dnsProbe?.let { "\nDNS 接管：" + it.detail } ?: "")
+                            running -> "${stats.count} 次" + (unified?.takeIf { it.hitsFromController }?.let { " · 已检查 ${it.missCount + it.hits} 个连接" } ?: "")
                             else -> "代理启动后统计"
                         },
                         neutralFalse = probed?.ok == null,

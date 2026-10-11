@@ -897,6 +897,22 @@ public final class ProxyNetworkMatchService extends Service {
                 previousHits=prefs.getLong("proxyAdblockSessionHits",0L);
                 oldRecent=prefs.getString("proxyAdblockRecentDomains","");
             }
+            // The counter comes from the controller over loopback HTTP (RuleWrapper hitCount, kept in
+            // memory and independent of the log level): no su, no log scan. core.log is read through
+            // su only while the 广告过滤 page is visible, for the recent-domain list.
+            final long controllerHits=controllerAdblockHits();
+            if(controllerHits>=0){
+                synchronized(ProxyAdblockSession.LOCK){
+                    if(destroyed||generation!=prefs.getLong("proxyAdblockSessionGeneration",0L)
+                            ||!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
+                    if(controllerHits!=previousHits){
+                        SharedPreferences.Editor counted=prefs.edit().putLong("proxyAdblockSessionHits",controllerHits);
+                        if(controllerHits>previousHits)counted.putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
+                        counted.apply();
+                    }
+                }
+            }
+            if(controllerHits>=0&&!prefs.getBoolean("proxyAdblockUiVisible",false))return;
             String path="/data/adb/hetu/run/core.log";
             String command="set +e; S=$(stat -c %s "+RootBridge.quote(path)+" 2>/dev/null || wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
                     +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
@@ -912,14 +928,14 @@ public final class ProxyNetworkMatchService extends Service {
             try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
             String chunk=newline<0?"":result.output.substring(newline+1);
             ProxyLogLines lines=ProxyLogLines.read(pending,discarding,chunk,size<offset);
-            long hits=previousHits;
+            long hits=controllerHits>=0?controllerHits:previousHits;
             LinkedHashSet<String> recent=new LinkedHashSet<>();
             if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
             java.util.regex.Pattern domainPattern=java.util.regex.Pattern.compile("-->\\s+([^\\s\\\"]+)");
             for(String line:lines.complete.split("\\r?\\n")){
                 String lower=line.toLowerCase(Locale.ROOT);
                 if(!lower.contains("hetu-adblock")||!lower.contains("reject")||!lower.contains("match"))continue;
-                hits++;
+                if(controllerHits<0)hits++;
                 java.util.regex.Matcher matcher=domainPattern.matcher(line);
                 if(matcher.find()){
                     String raw=matcher.group(1);
@@ -957,6 +973,23 @@ public final class ProxyNetworkMatchService extends Service {
                 edit.apply();
             }
         }catch(Exception ignored){}
+    }
+
+    /** hitCount of the live strict REJECT rule from the controller; -1 when it cannot be read. */
+    private long controllerAdblockHits(){
+        try{
+            org.json.JSONArray rules=new MihomoControllerClient(getApplicationContext()).rules().optJSONArray("rules");
+            if(rules==null)return -1L;
+            for(int i=0;i<rules.length();i++){
+                org.json.JSONObject rule=rules.optJSONObject(i);
+                if(rule==null)continue;
+                org.json.JSONObject extra=rule.optJSONObject("extra");
+                boolean disabled=rule.optBoolean("disabled",false)||(extra!=null&&extra.optBoolean("disabled",false));
+                if(AdblockRuleInspection.isBlockingRule(rule.optString("type"),rule.optString("payload"),rule.optString("proxy"),disabled))
+                    return extra==null?-1L:Math.max(0L,extra.optLong("hitCount",0L));
+            }
+        }catch(Exception ignored){}
+        return -1L;
     }
 
     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}
