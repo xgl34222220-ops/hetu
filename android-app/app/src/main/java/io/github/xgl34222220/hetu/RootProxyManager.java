@@ -127,6 +127,9 @@ final class RootProxyManager {
         final RootFakeIpRanges fakeIps;
         final String startup,settingsSignature;
         final int tproxyPort,redirectPort,controllerPort;
+        /** JS override scripts (覆写脚本) outcome of this preparation; empty when none is enabled. */
+        String overrideNotice="";
+        boolean overrideFallback;
         Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
             profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
         }
@@ -387,10 +390,14 @@ final class RootProxyManager {
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
 
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
-        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
-        String source=configs.read(selected);
-        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
+        // Without a selected profile, enabled override scripts generate the config from an empty one.
+        boolean scriptsOnly=selected==null&&OverrideScriptStart.hasEnabled(context);
+        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
+        String source=selected==null?"":configs.read(selected);
+        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
+        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,false,true);
+        if(override!=null)source=override.text;
         // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
         // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
@@ -404,7 +411,26 @@ final class RootProxyManager {
         // Keep the established startup argument protocol and the user's source untouched.
         String startup=fakeIps.privateStartup(generated.yaml);
         writeStartupCopy(startup);
-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
+        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature),override);
+    }
+
+    /**
+     * Applies the enabled JS override scripts to the source before Hetu writes its required
+     * parameters. Null when none is enabled. A failing script never blocks the start: the
+     * unmodified source is used and the notice is reported — except when no profile is selected,
+     * where there is no unmodified config to fall back to.
+     */
+    private OverrideScriptStart.Applied overrideScripts(ProxyRuntimeProfile profile,ProxyConfigLibrary.Entry selected,String source,boolean json,boolean supported)throws IOException{
+        OverrideScriptStart.Applied applied=OverrideScriptStart.apply(context,profile.core.id,supported,selected==null?null:selected.name,source,json);
+        if(applied==null)return null;
+        if(selected==null&&(applied.fallback||applied.text.trim().isEmpty()))
+            throw new IOException("未选择配置文件，覆写脚本也没有生成可用配置："+applied.notice);
+        return applied;
+    }
+
+    private static Prepared withOverride(Prepared p,OverrideScriptStart.Applied override){
+        if(override!=null){p.overrideNotice=override.notice;p.overrideFallback=override.fallback;}
+        return p;
     }
 
 
@@ -416,10 +442,15 @@ final class RootProxyManager {
     private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
         if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
-        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
-        String source=configs.read(selected);
-        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
+        boolean scriptable=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX;
+        boolean scriptsOnly=selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
+        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
+        String source=selected==null?"":configs.read(selected);
+        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
+        // sing-box: a native JSON source is scripted as JSON, a Mihomo YAML source before conversion.
+        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
+        if(override!=null)source=override.text;
         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
@@ -440,7 +471,7 @@ final class RootProxyManager {
                 +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
                 +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
         writeStartupCopy(startup);
-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature);
+        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature),override);
     }
 
     private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
@@ -846,6 +877,7 @@ final class RootProxyManager {
             p=prepare(profile,restartControllerPort);
         }
         RootProxyPolicy policy=p.policy;
+        if(!p.overrideNotice.isEmpty())stage(progress,p.overrideNotice);
         // A core that cannot run the adblock chain (Hysteria) starts without it, explicitly.
         if(profile.adblockChain&&!p.profile.adblockChain)profile=p.profile;
         String conversionWarnings=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?"":prefs.getString("proxyCoreConversionWarnings","");
@@ -993,7 +1025,11 @@ final class RootProxyManager {
             String shown=conversionWarnings.length()>900?conversionWarnings.substring(0,900)+"…":conversionWarnings;
             warning=(warning.isEmpty()?"":warning+"；")+profile.core.label+" 配置："+shown;
         }
-        result.put("sourceConfig",p.source.name)
+        if(!p.overrideNotice.isEmpty()){
+            result.put("overrideScripts",p.overrideNotice);
+            if(p.overrideFallback)warning=(warning.isEmpty()?"":warning+"；")+p.overrideNotice;
+        }
+        result.put("sourceConfig",p.source==null?"":p.source.name)
                 .put("core",profile.core.id)
                 .put("mode",profile.mode.id)
                 .put("dnsHijack",profile.dnsHijack.id)
