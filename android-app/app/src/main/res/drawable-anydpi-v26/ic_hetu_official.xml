@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Adaptive launcher icon. Same resource name as the packaged legacy ic_hetu_official.webp,
+     which stays byte-identical; on API 26+ (= minSdk) this anydpi variant is the one resolved. -->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@drawable/ic_hetu_official_background" />
+    <foreground android:drawable="@mipmap/ic_hetu_official_foreground" />
+    <monochrome android:drawable="@mipmap/ic_hetu_official_monochrome" />
+</adaptive-icon>

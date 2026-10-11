@@ -53,6 +53,7 @@ RELEASE_BUILD_DELTA = (
     implementation("androidx.profileinstaller:profileinstaller:1.4.1")
 '''),
 )
+RES = 'android-app/app/src/main/res/'
 AUTHORIZED_FILES = frozenset((
     BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT,
     PACKAGE + 'RootAutostart.java', PACKAGE + 'RootProxyManager.java',
@@ -85,6 +86,16 @@ AUTHORIZED_FILES = frozenset((
     # and the runtime inspector that no longer polls core.log through su for the counter.
     PACKAGE + 'AdblockDnsPolicy.java', PACKAGE + 'MihomoStartupConfig.java', PACKAGE + 'ProxyAdblockRules.java',
     PACKAGE + 'ToolsRuntimeBridge.kt',
+    # 2026-10-12 icon/splash authorization (user-approved 河图 swirl icon): the launcher icon becomes
+    # an adaptive icon under the unchanged resource name ic_hetu_official (anydpi-v26 variant; the
+    # legacy ic_hetu_official.webp and the manifest stay byte-identical), and Android 12+ gets a
+    # themed system splash plus the mesh-art first frame drawn by HetuActivity.
+    RES + 'drawable-anydpi-v26/ic_hetu_official.xml', RES + 'drawable/ic_hetu_official_background.xml',
+    *(RES + 'mipmap-' + density + '/ic_hetu_official_' + layer + '.webp'
+      for density in ('mdpi', 'hdpi', 'xhdpi', 'xxhdpi', 'xxxhdpi') for layer in ('foreground', 'monochrome')),
+    *(RES + folder + '/hetu_splash_' + kind + '.webp'
+      for folder in ('drawable-nodpi', 'drawable-night-nodpi') for kind in ('art', 'icon')),
+    RES + 'values-v31/styles.xml', RES + 'values-night-v31/styles.xml',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

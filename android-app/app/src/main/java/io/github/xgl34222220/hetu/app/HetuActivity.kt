@@ -124,6 +124,7 @@ class HetuActivity : ComponentActivity() {
         enableEdgeToEdge()
         vm = ViewModelProvider(this)[HetuViewModel::class.java]
         if (savedInstanceState == null) applyStartPage(intent)
+        val launchArt = savedInstanceState == null
         setContent {
             HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
                 val revision = vm.settingsRevision
@@ -133,6 +134,7 @@ class HetuActivity : ComponentActivity() {
                 CompositionLocalProvider(LocalDensity provides scaledDensity) {
                     HetuRoot(vm, requestedRoute) { requestedRoute = null }
                 }
+                if (launchArt) HetuLaunchArt()
             }
         }
     }
@@ -174,6 +176,30 @@ class HetuActivity : ComponentActivity() {
     companion object {
         const val EXTRA_START_PAGE = "io.github.xgl34222220.hetu.START_PAGE"
     }
+}
+
+/**
+ * Cold-start hand-off from the system splash: the first frame shows the full mesh art
+ * (hetu_splash_art, -night variant in dark mode) centre-cropped over the already-composed app,
+ * then fades it out (~360 ms total). It draws only — no pointer input — and never delays the
+ * app content composed beneath it.
+ */
+@Composable
+private fun HetuLaunchArt() {
+    var visible by remember { mutableStateOf(true) }
+    if (!visible) return
+    val alpha = remember { Animatable(1f) }
+    LaunchedEffect(Unit) {
+        delay(60)
+        alpha.animateTo(0f, androidx.compose.animation.core.tween(durationMillis = 300))
+        visible = false
+    }
+    androidx.compose.foundation.Image(
+        painter = androidx.compose.ui.res.painterResource(R.drawable.hetu_splash_art),
+        contentDescription = null,
+        contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+        modifier = Modifier.fillMaxSize().graphicsLayer { this.alpha = alpha.value },
+    )
 }
 
 /* ------------------------------------------------------------------ */
