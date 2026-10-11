@@ -336,6 +336,12 @@ final class RootProxyManager {
                     +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
                     +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
                     +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
+            if(snapshot.dnsFile!=null){
+                String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME;
+                cmd+="; cp "+RootBridge.quote(snapshot.dnsFile.getAbsolutePath())+" "+RootBridge.quote(dnsDst+suffix)
+                        +"; chmod 600 "+RootBridge.quote(dnsDst+suffix)+"; chown 0:0 "+RootBridge.quote(dnsDst+suffix)
+                        +"; mv -f "+RootBridge.quote(dnsDst+suffix)+" "+RootBridge.quote(dnsDst);
+            }
             RootBridge.Result copied=boundedRootShell(context,cmd,20000L);
             if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
@@ -345,6 +351,10 @@ final class RootProxyManager {
             try{
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                 controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
+                // The DNS-layer set exists only when the running copy declared it (dns: block present).
+                JSONObject loaded=controller.ruleProviders().optJSONObject("providers");
+                if(loaded!=null&&loaded.has(AdblockDnsPolicy.PROVIDER_NAME))
+                    controller.reloadLocalRuleProvider(AdblockDnsPolicy.PROVIDER_NAME);
                 verifyAdblockRuntime(controller,true,snapshot.count);
             }catch(Exception providerError){
                 // Do not reload the entire proxy after a provider error: this can
@@ -398,7 +408,8 @@ final class RootProxyManager {
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
-        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
+        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
+                prefs.getBoolean("proxyRecommendedDns",false));
         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
         // Private comments carry an already validated routing projection into start/boot.
         // Keep the established startup argument protocol and the user's source untouched.
@@ -565,6 +576,12 @@ final class RootProxyManager {
                 cmd.append("; cp ").append(RootBridge.quote(p.adblock.allowFile.getAbsolutePath())).append(' ').append(RootBridge.quote(allowTmp))
                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                         .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
+            }
+            if(p.adblock.dnsFile!=null){
+                String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME,dnsTmp=dnsDst+suffix;
+                cmd.append("; cp ").append(RootBridge.quote(p.adblock.dnsFile.getAbsolutePath())).append(' ').append(RootBridge.quote(dnsTmp))
+                        .append("; chmod 600 ").append(RootBridge.quote(dnsTmp)).append("; chown 0:0 ").append(RootBridge.quote(dnsTmp))
+                        .append("; mv -f ").append(RootBridge.quote(dnsTmp)).append(' ').append(RootBridge.quote(dnsDst));
             }
         }
         RootBridge.Result installed=boundedRootShell(context,cmd.toString(),15000L);
@@ -1950,7 +1967,12 @@ final class RootProxyManager {
                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
-                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
+                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]");
+            File adblockDns=p.adblock.dnsFile;
+            String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME,dnsTmp=dnsDst+".new";
+            if(adblockDns!=null)cmd.append(" || [ \"$(sha256sum ").append(RootBridge.quote(dnsDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
+                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockDns))).append(" ]");
+            cmd.append("; then")
                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
             if(adblockAllow!=null){
@@ -1958,6 +1980,13 @@ final class RootProxyManager {
                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                         .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                         .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
+            }
+            if(adblockDns!=null){
+                cmd.append("; cp ").append(RootBridge.quote(adblockDns.getAbsolutePath())).append(' ').append(RootBridge.quote(dnsTmp))
+                        .append("; chmod 600 ").append(RootBridge.quote(dnsTmp)).append("; chown 0:0 ").append(RootBridge.quote(dnsTmp))
+                        .append("; test \"$(sha256sum ").append(RootBridge.quote(dnsTmp)).append(" | cut -d ' ' -f 1)\" = ")
+                        .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockDns)))
+                        .append("; mv -f ").append(RootBridge.quote(dnsTmp)).append(' ').append(RootBridge.quote(dnsDst));
             }
             cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))

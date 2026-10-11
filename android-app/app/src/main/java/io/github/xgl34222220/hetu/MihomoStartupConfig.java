@@ -69,6 +69,32 @@ final class MihomoStartupConfig {
 
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,false);
+    }
+
+    /**
+     * Opt-in (default off) Hetu DNS for subscriptions without any dns: block: fake-ip with domestic
+     * DoH, so DNS answers carry fake-ip mappings and are not plain system resolution. Never applied
+     * when the source has its own dns: block; the selected source file is never edited.
+     */
+    static final String RECOMMENDED_DNS=
+            "dns:\n"+
+            "  enable: true\n"+
+            "  ipv6: false\n"+
+            "  enhanced-mode: fake-ip\n"+
+            "  fake-ip-range: 198.18.0.1/16\n"+
+            "  default-nameserver:\n"+
+            "    - 223.5.5.5\n"+
+            "    - 119.29.29.29\n"+
+            "  nameserver:\n"+
+            "    - https://223.5.5.5/dns-query\n"+
+            "    - https://doh.pub/dns-query\n";
+
+    static boolean sourceHasDns(String source){return hasTopLevelKey(source==null?"":normalize(source),"dns");}
+
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -116,6 +142,12 @@ final class MihomoStartupConfig {
         // filtering chain is enabled. The user's source YAML remains untouched.
         if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
+        if(recommendedDns&&!hasTopLevelKey(yaml,"dns")){
+            String base=trimOne(yaml);
+            yaml=base+(base.isEmpty()||base.endsWith("\n")?"":"\n")+RECOMMENDED_DNS;
+            // ipv6: false above only when the runtime IPv6 policy is not "enable".
+            if(profile.ipv6==ProxyRuntimeProfile.Ipv6.ENABLE)yaml=yaml.replace("  ipv6: false\n  enhanced-mode: fake-ip","  enhanced-mode: fake-ip");
+        }
         // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
         // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
         // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
@@ -136,6 +168,10 @@ final class MihomoStartupConfig {
             yaml=ensureAdblock(yaml);
         if(profile.cnIpDirect)
             yaml=ensureCnIpDirect(yaml);
+        // A subscription sniffer that is on but silent about parse-pure-ip gets it explicitly;
+        // enable: false / an explicit value are respected (UI explains the consequence).
+        if(profile.adblockChain&&hasTopLevelKey(yaml,"sniffer"))
+            yaml=AdblockDnsPolicy.ensureParsePureIp(yaml);
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
@@ -372,12 +408,16 @@ final class MihomoStartupConfig {
     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
     private static String ensureAdblock(String source)throws IOException{
         String yaml=normalize(source);
-        yaml=injectAdblockProvider(yaml);
+        // DNS layer first (only the dns: block changes); the provider it names is declared only
+        // when the policy really went in, so a config without a usable dns: block is unchanged.
+        AdblockDnsPolicy.Result dns=AdblockDnsPolicy.inject(yaml);
+        if(dns.injected)yaml=dns.yaml;
+        yaml=injectAdblockProvider(yaml,dns.injected);
         yaml=insertAdblockRuleRespectingUserPolicy(yaml);
         return yaml;
     }
 
-    private static String injectAdblockProvider(String source)throws IOException{
+    private static String injectAdblockProvider(String source,boolean dnsProvider)throws IOException{
         String[] lines=normalize(source).split("\n",-1);
         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
         for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
@@ -391,7 +431,13 @@ final class MihomoStartupConfig {
                 "    type: file\n"+
                 "    behavior: domain\n"+
                 "    format: text\n"+
-                "    path: "+ADBLOCK_PATH+"\n";
+                "    path: "+ADBLOCK_PATH+"\n"+
+                (dnsProvider?
+                "  "+AdblockDnsPolicy.PROVIDER_NAME+":\n"+
+                "    type: file\n"+
+                "    behavior: domain\n"+
+                "    format: text\n"+
+                "    path: "+AdblockDnsPolicy.PROVIDER_PATH+"\n":"");
         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
         String rest=found.group(1).trim();
         if(rest.startsWith("#"))rest="";
@@ -400,7 +446,8 @@ final class MihomoStartupConfig {
         for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
         for(int i=index+1;i<end;i++){
             String t=lines[i].trim();
-            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":"))
+            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":")
+                    ||t.startsWith(AdblockDnsPolicy.PROVIDER_NAME+":"))
                 throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
         }
         StringBuilder out=new StringBuilder();

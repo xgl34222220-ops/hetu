@@ -20,9 +20,15 @@ final class ProxyAdblockRules {
         final int count;
         final int allowCount;
         final String revision;
+        /** DNS-layer block set (block minus allow-covered/allow-parent suffixes); null when not exported. */
+        final File dnsFile;
+        final int dnsCount;
         Snapshot(File file, File allowFile, int count, int allowCount, String revision) {
+            this(file,allowFile,count,allowCount,revision,null,-1);
+        }
+        Snapshot(File file, File allowFile, int count, int allowCount, String revision, File dnsFile, int dnsCount) {
             this.file=file; this.allowFile=allowFile; this.count=count; this.allowCount=allowCount;
-            this.revision=revision==null?"":revision;
+            this.revision=revision==null?"":revision; this.dnsFile=dnsFile; this.dnsCount=dnsCount;
         }
     }
 
@@ -52,14 +58,17 @@ final class ProxyAdblockRules {
         File target=new File(previous,"hetu-adblock.txt");
         File allowTarget=new File(previous,"hetu-adblock-allow.txt");
         File meta=new File(previous,"hetu-adblock.meta");
-        if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
+        File dnsTarget=new File(previous,AdblockDnsPolicy.FILE_NAME);
+        if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&dnsTarget.isFile()&&meta.isFile()){
             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
             catch(Exception ignored){cached.clear();}
-            if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)){
+            if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)
+                    &&dnsValid(cached,dnsTarget)){
                 try{
                     int count=Integer.parseInt(cached.getProperty("count","-1"));
                     int allowCount=Integer.parseInt(cached.getProperty("allowCount","-1"));
-                    if(count>=0&&allowCount>=0)return new Snapshot(target,allowTarget,count,allowCount,persisted);
+                    int dnsCount=Integer.parseInt(cached.getProperty("dnsCount","-1"));
+                    if(count>=0&&allowCount>=0&&dnsCount>=0)return new Snapshot(target,allowTarget,count,allowCount,persisted,dnsTarget,dnsCount);
                 }catch(NumberFormatException ignored){}
             }
         }
@@ -74,8 +83,10 @@ final class ProxyAdblockRules {
         File stage=new File(dir,name+".new");
         if(!stage.mkdir())throw new IOException("无法创建广告过滤导出事务");
         target=new File(stage,"hetu-adblock.txt"); allowTarget=new File(stage,"hetu-adblock-allow.txt");
+        dnsTarget=new File(stage,AdblockDnsPolicy.FILE_NAME);
+        List<String> dnsDomains=AdblockDnsPolicy.dnsBlockDomains(domains,allow);
         try {
-        writer.write(domains,target); writer.write(allow,allowTarget);
+        writer.write(domains,target); writer.write(allow,allowTarget); writer.write(dnsDomains,dnsTarget);
         Properties saved=new Properties();
         saved.setProperty("directory",name);
         saved.setProperty("revision",revision);
@@ -83,6 +94,8 @@ final class ProxyAdblockRules {
         saved.setProperty("allowSha256",RuntimeCompatibility14.sha256(allowTarget));
         saved.setProperty("count",String.valueOf(domains.size()));
         saved.setProperty("allowCount",String.valueOf(allow.size()));
+        saved.setProperty("dnsSha256",RuntimeCompatibility14.sha256(dnsTarget));
+        saved.setProperty("dnsCount",String.valueOf(dnsDomains.size()));
         try(FileOutputStream out=new FileOutputStream(new File(stage,"hetu-adblock.meta"),false)){
             saved.store(out,null);out.getFD().sync();
         }
@@ -91,7 +104,8 @@ final class ProxyAdblockRules {
         File metaTmp=new File(dir,"current.meta.new");
         try(FileOutputStream out=new FileOutputStream(metaTmp,false)){saved.store(out,null);out.getFD().sync();}
         move(metaTmp,index);
-        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision);
+        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision,
+                new File(published,dnsTarget.getName()),dnsDomains.size());
         } finally {
             // Only our unpublished transaction is disposable. Previously returned
             // generations remain immutable, including during a failed refresh.
@@ -99,6 +113,13 @@ final class ProxyAdblockRules {
             if(abandoned!=null)for(File file:abandoned)file.delete();
             stage.delete();
         }
+    }
+
+    private static boolean dnsValid(Properties meta,File dns){
+        try{
+            String sha=meta.getProperty("dnsSha256","");
+            return sha.matches("[0-9a-f]{64}")&&sha.equals(RuntimeCompatibility14.sha256(dns));
+        }catch(IOException missing){return false;}
     }
 
     private static void move(File source,File target)throws IOException{

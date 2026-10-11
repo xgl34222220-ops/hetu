@@ -79,6 +79,12 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-11 CNIP kernel-bypass authorization: the MIT notice of the CNIP data source
     # (gaoyifan/china-operator-ip) that the built-in snapshots and ipset import already use.
     'android-app/app/src/main/assets/licenses/china-operator-ip.txt',
+    # 2026-10-12 ad-block repair authorization (PR #33 audit): DNS-layer blocking (pure-Java
+    # nameserver-policy/fake-ip-filter writer and the third exported domain set), the startup copy
+    # that declares it, the controller-counter based chain reading shared by both ad-block pages,
+    # and the runtime inspector that no longer polls core.log through su for the counter.
+    PACKAGE + 'AdblockDnsPolicy.java', PACKAGE + 'MihomoStartupConfig.java', PACKAGE + 'ProxyAdblockRules.java',
+    PACKAGE + 'ToolsRuntimeBridge.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
