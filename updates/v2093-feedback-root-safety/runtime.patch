@@ -175,7 +175,7 @@ index 4d17a16..303e13a 100644
    fi
    N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..8c01424 100755
+index ae832da..1ce6220 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -220,7 +220,7 @@ index ae832da..8c01424 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +89,80 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +89,81 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -235,6 +235,7 @@ index ae832da..8c01424 100755
 +CN4_ON=0
 +CN6_ON=0
 +CN_FORCE=""
++CN_TCPONLY=0
 +CN_CHAIN=""
 +CNIP_STATE=off
 +CNIP_REASON=""
@@ -304,7 +305,7 @@ index ae832da..8c01424 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +174,120 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +175,120 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -427,7 +428,7 @@ index ae832da..8c01424 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +295,53 @@ acquire_lock(){
+@@ -99,10 +296,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -483,7 +484,7 @@ index ae832da..8c01424 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +427,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +428,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -507,7 +508,7 @@ index ae832da..8c01424 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +476,8 @@ cleanup4(){
+@@ -233,7 +477,8 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -517,7 +518,7 @@ index ae832da..8c01424 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +492,136 @@ cleanup6(){
+@@ -248,13 +493,136 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -656,7 +657,7 @@ index ae832da..8c01424 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,9 +653,20 @@ findcorepid(){
+@@ -286,9 +654,20 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -678,7 +679,7 @@ index ae832da..8c01424 100755
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
    # two seconds for the tracked PID and then another two seconds for each orphan,
-@@ -296,6 +674,8 @@ stopcore(){
+@@ -296,6 +675,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -687,7 +688,7 @@ index ae832da..8c01424 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +700,14 @@ stopcore(){
+@@ -320,6 +701,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -702,16 +703,18 @@ index ae832da..8c01424 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -542,6 +930,167 @@ bypass6(){
+@@ -542,6 +931,171 @@ bypass6(){
    [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
  }
 
 +# ---------------------------------------------------------------- CNIP (ipset)
 +cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 +cnip_load_policy(){
-+  CNP_V4=0; CNP_V6=0; CN_FORCE=""
++  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0
 +  [ -r "$BASE/policy/cnip" ] || return 1
 +  CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
++  # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
++  [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
 +  bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
 +  split_safe_uids "$CN_FORCE" || CN_FORCE=""
 +  [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
@@ -719,8 +722,9 @@ index ae832da..8c01424 100755
 +# What the running session installed (watchdog Kill Switch, status, reload read it back).
 +cnip_load_session(){
 +  CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
-+  CN4_ON=0; CN6_ON=0; CN_FORCE=""
++  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
 +  [ "$CNIP_STATE" = ipset ] || return 0
++  [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
 +  [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
 +  [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
 +  CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -803,20 +807,21 @@ index ae832da..8c01424 100755
 +cn_split(){
 +  CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
 +  case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
++  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
 +  if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
 +    CS_TAIL="${CS_C}_T"
 +    if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
 +    else "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" || return 1; fi
 +    CS_OLDIFS=$IFS; IFS=,; set -- $CN_FORCE; IFS=$CS_OLDIFS
 +    for CS_U in "$@"; do "$CS_BIN" -t "$CS_T" -A "$CS_C" -m owner --uid-owner "$CS_U" -g "$CS_TAIL" || return 1; done
-+    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN || return 1
++    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN || return 1
 +    "$CS_BIN" -t "$CS_T" -A "$CS_C" -g "$CS_TAIL" || return 1
 +    CN_CHAIN="$CS_TAIL"; return 0
 +  fi
 +  if [ "$CS_KIND" = mark ] && [ -n "$MARK" ]; then
-+    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
++    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
 +  fi
-+  "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN
++  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN
 +}
 +# Per-chain fallback: an unreferenced "<chain>_T" left by a failed batch sweep.
 +cn_drop_tail(){ cleanup_chain_absent "$1" "$2" "$3" && return 0; "$1" -t "$2" -F "$3" >/dev/null 2>&1 || true; "$1" -t "$2" -X "$3" >/dev/null 2>&1 || true; }
@@ -870,7 +875,7 @@ index ae832da..8c01424 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -738,15 +1287,16 @@ install_mangle4(){
+@@ -738,15 +1292,16 @@ install_mangle4(){
      xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
    bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
@@ -892,7 +897,7 @@ index ae832da..8c01424 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -768,27 +1318,28 @@ install_mangle6(){
+@@ -768,27 +1323,28 @@ install_mangle6(){
      xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
    bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
@@ -930,7 +935,7 @@ index ae832da..8c01424 100755
  }
 
  # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
-@@ -841,7 +1392,8 @@ install_udp_leak_guard4(){
+@@ -841,7 +1397,8 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -940,7 +945,7 @@ index ae832da..8c01424 100755
    xt4 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt4 -t filter -N "$WRFWD" || return 1
-@@ -849,6 +1401,7 @@ install_udp_leak_guard4(){
+@@ -849,6 +1406,7 @@ install_udp_leak_guard4(){
      iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
      shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
      bypass4 "$WRFWD" filter "$CIDRS" || return 1
@@ -948,7 +953,7 @@ index ae832da..8c01424 100755
      xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
-@@ -864,7 +1417,8 @@ install_udp_leak_guard6(){
+@@ -864,7 +1422,8 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -958,7 +963,7 @@ index ae832da..8c01424 100755
    xt6 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt6 -t filter -N "$WRFWD" || return 1
-@@ -872,23 +1426,24 @@ install_udp_leak_guard6(){
+@@ -872,23 +1431,24 @@ install_udp_leak_guard6(){
      iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
      shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
      bypass6 "$WRFWD" filter "$CIDRS" || return 1
@@ -989,7 +994,7 @@ index ae832da..8c01424 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1476,122 @@ v6_disable_guard_ready(){
+@@ -921,16 +1481,122 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -1117,7 +1122,7 @@ index ae832da..8c01424 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +1622,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +1627,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -1126,7 +1131,7 @@ index ae832da..8c01424 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1020,19 +1681,58 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1020,19 +1686,71 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
  watchdog(){
@@ -1146,7 +1151,7 @@ index ae832da..8c01424 100755
 +    [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
 +    if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
 +      MISS=0; H_TICK=$((H_TICK+1))
-+      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
++      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
 +        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; fi
 +      sleep 2
 +    else MISS=$((MISS+1)); sleep 0.20; fi
@@ -1176,6 +1181,19 @@ index ae832da..8c01424 100755
 +  [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ] || rm -f "$WATCHDOG_PID"
 +  rm -f "$RUN/watchdog.ready.$$"
 +}
++# info-level ad-block logging writes one line per connection. The core appends (>>, O_APPEND),
++# so copy the newest 1 MiB to core.log.1 and truncate in place once core.log passes 8 MiB; the
++# App's offset reader already restarts at 1 when the size drops below its offset.
++LOG_ROTATE_BYTES=8388608
++core_log_rotate(){
++  [ -f "$LOG" ] || return 0
++  LR_SIZE=$(stat -c %s "$LOG" 2>/dev/null || wc -c < "$LOG" 2>/dev/null || echo 0)
++  case "$LR_SIZE" in ''|*[!0-9]*) return 0;; esac
++  [ "$LR_SIZE" -gt "$LOG_ROTATE_BYTES" ] || return 0
++  tail -c 1048576 "$LOG" > "$LOG.1.$$" 2>/dev/null && mv -f "$LOG.1.$$" "$LOG.1" 2>/dev/null || rm -f "$LOG.1.$$"
++  : > "$LOG" 2>/dev/null || true
++  printf '%s core.log rotated at %s bytes\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$LR_SIZE" >> "$WATCHDOG_LOG" 2>/dev/null || true
++}
 +start_watchdog(){
 +  stopwatchdog
 +  WD_GENERATION="$$-$(health_core_birth "$$")"
@@ -1193,7 +1211,7 @@ index ae832da..8c01424 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +1745,45 @@ probe_core_owner(){
+@@ -1045,9 +1763,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -1240,7 +1258,7 @@ index ae832da..8c01424 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +1794,27 @@ core_identity_prepare(){
+@@ -1058,14 +1812,27 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -1271,7 +1289,7 @@ index ae832da..8c01424 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +1828,9 @@ core_launch(){
+@@ -1079,8 +1846,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -1283,7 +1301,7 @@ index ae832da..8c01424 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +1897,21 @@ core_tune(){
+@@ -1147,6 +1915,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -1305,7 +1323,7 @@ index ae832da..8c01424 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,9 +1990,67 @@ google_firewall_maintain(){ (
+@@ -1225,9 +2008,67 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -1373,7 +1391,7 @@ index ae832da..8c01424 100755
    START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
    bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
    tuning_valid || fail "$TUNE_ERROR"
-@@ -1242,8 +2065,16 @@ start(){
+@@ -1242,8 +2083,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -1391,7 +1409,7 @@ index ae832da..8c01424 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2084,80 @@ start(){
+@@ -1253,75 +2102,80 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -1510,14 +1528,14 @@ index ae832da..8c01424 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2169,84 @@ start(){
+@@ -1333,19 +2187,84 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
 -  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 DNS 接管状态，已停止本次启动"; }
 -  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { cleanup; stopcore; rm -f "$SESSION"; fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
++  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$([ "$CNIP_STATE" = ipset ] && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
 +  printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
 +  transaction_current || fail "启动事务已撤销"
 +  if [ "$START_KILL" = 1 ]; then
@@ -1599,7 +1617,7 @@ index ae832da..8c01424 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +2308,12 @@ status(){
+@@ -1407,6 +2326,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -1612,7 +1630,7 @@ index ae832da..8c01424 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +2394,20 @@ status(){
+@@ -1487,13 +2412,20 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -1624,7 +1642,7 @@ index ae832da..8c01424 100755
 +    case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
 +    if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
 +  fi
-+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N"
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)"
  }
 
  # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -1635,7 +1653,7 @@ index ae832da..8c01424 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1666,16 +2580,18 @@ health_restore_table(){
+@@ -1666,16 +2598,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -1656,7 +1674,7 @@ index ae832da..8c01424 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1757,6 +2673,16 @@ health_json(){ (
+@@ -1757,6 +2691,16 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -1673,7 +1691,7 @@ index ae832da..8c01424 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +2700,16 @@ case "${1:-status}" in
+@@ -1774,10 +2718,16 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -1747,6 +1765,328 @@ index 0000000..b577946
 +Lcoil3/**;
 +HSPLkotlinx/coroutines/**;->**(**)**
 +Lkotlinx/coroutines/**;
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
+new file mode 100644
+index 0000000..62a0196
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
+@@ -0,0 +1,316 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.*;
++
++/**
++ * DNS-layer ad blocking for the private Mihomo runtime copy (pure Java, no Android API).
++ *
++ * The connection-layer AND rule only matches flows that still carry a hostname. Flows that reach
++ * the kernel as bare (often Chinese) IPs, e.g. under CNIP kernel bypass or redir-host DNS, never
++ * reach it. Answering the ad hostname itself with an empty NOERROR keeps those apps from getting
++ * an address at all.
++ *
++ * Verified against Mihomo ab405bad: dns.nameserver-policy is an ordered map evaluated first-match
++ * (config.parseNameServerPolicy keeps insertion order; Resolver.matchPolicy returns the first hit,
++ * for both A/AAAA and other queries); a "rule-set:" key accepts a behavior=domain provider; an
++ * rcode:// nameserver answers immediately and is never cached. In fake-ip mode the fake-ip
++ * middleware runs before the resolver, so the set is also exempted from fake IPs through
++ * fake-ip-filter (blacklist: "rule-set:" entry; rule: "RULE-SET,…,real-ip"; whitelist: nothing).
++ */
++final class AdblockDnsPolicy {
++    private AdblockDnsPolicy() {}
++
++    static final String PROVIDER_NAME = "hetu-adblock-dns";
++    static final String PROVIDER_PATH = "./ruleset/hetu-adblock-dns.txt";
++    static final String FILE_NAME = "hetu-adblock-dns.txt";
++    static final String BLOCK_ANSWER = "rcode://success";
++    static final String POLICY_LINE = "'rule-set:" + PROVIDER_NAME + "': '" + BLOCK_ANSWER + "'";
++    /** Mihomo's own fake-ip-filter defaults, kept when Hetu has to create the list. */
++    static final List<String> MIHOMO_DEFAULT_FAKE_IP_FILTER =
++            Collections.unmodifiableList(Arrays.asList("dns.msftnsci.com", "www.msftnsci.com", "www.msftconnecttest.com"));
++
++    /**
++     * Domains that may be answered empty at DNS. A blocked suffix is kept out when an allow entry
++     * equals it, lies under it (blocking the parent at DNS would also kill the allowed child) or
++     * covers it (the connection rule would let it through). The connection-layer AND rule still
++     * judges those domains with exact allow semantics.
++     */
++    static List<String> dnsBlockDomains(Collection<String> block, Collection<String> allow) {
++        HashSet<String> allowSet = new HashSet<>();
++        HashSet<String> allowParents = new HashSet<>();
++        if (allow != null) for (String raw : allow) {
++            String a = normalizeDomain(raw);
++            if (a.isEmpty()) continue;
++            allowSet.add(a);
++            for (int dot = a.indexOf('.'); dot >= 0 && dot < a.length() - 1; dot = a.indexOf('.', dot + 1))
++                allowParents.add(a.substring(dot + 1));
++        }
++        TreeSet<String> out = new TreeSet<>();
++        if (block != null) for (String raw : block) {
++            String d = normalizeDomain(raw);
++            if (d.isEmpty() || allowParents.contains(d) || coveredBy(d, allowSet)) continue;
++            out.add(d);
++        }
++        return new ArrayList<>(out);
++    }
++
++    static boolean coveredBy(String host, Set<String> set) {
++        String current = host;
++        while (true) {
++            if (set.contains(current)) return true;
++            int dot = current.indexOf('.');
++            if (dot < 0 || dot == current.length() - 1) return false;
++            current = current.substring(dot + 1);
++        }
++    }
++
++    private static String normalizeDomain(String raw) {
++        if (raw == null) return "";
++        String d = raw.trim().toLowerCase(Locale.ROOT);
++        if (d.startsWith("+.")) d = d.substring(2);
++        while (d.endsWith(".")) d = d.substring(0, d.length() - 1);
++        return d;
++    }
++
++    /** Outcome of [inject]: [reason] says why the DNS layer was left out. */
++    static final class Result {
++        final String yaml;
++        final boolean injected;
++        /** "", "fake-ip-filter", "fake-ip-rule", "fake-ip-whitelist" or a skipped-form note. */
++        final String fakeIp;
++        final String reason;
++        Result(String yaml, boolean injected, String fakeIp, String reason) {
++            this.yaml = yaml; this.injected = injected; this.fakeIp = fakeIp == null ? "" : fakeIp; this.reason = reason == null ? "" : reason;
++        }
++    }
++
++    /**
++     * Puts the block answer first in dns.nameserver-policy and, in fake-ip mode, exempts the set
++     * from fake IPs. No dns block (the core's DNS is not used) or an inline dns / nameserver-policy
++     * leaves the YAML untouched: connection-layer blocking still applies there.
++     */
++    static Result inject(String source) {
++        String yaml = source == null ? "" : source.replace("\r\n", "\n").replace('\r', '\n');
++        List<String> lines = new ArrayList<>(Arrays.asList(yaml.split("\n", -1)));
++        int start = -1;
++        for (int i = 0; i < lines.size(); i++) {
++            String line = lines.get(i);
++            if (indent(line) != 0 || !"dns".equals(key(line.trim()))) continue;
++            if (!line.matches("^dns\\s*:\\s*(?:#.*)?$")) return new Result(yaml, false, "", "inline-dns");
++            start = i; break;
++        }
++        if (start < 0) return new Result(yaml, false, "", "no-dns");
++        int end = blockEnd(lines, start);
++        int child = childIndent(lines, start, end);
++        for (int i = start + 1; i < end; i++) if (lines.get(i).contains(PROVIDER_NAME)) return new Result(yaml, false, "", "already-present");
++
++        // 1) nameserver-policy: our entry first.
++        int policy = findChild(lines, start, end, child, "nameserver-policy");
++        if (policy >= 0) {
++            String rest = valueOf(lines.get(policy));
++            if (rest.isEmpty()) {
++                int g = firstNestedIndent(lines, policy, end, child, child + 2);
++                lines.add(policy + 1, spaces(g) + POLICY_LINE);
++            } else if (rest.equals("{}")) {
++                lines.set(policy, spaces(child) + "nameserver-policy:");
++                lines.add(policy + 1, spaces(child + 2) + POLICY_LINE);
++            } else {
++                return new Result(yaml, false, "", "inline-nameserver-policy");
++            }
++        } else {
++            int at = lastContentLine(lines, start, end) + 1;
++            lines.add(at, spaces(child) + "nameserver-policy:");
++            lines.add(at + 1, spaces(child + 2) + POLICY_LINE);
++        }
++        end = blockEnd(lines, start);
++
++        // 2) fake-ip: the fake-ip middleware answers before the resolver policy.
++        String fakeIp = "";
++        int enhanced = findChild(lines, start, end, child, "enhanced-mode");
++        if (enhanced >= 0 && "fake-ip".equalsIgnoreCase(unquote(valueOf(lines.get(enhanced))))) {
++            int modeLine = findChild(lines, start, end, child, "fake-ip-filter-mode");
++            String mode = modeLine < 0 ? "blacklist" : unquote(valueOf(lines.get(modeLine))).toLowerCase(Locale.ROOT);
++            if ("whitelist".equals(mode)) {
++                fakeIp = "fake-ip-whitelist";
++            } else {
++                boolean rule = "rule".equals(mode);
++                String item = rule ? "RULE-SET," + PROVIDER_NAME + ",real-ip" : "'rule-set:" + PROVIDER_NAME + "'";
++                int filter = findChild(lines, start, end, child, "fake-ip-filter");
++                if (filter >= 0) {
++                    String rest = valueOf(lines.get(filter));
++                    if (rest.isEmpty()) {
++                        int g = firstNestedIndent(lines, filter, end, child, child + 2);
++                        lines.add(filter + 1, spaces(g) + "- " + item);
++                        fakeIp = rule ? "fake-ip-rule" : "fake-ip-filter";
++                    } else if (rest.equals("[]")) {
++                        lines.set(filter, spaces(child) + "fake-ip-filter:");
++                        lines.add(filter + 1, spaces(child + 2) + "- " + item);
++                        fakeIp = rule ? "fake-ip-rule" : "fake-ip-filter";
++                    } else {
++                        // Inline list: left untouched; ad hosts get fake IPs and the connection rule
++                        // still rejects them with their hostname.
++                        fakeIp = "fake-ip-inline-skipped";
++                    }
++                } else {
++                    int at = lastContentLine(lines, start, end) + 1;
++                    lines.add(at++, spaces(child) + "fake-ip-filter:");
++                    lines.add(at++, spaces(child + 2) + "- " + item);
++                    if (!rule) for (String d : MIHOMO_DEFAULT_FAKE_IP_FILTER) lines.add(at++, spaces(child + 2) + "- " + d);
++                    fakeIp = rule ? "fake-ip-rule" : "fake-ip-filter";
++                }
++            }
++        }
++        return new Result(String.join("\n", lines), true, fakeIp, "");
++    }
++
++    /* ------------------------------ sniffer ------------------------------ */
++
++    /** none: no sniffer block; enabled; disabled (explicit or missing enable); pure-ip-off: parse-pure-ip: false. */
++    static String snifferState(String yaml) {
++        List<String> lines = Arrays.asList((yaml == null ? "" : yaml.replace("\r\n", "\n")).split("\n", -1));
++        int start = topLevel(lines, "sniffer");
++        if (start < 0) return "none";
++        if (!valueOf(lines.get(start)).isEmpty()) return "inline";
++        int end = blockEnd(lines, start), child = childIndent(lines, start, end);
++        int enable = findChild(lines, start, end, child, "enable");
++        if (enable < 0 || !"true".equalsIgnoreCase(unquote(valueOf(lines.get(enable))))) return "disabled";
++        int pure = findChild(lines, start, end, child, "parse-pure-ip");
++        if (pure >= 0 && "false".equalsIgnoreCase(unquote(valueOf(lines.get(pure))))) return "pure-ip-off";
++        return "enabled";
++    }
++
++    /**
++     * A subscription sniffer with enable: true but no parse-pure-ip gets an explicit
++     * parse-pure-ip: true (Mihomo's default at ab405bad, made explicit so forks/older cores agree).
++     * enable: false and an explicit parse-pure-ip are the user's choice and stay unchanged.
++     */
++    static String ensureParsePureIp(String source) {
++        String yaml = source == null ? "" : source.replace("\r\n", "\n").replace('\r', '\n');
++        List<String> lines = new ArrayList<>(Arrays.asList(yaml.split("\n", -1)));
++        int start = topLevel(lines, "sniffer");
++        if (start < 0 || !valueOf(lines.get(start)).isEmpty()) return yaml;
++        int end = blockEnd(lines, start), child = childIndent(lines, start, end);
++        int enable = findChild(lines, start, end, child, "enable");
++        if (enable < 0 || !"true".equalsIgnoreCase(unquote(valueOf(lines.get(enable))))) return yaml;
++        if (findChild(lines, start, end, child, "parse-pure-ip") >= 0) return yaml;
++        lines.add(enable + 1, spaces(child) + "parse-pure-ip: true");
++        return String.join("\n", lines);
++    }
++
++    /* ------------------------------ DNS summary ------------------------------ */
++
++    /** dns.enhanced-mode of a YAML ("fake-ip", "redir-host", "" without a dns block / value). */
++    static String enhancedMode(String yaml) {
++        List<String> lines = Arrays.asList((yaml == null ? "" : yaml.replace("\r\n", "\n")).split("\n", -1));
++        int start = topLevel(lines, "dns");
++        if (start < 0 || !valueOf(lines.get(start)).isEmpty()) return "";
++        int end = blockEnd(lines, start), child = childIndent(lines, start, end);
++        int mode = findChild(lines, start, end, child, "enhanced-mode");
++        return mode < 0 ? "redir-host" : unquote(valueOf(lines.get(mode))).toLowerCase(Locale.ROOT);
++    }
++
++    static boolean hasDnsBlock(String yaml) {
++        return topLevel(Arrays.asList((yaml == null ? "" : yaml.replace("\r\n", "\n")).split("\n", -1)), "dns") >= 0;
++    }
++
++    /** True when the runtime copy answers the Hetu DNS block set from nameserver-policy. */
++    static boolean isInjected(String yaml) {
++        if (yaml == null) return false;
++        for (String raw : yaml.split("\\r?\\n")) {
++            String t = raw.trim();
++            if (t.startsWith("#")) continue;
++            if (t.contains("rule-set:" + PROVIDER_NAME) && t.contains(BLOCK_ANSWER)) return true;
++        }
++        return false;
++    }
++
++    /* ------------------------------ helpers ------------------------------ */
++
++    private static int topLevel(List<String> lines, String name) {
++        for (int i = 0; i < lines.size(); i++) {
++            String line = lines.get(i);
++            if (indent(line) == 0 && name.equals(key(line.trim()))) return i;
++        }
++        return -1;
++    }
++
++    private static int blockEnd(List<String> lines, int start) {
++        for (int i = start + 1; i < lines.size(); i++) {
++            String t = lines.get(i).trim();
++            if (t.isEmpty() || t.startsWith("#")) continue;
++            if (indent(lines.get(i)) == 0) return i;
++        }
++        return lines.size();
++    }
++
++    private static int childIndent(List<String> lines, int start, int end) {
++        int child = Integer.MAX_VALUE;
++        for (int i = start + 1; i < end; i++) {
++            String t = lines.get(i).trim();
++            if (t.isEmpty() || t.startsWith("#")) continue;
++            child = Math.min(child, indent(lines.get(i)));
++        }
++        return child == Integer.MAX_VALUE || child == 0 ? 2 : child;
++    }
++
++    private static int findChild(List<String> lines, int start, int end, int child, String name) {
++        for (int i = start + 1; i < end; i++) {
++            String line = lines.get(i);
++            if (indent(line) == child && name.equals(key(line.trim()))) return i;
++        }
++        return -1;
++    }
++
++    /** Indent of the first nested line under [keyLine] (a list item may sit at the key's own indent). */
++    private static int firstNestedIndent(List<String> lines, int keyLine, int end, int child, int fallback) {
++        for (int i = keyLine + 1; i < end; i++) {
++            String t = lines.get(i).trim();
++            if (t.isEmpty() || t.startsWith("#")) continue;
++            int ind = indent(lines.get(i));
++            if (ind > child || (ind == child && t.startsWith("-"))) return ind;
++            return fallback;
++        }
++        return fallback;
++    }
++
++    private static int lastContentLine(List<String> lines, int start, int end) {
++        int last = start;
++        for (int i = start + 1; i < end; i++) {
++            String t = lines.get(i).trim();
++            if (!t.isEmpty()) last = i;
++        }
++        return last;
++    }
++
++    private static String key(String trimmed) {
++        if (trimmed.startsWith("-") || trimmed.startsWith("#")) return "";
++        int colon = trimmed.indexOf(':');
++        if (colon <= 0) return "";
++        return unquote(trimmed.substring(0, colon).trim());
++    }
++
++    private static String valueOf(String line) {
++        String t = line.trim();
++        int colon = t.indexOf(':');
++        if (colon < 0) return "";
++        String rest = t.substring(colon + 1).trim();
++        boolean single = false, dbl = false;
++        for (int i = 0; i < rest.length(); i++) {
++            char c = rest.charAt(i);
++            if (c == '\'' && !dbl) single = !single;
++            else if (c == '"' && !single) dbl = !dbl;
++            else if (c == '#' && !single && !dbl && (i == 0 || Character.isWhitespace(rest.charAt(i - 1)))) return rest.substring(0, i).trim();
++        }
++        return rest;
++    }
++
++    private static String unquote(String v) {
++        String t = v == null ? "" : v.trim();
++        if (t.length() >= 2 && ((t.charAt(0) == '"' && t.charAt(t.length() - 1) == '"') || (t.charAt(0) == '\'' && t.charAt(t.length() - 1) == '\'')))
++            return t.substring(1, t.length() - 1).trim();
++        return t;
++    }
++
++    private static int indent(String s) { int n = 0; while (n < s.length() && (s.charAt(n) == ' ' || s.charAt(n) == '\t')) n++; return n; }
++    private static String spaces(int n) { StringBuilder b = new StringBuilder(n); for (int i = 0; i < n; i++) b.append(' '); return b.toString(); }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java
 new file mode 100644
 index 0000000..14f2211
@@ -2328,11 +2668,212 @@ index f104cef..b473a20 100644
      }
 
      private static String readLine(InputStream in)throws IOException{
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+index 71d5484..3804a2a 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
+@@ -69,6 +69,32 @@ final class MihomoStartupConfig {
+
+     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
++        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,false);
++    }
++
++    /**
++     * Opt-in (default off) Hetu DNS for subscriptions without any dns: block: fake-ip with domestic
++     * DoH, so DNS answers carry fake-ip mappings and are not plain system resolution. Never applied
++     * when the source has its own dns: block; the selected source file is never edited.
++     */
++    static final String RECOMMENDED_DNS=
++            "dns:\n"+
++            "  enable: true\n"+
++            "  ipv6: false\n"+
++            "  enhanced-mode: fake-ip\n"+
++            "  fake-ip-range: 198.18.0.1/16\n"+
++            "  default-nameserver:\n"+
++            "    - 223.5.5.5\n"+
++            "    - 119.29.29.29\n"+
++            "  nameserver:\n"+
++            "    - https://223.5.5.5/dns-query\n"+
++            "    - https://doh.pub/dns-query\n";
++
++    static boolean sourceHasDns(String source){return hasTopLevelKey(source==null?"":normalize(source),"dns");}
++
++    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
++            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
++            boolean recommendedDns)throws IOException{
+         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
+         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
+         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
+@@ -116,6 +142,12 @@ final class MihomoStartupConfig {
+         // filtering chain is enabled. The user's source YAML remains untouched.
+         if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
+
++        if(recommendedDns&&!hasTopLevelKey(yaml,"dns")){
++            String base=trimOne(yaml);
++            yaml=base+(base.isEmpty()||base.endsWith("\n")?"":"\n")+RECOMMENDED_DNS;
++            // ipv6: false above only when the runtime IPv6 policy is not "enable".
++            if(profile.ipv6==ProxyRuntimeProfile.Ipv6.ENABLE)yaml=yaml.replace("  ipv6: false\n  enhanced-mode: fake-ip","  enhanced-mode: fake-ip");
++        }
+         // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
+         // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
+         // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
+@@ -136,6 +168,10 @@ final class MihomoStartupConfig {
+             yaml=ensureAdblock(yaml);
+         if(profile.cnIpDirect)
+             yaml=ensureCnIpDirect(yaml);
++        // A subscription sniffer that is on but silent about parse-pure-ip gets it explicitly;
++        // enable: false / an explicit value are respected (UI explains the consequence).
++        if(profile.adblockChain&&hasTopLevelKey(yaml,"sniffer"))
++            yaml=AdblockDnsPolicy.ensureParsePureIp(yaml);
+
+         int tp=0,rp=0;
+         StringBuilder override=new StringBuilder();
+@@ -372,12 +408,16 @@ final class MihomoStartupConfig {
+     /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
+     private static String ensureAdblock(String source)throws IOException{
+         String yaml=normalize(source);
+-        yaml=injectAdblockProvider(yaml);
++        // DNS layer first (only the dns: block changes); the provider it names is declared only
++        // when the policy really went in, so a config without a usable dns: block is unchanged.
++        AdblockDnsPolicy.Result dns=AdblockDnsPolicy.inject(yaml);
++        if(dns.injected)yaml=dns.yaml;
++        yaml=injectAdblockProvider(yaml,dns.injected);
+         yaml=insertAdblockRuleRespectingUserPolicy(yaml);
+         return yaml;
+     }
+
+-    private static String injectAdblockProvider(String source)throws IOException{
++    private static String injectAdblockProvider(String source,boolean dnsProvider)throws IOException{
+         String[] lines=normalize(source).split("\n",-1);
+         int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
+         for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
+@@ -391,7 +431,13 @@ final class MihomoStartupConfig {
+                 "    type: file\n"+
+                 "    behavior: domain\n"+
+                 "    format: text\n"+
+-                "    path: "+ADBLOCK_PATH+"\n";
++                "    path: "+ADBLOCK_PATH+"\n"+
++                (dnsProvider?
++                "  "+AdblockDnsPolicy.PROVIDER_NAME+":\n"+
++                "    type: file\n"+
++                "    behavior: domain\n"+
++                "    format: text\n"+
++                "    path: "+AdblockDnsPolicy.PROVIDER_PATH+"\n":"");
+         if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
+         String rest=found.group(1).trim();
+         if(rest.startsWith("#"))rest="";
+@@ -400,7 +446,8 @@ final class MihomoStartupConfig {
+         for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
+         for(int i=index+1;i<end;i++){
+             String t=lines[i].trim();
+-            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":"))
++            if(t.startsWith(ProxyAdblockRules.PROVIDER_NAME+":")||t.startsWith(ProxyAdblockRules.ALLOW_PROVIDER_NAME+":")
++                    ||t.startsWith(AdblockDnsPolicy.PROVIDER_NAME+":"))
+                 throw new IOException("源配置占用了河图保留的 DNS 过滤 provider 名称");
+         }
+         StringBuilder out=new StringBuilder();
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+index 17eab36..a7bd311 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java
+@@ -20,9 +20,15 @@ final class ProxyAdblockRules {
+         final int count;
+         final int allowCount;
+         final String revision;
++        /** DNS-layer block set (block minus allow-covered/allow-parent suffixes); null when not exported. */
++        final File dnsFile;
++        final int dnsCount;
+         Snapshot(File file, File allowFile, int count, int allowCount, String revision) {
++            this(file,allowFile,count,allowCount,revision,null,-1);
++        }
++        Snapshot(File file, File allowFile, int count, int allowCount, String revision, File dnsFile, int dnsCount) {
+             this.file=file; this.allowFile=allowFile; this.count=count; this.allowCount=allowCount;
+-            this.revision=revision==null?"":revision;
++            this.revision=revision==null?"":revision; this.dnsFile=dnsFile; this.dnsCount=dnsCount;
+         }
+     }
+
+@@ -52,14 +58,17 @@ final class ProxyAdblockRules {
+         File target=new File(previous,"hetu-adblock.txt");
+         File allowTarget=new File(previous,"hetu-adblock-allow.txt");
+         File meta=new File(previous,"hetu-adblock.meta");
+-        if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&meta.isFile()){
++        File dnsTarget=new File(previous,AdblockDnsPolicy.FILE_NAME);
++        if(!persisted.isEmpty()&&target.isFile()&&allowTarget.isFile()&&dnsTarget.isFile()&&meta.isFile()){
+             try(FileInputStream in=new FileInputStream(meta)){cached.load(in);}
+             catch(Exception ignored){cached.clear();}
+-            if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)){
++            if(persisted.equals(cached.getProperty("revision",""))&&RuntimeCompatibility14.cachedPairValid(cached,target,allowTarget)
++                    &&dnsValid(cached,dnsTarget)){
+                 try{
+                     int count=Integer.parseInt(cached.getProperty("count","-1"));
+                     int allowCount=Integer.parseInt(cached.getProperty("allowCount","-1"));
+-                    if(count>=0&&allowCount>=0)return new Snapshot(target,allowTarget,count,allowCount,persisted);
++                    int dnsCount=Integer.parseInt(cached.getProperty("dnsCount","-1"));
++                    if(count>=0&&allowCount>=0&&dnsCount>=0)return new Snapshot(target,allowTarget,count,allowCount,persisted,dnsTarget,dnsCount);
+                 }catch(NumberFormatException ignored){}
+             }
+         }
+@@ -74,8 +83,10 @@ final class ProxyAdblockRules {
+         File stage=new File(dir,name+".new");
+         if(!stage.mkdir())throw new IOException("无法创建广告过滤导出事务");
+         target=new File(stage,"hetu-adblock.txt"); allowTarget=new File(stage,"hetu-adblock-allow.txt");
++        dnsTarget=new File(stage,AdblockDnsPolicy.FILE_NAME);
++        List<String> dnsDomains=AdblockDnsPolicy.dnsBlockDomains(domains,allow);
+         try {
+-        writer.write(domains,target); writer.write(allow,allowTarget);
++        writer.write(domains,target); writer.write(allow,allowTarget); writer.write(dnsDomains,dnsTarget);
+         Properties saved=new Properties();
+         saved.setProperty("directory",name);
+         saved.setProperty("revision",revision);
+@@ -83,6 +94,8 @@ final class ProxyAdblockRules {
+         saved.setProperty("allowSha256",RuntimeCompatibility14.sha256(allowTarget));
+         saved.setProperty("count",String.valueOf(domains.size()));
+         saved.setProperty("allowCount",String.valueOf(allow.size()));
++        saved.setProperty("dnsSha256",RuntimeCompatibility14.sha256(dnsTarget));
++        saved.setProperty("dnsCount",String.valueOf(dnsDomains.size()));
+         try(FileOutputStream out=new FileOutputStream(new File(stage,"hetu-adblock.meta"),false)){
+             saved.store(out,null);out.getFD().sync();
+         }
+@@ -91,7 +104,8 @@ final class ProxyAdblockRules {
+         File metaTmp=new File(dir,"current.meta.new");
+         try(FileOutputStream out=new FileOutputStream(metaTmp,false)){saved.store(out,null);out.getFD().sync();}
+         move(metaTmp,index);
+-        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision);
++        return new Snapshot(new File(published,target.getName()),new File(published,allowTarget.getName()),domains.size(),allow.size(),revision,
++                new File(published,dnsTarget.getName()),dnsDomains.size());
+         } finally {
+             // Only our unpublished transaction is disposable. Previously returned
+             // generations remain immutable, including during a failed refresh.
+@@ -101,6 +115,13 @@ final class ProxyAdblockRules {
+         }
+     }
+
++    private static boolean dnsValid(Properties meta,File dns){
++        try{
++            String sha=meta.getProperty("dnsSha256","");
++            return sha.matches("[0-9a-f]{64}")&&sha.equals(RuntimeCompatibility14.sha256(dns));
++        }catch(IOException missing){return false;}
++    }
++
+     private static void move(File source,File target)throws IOException{
+         try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
+         catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..3b6a5fd 100644
+index 4f004b9..73a2347 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-@@ -122,6 +122,11 @@ internal data class ProxyComposeState(
+@@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
+     val size: Int = -1,
+     val disabled: Boolean = false,
+     val hitCount: Long = 0L,
++    /** Mihomo RuleWrapper: connections this rule was checked against and did not match. */
++    val missCount: Long = 0L,
+ )
+
+ internal data class ProxyRuleProviderUi(
+@@ -122,6 +124,11 @@ internal data class ProxyComposeState(
      val continuityObservationTicket: Long = -1L,
      val continuityObservationSession: String = "",
      val continuityObservationNetworkEpoch: Long = 0L,
@@ -2344,7 +2885,7 @@ index 4f004b9..3b6a5fd 100644
  )
 
  internal class ProxyComposeController(context: Context) {
-@@ -151,11 +156,34 @@ internal class ProxyComposeController(context: Context) {
+@@ -151,11 +158,34 @@ internal class ProxyComposeController(context: Context) {
              observation.continuityObservationTicket, observation.continuityObservationSession,
              observation.continuityObservationNetworkEpoch, observation.continuityAutomationOnly)
 
@@ -2380,7 +2921,7 @@ index 4f004b9..3b6a5fd 100644
          } catch (cancel: CancellationException) { throw cancel }
          catch (_: Exception) { emptyMap() }
 
-@@ -208,6 +236,16 @@ internal class ProxyComposeController(context: Context) {
+@@ -208,6 +238,16 @@ internal class ProxyComposeController(context: Context) {
                      val observedPid = if (!live.optBoolean("running", fastRunning)) 0
                          else live.optInt("pid", 0).takeIf { it > 0 } ?: prefs.getInt("proxyRootObservedPid", 0)
                      if (observedPid > 0) live.put("pid", observedPid)
@@ -2397,7 +2938,16 @@ index 4f004b9..3b6a5fd 100644
                      freshStatus = true
                  }
              } catch (cancel: CancellationException) { throw cancel }
-@@ -299,13 +337,39 @@ internal class ProxyComposeController(context: Context) {
+@@ -281,6 +321,8 @@ internal class ProxyComposeController(context: Context) {
+                     .putString("proxyRootCoreGroup", status.optString("coreGroup", ""))
+                     .putBoolean("proxyRootDotGuard", status.optBoolean("dotGuard", false))
+                     .putString("proxyRootPrivateDns", status.optString("privateDns", ""))
++                    .putString("proxyRootIpv6DnsPolicy", status.optString("ipv6DnsPolicy", ""))
++                    .putBoolean("proxyCnIpKernelTcpOnlyActive", status.optBoolean("cnipTcpOnly", false))
+                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
+                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
+                     .putString("proxyRootTuning", status.optString("tuning", ""))
+@@ -299,13 +341,39 @@ internal class ProxyComposeController(context: Context) {
          var trafficMode = ""
          var controllerReadFailed = false
          var controllerError = ""
@@ -2442,7 +2992,7 @@ index 4f004b9..3b6a5fd 100644
                  val freshConnections = parseConnections(rawConnections, socketUids)
                  // One complete controller snapshot. Partial reads cannot acknowledge a
                  // selection or publish the absent counters as a fresh zero measurement.
-@@ -362,6 +426,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -362,6 +430,7 @@ internal class ProxyComposeController(context: Context) {
                  else -> ""
              },
              panelReady = panelReady,
@@ -2450,7 +3000,7 @@ index 4f004b9..3b6a5fd 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -423,9 +488,9 @@ internal class ProxyComposeController(context: Context) {
+@@ -423,9 +492,9 @@ internal class ProxyComposeController(context: Context) {
          if (!configs.hasConfiguredSubscription(selected)) {
              error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
          }
@@ -2463,7 +3013,7 @@ index 4f004b9..3b6a5fd 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -538,7 +603,14 @@ internal class ProxyComposeController(context: Context) {
+@@ -538,7 +607,14 @@ internal class ProxyComposeController(context: Context) {
      }
 
      suspend fun selectConfig(name: String) = withContext(Dispatchers.IO) {
@@ -2479,7 +3029,7 @@ index 4f004b9..3b6a5fd 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -683,6 +755,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +759,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -2490,7 +3040,15 @@ index 4f004b9..3b6a5fd 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -813,6 +889,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +869,7 @@ internal class ProxyComposeController(context: Context) {
+                 size = r.optInt("size", -1),
+                 disabled = extra?.optBoolean("disabled", false) ?: false,
+                 hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
++                missCount = extra?.optLong("missCount", 0L) ?: 0L,
+             )
+         }
+         return out
+@@ -813,6 +894,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -5244,7 +5802,7 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-index 56b04c2..7289454 100644
+index 56b04c2..c7162c6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 @@ -45,8 +45,20 @@ public final class ProxyNetworkMatchService extends Service {
@@ -5310,7 +5868,7 @@ index 56b04c2..7289454 100644
          evaluate();
          return START_STICKY;
      }
-@@ -123,56 +144,259 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -123,57 +144,260 @@ public final class ProxyNetworkMatchService extends Service {
          bootRestores.request(delayMs);
      }
 
@@ -5464,8 +6022,8 @@ index 56b04c2..7289454 100644
 +                .remove("proxyRecoveryTerminalReason").remove("proxyRecoveryCompletedAfterBudget").commit())
 +            prefs.edit().putString("proxyRecoveryTerminalReason","恢复预算未能保存，已停止自动尝试，请手动检查").apply();
 +        nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;
-         }
-     }
++        }
++    }
 +    }
 +
 +    private long remainingRecoveryTime(){
@@ -5510,9 +6068,9 @@ index 56b04c2..7289454 100644
 +            publishRecoveryError(boot,reason);
 +        }
 +        return false;
-+        }
-+    }
-+
+         }
+     }
+
 +    private boolean nativeRecoveryPending(RootAutostart.BootRestoreState state){
 +        return state==RootAutostart.BootRestoreState.ACTIVE||state==RootAutostart.BootRestoreState.PENDING
 +                ||state==RootAutostart.BootRestoreState.UNKNOWN;
@@ -5598,9 +6156,10 @@ index 56b04c2..7289454 100644
 +            nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;lastAutoRecoveryElapsed=-1L;
 +        });
 +    }
-
++
      @Override public void onDestroy(){
          destroyed=true;
+         evaluations.close();
 @@ -188,6 +412,27 @@ public final class ProxyNetworkMatchService extends Service {
      }
      @Override public android.os.IBinder onBind(Intent i){return null;}
@@ -5764,6 +6323,70 @@ index 56b04c2..7289454 100644
          }
      }
 
+@@ -630,6 +897,22 @@ public final class ProxyNetworkMatchService extends Service {
+                 previousHits=prefs.getLong("proxyAdblockSessionHits",0L);
+                 oldRecent=prefs.getString("proxyAdblockRecentDomains","");
+             }
++            // The counter comes from the controller over loopback HTTP (RuleWrapper hitCount, kept in
++            // memory and independent of the log level): no su, no log scan. core.log is read through
++            // su only while the 广告过滤 page is visible, for the recent-domain list.
++            final long controllerHits=controllerAdblockHits();
++            if(controllerHits>=0){
++                synchronized(ProxyAdblockSession.LOCK){
++                    if(destroyed||generation!=prefs.getLong("proxyAdblockSessionGeneration",0L)
++                            ||!prefs.getBoolean("proxyAdblockCounterArmed",false))return;
++                    if(controllerHits!=previousHits){
++                        SharedPreferences.Editor counted=prefs.edit().putLong("proxyAdblockSessionHits",controllerHits);
++                        if(controllerHits>previousHits)counted.putLong("proxyAdblockLastHitAt",System.currentTimeMillis());
++                        counted.apply();
++                    }
++                }
++            }
++            if(controllerHits>=0&&!prefs.getBoolean("proxyAdblockUiVisible",false))return;
+             String path="/data/adb/hetu/run/core.log";
+             String command="set +e; S=$(stat -c %s "+RootBridge.quote(path)+" 2>/dev/null || wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
+                     +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
+@@ -645,14 +928,14 @@ public final class ProxyNetworkMatchService extends Service {
+             try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
+             String chunk=newline<0?"":result.output.substring(newline+1);
+             ProxyLogLines lines=ProxyLogLines.read(pending,discarding,chunk,size<offset);
+-            long hits=previousHits;
++            long hits=controllerHits>=0?controllerHits:previousHits;
+             LinkedHashSet<String> recent=new LinkedHashSet<>();
+             if(oldRecent!=null&&!oldRecent.isEmpty())for(String item:oldRecent.split("\\n"))if(!item.trim().isEmpty())recent.add(item.trim());
+             java.util.regex.Pattern domainPattern=java.util.regex.Pattern.compile("-->\\s+([^\\s\\\"]+)");
+             for(String line:lines.complete.split("\\r?\\n")){
+                 String lower=line.toLowerCase(Locale.ROOT);
+                 if(!lower.contains("hetu-adblock")||!lower.contains("reject")||!lower.contains("match"))continue;
+-                hits++;
++                if(controllerHits<0)hits++;
+                 java.util.regex.Matcher matcher=domainPattern.matcher(line);
+                 if(matcher.find()){
+                     String raw=matcher.group(1);
+@@ -692,6 +975,23 @@ public final class ProxyNetworkMatchService extends Service {
+         }catch(Exception ignored){}
+     }
+
++    /** hitCount of the live strict REJECT rule from the controller; -1 when it cannot be read. */
++    private long controllerAdblockHits(){
++        try{
++            org.json.JSONArray rules=new MihomoControllerClient(getApplicationContext()).rules().optJSONArray("rules");
++            if(rules==null)return -1L;
++            for(int i=0;i<rules.length();i++){
++                org.json.JSONObject rule=rules.optJSONObject(i);
++                if(rule==null)continue;
++                org.json.JSONObject extra=rule.optJSONObject("extra");
++                boolean disabled=rule.optBoolean("disabled",false)||(extra!=null&&extra.optBoolean("disabled",false));
++                if(AdblockRuleInspection.isBlockingRule(rule.optString("type"),rule.optString("payload"),rule.optString("proxy"),disabled))
++                    return extra==null?-1L:Math.max(0L,extra.optLong("hitCount",0L));
++            }
++        }catch(Exception ignored){}
++        return -1L;
++    }
++
+     private Set<String> set(String key){Set<String>s=prefs.getStringSet(key,Collections.emptySet());return s==null?Collections.emptySet():new HashSet<>(s);}
+     private boolean matches(String value,Set<String>s,boolean ignore){if(s.isEmpty())return true;for(String x:s)if(ignore?x.equalsIgnoreCase(value):x.equals(value))return true;return false;}
+     private String clean(String s){if(s==null||"<unknown ssid>".equalsIgnoreCase(s))return"";if(s.length()>1&&s.startsWith("\"")&&s.endsWith("\""))return s.substring(1,s.length()-1);return s;}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java
 index 4f146e4..063c15d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyRuntimeProfile.java
@@ -5928,7 +6551,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..cc009be 100644
+index 9cd82da..f6eb5cc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -6072,16 +6695,33 @@ index 9cd82da..cc009be 100644
              ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
              String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
-@@ -267,7 +336,7 @@ final class RootProxyManager {
+@@ -267,7 +336,13 @@ final class RootProxyManager {
                      +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
                      +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
                      +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
 -            RootBridge.Result copied=RootBridge.rootShell(context,cmd,20000L);
++            if(snapshot.dnsFile!=null){
++                String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME;
++                cmd+="; cp "+RootBridge.quote(snapshot.dnsFile.getAbsolutePath())+" "+RootBridge.quote(dnsDst+suffix)
++                        +"; chmod 600 "+RootBridge.quote(dnsDst+suffix)+"; chown 0:0 "+RootBridge.quote(dnsDst+suffix)
++                        +"; mv -f "+RootBridge.quote(dnsDst+suffix)+" "+RootBridge.quote(dnsDst);
++            }
 +            RootBridge.Result copied=boundedRootShell(context,cmd,20000L);
              if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
              int port=liveControllerPort(state);
-@@ -309,10 +378,10 @@ final class RootProxyManager {
+@@ -276,6 +351,10 @@ final class RootProxyManager {
+             try{
+                 controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
+                 controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
++                // The DNS-layer set exists only when the running copy declared it (dns: block present).
++                JSONObject loaded=controller.ruleProviders().optJSONObject("providers");
++                if(loaded!=null&&loaded.has(AdblockDnsPolicy.PROVIDER_NAME))
++                    controller.reloadLocalRuleProvider(AdblockDnsPolicy.PROVIDER_NAME);
+                 verifyAdblockRuntime(controller,true,snapshot.count);
+             }catch(Exception providerError){
+                 // Do not reload the entire proxy after a provider error: this can
+@@ -309,10 +388,10 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -6094,7 +6734,17 @@ index 9cd82da..cc009be 100644
          if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE&&
                  profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
              throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
-@@ -338,6 +407,125 @@ final class RootProxyManager {
+@@ -329,7 +408,8 @@ final class RootProxyManager {
+         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
+         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
+         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
+-        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
++        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
++                prefs.getBoolean("proxyRecommendedDns",false));
+         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
+         // Private comments carry an already validated routing projection into start/boot.
+         // Keep the established startup argument protocol and the user's source untouched.
+@@ -338,6 +418,125 @@ final class RootProxyManager {
          return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
      }
 
@@ -6220,16 +6870,23 @@ index 9cd82da..cc009be 100644
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
          return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
                  +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
-@@ -379,7 +567,7 @@ final class RootProxyManager {
+@@ -378,8 +577,14 @@ final class RootProxyManager {
+                         .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
++            if(p.adblock.dnsFile!=null){
++                String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME,dnsTmp=dnsDst+suffix;
++                cmd.append("; cp ").append(RootBridge.quote(p.adblock.dnsFile.getAbsolutePath())).append(' ').append(RootBridge.quote(dnsTmp))
++                        .append("; chmod 600 ").append(RootBridge.quote(dnsTmp)).append("; chown 0:0 ").append(RootBridge.quote(dnsTmp))
++                        .append("; mv -f ").append(RootBridge.quote(dnsTmp)).append(' ').append(RootBridge.quote(dnsDst));
++            }
          }
 -        RootBridge.Result installed=RootBridge.rootShell(context,cmd.toString(),15000L);
 +        RootBridge.Result installed=boundedRootShell(context,cmd.toString(),15000L);
          if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
      }
 
-@@ -389,6 +577,9 @@ final class RootProxyManager {
+@@ -389,6 +594,9 @@ final class RootProxyManager {
              RootBridge.requireWorkerThread();
              if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
              ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
@@ -6239,7 +6896,7 @@ index 9cd82da..cc009be 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +595,7 @@ final class RootProxyManager {
+@@ -404,7 +612,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -6248,7 +6905,7 @@ index 9cd82da..cc009be 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,7 +603,7 @@ final class RootProxyManager {
+@@ -412,7 +620,7 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -6257,7 +6914,7 @@ index 9cd82da..cc009be 100644
              prefs.edit()
                      .putString("proxyRootTopologyFingerprint",nextFingerprint)
                      .putString("proxyRootAppliedSettings",p.settingsSignature)
-@@ -469,29 +660,84 @@ final class RootProxyManager {
+@@ -469,29 +677,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -6350,7 +7007,7 @@ index 9cd82da..cc009be 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -505,24 +751,44 @@ final class RootProxyManager {
+@@ -505,24 +768,44 @@ final class RootProxyManager {
          return startIfWanted(profile,()->true);
      }
      JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
@@ -6403,7 +7060,7 @@ index 9cd82da..cc009be 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +801,11 @@ final class RootProxyManager {
+@@ -535,7 +818,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -6416,7 +7073,7 @@ index 9cd82da..cc009be 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +814,8 @@ final class RootProxyManager {
+@@ -544,7 +831,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -6426,7 +7083,7 @@ index 9cd82da..cc009be 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +823,7 @@ final class RootProxyManager {
+@@ -552,7 +840,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -6435,7 +7092,7 @@ index 9cd82da..cc009be 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -575,20 +846,31 @@ final class RootProxyManager {
+@@ -575,20 +863,31 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -6474,7 +7131,7 @@ index 9cd82da..cc009be 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +880,7 @@ final class RootProxyManager {
+@@ -598,7 +897,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -6483,7 +7140,7 @@ index 9cd82da..cc009be 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +905,6 @@ final class RootProxyManager {
+@@ -623,7 +922,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -6491,7 +7148,7 @@ index 9cd82da..cc009be 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -659,15 +940,26 @@ final class RootProxyManager {
+@@ -659,15 +957,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -6520,7 +7177,7 @@ index 9cd82da..cc009be 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,6 +989,10 @@ final class RootProxyManager {
+@@ -697,6 +1006,10 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -6531,7 +7188,7 @@ index 9cd82da..cc009be 100644
          result.put("sourceConfig",p.source.name)
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
-@@ -723,10 +1019,17 @@ final class RootProxyManager {
+@@ -723,10 +1036,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -6549,7 +7206,7 @@ index 9cd82da..cc009be 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -749,11 +1052,18 @@ final class RootProxyManager {
+@@ -749,11 +1069,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -6568,7 +7225,7 @@ index 9cd82da..cc009be 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1071,49 @@ final class RootProxyManager {
+@@ -761,10 +1088,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -6619,7 +7276,7 @@ index 9cd82da..cc009be 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -789,10 +1138,12 @@ final class RootProxyManager {
+@@ -789,10 +1155,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -6634,7 +7291,7 @@ index 9cd82da..cc009be 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1153,40 @@ final class RootProxyManager {
+@@ -802,20 +1170,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -6680,7 +7337,7 @@ index 9cd82da..cc009be 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1196,26 @@ final class RootProxyManager {
+@@ -825,19 +1213,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -6711,7 +7368,7 @@ index 9cd82da..cc009be 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1223,40 @@ final class RootProxyManager {
+@@ -845,31 +1240,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -6768,7 +7425,7 @@ index 9cd82da..cc009be 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1266,7 @@ final class RootProxyManager {
+@@ -879,7 +1283,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -6777,7 +7434,7 @@ index 9cd82da..cc009be 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1326,7 @@ final class RootProxyManager {
+@@ -939,7 +1343,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -6786,7 +7443,7 @@ index 9cd82da..cc009be 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1408,7 @@ final class RootProxyManager {
+@@ -1021,7 +1425,7 @@ final class RootProxyManager {
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -6795,7 +7452,7 @@ index 9cd82da..cc009be 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1446,7 @@ final class RootProxyManager {
+@@ -1059,7 +1463,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -6804,7 +7461,7 @@ index 9cd82da..cc009be 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1458,22 @@ final class RootProxyManager {
+@@ -1071,22 +1475,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -6832,7 +7489,7 @@ index 9cd82da..cc009be 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1486,7 @@ final class RootProxyManager {
+@@ -1099,7 +1503,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -6841,7 +7498,7 @@ index 9cd82da..cc009be 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1534,7 @@ final class RootProxyManager {
+@@ -1147,7 +1551,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -6850,7 +7507,7 @@ index 9cd82da..cc009be 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1544,7 @@ final class RootProxyManager {
+@@ -1157,7 +1561,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -6859,7 +7516,7 @@ index 9cd82da..cc009be 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1207,10 +1594,14 @@ final class RootProxyManager {
+@@ -1207,10 +1611,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -6876,7 +7533,7 @@ index 9cd82da..cc009be 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1615,10 @@ final class RootProxyManager {
+@@ -1224,6 +1632,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -6887,7 +7544,7 @@ index 9cd82da..cc009be 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1636,7 @@ final class RootProxyManager {
+@@ -1241,7 +1653,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -6896,7 +7553,7 @@ index 9cd82da..cc009be 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1646,46 @@ final class RootProxyManager {
+@@ -1251,11 +1663,46 @@ final class RootProxyManager {
          }
      }
 
@@ -6944,7 +7601,7 @@ index 9cd82da..cc009be 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1699,121 @@ final class RootProxyManager {
+@@ -1269,14 +1716,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -7069,7 +7726,7 @@ index 9cd82da..cc009be 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +1826,7 @@ final class RootProxyManager {
+@@ -1289,7 +1843,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -7078,7 +7735,7 @@ index 9cd82da..cc009be 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +1850,7 @@ final class RootProxyManager {
+@@ -1313,7 +1867,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -7087,7 +7744,7 @@ index 9cd82da..cc009be 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +1870,28 @@ final class RootProxyManager {
+@@ -1333,13 +1887,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -7117,7 +7774,7 @@ index 9cd82da..cc009be 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +1918,27 @@ final class RootProxyManager {
+@@ -1366,13 +1935,28 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -7125,7 +7782,8 @@ index 9cd82da..cc009be 100644
 +        String cnipPolicy=policyDir+"/cnip";
 +        boolean cnipV4=prefs.getBoolean("proxyCnIpKernelV4",false),cnipV6=prefs.getBoolean("proxyCnIpKernelV6",false);
 +        if(cnipV4||cnipV6){
-+            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n";
++            String body="V4="+bit(cnipV4)+"\nV6="+bit(cnipV6)+"\nFORCE="+cnipForceUids()+"\n"
++                    +"TCPONLY="+bit(prefs.getBoolean("proxyCnIpKernelTcpOnly",false))+"\n";
 +            cmd.append("; printf %s ").append(RootBridge.quote(body)).append(" > ").append(RootBridge.quote(cnipPolicy+".new"))
 +                    .append("; chmod 600 ").append(RootBridge.quote(cnipPolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(cnipPolicy+".new"))
 +                    .append("; mv -f ").append(RootBridge.quote(cnipPolicy+".new")).append(' ').append(RootBridge.quote(cnipPolicy));
@@ -7145,7 +7803,35 @@ index 9cd82da..cc009be 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1412,14 +1978,44 @@ final class RootProxyManager {
+@@ -1384,7 +1968,12 @@ final class RootProxyManager {
+                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
+                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
+                     .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
+-                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]; then")
++                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow))).append(" ]");
++            File adblockDns=p.adblock.dnsFile;
++            String dnsDst=ROOT+"/run/ruleset/"+AdblockDnsPolicy.FILE_NAME,dnsTmp=dnsDst+".new";
++            if(adblockDns!=null)cmd.append(" || [ \"$(sha256sum ").append(RootBridge.quote(dnsDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
++                    .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockDns))).append(" ]");
++            cmd.append("; then")
+                     .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
+                     .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
+             if(adblockAllow!=null){
+@@ -1393,6 +1982,13 @@ final class RootProxyManager {
+                         .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
+                         .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
+             }
++            if(adblockDns!=null){
++                cmd.append("; cp ").append(RootBridge.quote(adblockDns.getAbsolutePath())).append(' ').append(RootBridge.quote(dnsTmp))
++                        .append("; chmod 600 ").append(RootBridge.quote(dnsTmp)).append("; chown 0:0 ").append(RootBridge.quote(dnsTmp))
++                        .append("; test \"$(sha256sum ").append(RootBridge.quote(dnsTmp)).append(" | cut -d ' ' -f 1)\" = ")
++                        .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockDns)))
++                        .append("; mv -f ").append(RootBridge.quote(dnsTmp)).append(' ').append(RootBridge.quote(dnsDst));
++            }
+             cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
+                     .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
+                     .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
+@@ -1412,14 +2008,44 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -7456,8 +8142,125 @@ index 0000000..07fab10
 +    }
 +    return result
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
+index e4053e5..72b8798 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
+@@ -17,7 +17,39 @@ internal class ToolsAdblockChain(
+     val controllerLoaded: Boolean,
+     val hits: Long,
+     val recent: List<String>,
+-)
++    /** Connections the REJECT rule was checked against without matching (controller missCount). */
++    val missCount: Long = 0L,
++    /** True when [hits] is the controller's in-memory hitCount (no log level, no su). */
++    val hitsFromController: Boolean = false,
++    /** Strict controller reading of the chain; null when the core is not running or silent. */
++    val report: AdblockChainReport? = null,
++    /** The running copy answers the DNS block set empty from nameserver-policy. */
++    val dnsLayer: Boolean = false,
++    /** dns.enhanced-mode of the running copy (fake-ip / redir-host; blank without a dns block). */
++    val enhancedMode: String = "",
++    /** none / enabled / disabled / pure-ip-off / inline: the running copy's sniffer. */
++    val snifferState: String = "none",
++    /** System Private DNS: off / opportunistic / hostname, and the hostname when set. */
++    val privateDnsMode: String = "",
++    val privateDnsHost: String = "",
++    /** What the running session reports (status JSON, cached by the controller read). */
++    val systemDns: String = "",
++    val dnsHijackMode: String = "",
++    val dotGuard: Boolean = false,
++    val dnsIpv6Rule: Boolean = false,
++    val ipv6DnsPolicy: String = "",
++    val cnip: String = "",
++    val cnipTcpOnly: Boolean = false,
++    /** The selected subscription has its own dns: block. */
++    val sourceHasDns: Boolean = true,
++    val recommendedDns: Boolean = false,
++    /** blacklist / whitelist / core and the selected package count of that scope. */
++    val appScope: String = "core",
++    val scopedApps: Int = 0,
++) {
++    /** Apps whose traffic never reaches the core (blacklist entries); -1: all but the whitelist. */
++    val appsOutside: Int get() = when (appScope) { "blacklist" -> scopedApps; "whitelist" -> -1; else -> 0 }
++}
+
+ /**
+  * Root-package access for pages 28–49 of the 工具 module. Like `ToolsConfigBridge`, it exists
+@@ -86,6 +118,18 @@ internal object ToolsRuntimeBridge {
+
+     /* ------------------------------ 广告过滤 ------------------------------ */
+
++    /** The hostname of a Private DNS set to "hostname" mode; null otherwise. Never changes the setting. */
++    fun privateDnsHostname(context: Context): String? = try {
++        val resolver = context.applicationContext.contentResolver
++        if (android.provider.Settings.Global.getString(resolver, "private_dns_mode") == "hostname")
++            android.provider.Settings.Global.getString(resolver, "private_dns_specifier")?.trim()?.ifBlank { null } ?: "未知主机名"
++        else null
++    } catch (_: Exception) { null }
++
++    private fun privateDnsMode(context: Context): String = try {
++        android.provider.Settings.Global.getString(context.applicationContext.contentResolver, "private_dns_mode").orEmpty()
++    } catch (_: Exception) { "" }
++
+     /**
+      * The checks `ProxyAdblockChainActivity` runs for its 运行链验证 card, in the same order and
+      * from the same sources: startup copy, live rules, runtime log, session counters.
+@@ -96,21 +140,48 @@ internal object ToolsRuntimeBridge {
+         val controller = ProxyComposeController(app)
+         val running = quietly(false) { controller.state().running }
+         val startup = quietly("") { RootProxyManager(app).startupConfig() }
+-        val rules = if (running) quietly(emptyList()) { controller.rules() } else emptyList()
+-        val adRule = rules.firstOrNull {
++        val rules = if (running) quietly<List<ProxyRuleUi>?>(null) { controller.rules() } else null
++        val adRule = rules?.firstOrNull {
+             it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
+         }
+-        val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
+         val mode = if (running) quietly("") { MihomoControllerClient(app).configs().optString("mode", "") } else ""
++        val providers = if (running && rules != null) quietly<List<ProxyRuleProviderUi>?>(null) { controller.ruleProviders() } else null
++        val report = if (rules != null && providers != null) AdblockVerification.inspect(mode, rules, providers) else null
++        val counted = report?.takeIf { it.loaded }
++        // Recent domains only: the counter itself comes from the controller below.
++        val stats = if (running) quietly(AdblockRuntimeStats()) { ProxyRuntimeInspector(app).adblockRuntimeStats() } else AdblockRuntimeStats()
+         val cachedRecent = prefs.getString("proxyAdblockRecentDomains", "").orEmpty().lineSequence().map { it.trim() }.filter { it.isNotEmpty() }.take(8).toList()
++        val profile = ProxyRuntimeProfile.load(prefs)
++        val source = quietly<String?>(null) { ProxyConfigLibrary(app).let { lib -> lib.selected(profile.core)?.let { lib.read(it) } } }
+         ToolsAdblockChain(
+             running = running,
+             mode = mode,
+             ruleMode = mode.isNotBlank() && AdblockRuleInspection.isRuleMode(mode),
+             startupInjected = AdblockRuleInspection.isInjected(startup),
+             controllerLoaded = adRule != null,
+-            hits = maxOf(prefs.getLong("proxyAdblockSessionHits", 0L), adRule?.hitCount ?: 0L, stats.count),
++            // Controller hitCount is authoritative while the core answers (in-memory RuleWrapper
++            // counter, independent of the log level); the log-derived session count is the fallback.
++            hits = counted?.hitCount ?: maxOf(prefs.getLong("proxyAdblockSessionHits", 0L), adRule?.hitCount ?: 0L, stats.count),
+             recent = stats.recentDomains.ifEmpty { cachedRecent },
++            missCount = counted?.missCount ?: 0L,
++            hitsFromController = counted != null,
++            report = report,
++            dnsLayer = AdblockDnsPolicy.isInjected(startup),
++            enhancedMode = AdblockDnsPolicy.enhancedMode(startup),
++            snifferState = AdblockDnsPolicy.snifferState(startup),
++            privateDnsMode = privateDnsMode(app),
++            privateDnsHost = privateDnsHostname(app).orEmpty(),
++            systemDns = prefs.getString("proxyRootSystemDns", "").orEmpty(),
++            dnsHijackMode = prefs.getString("proxyRootDnsMode", "").orEmpty(),
++            dotGuard = prefs.getBoolean("proxyRootDotGuard", false),
++            dnsIpv6Rule = prefs.getBoolean("proxyRootDnsIpv6Rule", false),
++            ipv6DnsPolicy = prefs.getString("proxyRootIpv6DnsPolicy", "").orEmpty(),
++            cnip = if (running) prefs.getString("proxyCnIpKernelStatus", "").orEmpty() else "",
++            cnipTcpOnly = prefs.getBoolean("proxyCnIpKernelTcpOnlyActive", false),
++            sourceHasDns = source == null || MihomoStartupConfig.sourceHasDns(source),
++            recommendedDns = prefs.getBoolean("proxyRecommendedDns", false),
++            appScope = profile.appScope.id,
++            scopedApps = prefs.getStringSet("proxyAppPackages", emptySet()).orEmpty().size,
+         )
+     }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
-index 4722bed..e88aefc 100644
+index 4722bed..1bf72fc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 @@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
@@ -7469,37 +8272,55 @@ index 4722bed..e88aefc 100644
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
  import kotlinx.coroutines.launch
-@@ -93,7 +95,9 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -93,7 +95,11 @@ internal fun AdblockScreen(vm: HetuViewModel) {
      var whitelistCandidate by remember { mutableStateOf<String?>(null) }
      val running = vm.state.running
      var injected by remember { mutableStateOf<Boolean?>(null) }
 -    var loadedInCore by remember { mutableStateOf<Boolean?>(null) }
 +    var chain by remember { mutableStateOf<AdblockChainReport?>(null) }
 +    var probe by remember { mutableStateOf<AdblockProbe?>(null) }
++    var dnsProbe by remember { mutableStateOf<AdblockProbe?>(null) }
++    var unified by remember { mutableStateOf<ToolsAdblockChain?>(null) }
 +    var probing by remember { mutableStateOf(false) }
      var showHelp by remember { mutableStateOf(false) }
 
      LaunchedEffect(revision, running) {
-@@ -109,14 +113,12 @@ internal fun AdblockScreen(vm: HetuViewModel) {
-             injected = try {
-                 AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
-             } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
+@@ -105,18 +111,24 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+             vm.toast(error.message ?: "规则读取失败")
+         }
+         if (running) {
+-            stats = try { vm.inspector.adblockRuntimeStats() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { stats }
+-            injected = try {
+-                AdblockRuleInspection.isInjected(withContext(Dispatchers.IO) { RootProxyManager(context).startupConfig() })
+-            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
 -            loadedInCore = try {
 -                vm.controller.rules().any {
 -                    it.payload.contains(ProxyAdblockRules.PROVIDER_NAME, true) || it.type.contains(ProxyAdblockRules.PROVIDER_NAME, true)
 -                }
 -            } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
-+            // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
-+            chain = AdblockVerification.chain(context)
++            // One data source with 工具 › 广告过滤: controller hitCount/missCount, strict chain, startup copy.
++            val live = try { ToolsRuntimeBridge.adblockChain(context) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++            unified = live
++            if (live != null) {
++                stats = AdblockRuntimeStats(count = live.hits, recentDomains = live.recent, logAvailable = true)
++                injected = live.startupInjected
++                // Strict: the REJECT rule over both providers, its position before routing, and the loaded rule counts.
++                chain = live.report
++            } else {
++                injected = null
++                chain = null
++            }
          } else {
++            unified = null
              injected = null
 -            loadedInCore = null
 +            chain = null
 +            probe = null
++            dnsProbe = null
          }
      }
 
-@@ -169,8 +171,22 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -169,8 +181,25 @@ internal fun AdblockScreen(vm: HetuViewModel) {
          if (prepare != null) vpnPermission.launch(prepare) else vm.filters.startVpn()
      }
 
@@ -7510,6 +8331,9 @@ index 4722bed..e88aefc 100644
 +            probe = try { AdblockVerification.probe(context) }
 +                catch (cancel: CancellationException) { throw cancel }
 +                catch (error: Exception) { AdblockProbe(null, "", error.message ?: "实测失败") }
++            dnsProbe = try { AdblockVerification.dnsProbe(context) }
++                catch (cancel: CancellationException) { throw cancel }
++                catch (error: Exception) { AdblockProbe(null, "", error.message ?: "DNS 实测失败") }
 +            probing = false
 +            revision++
 +        }
@@ -7523,7 +8347,7 @@ index 4722bed..e88aefc 100644
      val actualMode = vm.state.trafficMode.lowercase()
      val wrongMode = running && enabled && actualMode in listOf("global", "direct")
      val snapshot = rules
-@@ -280,9 +296,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -280,9 +309,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                      HxDivider(44.dp)
                      VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                      HxDivider(44.dp)
@@ -7540,8 +8364,8 @@ index 4722bed..e88aefc 100644
 +                        when { probing -> null; probed?.ok != null -> probed.ok; running -> stats.count > 0; else -> null },
 +                        when {
 +                            probing -> "正在向广告域名发送一次实测请求…"
-+                            probed != null -> probed.detail
-+                            running -> "${stats.count} 次"
++                            probed != null -> probed.detail + (dnsProbe?.let { "\nDNS 接管：" + it.detail } ?: "")
++                            running -> "${stats.count} 次" + (unified?.takeIf { it.hitsFromController }?.let { " · 已检查 ${it.missCount + it.hits} 个连接" } ?: "")
 +                            else -> "代理启动后统计"
 +                        },
 +                        neutralFalse = probed?.ok == null,
@@ -7553,7 +8377,7 @@ index 4722bed..e88aefc 100644
                  }
              }
          }
-@@ -504,7 +538,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
+@@ -504,7 +551,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
      }
  }
  @Composable
@@ -7563,7 +8387,7 @@ index 4722bed..e88aefc 100644
      val c = Hx.colors
      val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
      Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-@@ -528,6 +563,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
+@@ -528,6 +576,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
              Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
              Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
          }
@@ -7576,18 +8400,21 @@ index 4722bed..e88aefc 100644
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
 new file mode 100644
-index 0000000..6fff4a9
+index 0000000..b779c0c
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt
-@@ -0,0 +1,188 @@
+@@ -0,0 +1,340 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
 +import android.os.SystemClock
-+import java.net.HttpURLConnection
++import java.net.Inet4Address
++import java.net.Inet6Address
++import java.net.InetAddress
 +import java.net.InetSocketAddress
-+import java.net.Proxy
-+import java.net.URL
++import java.net.Socket
++import java.net.UnknownHostException
++import java.nio.charset.StandardCharsets
 +import java.util.Locale
 +import kotlinx.coroutines.CancellationException
 +import kotlinx.coroutines.Dispatchers
@@ -7609,6 +8436,11 @@ index 0000000..6fff4a9
 +    val allowRules: Int,
 +    /** Remote rule sets that loaded zero rules (unreachable / failed download). */
 +    val emptyRemoteProviders: List<String>,
++    /** Controller RuleWrapper counters of the REJECT rule: kept in memory, independent of log level. */
++    val hitCount: Long = 0L,
++    val missCount: Long = 0L,
++    /** Rules evaluated before the REJECT rule (leading exemptions / guards). */
++    val rulesBefore: Int = 0,
 +) {
 +    val loaded: Boolean get() = blockingIndex >= 0
 +    val ordered: Boolean get() = loaded && (firstRoutingIndex < 0 || blockingIndex < firstRoutingIndex) && (matchIndex < 0 || blockingIndex < matchIndex)
@@ -7645,8 +8477,12 @@ index 0000000..6fff4a9
 +        var blocking = -1
 +        var routing = -1
 +        var match = -1
++        var hit = 0L
++        var miss = 0L
 +        rules.forEachIndexed { position, rule ->
-+            if (blocking < 0 && AdblockRuleInspection.isBlockingRule(rule.type, rule.payload, rule.proxy, rule.disabled)) blocking = position
++            if (blocking < 0 && AdblockRuleInspection.isBlockingRule(rule.type, rule.payload, rule.proxy, rule.disabled)) {
++                blocking = position; hit = rule.hitCount; miss = rule.missCount
++            }
 +            val policy = rule.proxy.trim().uppercase(Locale.ROOT)
 +            if (routing < 0 && !rule.disabled && policy.isNotEmpty() && policy !in terminalPolicies && !policy.startsWith("REJECT")) routing = position
 +            if (match < 0 && rule.type.equals("Match", true)) match = position
@@ -7657,7 +8493,8 @@ index 0000000..6fff4a9
 +            it.name != ProxyAdblockRules.PROVIDER_NAME && it.name != ProxyAdblockRules.ALLOW_PROVIDER_NAME &&
 +                it.vehicleType.equals("HTTP", true) && it.ruleCount <= 0
 +        }.map { it.name }
-+        return AdblockChainReport(mode.trim().lowercase(Locale.ROOT), blocking, routing, match, block, allow, empty)
++        return AdblockChainReport(mode.trim().lowercase(Locale.ROOT), blocking, routing, match, block, allow, empty,
++            hitCount = hit, missCount = miss, rulesBefore = blocking.coerceAtLeast(0))
 +    }
 +
 +    /** Reads the live chain; null when the core is not running or did not answer. */
@@ -7714,10 +8551,39 @@ index 0000000..6fff4a9
 +        }
 +    }
 +
++    /** Index, hit and miss counters of the strict REJECT rule in a /rules reading; null without it. */
++    fun blockingCounters(rules: List<ProxyRuleUi>): Triple<Int, Long, Long>? {
++        val position = rules.indexOfFirst { AdblockRuleInspection.isBlockingRule(it.type, it.payload, it.proxy, it.disabled) }
++        if (position < 0) return null
++        return Triple(position, rules[position].hitCount, rules[position].missCount)
++    }
++
 +    /**
-+     * Sends one plain-HTTP request for a blocked host through the running core's loopback policy
-+     * listener (Hetu's own UID is exempt from transparent interception) and reads the core's own
-+     * decision for it from core.log. It counts once in 本次拦截, like any real blocked request.
++     * Verdict from two /rules readings around one request: the REJECT rule's hitCount went up, or
++     * the rule whose hitCount moved instead. Null when no counter moved (nothing concluded).
++     */
++    fun verdictFromCounters(before: List<ProxyRuleUi>, after: List<ProxyRuleUi>, domain: String): AdblockProbe? {
++        val b = blockingCounters(before)
++        val a = blockingCounters(after)
++        if (b != null && a != null && a.second > b.second) return AdblockProbe(true, domain, "$domain → REJECT，河图广告规则 hitCount +${a.second - b.second}")
++        val old = before.associateBy { it.index }
++        val moved = after.firstOrNull { rule -> rule.hitCount > (old[rule.index]?.hitCount ?: Long.MAX_VALUE) } ?: return null
++        val policy = moved.proxy.uppercase(Locale.ROOT)
++        val label = "第 ${moved.index + 1} 条 ${moved.type}${if (moved.payload.isNotBlank()) "," + moved.payload.take(60) else ""}"
++        return if (policy.startsWith("REJECT")) AdblockProbe(true, domain, "$domain → REJECT，命中配置自带规则 $label")
++        else AdblockProbe(false, domain, "$domain 未被拦截：命中 $label → ${moved.proxy}")
++    }
++
++    /** CONNECT request bytes for [domain]:443 (HTTPS tunnel: not subject to the cleartext policy). */
++    fun connectRequest(domain: String): ByteArray =
++        "CONNECT $domain:443 HTTP/1.1\r\nHost: $domain:443\r\nUser-Agent: Hetu-Android\r\nProxy-Connection: close\r\n\r\n".toByteArray(StandardCharsets.US_ASCII)
++
++    /**
++     * One raw-socket CONNECT for a blocked host through the running core's loopback HTTP listener
++     * (Hetu's own UID is exempt from transparent interception). A plain-HTTP request via
++     * HttpURLConnection never left the App: the network security config forbids cleartext to the
++     * target host, so the core saw nothing. The verdict comes from the controller's in-memory rule
++     * counters (no log level, no su); core.log is only a fallback when the controller is silent.
 +     */
 +    suspend fun probe(context: Context): AdblockProbe = withContext(Dispatchers.IO) {
 +        val app = context.applicationContext
@@ -7731,41 +8597,151 @@ index 0000000..6fff4a9
 +        }
 +        val domain = pickProbeDomain(rules.domains, rules.allowDomains)
 +            ?: return@withContext AdblockProbe(false, "", "本地规则库为空，没有可实测的广告域名")
-+        val log = "/data/adb/hetu/run/core.log"
-+        val pattern = RootBridge.quote("--> $domain:")
-+        fun count(): Int? {
-+            val result = RootBridge.rootShell(app, "grep -cF -- $pattern $log 2>/dev/null || true", 5_000L)
-+            return result.output.trim().lineSequence().lastOrNull()?.trim()?.toIntOrNull()
-+        }
-+        val before = count() ?: return@withContext AdblockProbe(null, domain, "无法读取核心日志，不能确认拦截结果")
++        val controller = ProxyComposeController(app)
++        suspend fun readRules(): List<ProxyRuleUi>? = try { controller.rules() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++        val before = readRules()
 +        val port = MihomoStartupConfig.egressProbePort(prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT))
 +        val started = SystemClock.elapsedRealtime()
-+        try {
-+            val connection = (URL("http://$domain/").openConnection(Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", port))) as HttpURLConnection).apply {
-+                instanceFollowRedirects = false
-+                useCaches = false
-+                connectTimeout = 3_000
-+                readTimeout = 3_000
-+                setRequestProperty("Connection", "close")
-+                setRequestProperty("User-Agent", "Hetu-Android")
++        val status = try {
++            Socket().use { socket ->
++                socket.soTimeout = 3_000
++                socket.connect(InetSocketAddress("127.0.0.1", port), 3_000)
++                socket.getOutputStream().apply { write(connectRequest(domain)); flush() }
++                val line = StringBuilder()
++                val input = socket.getInputStream()
++                while (line.length < 200) {
++                    val b = input.read()
++                    if (b < 0 || b == '\n'.code) break
++                    line.append(b.toChar())
++                }
++                line.toString().trim()
 +            }
-+            try { connection.responseCode } finally { connection.disconnect() }
 +        } catch (cancel: CancellationException) {
 +            throw cancel
 +        } catch (_: Exception) {
-+            // A rejected request usually fails here; the core log below is the evidence either way.
++            // A rejected tunnel is closed by the core; the counters below are the evidence either way.
++            ""
 +        }
 +        val elapsed = SystemClock.elapsedRealtime() - started
-+        for (attempt in 0 until 5) {
-+            if (attempt > 0) delay(300L)
-+            val after = count() ?: break
-+            if (after > before) {
-+                val tail = RootBridge.rootShell(app, "grep -F -- $pattern $log 2>/dev/null | tail -n 1", 5_000L).output
-+                val verdict = parseProbeLog(tail, domain)
-+                if (verdict != null) return@withContext if (verdict.ok == true) verdict.copy(detail = verdict.detail + " · ${elapsed} ms") else verdict
++        if (before != null) {
++            for (attempt in 0 until 6) {
++                if (attempt > 0) delay(250L)
++                val after = readRules() ?: break
++                val verdict = verdictFromCounters(before, after, domain)
++                if (verdict != null) return@withContext if (verdict.ok == true) verdict.copy(detail = verdict.detail + " · CONNECT 443 · ${elapsed} ms") else verdict
 +            }
 +        }
-+        AdblockProbe(null, domain, "核心日志里没有这次请求（代理未接收或日志级别过低），无法确认")
++        // Controller unreadable or silent: fall back to the core's own decision line.
++        val log = "/data/adb/hetu/run/core.log"
++        val pattern = RootBridge.quote("--> $domain:")
++        val tail = try { RootBridge.rootShell(app, "tail -c 262144 $log 2>/dev/null | grep -F -- $pattern | tail -n 1", 5_000L).output } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
++        parseProbeLog(tail, domain)?.let { return@withContext it }
++        AdblockProbe(null, domain, if (status.isEmpty()) "无法连接核心本地监听端口 $port，不能确认拦截结果" else "核心未记录这次 CONNECT 的规则判定（控制器计数未变化），无法确认")
++    }
++
++    /** Fake-IP pools Mihomo answers from (198.18.0.0/15 and its default IPv6 pool). */
++    fun isFakeIp(address: InetAddress): Boolean {
++        val b = address.address
++        return when (address) {
++            is Inet4Address -> (b[0].toInt() and 0xff) == 198 && ((b[1].toInt() and 0xff) == 18 || (b[1].toInt() and 0xff) == 19)
++            is Inet6Address -> (b[0].toInt() and 0xff) == 0xfd && (b[1].toInt() and 0xff) == 0xfe
++            else -> false
++        }
++    }
++
++    /**
++     * What the system resolver (the way ordinary apps resolve) answered for a blocked domain.
++     * [dnsLayer]: the running copy answers the DNS block set with an empty reply.
++     */
++    fun dnsVerdict(domain: String, answers: List<InetAddress>?, dnsLayer: Boolean, privateDnsHost: String?): AdblockProbe {
++        val bypass = privateDnsHost?.takeIf { it.isNotBlank() }?.let { "；系统私人 DNS（$it）绕过代理 DNS" }.orEmpty()
++        return when {
++            answers.isNullOrEmpty() && dnsLayer -> AdblockProbe(true, domain, "$domain 无解析结果：系统 DNS 已进入 Mihomo，DNS 层空应答生效")
++            answers.isNullOrEmpty() -> AdblockProbe(null, domain, "$domain 无解析结果；当前运行副本没有 DNS 层拦截，无法判断接管")
++            answers.all { isFakeIp(it) } -> AdblockProbe(true, domain, "$domain → fake-ip ${answers.first().hostAddress}：系统 DNS 已进入 Mihomo，连接层 REJECT 兜底")
++            dnsLayer -> AdblockProbe(false, domain, "$domain 返回真实地址 ${answers.first().hostAddress}：系统 DNS 未进入 Mihomo（私人 DNS / DoT / IPv6 DNS 绕过或系统缓存）$bypass")
++            else -> AdblockProbe(null, domain, "$domain 返回 ${answers.first().hostAddress}；redir-host 下无法区分是否经过 Mihomo$bypass")
++        }
++    }
++
++    /**
++     * DNS 接管实测: resolve a blocked host through the system resolver. Hetu's UID is not exempt
++     * from the DNS redirect chain, so its queries take the same path as any app's.
++     */
++    suspend fun dnsProbe(context: Context): AdblockProbe = withContext(Dispatchers.IO) {
++        val app = context.applicationContext
++        val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++        if (!prefs.getBoolean("proxyAdblockChain", true)) return@withContext AdblockProbe(null, "", "广告过滤未开启")
++        if (!ProxyStatusBridge.rootProxyRunning(app)) return@withContext AdblockProbe(null, "", "代理启动后可实测")
++        var rules = RuleStore.currentExportRules()
++        if (rules.domains.isEmpty()) {
++            RuleStore(app).reload()
++            rules = RuleStore.currentExportRules()
++        }
++        val domain = pickProbeDomain(rules.domains, rules.allowDomains)
++            ?: return@withContext AdblockProbe(false, "", "本地规则库为空，没有可实测的广告域名")
++        val startup = try { RootProxyManager(app).startupConfig() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
++        val answers = try { InetAddress.getAllByName(domain).toList() } catch (_: UnknownHostException) { emptyList() }
++            catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { null }
++        if (answers == null) return@withContext AdblockProbe(null, domain, "系统解析器未应答，无法确认 DNS 接管")
++        dnsVerdict(domain, answers, AdblockDnsPolicy.isInjected(startup), ToolsRuntimeBridge.privateDnsHostname(app))
++    }
++
++    /** 运行链验证 › DNS 路径: ok when DNS reaches the core and the DNS layer answers ad hosts. */
++    fun dnsPath(chain: ToolsAdblockChain): Pair<Boolean, String> {
++        val parts = ArrayList<String>()
++        parts += when (chain.enhancedMode) { "fake-ip" -> "fake-ip"; "redir-host" -> "redir-host"; "" -> "核心 DNS 未启用"; else -> chain.enhancedMode }
++        parts += when {
++            chain.dnsHijackMode.equals("off", true) -> "系统 DNS 未接管"
++            chain.systemDns == "captured" -> "系统 DNS 已接管"
++            chain.systemDns == "exempt" -> "系统 DNS 已接管（Root 进程豁免）"
++            else -> "接管状态未知"
++        }
++        parts += when (chain.privateDnsMode) {
++            "hostname" -> "私人 DNS ${chain.privateDnsHost.ifBlank { "主机名" }}（绕过代理 DNS）"
++            "opportunistic" -> if (chain.dotGuard) "私人 DNS 自动（DoT 已拦截，回落 53）" else "私人 DNS 自动（DoT 可能绕过）"
++            "off" -> "私人 DNS 关闭"
++            else -> "私人 DNS 未知"
++        }
++        parts += when {
++            chain.dnsIpv6Rule -> "IPv6 DNS 已劫持"
++            chain.ipv6DnsPolicy.startsWith("blocked") -> "IPv6 DNS 已阻断"
++            else -> "IPv6 DNS 未劫持"
++        }
++        parts += when (chain.cnip) {
++            "ipset" -> if (chain.cnipTcpOnly) "CNIP 内核旁路（仅 TCP）" else "CNIP 内核旁路"
++            "degraded" -> "CNIP 由核心规则处理"
++            else -> "CNIP 关闭"
++        }
++        parts += if (chain.dnsLayer) "DNS 层拦截已启用" else "无 DNS 层拦截"
++        val ok = chain.running && chain.dnsLayer && !chain.dnsHijackMode.equals("off", true) && chain.privateDnsMode != "hostname"
++        return ok to parts.joinToString(" · ")
++    }
++
++    /** Plain-language reasons the chain may miss ads; empty when nothing needs attention. */
++    fun hints(chain: ToolsAdblockChain): List<String> {
++        val out = ArrayList<String>()
++        if (chain.privateDnsMode == "hostname")
++            out += "系统私人 DNS 设为「${chain.privateDnsHost.ifBlank { "指定主机名" }}」：系统 DNS 直接加密发往该服务器，不经过 Mihomo，DNS 层拦截不生效，域名规则只能靠 SNI 嗅探。可在系统设置 › 网络 › 私人 DNS 改为「自动」或「关闭」（河图不会自动修改）。"
++        when (chain.snifferState) {
++            "disabled" -> out += "订阅关闭了域名嗅探（sniffer 未启用）：直连 IP 的广告连接没有域名，连接层规则无法识别，只能靠 DNS 层拦截。"
++            "pure-ip-off" -> out += "订阅设置了 parse-pure-ip: false：直连 IP 的连接不做嗅探，这部分广告无法按域名识别。"
++        }
++        if (chain.cnip == "ipset") out += if (chain.dnsLayer)
++            "CNIP 内核旁路已开启：解析为中国 IP 的连接${if (chain.cnipTcpOnly) "（TCP）" else ""}不经过核心，这些广告只靠 DNS 层拦截${if (chain.cnipTcpOnly) "" else "；可在 CNIP 卡片开启「仅 TCP 旁路」，让 UDP/QUIC 仍经核心判定"}。"
++        else "CNIP 内核旁路已开启且当前没有 DNS 层拦截：解析为中国 IP 的广告连接不经过核心，不会被拦截。"
++        if (!chain.sourceHasDns && !chain.recommendedDns)
++            out += "订阅没有 dns: 配置：核心只用系统 DNS（redir-host）。可开启下方「河图推荐 DNS」（fake-ip + 国内 DoH，默认关闭，重启代理后生效）。"
++        when {
++            chain.appsOutside > 0 -> out += "${chain.appsOutside} 个应用在黑名单中，不经过代理，也不经过去广告。"
++            chain.appsOutside < 0 -> out += "仅白名单中的 ${chain.scopedApps} 个应用经过代理和去广告，其他应用不经过。"
++        }
++        if (chain.running && chain.hitsFromController && chain.hits == 0L) {
++            val before = chain.report?.rulesBefore ?: 0
++            if (chain.missCount == 0L) out += "REJECT 规则还没有检查过任何连接：流量没有到达这条规则（未被代理捕获，或被前 $before 条规则先行放行）。"
++            else out += "REJECT 规则已检查 ${String.format(Locale.US, "%,d", chain.missCount)} 个连接但没有命中：这些连接可能没有域名（DNS 未经核心或嗅探未生效）。"
++        }
++        return out
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
@@ -14041,7 +15017,7 @@ index 800055c..d43d597 100644
 -    }
 -}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
-index d256004..b88ab5e 100644
+index d256004..044a7d9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen.kt
 @@ -41,6 +41,7 @@ import androidx.compose.ui.text.style.TextOverflow
@@ -14060,15 +15036,16 @@ index d256004..b88ab5e 100644
  import io.github.xgl34222220.hetu.home.HomeType
  import io.github.xgl34222220.hetu.home.HomeVerticalDivider
  import io.github.xgl34222220.hetu.home.LocalHomeColors
-@@ -93,6 +95,7 @@ internal fun ToolsAdblockScreen(
+@@ -93,6 +95,8 @@ internal fun ToolsAdblockScreen(
      onRetry: () -> Unit,
      modifier: Modifier = Modifier,
      scroll: ScrollState = rememberScrollState(),
 +    onProbe: (() -> Unit)? = null,
++    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
  ) {
      val ready = state.load is ToolsLoad.Ready
      val idle = ready && !state.busy
-@@ -115,9 +118,23 @@ internal fun ToolsAdblockScreen(
+@@ -115,9 +119,23 @@ internal fun ToolsAdblockScreen(
              is ToolsLoad.Failed -> ToolsEmpty(ToolsIcons.ShieldBan, "广告过滤状态读取失败", subtitle = load.message) {
                  ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
              }
@@ -14085,7 +15062,7 @@ index d256004..b88ab5e 100644
 +            } else {
                  StatusCard(state, idle, onEnabledChange, onSwitchToRuleMode, Modifier.homeEnter(stagger, 0))
 -                ChainCard(state, Modifier.homeEnter(stagger, 1))
-+                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe)
++                if (state.coreLiveVerify) ChainCard(state, Modifier.homeEnter(stagger, 1), onProbe, idle, onRecommendedDnsChange)
 +                else HomeCoreUnsupportedCard(
 +                    state.coreLabel, "运行链验证 · 热更新过滤规则",
 +                    "广告规则在启动时写入 ${state.coreLabel} 配置并按规则拦截；${state.coreLabel} 不提供 Mihomo 的规则读取接口，无法实时验证运行链，修改规则在重启代理后生效。",
@@ -14094,7 +15071,7 @@ index d256004..b88ab5e 100644
                  Column(Modifier.homeEnter(stagger, 2)) {
                      // 最近拦截 brings its own gap, so it can unfold without a jump.
                      HomeReveal(state.effective && state.recent.isNotEmpty()) { RecentCard(state.recent, onPickRecent, Modifier.padding(bottom = HomeDims.gap)) }
-@@ -126,22 +143,32 @@ internal fun ToolsAdblockScreen(
+@@ -126,22 +144,32 @@ internal fun ToolsAdblockScreen(
                  SourcesCard(state, idle, onUpdate, onSourceChange, Modifier.homeEnter(stagger, 3))
                  DomainCard("白名单（永不拦截）", "添加白名单", state.allow, idle, stagger, 4, onAdd = { onAddDomain(true) }, onRemove = { onRemoveDomain(it, true) })
                  DomainCard("黑名单（额外拦截）", "添加黑名单", state.block, idle, stagger, 5, onAdd = { onAddDomain(false) }, onRemove = { onRemoveDomain(it, false) })
@@ -14133,16 +15110,22 @@ index d256004..b88ab5e 100644
      return when (state.status) {
          ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("保护中"), ht("广告域名直接 REJECT，\n其余流量照常分流。"))
          ToolsAdStatus.WrongMode -> StatusLook(
-@@ -213,7 +240,7 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
+@@ -213,7 +241,13 @@ private fun Metric(label: String, value: String, color: Color, modifier: Modifie
  }
 
  @Composable
 -private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
-+private fun ChainCard(state: ToolsAdblockState, modifier: Modifier, onProbe: (() -> Unit)? = null) {
++private fun ChainCard(
++    state: ToolsAdblockState,
++    modifier: Modifier,
++    onProbe: (() -> Unit)? = null,
++    idle: Boolean = true,
++    onRecommendedDnsChange: ((Boolean) -> Unit)? = null,
++) {
      val running = state.enabled && state.proxyRunning
      HomeCard(modifier.fillMaxWidth()) {
          ToolsCardTitle("运行链验证")
-@@ -221,8 +248,29 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
+@@ -221,21 +255,78 @@ private fun ChainCard(state: ToolsAdblockState, modifier: Modifier) {
          HomeRowDivider(start = HomeRowDims.textStart)
          CheckRow(state.enabled && state.startupInjected, ht("启动配置注入"), ht(if (state.enabled && state.startupInjected) "hetu-adblock 已写入运行副本" else "当前启动副本没有广告 provider"))
          HomeRowDivider(start = HomeRowDims.textStart)
@@ -14150,6 +15133,11 @@ index d256004..b88ab5e 100644
 +        CheckRow(running && state.controllerLoaded, ht("Mihomo 规则链"), state.chainNote.takeIf { running && it.isNotBlank() }
 +            ?: ht(if (running && state.controllerLoaded) "核心已加载 REJECT 规则" else if (running) "核心尚未加载广告规则" else "等待代理启动"))
          HomeRowDivider(start = HomeRowDims.textStart)
+-        CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
++        if (running && state.dnsPath.isNotBlank()) {
++            CheckRow(state.dnsPathOk, ht("DNS 路径"), state.dnsPath, maxLines = 4)
++            HomeRowDivider(start = HomeRowDims.textStart)
++        }
 +        if (onProbe != null) {
 +            val probe = state.probe
 +            ToolsRow(
@@ -14169,10 +15157,57 @@ index d256004..b88ab5e 100644
 +                },
 +            )
 +            HomeRowDivider(start = HomeRowDims.textStart)
++            val dnsProbe = state.dnsProbe
++            if (state.probing || dnsProbe != null) {
++                ToolsRow(
++                    AnnotatedString(ht("DNS 接管实测")),
++                    icon = if (dnsProbe?.ok == true && !state.probing) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
++                    iconTint = if (dnsProbe?.ok == true && !state.probing) LocalHomeColors.current.good else if (dnsProbe?.ok == false && !state.probing) LocalHomeColors.current.bad else LocalHomeColors.current.t3,
++                    subtitle = if (state.probing) ht("用系统解析器解析一个已拦截域名…") else dnsProbe?.detail.orEmpty(),
++                    compact = true, subtitleMaxLines = 4,
++                )
++                HomeRowDivider(start = HomeRowDims.textStart)
++            }
 +        }
-         CheckRow(state.effective && state.hits > 0, ht("实际拦截"), "%,d ".format(state.shownHits) + ht("次"))
++        // Controller hitCount (in-memory, independent of the log level) and missCount: a rule that
++        // was never checked (miss 0) and one that sees hostless connections (miss > 0) differ.
++        CheckRow(
++            state.effective && state.hits > 0, ht("实际拦截"),
++            "%,d ".format(state.shownHits) + ht("次") + when {
++                !running -> ""
++                state.hitsFromController -> " · " + ht("已检查") + " %,d ".format(state.missCount + state.hits) + ht("个连接")
++                else -> " · " + ht("日志计数")
++            },
++        )
++        if (state.hints.isNotEmpty()) {
++            Column(Modifier.padding(start = 10.dp, end = 10.dp, top = 4.dp, bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
++                state.hints.forEach { hint -> HomeNotice(ht(hint), HomeIcons.TriangleAlert, Modifier.fillMaxWidth()) }
++            }
++        }
++        if (state.offerRecommendedDns && onRecommendedDnsChange != null) {
++            HomeRowDivider(start = HomeRowDims.textStart)
++            ToolsSwitchRow(
++                "河图推荐 DNS", state.recommendedDns, onRecommendedDnsChange, icon = ToolsFeatureIcons.Globe,
++                subtitle = "订阅没有 dns: 时启用 fake-ip + 国内 DoH；默认关闭，重启代理后生效", enabled = idle,
++            )
++        }
      }
  }
+
+ @Composable
+-private fun CheckRow(ok: Boolean, title: String, detail: String) {
++private fun CheckRow(ok: Boolean, title: String, detail: String, maxLines: Int = 2) {
+     val c = LocalHomeColors.current
+     val tint by animateColorAsState(if (ok) c.good else c.t3, HomeMotion.fade(LocalHomeMotionEnabled.current, 260), label = "tools-ad-check")
+     ToolsRow(
+         AnnotatedString(title),
+         icon = if (ok) HomeIcons.CircleCheck else ToolsFeatureIcons.CircleDashed,
+         iconTint = tint,
+-        subtitle = detail, compact = true,
++        subtitle = detail, compact = true, subtitleMaxLines = maxLines,
+     )
+ }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
 index 67585f1..2702aa2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
@@ -14306,7 +15341,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..afb915d 100644
+index f575100..bb3ebb5 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -14326,7 +15361,7 @@ index f575100..afb915d 100644
      const val AdblockChain = "proxyAdblockChain"
      const val AdblockFallback = "proxyAdblockFallbackEnabled"
      const val Cname = "cnameProtection"
-@@ -213,9 +216,28 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -213,9 +216,33 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              /* ------------------------------ CNIP ------------------------------ */
              loadCnIp = { prefs.getBoolean(Keys.CnIp, false) },
              setCnIp = { on -> prefs.edit().putBoolean(Keys.CnIp, on).apply(); dirty(Keys.CnIp) },
@@ -14343,6 +15378,11 @@ index f575100..afb915d 100644
 +                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
 +                changed()
 +            },
++            loadCnIpTcpOnly = { prefs.getBoolean("proxyCnIpKernelTcpOnly", false) },
++            setCnIpTcpOnly = { on ->
++                prefs.edit().putBoolean("proxyCnIpKernelTcpOnly", on).putBoolean("proxyRootSettingsDirty", true).apply()
++                changed()
++            },
 
              /* ------------------------------ 诊断与维护 ------------------------------ */
              onOpenDiagnosticsDetails = if (onOpenDiagnosticsDetails == null) null else { { diagnosticsDetails?.invoke() } },
@@ -14355,7 +15395,7 @@ index f575100..afb915d 100644
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
                  if (passed) ToolsPreflight.Passed() else ToolsPreflight.Failed(message.ifBlank { "预检未通过" })
-@@ -225,7 +247,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -225,7 +252,8 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              restoreNetwork = { proxy.stop(); changed(); "已停止 Root 代理并执行网络规则回滚" },
              onCopy = { label, text ->
                  val clipboard = app.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -14365,18 +15405,34 @@ index f575100..afb915d 100644
                  toast("已复制$label")
              },
 
-@@ -233,6 +256,10 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -233,6 +261,12 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              loadAdblock = {
                  val snapshot = rules.rulesSnapshot()
                  val chain = ToolsRuntimeBridge.adblockChain(app)
 +                // Strict live reading: the REJECT rule over both providers, ahead of routing, with loaded rules.
 +                val (coreLabel, coreRoutesAds, coreLiveVerify) = io.github.xgl34222220.hetu.ProxyCoreSupport.adblockCore(prefs, chain.running)
 +                // Only Mihomo exposes the rule chain; other cores get the per-core state, not a failed read.
-+                val report = if (chain.running && coreLiveVerify) AdblockVerification.chain(app) else null
++                // The same controller reading feeds 广告过滤 here and in the legacy page (ToolsRuntimeBridge).
++                val report = if (chain.running && coreLiveVerify) chain.report else null
++                val (dnsPathOk, dnsPath) = AdblockVerification.dnsPath(chain)
                  val now = System.currentTimeMillis()
                  ToolsAdblockSnapshot(
                      ToolsAdblockState(
-@@ -262,12 +289,20 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+@@ -243,6 +277,13 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+                         modeLabel = when (chain.mode.lowercase()) { "global" -> "全局"; "direct" -> "直连"; else -> "" },
+                         ruleCount = snapshot.count,
+                         hits = chain.hits,
++                        missCount = chain.missCount,
++                        hitsFromController = chain.hitsFromController,
++                        dnsPath = if (coreLiveVerify) dnsPath else "",
++                        dnsPathOk = dnsPathOk,
++                        hints = if (prefs.getBoolean(Keys.AdblockChain, true) && coreRoutesAds) AdblockVerification.hints(chain) else emptyList(),
++                        offerRecommendedDns = !chain.sourceHasDns || chain.recommendedDns,
++                        recommendedDns = chain.recommendedDns,
+                         allow = snapshot.allow,
+                         block = snapshot.block,
+                         sources = snapshot.sources.map { source ->
+@@ -262,12 +303,29 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                          levelNote = snapshot.sources.filter { it.enabled }.joinToString(" + ") { it.name }.ifBlank { "没有启用的规则源" } + "。",
                          recent = chain.recent,
                          startupInjected = chain.startupInjected,
@@ -14395,10 +15451,19 @@ index f575100..afb915d 100644
 +                val result = AdblockVerification.probe(app)
 +                ToolsAdProbe(result.ok, result.detail)
 +            },
++            probeAdblockDns = {
++                val result = AdblockVerification.dnsProbe(app)
++                ToolsAdProbe(result.ok, result.detail)
++            },
++            setRecommendedDns = { on ->
++                prefs.edit().putBoolean("proxyRecommendedDns", on).apply()
++                dirty("proxyRecommendedDns")
++                "已保存，重启代理后生效"
++            },
              setAdblockEnabled = { on ->
                  val note = withContext(Dispatchers.IO) { ProxyAdblockRuntimeBridge.setEnabled(app, on) }
                  dirty(Keys.AdblockChain)
-@@ -339,10 +374,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
+@@ -339,10 +397,15 @@ private fun ProxyCoreRemoteStatus.toToolsCore(): ToolsCore {
  /** Launcher icon of [app], loaded lazily through the controller's icon cache; letter tile meanwhile. */
  @Composable
  private fun ToolsAppIcon(controller: HetuComposeController, app: ToolsApp, modifier: Modifier) {
@@ -14418,10 +15483,10 @@ index f575100..afb915d 100644
 
  /**
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-index 40111ed..95fa80f 100644
+index 40111ed..7b80bde 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureModels.kt
-@@ -180,7 +180,23 @@ internal data class ToolsShareState(
+@@ -180,7 +180,25 @@ internal data class ToolsShareState(
 
  /* ---------------------------- CNIP (39) ---------------------------- */
 
@@ -14437,6 +15502,8 @@ index 40111ed..95fa80f 100644
 +    val kernelReason: String = "",
 +    val kernelV4Entries: Int = 0,
 +    val kernelV6Entries: Int = 0,
++    /** Optional (default off): only TCP to CN addresses skips the core; UDP/QUIC still reaches it. */
++    val kernelTcpOnly: Boolean = false,
 +)
 +
 +/** What the CNIP kernel bypass page reads back. */
@@ -14446,7 +15513,7 @@ index 40111ed..95fa80f 100644
 
  /* ---------------------------- 诊断与维护 (40–43) ---------------------------- */
 
-@@ -203,6 +219,9 @@ internal sealed interface ToolsDiagOverlay {
+@@ -203,6 +221,9 @@ internal sealed interface ToolsDiagOverlay {
 
      /** Page 42. */
      data class ConfirmRestore(val running: Boolean = false) : ToolsDiagOverlay
@@ -14456,7 +15523,7 @@ index 40111ed..95fa80f 100644
  }
 
  internal data class ToolsDiagState(val preflight: ToolsPreflight = ToolsPreflight.Idle)
-@@ -218,6 +237,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
+@@ -218,6 +239,9 @@ internal enum class ToolsAdLevel(val id: String, val label: String, val note: St
  /** [meta]: “使用内置快照”, “更新于 10 分钟前”, or the last error. */
  internal data class ToolsAdSource(val id: String, val name: String, val count: Int, val meta: String, val enabled: Boolean)
 
@@ -14466,7 +15533,7 @@ index 40111ed..95fa80f 100644
  internal enum class ToolsAdStatus { Protecting, WrongMode, Waiting, Unverified, Off }
 
  internal data class ToolsAdblockState(
-@@ -241,13 +263,27 @@ internal data class ToolsAdblockState(
+@@ -241,13 +265,40 @@ internal data class ToolsAdblockState(
      val recent: List<String> = emptyList(),
      val startupInjected: Boolean = false,
      val controllerLoaded: Boolean = false,
@@ -14474,6 +15541,19 @@ index 40111ed..95fa80f 100644
 +    val chainNote: String = "",
 +    /** Last 实测拦截 result; null until the user runs one. */
 +    val probe: ToolsAdProbe? = null,
++    /** Last DNS 接管实测 result (system resolver for a blocked host); null until run. */
++    val dnsProbe: ToolsAdProbe? = null,
++    /** Controller missCount of the REJECT rule; [hitsFromController] says [hits] is its hitCount. */
++    val missCount: Long = 0,
++    val hitsFromController: Boolean = false,
++    /** 运行链验证 › DNS 路径 (DNS mode, takeover, Private DNS, IPv6 DNS, CNIP, DNS layer). */
++    val dnsPath: String = "",
++    val dnsPathOk: Boolean = false,
++    /** Reasons the chain may miss ads (Private DNS hostname, sniffer, CNIP, app scope, counters). */
++    val hints: List<String> = emptyList(),
++    /** Subscription without dns: — the opt-in 河图推荐 DNS switch is offered. */
++    val offerRecommendedDns: Boolean = false,
++    val recommendedDns: Boolean = false,
 +    val probing: Boolean = false,
      val standaloneDns: Boolean = false,
      val cnameProtection: Boolean = true,
@@ -14494,12 +15574,14 @@ index 40111ed..95fa80f 100644
      val status: ToolsAdStatus
          get() = when {
              !enabled -> ToolsAdStatus.Off
-@@ -363,10 +399,16 @@ internal class ToolsFeatureActions(
+@@ -363,10 +414,18 @@ internal class ToolsFeatureActions(
      /* CNIP */
      val loadCnIp: (suspend () -> Boolean)? = null,
      val setCnIp: suspend (Boolean) -> Unit = {},
 +    val loadCnIpKernel: (suspend () -> ToolsCnIpKernel)? = null,
 +    val setCnIpKernel: suspend (v4: Boolean, v6: Boolean) -> Unit = { _, _ -> },
++    val loadCnIpTcpOnly: (suspend () -> Boolean)? = null,
++    val setCnIpTcpOnly: suspend (Boolean) -> Unit = {},
 
      /* 诊断与维护 */
      val runPreflight: (suspend () -> ToolsPreflight)? = null,
@@ -14511,31 +15593,36 @@ index 40111ed..95fa80f 100644
      val startupConfig: suspend () -> String = { "" },
      val diagnostics: suspend () -> String = { "" },
      /** Stops the proxy and rolls back the rules it added; returns the confirmation text. */
-@@ -385,6 +427,8 @@ internal class ToolsFeatureActions(
+@@ -385,6 +444,12 @@ internal class ToolsFeatureActions(
      val setCnameProtection: suspend (Boolean) -> Unit = {},
      /** “切到规则” on the wrong-mode warning; null hides the button. */
      val switchToRuleMode: (suspend () -> Unit)? = null,
 +    /** 实测拦截: one request for a blocked host through the core; null hides the button. */
 +    val probeAdblock: (suspend () -> ToolsAdProbe)? = null,
++    /** DNS 接管实测, run together with [probeAdblock]; null hides its row. */
++    val probeAdblockDns: (suspend () -> ToolsAdProbe)? = null,
++    /** 河图推荐 DNS (default off): only offered for subscriptions without dns:. */
++    val setRecommendedDns: suspend (Boolean) -> String = { "" },
 
      val onMessage: (String) -> Unit = {},
  ) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-index 6e1e067..4c5c989 100644
+index 6e1e067..08e9255 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureRoute.kt
-@@ -328,7 +328,9 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -328,7 +328,10 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
      LaunchedEffect(Unit) {
          val loader = actions.loadCnIp ?: return@LaunchedEffect
          state = try {
 -            ToolsCnIpState(ToolsLoad.Ready, loader())
 +            val kernel = actions.loadCnIpKernel?.invoke()
 +            if (kernel == null) ToolsCnIpState(ToolsLoad.Ready, loader())
-+            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries)
++            else ToolsCnIpState(ToolsLoad.Ready, loader(), kernel.v4, kernel.v6, kernel.status, kernel.reason, kernel.v4Entries, kernel.v6Entries,
++                kernelTcpOnly = actions.loadCnIpTcpOnly?.invoke() ?: false)
          } catch (cancel: CancellationException) {
              throw cancel
          } catch (error: Exception) {
-@@ -346,6 +348,14 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -346,6 +349,22 @@ private fun CnIpHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
              }
          },
          modifier = modifier,
@@ -14547,10 +15634,18 @@ index 6e1e067..4c5c989 100644
 +                actions.onMessage("已保存；重启代理后生效")
 +            }
 +        },
++        onTcpOnlyChange = if (actions.loadCnIpTcpOnly == null) null else { on ->
++            val previous = state
++            state = state.copy(kernelTcpOnly = on)
++            scope.attempt({ error -> state = previous; actions.onMessage(error.reason("保存失败")) }) {
++                actions.setCnIpTcpOnly(on)
++                actions.onMessage("已保存；重启代理后生效")
++            }
++        },
      )
  }
 
-@@ -388,7 +398,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -388,7 +407,12 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          onStartupConfig = { open(ToolsDiagOverlay.StartupConfig(), actions.startupConfig) { ToolsDiagOverlay.StartupConfig(it) } },
          onReport = { open(ToolsDiagOverlay.Report(), actions.diagnostics) { ToolsDiagOverlay.Report(it) } },
          onRestore = { overlay = ToolsDiagOverlay.ConfirmRestore() },
@@ -14564,7 +15659,7 @@ index 6e1e067..4c5c989 100644
          modifier = modifier,
      )
 
-@@ -399,6 +414,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
+@@ -399,6 +423,9 @@ private fun DiagHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifier:
          is ToolsDiagOverlay.Report -> HomeModalSheet(onDismiss = { overlay = null }) {
              ToolsReportSheetContent(current.content, onCopy = { actions.onCopy("诊断信息", it) })
          }
@@ -14574,18 +15669,21 @@ index 6e1e067..4c5c989 100644
          is ToolsDiagOverlay.ConfirmRestore -> ToolsDialog(onDismiss = { if (!current.running) overlay = null }) {
              ToolsRestoreNetworkDialogCard(
                  loading = current.running,
-@@ -427,7 +445,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -427,7 +454,8 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
 
      suspend fun read() {
          val snapshot = (actions.loadAdblock ?: return)()
 -        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false)
 +        // A re-read keeps the last 实测 result; it is the user's evidence, not part of the snapshot.
-+        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, probing = state.probing)
++        state = snapshot.state.copy(load = ToolsLoad.Ready, busy = false, updating = false, refreshing = false, probe = state.probe, dnsProbe = state.dnsProbe, probing = state.probing)
      }
 
      fun reload(announce: String? = null) {
-@@ -508,6 +527,19 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+@@ -506,8 +534,26 @@ private fun AdblockHost(actions: ToolsFeatureActions, onBack: () -> Unit, modifi
+         },
+         onStandaloneDnsChange = { on -> change(state.copy(standaloneDns = on), "独立 DNS 过滤切换失败") { actions.setStandaloneDns(on) } },
          onCnameChange = { on -> change(state.copy(cnameProtection = on), "保存失败") { actions.setCnameProtection(on); "" } },
++        onRecommendedDnsChange = { on -> change(state.copy(recommendedDns = on), "保存失败") { actions.setRecommendedDns(on) } },
          onRetry = { state = ToolsAdblockState(); reload() },
          modifier = modifier,
 +        onProbe = actions.probeAdblock?.let { probeOnce ->
@@ -14595,7 +15693,11 @@ index 6e1e067..4c5c989 100644
 +                    scope.launch {
 +                        val result = try { probeOnce() } catch (cancel: CancellationException) { throw cancel }
 +                            catch (error: Exception) { ToolsAdProbe(null, error.reason("实测失败")) }
-+                        state = state.copy(probing = false, probe = result)
++                        val dns = actions.probeAdblockDns?.let { dnsOnce ->
++                            try { dnsOnce() } catch (cancel: CancellationException) { throw cancel }
++                            catch (error: Exception) { ToolsAdProbe(null, error.reason("DNS 实测失败")) }
++                        }
++                        state = state.copy(probing = false, probe = result, dnsProbe = dns)
 +                        reload()
 +                    }
 +                }
@@ -14648,14 +15750,15 @@ index 60a38ad..1cdba86 100644
          ToolsGroupSpec("分流与过滤", listOf(ToolsEntry.Apps, ToolsEntry.Adblock, ToolsEntry.Bypass, ToolsEntry.CnIp)),
          ToolsGroupSpec("网络", listOf(ToolsEntry.NetMatch, ToolsEntry.Share)),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-index 4bdee7e..01d2607 100644
+index 4bdee7e..0d74be3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsNetworkScreens.kt
-@@ -217,18 +217,55 @@ internal fun ToolsCnIpScreen(
+@@ -217,18 +217,66 @@ internal fun ToolsCnIpScreen(
      onBack: () -> Unit,
      onEnabledChange: (Boolean) -> Unit,
      modifier: Modifier = Modifier,
 +    onKernelChange: ((v4: Boolean, v6: Boolean) -> Unit)? = null,
++    onTcpOnlyChange: ((Boolean) -> Unit)? = null,
  ) {
      val stagger = rememberHomeStagger()
      ToolsPage(title = "CNIP 设置", onBack = onBack, modifier = modifier, subtitle = "中国大陆 IPv4 / IPv6 自动直连") {
@@ -14687,15 +15790,25 @@ index 4bdee7e..01d2607 100644
 +                    enabled = state.load is ToolsLoad.Ready,
 +                )
 +                HomeRowDivider(start = HomeRowDims.textStart)
++                if (onTcpOnlyChange != null) {
++                    // Ad blocking: CN-resolved ad hosts bypass the core entirely; keeping UDP/QUIC in
++                    // the core lets its rules still see those flows. Default off.
++                    ToolsSwitchRow(
++                        "仅 TCP 旁路", state.kernelTcpOnly, onTcpOnlyChange,
++                        icon = ToolsFeatureIcons.Shield, subtitle = "只让国内 TCP 连接绕过核心，UDP / QUIC 仍经核心规则（含去广告）",
++                        enabled = state.load is ToolsLoad.Ready && (state.kernelV4 || state.kernelV6),
++                    )
++                    HomeRowDivider(start = HomeRowDims.textStart)
++                }
 +                ToolsRow(AnnotatedString(ht("内核状态")), icon = ToolsIcons.Database, subtitle = ht(cnIpKernelStatusText(state)))
 +            }
-+        }
+         }
 +        HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 3)) {
 +            ToolsRow(AnnotatedString(ht("数据源")), icon = ToolsIcons.Database,
 +                subtitle = ht("gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，内核集合随之热更新"))
-         }
-     }
- }
++        }
++    }
++}
 +
 +internal fun cnIpKernelStatusText(state: ToolsCnIpState): String = when {
 +    !state.kernelV4 && !state.kernelV6 -> "未开启"
@@ -14708,9 +15821,9 @@ index 4bdee7e..01d2607 100644
 +        state.kernelReason.contains("ipset-unavailable") -> "设备不支持 ipset，已降级为核心内规则"
 +        state.kernelReason.contains("mode-") -> "当前代理模式不支持内核绕过，已降级为核心内规则"
 +        else -> "内核绕过未生效，已降级为核心内规则" + if (state.kernelReason.isBlank()) "" else "（" + state.kernelReason + "）"
-+    }
+     }
 +    else -> "重启代理后生效"
-+}
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
 index 7967521..17acd48 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsRoute.kt
@@ -15197,6 +16310,288 @@ index e5b66e9..828a077 100644
  }
 
  @Composable
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockDnsLayer93Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockDnsLayer93Test.java
+new file mode 100644
+index 0000000..78adc74
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockDnsLayer93Test.java
+@@ -0,0 +1,178 @@
++package io.github.xgl34222220.hetu;
++
++import org.junit.Rule;
++import org.junit.Test;
++import org.junit.rules.TemporaryFolder;
++import org.yaml.snakeyaml.LoaderOptions;
++import org.yaml.snakeyaml.Yaml;
++
++import java.io.File;
++import java.nio.charset.StandardCharsets;
++import java.nio.file.Files;
++import java.util.*;
++
++import static org.junit.Assert.*;
++
++/** DNS-layer ad blocking (nameserver-policy rcode + fake-ip-filter) and the sniffer merge. */
++public class AdblockDnsLayer93Test {
++    @Rule public TemporaryFolder temp = new TemporaryFolder();
++
++    private static final String BASE =
++            "proxies:\n" +
++            "  - {name: a, type: ss, server: 1.1.1.1, port: 443, cipher: aes-128-gcm, password: x}\n" +
++            "rules:\n" +
++            "  - MATCH,DIRECT\n";
++
++    private static ProxyRuntimeProfile profile(boolean adblock, ProxyRuntimeProfile.DnsHijack hijack) {
++        return new ProxyRuntimeProfile(ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TPROXY,
++                ProxyRuntimeProfile.Ipv6.ENABLE, ProxyRuntimeProfile.AppScope.CORE, hijack,
++                true, true, true, false, false, adblock);
++    }
++
++    private static String gen(String source) throws Exception {
++        return MihomoStartupConfig.generate(source, profile(true, ProxyRuntimeProfile.DnsHijack.TPROXY)).yaml;
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> load(String yaml) {
++        return (Map<String, Object>) new Yaml(new LoaderOptions()).load(yaml);
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> dns(String yaml) { return (Map<String, Object>) load(yaml).get("dns"); }
++
++    @Test public void blockAnswerIsTheFirstNameserverPolicyAndItsProviderIsDeclared() throws Exception {
++        String out = gen(BASE + "dns:\n  enable: true\n  nameserver-policy:\n    'geosite:cn': 223.5.5.5\n    '+.corp.test': 10.0.0.1\n  nameserver:\n    - 223.5.5.5\n");
++        @SuppressWarnings("unchecked")
++        Map<String, Object> policy = (Map<String, Object>) dns(out).get("nameserver-policy");
++        List<String> keys = new ArrayList<>(policy.keySet());
++        assertEquals("rule-set:hetu-adblock-dns", keys.get(0));
++        assertEquals("rcode://success", policy.get("rule-set:hetu-adblock-dns"));
++        assertEquals(Arrays.asList("rule-set:hetu-adblock-dns", "geosite:cn", "+.corp.test"), keys);
++        @SuppressWarnings("unchecked")
++        Map<String, Object> providers = (Map<String, Object>) load(out).get("rule-providers");
++        @SuppressWarnings("unchecked")
++        Map<String, Object> dnsSet = (Map<String, Object>) providers.get("hetu-adblock-dns");
++        assertEquals("domain", dnsSet.get("behavior"));
++        assertEquals("./ruleset/hetu-adblock-dns.txt", dnsSet.get("path"));
++        assertTrue(AdblockDnsPolicy.isInjected(out));
++        assertTrue(AdblockRuleInspection.isInjected(out));
++    }
++
++    @Test public void listenerOnlyDnsGetsAPolicyBlock() throws Exception {
++        String out = gen(BASE);
++        @SuppressWarnings("unchecked")
++        Map<String, Object> policy = (Map<String, Object>) dns(out).get("nameserver-policy");
++        assertEquals(Collections.singletonList("rule-set:hetu-adblock-dns"), new ArrayList<>(policy.keySet()));
++        assertEquals(":11053", dns(out).get("listen"));
++    }
++
++    @Test public void withoutCoreDnsTheConnectionLayerStaysAlone() throws Exception {
++        String out = MihomoStartupConfig.generate(BASE, profile(true, ProxyRuntimeProfile.DnsHijack.OFF)).yaml;
++        assertFalse(out.contains("hetu-adblock-dns"));
++        assertNull(load(out).get("dns"));
++        assertTrue(AdblockRuleInspection.isInjected(out));
++    }
++
++    @Test public void noAdblockNoDnsLayer() throws Exception {
++        String out = MihomoStartupConfig.generate(BASE + "dns:\n  enable: true\n  nameserver:\n    - 223.5.5.5\n",
++                profile(false, ProxyRuntimeProfile.DnsHijack.TPROXY)).yaml;
++        assertFalse(out.contains("hetu-adblock"));
++    }
++
++    @Test public void fakeIpBlacklistExemptsTheSetFromFakeIps() throws Exception {
++        String out = gen(BASE + "dns:\n  enable: true\n  enhanced-mode: fake-ip\n  fake-ip-filter:\n    - '*.lan'\n  nameserver:\n    - 223.5.5.5\n");
++        assertEquals(Arrays.asList("rule-set:hetu-adblock-dns", "*.lan"), dns(out).get("fake-ip-filter"));
++    }
++
++    @Test public void fakeIpWithoutFilterKeepsMihomoDefaults() throws Exception {
++        String out = gen(BASE + "dns:\n  enable: true\n  enhanced-mode: fake-ip\n  nameserver:\n    - 223.5.5.5\n");
++        List<String> expected = new ArrayList<>();
++        expected.add("rule-set:hetu-adblock-dns");
++        expected.addAll(AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER);
++        assertEquals(expected, dns(out).get("fake-ip-filter"));
++    }
++
++    @Test public void fakeIpRuleModeReturnsRealIpFirst() throws Exception {
++        String out = gen(BASE + "dns:\n  enable: true\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: rule\n  fake-ip-filter:\n  - GEOSITE,cn,real-ip\n  - MATCH,fake-ip\n  nameserver:\n  - 223.5.5.5\n");
++        assertEquals(Arrays.asList("RULE-SET,hetu-adblock-dns,real-ip", "GEOSITE,cn,real-ip", "MATCH,fake-ip"), dns(out).get("fake-ip-filter"));
++    }
++
++    @Test public void fakeIpWhitelistAndRedirHostLeaveTheFilterAlone() throws Exception {
++        String white = gen(BASE + "dns:\n  enable: true\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: whitelist\n  fake-ip-filter:\n    - '+.google.com'\n  nameserver:\n    - 223.5.5.5\n");
++        assertEquals(Collections.singletonList("+.google.com"), dns(white).get("fake-ip-filter"));
++        String redir = gen(BASE + "dns:\n  enable: true\n  enhanced-mode: redir-host\n  nameserver:\n    - 223.5.5.5\n");
++        assertNull(dns(redir).get("fake-ip-filter"));
++        assertTrue(AdblockDnsPolicy.isInjected(redir));
++    }
++
++    @Test public void inlinePolicyIsLeftUntouchedAndNoDnsProviderIsDeclared() throws Exception {
++        String out = gen(BASE + "dns:\n  enable: true\n  nameserver-policy: {'geosite:cn': 223.5.5.5}\n  nameserver:\n    - 223.5.5.5\n");
++        assertFalse(out.contains("hetu-adblock-dns"));
++        assertTrue(AdblockRuleInspection.isInjected(out));
++    }
++
++    @Test public void dnsSetSkipsParentsAndChildrenOfAllowedDomains() {
++        List<String> dns = AdblockDnsPolicy.dnsBlockDomains(
++                Arrays.asList("example.com", "ads.example.com", "tracker.test", "cdn.allowed.test", "allowed.test", "plain.ad"),
++                Arrays.asList("good.ads.example.com", "allowed.test"));
++        // example.com and ads.example.com are parents of an allowed child; allowed.test and
++        // cdn.allowed.test are covered by the allow entry. Only the rest is answered empty.
++        assertEquals(Arrays.asList("plain.ad", "tracker.test"), dns);
++    }
++
++    @Test public void exportPublishesTheDnsSetAndReusesItOnlyWhenHashVerified() throws Exception {
++        File root = temp.newFolder();
++        ProxyAdblockRules.Snapshot first = ProxyAdblockRules.exportSnapshot(root, "g.dns",
++                new HashSet<>(Arrays.asList("ads.example.com", "plain.ad")), new HashSet<>(Collections.singletonList("good.ads.example.com")));
++        assertNotNull(first.dnsFile);
++        assertEquals(AdblockDnsPolicy.FILE_NAME, first.dnsFile.getName());
++        assertEquals(first.file.getParentFile(), first.dnsFile.getParentFile());
++        assertEquals("+.plain.ad\n", new String(Files.readAllBytes(first.dnsFile.toPath()), StandardCharsets.UTF_8));
++        assertEquals(1, first.dnsCount);
++        ProxyAdblockRules.Snapshot again = ProxyAdblockRules.exportSnapshot(root, "g.dns",
++                new HashSet<>(Arrays.asList("ads.example.com", "plain.ad")), new HashSet<>(Collections.singletonList("good.ads.example.com")));
++        assertEquals(first.dnsFile, again.dnsFile);
++        Files.write(first.dnsFile.toPath(), "+.tampered.test\n".getBytes(StandardCharsets.UTF_8));
++        ProxyAdblockRules.Snapshot repaired = ProxyAdblockRules.exportSnapshot(root, "g.dns",
++                new HashSet<>(Arrays.asList("ads.example.com", "plain.ad")), new HashSet<>(Collections.singletonList("good.ads.example.com")));
++        assertNotEquals(first.dnsFile, repaired.dnsFile);
++        assertEquals("+.plain.ad\n", new String(Files.readAllBytes(repaired.dnsFile.toPath()), StandardCharsets.UTF_8));
++    }
++
++    @Test public void enabledSubscriptionSnifferGetsParsePureIp() throws Exception {
++        String out = gen(BASE + "sniffer:\n  enable: true\n  sniff:\n    TLS:\n      ports: [443]\n");
++        @SuppressWarnings("unchecked")
++        Map<String, Object> sniffer = (Map<String, Object>) load(out).get("sniffer");
++        assertEquals(Boolean.TRUE, sniffer.get("parse-pure-ip"));
++        assertEquals("enabled", AdblockDnsPolicy.snifferState(out));
++    }
++
++    @Test public void explicitSnifferChoicesAreRespected() throws Exception {
++        String off = gen(BASE + "sniffer:\n  enable: false\n");
++        assertFalse(off.contains("parse-pure-ip"));
++        assertEquals("disabled", AdblockDnsPolicy.snifferState(off));
++        String pureOff = gen(BASE + "sniffer:\n  enable: true\n  parse-pure-ip: false\n");
++        assertFalse(pureOff.contains("parse-pure-ip: true"));
++        assertEquals("pure-ip-off", AdblockDnsPolicy.snifferState(pureOff));
++        assertEquals("none", AdblockDnsPolicy.snifferState(BASE));
++    }
++
++    @Test public void recommendedDnsIsOptInAndOnlyForSubscriptionsWithoutDns() throws Exception {
++        ProxyRuntimeProfile p = profile(true, ProxyRuntimeProfile.DnsHijack.TPROXY);
++        String off = MihomoStartupConfig.generate(BASE, p, "s", 29090, ProxyRuntimeProfile.AppScope.CORE,
++                Collections.<String>emptySet(), Collections.<String>emptySet(), "", false).yaml;
++        assertEquals("redir-host", AdblockDnsPolicy.enhancedMode(off));
++        String on = MihomoStartupConfig.generate(BASE, p, "s", 29090, ProxyRuntimeProfile.AppScope.CORE,
++                Collections.<String>emptySet(), Collections.<String>emptySet(), "", true).yaml;
++        assertEquals("fake-ip", AdblockDnsPolicy.enhancedMode(on));
++        assertEquals(":11053", dns(on).get("listen"));
++        assertTrue(((List<?>) dns(on).get("fake-ip-filter")).contains("rule-set:hetu-adblock-dns"));
++        String own = BASE + "dns:\n  enable: true\n  enhanced-mode: redir-host\n  nameserver:\n    - 1.1.1.1\n";
++        String kept = MihomoStartupConfig.generate(own, p, "s", 29090, ProxyRuntimeProfile.AppScope.CORE,
++                Collections.<String>emptySet(), Collections.<String>emptySet(), "", true).yaml;
++        assertEquals("redir-host", AdblockDnsPolicy.enhancedMode(kept));
++        assertTrue(MihomoStartupConfig.sourceHasDns(own));
++        assertFalse(MihomoStartupConfig.sourceHasDns(BASE));
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockProbe93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockProbe93Test.kt
+new file mode 100644
+index 0000000..2bb498c
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockProbe93Test.kt
+@@ -0,0 +1,92 @@
++package io.github.xgl34222220.hetu
++
++import java.net.InetAddress
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++
++/** 拦截实测 by controller counters, DNS 接管实测, DNS 路径 and the page hints. */
++class AdblockProbe93Test {
++    private val adPayload = "((RuleSet,hetu-adblock) && (NOT,(!(RuleSet,hetu-adblock-allow))))"
++    private fun rules(adHits: Long, adMiss: Long = 0, routeHits: Long = 0) = listOf(
++        ProxyRuleUi(0, "ProcessName", "com.example", "DIRECT", hitCount = 0),
++        ProxyRuleUi(1, "AND", adPayload, "REJECT", hitCount = adHits, missCount = adMiss),
++        ProxyRuleUi(2, "Match", "", "节点选择", hitCount = routeHits),
++    )
++
++    private fun chain(
++        running: Boolean = true, hits: Long = 0, miss: Long = 0, fromController: Boolean = true, dnsLayer: Boolean = true,
++        privateMode: String = "off", privateHost: String = "", sniffer: String = "enabled", cnip: String = "off",
++        tcpOnly: Boolean = false, sourceHasDns: Boolean = true, scope: String = "core", scoped: Int = 0,
++    ) = ToolsAdblockChain(
++        running = running, mode = "rule", ruleMode = true, startupInjected = true, controllerLoaded = true,
++        hits = hits, recent = emptyList(), missCount = miss, hitsFromController = fromController,
++        report = AdblockVerification.inspect("rule", rules(hits, miss), emptyList()),
++        dnsLayer = dnsLayer, enhancedMode = "redir-host", snifferState = sniffer, privateDnsMode = privateMode,
++        privateDnsHost = privateHost, systemDns = "captured", dnsHijackMode = "tproxy", dotGuard = true,
++        dnsIpv6Rule = true, cnip = cnip, cnipTcpOnly = tcpOnly, sourceHasDns = sourceHasDns, appScope = scope, scopedApps = scoped,
++    )
++
++    @Test fun rejectHitCountDeltaIsTheVerdict() {
++        val verdict = AdblockVerification.verdictFromCounters(rules(4), rules(5), "doubleclick.net")
++        assertEquals(true, verdict?.ok)
++        assertTrue(verdict!!.detail.contains("hitCount +1"))
++    }
++
++    @Test fun anotherRuleMovingMeansNotBlocked() {
++        val verdict = AdblockVerification.verdictFromCounters(rules(4, routeHits = 9), rules(4, routeHits = 10), "doubleclick.net")
++        assertEquals(false, verdict?.ok)
++        assertTrue(verdict!!.detail.contains("节点选择"))
++        assertNull(AdblockVerification.verdictFromCounters(rules(4), rules(4), "doubleclick.net"))
++    }
++
++    @Test fun connectRequestIsAnHttpsTunnel() {
++        val text = String(AdblockVerification.connectRequest("ads.example.net"), Charsets.US_ASCII)
++        assertTrue(text.startsWith("CONNECT ads.example.net:443 HTTP/1.1\r\nHost: ads.example.net:443\r\n"))
++        assertTrue(text.endsWith("\r\n\r\n"))
++    }
++
++    @Test fun inspectCarriesControllerCounters() {
++        val report = AdblockVerification.inspect("rule", rules(7, 120), emptyList())
++        assertEquals(7L, report.hitCount); assertEquals(120L, report.missCount); assertEquals(1, report.rulesBefore)
++    }
++
++    @Test fun dnsTakeoverVerdicts() {
++        val real = listOf(InetAddress.getByAddress("ad.test", byteArrayOf(142.toByte(), 250.toByte(), 1, 1)))
++        val fake = listOf(InetAddress.getByAddress("ad.test", byteArrayOf(198.toByte(), 18, 0, 9)))
++        assertEquals(true, AdblockVerification.dnsVerdict("ad.test", emptyList(), dnsLayer = true, privateDnsHost = null).ok)
++        assertNull(AdblockVerification.dnsVerdict("ad.test", emptyList(), dnsLayer = false, privateDnsHost = null).ok)
++        assertEquals(true, AdblockVerification.dnsVerdict("ad.test", fake, dnsLayer = true, privateDnsHost = null).ok)
++        val bypass = AdblockVerification.dnsVerdict("ad.test", real, dnsLayer = true, privateDnsHost = "dns.alidns.com")
++        assertEquals(false, bypass.ok)
++        assertTrue(bypass.detail.contains("dns.alidns.com"))
++        assertNull(AdblockVerification.dnsVerdict("ad.test", real, dnsLayer = false, privateDnsHost = null).ok)
++    }
++
++    @Test fun dnsPathRowNamesEveryHop() {
++        val (ok, line) = AdblockVerification.dnsPath(chain(cnip = "ipset", tcpOnly = true))
++        assertTrue(ok)
++        listOf("redir-host", "系统 DNS 已接管", "私人 DNS 关闭", "IPv6 DNS 已劫持", "CNIP 内核旁路（仅 TCP）", "DNS 层拦截已启用").forEach {
++            assertTrue(line, line.contains(it))
++        }
++        assertFalse(AdblockVerification.dnsPath(chain(privateMode = "hostname", privateHost = "dot.pub")).first)
++        assertFalse(AdblockVerification.dnsPath(chain(dnsLayer = false)).first)
++    }
++
++    @Test fun hintsExplainWhyAdsCanPass() {
++        assertTrue(AdblockVerification.hints(chain(hits = 3, miss = 10)).isEmpty())
++        val privateDns = AdblockVerification.hints(chain(hits = 3, privateMode = "hostname", privateHost = "dot.pub"))
++        assertTrue(privateDns.single().contains("dot.pub") && privateDns.single().contains("不会自动修改"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, sniffer = "disabled")).single().contains("嗅探"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, cnip = "ipset")).single().contains("仅 TCP 旁路"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, cnip = "ipset", dnsLayer = false)).single().contains("不会被拦截"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, sourceHasDns = false)).single().contains("河图推荐 DNS"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, scope = "blacklist", scoped = 4)).single().startsWith("4 个应用"))
++        assertTrue(AdblockVerification.hints(chain(hits = 3, scope = "whitelist", scoped = 2)).single().contains("2 个应用"))
++        assertTrue(AdblockVerification.hints(chain(hits = 0, miss = 0)).single().contains("还没有检查过任何连接"))
++        assertTrue(AdblockVerification.hints(chain(hits = 0, miss = 42)).single().contains("已检查 42 个连接"))
++        assertTrue(AdblockVerification.hints(chain(hits = 0, fromController = false)).isEmpty())
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt
 new file mode 100644
 index 0000000..0921695
