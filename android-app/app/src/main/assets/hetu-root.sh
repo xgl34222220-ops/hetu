@@ -100,6 +100,7 @@ CN_FILE6="$RUN/ruleset/hetu-cn-v6.txt"
 CN4_ON=0
 CN6_ON=0
 CN_FORCE=""
+CN_TCPONLY=0
 CN_CHAIN=""
 CNIP_STATE=off
 CNIP_REASON=""
@@ -933,9 +934,11 @@ bypass6(){
 # ---------------------------------------------------------------- CNIP (ipset)
 cnip_policy_value(){ sed -n "s/^$1=//p" "$BASE/policy/cnip" 2>/dev/null | head -n 1; }
 cnip_load_policy(){
-  CNP_V4=0; CNP_V6=0; CN_FORCE=""
+  CNP_V4=0; CNP_V6=0; CN_FORCE=""; CN_TCPONLY=0
   [ -r "$BASE/policy/cnip" ] || return 1
   CNP_V4=$(cnip_policy_value V4); CNP_V6=$(cnip_policy_value V6); CN_FORCE=$(cnip_policy_value FORCE)
+  # Optional (default off): only TCP to CN addresses bypasses the core; UDP/QUIC still reaches it.
+  [ "$(cnip_policy_value TCPONLY)" = 1 ] && CN_TCPONLY=1
   bool "$CNP_V4" || CNP_V4=0; bool "$CNP_V6" || CNP_V6=0
   split_safe_uids "$CN_FORCE" || CN_FORCE=""
   [ "$CNP_V4" = 1 ] || [ "$CNP_V6" = 1 ]
@@ -943,8 +946,9 @@ cnip_load_policy(){
 # What the running session installed (watchdog Kill Switch, status, reload read it back).
 cnip_load_session(){
   CNIP_STATE=$(sed -n 's/^CNIP=//p' "$SESSION" 2>/dev/null | head -n 1); [ -n "$CNIP_STATE" ] || CNIP_STATE=off
-  CN4_ON=0; CN6_ON=0; CN_FORCE=""
+  CN4_ON=0; CN6_ON=0; CN_FORCE=""; CN_TCPONLY=0
   [ "$CNIP_STATE" = ipset ] || return 0
+  [ "$(sed -n 's/^CNIP_TCPONLY=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN_TCPONLY=1
   [ "$(sed -n 's/^CNIP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN4_ON=1
   [ "$(sed -n 's/^CNIP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)" != 1 ] || CN6_ON=1
   CN_FORCE=$(sed -n 's/^CNIP_FORCE=//p' "$SESSION" 2>/dev/null | head -n 1)
@@ -1027,20 +1031,21 @@ cnip_prepare(){
 cn_split(){
   CS_BIN="$1"; CS_T="$2"; CS_C="$3"; CS_KIND="$4"; CN_CHAIN="$CS_C"
   case "$CS_BIN" in xt6*) [ "$CN6_ON" = 1 ] || return 0; CS_SET=$CN_SET6;; *) [ "$CN4_ON" = 1 ] || return 0; CS_SET=$CN_SET4;; esac
+  CS_P=""; [ "$CN_TCPONLY" != 1 ] || CS_P="-p tcp"
   if [ "$CS_KIND" = owner ] && [ -n "$CN_FORCE" ]; then
     CS_TAIL="${CS_C}_T"
     if [ "${5:-}" = reuse ]; then "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" >/dev/null 2>&1 || true; "$CS_BIN" -t "$CS_T" -F "$CS_TAIL" || return 1
     else "$CS_BIN" -t "$CS_T" -N "$CS_TAIL" || return 1; fi
     CS_OLDIFS=$IFS; IFS=,; set -- $CN_FORCE; IFS=$CS_OLDIFS
     for CS_U in "$@"; do "$CS_BIN" -t "$CS_T" -A "$CS_C" -m owner --uid-owner "$CS_U" -g "$CS_TAIL" || return 1; done
-    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN || return 1
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN || return 1
     "$CS_BIN" -t "$CS_T" -A "$CS_C" -g "$CS_TAIL" || return 1
     CN_CHAIN="$CS_TAIL"; return 0
   fi
   if [ "$CS_KIND" = mark ] && [ -n "$MARK" ]; then
-    "$CS_BIN" -t "$CS_T" -A "$CS_C" -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
+    "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m mark ! --mark "$MARK/$MASK" -m set --match-set "$CS_SET" dst -j RETURN; return
   fi
-  "$CS_BIN" -t "$CS_T" -A "$CS_C" -m set --match-set "$CS_SET" dst -j RETURN
+  "$CS_BIN" -t "$CS_T" -A "$CS_C" $CS_P -m set --match-set "$CS_SET" dst -j RETURN
 }
 # Per-chain fallback: an unreferenced "<chain>_T" left by a failed batch sweep.
 cn_drop_tail(){ cleanup_chain_absent "$1" "$2" "$3" && return 0; "$1" -t "$2" -F "$3" >/dev/null 2>&1 || true; "$1" -t "$2" -X "$3" >/dev/null 2>&1 || true; }
@@ -1695,7 +1700,7 @@ watchdog(){
     [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
-      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
+      if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
         [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; fi
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
@@ -1719,6 +1724,19 @@ watchdog(){
   fi
   [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ] || rm -f "$WATCHDOG_PID"
   rm -f "$RUN/watchdog.ready.$$"
+}
+# info-level ad-block logging writes one line per connection. The core appends (>>, O_APPEND),
+# so copy the newest 1 MiB to core.log.1 and truncate in place once core.log passes 8 MiB; the
+# App's offset reader already restarts at 1 when the size drops below its offset.
+LOG_ROTATE_BYTES=8388608
+core_log_rotate(){
+  [ -f "$LOG" ] || return 0
+  LR_SIZE=$(stat -c %s "$LOG" 2>/dev/null || wc -c < "$LOG" 2>/dev/null || echo 0)
+  case "$LR_SIZE" in ''|*[!0-9]*) return 0;; esac
+  [ "$LR_SIZE" -gt "$LOG_ROTATE_BYTES" ] || return 0
+  tail -c 1048576 "$LOG" > "$LOG.1.$$" 2>/dev/null && mv -f "$LOG.1.$$" "$LOG.1" 2>/dev/null || rm -f "$LOG.1.$$"
+  : > "$LOG" 2>/dev/null || true
+  printf '%s core.log rotated at %s bytes\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$LR_SIZE" >> "$WATCHDOG_LOG" 2>/dev/null || true
 }
 start_watchdog(){
   stopwatchdog
@@ -2170,7 +2188,7 @@ start(){
   # Finish the immutable session before its integrity snapshot. Updating it after
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
-  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
+  printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$([ "$CNIP_STATE" = ipset ] && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
   transaction_current || fail "启动事务已撤销"
   if [ "$START_KILL" = 1 ]; then
@@ -2401,7 +2419,7 @@ status(){
     case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
     if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
   fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N"
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
