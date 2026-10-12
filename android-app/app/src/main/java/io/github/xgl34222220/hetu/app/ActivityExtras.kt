@@ -209,6 +209,31 @@ internal class RankState(dimension: String, sort: String) {
     var sort by mutableStateOf(sort)
     var historical by mutableStateOf(false)
     var history by mutableStateOf<List<TrafficRank>>(emptyList())
+    /** Selected history window (ms) and what the daemon counted in it (controller totals). */
+    var range by mutableStateOf(86_400_000L)
+    var totals by mutableStateOf(0L to 0L)
+    var loading by mutableStateOf(false)
+    var revision by mutableStateOf(0)
+}
+
+/** History windows offered on the ranking page; the retention setting bounds what exists. */
+internal val historyRanges = listOf(3_600_000L to "1 小时", 86_400_000L to "24 小时", 7 * 86_400_000L to "7 天", 30 * 86_400_000L to "30 天")
+internal fun historyRangeLabel(range: Long) = historyRanges.firstOrNull { it.first == range }?.second ?: "24 小时"
+/** History dimensions: the five the Root daemon aggregates, plus the App-recorded proxy chain. */
+internal val historyDimensions = listOf("app" to "应用", "host" to "域名", "ip" to "目标 IP", "outbound" to "出站", "rule" to "规则", "route" to "代理链")
+
+/** Daemon keys are package names, process names or "uid:N"; show the app label when one resolves. */
+private fun historyLabel(context: android.content.Context, key: String, cache: MutableMap<String, String>): String = cache.getOrPut(key) {
+    val pm = context.packageManager
+    try {
+        val pkg = when {
+            key.startsWith("uid:") -> key.removePrefix("uid:").toIntOrNull()?.let { pm.getPackagesForUid(it)?.firstOrNull() }
+            key.contains('.') && !key.contains(' ') -> key
+            else -> null
+        } ?: return@getOrPut key
+        val label = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
+        if (label.isBlank() || label == pkg) pkg else "$label · $pkg"
+    } catch (_: Exception) { key }
 }
 
 @Composable
@@ -218,20 +243,38 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
         RankState(
             vm.prefs.getString("overviewRankDimension", "host").orEmpty().ifBlank { "host" },
             vm.prefs.getString("overviewRankSort", "count").orEmpty().ifBlank { "count" },
-        )
+        ).apply { range = vm.prefs.getLong("historyRankRange", 86_400_000L).takeIf { r -> historyRanges.any { it.first == r } } ?: 86_400_000L }
     }
+    val labels = remember { HashMap<String, String>() }
     LaunchedEffect(state.dimension, state.sort) {
         vm.prefs.edit().putString("overviewRankDimension", state.dimension).putString("overviewRankSort", state.sort).apply()
     }
-    LaunchedEffect(state.historical, state.dimension, state.sort) {
+    LaunchedEffect(state.range) { vm.prefs.edit().putLong("historyRankRange", state.range).apply() }
+    LaunchedEffect(state.historical, state.dimension, state.sort, state.range, state.revision) {
         if (state.historical) {
-            state.history = try {
-                ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, System.currentTimeMillis() - 86_400_000L)
+            state.loading = true
+            try {
+                // Closed minutes the Root daemon counted (also while the App was killed) first.
+                try { DaemonMonitorBridge.pullTraffic(context, force = state.revision > 0) } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) { }
+                val since = System.currentTimeMillis() - state.range
+                var rows = if (state.dimension in DaemonMonitorPolicy.DIMENSIONS)
+                    ProxyApiHistoryStore.dimensionRanking(context, state.dimension, state.sort, since) else emptyList()
+                // Without daemon data (older session, core without Clash API) the App-recorded history remains.
+                if (rows.isEmpty() && state.dimension in setOf("host", "app", "route"))
+                    rows = ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, since)
+                if (state.dimension == "app") rows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    // A package seen both by name and by uid becomes one row (list keys stay unique).
+                    rows.map { it.copy(name = historyLabel(context, it.name, labels)) }.groupBy { it.name }
+                        .map { (name, same) -> TrafficRank(name, same.sumOf { it.connections }, same.sumOf { it.upload }, same.sumOf { it.download }) }
+                        .sortedByDescending { if (state.sort == "traffic") it.upload + it.download else it.connections.toLong() }
+                }
+                state.history = rows
+                state.totals = ProxyApiHistoryStore.rangeTotals(context, since)
             } catch (cancel: kotlinx.coroutines.CancellationException) {
                 throw cancel
             } catch (_: Exception) {
-                emptyList()
-            }
+                state.history = emptyList()
+            } finally { state.loading = false }
         }
     }
     return state
@@ -241,24 +284,43 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
     val historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
     item(key = "rank-controls") {
         Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            HxSegmented(
-                options = listOf("host" to "域名 / IP", "app" to "应用", "route" to "代理链"),
-                selected = rank.dimension,
-                onSelect = { rank.dimension = it },
-            )
+            if (rank.historical && historyEnabled) {
+                // History: the five dimensions the Root daemon aggregates (plus the proxy chain) over a chosen window.
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    historyDimensions.forEach { (key, label) -> HxToggleChip(label, rank.dimension == key) { if (it) rank.dimension = key } }
+                }
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    historyRanges.forEach { (range, label) -> HxToggleChip(label, rank.range == range) { if (it) rank.range = range } }
+                }
+            } else {
+                HxSegmented(
+                    options = listOf("host" to "域名 / IP", "app" to "应用", "route" to "代理链"),
+                    selected = if (rank.dimension in setOf("host", "app", "route")) rank.dimension else "host",
+                    onSelect = { rank.dimension = it },
+                )
+            }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 HxToggleChip(if (rank.sort == "traffic") "按流量" else "按连接数", rank.sort == "traffic") {
                     rank.sort = if (it) "traffic" else "count"
                 }
                 if (historyEnabled) {
-                    HxToggleChip(if (rank.historical) "24 小时" else "实时", rank.historical) { rank.historical = it }
+                    HxToggleChip(if (rank.historical) "历史 · " + historyRangeLabel(rank.range) else "实时", rank.historical) { rank.historical = it }
+                    if (rank.historical) HxToggleChip(if (rank.loading) "读取中…" else "刷新", false) { rank.revision++ }
                 } else {
                     Text("在「测速与 API」开启历史采集可查看 24 小时排行", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
                 }
             }
+            if (rank.historical && historyEnabled && (rank.totals.first > 0 || rank.totals.second > 0)) {
+                Text(
+                    historyRangeLabel(rank.range) + "合计 ↓ ${HxFormat.bytes(rank.totals.second)}  ↑ ${HxFormat.bytes(rank.totals.first)} · Root 守护统计（含已关闭连接）",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = Hx.colors.textMuted,
+                )
+            }
         }
     }
-    val rows = if (rank.historical && historyEnabled) rank.history else rankConnections(vm.state.connections, rank.dimension, rank.sort)
+    val rows = if (rank.historical && historyEnabled) rank.history
+        else rankConnections(vm.state.connections, if (rank.dimension in setOf("host", "app", "route")) rank.dimension else "host", rank.sort)
     if (rows.isEmpty()) {
         item(key = "rank-empty") { HxEmpty(Icons.Rounded.QueryStats, if (rank.historical) "暂无已采集的历史" else "暂无实时连接") }
     }

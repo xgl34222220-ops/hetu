@@ -175,7 +175,7 @@ index 4d17a16..303e13a 100644
    fi
    N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..83cf5c6 100755
+index ae832da..1e1622d 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -677,7 +677,7 @@ index ae832da..83cf5c6 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,9 +667,20 @@ findcorepid(){
+@@ -286,8 +667,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -690,16 +690,17 @@ index ae832da..83cf5c6 100755
 +      fi
 +    fi;; esac
    rm -f "$WATCHDOG_PID"
- }
++  # The monitor belongs to the same session; every path that ends the watchdog ends it too.
++  stopmonitor
++}
 +process_exited(){
 +  kill -0 "$1" 2>/dev/null || return 0
 +  PE_STATE=$(sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $1}')
 +  [ "$PE_STATE" = Z ]
-+}
+ }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-   # two seconds for the tracked PID and then another two seconds for each orphan,
-@@ -296,6 +688,8 @@ stopcore(){
+@@ -296,6 +690,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -708,7 +709,7 @@ index ae832da..83cf5c6 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +714,14 @@ stopcore(){
+@@ -320,6 +716,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -723,7 +724,7 @@ index ae832da..83cf5c6 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -362,6 +764,131 @@ v6disabled(){
+@@ -362,6 +766,131 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -855,7 +856,7 @@ index ae832da..83cf5c6 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +983,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +985,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -953,7 +954,7 @@ index ae832da..83cf5c6 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -542,6 +1160,171 @@ bypass6(){
+@@ -542,6 +1162,171 @@ bypass6(){
    [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
  }
 
@@ -1125,7 +1126,7 @@ index ae832da..83cf5c6 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -731,22 +1514,23 @@ install_mangle4(){
+@@ -731,22 +1516,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -1158,7 +1159,7 @@ index ae832da..83cf5c6 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,34 +1545,35 @@ install_mangle6(){
+@@ -761,34 +1547,35 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -1207,7 +1208,7 @@ index ae832da..83cf5c6 100755
  }
 
  # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
-@@ -822,12 +1607,12 @@ remove_dot_guard(){
+@@ -822,12 +1609,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -1222,7 +1223,7 @@ index ae832da..83cf5c6 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +1626,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +1628,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -1244,7 +1245,7 @@ index ae832da..83cf5c6 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +1651,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +1653,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -1288,7 +1289,7 @@ index ae832da..83cf5c6 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1710,126 @@ v6_disable_guard_ready(){
+@@ -921,16 +1712,126 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -1420,7 +1421,7 @@ index ae832da..83cf5c6 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +1860,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +1862,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -1429,7 +1430,7 @@ index ae832da..83cf5c6 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1020,19 +1919,74 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1020,19 +1921,75 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
  watchdog(){
@@ -1459,6 +1460,7 @@ index ae832da..83cf5c6 100755
 +  [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
 +  # Holding the lock: nothing may cut the capture removal off half-way.
 +  trap '' TERM INT HUP
++  stopmonitor
    REC=$(cat "$PIDFILE" 2>/dev/null || true)
    if [ "$REC" = "$COREPID" ]; then
 -    cleanup; restorev6; rm -f "$PIDFILE"
@@ -1512,7 +1514,7 @@ index ae832da..83cf5c6 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +1999,45 @@ probe_core_owner(){
+@@ -1045,9 +2002,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -1559,7 +1561,7 @@ index ae832da..83cf5c6 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +2048,27 @@ core_identity_prepare(){
+@@ -1058,14 +2051,27 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -1590,7 +1592,7 @@ index ae832da..83cf5c6 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +2082,9 @@ core_launch(){
+@@ -1079,8 +2085,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -1602,7 +1604,7 @@ index ae832da..83cf5c6 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +2151,21 @@ core_tune(){
+@@ -1147,6 +2154,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -1624,7 +1626,7 @@ index ae832da..83cf5c6 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,11 +2244,70 @@ google_firewall_maintain(){ (
+@@ -1225,11 +2247,70 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -1695,7 +1697,7 @@ index ae832da..83cf5c6 100755
    tuning_valid || fail "$TUNE_ERROR"
    DNS_PROTOS=""; [ "$START_DNS_TCP" = 0 ] || DNS_PROTOS=tcp; [ "$START_DNS_UDP" = 0 ] || DNS_PROTOS="${DNS_PROTOS:+$DNS_PROTOS }udp"
    # Neither protocol captured is the same as DNS takeover switched off.
-@@ -1242,8 +2320,16 @@ start(){
+@@ -1242,8 +2323,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -1705,15 +1707,15 @@ index ae832da..83cf5c6 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2339,87 @@ start(){
+@@ -1253,75 +2342,87 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -1839,7 +1841,7 @@ index ae832da..83cf5c6 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2431,86 @@ start(){
+@@ -1333,19 +2434,88 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -1870,6 +1872,8 @@ index ae832da..83cf5c6 100755
 -  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
 +  start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
 +  transaction_current || fail "启动事务已撤销"
++  # Optional session daemon (network match / traffic); its failure never fails the start.
++  start_monitor >/dev/null 2>&1 || printf '%s monitor not started\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$WATCHDOG_LOG" 2>/dev/null || true
    rm -f "$START_ERROR"; start_stage "running"
 -  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
 +  START_ACTIVE=0
@@ -1931,7 +1935,7 @@ index ae832da..83cf5c6 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +2572,12 @@ status(){
+@@ -1407,6 +2577,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -1944,7 +1948,7 @@ index ae832da..83cf5c6 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +2658,21 @@ status(){
+@@ -1487,13 +2663,21 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -1968,7 +1972,7 @@ index ae832da..83cf5c6 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1666,16 +2845,18 @@ health_restore_table(){
+@@ -1666,16 +2850,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -1989,10 +1993,471 @@ index ae832da..83cf5c6 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1757,6 +2938,16 @@ health_json(){ (
+@@ -1757,6 +2943,477 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
++# ------------------------------------------------------------------ Root monitor daemon
++# Network-match automation and traffic accounting keep running when the App process is killed.
++# Session scoped: `start` spawns it after the watchdog is ready, only when the App exported
++# $BASE/policy/monitor with NETMATCH=1 or TRAFFIC=1. It never touches netfilter, routes or the
++# transaction lock; stopwatchdog() (stop, rollback, start, status self-heal) and the watchdog's
++# core-exit path stop it. Identity is the command line "<script> monitor", one instance at a time
++# (lock directory + pidfile), and it exits as soon as the session generation changes.
++MONITOR_PID="$RUN/monitor.pid"
++MONITOR_LOCK="$RUN/.monitor.lock"
++MONITOR_DIR="$RUN/monitor"
++MONITOR_POLICY="$BASE/policy/monitor"
++MONITOR_SPOOL="$MONITOR_DIR/traffic.spool"
++MONITOR_SPOOL_MAX=2097152
++# Hot per-poll state lives in tmpfs, never on flash; falls back to the run directory.
++MONITOR_TMP_ROOT=/dev/hetu-monitor
++MONITOR_HTTP_TOOLS="curl wget nc"
++MONITOR_APP_SERVICE=io.github.xgl34222220.hetu/.ProxyNetworkMatchService
++MONITOR_APP_ACTION=io.github.xgl34222220.hetu.DAEMON_NETWORK_ACTION
++MONITOR_SCRIPTS="$BASE/scripts"
++MONITOR_SCRIPTS_LOG="$RUN/scripts.log"
++
++monitor_is_ours(){
++  case "${1:-}" in ''|*[!0-9]*) return 1;; esac
++  kill -0 "$1" 2>/dev/null || return 1
++  MI_CMD=$(tr '\000' '\n' < "/proc/$1/cmdline" 2>/dev/null) || return 1
++  printf '%s\n' "$MI_CMD" | awk -v s="$BASE/hetu-root.sh" '$0==s {if(getline>0 && $0=="monitor") found=1} END {exit !found}'
++}
++stopmonitor(){
++  SM_PID=$(cat "$MONITOR_PID" 2>/dev/null || true)
++  if [ "$SM_PID" != "$$" ] && monitor_is_ours "$SM_PID"; then
++    kill "$SM_PID" 2>/dev/null || true
++    SM_N=0
++    while monitor_is_ours "$SM_PID" && [ "$SM_N" -lt 60 ]; do sleep 0.05; SM_N=$((SM_N+1)); done
++    if monitor_is_ours "$SM_PID"; then kill -9 "$SM_PID" 2>/dev/null || true; fi
++  fi
++  # A SIGKILLed monitor cannot reap its bounded child (script runner or controller fetch).
++  case "$SM_PID" in ''|*[!0-9]*) ;; *)
++    if [ "$SM_PID" != "$$" ] && ! monitor_is_ours "$SM_PID"; then
++      for SM_TMP in "$MONITOR_TMP_ROOT/$SM_PID" "$MONITOR_DIR/tmp.$SM_PID"; do
++        SM_CHILD=$(cat "$SM_TMP/child" 2>/dev/null || true)
++        case "$SM_CHILD" in ''|*[!0-9]*) ;; *)
++          SM_PPID=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$SM_CHILD/status" 2>/dev/null)
++          case "$SM_PPID" in 1|"$SM_PID") monitor_kill_tree "$SM_CHILD";; esac;; esac
++        rm -rf "$SM_TMP"
++      done
++    fi;; esac
++  if [ "$SM_PID" != "$$" ]; then rm -f "$MONITOR_PID"; rm -rf "$MONITOR_LOCK"; fi
++}
++monitor_policy_value(){ sed -n "s/^$1=//p" "$MONITOR_POLICY" 2>/dev/null | head -n 1; }
++monitor_wanted(){
++  [ -r "$MONITOR_POLICY" ] || return 1
++  [ "$(monitor_policy_value NETMATCH)" = 1 ] || [ "$(monitor_policy_value TRAFFIC)" = 1 ]
++}
++start_monitor(){
++  stopmonitor
++  monitor_wanted || return 0
++  SMO_GEN=$(cat "$RUN/generation" 2>/dev/null) || return 1
++  [ -n "$SMO_GEN" ] || return 1
++  mkdir -p "$MONITOR_DIR" 2>/dev/null || return 1
++  "$0" monitor "$SMO_GEN" </dev/null >/dev/null 2>&1 &
++  SMO_CHILD=$!
++  printf '%s\n' "$SMO_CHILD" > "$MONITOR_PID" || return 1
++  printf '%s started pid=%s generation=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$SMO_CHILD" "$SMO_GEN" >> "$MONITOR_DIR/monitor.log" 2>/dev/null || true
++}
++monitor_now_ms(){ MON_NOW=$(awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null); case "$MON_NOW" in ''|*[!0-9]*) MON_NOW=0;; esac; }
++# Every descendant of a PID (script runner -> timeout -> sh), deepest first, so none outlives us.
++monitor_kill_tree(){
++  case "${1:-}" in ''|*[!0-9]*) return 0;; esac
++  for MKT_PATH in $(grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null); do
++    MKT_PID=${MKT_PATH#/proc/}; MKT_PID=${MKT_PID%/status}
++    [ "$MKT_PID" != "$$" ] || continue
++    monitor_kill_tree "$MKT_PID"
++  done
++  kill -9 "$1" 2>/dev/null || true
++}
++# Runs a bounded child so a TERM reaches the trap at once and the child dies with the monitor.
++monitor_child(){
++  "$@" &
++  MON_CHILD=$!
++  printf '%s\n' "$MON_CHILD" > "$MON_TMP/child" 2>/dev/null || true
++  wait "$MON_CHILD"; MC_RC=$?
++  MON_CHILD=""
++  return "$MC_RC"
++}
++monitor_sleep(){ sleep "$1" & MON_SLEEP=$!; wait "$MON_SLEEP" 2>/dev/null; MON_SLEEP=""; }
++monitor_term(){
++  trap '' TERM INT HUP
++  [ -z "${MON_SLEEP:-}" ] || kill "$MON_SLEEP" 2>/dev/null || true
++  [ -z "${MON_CHILD:-}" ] || monitor_kill_tree "$MON_CHILD"
++  MON_CHILD=""
++  monitor_flush_open
++  exit 0
++}
++monitor_release(){
++  [ -z "${MON_SLEEP:-}" ] || kill "$MON_SLEEP" 2>/dev/null || true
++  [ -z "${MON_CHILD:-}" ] || monitor_kill_tree "$MON_CHILD"
++  [ "$(cat "$MONITOR_LOCK/pid" 2>/dev/null || true)" != "$$" ] || rm -rf "$MONITOR_LOCK"
++  [ "$(cat "$MONITOR_PID" 2>/dev/null || true)" != "$$" ] || rm -f "$MONITOR_PID"
++  [ -z "${MON_TMP:-}" ] || rm -rf "$MON_TMP"
++  printf '%s exited pid=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$$" >> "$MONITOR_DIR/monitor.log" 2>/dev/null || true
++  tail -n 40 "$MONITOR_DIR/monitor.log" > "$MONITOR_DIR/monitor.log.new.$$" 2>/dev/null && mv -f "$MONITOR_DIR/monitor.log.new.$$" "$MONITOR_DIR/monitor.log" 2>/dev/null || rm -f "$MONITOR_DIR/monitor.log.new.$$"
++}
++monitor_load_policy(){
++  MON_POLICY_SIG=$(cksum < "$MONITOR_POLICY" 2>/dev/null | awk '{print $1 ":" $2}')
++  MON_NETMATCH=$(monitor_policy_value NETMATCH); MON_TRAFFIC=$(monitor_policy_value TRAFFIC)
++  [ "$MON_NETMATCH" = 1 ] || MON_NETMATCH=0
++  [ "$MON_TRAFFIC" = 1 ] || MON_TRAFFIC=0
++  MON_MOBILE=$(monitor_policy_value MOBILE); [ "$MON_MOBILE" = 1 ] || MON_MOBILE=0
++  MON_MATCH_ACTION=$(monitor_policy_value MATCH_ACTION); MON_UNMATCH_ACTION=$(monitor_policy_value UNMATCH_ACTION)
++  [ -n "$MON_MATCH_ACTION" ] || MON_MATCH_ACTION=start
++  [ -n "$MON_UNMATCH_ACTION" ] || MON_UNMATCH_ACTION=none
++  MON_PROXY_MODE=$(monitor_policy_value MODE); MON_CONFIG=$(monitor_policy_value CONFIG)
++  MON_API_PORT=$(monitor_policy_value API_PORT); MON_API_SECRET=$(monitor_policy_value API_SECRET)
++  port "$MON_API_PORT" || MON_TRAFFIC=0
++  kind_has_api "$(core_kind)" || MON_TRAFFIC=0
++  MON_INTERVAL=$(monitor_policy_value TRAFFIC_INTERVAL)
++  case "$MON_INTERVAL" in ''|*[!0-9]*) MON_INTERVAL=5;; esac
++  [ "$MON_INTERVAL" -ge 3 ] || MON_INTERVAL=3
++  [ "$MON_INTERVAL" -le 60 ] || MON_INTERVAL=60
++  for MLP_KEY in SSID BSSID SLOT MCCMNC; do
++    sed -n "s/^$MLP_KEY=//p" "$MONITOR_POLICY" 2>/dev/null > "$MON_TMP/cond.$MLP_KEY" || : > "$MON_TMP/cond.$MLP_KEY"
++  done
++  MON_NEEDS_SLOT=0; [ ! -s "$MON_TMP/cond.SLOT" ] || MON_NEEDS_SLOT=1
++  MON_NEEDS_OP=0; [ ! -s "$MON_TMP/cond.MCCMNC" ] || MON_NEEDS_OP=1
++}
++
++# ---- environment (all reads are best effort; an unreadable value never matches a condition)
++monitor_route_dev(){
++  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="dev"){print $(i+1); exit}}'
++}
++monitor_kind_of(){
++  case "$1" in '') printf offline;; wlan*|swlan*|wifi*|mlan*) printf wifi;;
++    rmnet*|rev_rmnet*|ccmni*|seth_*|pdp*|ppp*|clat*|v4-rmnet*|v4-ccmni*|wwan*|rmnet_data*) printf cellular;;
++    *) printf other;; esac
++}
++monitor_wifi_ident(){
++  MW_SSID=""; MW_BSSID=""
++  MW_LINE=$(timeout 5 cmd wifi status 2>/dev/null | grep -m 1 'SSID: ')
++  [ -n "$MW_LINE" ] || MW_LINE=$(timeout 5 dumpsys wifi 2>/dev/null | grep -m 1 'mWifiInfo SSID: ')
++  if [ -n "$MW_LINE" ]; then
++    MW_SSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*SSID: "\(.*\)", BSSID: .*/\1/p')
++    [ -n "$MW_SSID" ] || MW_SSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*SSID: \([^",][^,]*\), BSSID: .*/\1/p')
++    MW_BSSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*BSSID: \([0-9A-Fa-f:]\{17\}\).*/\1/p')
++  fi
++  if [ -z "$MW_SSID" ] && has iw; then
++    MW_OUT=$(timeout 5 iw dev "$1" link 2>/dev/null)
++    MW_SSID=$(printf '%s\n' "$MW_OUT" | sed -n 's/^[[:space:]]*SSID: //p' | head -n 1)
++    [ -n "$MW_BSSID" ] || MW_BSSID=$(printf '%s\n' "$MW_OUT" | sed -n 's/^Connected to \([0-9A-Fa-f:]\{17\}\).*/\1/p' | head -n 1)
++  fi
++  case "$MW_SSID" in '<unknown ssid>') MW_SSID="";; esac
++  case "$MW_BSSID" in 02:00:00:00:00:00|00:00:00:00:00:00) MW_BSSID="";; esac
++}
++monitor_slot_operator(){ printf '%s\n' "$1" | awk -F, -v s="$2" '{v=$s; gsub(/[-_ ]/,"",v); if (v ~ /^[0-9][0-9][0-9][0-9][0-9][0-9]?$/) print v}'; }
++monitor_cell_ident(){
++  MC_SLOT=-1; MC_SIMOP=""; MC_NETOP=""
++  MC_SUB=$(settings get global multi_sim_data_call 2>/dev/null)
++  case "$MC_SUB" in ''|*[!0-9]*) ;; *)
++    MC_SIM=$(timeout 5 content query --uri content://telephony/siminfo --projection sim_id --where "_id=$MC_SUB" 2>/dev/null | sed -n 's/.*sim_id=\([0-9][0-9]*\).*/\1/p' | head -n 1)
++    case "$MC_SIM" in 0|1) MC_SLOT=$((MC_SIM+1));; esac;; esac
++  MC_SIMPROP=$(getprop gsm.sim.operator.numeric 2>/dev/null); MC_NETPROP=$(getprop gsm.operator.numeric 2>/dev/null)
++  if [ "$MC_SLOT" = -1 ]; then
++    # One loaded SIM decides the data slot on its own.
++    MC_SLOT=$(getprop gsm.sim.state 2>/dev/null | awk -F, '{n=0; s=-1; for(i=1;i<=NF;i++) if($i=="LOADED"||$i=="READY"){n++; s=i} if(n==1 && s<=2) print s; else print -1}')
++    case "$MC_SLOT" in 1|2) ;; *) MC_SLOT=-1;; esac
++  fi
++  if [ "$MC_SLOT" != -1 ]; then
++    MC_SIMOP=$(monitor_slot_operator "$MC_SIMPROP" "$MC_SLOT"); MC_NETOP=$(monitor_slot_operator "$MC_NETPROP" "$MC_SLOT")
++  fi
++}
++monitor_member(){ # value file ignorecase -> empty file matches anything
++  [ -s "$2" ] || return 0
++  if [ "$3" = 1 ]; then grep -Fxiq -- "$1" "$2"; else grep -Fxq -- "$1" "$2"; fi
++}
++monitor_sense(){
++  ME_DEV=$(monitor_route_dev); ME_KIND=$(monitor_kind_of "$ME_DEV")
++  if [ "$ME_KIND" != "$MON_LAST_KIND" ] || [ "$ME_DEV" != "$MON_LAST_DEV" ] || [ $((MON_NOW-MON_IDENT_AT)) -ge 15000 ]; then
++    MON_SSID=""; MON_BSSID=""; MON_SLOT=-1; MON_SIMOP=""; MON_NETOP=""
++    if [ "$ME_KIND" = wifi ]; then monitor_wifi_ident "$ME_DEV"; MON_SSID="$MW_SSID"; MON_BSSID="$MW_BSSID"
++    elif [ "$ME_KIND" = cellular ] && { [ "$MON_NEEDS_SLOT" = 1 ] || [ "$MON_NEEDS_OP" = 1 ]; }; then
++      monitor_cell_ident; MON_SLOT="$MC_SLOT"; MON_SIMOP="$MC_SIMOP"; MON_NETOP="$MC_NETOP"
++    fi
++    MON_LAST_KIND="$ME_KIND"; MON_LAST_DEV="$ME_DEV"; MON_IDENT_AT="$MON_NOW"
++  fi
++  ME_MATCH=0
++  if [ "$ME_KIND" = wifi ] && monitor_member "$MON_SSID" "$MON_TMP/cond.SSID" 0 && monitor_member "$MON_BSSID" "$MON_TMP/cond.BSSID" 1; then ME_MATCH=1; fi
++  if [ "$ME_KIND" = cellular ]; then
++    [ "$MON_MOBILE" != 1 ] || ME_MATCH=1
++    if [ "$MON_SLOT" != -1 ] && [ -s "$MON_TMP/cond.SLOT" ] && grep -Fxq -- "$MON_SLOT" "$MON_TMP/cond.SLOT"; then ME_MATCH=1; fi
++    if [ -s "$MON_TMP/cond.MCCMNC" ]; then
++      if [ -n "$MON_SIMOP" ] && grep -Fxq -- "$MON_SIMOP" "$MON_TMP/cond.MCCMNC"; then ME_MATCH=1; fi
++      if [ -n "$MON_NETOP" ] && grep -Fxq -- "$MON_NETOP" "$MON_TMP/cond.MCCMNC"; then ME_MATCH=1; fi
++    fi
++  fi
++  case "$ME_KIND" in
++    wifi) ME_LABEL="Wi‑Fi${MON_SSID:+ · $MON_SSID}${MON_BSSID:+ · $MON_BSSID}";;
++    cellular) ME_LABEL="移动数据"; [ "$MON_SLOT" = -1 ] || ME_LABEL="$ME_LABEL · 卡$MON_SLOT"
++      ME_OP="$MON_SIMOP"; [ -n "$ME_OP" ] || ME_OP="$MON_NETOP"; [ -z "$ME_OP" ] || ME_LABEL="$ME_LABEL · $ME_OP";;
++    *) ME_LABEL="其他/离线";;
++  esac
++  if [ "$ME_MATCH" = 1 ]; then ME_ACTION="$MON_MATCH_ACTION"; else ME_ACTION="$MON_UNMATCH_ACTION"; fi
++}
++
++# ---- actions
++monitor_script_name_ok(){
++  case "$1" in ''|.*|*[!A-Za-z0-9._-]*|pre-start.sh|post-stop.sh) return 1;; *.sh|*.SH|*.Sh|*.sH) ;; *) return 1;; esac
++  [ "${#1}" -le 75 ]
++}
++monitor_run_script(){ (
++  trap - EXIT
++  MS_NAME="$1"; MS_EVENT="$2"; MS_PATH="$MONITOR_SCRIPTS/$MS_NAME"
++  [ -f "$MS_PATH" ] || exit 44
++  HETU_HOOK=network; HETU_EVENT="$MS_EVENT"; HETU_NETWORK="$3"; HETU_MODE="$MON_PROXY_MODE"; HETU_CONFIG="$MON_CONFIG"
++  HETU_BASE="$BASE"; HETU_RUN_DIR="$RUN"; HETU_SCRIPT_DIR="$MONITOR_SCRIPTS"; HETU_ORIGIN=root-monitor
++  export HETU_HOOK HETU_EVENT HETU_NETWORK HETU_MODE HETU_CONFIG HETU_BASE HETU_RUN_DIR HETU_SCRIPT_DIR HETU_ORIGIN
++  { printf '\n[%s] network-match event=%s script=%s network=%s origin=root-monitor\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$MS_EVENT" "$MS_NAME" "$3"
++    if has timeout; then timeout 12 sh "$MS_PATH" </dev/null; else sh "$MS_PATH" </dev/null; fi; MS_RC=$?
++    printf '[network-match] exit=%s\n' "$MS_RC"; exit "$MS_RC"; } >> "$MONITOR_SCRIPTS_LOG" 2>&1
++) }
++monitor_handoff(){
++  # Stop and config switching change App-owned intent (owner, wanted, generated config): the App
++  # service executes them, woken by Root even after its process was killed.
++  MH_OUT=$(timeout 10 am start-foreground-service -n "$MONITOR_APP_SERVICE" -a "$MONITOR_APP_ACTION" \
++    --es kind "$1" --es target "$2" --es label "$3" --es id "$4" --el at "$MON_NOW" 2>&1); MH_RC=$?
++  case "$MH_OUT" in *Error*|*error:*|*Exception*) MH_RC=1;; esac
++  return "$MH_RC"
++}
++monitor_record(){
++  printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" >> "$MONITOR_DIR/actions.log" 2>/dev/null || true
++  tail -n 40 "$MONITOR_DIR/actions.log" > "$MONITOR_DIR/actions.log.new.$$" 2>/dev/null && mv -f "$MONITOR_DIR/actions.log.new.$$" "$MONITOR_DIR/actions.log" 2>/dev/null || rm -f "$MONITOR_DIR/actions.log.new.$$"
++}
++monitor_limiter_allow(){ # decision: same decision not within 30 s, at most 3 actions per 60 s
++  ML_KEEP=""; ML_COUNT=0; ML_REPEAT=0
++  for ML_ITEM in $MON_RECENT; do
++    ML_AT=${ML_ITEM%%:*}
++    [ $((MON_NOW-ML_AT)) -lt 60000 ] || continue
++    ML_KEEP="$ML_KEEP $ML_ITEM"; ML_COUNT=$((ML_COUNT+1))
++    if [ "${ML_ITEM#*:}" = "$1" ] && [ $((MON_NOW-ML_AT)) -lt 30000 ]; then ML_REPEAT=1; fi
++  done
++  MON_RECENT="$ML_KEEP"
++  [ "$ML_REPEAT" = 0 ] && [ "$ML_COUNT" -lt 3 ] || return 1
++  MON_RECENT="$MON_RECENT $MON_NOW:$1"
++}
++monitor_netmatch_tick(){
++  monitor_sense
++  MD_DECISION="$ME_LABEL|$ME_MATCH|$ME_ACTION"
++  if [ "$MD_DECISION" != "$MON_CAND" ]; then MON_CAND="$MD_DECISION"; MON_CAND_AT="$MON_NOW"; return 0; fi
++  [ $((MON_NOW-MON_CAND_AT)) -ge 2500 ] || return 0
++  [ "$MD_DECISION" != "$MON_DONE" ] || return 0
++  MON_DONE="$MD_DECISION"
++  printf '%s\n' "$ME_LABEL" > "$MON_TMP/environment" 2>/dev/null || true
++  if [ "$MON_BASELINED" != 1 ]; then MON_BASELINED=1; monitor_record "baseline match=$ME_MATCH action=$ME_ACTION network=$ME_LABEL"; return 0; fi
++  MD_EVENT=network-unmatch; [ "$ME_MATCH" != 1 ] || MD_EVENT=network-match
++  case "$ME_ACTION" in start|none|'') monitor_record "no-op match=$ME_MATCH action=${ME_ACTION:-none} network=$ME_LABEL"; return 0;; esac
++  # The action signature alone limits: a flapping network cannot drive a switch/script loop.
++  MD_SIG=$(printf '%s' "$ME_ACTION" | cksum | awk '{print $1}')
++  if ! monitor_limiter_allow "$MD_SIG"; then monitor_record "rate-limited action=$ME_ACTION network=$ME_LABEL"; return 0; fi
++  MON_SEQ=$((MON_SEQ+1)); MD_ID="$MON_GEN-$MON_SEQ"
++  case "$ME_ACTION" in
++    run_script:*)
++      MD_NAME=${ME_ACTION#run_script:}
++      if ! monitor_script_name_ok "$MD_NAME"; then monitor_record "refused script=$MD_NAME"; return 0; fi
++      monitor_child monitor_run_script "$MD_NAME" "$MD_EVENT" "$ME_LABEL"; MD_RC=$?
++      monitor_record "script=$MD_NAME exit=$MD_RC id=$MD_ID network=$ME_LABEL";;
++    stop)
++      if monitor_child monitor_handoff stop "" "$ME_LABEL" "$MD_ID"; then monitor_record "handoff=stop id=$MD_ID network=$ME_LABEL"
++      else monitor_record "handoff-failed=stop id=$MD_ID network=$ME_LABEL"; fi;;
++    switch_config:*)
++      MD_NAME=${ME_ACTION#switch_config:}
++      if monitor_child monitor_handoff switch "$MD_NAME" "$ME_LABEL" "$MD_ID"; then monitor_record "handoff=switch target=$MD_NAME id=$MD_ID network=$ME_LABEL"
++      else monitor_record "handoff-failed=switch target=$MD_NAME id=$MD_ID network=$ME_LABEL"; fi;;
++    *) monitor_record "ignored action=$ME_ACTION";;
++  esac
++}
++
++# ---- traffic collector
++monitor_http_get(){ # path -> body on stdout
++  MHG_URL="http://127.0.0.1:$MON_API_PORT$1"
++  for MHG_TOOL in $MONITOR_HTTP_TOOLS; do
++    case "$MHG_TOOL" in
++      curl) has curl || continue
++        if [ -n "$MON_API_SECRET" ]; then curl -fsS -m 4 -H "Authorization: Bearer $MON_API_SECRET" "$MHG_URL" 2>/dev/null && return 0
++        else curl -fsS -m 4 "$MHG_URL" 2>/dev/null && return 0; fi;;
++      wget) for MHG_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
++          [ -x "$MHG_BB" ] || continue
++          if [ -n "$MON_API_SECRET" ]; then timeout 5 "$MHG_BB" wget -q -T 4 -O - --header "Authorization: Bearer $MON_API_SECRET" "$MHG_URL" 2>/dev/null && return 0
++          else timeout 5 "$MHG_BB" wget -q -T 4 -O - "$MHG_URL" 2>/dev/null && return 0; fi
++        done;;
++      nc) has nc || continue
++        { printf 'GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n' "$1"; [ -z "$MON_API_SECRET" ] || printf 'Authorization: Bearer %s\r\n' "$MON_API_SECRET"; printf '\r\n'; } \
++          | timeout 5 nc -w 4 127.0.0.1 "$MON_API_PORT" 2>/dev/null | awk 'BEGIN{h=1; ok=0} h && NR==1 {ok=($2=="200")} h && /^\r?$/ {h=0; next} !h && ok {print} END {exit !ok}' && return 0;;
++    esac
++  done
++  return 1
++}
++monitor_flush_open(){
++  [ -n "${MON_TMP:-}" ] && [ -s "$MON_TMP/bucket" ] || return 0
++  monitor_spool_append "$MON_TMP/bucket"; : > "$MON_TMP/bucket"
++}
++monitor_spool_append(){
++  MSA_SIZE=$(stat -c %s "$MONITOR_SPOOL" 2>/dev/null || echo 0)
++  case "$MSA_SIZE" in ''|*[!0-9]*) MSA_SIZE=0;; esac
++  if [ "$MSA_SIZE" -gt "$MONITOR_SPOOL_MAX" ]; then mv -f "$MONITOR_SPOOL" "$MONITOR_SPOOL.old" 2>/dev/null || true; fi
++  cat "$1" >> "$MONITOR_SPOOL" 2>/dev/null || true
++}
++# One awk pass: per-connection deltas against the previous poll, merged into the open minute
++# bucket by app / host / destination IP / outbound / rule, plus global totals from the
++# controller counters (which also count connections that closed between polls). A finished
++# minute is written to $MON_TMP/flush; the caller appends it to the spool.
++MONITOR_TRAFFIC_AWK='
++function num(s, key) { if (match(s, "\"" key "\":[0-9]+")) return substr(s, RSTART + length(key) + 3, RLENGTH - length(key) - 3) + 0; return -1 }
++function str(s, key,   v) { if (match(s, "\"" key "\":\"[^\"]*\"")) { v = substr(s, RSTART + length(key) + 4, RLENGTH - length(key) - 5); gsub(/[\t\r\n]/, " ", v); return substr(v, 1, 200) } return "" }
++function add(dim, key, up, down, fresh,   k) { if (key == "") key = "-"; k = dim SUBSEP key; U[k] += up; D[k] += down; C[k] += fresh; K[k] = 1 }
++FILENAME == prevf { if ($1 == "#TOTAL") { PTU = $2 + 0; PTD = $3 + 0; HAVE_T = 1 } else { PU[$1] = $2 + 0; PD[$1] = $3 + 0 } next }
++FILENAME == bucketf { if ($1 == "M") BM = $2 + 0; else if ($1 == "T") { TU = $2 + 0; TD = $3 + 0 } else if ($1 == "B") { k = $2 SUBSEP $3; U[k] = $4 + 0; D[k] = $5 + 0; C[k] = $6 + 0; K[k] = 1 } next }
++{ body = body $0 }
++END {
++  printf "" > prevout
++  if (BM != "" && BM != minute) {
++    printf "M\t%d\n", BM > flushf
++    printf "T\t%d\t%d\n", TU, TD > flushf
++    for (k in K) { split(k, p, SUBSEP); printf "B\t%s\t%s\t%d\t%d\t%d\n", p[1], p[2], U[k], D[k], C[k] > flushf }
++    split("", U); split("", D); split("", C); split("", K); TU = 0; TD = 0
++  }
++  gu = num(body, "uploadTotal"); gd = num(body, "downloadTotal")
++  if (gu >= 0 && gd >= 0) {
++    if (HAVE_T && gu >= PTU && gd >= PTD) { TU += gu - PTU; TD += gd - PTD }
++    else if (HAVE_T) { TU += gu; TD += gd }
++    printf "#TOTAL\t%d\t%d\n", gu, gd > prevout
++  }
++  at = index(body, "\"connections\":[")
++  n = 0
++  if (at > 0) { rest = substr(body, at + 15); if (substr(rest, 1, 1) != "]") n = split(rest, part, "[}],[{]") }
++  for (i = 1; i <= n; i++) {
++    s = part[i]; id = str(s, "id"); if (id == "") continue
++    up = num(s, "upload"); down = num(s, "download"); if (up < 0) up = 0; if (down < 0) down = 0
++    printf "%s\t%d\t%d\n", id, up, down > prevout
++    if (first) continue
++    fresh = !(id in PU)
++    du = fresh ? up : up - PU[id]; dd = fresh ? down : down - PD[id]
++    if (du < 0) du = up; if (dd < 0) dd = down
++    if (du == 0 && dd == 0 && !fresh) continue
++    app = str(s, "process")
++    if (app == "") { app = str(s, "processPath"); sub(/.*\//, "", app) }
++    if (app == "") { u = num(s, "uid"); if (u >= 0) app = "uid:" u }
++    host = str(s, "host"); if (host == "") host = str(s, "sniffHost")
++    ip = str(s, "destinationIP")
++    out = ""; if (match(s, "\"chains\":\\[\"[^\"]*\"")) { out = substr(s, RSTART + 11, RLENGTH - 12); gsub(/[\t\r\n]/, " ", out) }
++    rule = str(s, "rule"); payload = str(s, "rulePayload"); if (payload != "") rule = rule "(" payload ")"
++    add("app", app, du, dd, fresh); add("host", host, du, dd, fresh); add("ip", ip, du, dd, fresh)
++    add("outbound", out, du, dd, fresh); add("rule", substr(rule, 1, 200), du, dd, fresh)
++  }
++  printf "M\t%d\n", minute > bucketout
++  printf "T\t%d\t%d\n", TU, TD > bucketout
++  for (k in K) { split(k, p, SUBSEP); printf "B\t%s\t%s\t%d\t%d\t%d\n", p[1], p[2], U[k], D[k], C[k] > bucketout }
++}'
++monitor_traffic_tick(){
++  monitor_child monitor_http_get /connections > "$MON_TMP/body" 2>/dev/null || { MON_FETCH_FAIL=$((MON_FETCH_FAIL+1)); return 0; }
++  MON_FETCH_FAIL=0
++  MT_MINUTE=$(($(date +%s)/60*60))
++  # The first poll only records what is already open: those bytes were sent before this session's
++  # monitor watched them (or counted by an earlier instance).
++  MT_FIRST=0; [ -f "$MON_TMP/prev" ] || { MT_FIRST=1; : > "$MON_TMP/prev"; }
++  [ -f "$MON_TMP/bucket" ] || : > "$MON_TMP/bucket"
++  rm -f "$MON_TMP/flush"
++  awk -v prevf="$MON_TMP/prev" -v bucketf="$MON_TMP/bucket" -v prevout="$MON_TMP/prev.new" -v bucketout="$MON_TMP/bucket.new" \
++    -v flushf="$MON_TMP/flush" -v minute="$MT_MINUTE" -v first="$MT_FIRST" "$MONITOR_TRAFFIC_AWK" "$MON_TMP/prev" "$MON_TMP/bucket" "$MON_TMP/body" 2>/dev/null || return 0
++  mv -f "$MON_TMP/prev.new" "$MON_TMP/prev" 2>/dev/null; mv -f "$MON_TMP/bucket.new" "$MON_TMP/bucket" 2>/dev/null
++  [ ! -s "$MON_TMP/flush" ] || monitor_spool_append "$MON_TMP/flush"
++}
++
++monitor_main(){
++  MON_GEN="${1:-}"
++  trap - EXIT
++  [ -n "$MON_GEN" ] && [ "$MON_GEN" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
++  mkdir -p "$MONITOR_DIR" 2>/dev/null || exit 0
++  if ! mkdir "$MONITOR_LOCK" 2>/dev/null; then
++    MM_OWNER=$(cat "$MONITOR_LOCK/pid" 2>/dev/null || true)
++    if [ "$MM_OWNER" != "$$" ] && monitor_is_ours "$MM_OWNER"; then exit 0; fi
++    rm -rf "$MONITOR_LOCK"; mkdir "$MONITOR_LOCK" 2>/dev/null || exit 0
++  fi
++  printf '%s\n' "$$" > "$MONITOR_LOCK/pid" || { rm -rf "$MONITOR_LOCK"; exit 0; }
++  MON_CHILD=""; MON_SLEEP=""; MON_TMP=""
++  trap 'monitor_release' EXIT
++  trap 'monitor_term' TERM INT HUP
++  MM_N=0
++  while [ "$(cat "$MONITOR_PID" 2>/dev/null)" != "$$" ]; do
++    MM_N=$((MM_N+1)); [ "$MM_N" -lt 80 ] || exit 0; sleep 0.025
++  done
++  MON_TMP="$MONITOR_TMP_ROOT/$$"
++  mkdir -p "$MON_TMP" 2>/dev/null && chmod 700 "$MONITOR_TMP_ROOT" "$MON_TMP" 2>/dev/null || { MON_TMP="$MONITOR_DIR/tmp.$$"; mkdir -p "$MON_TMP" || exit 0; }
++  rm -rf "$MONITOR_DIR"/tmp.* 2>/dev/null; mkdir -p "$MON_TMP" 2>/dev/null || exit 0
++  monitor_load_policy
++  MON_LAST_KIND=""; MON_LAST_DEV=""; MON_IDENT_AT=-100000; MON_CAND=""; MON_CAND_AT=0; MON_DONE=""; MON_BASELINED=0
++  MON_RECENT=""; MON_SEQ=0; MON_NEXT_TRAFFIC=0; MON_FETCH_FAIL=0
++  MON_CORE=$(cat "$PIDFILE" 2>/dev/null || true)
++  while :; do
++    [ "$MON_GEN" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
++    [ "$(cat "$MONITOR_PID" 2>/dev/null)" = "$$" ] || exit 0
++    { core_maybe_alive "$MON_CORE" && kill -0 "$MON_CORE" 2>/dev/null; } || exit 0
++    [ -r "$MONITOR_POLICY" ] || exit 0
++    MM_SIG=$(cksum < "$MONITOR_POLICY" 2>/dev/null | awk '{print $1 ":" $2}')
++    if [ "$MM_SIG" != "$MON_POLICY_SIG" ]; then monitor_load_policy; MON_CAND=""; fi
++    [ "$MON_NETMATCH" = 1 ] || [ "$MON_TRAFFIC" = 1 ] || exit 0
++    monitor_now_ms
++    [ "$MON_NETMATCH" != 1 ] || monitor_netmatch_tick
++    if [ "$MON_TRAFFIC" = 1 ] && [ "$MON_NOW" -ge "$MON_NEXT_TRAFFIC" ]; then
++      monitor_traffic_tick; MON_NEXT_TRAFFIC=$((MON_NOW+MON_INTERVAL*1000))
++    fi
++    monitor_sleep 2
++  done
++}
++monitor_status_json(){
++  MS_PID=$(cat "$MONITOR_PID" 2>/dev/null || true); MS_ALIVE=false
++  if monitor_is_ours "$MS_PID" && [ -n "$(cat "$RUN/generation" 2>/dev/null)" ]; then MS_ALIVE=true; else MS_PID=0; fi
++  case "$MS_PID" in ''|*[!0-9]*) MS_PID=0;; esac
++  MS_NM=false; MS_TR=false
++  [ "$(monitor_policy_value NETMATCH)" != 1 ] || MS_NM=true
++  [ "$(monitor_policy_value TRAFFIC)" != 1 ] || MS_TR=true
++  MS_GEN=$(monitor_policy_value GEN | tr -cd 'A-Za-z0-9._-' | cut -c1-64)
++  MS_LAST=$(tail -n 1 "$MONITOR_DIR/actions.log" 2>/dev/null | tr -d '\000-\037"\\' | cut -c1-300)
++  printf '{"ok":true,"alive":%s,"pid":%s,"netmatch":%s,"traffic":%s,"policy":"%s","lastAction":"%s"}\n' "$MS_ALIVE" "$MS_PID" "$MS_NM" "$MS_TR" "$MS_GEN" "$MS_LAST"
++}
++# The App changed the exported policy while a session runs: start the monitor if it is now wanted
++# and not alive. Never during a transaction (one lock attempt), never without a live core+watchdog.
++monitor_ensure(){
++  try_lock_once || { ok "运行事务进行中，稍后生效"; return 0; }
++  ME_CORE=$(cat "$PIDFILE" 2>/dev/null || true)
++  if monitor_wanted && [ -r "$SESSION" ] && pidcore "$ME_CORE" && kill -0 "$ME_CORE" 2>/dev/null && watchdog_alive \
++      && ! monitor_is_ours "$(cat "$MONITOR_PID" 2>/dev/null || true)"; then
++    start_monitor >/dev/null 2>&1 || true
++  fi
++  release_lock
++  ok "监控策略已应用"
++}
++# Hands the closed traffic minutes to the App: one "ready" batch at a time, kept until the App
++# acknowledges its id, so an App killed between read and commit gets the same batch again.
++traffic_take(){
++  mkdir -p "$MONITOR_DIR" || fail "无法读取流量记录"
++  if [ ! -s "$MONITOR_DIR/traffic.ready" ]; then
++    TT_TMP="$MONITOR_DIR/traffic.taking.$$"
++    : > "$TT_TMP"
++    for TT_F in "$MONITOR_SPOOL.old" "$MONITOR_SPOOL"; do
++      [ -s "$TT_F" ] || continue
++      mv -f "$TT_F" "$TT_F.take.$$" 2>/dev/null || continue
++      cat "$TT_F.take.$$" >> "$TT_TMP"; rm -f "$TT_F.take.$$"
++    done
++    if [ -s "$TT_TMP" ]; then
++      { printf 'HETU-TRAFFIC\t1\t%s-%s\n' "$(date +%s)" "$$"; cat "$TT_TMP"; } > "$MONITOR_DIR/traffic.ready.new" && mv -f "$MONITOR_DIR/traffic.ready.new" "$MONITOR_DIR/traffic.ready"
++    fi
++    rm -f "$TT_TMP"
++  fi
++  [ -s "$MONITOR_DIR/traffic.ready" ] && cat "$MONITOR_DIR/traffic.ready"
++  return 0
++}
++traffic_ack(){
++  case "${1:-}" in ''|*[!0-9-]*) fail "批次参数错误";; esac
++  TA_HEAD=$(head -n 1 "$MONITOR_DIR/traffic.ready" 2>/dev/null | awk -F '\t' '{print $3}')
++  [ "$TA_HEAD" != "$1" ] || rm -f "$MONITOR_DIR/traffic.ready"
++  ok "已确认流量批次"
++}
++
 +validate_action(){
 +  case "$2" in mihomo|sing-box|xray|v2ray|hysteria) ;; *) fail "未知核心类型";; esac
 +  [ -x "$BASE/bin/core" ] || fail "核心文件不存在或不可执行"; [ -r "$1" ] || fail "配置文件不存在"
@@ -2006,7 +2471,7 @@ index ae832da..83cf5c6 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +2965,16 @@ case "${1:-status}" in
+@@ -1774,10 +3431,21 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -2022,6 +2487,11 @@ index ae832da..83cf5c6 100755
 +  cnip-reload) { [ "$#" = 1 ] || [ "$#" = 2 ]; } || fail "参数错误"; root; cnip_reload;;
    repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
 -  watchdog) { [ "$#" = 10 ] || [ "$#" = 11 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}";;
++  monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
++  monitor-status) root; monitor_status_json;;
++  monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;
++  traffic-take) [ "$#" = 1 ] || fail "参数错误"; root; traffic_take;;
++  traffic-ack) [ "$#" = 2 ] || fail "参数错误"; root; traffic_ack "$2";;
 +  watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
    *) fail "未知 Root 代理操作";;
  esac
@@ -3244,6 +3714,239 @@ index 0000000..b231fee
 +        }
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/DaemonMonitorPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DaemonMonitorPolicy.java
+new file mode 100644
+index 0000000..fa5d493
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/DaemonMonitorPolicy.java
+@@ -0,0 +1,227 @@
++package io.github.xgl34222220.hetu;
++
++import java.nio.charset.StandardCharsets;
++import java.util.ArrayList;
++import java.util.Collection;
++import java.util.Collections;
++import java.util.LinkedHashMap;
++import java.util.List;
++import java.util.Locale;
++import java.util.Map;
++import java.util.Set;
++import java.util.TreeSet;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++import java.util.zip.CRC32;
++
++/**
++ * Pure rules of the Root monitor daemon (no Android API, host-tested): the policy file the App
++ * exports to {@code $BASE/policy/monitor}, the {@code monitor-status} reply, the daemon's App
++ * hand-off (stop / switch config) and the traffic batches handed out by {@code traffic-take}.
++ *
++ * <p>The daemon (hetu-root.sh monitor) runs only while a Root session runs. It evaluates network
++ * match itself (same OR semantics as {@link NetworkMatchRules}), runs network scripts itself, and
++ * wakes the App service for the actions that change App-owned intent. It also polls the core's
++ * Clash API and aggregates traffic per minute by app / host / destination IP / outbound / rule.
++ */
++final class DaemonMonitorPolicy {
++    private DaemonMonitorPolicy() {}
++
++    static final String POLICY_PATH = "/data/adb/hetu/policy/monitor";
++    static final String ACTION_DAEMON = "io.github.xgl34222220.hetu.DAEMON_NETWORK_ACTION";
++    static final int DEFAULT_INTERVAL_SECONDS = 5;
++    static final int MAX_LIST = 64;
++    static final long HANDOFF_MAX_AGE_MS = 60_000L;
++    static final String[] DIMENSIONS = {"app", "host", "ip", "outbound", "rule"};
++
++    // ------------------------------------------------------------------ policy body
++    static final class Inputs {
++        boolean traffic, netmatch, mobile;
++        int intervalSeconds = DEFAULT_INTERVAL_SECONDS, apiPort;
++        String apiSecret = "", matchAction = "start", unmatchAction = "none", mode = "", config = "";
++        Collection<String> ssids = Collections.emptyList(), bssids = Collections.emptyList(),
++                slots = Collections.emptyList(), mccMncs = Collections.emptyList();
++    }
++
++    /**
++     * Line-oriented body ("KEY=value", list keys repeated). Values carrying control characters are
++     * dropped, never escaped, so a crafted SSID or secret cannot add a line. A secret that cannot be
++     * written disables traffic instead of polling unauthenticated. GEN identifies the content.
++     */
++    static String body(Inputs in) {
++        StringBuilder lines = new StringBuilder();
++        boolean traffic = in.traffic && in.apiPort >= 1 && in.apiPort <= 65535;
++        String secret = in.apiSecret == null ? "" : in.apiSecret;
++        if (!lineSafe(secret) || secret.length() > 256) traffic = false;
++        int interval = Math.max(3, Math.min(60, in.intervalSeconds));
++        append(lines, "VERSION", "1");
++        append(lines, "TRAFFIC", traffic ? "1" : "0");
++        append(lines, "TRAFFIC_INTERVAL", Integer.toString(interval));
++        append(lines, "API_PORT", traffic ? Integer.toString(in.apiPort) : "0");
++        append(lines, "API_SECRET", traffic ? secret : "");
++        append(lines, "NETMATCH", in.netmatch ? "1" : "0");
++        append(lines, "MOBILE", in.mobile ? "1" : "0");
++        append(lines, "MATCH_ACTION", NetworkMatchRules.parseAction(in.matchAction == null || in.matchAction.isEmpty() ? "start" : in.matchAction).encode());
++        append(lines, "UNMATCH_ACTION", NetworkMatchRules.parseAction(in.unmatchAction == null || in.unmatchAction.isEmpty() ? "none" : in.unmatchAction).encode());
++        append(lines, "MODE", lineSafe(in.mode) ? clip(in.mode, 40) : "");
++        append(lines, "CONFIG", lineSafe(in.config) ? clip(in.config, 160) : "");
++        for (String v : listValues(in.ssids, false)) append(lines, "SSID", v);
++        for (String v : listValues(in.bssids, true)) append(lines, "BSSID", v);
++        for (String v : NetworkMatchRules.sanitizeSlots(in.slots)) append(lines, "SLOT", v);
++        for (String v : NetworkMatchRules.sanitizeMccMncs(in.mccMncs)) append(lines, "MCCMNC", v);
++        CRC32 crc = new CRC32();
++        crc.update(lines.toString().getBytes(StandardCharsets.UTF_8));
++        return "GEN=" + String.format(Locale.ROOT, "%08x", crc.getValue()) + "\n" + lines;
++    }
++
++    static boolean wanted(String body) {
++        return body.contains("\nTRAFFIC=1\n") || body.contains("\nNETMATCH=1\n");
++    }
++
++    static String generation(String body) {
++        if (body == null || !body.startsWith("GEN=")) return "";
++        int end = body.indexOf('\n');
++        return end < 0 ? body.substring(4) : body.substring(4, end);
++    }
++
++    /** Root command that installs the body atomically (0600 root) or removes the policy when unused. */
++    static String installCommand(String body) {
++        String path = POLICY_PATH, tmp = POLICY_PATH + ".new";
++        if (body == null || !wanted(body)) return "rm -f " + NetworkMatchRules.q(path);
++        return "mkdir -p /data/adb/hetu/policy && chmod 700 /data/adb/hetu/policy && printf %s " + NetworkMatchRules.q(body)
++                + " > " + NetworkMatchRules.q(tmp) + " && chmod 600 " + NetworkMatchRules.q(tmp)
++                + " && chown 0:0 " + NetworkMatchRules.q(tmp) + " && mv -f " + NetworkMatchRules.q(tmp) + " " + NetworkMatchRules.q(path);
++    }
++
++    private static List<String> listValues(Collection<String> values, boolean lower) {
++        TreeSet<String> out = new TreeSet<>();
++        if (values != null) for (String v : values) {
++            if (v == null) continue;
++            String t = v.trim();
++            if (t.isEmpty() || !lineSafe(t) || t.length() > 64) continue;
++            out.add(lower ? t.toLowerCase(Locale.ROOT) : t);
++            if (out.size() >= MAX_LIST) break;
++        }
++        return new ArrayList<>(out);
++    }
++
++    static boolean lineSafe(String value) {
++        if (value == null) return true;
++        for (int i = 0; i < value.length(); i++) {
++            char c = value.charAt(i);
++            if (c < 32 || c == 127) return false;
++        }
++        return true;
++    }
++
++    private static String clip(String value, int max) { return value == null ? "" : value.length() > max ? value.substring(0, max) : value; }
++    private static void append(StringBuilder out, String key, String value) { out.append(key).append('=').append(value).append('\n'); }
++
++    // ------------------------------------------------------------------ monitor-status
++    static final class Status {
++        final boolean alive, netmatch, traffic;
++        final String policy, lastAction;
++        Status(boolean alive, boolean netmatch, boolean traffic, String policy, String lastAction) {
++            this.alive = alive; this.netmatch = netmatch; this.traffic = traffic; this.policy = policy; this.lastAction = lastAction;
++        }
++        /** The daemon owns network-match actions only while it is alive with network match enabled. */
++        boolean ownsNetworkMatch() { return alive && netmatch; }
++    }
++
++    static final Status DOWN = new Status(false, false, false, "", "");
++
++    /** Last JSON line of monitor-status; anything unreadable means "not alive" (the App acts). */
++    static Status parseStatus(String output) {
++        if (output == null) return DOWN;
++        String line = "";
++        for (String l : output.split("\\r?\\n")) if (l.trim().startsWith("{")) line = l.trim();
++        if (!line.contains("\"ok\":true")) return DOWN;
++        return new Status(line.contains("\"alive\":true"), line.contains("\"netmatch\":true"), line.contains("\"traffic\":true"),
++                jsonString(line, "policy"), jsonString(line, "lastAction"));
++    }
++
++    private static String jsonString(String line, String key) {
++        Matcher m = Pattern.compile("\"" + key + "\":\"([^\"]*)\"").matcher(line);
++        return m.find() ? m.group(1) : "";
++    }
++
++    // ------------------------------------------------------------------ hand-off
++    static final class Handoff {
++        final String kind, target, label, id;
++        Handoff(String kind, String target, String label, String id) { this.kind = kind; this.target = target; this.label = label; this.id = id; }
++    }
++
++    private static final Pattern HANDOFF_ID = Pattern.compile("[0-9]{1,10}-[0-9]{1,20}-[0-9]{1,9}");
++
++    /**
++     * Validates a daemon hand-off (only Root/system can start the non-exported service). Unknown
++     * kinds, malformed ids, invalid config names and stale requests are refused.
++     */
++    static Handoff parseHandoff(String kind, String target, String label, String id, long atMs, long nowMs) {
++        if (id == null || !HANDOFF_ID.matcher(id).matches()) return null;
++        if (atMs <= 0 || nowMs - atMs > HANDOFF_MAX_AGE_MS || atMs - nowMs > HANDOFF_MAX_AGE_MS) return null;
++        String safeLabel = label == null || !lineSafe(label) ? "" : clip(label, 160);
++        if ("stop".equals(kind)) return new Handoff("stop", "", safeLabel, id);
++        if ("switch".equals(kind) && NetworkMatchRules.validConfigName(target)) return new Handoff("switch", target, safeLabel, id);
++        return null;
++    }
++
++    // ------------------------------------------------------------------ traffic batches
++    static final class Row {
++        final long minute; final String dimension, key; final long upload, download; final int connections;
++        Row(long minute, String dimension, String key, long upload, long download, int connections) {
++            this.minute = minute; this.dimension = dimension; this.key = key; this.upload = upload; this.download = download; this.connections = connections;
++        }
++    }
++
++    static final class Batch {
++        final String id;
++        final List<Row> rows = new ArrayList<>();
++        /** minute (epoch seconds, minute aligned) -> {upload, download} from the controller counters. */
++        final Map<Long, long[]> totals = new LinkedHashMap<>();
++        int rejected;
++        Batch(String id) { this.id = id; }
++    }
++
++    private static final Pattern BATCH_ID = Pattern.compile("[0-9]{1,20}-[0-9]{1,10}");
++    private static final Set<String> DIMENSION_SET = new TreeSet<>(java.util.Arrays.asList(DIMENSIONS));
++
++    /**
++     * Parses one traffic-take batch. Rows of a minute follow its "M" line; malformed lines are
++     * counted and skipped, keys are clipped to 200 characters, negative or absurd counters dropped.
++     * Returns null for an empty or foreign reply.
++     */
++    static Batch parseBatch(String text) {
++        if (text == null) return null;
++        String[] lines = text.split("\\r?\\n");
++        if (lines.length == 0) return null;
++        String[] head = lines[0].split("\t", -1);
++        if (head.length != 3 || !"HETU-TRAFFIC".equals(head[0]) || !"1".equals(head[1]) || !BATCH_ID.matcher(head[2]).matches()) return null;
++        Batch batch = new Batch(head[2]);
++        long minute = -1;
++        for (int i = 1; i < lines.length; i++) {
++            String[] f = lines[i].split("\t", -1);
++            try {
++                if (f.length == 2 && "M".equals(f[0])) {
++                    long m = Long.parseLong(f[1]);
++                    minute = m > 0 && m % 60 == 0 ? m : -1;
++                    if (minute < 0) batch.rejected++;
++                } else if (f.length == 3 && "T".equals(f[0]) && minute > 0) {
++                    long up = counter(f[1]), down = counter(f[2]);
++                    long[] t = batch.totals.get(minute);
++                    if (t == null) batch.totals.put(minute, new long[]{up, down}); else { t[0] += up; t[1] += down; }
++                } else if (f.length == 6 && "B".equals(f[0]) && minute > 0 && DIMENSION_SET.contains(f[1])) {
++                    String key = f[2].isEmpty() ? "-" : f[2].length() > 200 ? f[2].substring(0, 200) : f[2];
++                    batch.rows.add(new Row(minute, f[1], key, counter(f[3]), counter(f[4]), (int) Math.min(Integer.MAX_VALUE, counter(f[5]))));
++                } else if (!lines[i].isEmpty()) batch.rejected++;
++            } catch (NumberFormatException bad) { batch.rejected++; }
++        }
++        return batch;
++    }
++
++    private static long counter(String raw) {
++        long v = Long.parseLong(raw);
++        if (v < 0 || v > (1L << 50)) throw new NumberFormatException("counter");
++        return v;
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java
 new file mode 100644
 index 0000000..3d9f572
@@ -4062,6 +4765,154 @@ index 65d651c..737190c 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
+index 738ebf5..dba3eb7 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
+@@ -21,13 +21,22 @@ internal object ProxyApiHistoryStore {
+         if (helper == null) helper = HistoryDb(context.applicationContext)
+         return helper!!.writableDatabase
+     }
+-    private class HistoryDb(context: Context) : SQLiteOpenHelper(context, "hetu-api-history.db", null, 1) {
++    private class HistoryDb(context: Context) : SQLiteOpenHelper(context, "hetu-api-history.db", null, 2) {
+         override fun onCreate(db: SQLiteDatabase) {
+             db.execSQL("CREATE TABLE traffic(time INTEGER PRIMARY KEY, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
+             db.execSQL("CREATE TABLE connections(id TEXT PRIMARY KEY, seen INTEGER NOT NULL, host TEXT, app TEXT, route TEXT, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
+             db.execSQL("CREATE INDEX connections_seen ON connections(seen)")
++            createDimensionTables(db)
++        }
++        override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) { if (old < 2) createDimensionTables(db) }
++        // Version 2: minute buckets fed by the Root monitor daemon (it keeps counting while the App
++        // is killed), by app / host / destination IP / outbound / rule, plus controller totals.
++        private fun createDimensionTables(db: SQLiteDatabase) {
++            db.execSQL("CREATE TABLE IF NOT EXISTS traffic_dimension_buckets(minute INTEGER NOT NULL, dim TEXT NOT NULL, key TEXT NOT NULL, upload INTEGER NOT NULL, download INTEGER NOT NULL, connections INTEGER NOT NULL, PRIMARY KEY(minute, dim, key))")
++            db.execSQL("CREATE INDEX IF NOT EXISTS traffic_dimension_dim_minute ON traffic_dimension_buckets(dim, minute)")
++            db.execSQL("CREATE TABLE IF NOT EXISTS traffic_minutes(minute INTEGER PRIMARY KEY, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
++            db.execSQL("CREATE TABLE IF NOT EXISTS history_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+         }
+-        override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) = Unit
+     }
+     suspend fun record(context: Context, upload: Long, download: Long, connections: List<ProxyConnectionUi> = emptyList(), now: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
+         val prefs = context.getSharedPreferences("hetu", 0)
+@@ -48,21 +57,98 @@ internal object ProxyApiHistoryStore {
+                 db.setTransactionSuccessful(); lastRecord = now
+             } finally { db.endTransaction() }
+             if (now < lastPrune || now - lastPrune >= 60_000) {
+-                val cutoff = now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L
+-                db.delete("traffic", "time < ?", arrayOf(cutoff.toString()))
+-                db.delete("connections", "seen < ?", arrayOf(cutoff.toString()))
+-                val limit = prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256) * 1024L * 1024
+-                fun size() = db.rawQuery("PRAGMA page_count", null).use { it.moveToFirst(); it.getLong(0) } * db.rawQuery("PRAGMA page_size", null).use { it.moveToFirst(); it.getLong(0) }
+-                var attempts = 0
+-                while (size() > limit && attempts++ < 8) {
+-                    db.execSQL("DELETE FROM traffic WHERE time IN (SELECT time FROM traffic ORDER BY time LIMIT max(1,(SELECT count(*) / 3 FROM traffic)))")
+-                    db.execSQL("DELETE FROM connections WHERE id IN (SELECT id FROM connections ORDER BY seen LIMIT max(1,(SELECT count(*) / 3 FROM connections)))")
+-                    db.execSQL("VACUUM")
+-                }
++                pruneLocked(db, prefs, now)
+                 lastPrune = now
+             }
+         }
+     }
++    /** Retention days and database size cap over every history table (oldest third first). */
++    private fun pruneLocked(db: SQLiteDatabase, prefs: android.content.SharedPreferences, now: Long) {
++        val cutoff = now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L
++        db.delete("traffic", "time < ?", arrayOf(cutoff.toString()))
++        db.delete("connections", "seen < ?", arrayOf(cutoff.toString()))
++        db.delete("traffic_dimension_buckets", "minute < ?", arrayOf((cutoff / 1000).toString()))
++        db.delete("traffic_minutes", "minute < ?", arrayOf((cutoff / 1000).toString()))
++        val limit = prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256) * 1024L * 1024
++        fun size() = db.rawQuery("PRAGMA page_count", null).use { it.moveToFirst(); it.getLong(0) } * db.rawQuery("PRAGMA page_size", null).use { it.moveToFirst(); it.getLong(0) }
++        var attempts = 0
++        while (size() > limit && attempts++ < 8) {
++            db.execSQL("DELETE FROM traffic WHERE time IN (SELECT time FROM traffic ORDER BY time LIMIT max(1,(SELECT count(*) / 3 FROM traffic)))")
++            db.execSQL("DELETE FROM connections WHERE id IN (SELECT id FROM connections ORDER BY seen LIMIT max(1,(SELECT count(*) / 3 FROM connections)))")
++            // Daemon buckets: drop the oldest third of the minutes they cover (at least one minute).
++            db.execSQL("DELETE FROM traffic_dimension_buckets WHERE minute <= (SELECT minute FROM (SELECT DISTINCT minute FROM traffic_dimension_buckets ORDER BY minute) LIMIT 1 OFFSET (SELECT count(DISTINCT minute) / 3 FROM traffic_dimension_buckets))")
++            db.execSQL("DELETE FROM traffic_minutes WHERE minute IN (SELECT minute FROM traffic_minutes ORDER BY minute LIMIT max(1,(SELECT count(*) / 3 FROM traffic_minutes)))")
++            db.execSQL("VACUUM")
++        }
++    }
++
++    /**
++     * Commits one daemon batch (minute buckets + totals) and its id in a single transaction, so a
++     * batch delivered again after a crash between commit and acknowledgement is skipped. Returns
++     * the number of rows merged. Disabled history discards the batch (the caller still acks it).
++     */
++    suspend fun ingestDaemonBatch(context: Context, batch: DaemonMonitorPolicy.Batch, now: Long = System.currentTimeMillis()): Int = withContext(Dispatchers.IO) {
++        val prefs = context.getSharedPreferences("hetu", 0)
++        if (!prefs.getBoolean("proxyApiHistoryEnabled", false)) return@withContext 0
++        gate.withLock {
++            val db = database(context)
++            val seen = db.rawQuery("SELECT value FROM history_meta WHERE key='daemonBatch'", null).use { if (it.moveToFirst()) it.getString(0) else "" }
++            if (seen == batch.id) return@withLock 0
++            val cutoff = (now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L) / 1000
++            var merged = 0
++            db.beginTransaction()
++            try {
++                val update = db.compileStatement("UPDATE traffic_dimension_buckets SET upload=upload+?, download=download+?, connections=connections+? WHERE minute=? AND dim=? AND key=?")
++                val insert = db.compileStatement("INSERT INTO traffic_dimension_buckets(minute,dim,key,upload,download,connections) VALUES(?,?,?,?,?,?)")
++                for (row in batch.rows) {
++                    if (row.minute < cutoff) continue
++                    update.clearBindings()
++                    update.bindLong(1, row.upload); update.bindLong(2, row.download); update.bindLong(3, row.connections.toLong())
++                    update.bindLong(4, row.minute); update.bindString(5, row.dimension); update.bindString(6, row.key)
++                    if (update.executeUpdateDelete() == 0) {
++                        insert.clearBindings()
++                        insert.bindLong(1, row.minute); insert.bindString(2, row.dimension); insert.bindString(3, row.key)
++                        insert.bindLong(4, row.upload); insert.bindLong(5, row.download); insert.bindLong(6, row.connections.toLong())
++                        insert.executeInsert()
++                    }
++                    merged++
++                }
++                for ((minute, value) in batch.totals) {
++                    if (minute < cutoff) continue
++                    db.execSQL("INSERT OR IGNORE INTO traffic_minutes(minute,upload,download) VALUES(?,0,0)", arrayOf(minute))
++                    db.execSQL("UPDATE traffic_minutes SET upload=upload+?, download=download+? WHERE minute=?", arrayOf(value[0], value[1], minute))
++                }
++                db.execSQL("INSERT OR REPLACE INTO history_meta(key,value) VALUES('daemonBatch',?)", arrayOf(batch.id))
++                db.setTransactionSuccessful()
++            } finally { db.endTransaction() }
++            pruneLocked(db, prefs, now)
++            lastPrune = now
++            merged
++        }
++    }
++
++    /** Top list of one daemon dimension (app / host / ip / outbound / rule) since [since] (ms). */
++    suspend fun dimensionRanking(context: Context, dimension: String, sort: String, since: Long, limit: Int = 20): List<TrafficRank> = withContext(Dispatchers.IO) {
++        if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext emptyList()
++        if (dimension !in DaemonMonitorPolicy.DIMENSIONS) return@withContext emptyList()
++        val order = if (sort == "traffic") "sum(upload)+sum(download)" else "sum(connections)"
++        gate.withLock {
++            database(context).rawQuery("SELECT key,sum(connections),sum(upload),sum(download) FROM traffic_dimension_buckets WHERE dim=? AND minute>=? GROUP BY key ORDER BY $order DESC, key LIMIT ?",
++                arrayOf(dimension, (since / 1000).toString(), limit.coerceIn(1, 100).toString())).use { rows ->
++                buildList { while (rows.moveToNext()) add(TrafficRank(rows.getString(0).orEmpty().ifBlank { "—" }, rows.getInt(1), rows.getLong(2), rows.getLong(3))) }
++            }
++        }
++    }
++
++    /** Controller totals (upload, download) since [since] (ms), counted by the daemon. */
++    suspend fun rangeTotals(context: Context, since: Long): Pair<Long, Long> = withContext(Dispatchers.IO) {
++        if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext 0L to 0L
++        gate.withLock {
++            database(context).rawQuery("SELECT coalesce(sum(upload),0),coalesce(sum(download),0) FROM traffic_minutes WHERE minute>=?", arrayOf((since / 1000).toString())).use {
++                if (it.moveToFirst()) it.getLong(0) to it.getLong(1) else 0L to 0L
++            }
++        }
++    }
+     suspend fun recent(context: Context, windowMs: Long = 60_000L, now: Long = System.currentTimeMillis()): List<Triple<Long, Long, Long>> = withContext(Dispatchers.IO) {
+         if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext emptyList()
+         gate.withLock {
+@@ -82,7 +168,7 @@ internal object ProxyApiHistoryStore {
+         }
+     }
+     suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
+-        gate.withLock { database(context).apply { delete("traffic", null, null); delete("connections", null, null); execSQL("VACUUM") }; lastRecord = 0; lastPrune = 0 }
++        gate.withLock { database(context).apply { delete("traffic", null, null); delete("connections", null, null); delete("traffic_dimension_buckets", null, null); delete("traffic_minutes", null, null); execSQL("VACUUM") }; lastRecord = 0; lastPrune = 0 }
+         context.getSharedPreferences("hetu", 0).edit().remove("proxyApiTrafficHistory").apply()
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 index 4f004b9..619a89d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
@@ -7179,10 +8030,25 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
-index 9aa0aba..3c138b8 100644
+index 9aa0aba..924ab59 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
-@@ -343,8 +343,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -79,11 +79,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
+     fun setEnabled(value: Boolean) {
+         prefs.edit().putBoolean("networkMatchEnabled", value).apply()
+         if (value) service("START") else context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
++        DaemonMonitorBridge.exportAsync(context)
+         refresh()
+     }
+     fun evaluate() {
+         prefs.edit().putBoolean("networkMatchForceEval", true).apply()
+         if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
++        // A running session's Root monitor reloads the exported rules.
++        DaemonMonitorBridge.exportAsync(context)
+         scope.launch { delay(550); refresh() }
+     }
+     fun currentAction(key: String, def: String): String = when (prefs.getString(key, def)) {
+@@ -343,8 +346,21 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
      val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
      val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
      val bssids = remember(bssidOriginal) { mutableStateListOf<HxEditEntry>().apply { bssidOriginal.forEach { add(HxEditEntry(it)) } } }
@@ -7191,6 +8057,12 @@ index 9aa0aba..3c138b8 100644
 +    val mccOriginal = remember(revision) { prefs.getStringSet("networkMatchMccMnc", emptySet()).orEmpty().sorted() }
 +    val mccs = remember(mccOriginal) { mutableStateListOf<HxEditEntry>().apply { mccOriginal.forEach { add(HxEditEntry(it)) } } }
 +    val lastActionResult = remember(revision) { prefs.getString("networkMatchLastActionResult", "").orEmpty() }
++    // Root monitor daemon: while a session runs it evaluates these rules itself (also when the App is killed).
++    var daemon by remember { mutableStateOf<DaemonMonitorPolicy.Status?>(null) }
++    LaunchedEffect(revision) {
++        daemon = if (!prefs.getBoolean("proxyRootRuntimeRunning", false)) null
++            else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DaemonMonitorBridge.status(context) }
++    }
 +    var targetPick by remember { mutableStateOf<Pair<String, String>?>(null) }
 +    var targetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
      fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
@@ -7199,7 +8071,16 @@ index 9aa0aba..3c138b8 100644
 
      fun refresh() { revision++ }
      fun service(action: String) {
-@@ -370,10 +377,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -354,6 +370,8 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     fun evaluate() {
+         prefs.edit().putBoolean("networkMatchForceEval", true).apply()
+         if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
++        // A running session's Root monitor reloads the exported rules.
++        DaemonMonitorBridge.exportAsync(context)
+         scope.launch { delay(550); refresh() }
+     }
+     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+@@ -370,10 +388,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
          if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
      }
@@ -7241,7 +8122,7 @@ index 9aa0aba..3c138b8 100644
      }
      fun save() {
          val bad = values(bssids).firstOrNull { !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) }
-@@ -381,9 +415,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -381,9 +426,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
              vm.toast("BSSID 格式无效：$bad")
              return
          }
@@ -7257,7 +8138,36 @@ index 9aa0aba..3c138b8 100644
              .apply()
          vm.toast("匹配条件已保存")
          refresh()
-@@ -435,6 +475,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -411,6 +462,20 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         iconTint = home.accent,
+                         trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
+                     )
++                    SettingsDivider()
++                    val owns = daemon?.ownsNetworkMatch() == true
++                    HomeRowLayout(
++                        AnnotatedString(ht("Root 守护")),
++                        subtitle = when {
++                            daemon == null -> "代理运行时由 Root 守护执行匹配，App 被杀也不中断"
++                            owns -> "正在执行网络匹配" + (daemon?.lastAction?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "")
++                            daemon?.alive == true -> "运行中（未启用网络匹配）"
++                            else -> "未运行：由 App 前台服务执行匹配"
++                        },
++                        icon = HxIcons.Radio,
++                        iconTint = home.accent,
++                        trailing = { HomeStatusDot(if (owns) home.good else home.t3, pulse = owns) },
++                    )
+                 }
+             }
+         }
+@@ -426,6 +491,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         } else {
+                             prefs.edit().putBoolean("networkMatchEnabled", false).apply()
+                             context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
++                            DaemonMonitorBridge.exportAsync(context)
+                             refresh()
+                         }
+                     }, subtitle = ht(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理"), icon = HxIcons.Radio)
+@@ -435,6 +501,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          refresh()
                          evaluate()
                      }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
@@ -7270,7 +8180,7 @@ index 9aa0aba..3c138b8 100644
                  }
              }
          }
-@@ -448,6 +494,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -448,6 +520,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      SettingsNavRow(ht("条件失配"), compact = true, icon = HxIcons.CircleStop, value = ht(actionLabel("networkUnmatchAction", "none")), dropdown = true) {
                          actionKey = "networkUnmatchAction"
                      }
@@ -7281,7 +8191,7 @@ index 9aa0aba..3c138b8 100644
                  }
              }
          }
-@@ -457,6 +507,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -457,6 +533,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "bssid") {
              SettingsSection { HxEditableList("Wi‑Fi BSSID（留空不限）", "BSSID", "AA:BB:CC:DD:EE:FF", bssids) }
          }
@@ -7291,7 +8201,7 @@ index 9aa0aba..3c138b8 100644
          item(key = "note") {
              HxBanner(
                  ht("部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。"),
-@@ -471,15 +524,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -471,15 +550,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
              title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
              referenceRadios = true,
              trailingReferenceRadios = key == "networkUnmatchAction",
@@ -7337,7 +8247,7 @@ index 9aa0aba..3c138b8 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
-index 56b04c2..4a64c5d 100644
+index 56b04c2..3f79c11 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkMatchService.java
 @@ -45,8 +45,20 @@ public final class ProxyNetworkMatchService extends Service {
@@ -7370,11 +8280,17 @@ index 56b04c2..4a64c5d 100644
                      .putLong("proxyNetworkCheckedAt",0L)
                      .remove("proxyNetworkHealthTraceId").remove("proxyPolicyEgressTraceId")
                      .remove("proxyRootEgressVerifiedAt").apply();
-@@ -97,12 +110,20 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -97,12 +110,26 @@ public final class ProxyNetworkMatchService extends Service {
 
      @Override public int onStartCommand(Intent i,int f,int id){
          String action=i==null?"":i.getAction();
 -        if(RootAutostart.ACTION_RUNNING.equals(action)&&prefs.getBoolean("proxyRootAutoStart",false)){
++        if(DaemonMonitorPolicy.ACTION_DAEMON.equals(action)){
++            // Root monitor hand-off (only Root/system can start this non-exported service).
++            handleDaemonHandoff(i);
++            if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){stopSelf();return START_NOT_STICKY;}
++            return START_STICKY;
++        }
 +        if(RootAutostart.ACTION_RUNNING.equals(action)&&bootAutoEnabled()){
              // Validate native boot state on the worker before publishing recovery intent.
              worker.execute(()->{
@@ -7394,7 +8310,7 @@ index 56b04c2..4a64c5d 100644
                      else if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false))stopSelf();
                  }catch(Exception error){prefs.edit().putString("proxyRootBootError","开机运行状态同步失败："+error.getClass().getSimpleName()).apply();}
              });
-@@ -114,7 +135,7 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -114,7 +141,7 @@ public final class ProxyNetworkMatchService extends Service {
          if(ACTION_BOOT_RESTORE.equals(action)){
              prefs.edit().putLong("proxyRootBootServiceAt",System.currentTimeMillis()).apply();
              scheduleBootRestore(350L);
@@ -7403,7 +8319,7 @@ index 56b04c2..4a64c5d 100644
          evaluate();
          return START_STICKY;
      }
-@@ -123,57 +144,260 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -123,56 +150,259 @@ public final class ProxyNetworkMatchService extends Service {
          bootRestores.request(delayMs);
      }
 
@@ -7504,9 +8420,9 @@ index 56b04c2..4a64c5d 100644
 -                    .apply();
 -            return Math.min(30000L,2000L+Math.min(++bootRestoreAttempts,28)*1000L);
 +            return deferBootRecovery("Root 代理开机恢复失败："+detail);
-         }
-     }
-
++        }
++    }
++
 +    private boolean bootAutoEnabled(){
 +        return prefs.getBoolean("proxyRootAutoStart",false)&&!prefs.getBoolean("proxyRootAutoStartRevoked",false);
 +    }
@@ -7543,8 +8459,8 @@ index 56b04c2..4a64c5d 100644
 +                        .putLong("proxyRecoveryManualGeneration",manual));
 +                lastAutoRecoveryElapsed=-1L;
 +            }
-+        }
-+    }
+         }
+     }
 +    }
 +
 +    private void beginRecoveryEpisode(SharedPreferences.Editor edit){
@@ -7691,11 +8607,10 @@ index 56b04c2..4a64c5d 100644
 +            nextBootRecoveryElapsed=-1L;bootRestoreAttempts=0;lastAutoRecoveryElapsed=-1L;
 +        });
 +    }
-+
+
      @Override public void onDestroy(){
          destroyed=true;
-         evaluations.close();
-@@ -188,6 +412,27 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -188,6 +418,27 @@ public final class ProxyNetworkMatchService extends Service {
      }
      @Override public android.os.IBinder onBind(Intent i){return null;}
 
@@ -7723,7 +8638,7 @@ index 56b04c2..4a64c5d 100644
      private void register(){
          cb=new ConnectivityManager.NetworkCallback(){
              @Override public void onAvailable(Network n){
-@@ -212,8 +457,7 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -212,8 +463,7 @@ public final class ProxyNetworkMatchService extends Service {
                  });
              }
              @Override public void onLinkPropertiesChanged(Network n,LinkProperties links){
@@ -7733,7 +8648,7 @@ index 56b04c2..4a64c5d 100644
              }
              @Override public void onBlockedStatusChanged(Network n,boolean blocked){
                  networkChanged("blocked",()->{networkEvents.blocked(n,blocked);networkState.blocked(n,blocked);});
-@@ -243,7 +487,8 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -243,7 +493,8 @@ public final class ProxyNetworkMatchService extends Service {
              if(networkRefreshTask!=null){networkRefreshTask.cancel(false);networkRefreshTask=null;}
              pendingRecoveryRoute=null;
              if(route.network!=null&&prefs.getBoolean("proxyRootWanted",false)){
@@ -7743,17 +8658,19 @@ index 56b04c2..4a64c5d 100644
                  try{networkRefreshTask=metrics.schedule(()->queueNetworkRecovery(route,reason),
                          2500L,TimeUnit.MILLISECONDS);}catch(RejectedExecutionException stopped){}
              }
-@@ -397,6 +642,9 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -396,7 +647,10 @@ public final class ProxyNetworkMatchService extends Service {
+                                 throw new IllegalStateException(result.optString("message","自动启动未完成"));
                          }
                      }else if("stop".equals(action)&&running&&"automation".equals(owner)){
-                         scheduleAutomaticStop(automaticStopGeneration);
+-                        scheduleAutomaticStop(automaticStopGeneration);
++                        if(!deferToDaemon(NetworkMatchRules.parseAction(action)))scheduleAutomaticStop(automaticStopGeneration);
 +                    }else{
 +                        NetworkMatchRules.Action background=NetworkMatchRules.parseAction(action);
-+                        if(background.background())scheduleBackgroundAction(automaticStopGeneration,environment,background);
++                        if(background.background()&&!deferToDaemon(background))scheduleBackgroundAction(automaticStopGeneration,environment,background);
                      }
                      // A failed start must remain eligible for the next callback.
                      prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
-@@ -435,6 +683,45 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -435,6 +689,98 @@ public final class ProxyNetworkMatchService extends Service {
          },3500L);
      }
 
@@ -7793,13 +8710,66 @@ index 56b04c2..4a64c5d 100644
 +        },NetworkMatchRules.STABLE_DELAY_MS);
 +    }
 +    private static String actionText(NetworkMatchRules.Action action){
-+        return "switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
++        return "stop".equals(action.kind)?"停止 Root 代理":"switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
 +    }
++
++    /**
++     * While the Root monitor daemon is alive with network match enabled it owns stop / switch /
++     * script decisions (it keeps running when this process is killed); acting here as well would
++     * execute them twice. Asked only when a changed decision carries such an action.
++     */
++    private boolean deferToDaemon(NetworkMatchRules.Action action){
++        if(!prefs.getBoolean("proxyRootRuntimeRunning",false))return false;
++        DaemonMonitorPolicy.Status status=DaemonMonitorBridge.status(getApplicationContext());
++        if(!status.ownsNetworkMatch())return false;
++        prefs.edit().putString("networkMatchLastActionResult","已交由 Root 守护执行："+actionText(action))
++                .putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
++        return true;
++    }
++
++    /** Executes a stop / switch-config decision the Root monitor confirmed (debounced, rate limited there). */
++    private void handleDaemonHandoff(Intent intent){
++        final DaemonMonitorPolicy.Handoff handoff=DaemonMonitorPolicy.parseHandoff(intent.getStringExtra("kind"),intent.getStringExtra("target"),
++                intent.getStringExtra("label"),intent.getStringExtra("id"),intent.getLongExtra("at",0L),SystemClock.elapsedRealtime());
++        if(handoff==null||!prefs.getBoolean("networkMatchEnabled",false))return;
++        try{worker.execute(()->{
++            if(destroyed||!prefs.getBoolean("networkMatchEnabled",false))return;
++            // One execution per daemon decision, also when am delivers the intent again.
++            if(handoff.id.equals(prefs.getString("networkMatchDaemonHandledId",""))
++                    ||!prefs.edit().putString("networkMatchDaemonHandledId",handoff.id).commit())return;
++            automaticStopGeneration++;
++            final long generation=automaticStopGeneration;
++            java.util.function.BooleanSupplier current=()->!destroyed&&generation==automaticStopGeneration&&prefs.getBoolean("networkMatchEnabled",false);
++            String result;
++            try{
++                RootProxyManager root=new RootProxyManager(getApplicationContext());
++                if("stop".equals(handoff.kind)){
++                    JSONObject out=root.stopIfAutomationOwned(current);
++                    if(out.optBoolean("cancelled",false))result="Root 守护请求停止：当前会话不是自动匹配启动，已保留运行";
++                    else{
++                        result="Root 守护稳定确认后已停止："+handoff.label;
++                        prefs.edit().putString("proxyLastAutoStopReason","网络匹配（Root 守护）在稳定确认后执行停止："+handoff.label)
++                                .putLong("proxyLastAutoStopAt",System.currentTimeMillis()).apply();
++                    }
++                }else{
++                    JSONObject out=root.switchConfigForAutomation(handoff.target,current);
++                    if(out.optBoolean("cancelled",false))result="Root 守护请求切换配置：已被新的决定取代";
++                    else if(out.optBoolean("unchanged",false))result="已是目标配置："+handoff.target;
++                    else if(!out.optBoolean("ok",false))result="切换配置失败："+out.optString("message","未知错误");
++                    else result="Root 守护已切换配置 "+out.optString("from","")+" → "+handoff.target+(out.optBoolean("restarted",false)?"（已重启核心）":"（下次启动生效）");
++                }
++            }catch(Exception error){
++                result="Root 守护交办失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());
++            }
++            prefs.edit().putString("networkMatchLastActionResult",result).putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
++        });}catch(RejectedExecutionException stopped){}
++    }
++
 +
      private static final class Environment{
          final String label;
          final boolean matched;
-@@ -453,11 +740,50 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -453,11 +799,50 @@ public final class ProxyNetworkMatchService extends Service {
              WifiInfo info=wm==null?null:wm.getConnectionInfo();
              if(info!=null){ssid=clean(info.getSSID());bssid=clean(info.getBSSID());}
          }catch(SecurityException ignored){}
@@ -7855,7 +8825,7 @@ index 56b04c2..4a64c5d 100644
      }
 
      private boolean coreAlive(){
-@@ -482,16 +808,31 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -482,16 +867,31 @@ public final class ProxyNetworkMatchService extends Service {
          }
      }
 
@@ -7890,7 +8860,7 @@ index 56b04c2..4a64c5d 100644
                  probeEgressIfPending();
                  return;
              }
-@@ -500,53 +841,60 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -500,53 +900,60 @@ public final class ProxyNetworkMatchService extends Service {
                  prefs.edit().putString("proxyAutoRecoveryError","等待网络恢复后重新启动代理").apply();
                  return;
              }
@@ -7970,7 +8940,7 @@ index 56b04c2..4a64c5d 100644
          }
      }
 
-@@ -630,6 +978,22 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -630,6 +1037,22 @@ public final class ProxyNetworkMatchService extends Service {
                  previousHits=prefs.getLong("proxyAdblockSessionHits",0L);
                  oldRecent=prefs.getString("proxyAdblockRecentDomains","");
              }
@@ -7993,7 +8963,7 @@ index 56b04c2..4a64c5d 100644
              String path="/data/adb/hetu/run/core.log";
              String command="set +e; S=$(stat -c %s "+RootBridge.quote(path)+" 2>/dev/null || wc -c < "+RootBridge.quote(path)+" 2>/dev/null || echo 0); "
                      +"case \"$S\" in ''|*[!0-9]*) S=0;; esac; "
-@@ -645,14 +1009,14 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -645,14 +1068,14 @@ public final class ProxyNetworkMatchService extends Service {
              try{size=Long.parseLong(sizeText);}catch(Exception invalid){return;}
              String chunk=newline<0?"":result.output.substring(newline+1);
              ProxyLogLines lines=ProxyLogLines.read(pending,discarding,chunk,size<offset);
@@ -8010,7 +8980,7 @@ index 56b04c2..4a64c5d 100644
                  java.util.regex.Matcher matcher=domainPattern.matcher(line);
                  if(matcher.find()){
                      String raw=matcher.group(1);
-@@ -692,6 +1056,23 @@ public final class ProxyNetworkMatchService extends Service {
+@@ -692,6 +1115,23 @@ public final class ProxyNetworkMatchService extends Service {
          }catch(Exception ignored){}
      }
 
@@ -8303,7 +9273,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..2363adc 100644
+index 9cd82da..6657c7a 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -9711,7 +10681,7 @@ index 9cd82da..2363adc 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2059,39 @@ final class RootProxyManager {
+@@ -1366,13 +2059,42 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -9736,6 +10706,9 @@ index 9cd82da..2363adc 100644
 +                    .append("; chmod 600 ").append(RootBridge.quote(sharePolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(sharePolicy+".new"))
 +                    .append("; mv -f ").append(RootBridge.quote(sharePolicy+".new")).append(' ').append(RootBridge.quote(sharePolicy));
 +        }else cmd.append("; rm -f ").append(RootBridge.quote(sharePolicy));
++        // Root monitor daemon policy (network match + traffic history while the App is killed):
++        // a file as well, so boot plans keep it; a failed write never fails the deployment.
++        cmd.append("; { ").append(DaemonMonitorBridge.exportCommand(prefs)).append("; } || :");
          if(deployCore){
 +            if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
 +                    .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
@@ -9751,7 +10724,7 @@ index 9cd82da..2363adc 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2103,12 @@ final class RootProxyManager {
+@@ -1384,7 +2106,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -9765,7 +10738,7 @@ index 9cd82da..2363adc 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2117,13 @@ final class RootProxyManager {
+@@ -1393,6 +2120,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -9779,7 +10752,7 @@ index 9cd82da..2363adc 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2143,44 @@ final class RootProxyManager {
+@@ -1412,14 +2146,44 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -10493,6 +11466,138 @@ index e4053e5..72b8798 100644
          )
      }
 
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
+index e16a145..82106ba 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
+@@ -209,6 +209,31 @@ internal class RankState(dimension: String, sort: String) {
+     var sort by mutableStateOf(sort)
+     var historical by mutableStateOf(false)
+     var history by mutableStateOf<List<TrafficRank>>(emptyList())
++    /** Selected history window (ms) and what the daemon counted in it (controller totals). */
++    var range by mutableStateOf(86_400_000L)
++    var totals by mutableStateOf(0L to 0L)
++    var loading by mutableStateOf(false)
++    var revision by mutableStateOf(0)
++}
++
++/** History windows offered on the ranking page; the retention setting bounds what exists. */
++internal val historyRanges = listOf(3_600_000L to "1 小时", 86_400_000L to "24 小时", 7 * 86_400_000L to "7 天", 30 * 86_400_000L to "30 天")
++internal fun historyRangeLabel(range: Long) = historyRanges.firstOrNull { it.first == range }?.second ?: "24 小时"
++/** History dimensions: the five the Root daemon aggregates, plus the App-recorded proxy chain. */
++internal val historyDimensions = listOf("app" to "应用", "host" to "域名", "ip" to "目标 IP", "outbound" to "出站", "rule" to "规则", "route" to "代理链")
++
++/** Daemon keys are package names, process names or "uid:N"; show the app label when one resolves. */
++private fun historyLabel(context: android.content.Context, key: String, cache: MutableMap<String, String>): String = cache.getOrPut(key) {
++    val pm = context.packageManager
++    try {
++        val pkg = when {
++            key.startsWith("uid:") -> key.removePrefix("uid:").toIntOrNull()?.let { pm.getPackagesForUid(it)?.firstOrNull() }
++            key.contains('.') && !key.contains(' ') -> key
++            else -> null
++        } ?: return@getOrPut key
++        val label = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString()
++        if (label.isBlank() || label == pkg) pkg else "$label · $pkg"
++    } catch (_: Exception) { key }
+ }
+
+ @Composable
+@@ -218,20 +243,38 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
+         RankState(
+             vm.prefs.getString("overviewRankDimension", "host").orEmpty().ifBlank { "host" },
+             vm.prefs.getString("overviewRankSort", "count").orEmpty().ifBlank { "count" },
+-        )
++        ).apply { range = vm.prefs.getLong("historyRankRange", 86_400_000L).takeIf { r -> historyRanges.any { it.first == r } } ?: 86_400_000L }
+     }
++    val labels = remember { HashMap<String, String>() }
+     LaunchedEffect(state.dimension, state.sort) {
+         vm.prefs.edit().putString("overviewRankDimension", state.dimension).putString("overviewRankSort", state.sort).apply()
+     }
+-    LaunchedEffect(state.historical, state.dimension, state.sort) {
++    LaunchedEffect(state.range) { vm.prefs.edit().putLong("historyRankRange", state.range).apply() }
++    LaunchedEffect(state.historical, state.dimension, state.sort, state.range, state.revision) {
+         if (state.historical) {
+-            state.history = try {
+-                ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, System.currentTimeMillis() - 86_400_000L)
++            state.loading = true
++            try {
++                // Closed minutes the Root daemon counted (also while the App was killed) first.
++                try { DaemonMonitorBridge.pullTraffic(context, force = state.revision > 0) } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) { }
++                val since = System.currentTimeMillis() - state.range
++                var rows = if (state.dimension in DaemonMonitorPolicy.DIMENSIONS)
++                    ProxyApiHistoryStore.dimensionRanking(context, state.dimension, state.sort, since) else emptyList()
++                // Without daemon data (older session, core without Clash API) the App-recorded history remains.
++                if (rows.isEmpty() && state.dimension in setOf("host", "app", "route"))
++                    rows = ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, since)
++                if (state.dimension == "app") rows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
++                    // A package seen both by name and by uid becomes one row (list keys stay unique).
++                    rows.map { it.copy(name = historyLabel(context, it.name, labels)) }.groupBy { it.name }
++                        .map { (name, same) -> TrafficRank(name, same.sumOf { it.connections }, same.sumOf { it.upload }, same.sumOf { it.download }) }
++                        .sortedByDescending { if (state.sort == "traffic") it.upload + it.download else it.connections.toLong() }
++                }
++                state.history = rows
++                state.totals = ProxyApiHistoryStore.rangeTotals(context, since)
+             } catch (cancel: kotlinx.coroutines.CancellationException) {
+                 throw cancel
+             } catch (_: Exception) {
+-                emptyList()
+-            }
++                state.history = emptyList()
++            } finally { state.loading = false }
+         }
+     }
+     return state
+@@ -241,24 +284,43 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
+     val historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
+     item(key = "rank-controls") {
+         Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+-            HxSegmented(
+-                options = listOf("host" to "域名 / IP", "app" to "应用", "route" to "代理链"),
+-                selected = rank.dimension,
+-                onSelect = { rank.dimension = it },
+-            )
++            if (rank.historical && historyEnabled) {
++                // History: the five dimensions the Root daemon aggregates (plus the proxy chain) over a chosen window.
++                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    historyDimensions.forEach { (key, label) -> HxToggleChip(label, rank.dimension == key) { if (it) rank.dimension = key } }
++                }
++                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    historyRanges.forEach { (range, label) -> HxToggleChip(label, rank.range == range) { if (it) rank.range = range } }
++                }
++            } else {
++                HxSegmented(
++                    options = listOf("host" to "域名 / IP", "app" to "应用", "route" to "代理链"),
++                    selected = if (rank.dimension in setOf("host", "app", "route")) rank.dimension else "host",
++                    onSelect = { rank.dimension = it },
++                )
++            }
+             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                 HxToggleChip(if (rank.sort == "traffic") "按流量" else "按连接数", rank.sort == "traffic") {
+                     rank.sort = if (it) "traffic" else "count"
+                 }
+                 if (historyEnabled) {
+-                    HxToggleChip(if (rank.historical) "24 小时" else "实时", rank.historical) { rank.historical = it }
++                    HxToggleChip(if (rank.historical) "历史 · " + historyRangeLabel(rank.range) else "实时", rank.historical) { rank.historical = it }
++                    if (rank.historical) HxToggleChip(if (rank.loading) "读取中…" else "刷新", false) { rank.revision++ }
+                 } else {
+                     Text("在「测速与 API」开启历史采集可查看 24 小时排行", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+                 }
+             }
++            if (rank.historical && historyEnabled && (rank.totals.first > 0 || rank.totals.second > 0)) {
++                Text(
++                    historyRangeLabel(rank.range) + "合计 ↓ ${HxFormat.bytes(rank.totals.second)}  ↑ ${HxFormat.bytes(rank.totals.first)} · Root 守护统计（含已关闭连接）",
++                    style = MaterialTheme.typography.labelSmall,
++                    color = Hx.colors.textMuted,
++                )
++            }
+         }
+     }
+-    val rows = if (rank.historical && historyEnabled) rank.history else rankConnections(vm.state.connections, rank.dimension, rank.sort)
++    val rows = if (rank.historical && historyEnabled) rank.history
++        else rankConnections(vm.state.connections, if (rank.dimension in setOf("host", "app", "route")) rank.dimension else "host", rank.sort)
+     if (rows.isEmpty()) {
+         item(key = "rank-empty") { HxEmpty(Icons.Rounded.QueryStats, if (rank.historical) "暂无已采集的历史" else "暂无实时连接") }
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 index 4722bed..075399f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
@@ -11550,6 +12655,106 @@ index 2243235..afee729 100644
          }
          Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
      }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DaemonMonitorBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DaemonMonitorBridge.kt
+new file mode 100644
+index 0000000..4bae890
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/DaemonMonitorBridge.kt
+@@ -0,0 +1,94 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.content.SharedPreferences
++import java.util.concurrent.Executors
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.withContext
++
++/**
++ * App side of the Root monitor daemon (hetu-root.sh monitor): exports the policy it reads, asks
++ * whether it owns network-match actions right now, and pulls its traffic batches into
++ * [ProxyApiHistoryStore]. All Root work runs off the main thread.
++ */
++internal object DaemonMonitorBridge {
++    private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
++    private val exporter = Executors.newSingleThreadExecutor { r -> Thread(r, "hetu-monitor-policy").apply { isDaemon = true } }
++    @Volatile private var lastPull = 0L
++
++    @JvmStatic
++    fun policyBody(prefs: SharedPreferences): String {
++        val inputs = DaemonMonitorPolicy.Inputs()
++        inputs.traffic = prefs.getBoolean("proxyApiHistoryEnabled", false)
++        inputs.netmatch = prefs.getBoolean("networkMatchEnabled", false)
++        inputs.mobile = prefs.getBoolean("networkMatchMobile", false)
++        inputs.ssids = prefs.getStringSet("networkMatchSsids", emptySet()).orEmpty().toList()
++        inputs.bssids = prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().toList()
++        inputs.slots = prefs.getStringSet("networkMatchSimSlots", emptySet()).orEmpty().toList()
++        inputs.mccMncs = prefs.getStringSet("networkMatchMccMnc", emptySet()).orEmpty().toList()
++        inputs.matchAction = prefs.getString("networkMatchAction", "start").orEmpty()
++        inputs.unmatchAction = prefs.getString("networkUnmatchAction", "none").orEmpty()
++        inputs.apiPort = prefs.getInt("proxyControllerPort", MihomoStartupConfig.CONTROLLER_PORT)
++        inputs.apiSecret = prefs.getString("proxyControllerSecret", "").orEmpty()
++        inputs.mode = prefs.getString("proxyBaseMode", "").orEmpty()
++        inputs.config = prefs.getString("proxyUiLastConfig", "").orEmpty()
++        inputs.intervalSeconds = prefs.getInt("proxyApiHistoryDaemonInterval", DaemonMonitorPolicy.DEFAULT_INTERVAL_SECONDS)
++        return DaemonMonitorPolicy.body(inputs)
++    }
++
++    /** Shell fragment for the deployment command: written with every start (boot plans keep it). */
++    @JvmStatic
++    fun exportCommand(prefs: SharedPreferences): String = DaemonMonitorPolicy.installCommand(policyBody(prefs))
++
++    /**
++     * Settings changed while a session may run: rewrite the policy (the monitor reloads it on its
++     * next tick) and start the monitor when it became wanted. No Root call when nothing runs.
++     */
++    @JvmStatic
++    fun exportAsync(context: Context) {
++        val app = context.applicationContext
++        try {
++            exporter.execute {
++                val prefs = app.getSharedPreferences("hetu", 0)
++                if (!prefs.getBoolean("proxyRootRuntimeRunning", false)) return@execute
++                val body = policyBody(prefs)
++                val command = DaemonMonitorPolicy.installCommand(body) +
++                    (if (DaemonMonitorPolicy.wanted(body)) "; sh $SCRIPT monitor-ensure >/dev/null 2>&1" else "") + "; exit 0"
++                try {
++                    if (RootBridge.rootShell(app, command, 8_000L).ok())
++                        prefs.edit().putString("daemonMonitorPolicyGen", DaemonMonitorPolicy.generation(body)).apply()
++                } catch (_: Throwable) { }
++            }
++        } catch (_: Exception) { }
++    }
++
++    /** Worker thread only. Unreadable or failing replies mean "not alive": the App keeps acting. */
++    @JvmStatic
++    fun status(context: Context): DaemonMonitorPolicy.Status = try {
++        val result = RootBridge.rootShell(context.applicationContext, "sh $SCRIPT monitor-status", 5_000L)
++        if (result.ok()) DaemonMonitorPolicy.parseStatus(result.output) else DaemonMonitorPolicy.DOWN
++    } catch (_: Throwable) { DaemonMonitorPolicy.DOWN }
++
++    /**
++     * Pulls the daemon's closed traffic minutes into the history database: one batch, committed
++     * with its id (a batch re-delivered after a crash is skipped), then acknowledged. At most once
++     * every 15 seconds unless [force].
++     */
++    suspend fun pullTraffic(context: Context, force: Boolean = false): Int = withContext(Dispatchers.IO) {
++        val app = context.applicationContext
++        val prefs = app.getSharedPreferences("hetu", 0)
++        if (!prefs.getBoolean("proxyApiHistoryEnabled", false)) return@withContext 0
++        val now = System.currentTimeMillis()
++        if (!force && now >= lastPull && now - lastPull < 15_000L) return@withContext 0
++        lastPull = now
++        var total = 0
++        repeat(4) {
++            val reply = try { RootBridge.rootShell(app, "sh $SCRIPT traffic-take", 15_000L) } catch (_: Throwable) { return@withContext total }
++            if (!reply.ok()) return@withContext total
++            val batch = DaemonMonitorPolicy.parseBatch(reply.output) ?: return@withContext total
++            total += ProxyApiHistoryStore.ingestDaemonBatch(app, batch)
++            try { RootBridge.rootShell(app, "sh $SCRIPT traffic-ack " + RootBridge.quote(batch.id), 8_000L) } catch (_: Throwable) { return@withContext total }
++        }
++        total
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 index 2b1a624..265b68d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
@@ -15293,6 +16498,62 @@ index 820f6b5..3f00dcf 100644
                  else -> false
              }
          },
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+index b7d3a38..7f0816b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
+@@ -836,6 +836,10 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+     val c = Hx.colors
+     var draft by remember { mutableStateOf(PanelApiDraft11.read(vm.prefs)) }
+     var error by remember { mutableStateOf<String?>(null) }
++    val sheetContext = androidx.compose.ui.platform.LocalContext.current
++    // History retention and database cap (ProxyApiHistoryStore prunes every table with them).
++    var retentionDays by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90)) }
++    var maxMb by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256)) }
+
+     HxSheet(onDismiss = onDismiss, containerColor = c.canvas) {
+         Column(
+@@ -876,10 +880,28 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+             ApiSettingCard(
+                 icon = Icons.Rounded.Hub,
+                 title = "流量与连接历史",
+-                subtitle = "保存最近 24 小时排行所需的数据",
++                subtitle = if (draft.history) "Root 守护按应用 / 域名 / 目标 IP / 出站 / 规则统计，App 被杀也不中断" else "保存最近 24 小时排行所需的数据",
+                 checked = draft.history,
+                 onCheckedChange = { draft = draft.copy(history = it); error = null },
+-            )
++            ) {
++                if (draft.history) {
++                    Text("保留天数", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
++                    Spacer(Modifier.height(6.dp))
++                    HxSegmented(
++                        options = listOf("1" to "1 天", "7" to "7 天", "30" to "30 天", "90" to "90 天"),
++                        selected = retentionDays.toString(),
++                        onSelect = { retentionDays = it.toInt() },
++                    )
++                    Spacer(Modifier.height(10.dp))
++                    Text("数据库上限", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
++                    Spacer(Modifier.height(6.dp))
++                    HxSegmented(
++                        options = listOf("16" to "16 MB", "64" to "64 MB", "128" to "128 MB", "256" to "256 MB"),
++                        selected = maxMb.toString(),
++                        onSelect = { maxMb = it.toInt() },
++                    )
++                }
++            }
+
+             ApiSettingCard(
+                 icon = Icons.Rounded.Settings,
+@@ -949,6 +971,9 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+                         val problem = draft.validationError()
+                         if (problem != null) error = problem else {
+                             draft.save(vm.prefs)
++                            vm.prefs.edit().putInt("proxyApiHistoryRetentionDays", retentionDays).putInt("proxyApiHistoryMaxMb", maxMb).apply()
++                            // A running session's Root monitor picks the change up (start/stop collecting).
++                            DaemonMonitorBridge.exportAsync(sheetContext)
+                             vm.toast("已保存")
+                             onDismiss()
+                         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt
 new file mode 100644
 index 0000000..b0c70e2
@@ -25294,6 +26555,165 @@ index 0000000..6d23862
 +        assertEquals(smartKey, prefs.getString("proxySelectedConfig.${smart.id}", null))
 +        // Choosing Mihomo never selects a non-Mihomo template behind the user's back.
 +        for (core in nonMihomo) assertNull(library.selected(core))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/DaemonTrafficHistory105Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DaemonTrafficHistory105Test.kt
+new file mode 100644
+index 0000000..285d615
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/DaemonTrafficHistory105Test.kt
+@@ -0,0 +1,153 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import kotlinx.coroutines.runBlocking
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/**
++ * Root monitor daemon (BoxProxy gap #4/#5): the exported policy, the monitor-status reply, the App
++ * hand-off validation and the multi-dimension traffic history fed by the daemon's batches
++ * (exactly-once ingestion, top lists per dimension and range, totals, retention).
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class DaemonTrafficHistory105Test {
++    private val context: Application get() = ApplicationProvider.getApplicationContext()
++    private val prefs get() = context.getSharedPreferences("hetu", 0)
++
++    @Before fun reset() {
++        prefs.edit().clear().putBoolean("proxyApiHistoryEnabled", true).commit()
++        runBlocking { ProxyApiHistoryStore.clear(context) }
++    }
++
++    @Test fun policyCarriesRulesAndDropsLineBreakingValues() {
++        prefs.edit().putBoolean("networkMatchEnabled", true).putBoolean("networkMatchMobile", true)
++            .putStringSet("networkMatchSsids", setOf("Home", "Evil\nTRAFFIC=1", "家"))
++            .putStringSet("networkMatchBssids", setOf("AA:BB:CC:DD:EE:01"))
++            .putStringSet("networkMatchSimSlots", setOf("2", "9"))
++            .putStringSet("networkMatchMccMnc", setOf("460-00", "x"))
++            .putString("networkMatchAction", "run_script:on-home.sh").putString("networkUnmatchAction", "switch_config:../etc")
++            .putInt("proxyControllerPort", 29091).putString("proxyControllerSecret", "s3cret").commit()
++        val body = DaemonMonitorBridge.policyBody(prefs)
++        val lines = body.lines()
++        assertTrue(lines.first().matches(Regex("GEN=[0-9a-f]{8}")))
++        assertTrue("TRAFFIC=1" in lines); assertTrue("API_PORT=29091" in lines); assertTrue("API_SECRET=s3cret" in lines)
++        assertTrue("NETMATCH=1" in lines); assertTrue("MOBILE=1" in lines)
++        assertEquals(listOf("SSID=Home", "SSID=家"), lines.filter { it.startsWith("SSID=") })
++        assertTrue("BSSID=aa:bb:cc:dd:ee:01" in lines)
++        assertEquals(listOf("SLOT=2"), lines.filter { it.startsWith("SLOT=") })
++        assertEquals(listOf("MCCMNC=46000"), lines.filter { it.startsWith("MCCMNC=") })
++        assertTrue("MATCH_ACTION=run_script:on-home.sh" in lines)
++        assertTrue("a malformed target acts as none", "UNMATCH_ACTION=none" in lines)
++        assertEquals("one line per key: an SSID cannot inject a switch", 1, lines.count { it.startsWith("TRAFFIC=") })
++        assertTrue(DaemonMonitorPolicy.wanted(body))
++        assertEquals(lines.first().removePrefix("GEN="), DaemonMonitorPolicy.generation(body))
++        assertEquals("same input, same generation", body, DaemonMonitorBridge.policyBody(prefs))
++        val install = DaemonMonitorPolicy.installCommand(body)
++        assertTrue(install.contains("chmod 600") && install.contains("chown 0:0") && install.endsWith("'/data/adb/hetu/policy/monitor'"))
++
++        // A secret that would break a line disables traffic instead of polling unauthenticated.
++        prefs.edit().putString("proxyControllerSecret", "a\nb").commit()
++        val unsafe = DaemonMonitorBridge.policyBody(prefs).lines()
++        assertTrue("TRAFFIC=0" in unsafe); assertTrue("API_SECRET=" in unsafe)
++        // Nothing enabled: no policy file, so start spawns no monitor.
++        prefs.edit().putBoolean("networkMatchEnabled", false).putBoolean("proxyApiHistoryEnabled", false).commit()
++        val off = DaemonMonitorBridge.policyBody(prefs)
++        assertFalse(DaemonMonitorPolicy.wanted(off))
++        assertEquals("rm -f '/data/adb/hetu/policy/monitor'", DaemonMonitorPolicy.installCommand(off))
++    }
++
++    @Test fun statusAndHandoffAreValidatedBeforeTheAppDefersOrActs() {
++        val alive = DaemonMonitorPolicy.parseStatus("noise\n{\"ok\":true,\"alive\":true,\"pid\":42,\"netmatch\":true,\"traffic\":false,\"policy\":\"1a2b3c4d\",\"lastAction\":\"handoff=stop id=1-2-3\"}\n")
++        assertTrue(alive.ownsNetworkMatch()); assertFalse(alive.traffic)
++        assertEquals("1a2b3c4d", alive.policy); assertEquals("handoff=stop id=1-2-3", alive.lastAction)
++        assertFalse(DaemonMonitorPolicy.parseStatus("{\"ok\":true,\"alive\":true,\"netmatch\":false}").ownsNetworkMatch())
++        assertFalse(DaemonMonitorPolicy.parseStatus("{\"ok\":true,\"alive\":false,\"netmatch\":true}").ownsNetworkMatch())
++        assertFalse("an old script without monitor-status keeps the App in charge",
++            DaemonMonitorPolicy.parseStatus("{\"ok\":false,\"message\":\"未知 Root 代理操作\"}").ownsNetworkMatch())
++        assertFalse(DaemonMonitorPolicy.parseStatus(null).alive)
++
++        val now = 1_000_000L
++        val stop = DaemonMonitorPolicy.parseHandoff("stop", "", "移动数据", "16748-250447-2", now - 1_000L, now)
++        assertNotNull(stop); assertEquals("stop", stop!!.kind)
++        val switch = DaemonMonitorPolicy.parseHandoff("switch", "Away.yaml", "Wi‑Fi · Cafe", "16748-250447-3", now, now)
++        assertEquals("Away.yaml", switch!!.target)
++        assertNull(DaemonMonitorPolicy.parseHandoff("switch", "../x.yaml", "", "1-2-3", now, now))
++        assertNull(DaemonMonitorPolicy.parseHandoff("start", "", "", "1-2-3", now, now))
++        assertNull(DaemonMonitorPolicy.parseHandoff("stop", "", "", "bad id", now, now))
++        assertNull("stale hand-off", DaemonMonitorPolicy.parseHandoff("stop", "", "", "1-2-3", now - 61_000L, now))
++        assertNull(DaemonMonitorPolicy.parseHandoff("stop", "", "", "1-2-3", 0L, now))
++        assertEquals("control characters never reach a preference", "", DaemonMonitorPolicy.parseHandoff("stop", "", "a\nb", "1-2-3", now, now)!!.label)
++    }
++
++    private fun batch(id: String, vararg minutes: Pair<Long, String>): DaemonMonitorPolicy.Batch {
++        val text = StringBuilder("HETU-TRAFFIC\t1\t$id\n")
++        minutes.forEach { (minute, rows) -> text.append("M\t$minute\n").append(rows) }
++        return DaemonMonitorPolicy.parseBatch(text.toString())!!
++    }
++
++    @Test fun batchesParseStrictlyAndIngestExactlyOnce() {
++        val now = System.currentTimeMillis()
++        val m1 = now / 60_000 * 60 - 120
++        val m2 = m1 + 60
++        val parsed = DaemonMonitorPolicy.parseBatch("HETU-TRAFFIC\t1\t1760000000-77\nM\t$m1\nT\t600\t3000\n" +
++            "B\tapp\tcom.old\t100\t1000\t0\nB\thost\t\t5\t5\t1\nB\tbogus\tx\t1\t1\t1\nB\tip\t1.2.3.4\t-5\t1\t1\nM\t61\nB\tapp\tx\t1\t1\t1\ngarbage\n")!!
++        assertEquals("1760000000-77", parsed.id)
++        assertEquals(2, parsed.rows.size)
++        assertEquals("-", parsed.rows[1].key)
++        assertEquals(5, parsed.rejected)
++        assertEquals(600L, parsed.totals[m1]!![0])
++        assertNull(DaemonMonitorPolicy.parseBatch("{\"ok\":false}"))
++        assertNull(DaemonMonitorPolicy.parseBatch(""))
++
++        val first = batch("1760000000-1", m1 to "T\t600\t3000\nB\tapp\tcom.a\t100\t1000\t1\nB\toutbound\tNodeA\t100\t1000\t1\nB\trule\tMatch\t100\t1000\t1\n",
++            m2 to "T\t50\t60\nB\tapp\tcom.a\t10\t20\t0\nB\tapp\tuid:10123\t300\t5\t2\nB\tip\t198.51.100.7\t300\t5\t2\n")
++        runBlocking {
++            assertEquals(6, ProxyApiHistoryStore.ingestDaemonBatch(context, first, now))
++            assertEquals("the same batch again (crash before ack) is skipped", 0, ProxyApiHistoryStore.ingestDaemonBatch(context, first, now))
++            val apps = ProxyApiHistoryStore.dimensionRanking(context, "app", "traffic", now - 3_600_000L)
++            assertEquals(listOf("com.a", "uid:10123"), apps.map { it.name })
++            assertEquals(TrafficRank("com.a", 1, 110, 1020), apps[0])
++            val byCount = ProxyApiHistoryStore.dimensionRanking(context, "app", "count", now - 3_600_000L)
++            assertEquals("uid:10123", byCount[0].name)
++            assertEquals(listOf("NodeA"), ProxyApiHistoryStore.dimensionRanking(context, "outbound", "traffic", now - 3_600_000L).map { it.name })
++            assertEquals(listOf("198.51.100.7"), ProxyApiHistoryStore.dimensionRanking(context, "ip", "traffic", now - 3_600_000L).map { it.name })
++            assertTrue("route is not a daemon dimension", ProxyApiHistoryStore.dimensionRanking(context, "route", "traffic", 0L).isEmpty())
++            assertEquals(650L to 3060L, ProxyApiHistoryStore.rangeTotals(context, now - 3_600_000L))
++            assertEquals("the range bounds the window", 50L to 60L, ProxyApiHistoryStore.rangeTotals(context, m2 * 1000))
++            // A later batch merges into existing minutes.
++            ProxyApiHistoryStore.ingestDaemonBatch(context, batch("1760000060-2", m2 to "T\t1\t1\nB\tapp\tcom.a\t1\t1\t1\n"), now)
++            assertEquals(TrafficRank("com.a", 2, 111, 1021), ProxyApiHistoryStore.dimensionRanking(context, "app", "traffic", now - 3_600_000L)[0])
++        }
++    }
++
++    @Test fun retentionAndDisabledHistoryBoundWhatIsKept() {
++        val now = System.currentTimeMillis()
++        val old = (now - 3 * 86_400_000L) / 60_000 * 60
++        val recent = now / 60_000 * 60 - 60
++        prefs.edit().putInt("proxyApiHistoryRetentionDays", 1).commit()
++        runBlocking {
++            ProxyApiHistoryStore.ingestDaemonBatch(context, batch("1-1", old to "T\t9\t9\nB\thost\told.example\t9\t9\t1\n",
++                recent to "T\t1\t2\nB\thost\tnew.example\t1\t2\t1\n"), now)
++            assertEquals(listOf("new.example"), ProxyApiHistoryStore.dimensionRanking(context, "host", "traffic", 0L).map { it.name })
++            assertEquals(1L to 2L, ProxyApiHistoryStore.rangeTotals(context, 0L))
++            prefs.edit().putBoolean("proxyApiHistoryEnabled", false).commit()
++            assertEquals(0, ProxyApiHistoryStore.ingestDaemonBatch(context, batch("1-2", recent to "B\thost\tx\t1\t1\t1\n"), now))
++            assertTrue(ProxyApiHistoryStore.dimensionRanking(context, "host", "traffic", 0L).isEmpty())
++            prefs.edit().putBoolean("proxyApiHistoryEnabled", true).commit()
++            ProxyApiHistoryStore.clear(context)
++            assertTrue(ProxyApiHistoryStore.dimensionRanking(context, "host", "traffic", 0L).isEmpty())
++            assertEquals(0L to 0L, ProxyApiHistoryStore.rangeTotals(context, 0L))
++        }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt

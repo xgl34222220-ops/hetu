@@ -2080,6 +2080,9 @@ final class RootProxyManager {
                     .append("; chmod 600 ").append(RootBridge.quote(sharePolicy+".new")).append("; chown 0:0 ").append(RootBridge.quote(sharePolicy+".new"))
                     .append("; mv -f ").append(RootBridge.quote(sharePolicy+".new")).append(' ').append(RootBridge.quote(sharePolicy));
         }else cmd.append("; rm -f ").append(RootBridge.quote(sharePolicy));
+        // Root monitor daemon policy (network match + traffic history while the App is killed):
+        // a file as well, so boot plans keep it; a failed write never fails the deployment.
+        cmd.append("; { ").append(DaemonMonitorBridge.exportCommand(prefs)).append("; } || :");
         if(deployCore){
             if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
                     .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
