@@ -210,6 +210,11 @@ def main():
     released=subprocess.run([sys.executable,str(Path(__file__).with_name('smoke_release_continuity93.py'))],timeout=1800,env=smoke_env)
     report['release_smoke_exit']=released.returncode
     if released.returncode:raise RuntimeError('Release APK install smoke failed; inspect release evidence')
+    if os.environ.get('HETU_BASELINE_PROFILE')=='1':
+     # Generate the baseline profile from ART on the installed release APK (no Macrobenchmark module).
+     profiled=subprocess.run([sys.executable,str(Path(__file__).with_name('profile_release_continuity93.py'))],timeout=1800,env=smoke_env)
+     report['baseline_profile_exit']=profiled.returncode
+     if profiled.returncode:raise RuntimeError('Baseline profile generation failed; inspect baseline-profile evidence')
    report['result']='PASS'
  except Exception as error:report['error']=str(error)
  finally:
