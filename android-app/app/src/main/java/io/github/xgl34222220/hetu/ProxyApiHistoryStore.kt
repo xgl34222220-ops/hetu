@@ -21,13 +21,22 @@ internal object ProxyApiHistoryStore {
         if (helper == null) helper = HistoryDb(context.applicationContext)
         return helper!!.writableDatabase
     }
-    private class HistoryDb(context: Context) : SQLiteOpenHelper(context, "hetu-api-history.db", null, 1) {
+    private class HistoryDb(context: Context) : SQLiteOpenHelper(context, "hetu-api-history.db", null, 2) {
         override fun onCreate(db: SQLiteDatabase) {
             db.execSQL("CREATE TABLE traffic(time INTEGER PRIMARY KEY, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
             db.execSQL("CREATE TABLE connections(id TEXT PRIMARY KEY, seen INTEGER NOT NULL, host TEXT, app TEXT, route TEXT, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
             db.execSQL("CREATE INDEX connections_seen ON connections(seen)")
+            createDimensionTables(db)
         }
-        override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) = Unit
+        override fun onUpgrade(db: SQLiteDatabase, old: Int, new: Int) { if (old < 2) createDimensionTables(db) }
+        // Version 2: minute buckets fed by the Root monitor daemon (it keeps counting while the App
+        // is killed), by app / host / destination IP / outbound / rule, plus controller totals.
+        private fun createDimensionTables(db: SQLiteDatabase) {
+            db.execSQL("CREATE TABLE IF NOT EXISTS traffic_dimension_buckets(minute INTEGER NOT NULL, dim TEXT NOT NULL, key TEXT NOT NULL, upload INTEGER NOT NULL, download INTEGER NOT NULL, connections INTEGER NOT NULL, PRIMARY KEY(minute, dim, key))")
+            db.execSQL("CREATE INDEX IF NOT EXISTS traffic_dimension_dim_minute ON traffic_dimension_buckets(dim, minute)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS traffic_minutes(minute INTEGER PRIMARY KEY, upload INTEGER NOT NULL, download INTEGER NOT NULL)")
+            db.execSQL("CREATE TABLE IF NOT EXISTS history_meta(key TEXT PRIMARY KEY, value TEXT NOT NULL)")
+        }
     }
     suspend fun record(context: Context, upload: Long, download: Long, connections: List<ProxyConnectionUi> = emptyList(), now: Long = System.currentTimeMillis()) = withContext(Dispatchers.IO) {
         val prefs = context.getSharedPreferences("hetu", 0)
@@ -48,18 +57,95 @@ internal object ProxyApiHistoryStore {
                 db.setTransactionSuccessful(); lastRecord = now
             } finally { db.endTransaction() }
             if (now < lastPrune || now - lastPrune >= 60_000) {
-                val cutoff = now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L
-                db.delete("traffic", "time < ?", arrayOf(cutoff.toString()))
-                db.delete("connections", "seen < ?", arrayOf(cutoff.toString()))
-                val limit = prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256) * 1024L * 1024
-                fun size() = db.rawQuery("PRAGMA page_count", null).use { it.moveToFirst(); it.getLong(0) } * db.rawQuery("PRAGMA page_size", null).use { it.moveToFirst(); it.getLong(0) }
-                var attempts = 0
-                while (size() > limit && attempts++ < 8) {
-                    db.execSQL("DELETE FROM traffic WHERE time IN (SELECT time FROM traffic ORDER BY time LIMIT max(1,(SELECT count(*) / 3 FROM traffic)))")
-                    db.execSQL("DELETE FROM connections WHERE id IN (SELECT id FROM connections ORDER BY seen LIMIT max(1,(SELECT count(*) / 3 FROM connections)))")
-                    db.execSQL("VACUUM")
-                }
+                pruneLocked(db, prefs, now)
                 lastPrune = now
+            }
+        }
+    }
+    /** Retention days and database size cap over every history table (oldest third first). */
+    private fun pruneLocked(db: SQLiteDatabase, prefs: android.content.SharedPreferences, now: Long) {
+        val cutoff = now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L
+        db.delete("traffic", "time < ?", arrayOf(cutoff.toString()))
+        db.delete("connections", "seen < ?", arrayOf(cutoff.toString()))
+        db.delete("traffic_dimension_buckets", "minute < ?", arrayOf((cutoff / 1000).toString()))
+        db.delete("traffic_minutes", "minute < ?", arrayOf((cutoff / 1000).toString()))
+        val limit = prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256) * 1024L * 1024
+        fun size() = db.rawQuery("PRAGMA page_count", null).use { it.moveToFirst(); it.getLong(0) } * db.rawQuery("PRAGMA page_size", null).use { it.moveToFirst(); it.getLong(0) }
+        var attempts = 0
+        while (size() > limit && attempts++ < 8) {
+            db.execSQL("DELETE FROM traffic WHERE time IN (SELECT time FROM traffic ORDER BY time LIMIT max(1,(SELECT count(*) / 3 FROM traffic)))")
+            db.execSQL("DELETE FROM connections WHERE id IN (SELECT id FROM connections ORDER BY seen LIMIT max(1,(SELECT count(*) / 3 FROM connections)))")
+            // Daemon buckets: drop the oldest third of the minutes they cover (at least one minute).
+            db.execSQL("DELETE FROM traffic_dimension_buckets WHERE minute <= (SELECT minute FROM (SELECT DISTINCT minute FROM traffic_dimension_buckets ORDER BY minute) LIMIT 1 OFFSET (SELECT count(DISTINCT minute) / 3 FROM traffic_dimension_buckets))")
+            db.execSQL("DELETE FROM traffic_minutes WHERE minute IN (SELECT minute FROM traffic_minutes ORDER BY minute LIMIT max(1,(SELECT count(*) / 3 FROM traffic_minutes)))")
+            db.execSQL("VACUUM")
+        }
+    }
+
+    /**
+     * Commits one daemon batch (minute buckets + totals) and its id in a single transaction, so a
+     * batch delivered again after a crash between commit and acknowledgement is skipped. Returns
+     * the number of rows merged. Disabled history discards the batch (the caller still acks it).
+     */
+    suspend fun ingestDaemonBatch(context: Context, batch: DaemonMonitorPolicy.Batch, now: Long = System.currentTimeMillis()): Int = withContext(Dispatchers.IO) {
+        val prefs = context.getSharedPreferences("hetu", 0)
+        if (!prefs.getBoolean("proxyApiHistoryEnabled", false)) return@withContext 0
+        gate.withLock {
+            val db = database(context)
+            val seen = db.rawQuery("SELECT value FROM history_meta WHERE key='daemonBatch'", null).use { if (it.moveToFirst()) it.getString(0) else "" }
+            if (seen == batch.id) return@withLock 0
+            val cutoff = (now - prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90) * 86_400_000L) / 1000
+            var merged = 0
+            db.beginTransaction()
+            try {
+                val update = db.compileStatement("UPDATE traffic_dimension_buckets SET upload=upload+?, download=download+?, connections=connections+? WHERE minute=? AND dim=? AND key=?")
+                val insert = db.compileStatement("INSERT INTO traffic_dimension_buckets(minute,dim,key,upload,download,connections) VALUES(?,?,?,?,?,?)")
+                for (row in batch.rows) {
+                    if (row.minute < cutoff) continue
+                    update.clearBindings()
+                    update.bindLong(1, row.upload); update.bindLong(2, row.download); update.bindLong(3, row.connections.toLong())
+                    update.bindLong(4, row.minute); update.bindString(5, row.dimension); update.bindString(6, row.key)
+                    if (update.executeUpdateDelete() == 0) {
+                        insert.clearBindings()
+                        insert.bindLong(1, row.minute); insert.bindString(2, row.dimension); insert.bindString(3, row.key)
+                        insert.bindLong(4, row.upload); insert.bindLong(5, row.download); insert.bindLong(6, row.connections.toLong())
+                        insert.executeInsert()
+                    }
+                    merged++
+                }
+                for ((minute, value) in batch.totals) {
+                    if (minute < cutoff) continue
+                    db.execSQL("INSERT OR IGNORE INTO traffic_minutes(minute,upload,download) VALUES(?,0,0)", arrayOf(minute))
+                    db.execSQL("UPDATE traffic_minutes SET upload=upload+?, download=download+? WHERE minute=?", arrayOf(value[0], value[1], minute))
+                }
+                db.execSQL("INSERT OR REPLACE INTO history_meta(key,value) VALUES('daemonBatch',?)", arrayOf(batch.id))
+                db.setTransactionSuccessful()
+            } finally { db.endTransaction() }
+            pruneLocked(db, prefs, now)
+            lastPrune = now
+            merged
+        }
+    }
+
+    /** Top list of one daemon dimension (app / host / ip / outbound / rule) since [since] (ms). */
+    suspend fun dimensionRanking(context: Context, dimension: String, sort: String, since: Long, limit: Int = 20): List<TrafficRank> = withContext(Dispatchers.IO) {
+        if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext emptyList()
+        if (dimension !in DaemonMonitorPolicy.DIMENSIONS) return@withContext emptyList()
+        val order = if (sort == "traffic") "sum(upload)+sum(download)" else "sum(connections)"
+        gate.withLock {
+            database(context).rawQuery("SELECT key,sum(connections),sum(upload),sum(download) FROM traffic_dimension_buckets WHERE dim=? AND minute>=? GROUP BY key ORDER BY $order DESC, key LIMIT ?",
+                arrayOf(dimension, (since / 1000).toString(), limit.coerceIn(1, 100).toString())).use { rows ->
+                buildList { while (rows.moveToNext()) add(TrafficRank(rows.getString(0).orEmpty().ifBlank { "—" }, rows.getInt(1), rows.getLong(2), rows.getLong(3))) }
+            }
+        }
+    }
+
+    /** Controller totals (upload, download) since [since] (ms), counted by the daemon. */
+    suspend fun rangeTotals(context: Context, since: Long): Pair<Long, Long> = withContext(Dispatchers.IO) {
+        if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext 0L to 0L
+        gate.withLock {
+            database(context).rawQuery("SELECT coalesce(sum(upload),0),coalesce(sum(download),0) FROM traffic_minutes WHERE minute>=?", arrayOf((since / 1000).toString())).use {
+                if (it.moveToFirst()) it.getLong(0) to it.getLong(1) else 0L to 0L
             }
         }
     }
@@ -82,7 +168,7 @@ internal object ProxyApiHistoryStore {
         }
     }
     suspend fun clear(context: Context) = withContext(Dispatchers.IO) {
-        gate.withLock { database(context).apply { delete("traffic", null, null); delete("connections", null, null); execSQL("VACUUM") }; lastRecord = 0; lastPrune = 0 }
+        gate.withLock { database(context).apply { delete("traffic", null, null); delete("connections", null, null); delete("traffic_dimension_buckets", null, null); delete("traffic_minutes", null, null); execSQL("VACUUM") }; lastRecord = 0; lastPrune = 0 }
         context.getSharedPreferences("hetu", 0).edit().remove("proxyApiTrafficHistory").apply()
     }
 }

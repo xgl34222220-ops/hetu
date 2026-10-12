@@ -110,6 +110,12 @@ public final class ProxyNetworkMatchService extends Service {
 
     @Override public int onStartCommand(Intent i,int f,int id){
         String action=i==null?"":i.getAction();
+        if(DaemonMonitorPolicy.ACTION_DAEMON.equals(action)){
+            // Root monitor hand-off (only Root/system can start this non-exported service).
+            handleDaemonHandoff(i);
+            if(!prefs.getBoolean("networkMatchEnabled",false)&&!prefs.getBoolean("proxyRootWanted",false)){stopSelf();return START_NOT_STICKY;}
+            return START_STICKY;
+        }
         if(RootAutostart.ACTION_RUNNING.equals(action)&&bootAutoEnabled()){
             // Validate native boot state on the worker before publishing recovery intent.
             worker.execute(()->{
@@ -641,10 +647,10 @@ public final class ProxyNetworkMatchService extends Service {
                                 throw new IllegalStateException(result.optString("message","自动启动未完成"));
                         }
                     }else if("stop".equals(action)&&running&&"automation".equals(owner)){
-                        scheduleAutomaticStop(automaticStopGeneration);
+                        if(!deferToDaemon(NetworkMatchRules.parseAction(action)))scheduleAutomaticStop(automaticStopGeneration);
                     }else{
                         NetworkMatchRules.Action background=NetworkMatchRules.parseAction(action);
-                        if(background.background())scheduleBackgroundAction(automaticStopGeneration,environment,background);
+                        if(background.background()&&!deferToDaemon(background))scheduleBackgroundAction(automaticStopGeneration,environment,background);
                     }
                     // A failed start must remain eligible for the next callback.
                     prefs.edit().putString("networkMatchLastSig",sig).putBoolean("networkMatchForceEval",false).apply();
@@ -719,8 +725,61 @@ public final class ProxyNetworkMatchService extends Service {
         },NetworkMatchRules.STABLE_DELAY_MS);
     }
     private static String actionText(NetworkMatchRules.Action action){
-        return "switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
+        return "stop".equals(action.kind)?"停止 Root 代理":"switch".equals(action.kind)?"切换配置 "+action.target:"运行脚本 "+action.target;
     }
+
+    /**
+     * While the Root monitor daemon is alive with network match enabled it owns stop / switch /
+     * script decisions (it keeps running when this process is killed); acting here as well would
+     * execute them twice. Asked only when a changed decision carries such an action.
+     */
+    private boolean deferToDaemon(NetworkMatchRules.Action action){
+        if(!prefs.getBoolean("proxyRootRuntimeRunning",false))return false;
+        DaemonMonitorPolicy.Status status=DaemonMonitorBridge.status(getApplicationContext());
+        if(!status.ownsNetworkMatch())return false;
+        prefs.edit().putString("networkMatchLastActionResult","已交由 Root 守护执行："+actionText(action))
+                .putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
+        return true;
+    }
+
+    /** Executes a stop / switch-config decision the Root monitor confirmed (debounced, rate limited there). */
+    private void handleDaemonHandoff(Intent intent){
+        final DaemonMonitorPolicy.Handoff handoff=DaemonMonitorPolicy.parseHandoff(intent.getStringExtra("kind"),intent.getStringExtra("target"),
+                intent.getStringExtra("label"),intent.getStringExtra("id"),intent.getLongExtra("at",0L),SystemClock.elapsedRealtime());
+        if(handoff==null||!prefs.getBoolean("networkMatchEnabled",false))return;
+        try{worker.execute(()->{
+            if(destroyed||!prefs.getBoolean("networkMatchEnabled",false))return;
+            // One execution per daemon decision, also when am delivers the intent again.
+            if(handoff.id.equals(prefs.getString("networkMatchDaemonHandledId",""))
+                    ||!prefs.edit().putString("networkMatchDaemonHandledId",handoff.id).commit())return;
+            automaticStopGeneration++;
+            final long generation=automaticStopGeneration;
+            java.util.function.BooleanSupplier current=()->!destroyed&&generation==automaticStopGeneration&&prefs.getBoolean("networkMatchEnabled",false);
+            String result;
+            try{
+                RootProxyManager root=new RootProxyManager(getApplicationContext());
+                if("stop".equals(handoff.kind)){
+                    JSONObject out=root.stopIfAutomationOwned(current);
+                    if(out.optBoolean("cancelled",false))result="Root 守护请求停止：当前会话不是自动匹配启动，已保留运行";
+                    else{
+                        result="Root 守护稳定确认后已停止："+handoff.label;
+                        prefs.edit().putString("proxyLastAutoStopReason","网络匹配（Root 守护）在稳定确认后执行停止："+handoff.label)
+                                .putLong("proxyLastAutoStopAt",System.currentTimeMillis()).apply();
+                    }
+                }else{
+                    JSONObject out=root.switchConfigForAutomation(handoff.target,current);
+                    if(out.optBoolean("cancelled",false))result="Root 守护请求切换配置：已被新的决定取代";
+                    else if(out.optBoolean("unchanged",false))result="已是目标配置："+handoff.target;
+                    else if(!out.optBoolean("ok",false))result="切换配置失败："+out.optString("message","未知错误");
+                    else result="Root 守护已切换配置 "+out.optString("from","")+" → "+handoff.target+(out.optBoolean("restarted",false)?"（已重启核心）":"（下次启动生效）");
+                }
+            }catch(Exception error){
+                result="Root 守护交办失败："+(error.getMessage()==null?error.getClass().getSimpleName():error.getMessage());
+            }
+            prefs.edit().putString("networkMatchLastActionResult",result).putLong("networkMatchLastActionAt",System.currentTimeMillis()).apply();
+        });}catch(RejectedExecutionException stopped){}
+    }
+
 
     private static final class Environment{
         final String label;

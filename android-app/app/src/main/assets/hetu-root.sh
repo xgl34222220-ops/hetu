@@ -675,6 +675,8 @@ stopwatchdog(){
       fi
     fi;; esac
   rm -f "$WATCHDOG_PID"
+  # The monitor belongs to the same session; every path that ends the watchdog ends it too.
+  stopmonitor
 }
 process_exited(){
   kill -0 "$1" 2>/dev/null || return 0
@@ -1943,6 +1945,7 @@ watchdog(){
   [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
   # Holding the lock: nothing may cut the capture removal off half-way.
   trap '' TERM INT HUP
+  stopmonitor
   REC=$(cat "$PIDFILE" 2>/dev/null || true)
   if [ "$REC" = "$COREPID" ]; then
     RESULT="network-restore-failed"
@@ -2454,6 +2457,8 @@ start(){
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
   transaction_current || fail "启动事务已撤销"
+  # Optional session daemon (network match / traffic); its failure never fails the start.
+  start_monitor >/dev/null 2>&1 || printf '%s monitor not started\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$WATCHDOG_LOG" 2>/dev/null || true
   rm -f "$START_ERROR"; start_stage "running"
   START_ACTIVE=0
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE"
@@ -2938,6 +2943,467 @@ health_json(){ (
   printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
 ); }
 
+# ------------------------------------------------------------------ Root monitor daemon
+# Network-match automation and traffic accounting keep running when the App process is killed.
+# Session scoped: `start` spawns it after the watchdog is ready, only when the App exported
+# $BASE/policy/monitor with NETMATCH=1 or TRAFFIC=1. It never touches netfilter, routes or the
+# transaction lock; stopwatchdog() (stop, rollback, start, status self-heal) and the watchdog's
+# core-exit path stop it. Identity is the command line "<script> monitor", one instance at a time
+# (lock directory + pidfile), and it exits as soon as the session generation changes.
+MONITOR_PID="$RUN/monitor.pid"
+MONITOR_LOCK="$RUN/.monitor.lock"
+MONITOR_DIR="$RUN/monitor"
+MONITOR_POLICY="$BASE/policy/monitor"
+MONITOR_SPOOL="$MONITOR_DIR/traffic.spool"
+MONITOR_SPOOL_MAX=2097152
+# Hot per-poll state lives in tmpfs, never on flash; falls back to the run directory.
+MONITOR_TMP_ROOT=/dev/hetu-monitor
+MONITOR_HTTP_TOOLS="curl wget nc"
+MONITOR_APP_SERVICE=io.github.xgl34222220.hetu/.ProxyNetworkMatchService
+MONITOR_APP_ACTION=io.github.xgl34222220.hetu.DAEMON_NETWORK_ACTION
+MONITOR_SCRIPTS="$BASE/scripts"
+MONITOR_SCRIPTS_LOG="$RUN/scripts.log"
+
+monitor_is_ours(){
+  case "${1:-}" in ''|*[!0-9]*) return 1;; esac
+  kill -0 "$1" 2>/dev/null || return 1
+  MI_CMD=$(tr '\000' '\n' < "/proc/$1/cmdline" 2>/dev/null) || return 1
+  printf '%s\n' "$MI_CMD" | awk -v s="$BASE/hetu-root.sh" '$0==s {if(getline>0 && $0=="monitor") found=1} END {exit !found}'
+}
+stopmonitor(){
+  SM_PID=$(cat "$MONITOR_PID" 2>/dev/null || true)
+  if [ "$SM_PID" != "$$" ] && monitor_is_ours "$SM_PID"; then
+    kill "$SM_PID" 2>/dev/null || true
+    SM_N=0
+    while monitor_is_ours "$SM_PID" && [ "$SM_N" -lt 60 ]; do sleep 0.05; SM_N=$((SM_N+1)); done
+    if monitor_is_ours "$SM_PID"; then kill -9 "$SM_PID" 2>/dev/null || true; fi
+  fi
+  # A SIGKILLed monitor cannot reap its bounded child (script runner or controller fetch).
+  case "$SM_PID" in ''|*[!0-9]*) ;; *)
+    if [ "$SM_PID" != "$$" ] && ! monitor_is_ours "$SM_PID"; then
+      for SM_TMP in "$MONITOR_TMP_ROOT/$SM_PID" "$MONITOR_DIR/tmp.$SM_PID"; do
+        SM_CHILD=$(cat "$SM_TMP/child" 2>/dev/null || true)
+        case "$SM_CHILD" in ''|*[!0-9]*) ;; *)
+          SM_PPID=$(sed -n 's/^PPid:[[:space:]]*//p' "/proc/$SM_CHILD/status" 2>/dev/null)
+          case "$SM_PPID" in 1|"$SM_PID") monitor_kill_tree "$SM_CHILD";; esac;; esac
+        rm -rf "$SM_TMP"
+      done
+    fi;; esac
+  if [ "$SM_PID" != "$$" ]; then rm -f "$MONITOR_PID"; rm -rf "$MONITOR_LOCK"; fi
+}
+monitor_policy_value(){ sed -n "s/^$1=//p" "$MONITOR_POLICY" 2>/dev/null | head -n 1; }
+monitor_wanted(){
+  [ -r "$MONITOR_POLICY" ] || return 1
+  [ "$(monitor_policy_value NETMATCH)" = 1 ] || [ "$(monitor_policy_value TRAFFIC)" = 1 ]
+}
+start_monitor(){
+  stopmonitor
+  monitor_wanted || return 0
+  SMO_GEN=$(cat "$RUN/generation" 2>/dev/null) || return 1
+  [ -n "$SMO_GEN" ] || return 1
+  mkdir -p "$MONITOR_DIR" 2>/dev/null || return 1
+  "$0" monitor "$SMO_GEN" </dev/null >/dev/null 2>&1 &
+  SMO_CHILD=$!
+  printf '%s\n' "$SMO_CHILD" > "$MONITOR_PID" || return 1
+  printf '%s started pid=%s generation=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$SMO_CHILD" "$SMO_GEN" >> "$MONITOR_DIR/monitor.log" 2>/dev/null || true
+}
+monitor_now_ms(){ MON_NOW=$(awk '{printf "%d", $1*1000}' /proc/uptime 2>/dev/null); case "$MON_NOW" in ''|*[!0-9]*) MON_NOW=0;; esac; }
+# Every descendant of a PID (script runner -> timeout -> sh), deepest first, so none outlives us.
+monitor_kill_tree(){
+  case "${1:-}" in ''|*[!0-9]*) return 0;; esac
+  for MKT_PATH in $(grep -l "^PPid:[[:space:]]*$1\$" /proc/[0-9]*/status 2>/dev/null); do
+    MKT_PID=${MKT_PATH#/proc/}; MKT_PID=${MKT_PID%/status}
+    [ "$MKT_PID" != "$$" ] || continue
+    monitor_kill_tree "$MKT_PID"
+  done
+  kill -9 "$1" 2>/dev/null || true
+}
+# Runs a bounded child so a TERM reaches the trap at once and the child dies with the monitor.
+monitor_child(){
+  "$@" &
+  MON_CHILD=$!
+  printf '%s\n' "$MON_CHILD" > "$MON_TMP/child" 2>/dev/null || true
+  wait "$MON_CHILD"; MC_RC=$?
+  MON_CHILD=""
+  return "$MC_RC"
+}
+monitor_sleep(){ sleep "$1" & MON_SLEEP=$!; wait "$MON_SLEEP" 2>/dev/null; MON_SLEEP=""; }
+monitor_term(){
+  trap '' TERM INT HUP
+  [ -z "${MON_SLEEP:-}" ] || kill "$MON_SLEEP" 2>/dev/null || true
+  [ -z "${MON_CHILD:-}" ] || monitor_kill_tree "$MON_CHILD"
+  MON_CHILD=""
+  monitor_flush_open
+  exit 0
+}
+monitor_release(){
+  [ -z "${MON_SLEEP:-}" ] || kill "$MON_SLEEP" 2>/dev/null || true
+  [ -z "${MON_CHILD:-}" ] || monitor_kill_tree "$MON_CHILD"
+  [ "$(cat "$MONITOR_LOCK/pid" 2>/dev/null || true)" != "$$" ] || rm -rf "$MONITOR_LOCK"
+  [ "$(cat "$MONITOR_PID" 2>/dev/null || true)" != "$$" ] || rm -f "$MONITOR_PID"
+  [ -z "${MON_TMP:-}" ] || rm -rf "$MON_TMP"
+  printf '%s exited pid=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$$" >> "$MONITOR_DIR/monitor.log" 2>/dev/null || true
+  tail -n 40 "$MONITOR_DIR/monitor.log" > "$MONITOR_DIR/monitor.log.new.$$" 2>/dev/null && mv -f "$MONITOR_DIR/monitor.log.new.$$" "$MONITOR_DIR/monitor.log" 2>/dev/null || rm -f "$MONITOR_DIR/monitor.log.new.$$"
+}
+monitor_load_policy(){
+  MON_POLICY_SIG=$(cksum < "$MONITOR_POLICY" 2>/dev/null | awk '{print $1 ":" $2}')
+  MON_NETMATCH=$(monitor_policy_value NETMATCH); MON_TRAFFIC=$(monitor_policy_value TRAFFIC)
+  [ "$MON_NETMATCH" = 1 ] || MON_NETMATCH=0
+  [ "$MON_TRAFFIC" = 1 ] || MON_TRAFFIC=0
+  MON_MOBILE=$(monitor_policy_value MOBILE); [ "$MON_MOBILE" = 1 ] || MON_MOBILE=0
+  MON_MATCH_ACTION=$(monitor_policy_value MATCH_ACTION); MON_UNMATCH_ACTION=$(monitor_policy_value UNMATCH_ACTION)
+  [ -n "$MON_MATCH_ACTION" ] || MON_MATCH_ACTION=start
+  [ -n "$MON_UNMATCH_ACTION" ] || MON_UNMATCH_ACTION=none
+  MON_PROXY_MODE=$(monitor_policy_value MODE); MON_CONFIG=$(monitor_policy_value CONFIG)
+  MON_API_PORT=$(monitor_policy_value API_PORT); MON_API_SECRET=$(monitor_policy_value API_SECRET)
+  port "$MON_API_PORT" || MON_TRAFFIC=0
+  kind_has_api "$(core_kind)" || MON_TRAFFIC=0
+  MON_INTERVAL=$(monitor_policy_value TRAFFIC_INTERVAL)
+  case "$MON_INTERVAL" in ''|*[!0-9]*) MON_INTERVAL=5;; esac
+  [ "$MON_INTERVAL" -ge 3 ] || MON_INTERVAL=3
+  [ "$MON_INTERVAL" -le 60 ] || MON_INTERVAL=60
+  for MLP_KEY in SSID BSSID SLOT MCCMNC; do
+    sed -n "s/^$MLP_KEY=//p" "$MONITOR_POLICY" 2>/dev/null > "$MON_TMP/cond.$MLP_KEY" || : > "$MON_TMP/cond.$MLP_KEY"
+  done
+  MON_NEEDS_SLOT=0; [ ! -s "$MON_TMP/cond.SLOT" ] || MON_NEEDS_SLOT=1
+  MON_NEEDS_OP=0; [ ! -s "$MON_TMP/cond.MCCMNC" ] || MON_NEEDS_OP=1
+}
+
+# ---- environment (all reads are best effort; an unreadable value never matches a condition)
+monitor_route_dev(){
+  ip -4 route get 1.1.1.1 2>/dev/null | awk '{for(i=1;i<NF;i++) if($i=="dev"){print $(i+1); exit}}'
+}
+monitor_kind_of(){
+  case "$1" in '') printf offline;; wlan*|swlan*|wifi*|mlan*) printf wifi;;
+    rmnet*|rev_rmnet*|ccmni*|seth_*|pdp*|ppp*|clat*|v4-rmnet*|v4-ccmni*|wwan*|rmnet_data*) printf cellular;;
+    *) printf other;; esac
+}
+monitor_wifi_ident(){
+  MW_SSID=""; MW_BSSID=""
+  MW_LINE=$(timeout 5 cmd wifi status 2>/dev/null | grep -m 1 'SSID: ')
+  [ -n "$MW_LINE" ] || MW_LINE=$(timeout 5 dumpsys wifi 2>/dev/null | grep -m 1 'mWifiInfo SSID: ')
+  if [ -n "$MW_LINE" ]; then
+    MW_SSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*SSID: "\(.*\)", BSSID: .*/\1/p')
+    [ -n "$MW_SSID" ] || MW_SSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*SSID: \([^",][^,]*\), BSSID: .*/\1/p')
+    MW_BSSID=$(printf '%s\n' "$MW_LINE" | sed -n 's/.*BSSID: \([0-9A-Fa-f:]\{17\}\).*/\1/p')
+  fi
+  if [ -z "$MW_SSID" ] && has iw; then
+    MW_OUT=$(timeout 5 iw dev "$1" link 2>/dev/null)
+    MW_SSID=$(printf '%s\n' "$MW_OUT" | sed -n 's/^[[:space:]]*SSID: //p' | head -n 1)
+    [ -n "$MW_BSSID" ] || MW_BSSID=$(printf '%s\n' "$MW_OUT" | sed -n 's/^Connected to \([0-9A-Fa-f:]\{17\}\).*/\1/p' | head -n 1)
+  fi
+  case "$MW_SSID" in '<unknown ssid>') MW_SSID="";; esac
+  case "$MW_BSSID" in 02:00:00:00:00:00|00:00:00:00:00:00) MW_BSSID="";; esac
+}
+monitor_slot_operator(){ printf '%s\n' "$1" | awk -F, -v s="$2" '{v=$s; gsub(/[-_ ]/,"",v); if (v ~ /^[0-9][0-9][0-9][0-9][0-9][0-9]?$/) print v}'; }
+monitor_cell_ident(){
+  MC_SLOT=-1; MC_SIMOP=""; MC_NETOP=""
+  MC_SUB=$(settings get global multi_sim_data_call 2>/dev/null)
+  case "$MC_SUB" in ''|*[!0-9]*) ;; *)
+    MC_SIM=$(timeout 5 content query --uri content://telephony/siminfo --projection sim_id --where "_id=$MC_SUB" 2>/dev/null | sed -n 's/.*sim_id=\([0-9][0-9]*\).*/\1/p' | head -n 1)
+    case "$MC_SIM" in 0|1) MC_SLOT=$((MC_SIM+1));; esac;; esac
+  MC_SIMPROP=$(getprop gsm.sim.operator.numeric 2>/dev/null); MC_NETPROP=$(getprop gsm.operator.numeric 2>/dev/null)
+  if [ "$MC_SLOT" = -1 ]; then
+    # One loaded SIM decides the data slot on its own.
+    MC_SLOT=$(getprop gsm.sim.state 2>/dev/null | awk -F, '{n=0; s=-1; for(i=1;i<=NF;i++) if($i=="LOADED"||$i=="READY"){n++; s=i} if(n==1 && s<=2) print s; else print -1}')
+    case "$MC_SLOT" in 1|2) ;; *) MC_SLOT=-1;; esac
+  fi
+  if [ "$MC_SLOT" != -1 ]; then
+    MC_SIMOP=$(monitor_slot_operator "$MC_SIMPROP" "$MC_SLOT"); MC_NETOP=$(monitor_slot_operator "$MC_NETPROP" "$MC_SLOT")
+  fi
+}
+monitor_member(){ # value file ignorecase -> empty file matches anything
+  [ -s "$2" ] || return 0
+  if [ "$3" = 1 ]; then grep -Fxiq -- "$1" "$2"; else grep -Fxq -- "$1" "$2"; fi
+}
+monitor_sense(){
+  ME_DEV=$(monitor_route_dev); ME_KIND=$(monitor_kind_of "$ME_DEV")
+  if [ "$ME_KIND" != "$MON_LAST_KIND" ] || [ "$ME_DEV" != "$MON_LAST_DEV" ] || [ $((MON_NOW-MON_IDENT_AT)) -ge 15000 ]; then
+    MON_SSID=""; MON_BSSID=""; MON_SLOT=-1; MON_SIMOP=""; MON_NETOP=""
+    if [ "$ME_KIND" = wifi ]; then monitor_wifi_ident "$ME_DEV"; MON_SSID="$MW_SSID"; MON_BSSID="$MW_BSSID"
+    elif [ "$ME_KIND" = cellular ] && { [ "$MON_NEEDS_SLOT" = 1 ] || [ "$MON_NEEDS_OP" = 1 ]; }; then
+      monitor_cell_ident; MON_SLOT="$MC_SLOT"; MON_SIMOP="$MC_SIMOP"; MON_NETOP="$MC_NETOP"
+    fi
+    MON_LAST_KIND="$ME_KIND"; MON_LAST_DEV="$ME_DEV"; MON_IDENT_AT="$MON_NOW"
+  fi
+  ME_MATCH=0
+  if [ "$ME_KIND" = wifi ] && monitor_member "$MON_SSID" "$MON_TMP/cond.SSID" 0 && monitor_member "$MON_BSSID" "$MON_TMP/cond.BSSID" 1; then ME_MATCH=1; fi
+  if [ "$ME_KIND" = cellular ]; then
+    [ "$MON_MOBILE" != 1 ] || ME_MATCH=1
+    if [ "$MON_SLOT" != -1 ] && [ -s "$MON_TMP/cond.SLOT" ] && grep -Fxq -- "$MON_SLOT" "$MON_TMP/cond.SLOT"; then ME_MATCH=1; fi
+    if [ -s "$MON_TMP/cond.MCCMNC" ]; then
+      if [ -n "$MON_SIMOP" ] && grep -Fxq -- "$MON_SIMOP" "$MON_TMP/cond.MCCMNC"; then ME_MATCH=1; fi
+      if [ -n "$MON_NETOP" ] && grep -Fxq -- "$MON_NETOP" "$MON_TMP/cond.MCCMNC"; then ME_MATCH=1; fi
+    fi
+  fi
+  case "$ME_KIND" in
+    wifi) ME_LABEL="Wi‑Fi${MON_SSID:+ · $MON_SSID}${MON_BSSID:+ · $MON_BSSID}";;
+    cellular) ME_LABEL="移动数据"; [ "$MON_SLOT" = -1 ] || ME_LABEL="$ME_LABEL · 卡$MON_SLOT"
+      ME_OP="$MON_SIMOP"; [ -n "$ME_OP" ] || ME_OP="$MON_NETOP"; [ -z "$ME_OP" ] || ME_LABEL="$ME_LABEL · $ME_OP";;
+    *) ME_LABEL="其他/离线";;
+  esac
+  if [ "$ME_MATCH" = 1 ]; then ME_ACTION="$MON_MATCH_ACTION"; else ME_ACTION="$MON_UNMATCH_ACTION"; fi
+}
+
+# ---- actions
+monitor_script_name_ok(){
+  case "$1" in ''|.*|*[!A-Za-z0-9._-]*|pre-start.sh|post-stop.sh) return 1;; *.sh|*.SH|*.Sh|*.sH) ;; *) return 1;; esac
+  [ "${#1}" -le 75 ]
+}
+monitor_run_script(){ (
+  trap - EXIT
+  MS_NAME="$1"; MS_EVENT="$2"; MS_PATH="$MONITOR_SCRIPTS/$MS_NAME"
+  [ -f "$MS_PATH" ] || exit 44
+  HETU_HOOK=network; HETU_EVENT="$MS_EVENT"; HETU_NETWORK="$3"; HETU_MODE="$MON_PROXY_MODE"; HETU_CONFIG="$MON_CONFIG"
+  HETU_BASE="$BASE"; HETU_RUN_DIR="$RUN"; HETU_SCRIPT_DIR="$MONITOR_SCRIPTS"; HETU_ORIGIN=root-monitor
+  export HETU_HOOK HETU_EVENT HETU_NETWORK HETU_MODE HETU_CONFIG HETU_BASE HETU_RUN_DIR HETU_SCRIPT_DIR HETU_ORIGIN
+  { printf '\n[%s] network-match event=%s script=%s network=%s origin=root-monitor\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$MS_EVENT" "$MS_NAME" "$3"
+    if has timeout; then timeout 12 sh "$MS_PATH" </dev/null; else sh "$MS_PATH" </dev/null; fi; MS_RC=$?
+    printf '[network-match] exit=%s\n' "$MS_RC"; exit "$MS_RC"; } >> "$MONITOR_SCRIPTS_LOG" 2>&1
+) }
+monitor_handoff(){
+  # Stop and config switching change App-owned intent (owner, wanted, generated config): the App
+  # service executes them, woken by Root even after its process was killed.
+  MH_OUT=$(timeout 10 am start-foreground-service -n "$MONITOR_APP_SERVICE" -a "$MONITOR_APP_ACTION" \
+    --es kind "$1" --es target "$2" --es label "$3" --es id "$4" --el at "$MON_NOW" 2>&1); MH_RC=$?
+  case "$MH_OUT" in *Error*|*error:*|*Exception*) MH_RC=1;; esac
+  return "$MH_RC"
+}
+monitor_record(){
+  printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" >> "$MONITOR_DIR/actions.log" 2>/dev/null || true
+  tail -n 40 "$MONITOR_DIR/actions.log" > "$MONITOR_DIR/actions.log.new.$$" 2>/dev/null && mv -f "$MONITOR_DIR/actions.log.new.$$" "$MONITOR_DIR/actions.log" 2>/dev/null || rm -f "$MONITOR_DIR/actions.log.new.$$"
+}
+monitor_limiter_allow(){ # decision: same decision not within 30 s, at most 3 actions per 60 s
+  ML_KEEP=""; ML_COUNT=0; ML_REPEAT=0
+  for ML_ITEM in $MON_RECENT; do
+    ML_AT=${ML_ITEM%%:*}
+    [ $((MON_NOW-ML_AT)) -lt 60000 ] || continue
+    ML_KEEP="$ML_KEEP $ML_ITEM"; ML_COUNT=$((ML_COUNT+1))
+    if [ "${ML_ITEM#*:}" = "$1" ] && [ $((MON_NOW-ML_AT)) -lt 30000 ]; then ML_REPEAT=1; fi
+  done
+  MON_RECENT="$ML_KEEP"
+  [ "$ML_REPEAT" = 0 ] && [ "$ML_COUNT" -lt 3 ] || return 1
+  MON_RECENT="$MON_RECENT $MON_NOW:$1"
+}
+monitor_netmatch_tick(){
+  monitor_sense
+  MD_DECISION="$ME_LABEL|$ME_MATCH|$ME_ACTION"
+  if [ "$MD_DECISION" != "$MON_CAND" ]; then MON_CAND="$MD_DECISION"; MON_CAND_AT="$MON_NOW"; return 0; fi
+  [ $((MON_NOW-MON_CAND_AT)) -ge 2500 ] || return 0
+  [ "$MD_DECISION" != "$MON_DONE" ] || return 0
+  MON_DONE="$MD_DECISION"
+  printf '%s\n' "$ME_LABEL" > "$MON_TMP/environment" 2>/dev/null || true
+  if [ "$MON_BASELINED" != 1 ]; then MON_BASELINED=1; monitor_record "baseline match=$ME_MATCH action=$ME_ACTION network=$ME_LABEL"; return 0; fi
+  MD_EVENT=network-unmatch; [ "$ME_MATCH" != 1 ] || MD_EVENT=network-match
+  case "$ME_ACTION" in start|none|'') monitor_record "no-op match=$ME_MATCH action=${ME_ACTION:-none} network=$ME_LABEL"; return 0;; esac
+  # The action signature alone limits: a flapping network cannot drive a switch/script loop.
+  MD_SIG=$(printf '%s' "$ME_ACTION" | cksum | awk '{print $1}')
+  if ! monitor_limiter_allow "$MD_SIG"; then monitor_record "rate-limited action=$ME_ACTION network=$ME_LABEL"; return 0; fi
+  MON_SEQ=$((MON_SEQ+1)); MD_ID="$MON_GEN-$MON_SEQ"
+  case "$ME_ACTION" in
+    run_script:*)
+      MD_NAME=${ME_ACTION#run_script:}
+      if ! monitor_script_name_ok "$MD_NAME"; then monitor_record "refused script=$MD_NAME"; return 0; fi
+      monitor_child monitor_run_script "$MD_NAME" "$MD_EVENT" "$ME_LABEL"; MD_RC=$?
+      monitor_record "script=$MD_NAME exit=$MD_RC id=$MD_ID network=$ME_LABEL";;
+    stop)
+      if monitor_child monitor_handoff stop "" "$ME_LABEL" "$MD_ID"; then monitor_record "handoff=stop id=$MD_ID network=$ME_LABEL"
+      else monitor_record "handoff-failed=stop id=$MD_ID network=$ME_LABEL"; fi;;
+    switch_config:*)
+      MD_NAME=${ME_ACTION#switch_config:}
+      if monitor_child monitor_handoff switch "$MD_NAME" "$ME_LABEL" "$MD_ID"; then monitor_record "handoff=switch target=$MD_NAME id=$MD_ID network=$ME_LABEL"
+      else monitor_record "handoff-failed=switch target=$MD_NAME id=$MD_ID network=$ME_LABEL"; fi;;
+    *) monitor_record "ignored action=$ME_ACTION";;
+  esac
+}
+
+# ---- traffic collector
+monitor_http_get(){ # path -> body on stdout
+  MHG_URL="http://127.0.0.1:$MON_API_PORT$1"
+  for MHG_TOOL in $MONITOR_HTTP_TOOLS; do
+    case "$MHG_TOOL" in
+      curl) has curl || continue
+        if [ -n "$MON_API_SECRET" ]; then curl -fsS -m 4 -H "Authorization: Bearer $MON_API_SECRET" "$MHG_URL" 2>/dev/null && return 0
+        else curl -fsS -m 4 "$MHG_URL" 2>/dev/null && return 0; fi;;
+      wget) for MHG_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do
+          [ -x "$MHG_BB" ] || continue
+          if [ -n "$MON_API_SECRET" ]; then timeout 5 "$MHG_BB" wget -q -T 4 -O - --header "Authorization: Bearer $MON_API_SECRET" "$MHG_URL" 2>/dev/null && return 0
+          else timeout 5 "$MHG_BB" wget -q -T 4 -O - "$MHG_URL" 2>/dev/null && return 0; fi
+        done;;
+      nc) has nc || continue
+        { printf 'GET %s HTTP/1.0\r\nHost: 127.0.0.1\r\n' "$1"; [ -z "$MON_API_SECRET" ] || printf 'Authorization: Bearer %s\r\n' "$MON_API_SECRET"; printf '\r\n'; } \
+          | timeout 5 nc -w 4 127.0.0.1 "$MON_API_PORT" 2>/dev/null | awk 'BEGIN{h=1; ok=0} h && NR==1 {ok=($2=="200")} h && /^\r?$/ {h=0; next} !h && ok {print} END {exit !ok}' && return 0;;
+    esac
+  done
+  return 1
+}
+monitor_flush_open(){
+  [ -n "${MON_TMP:-}" ] && [ -s "$MON_TMP/bucket" ] || return 0
+  monitor_spool_append "$MON_TMP/bucket"; : > "$MON_TMP/bucket"
+}
+monitor_spool_append(){
+  MSA_SIZE=$(stat -c %s "$MONITOR_SPOOL" 2>/dev/null || echo 0)
+  case "$MSA_SIZE" in ''|*[!0-9]*) MSA_SIZE=0;; esac
+  if [ "$MSA_SIZE" -gt "$MONITOR_SPOOL_MAX" ]; then mv -f "$MONITOR_SPOOL" "$MONITOR_SPOOL.old" 2>/dev/null || true; fi
+  cat "$1" >> "$MONITOR_SPOOL" 2>/dev/null || true
+}
+# One awk pass: per-connection deltas against the previous poll, merged into the open minute
+# bucket by app / host / destination IP / outbound / rule, plus global totals from the
+# controller counters (which also count connections that closed between polls). A finished
+# minute is written to $MON_TMP/flush; the caller appends it to the spool.
+MONITOR_TRAFFIC_AWK='
+function num(s, key) { if (match(s, "\"" key "\":[0-9]+")) return substr(s, RSTART + length(key) + 3, RLENGTH - length(key) - 3) + 0; return -1 }
+function str(s, key,   v) { if (match(s, "\"" key "\":\"[^\"]*\"")) { v = substr(s, RSTART + length(key) + 4, RLENGTH - length(key) - 5); gsub(/[\t\r\n]/, " ", v); return substr(v, 1, 200) } return "" }
+function add(dim, key, up, down, fresh,   k) { if (key == "") key = "-"; k = dim SUBSEP key; U[k] += up; D[k] += down; C[k] += fresh; K[k] = 1 }
+FILENAME == prevf { if ($1 == "#TOTAL") { PTU = $2 + 0; PTD = $3 + 0; HAVE_T = 1 } else { PU[$1] = $2 + 0; PD[$1] = $3 + 0 } next }
+FILENAME == bucketf { if ($1 == "M") BM = $2 + 0; else if ($1 == "T") { TU = $2 + 0; TD = $3 + 0 } else if ($1 == "B") { k = $2 SUBSEP $3; U[k] = $4 + 0; D[k] = $5 + 0; C[k] = $6 + 0; K[k] = 1 } next }
+{ body = body $0 }
+END {
+  printf "" > prevout
+  if (BM != "" && BM != minute) {
+    printf "M\t%d\n", BM > flushf
+    printf "T\t%d\t%d\n", TU, TD > flushf
+    for (k in K) { split(k, p, SUBSEP); printf "B\t%s\t%s\t%d\t%d\t%d\n", p[1], p[2], U[k], D[k], C[k] > flushf }
+    split("", U); split("", D); split("", C); split("", K); TU = 0; TD = 0
+  }
+  gu = num(body, "uploadTotal"); gd = num(body, "downloadTotal")
+  if (gu >= 0 && gd >= 0) {
+    if (HAVE_T && gu >= PTU && gd >= PTD) { TU += gu - PTU; TD += gd - PTD }
+    else if (HAVE_T) { TU += gu; TD += gd }
+    printf "#TOTAL\t%d\t%d\n", gu, gd > prevout
+  }
+  at = index(body, "\"connections\":[")
+  n = 0
+  if (at > 0) { rest = substr(body, at + 15); if (substr(rest, 1, 1) != "]") n = split(rest, part, "[}],[{]") }
+  for (i = 1; i <= n; i++) {
+    s = part[i]; id = str(s, "id"); if (id == "") continue
+    up = num(s, "upload"); down = num(s, "download"); if (up < 0) up = 0; if (down < 0) down = 0
+    printf "%s\t%d\t%d\n", id, up, down > prevout
+    if (first) continue
+    fresh = !(id in PU)
+    du = fresh ? up : up - PU[id]; dd = fresh ? down : down - PD[id]
+    if (du < 0) du = up; if (dd < 0) dd = down
+    if (du == 0 && dd == 0 && !fresh) continue
+    app = str(s, "process")
+    if (app == "") { app = str(s, "processPath"); sub(/.*\//, "", app) }
+    if (app == "") { u = num(s, "uid"); if (u >= 0) app = "uid:" u }
+    host = str(s, "host"); if (host == "") host = str(s, "sniffHost")
+    ip = str(s, "destinationIP")
+    out = ""; if (match(s, "\"chains\":\\[\"[^\"]*\"")) { out = substr(s, RSTART + 11, RLENGTH - 12); gsub(/[\t\r\n]/, " ", out) }
+    rule = str(s, "rule"); payload = str(s, "rulePayload"); if (payload != "") rule = rule "(" payload ")"
+    add("app", app, du, dd, fresh); add("host", host, du, dd, fresh); add("ip", ip, du, dd, fresh)
+    add("outbound", out, du, dd, fresh); add("rule", substr(rule, 1, 200), du, dd, fresh)
+  }
+  printf "M\t%d\n", minute > bucketout
+  printf "T\t%d\t%d\n", TU, TD > bucketout
+  for (k in K) { split(k, p, SUBSEP); printf "B\t%s\t%s\t%d\t%d\t%d\n", p[1], p[2], U[k], D[k], C[k] > bucketout }
+}'
+monitor_traffic_tick(){
+  monitor_child monitor_http_get /connections > "$MON_TMP/body" 2>/dev/null || { MON_FETCH_FAIL=$((MON_FETCH_FAIL+1)); return 0; }
+  MON_FETCH_FAIL=0
+  MT_MINUTE=$(($(date +%s)/60*60))
+  # The first poll only records what is already open: those bytes were sent before this session's
+  # monitor watched them (or counted by an earlier instance).
+  MT_FIRST=0; [ -f "$MON_TMP/prev" ] || { MT_FIRST=1; : > "$MON_TMP/prev"; }
+  [ -f "$MON_TMP/bucket" ] || : > "$MON_TMP/bucket"
+  rm -f "$MON_TMP/flush"
+  awk -v prevf="$MON_TMP/prev" -v bucketf="$MON_TMP/bucket" -v prevout="$MON_TMP/prev.new" -v bucketout="$MON_TMP/bucket.new" \
+    -v flushf="$MON_TMP/flush" -v minute="$MT_MINUTE" -v first="$MT_FIRST" "$MONITOR_TRAFFIC_AWK" "$MON_TMP/prev" "$MON_TMP/bucket" "$MON_TMP/body" 2>/dev/null || return 0
+  mv -f "$MON_TMP/prev.new" "$MON_TMP/prev" 2>/dev/null; mv -f "$MON_TMP/bucket.new" "$MON_TMP/bucket" 2>/dev/null
+  [ ! -s "$MON_TMP/flush" ] || monitor_spool_append "$MON_TMP/flush"
+}
+
+monitor_main(){
+  MON_GEN="${1:-}"
+  trap - EXIT
+  [ -n "$MON_GEN" ] && [ "$MON_GEN" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+  mkdir -p "$MONITOR_DIR" 2>/dev/null || exit 0
+  if ! mkdir "$MONITOR_LOCK" 2>/dev/null; then
+    MM_OWNER=$(cat "$MONITOR_LOCK/pid" 2>/dev/null || true)
+    if [ "$MM_OWNER" != "$$" ] && monitor_is_ours "$MM_OWNER"; then exit 0; fi
+    rm -rf "$MONITOR_LOCK"; mkdir "$MONITOR_LOCK" 2>/dev/null || exit 0
+  fi
+  printf '%s\n' "$$" > "$MONITOR_LOCK/pid" || { rm -rf "$MONITOR_LOCK"; exit 0; }
+  MON_CHILD=""; MON_SLEEP=""; MON_TMP=""
+  trap 'monitor_release' EXIT
+  trap 'monitor_term' TERM INT HUP
+  MM_N=0
+  while [ "$(cat "$MONITOR_PID" 2>/dev/null)" != "$$" ]; do
+    MM_N=$((MM_N+1)); [ "$MM_N" -lt 80 ] || exit 0; sleep 0.025
+  done
+  MON_TMP="$MONITOR_TMP_ROOT/$$"
+  mkdir -p "$MON_TMP" 2>/dev/null && chmod 700 "$MONITOR_TMP_ROOT" "$MON_TMP" 2>/dev/null || { MON_TMP="$MONITOR_DIR/tmp.$$"; mkdir -p "$MON_TMP" || exit 0; }
+  rm -rf "$MONITOR_DIR"/tmp.* 2>/dev/null; mkdir -p "$MON_TMP" 2>/dev/null || exit 0
+  monitor_load_policy
+  MON_LAST_KIND=""; MON_LAST_DEV=""; MON_IDENT_AT=-100000; MON_CAND=""; MON_CAND_AT=0; MON_DONE=""; MON_BASELINED=0
+  MON_RECENT=""; MON_SEQ=0; MON_NEXT_TRAFFIC=0; MON_FETCH_FAIL=0
+  MON_CORE=$(cat "$PIDFILE" 2>/dev/null || true)
+  while :; do
+    [ "$MON_GEN" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
+    [ "$(cat "$MONITOR_PID" 2>/dev/null)" = "$$" ] || exit 0
+    { core_maybe_alive "$MON_CORE" && kill -0 "$MON_CORE" 2>/dev/null; } || exit 0
+    [ -r "$MONITOR_POLICY" ] || exit 0
+    MM_SIG=$(cksum < "$MONITOR_POLICY" 2>/dev/null | awk '{print $1 ":" $2}')
+    if [ "$MM_SIG" != "$MON_POLICY_SIG" ]; then monitor_load_policy; MON_CAND=""; fi
+    [ "$MON_NETMATCH" = 1 ] || [ "$MON_TRAFFIC" = 1 ] || exit 0
+    monitor_now_ms
+    [ "$MON_NETMATCH" != 1 ] || monitor_netmatch_tick
+    if [ "$MON_TRAFFIC" = 1 ] && [ "$MON_NOW" -ge "$MON_NEXT_TRAFFIC" ]; then
+      monitor_traffic_tick; MON_NEXT_TRAFFIC=$((MON_NOW+MON_INTERVAL*1000))
+    fi
+    monitor_sleep 2
+  done
+}
+monitor_status_json(){
+  MS_PID=$(cat "$MONITOR_PID" 2>/dev/null || true); MS_ALIVE=false
+  if monitor_is_ours "$MS_PID" && [ -n "$(cat "$RUN/generation" 2>/dev/null)" ]; then MS_ALIVE=true; else MS_PID=0; fi
+  case "$MS_PID" in ''|*[!0-9]*) MS_PID=0;; esac
+  MS_NM=false; MS_TR=false
+  [ "$(monitor_policy_value NETMATCH)" != 1 ] || MS_NM=true
+  [ "$(monitor_policy_value TRAFFIC)" != 1 ] || MS_TR=true
+  MS_GEN=$(monitor_policy_value GEN | tr -cd 'A-Za-z0-9._-' | cut -c1-64)
+  MS_LAST=$(tail -n 1 "$MONITOR_DIR/actions.log" 2>/dev/null | tr -d '\000-\037"\\' | cut -c1-300)
+  printf '{"ok":true,"alive":%s,"pid":%s,"netmatch":%s,"traffic":%s,"policy":"%s","lastAction":"%s"}\n' "$MS_ALIVE" "$MS_PID" "$MS_NM" "$MS_TR" "$MS_GEN" "$MS_LAST"
+}
+# The App changed the exported policy while a session runs: start the monitor if it is now wanted
+# and not alive. Never during a transaction (one lock attempt), never without a live core+watchdog.
+monitor_ensure(){
+  try_lock_once || { ok "运行事务进行中，稍后生效"; return 0; }
+  ME_CORE=$(cat "$PIDFILE" 2>/dev/null || true)
+  if monitor_wanted && [ -r "$SESSION" ] && pidcore "$ME_CORE" && kill -0 "$ME_CORE" 2>/dev/null && watchdog_alive \
+      && ! monitor_is_ours "$(cat "$MONITOR_PID" 2>/dev/null || true)"; then
+    start_monitor >/dev/null 2>&1 || true
+  fi
+  release_lock
+  ok "监控策略已应用"
+}
+# Hands the closed traffic minutes to the App: one "ready" batch at a time, kept until the App
+# acknowledges its id, so an App killed between read and commit gets the same batch again.
+traffic_take(){
+  mkdir -p "$MONITOR_DIR" || fail "无法读取流量记录"
+  if [ ! -s "$MONITOR_DIR/traffic.ready" ]; then
+    TT_TMP="$MONITOR_DIR/traffic.taking.$$"
+    : > "$TT_TMP"
+    for TT_F in "$MONITOR_SPOOL.old" "$MONITOR_SPOOL"; do
+      [ -s "$TT_F" ] || continue
+      mv -f "$TT_F" "$TT_F.take.$$" 2>/dev/null || continue
+      cat "$TT_F.take.$$" >> "$TT_TMP"; rm -f "$TT_F.take.$$"
+    done
+    if [ -s "$TT_TMP" ]; then
+      { printf 'HETU-TRAFFIC\t1\t%s-%s\n' "$(date +%s)" "$$"; cat "$TT_TMP"; } > "$MONITOR_DIR/traffic.ready.new" && mv -f "$MONITOR_DIR/traffic.ready.new" "$MONITOR_DIR/traffic.ready"
+    fi
+    rm -f "$TT_TMP"
+  fi
+  [ -s "$MONITOR_DIR/traffic.ready" ] && cat "$MONITOR_DIR/traffic.ready"
+  return 0
+}
+traffic_ack(){
+  case "${1:-}" in ''|*[!0-9-]*) fail "批次参数错误";; esac
+  TA_HEAD=$(head -n 1 "$MONITOR_DIR/traffic.ready" 2>/dev/null | awk -F '\t' '{print $3}')
+  [ "$TA_HEAD" != "$1" ] || rm -f "$MONITOR_DIR/traffic.ready"
+  ok "已确认流量批次"
+}
+
 validate_action(){
   case "$2" in mihomo|sing-box|xray|v2ray|hysteria) ;; *) fail "未知核心类型";; esac
   [ -x "$BASE/bin/core" ] || fail "核心文件不存在或不可执行"; [ -r "$1" ] || fail "配置文件不存在"
@@ -2975,6 +3441,11 @@ case "${1:-status}" in
   # Hot swap of the CN sets (App after deploying new lists; watchdog with "auto").
   cnip-reload) { [ "$#" = 1 ] || [ "$#" = 2 ]; } || fail "参数错误"; root; cnip_reload;;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
+  monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
+  monitor-status) root; monitor_status_json;;
+  monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;
+  traffic-take) [ "$#" = 1 ] || fail "参数错误"; root; traffic_take;;
+  traffic-ack) [ "$#" = 2 ] || fail "参数错误"; root; traffic_ack "$2";;
   watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
   *) fail "未知 Root 代理操作";;
 esac

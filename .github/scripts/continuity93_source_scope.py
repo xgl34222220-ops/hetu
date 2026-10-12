@@ -110,6 +110,11 @@ AUTHORIZED_FILES = frozenset((
     # SIM/MCC+MNC conditions, switch-config/run-script actions and the shared ingress policy.
     PACKAGE + 'ProxyNetworkAutomationActivity.kt', PACKAGE + 'ProxySharedNetworkInspector.kt',
     PACKAGE + 'NetworkMatchRules.java', PACKAGE + 'SharedNetworkRules.java',
+    # 2026-10-12 Root monitor daemon authorization (BoxProxy parity #4/#5): network match and
+    # traffic accounting keep running in a session-scoped hetu-root.sh monitor while the App is
+    # killed; the pure-Java policy/hand-off/batch rules (no Android API), the App bridge and the
+    # multi-dimension history tables of the existing traffic history store.
+    PACKAGE + 'DaemonMonitorPolicy.java', PACKAGE + 'app/DaemonMonitorBridge.kt', PACKAGE + 'ProxyApiHistoryStore.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

@@ -79,11 +79,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
     fun setEnabled(value: Boolean) {
         prefs.edit().putBoolean("networkMatchEnabled", value).apply()
         if (value) service("START") else context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
+        DaemonMonitorBridge.exportAsync(context)
         refresh()
     }
     fun evaluate() {
         prefs.edit().putBoolean("networkMatchForceEval", true).apply()
         if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
+        // A running session's Root monitor reloads the exported rules.
+        DaemonMonitorBridge.exportAsync(context)
         scope.launch { delay(550); refresh() }
     }
     fun currentAction(key: String, def: String): String = when (prefs.getString(key, def)) {
@@ -348,6 +351,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val mccOriginal = remember(revision) { prefs.getStringSet("networkMatchMccMnc", emptySet()).orEmpty().sorted() }
     val mccs = remember(mccOriginal) { mutableStateListOf<HxEditEntry>().apply { mccOriginal.forEach { add(HxEditEntry(it)) } } }
     val lastActionResult = remember(revision) { prefs.getString("networkMatchLastActionResult", "").orEmpty() }
+    // Root monitor daemon: while a session runs it evaluates these rules itself (also when the App is killed).
+    var daemon by remember { mutableStateOf<DaemonMonitorPolicy.Status?>(null) }
+    LaunchedEffect(revision) {
+        daemon = if (!prefs.getBoolean("proxyRootRuntimeRunning", false)) null
+            else kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { DaemonMonitorBridge.status(context) }
+    }
     var targetPick by remember { mutableStateOf<Pair<String, String>?>(null) }
     var targetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
@@ -361,6 +370,8 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     fun evaluate() {
         prefs.edit().putBoolean("networkMatchForceEval", true).apply()
         if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
+        // A running session's Root monitor reloads the exported rules.
+        DaemonMonitorBridge.exportAsync(context)
         scope.launch { delay(550); refresh() }
     }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
@@ -451,6 +462,20 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         iconTint = home.accent,
                         trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
                     )
+                    SettingsDivider()
+                    val owns = daemon?.ownsNetworkMatch() == true
+                    HomeRowLayout(
+                        AnnotatedString(ht("Root 守护")),
+                        subtitle = when {
+                            daemon == null -> "代理运行时由 Root 守护执行匹配，App 被杀也不中断"
+                            owns -> "正在执行网络匹配" + (daemon?.lastAction?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "")
+                            daemon?.alive == true -> "运行中（未启用网络匹配）"
+                            else -> "未运行：由 App 前台服务执行匹配"
+                        },
+                        icon = HxIcons.Radio,
+                        iconTint = home.accent,
+                        trailing = { HomeStatusDot(if (owns) home.good else home.t3, pulse = owns) },
+                    )
                 }
             }
         }
@@ -466,6 +491,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         } else {
                             prefs.edit().putBoolean("networkMatchEnabled", false).apply()
                             context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
+                            DaemonMonitorBridge.exportAsync(context)
                             refresh()
                         }
                     }, subtitle = ht(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理"), icon = HxIcons.Radio)

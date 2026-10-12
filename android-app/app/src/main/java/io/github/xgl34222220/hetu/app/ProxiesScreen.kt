@@ -836,6 +836,10 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
     val c = Hx.colors
     var draft by remember { mutableStateOf(PanelApiDraft11.read(vm.prefs)) }
     var error by remember { mutableStateOf<String?>(null) }
+    val sheetContext = androidx.compose.ui.platform.LocalContext.current
+    // History retention and database cap (ProxyApiHistoryStore prunes every table with them).
+    var retentionDays by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryRetentionDays", 7).coerceIn(1, 90)) }
+    var maxMb by remember { mutableStateOf(vm.prefs.getInt("proxyApiHistoryMaxMb", 16).coerceIn(4, 256)) }
 
     HxSheet(onDismiss = onDismiss, containerColor = c.canvas) {
         Column(
@@ -876,10 +880,28 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
             ApiSettingCard(
                 icon = Icons.Rounded.Hub,
                 title = "流量与连接历史",
-                subtitle = "保存最近 24 小时排行所需的数据",
+                subtitle = if (draft.history) "Root 守护按应用 / 域名 / 目标 IP / 出站 / 规则统计，App 被杀也不中断" else "保存最近 24 小时排行所需的数据",
                 checked = draft.history,
                 onCheckedChange = { draft = draft.copy(history = it); error = null },
-            )
+            ) {
+                if (draft.history) {
+                    Text("保留天数", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                    Spacer(Modifier.height(6.dp))
+                    HxSegmented(
+                        options = listOf("1" to "1 天", "7" to "7 天", "30" to "30 天", "90" to "90 天"),
+                        selected = retentionDays.toString(),
+                        onSelect = { retentionDays = it.toInt() },
+                    )
+                    Spacer(Modifier.height(10.dp))
+                    Text("数据库上限", style = MaterialTheme.typography.labelMedium, color = c.textMuted)
+                    Spacer(Modifier.height(6.dp))
+                    HxSegmented(
+                        options = listOf("16" to "16 MB", "64" to "64 MB", "128" to "128 MB", "256" to "256 MB"),
+                        selected = maxMb.toString(),
+                        onSelect = { maxMb = it.toInt() },
+                    )
+                }
+            }
 
             ApiSettingCard(
                 icon = Icons.Rounded.Settings,
@@ -949,6 +971,9 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
                         val problem = draft.validationError()
                         if (problem != null) error = problem else {
                             draft.save(vm.prefs)
+                            vm.prefs.edit().putInt("proxyApiHistoryRetentionDays", retentionDays).putInt("proxyApiHistoryMaxMb", maxMb).apply()
+                            // A running session's Root monitor picks the change up (start/stop collecting).
+                            DaemonMonitorBridge.exportAsync(sheetContext)
                             vm.toast("已保存")
                             onDismiss()
                         }
