@@ -199,11 +199,15 @@ jobs:
         python3 tools/qa/test_cnip93.py -v 2>&1 | tee out/verification/cnip93-tests.txt
 
         python3 tools/qa/test_adblock93.py -v 2>&1 | tee out/verification/adblock93-tests.txt
+
         python3 tools/qa/test_core_templates93.py -v 2>&1 | tee out/verification/core-templates93-tests.txt
+
         python3 tools/qa/test_parity_small93.py -v 2>&1 | tee out/verification/parity-small93-tests.txt
+
         python3 tools/qa/test_netshare93.py -v 2>&1 | tee out/verification/netshare93-tests.txt
 
         python3 tools/qa/test_netmatch93.py -v 2>&1 | tee out/verification/netmatch93-tests.txt
+
         python3 tools/qa/test_override_js93.py -v 2>&1 | tee out/verification/override-js93-tests.txt
 
         '
