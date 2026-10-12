@@ -212,11 +212,14 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "c37cf265827e07c2f94ab49ab17ba88325deb7bbe37923502bade1f3d5c4a6d6",
+  "patchSha256": "863ac6251336c215cb7f1901ceeebefdd8cb518456d4b8f056092ea9a27973f7",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
     "android-app/app/src/main/assets/hetu-autostart.sh",
+    "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf",
+    "android-app/app/src/main/assets/hetu-bpf/hetu_match.o",
+    "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf",
     "android-app/app/src/main/assets/hetu-root.sh",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt",
     "android-app/app/src/main/baseline-prof.txt",
@@ -387,6 +390,9 @@
     "android-app/app/build.gradle.kts": "01df1e786b083fd352a43700f02274701db367e21b0ce8d1960b3ba1e58c3001",
     "android-app/app/proguard-rules.pro": "9b458c761f6b8f9b2d2b60fa2ec1bdd691fe53ec1899f77cdc84aba962b16f75",
     "android-app/app/src/main/assets/hetu-autostart.sh": "78ceb75d26d99c0d80a5ad20b4a48747bd7a60a57752a6e2ffea0cae0bfe52a4",
+    "android-app/app/src/main/assets/hetu-bpf/arm64-v8a/hetu-bpf": "72cd1b8e59d62d0d04bb09f674cbea415036d22f3f6ffec571048d6b49ad8046",
+    "android-app/app/src/main/assets/hetu-bpf/hetu_match.o": "096e6be233a226866a1ead5de94f671fa77cee09ec4cf1e9cb01d9875c5920de",
+    "android-app/app/src/main/assets/hetu-bpf/x86_64/hetu-bpf": "3dd6a2246ee8b4f34d2ab4dcffef8c5d288a1432b7aa0d2b1cd9df111c5b7968",
     "android-app/app/src/main/assets/hetu-root.sh": "91bf24fdfd30bfbd20090160b278ac331afca226bfd2af47e2daf6634110e0de",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "5e6fa13436e74cb3cfc8f29571a45172e9d601e0fb2bd0ada3d8199bff4a5d00",
@@ -957,13 +963,14 @@
     }
   },
   "evidenceSourcesSha256": {
-    ".github/scripts/continuity93_ci_config.py": "ff82d5dc7c25bb8e757e56a5b46e43db401fc534b6aff2ba73f3e98d31a6fb2c",
-    ".github/scripts/continuity93_source_scope.py": "ec51e58b5bd540d9c9f107ef4936ad56486fbd4331eaacf1f544766e61b4dd72",
+    ".github/scripts/continuity93_ci_config.py": "683509722dda5b159f26c2eb8859d40e7326f8cd5268bcee0546f15933d74044",
+    ".github/scripts/continuity93_source_scope.py": "5c2b725bdf12cd1f4e0e89ec15150b1d8309aa9d8bdef8e842194fbe48b67539",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
     ".github/scripts/run_continuity93_network_soak.py": "69cc5fd6df391835e98c7249ce8b2676835f9efec5ed37518ded924a1d8ee1cf",
     ".github/scripts/smoke_release_continuity93.py": "d28ccbd79f5f950eb58c9efbceb83c6bccf05f0a7dfa396a2dbd6ead1bb9eef0",
+    ".github/scripts/test_continuity93_ebpf_gate.py": "bd0a794726b9ef2647e60e485600993250ee9dbd1034caf58d71bdae1c16164c",
     ".github/scripts/test_continuity93_evidence.py": "2cb5d7c51feefa3c94896cd6ea590fb38260864cacc8132b2fb7dfffc08a4d64",
     ".github/scripts/test_continuity93_network_soak.py": "e0cbcb6d7b898627849f6c41c6e0e1903be537e1189c604372c11fffd6dba5d8",
     ".github/scripts/transport_continuity93_failures.py": "5afddef49021db6ed7bc8e8f27a57a078b749e7d9f5dfd13185a3599835fa9a9",
@@ -971,7 +978,7 @@
     ".github/scripts/verify_continuity93_test_results.py": "da3afaba2d8f420f2292697375f8fbeb2b7308f24c53b947723341351437024c",
     ".github/scripts/verify_release_continuity93.py": "cc829fd3859ffa9cb9db1f2c88e595257271cb618750c613a1fe2f84c2990f92",
     ".github/workflows/v2092-build.yml": "738e0097eb086600ddf087bcb6a1ccf00c0973374b354f9556555beb1630a121",
-    ".github/workflows/v2093-build.yml": "fb77901b7c0cc1366eda64546a917dde3afcb20dd7af775eea7aa506de9a0b0e",
+    ".github/workflows/v2093-build.yml": "cd06655e5eeda90d0d19dd41e2d0cfd9171db965ecacdc3282fe4eb8e662e2d0",
     "tools/qa/netfilter_model93.py": "a74b517bc29e817a27d35fda03cefddcb40ad3e5a1d19d5e5371320100bf4e3c",
     "tools/qa/test_adblock93.py": "3b44d2d6d62bb5035827180ccc7dc8af5a212e5b841dcdee39305dc2347270b5",
     "tools/qa/test_app_recovery93.py": "d315f66ce2f8717b010fbd6b6021765238fb5d422cda26f604d26bbd08366e9a",
@@ -3467,5 +3474,6 @@
   "old17BootTestBodiesPreserved": true,
   "old26RootHealthTestBodiesPreserved": true,
   "oldRecoveryStressAssertionsAndBudgetsPreserved": true,
-  "allOriginalRecoveryArtifactsPreserved": true
+  "allOriginalRecoveryArtifactsPreserved": true,
+  "ebpfPayloadsFromSource": true
 }
