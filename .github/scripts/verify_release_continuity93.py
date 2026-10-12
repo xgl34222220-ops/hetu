@@ -16,12 +16,15 @@ SIGNING_SHA256 = '701bbb0aaa5709cf2bebd96ff85ebd64c06cf6c3a2211ec21a9c51e534a5fa
 
 
 # Floors for the packaged ART profile compiled from the generated baseline-prof.txt (plus library
-# profiles). The hand-written 15-line wildcard profile packaged 5020 bytes / 4196 classes / 15717 hot.
-# The generated profile must package strictly more than that.
+# profiles). The hand-written 15-line wildcard profile packaged 5020 bytes / 4196 classes / 15717 hot:
+# its wildcards marked every method of six whole packages hot, used or not. The ART-recorded profile
+# only carries what the profiled journeys executed (run 38213108145: 7813 bytes / 3441 classes /
+# 9520 hot / 10550 startup), so it must package more bytes than the old file (proves it is not the
+# old profile) while class/method counts are regression floors ~10% under the recorded profile.
 MIN_PROFILE_BYTES = 5021
-MIN_PROFILE_CLASSES = 4197
-MIN_PROFILE_HOT_METHODS = 15718
-MIN_PROFILE_STARTUP_METHODS = 15779
+MIN_PROFILE_CLASSES = 3100
+MIN_PROFILE_HOT_METHODS = 8500
+MIN_PROFILE_STARTUP_METHODS = 9500
 
 
 def decode_baseline_prof(data):
