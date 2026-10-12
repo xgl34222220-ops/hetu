@@ -7,11 +7,14 @@ which AGP hands back to R8 so the next release build rewrites them to its own mi
 packages them as assets/dexopt/baseline.prof(m).
 
 Mapping rules (R8 map format): a class line `orig -> obf:`; member lines with a minified line range
-form inline groups whose LAST line is the residual (real) method; a residual line may carry a
+form inline groups whose LAST line is the residual (real) method, except that a position-0 last
+line preceded by the same method qualified with another class is a class-merge move (the qualified
+frame is the source method); a residual line may carry a
 qualified original name when R8 moved the method from another class; a following
 `com.android.tools.r8.residualsignature` comment gives the minified descriptor when R8 changed the
 signature; `com.android.tools.r8.synthesized` classes/methods have no source counterpart and are
-dropped (their code is reached through the source methods that are kept).
+dropped, except lambda/source methods R8 moved into a synthesized holder (qualified residual
+line), which map back to their source method.
 """
 import argparse
 import json
@@ -21,7 +24,7 @@ import re
 PRIMITIVES = {'void': 'V', 'boolean': 'Z', 'byte': 'B', 'char': 'C', 'short': 'S', 'int': 'I', 'long': 'J',
               'float': 'F', 'double': 'D'}
 CLASS_LINE = re.compile(r'^(\S+) -> (\S+):$')
-MEMBER_LINE = re.compile(r'^\s+(?:(\d+):(\d+):)?(\S+) ([^\s(]+)\(([^)]*)\)(?::\d+(?::\d+)?)? -> (\S+)$')
+MEMBER_LINE = re.compile(r'^\s+(?:(\d+):(\d+):)?(\S+) ([^\s(]+)\(([^)]*)\)(?::(\d+)(?::\d+)?)? -> (\S+)$')
 RULE = re.compile(r'^([HSP]*)(L[^;]+;)(?:->(.+))?$')
 DESC_TYPE = re.compile(r'\[*(?:L[^;]+;|[VZBCSIJFD])')
 
@@ -83,9 +86,9 @@ def parse_mapping(path):
             continue
         member = MEMBER_LINE.match(raw)
         if member and current is not None:
-            start, end, ret, name, args, obf_name = member.groups()
+            start, end, ret, name, args, origin, obf_name = member.groups()
             last_member = {'obfClass': current[1], 'origClass': current[0], 'name': name, 'ret': ret,
-                           'args': [a for a in args.split(',') if a], 'obfName': obf_name,
+                           'args': [a for a in args.split(',') if a], 'obfName': obf_name, 'origin': origin,
                            'range': (start, end) if start is not None else None, 'residual': None, 'synthesized': False}
             entries.append(last_member)
         else:
@@ -97,6 +100,16 @@ def parse_mapping(path):
         if (entry['range'] is not None and following is not None and following['obfClass'] == entry['obfClass']
                 and following['range'] == entry['range'] and following['obfName'] == entry['obfName']):
             continue  # inlined frame; the group's last line is the real method
+        previous = entries[index - 1] if index else None
+        if (entry['range'] is not None and entry['origin'] == '0' and '.' not in entry['name'] and previous is not None
+                and previous['obfClass'] == entry['obfClass'] and previous['range'] == entry['range']
+                and previous['obfName'] == entry['obfName'] and previous['name'].rsplit('.', 1)[-1] == entry['name']
+                and previous['args'] == entry['args'] and previous['ret'] == entry['ret'] and '.' in previous['name']):
+            # Class merging: R8 writes the moved method as its qualified source frame followed by a
+            # position-0 frame in the merge target; the qualified frame is the source method.
+            moved = dict(previous, residual=entry['residual'], synthesized=entry['synthesized'])
+            residual.append(moved)
+            continue
         residual.append(entry)
     return obf_to_orig, orig_to_obf, residual, synthesized
 
@@ -108,7 +121,9 @@ def build_index(path):
         if entry['synthesized']:
             continue
         name, orig_class = entry['name'], entry['origClass']
-        if '.' in name:  # moved from another class by R8
+        if '.' not in name and entry['obfClass'] in synthesized:
+            continue  # member of an R8-synthesized class (e.g. a lambda holder) with no source method
+        if '.' in name:  # moved from another class by R8 (also lambda bodies inside synthesized holders)
             owner, name = name.rsplit('.', 1)
             orig_class = owner.replace('.', '/')
         orig_desc = '(' + ''.join(java_to_desc(a) for a in entry['args']) + ')' + java_to_desc(entry['ret'])
@@ -130,10 +145,10 @@ def retrace(lines, mapping):
             continue
         stats['input'] += 1
         flags, cls, method = match.group(1), match.group(2)[1:-1], match.group(3)
-        if cls in synthesized:
-            stats['droppedSynthesized'] += 1
-            continue
         if method is None:
+            if cls in synthesized:
+                stats['droppedSynthesized'] += 1
+                continue
             orig = obf_to_orig.get(cls, cls)
             rules.setdefault('L' + orig + ';', set())
             continue
@@ -141,6 +156,9 @@ def retrace(lines, mapping):
         desc = '(' + desc
         targets = index.get((cls, name, desc))
         if targets is None:
+            if cls in synthesized:
+                stats['droppedSynthesized'] += 1
+                continue
             if cls in obf_to_orig:
                 stats['droppedUnmapped'] += 1  # e.g. R8-synthesized member without a source method
                 continue
@@ -151,6 +169,11 @@ def retrace(lines, mapping):
         for orig_class, orig_name, orig_desc in targets:
             key = 'L' + orig_class + ';->' + orig_name + orig_desc
             rules.setdefault(key, set()).update(flags)
+    # A startup method's source owner is a startup class even when R8 merged it into another class
+    # (the dumped class rule then names only the merge target).
+    for key, flags in list(rules.items()):
+        if '->' in key and 'S' in flags:
+            rules.setdefault(key.split('->', 1)[0], set())
     out = []
     for key in sorted(rules):
         if '->' in key:
