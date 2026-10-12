@@ -57,7 +57,7 @@ internal object DaemonMonitorBridge {
                 try {
                     if (RootBridge.rootShell(app, command, 8_000L).ok())
                         prefs.edit().putString("daemonMonitorPolicyGen", DaemonMonitorPolicy.generation(body)).apply()
-                } catch (_: Exception) { }
+                } catch (_: Throwable) { }
             }
         } catch (_: Exception) { }
     }
@@ -67,7 +67,7 @@ internal object DaemonMonitorBridge {
     fun status(context: Context): DaemonMonitorPolicy.Status = try {
         val result = RootBridge.rootShell(context.applicationContext, "sh $SCRIPT monitor-status", 5_000L)
         if (result.ok()) DaemonMonitorPolicy.parseStatus(result.output) else DaemonMonitorPolicy.DOWN
-    } catch (_: Exception) { DaemonMonitorPolicy.DOWN }
+    } catch (_: Throwable) { DaemonMonitorPolicy.DOWN }
 
     /**
      * Pulls the daemon's closed traffic minutes into the history database: one batch, committed
@@ -83,11 +83,11 @@ internal object DaemonMonitorBridge {
         lastPull = now
         var total = 0
         repeat(4) {
-            val reply = try { RootBridge.rootShell(app, "sh $SCRIPT traffic-take", 15_000L) } catch (_: Exception) { return@withContext total }
+            val reply = try { RootBridge.rootShell(app, "sh $SCRIPT traffic-take", 15_000L) } catch (_: Throwable) { return@withContext total }
             if (!reply.ok()) return@withContext total
             val batch = DaemonMonitorPolicy.parseBatch(reply.output) ?: return@withContext total
             total += ProxyApiHistoryStore.ingestDaemonBatch(app, batch)
-            try { RootBridge.rootShell(app, "sh $SCRIPT traffic-ack " + RootBridge.quote(batch.id), 8_000L) } catch (_: Exception) { return@withContext total }
+            try { RootBridge.rootShell(app, "sh $SCRIPT traffic-ack " + RootBridge.quote(batch.id), 8_000L) } catch (_: Throwable) { return@withContext total }
         }
         total
     }

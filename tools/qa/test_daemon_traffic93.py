@@ -20,6 +20,8 @@ scripted.
   stable decision is a baseline, a change acts only after the 2.5 s debounce, run_script runs in
   the daemon (env, exit code, scripts.log), stop / switch_config are handed to the App service via
   am start-foreground-service, and a flapping network is rate limited.
+* App <-> daemon formats: the production DaemonMonitorPolicy.java (compiled verbatim) writes the
+  policy the shell monitor evaluates, and parses the batch traffic-take prints.
 """
 from pathlib import Path
 import json
