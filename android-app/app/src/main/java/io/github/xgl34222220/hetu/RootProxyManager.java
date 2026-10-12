@@ -408,12 +408,20 @@ final class RootProxyManager {
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
         Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
+        // Groups naming a node/group/provider the file no longer defines would stop Mihomo
+        // ("proxy not found"): strip those references from the private copy and say so.
+        ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
+        source=cleaned.text;
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
                 prefs.getBoolean("proxyRecommendedDns",false));
         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
         // Private comments carry an already validated routing projection into start/boot.
         // Keep the established startup argument protocol and the user's source untouched.
         String startup=fakeIps.privateStartup(generated.yaml);
+        if(cleaned.changed)startup=StartupDiagnostics.header(cleaned.notices)+startup;
+        recordStartupDiagnostics(cleaned.notices,safeDiagnostics(()->StartupDiagnostics.mihomo(cleaned.text,generated.yaml,profile,
+                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
+                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
         writeStartupCopy(startup);
         return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
     }
@@ -445,9 +453,16 @@ final class RootProxyManager {
                 .putInt("proxyCoreConversionNodes",built.nodes)
                 .putString("proxyCoreConversionSource",selected.core.id+"/"+selected.name).apply();
         RootFakeIpRanges fakeIps=nativeFakeIps(profile,built.fakeIpV4);
+        final String nativeSource=source;
+        final ProxyRuntimeProfile nativeProfile=profile;
+        recordStartupDiagnostics(built.cleanupNotices,safeDiagnostics(()->StartupDiagnostics.nativeCore(nativeProfile.core.label,built.nativeSource,nativeSource,
+                options.tproxyPort,options.redirectPort,options.dnsPort,ProxyCoreConfig.clashApi(nativeProfile.core)?controllerPort:0,
+                controllerPort==fixedControllerPort,fakeIps.ipv4)));
         // The startup copy keeps the established protocol: native payload + the terminal
         // fake-IP block, which hetu-root.sh strips again before the core reads its file.
-        String startup=built.config+(built.config.endsWith("\n")?"":"\n")
+        // Cleanup notices lead the copy as comments; hetu-root.sh drops them from the core's file.
+        String startup=(built.cleanupNotices.isEmpty()?"":StartupDiagnostics.header(built.cleanupNotices))
+                +built.config+(built.config.endsWith("\n")?"":"\n")
                 +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
                 +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
         writeStartupCopy(startup);
@@ -545,6 +560,7 @@ final class RootProxyManager {
                 +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                 +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                 +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
+                +(prefs.getBoolean(CoreResourceLimits.PREF_ENABLED,false)?"|cgroup=1":"")
                 +"|systemDns="+bit(prefs.getBoolean("proxyDnsSystemResolver",true))
                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
@@ -947,8 +963,8 @@ final class RootProxyManager {
         String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
         String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
         String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
-        String mem=prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"";
-        String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
+        String mem=cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"");
+        String ioWeight=cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"");
         String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
         JSONObject result;
         String[] bootArgs=new String[]{
@@ -1009,6 +1025,12 @@ final class RootProxyManager {
         if(conversionWarnings!=null&&!conversionWarnings.isEmpty()){
             String shown=conversionWarnings.length()>900?conversionWarnings.substring(0,900)+"…":conversionWarnings;
             warning=(warning.isEmpty()?"":warning+"；")+profile.core.label+" 配置："+shown;
+        }
+        // Native cores already carry the cleanup in their conversion warnings above.
+        String cleanupNotices=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?prefs.getString("proxyConfigCleanupNotices",""):"";
+        if(cleanupNotices!=null&&!cleanupNotices.isEmpty()){
+            String shown=cleanupNotices.length()>900?cleanupNotices.substring(0,900)+"…":cleanupNotices;
+            warning=(warning.isEmpty()?"":warning+"；")+"失效引用已自动清理："+shown;
         }
         result.put("sourceConfig",p.source.name)
                 .put("core",profile.core.id)
@@ -1143,8 +1165,16 @@ final class RootProxyManager {
                 bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                 bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                 bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
-                prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"",
-                prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"",bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
+                cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):""),
+                cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):""),bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
+    }
+
+    /**
+     * 资源限制 → cgroup 硬限制 (default off): the same memory / I/O value with a "cg:" prefix, which
+     * hetu-root.sh turns into memcg memory.max and an io weight (cgroup v2, v1 fallback) for the core.
+     */
+    private String cgroupTuning(String value){
+        return CoreResourceLimits.argument(value,prefs.getBoolean(CoreResourceLimits.PREF_ENABLED,false));
     }
 
     private void installAutostart(Prepared p,String[] args)throws Exception{
@@ -1597,6 +1627,31 @@ final class RootProxyManager {
         return new String(Files.readAllBytes(f.toPath()),StandardCharsets.UTF_8);
     }
     File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
+
+    /** Diagnostics are explanatory only: a failure to describe the sources never blocks a start. */
+    private static List<String> safeDiagnostics(java.util.concurrent.Callable<List<String>> build){
+        try{return build.call();}catch(Exception failed){return Collections.singletonList("[来源] 无法生成来源诊断："+failed.getMessage());}
+    }
+
+    /**
+     * 启动诊断: reference cleanup + where ports / DNS / fake-IP came from, kept for the 启动配置 page
+     * (prefs) and as a small private log next to the startup copy. The start warning repeats the cleanup.
+     */
+    private void recordStartupDiagnostics(List<String> cleanupNotices,List<String> sourceLines){
+        String report=StartupDiagnostics.report(cleanupNotices,sourceLines);
+        prefs.edit().putString("proxyStartupDiagnostics",report)
+                .putLong("proxyStartupDiagnosticsAt",System.currentTimeMillis())
+                .putString("proxyConfigCleanupNotices",String.join("；",cleanupNotices)).apply();
+        try{
+            File log=new File(startupFile().getParentFile(),"startup-diagnostics.log");
+            File dir=log.getParentFile();
+            if(dir!=null&&(dir.isDirectory()||dir.mkdirs())){
+                try(FileOutputStream out=new FileOutputStream(log,false)){out.write(report.getBytes(StandardCharsets.UTF_8));}
+            }
+        }catch(IOException ignored){
+            // The prefs copy above is what the page shows.
+        }
+    }
 
     private void writeStartupCopy(String text)throws IOException{
         File target=startupFile(),dir=target.getParentFile();

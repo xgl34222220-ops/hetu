@@ -175,7 +175,7 @@ index 4d17a16..303e13a 100644
    fi
    N=$((N+1)); [ "$N" -le 120 ] || { state restore-timeout; exit 1; }
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..1ce6220 100755
+index ae832da..bc84d65 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -185,7 +185,25 @@ index ae832da..1ce6220 100755
  set -u
  umask 077
 
-@@ -20,6 +20,12 @@ START_STATE="$RUN/start-state"
+@@ -11,6 +11,17 @@ SESSION="$RUN/session.state"
+ LOG="$RUN/core.log"
+ CHECKLOG="$RUN/config-check.log"
+ IPV6_STATE="$RUN/ipv6.state"
++# rp_filter / ip_forward values changed for this session (path<TAB>original<TAB>set), restored on stop.
++SYSCTL_NET=/proc/sys/net
++SYSCTL_TUNE_STATE="$RUN/sysctl-tune.state"
++# Opt-in cgroup limits for the core (memcg memory.max / io weight, v2 first, v1 fallback).
++CG_MOUNTS=/proc/mounts
++CG_V1_MEMORY="/dev/memcg /sys/fs/cgroup/memory"
++CG_V1_BLKIO="/dev/blkio /sys/fs/cgroup/blkio"
++CG_STATE="$RUN/cgroup.state"
++START_CG_MEM=0
++START_CG_IO=0
++NS_NOTES=""
+ V6_CONF=/proc/sys/net/ipv6/conf
+ NET_STATE="$RUN/net.state"
+ WATCHDOG_PID="$RUN/watchdog.pid"
+@@ -20,6 +31,12 @@ START_STATE="$RUN/start-state"
  START_ERROR="$RUN/last-start-error"
  START_TIMING="$RUN/startup-timing"
  LOCK_DIR="$RUN/.txn.lock"
@@ -198,7 +216,7 @@ index ae832da..1ce6220 100755
  CLEAN_SNAPSHOT_ACTIVE=0
  FAKE_IP_V4=""
  FAKE_IP_V6=""
-@@ -34,7 +40,21 @@ MARK=""
+@@ -34,7 +51,21 @@ MARK=""
  MASK=""
  TABLE=""
  PREF=""
@@ -220,7 +238,7 @@ index ae832da..1ce6220 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +89,81 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,81 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -305,7 +323,7 @@ index ae832da..1ce6220 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +175,120 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +186,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -419,6 +437,7 @@ index ae832da..1ce6220 100755
 +    cleanup_confirmed || RB_FAILED=1
 +  fi
 +  restorev6 || RB_FAILED=1
++  net_sysctl_restore; cgroup_release
 +  if [ "$RB_FAILED" = 0 ]; then rm -f "$SESSION"; else
 +    printf '%s\n' 'rollback-incomplete' > "$RUN/rollback-state"
 +  fi
@@ -428,7 +447,7 @@ index ae832da..1ce6220 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +296,53 @@ acquire_lock(){
+@@ -99,10 +308,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -484,7 +503,7 @@ index ae832da..1ce6220 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +428,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +440,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -508,7 +527,7 @@ index ae832da..1ce6220 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +477,8 @@ cleanup4(){
+@@ -233,7 +489,8 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -518,7 +537,7 @@ index ae832da..1ce6220 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +493,136 @@ cleanup6(){
+@@ -248,13 +505,137 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -642,6 +661,7 @@ index ae832da..1ce6220 100755
 +  stopcore || SC_FAILED=1
 +  cleanup_confirmed || SC_FAILED=1
 +  restorev6 || SC_FAILED=1
++  net_sysctl_restore; cgroup_release
 +  [ "$SC_FAILED" = 0 ] || return 1
 +  rm -f "$SESSION"
 +}
@@ -657,7 +677,7 @@ index ae832da..1ce6220 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,9 +654,20 @@ findcorepid(){
+@@ -286,9 +667,20 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -679,7 +699,7 @@ index ae832da..1ce6220 100755
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
    # two seconds for the tracked PID and then another two seconds for each orphan,
-@@ -296,6 +675,8 @@ stopcore(){
+@@ -296,6 +688,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -688,7 +708,7 @@ index ae832da..1ce6220 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +701,14 @@ stopcore(){
+@@ -320,6 +714,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -703,7 +723,139 @@ index ae832da..1ce6220 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -542,6 +931,171 @@ bypass6(){
+@@ -362,6 +764,131 @@ v6disabled(){
+   [ "$V6_FOUND" = 1 ]
+ }
+
++# TPROXY replies and shared (tethered) traffic arrive on an interface the reverse-path check may
++# reject when rp_filter is strict (1) somewhere. The kernel uses max(all, iface), so loose mode is
++# all=2. Only a strict setup is touched, ip_forward only when it is off for sharing, and the journal
++# is written before the first change. Restore puts back an original only while the value is still
++# the one written here (netd or the user may have changed it since). Never fails a start or stop.
++net_sysctl_apply(){
++  NS_NOTES=""
++  NS_RP=0; case "$START_MODE" in tproxy|enhance) NS_RP=1;; esac
++  [ "${NEED_TP:-0}" != 1 ] || NS_RP=1; [ "$START_SHARE" != 1 ] || NS_RP=1
++  NS_J=""; NS_TAB=$(printf '\t')
++  if [ "$NS_RP" = 1 ] && [ -w "$SYSCTL_NET/ipv4/conf/all/rp_filter" ]; then
++    NS_STRICT=0
++    for NS_P in "$SYSCTL_NET"/ipv4/conf/*/rp_filter; do
++      [ -e "$NS_P" ] || continue; NS_V=""; read -r NS_V < "$NS_P" 2>/dev/null || continue
++      [ "$NS_V" != 1 ] || NS_STRICT=1
++    done
++    NS_ALL=""; read -r NS_ALL < "$SYSCTL_NET/ipv4/conf/all/rp_filter" 2>/dev/null || NS_ALL=""
++    case "$NS_ALL" in 0|1) [ "$NS_STRICT" != 1 ] || NS_J="${NS_J}$SYSCTL_NET/ipv4/conf/all/rp_filter${NS_TAB}$NS_ALL${NS_TAB}2
++";; esac
++  fi
++  if [ "$START_SHARE" = 1 ] && [ -w "$SYSCTL_NET/ipv4/ip_forward" ]; then
++    NS_F=""; read -r NS_F < "$SYSCTL_NET/ipv4/ip_forward" 2>/dev/null || NS_F=""
++    [ "$NS_F" != 0 ] || NS_J="${NS_J}$SYSCTL_NET/ipv4/ip_forward${NS_TAB}0${NS_TAB}1
++"
++  fi
++  [ -n "$NS_J" ] || return 0
++  printf '%s' "$NS_J" > "$SYSCTL_TUNE_STATE.new.$$" && mv -f "$SYSCTL_TUNE_STATE.new.$$" "$SYSCTL_TUNE_STATE" || { rm -f "$SYSCTL_TUNE_STATE.new.$$"; NS_NOTES="rp_filter/ip_forward 未调整：无法记录原值"; return 0; }
++  while IFS="$NS_TAB" read -r NS_P NS_OLD NS_SET; do
++    [ -n "$NS_P" ] || continue
++    if printf '%s\n' "$NS_SET" > "$NS_P" 2>/dev/null; then NS_NOTES="${NS_NOTES:+$NS_NOTES；}${NS_P#$SYSCTL_NET/ipv4/} $NS_OLD→$NS_SET（停止后恢复）"
++    else NS_NOTES="${NS_NOTES:+$NS_NOTES；}${NS_P#$SYSCTL_NET/ipv4/} 写入失败，保持 $NS_OLD"; fi
++  done < "$SYSCTL_TUNE_STATE"
++  return 0
++}
++net_sysctl_restore(){
++  [ -f "$SYSCTL_TUNE_STATE" ] || return 0
++  NR_TAB=$(printf '\t'); NR_FAILED=0
++  while IFS="$NR_TAB" read -r NR_P NR_OLD NR_SET; do
++    case "$NR_P" in "$SYSCTL_NET"/ipv4/conf/*/rp_filter|"$SYSCTL_NET"/ipv4/ip_forward) ;; *) continue;; esac
++    case "$NR_OLD:$NR_SET" in [0-2]:[0-2]) ;; *) continue;; esac
++    [ -e "$NR_P" ] || continue
++    NR_NOW=""; read -r NR_NOW < "$NR_P" 2>/dev/null || { NR_FAILED=1; continue; }
++    [ "$NR_NOW" = "$NR_SET" ] || continue
++    printf '%s\n' "$NR_OLD" > "$NR_P" 2>/dev/null || NR_FAILED=1
++  done < "$SYSCTL_TUNE_STATE"
++  # A failed write keeps the journal so the next stop/start retries it.
++  [ "$NR_FAILED" != 0 ] || rm -f "$SYSCTL_TUNE_STATE"
++  return 0
++}
++# START_MEM / START_IO carry a "cg:" prefix when 资源限制 → cgroup 硬限制 is on (App setting, default off).
++tuning_cgroup_flags(){
++  START_CG_MEM=0; START_CG_IO=0
++  case "$START_MEM" in cg:*) START_MEM=${START_MEM#cg:}; START_CG_MEM=1;; esac
++  case "$START_IO" in cg:*) START_IO=${START_IO#cg:}; START_CG_IO=1;; esac
++  [ -n "$START_MEM" ] || START_CG_MEM=0; [ -n "$START_IO" ] || START_CG_IO=0
++  return 0
++}
++cg_v1_dir(){
++  for CV_D in $1; do [ -d "$CV_D" ] && [ -e "$CV_D/$2" ] && { printf '%s' "$CV_D"; return 0; }; done
++  return 1
++}
++cg_join(){
++  # $1 cgroup dir, $2 pid. v2 has cgroup.procs; v1 accepts cgroup.procs or tasks.
++  if [ -e "$1/cgroup.procs" ]; then printf '%s\n' "$2" > "$1/cgroup.procs" 2>/dev/null && return 0; fi
++  [ -e "$1/tasks" ] && printf '%s\n' "$2" > "$1/tasks" 2>/dev/null
++}
++cg_record(){ grep -qxF "$1" "$CG_STATE" 2>/dev/null || printf '%s\n' "$1" >> "$CG_STATE" 2>/dev/null || true; }
++core_cgroup(){
++  CG_PID="$1"; CG_REPORT=""; CG_MEM_DONE=0; CG_IO_DONE=0
++  [ "$START_CG_MEM" = 1 ] || [ "$START_CG_IO" = 1 ] || return 0
++  CG_V2=$(awk '$3=="cgroup2" {print $2; exit}' "$CG_MOUNTS" 2>/dev/null)
++  if [ -n "$CG_V2" ] && [ -d "$CG_V2" ]; then
++    CG_DIR="$CG_V2/hetu_core"
++    [ "$START_CG_MEM" != 1 ] || printf '+memory\n' > "$CG_V2/cgroup.subtree_control" 2>/dev/null || true
++    [ "$START_CG_IO" != 1 ] || printf '+io\n' > "$CG_V2/cgroup.subtree_control" 2>/dev/null || true
++    if mkdir -p "$CG_DIR" 2>/dev/null; then
++      cg_record "$CG_DIR"
++      if [ "$START_CG_MEM" = 1 ] && [ -e "$CG_DIR/memory.max" ] && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.max" 2>/dev/null; then CG_MEM_DONE=1; fi
++      if [ "$START_CG_IO" = 1 ] && [ -e "$CG_DIR/io.weight" ] && printf 'default %s\n' "$(( (8-START_IO)*25 ))" > "$CG_DIR/io.weight" 2>/dev/null; then CG_IO_DONE=1; fi
++      if [ "$CG_MEM_DONE$CG_IO_DONE" != 00 ]; then
++        if cg_join "$CG_DIR" "$CG_PID"; then
++          [ "$CG_MEM_DONE" != 1 ] || CG_REPORT="${CG_REPORT}memcg=v2:$START_MEM_BYTES "
++          [ "$CG_IO_DONE" != 1 ] || CG_REPORT="${CG_REPORT}iocg=v2:$(( (8-START_IO)*25 )) "
++        else CG_MEM_DONE=0; CG_IO_DONE=0; fi
++      fi
++    fi
++  fi
++  if [ "$START_CG_MEM" = 1 ] && [ "$CG_MEM_DONE" != 1 ]; then
++    CG_BASE=$(cg_v1_dir "$CG_V1_MEMORY" memory.limit_in_bytes) && CG_DIR="$CG_BASE/hetu_core" && mkdir -p "$CG_DIR" 2>/dev/null &&
++      cg_record "$CG_DIR" && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.limit_in_bytes" 2>/dev/null && cg_join "$CG_DIR" "$CG_PID" &&
++      { CG_MEM_DONE=1; CG_REPORT="${CG_REPORT}memcg=v1:$START_MEM_BYTES "; }
++    [ "$CG_MEM_DONE" = 1 ] || CG_REPORT="${CG_REPORT}memcg=failed "
++  fi
++  if [ "$START_CG_IO" = 1 ] && [ "$CG_IO_DONE" != 1 ]; then
++    CG_BASE=$(cg_v1_dir "$CG_V1_BLKIO" blkio.weight) && CG_DIR="$CG_BASE/hetu_core" && mkdir -p "$CG_DIR" 2>/dev/null &&
++      cg_record "$CG_DIR" && printf '%s\n' "$(( (8-START_IO)*125 ))" > "$CG_DIR/blkio.weight" 2>/dev/null && cg_join "$CG_DIR" "$CG_PID" &&
++      { CG_IO_DONE=1; CG_REPORT="${CG_REPORT}iocg=v1:$(( (8-START_IO)*125 )) "; }
++    [ "$CG_IO_DONE" = 1 ] || CG_REPORT="${CG_REPORT}iocg=failed "
++  fi
++  CG_TUNED=$(head -n 1 "$RUN/tuning-status" 2>/dev/null || true); [ "$CG_TUNED" != none ] || CG_TUNED=""
++  printf '%s\n' "$CG_TUNED$CG_REPORT" > "$RUN/tuning-status" 2>/dev/null || true
++  printf '[河图] cgroup 资源限制：%s\n' "$CG_REPORT" >> "$LOG" 2>/dev/null || true
++  return 0
++}
++# After the core exited: remove the (now empty) Hetu cgroups. Best effort, never fails a stop.
++cgroup_release(){
++  [ -f "$CG_STATE" ] || return 0
++  CR_LEFT=""
++  while read -r CR_D; do
++    case "$CR_D" in */hetu_core) ;; *) continue;; esac
++    [ -d "$CR_D" ] || continue
++    rmdir "$CR_D" 2>/dev/null || CR_LEFT="$CR_LEFT$CR_D
++"
++  done < "$CG_STATE"
++  if [ -n "$CR_LEFT" ]; then printf '%s' "$CR_LEFT" > "$CG_STATE" 2>/dev/null || true; else rm -f "$CG_STATE"; fi
++  return 0
++}
++# Lines the App put into the startup copy (dangling-reference cleanup) and this start's own notes
++# go to the top of the fresh core log, so the core log explains why the core saw a changed group.
++start_log_notices(){
++  grep '^# HETU_NOTICE: ' "$1" 2>/dev/null | head -n 64 | sed 's/^# HETU_NOTICE: /[河图] /' >> "$LOG" 2>/dev/null || true
++  [ -z "$NS_NOTES" ] || printf '[河图] 网络参数：%s\n' "$NS_NOTES" >> "$LOG" 2>/dev/null || true
++  return 0
++}
++
+ split_safe_uids(){
+   LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
+   for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
+@@ -542,6 +1069,171 @@ bypass6(){
    [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
  }
 
@@ -875,7 +1027,7 @@ index ae832da..1ce6220 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -738,15 +1292,16 @@ install_mangle4(){
+@@ -738,15 +1430,16 @@ install_mangle4(){
      xt4 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
    bypass4 "$MOUT" mangle "$CIDRS" || return 1; bypass4 "$MPRE" mangle "$CIDRS" || return 1
@@ -897,7 +1049,7 @@ index ae832da..1ce6220 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -768,27 +1323,28 @@ install_mangle6(){
+@@ -768,27 +1461,28 @@ install_mangle6(){
      xt6 -t mangle -A "$MOUT" -p udp --dport 53 -j RETURN || return 1
    fi
    bypass6 "$MOUT" mangle "$CIDRS" || return 1; bypass6 "$MPRE" mangle "$CIDRS" || return 1
@@ -935,7 +1087,7 @@ index ae832da..1ce6220 100755
  }
 
  # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
-@@ -841,7 +1397,8 @@ install_udp_leak_guard4(){
+@@ -841,7 +1535,8 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -945,7 +1097,7 @@ index ae832da..1ce6220 100755
    xt4 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt4 -t filter -N "$WRFWD" || return 1
-@@ -849,6 +1406,7 @@ install_udp_leak_guard4(){
+@@ -849,6 +1544,7 @@ install_udp_leak_guard4(){
      iface_in xt4 filter "$WRFWD" "$IFACES" || return 1
      shared_mac_returns xt4 filter "$WRFWD" "$MACS" || return 1
      bypass4 "$WRFWD" filter "$CIDRS" || return 1
@@ -953,7 +1105,7 @@ index ae832da..1ce6220 100755
      xt4 -t filter -A "$WRFWD" -p udp -j REJECT || return 1
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
-@@ -864,7 +1422,8 @@ install_udp_leak_guard6(){
+@@ -864,7 +1560,8 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -963,7 +1115,7 @@ index ae832da..1ce6220 100755
    xt6 -t filter -I OUTPUT 1 -j "$WROUT" || return 1
    if [ "$SHARE" = 1 ]; then
      xt6 -t filter -N "$WRFWD" || return 1
-@@ -872,23 +1431,24 @@ install_udp_leak_guard6(){
+@@ -872,23 +1569,24 @@ install_udp_leak_guard6(){
      iface_in xt6 filter "$WRFWD" "$IFACES" || return 1
      shared_mac_returns xt6 filter "$WRFWD" "$MACS" || return 1
      bypass6 "$WRFWD" filter "$CIDRS" || return 1
@@ -994,7 +1146,7 @@ index ae832da..1ce6220 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1481,122 @@ v6_disable_guard_ready(){
+@@ -921,16 +1619,126 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -1081,6 +1233,10 @@ index ae832da..1ce6220 100755
 +    CP_LINES=$(wc -l < "$CP_SRC") || return 1
 +    head -n $((CP_LINES-5)) "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }
 +  else cat "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }; fi
++  # Leading reference-cleanup notices are Hetu comments (copied into core.log), not core input.
++  if grep -q '^# HETU_NOTICE: ' "$CP_OUT.new.$$" 2>/dev/null; then
++    sed '/^# HETU_NOTICE: /d' "$CP_OUT.new.$$" > "$CP_OUT.new.$$.n" && mv -f "$CP_OUT.new.$$.n" "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$" "$CP_OUT.new.$$.n"; return 1; }
++  fi
 +  chmod 600 "$CP_OUT.new.$$" 2>/dev/null || true
 +  mv -f "$CP_OUT.new.$$" "$CP_OUT" || return 1
 +  printf '%s' "$CP_OUT"
@@ -1122,7 +1278,7 @@ index ae832da..1ce6220 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +1627,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +1769,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -1131,7 +1287,7 @@ index ae832da..1ce6220 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1020,19 +1686,71 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1020,19 +1828,73 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
  watchdog(){
@@ -1172,7 +1328,9 @@ index ae832da..1ce6220 100755
 +      if atomic_kill_guard 4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && atomic_kill_guard 6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi
 +    elif cleanup_confirmed && restorev6; then
 +      RESULT="network-restored"; rm -f "$MODEFILE" "$SESSION"
++      net_sysctl_restore
 +    fi
++    cgroup_release
 +    rm -f "$PIDFILE"
 +    date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true
 +    printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
@@ -1211,7 +1369,7 @@ index ae832da..1ce6220 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +1763,45 @@ probe_core_owner(){
+@@ -1045,9 +1907,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -1258,7 +1416,7 @@ index ae832da..1ce6220 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +1812,27 @@ core_identity_prepare(){
+@@ -1058,14 +1956,27 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -1289,7 +1447,7 @@ index ae832da..1ce6220 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +1846,9 @@ core_launch(){
+@@ -1079,8 +1990,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -1301,7 +1459,7 @@ index ae832da..1ce6220 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +1915,21 @@ core_tune(){
+@@ -1147,6 +2059,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -1323,7 +1481,7 @@ index ae832da..1ce6220 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,9 +2008,67 @@ google_firewall_maintain(){ (
+@@ -1225,11 +2152,70 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -1390,8 +1548,11 @@ index ae832da..1ce6220 100755
 +  unset HETU_GMS_APPIDS HETU_PRIVATE_DNS_MODE
    START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
    bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
++  tuning_cgroup_flags
    tuning_valid || fail "$TUNE_ERROR"
-@@ -1242,8 +2083,16 @@ start(){
+   DNS_PROTOS=""; [ "$START_DNS_TCP" = 0 ] || DNS_PROTOS=tcp; [ "$START_DNS_UDP" = 0 ] || DNS_PROTOS="${DNS_PROTOS:+$DNS_PROTOS }udp"
+   # Neither protocol captured is the same as DNS takeover switched off.
+@@ -1242,8 +2228,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -1409,7 +1570,7 @@ index ae832da..1ce6220 100755
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2102,80 @@ start(){
+@@ -1253,75 +2247,85 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -1438,9 +1599,11 @@ index ae832da..1ce6220 100755
 +  fi
    start_stage "cleanup-network"
    stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
++  net_sysctl_restore
    start_stage "stop-old-core"
 -  stopcore; rm -f "$CRASH_STATE" "$SESSION"
 +  stopcore || fail "旧核心未确认退出"; rm -f "$CRASH_STATE" "$SESSION"
++  cgroup_release
    start_stage "check-ports"
    check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
    markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
@@ -1452,6 +1615,8 @@ index ae832da..1ce6220 100755
 +    install_v6_disable "$START_SHARE" || { fail "IPv6 禁用保护安装失败，未启动代理"; }
      # No all/default/rmnet sysctl writes: netd owns the physical network.
    fi
++  start_stage "rp-filter"
++  net_sysctl_apply
 
 -  mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { cleanup; restorev6; rm -f "$SESSION"; fail "无法创建 Mihomo 运行缓存目录"; }
 -  start_stage "core-identity"
@@ -1459,7 +1624,7 @@ index ae832da..1ce6220 100755
 +  mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
    start_stage "launch-core"
 -  : > "$LOG"; core_launch; printf '%s\n' "$START_PID" > "$PIDFILE"; printf '%s\n' "$START_MODE" > "$MODEFILE"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS"
-+  : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
++  : > "$LOG" || fail "无法准备核心日志"; start_log_notices "$START_CFG"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
 +  core_identity_confirm "$START_PID" || { rm -f "$RUN/state/identity.cache" 2>/dev/null; fail "核心隔离身份验证失败"; }
    start_stage "wait-listeners"
    wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
@@ -1494,6 +1659,7 @@ index ae832da..1ce6220 100755
 -        if [ "$START_V6" = enable ]; then install_udp_leak_guard6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { cleanup; stopcore; restorev6; rm -f "$SESSION"; fail "IPv6 UDP 防裸连规则安装失败，已回滚"; }; fi
 -        ;;
 -    esac
++  core_cgroup "$START_PID"
 +  # Capture rules are recorded and committed in one iptables-restore per family/table. If a
 +  # commit is refused (old iptables-restore, missing match module, ...) the partial state is
 +  # swept and the same rules are installed one by one, exactly as before.
@@ -1528,7 +1694,7 @@ index ae832da..1ce6220 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2187,84 @@ start(){
+@@ -1333,19 +2337,85 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -1592,6 +1758,7 @@ index ae832da..1ce6220 100755
 +  stopwatchdog
 +  cleanup_confirmed || HB_FAILED=1
 +  restorev6 || HB_FAILED=1
++  net_sysctl_restore; cgroup_release
 +  [ "$HB_FAILED" = 0 ] || return 1
 +  rm -f "$MODEFILE" "$SESSION" "$PIDFILE"
 +  date '+%Y-%m-%dT%H:%M:%S%z core exited; network-restored by status self-heal' > "$CRASH_STATE" 2>/dev/null || true
@@ -1617,7 +1784,7 @@ index ae832da..1ce6220 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +2326,12 @@ status(){
+@@ -1407,6 +2477,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -1630,7 +1797,7 @@ index ae832da..1ce6220 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +2412,20 @@ status(){
+@@ -1487,13 +2563,20 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -1653,7 +1820,7 @@ index ae832da..1ce6220 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1666,16 +2598,18 @@ health_restore_table(){
+@@ -1666,16 +2749,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -1674,7 +1841,7 @@ index ae832da..1ce6220 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1757,6 +2691,16 @@ health_json(){ (
+@@ -1757,6 +2842,16 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -1691,7 +1858,7 @@ index ae832da..1ce6220 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +2718,16 @@ case "${1:-status}" in
+@@ -1774,10 +2869,16 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -2327,6 +2494,292 @@ index 0000000..c7473f3
 +fastOpen: true
 +""";
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java
+new file mode 100644
+index 0000000..4278cbc
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java
+@@ -0,0 +1,280 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.*;
++import java.util.regex.Matcher;
++import java.util.regex.Pattern;
++import org.yaml.snakeyaml.DumperOptions;
++import org.yaml.snakeyaml.LoaderOptions;
++import org.yaml.snakeyaml.Yaml;
++import org.yaml.snakeyaml.constructor.SafeConstructor;
++import org.yaml.snakeyaml.error.YAMLException;
++import org.yaml.snakeyaml.representer.Representer;
++
++/**
++ * Removes dangling references before a core starts: a Mihomo proxy group that names a node, group or
++ * proxy provider that is not defined, or a sing-box selector/urltest outbound that names a missing tag.
++ * Such a reference makes the core refuse the whole file ("proxy not found"), typically after a
++ * subscription update dropped a few nodes.
++ *
++ * <p>Only the private startup copy is changed; the user's file stays untouched. A group that ends up
++ * with no member falls back to the built-in DIRECT (Mihomo) or a direct outbound (sing-box), so rules and
++ * other groups that point at it stay valid. Every removal is reported as one readable notice.
++ * Pure JVM: no Android API.
++ */
++final class ConfigReferenceCleaner {
++    private ConfigReferenceCleaner() {}
++
++    static final int MAX_NOTICES = 40;
++    static final Set<String> MIHOMO_BUILTINS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
++            "DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE", "GLOBAL")));
++
++    static final class Result {
++        final String text;
++        final List<String> notices;
++        final boolean changed;
++        Result(String text, List<String> notices, boolean changed) {
++            this.text = text; this.notices = Collections.unmodifiableList(new ArrayList<>(notices)); this.changed = changed;
++        }
++    }
++
++    // ------------------------------------------------------------------ Mihomo YAML
++
++    static Result mihomo(String yaml) {
++        List<String> notices = new ArrayList<>();
++        if (yaml == null || !MihomoStartupConfig.hasTopLevelKey(yaml, "proxy-groups")) return new Result(yaml, notices, false);
++        Map<String, Object> root;
++        try {
++            Object loaded = loader().load(yaml);
++            if (!(loaded instanceof Map)) return new Result(yaml, notices, false);
++            @SuppressWarnings("unchecked") Map<String, Object> m = (Map<String, Object>) loaded;
++            root = m;
++        } catch (YAMLException | ClassCastException invalid) {
++            // The core check reports a malformed file itself; never guess at a repair.
++            return new Result(yaml, notices, false);
++        }
++        List<Object> groups = list(root.get("proxy-groups"));
++        if (groups == null || groups.isEmpty()) return new Result(yaml, notices, false);
++        Set<String> names = new HashSet<>();
++        List<Object> proxies = list(root.get("proxies"));
++        if (proxies != null) for (Object p : proxies) { String n = name(p); if (n != null) names.add(n); }
++        for (Object g : groups) { String n = name(g); if (n != null) names.add(n); }
++        Set<String> providers = new HashSet<>();
++        Object providerMap = root.get("proxy-providers");
++        if (providerMap instanceof Map) for (Object k : ((Map<?, ?>) providerMap).keySet()) providers.add(String.valueOf(k));
++
++        boolean changed = false;
++        List<Object> cleaned = new ArrayList<>();
++        for (Object g : groups) {
++            if (!(g instanceof Map)) { cleaned.add(g); continue; }
++            @SuppressWarnings("unchecked") Map<String, Object> group = new LinkedHashMap<>((Map<String, Object>) g);
++            String groupName = name(group) == null ? "?" : name(group);
++            boolean touched = false;
++            List<Object> members = list(group.get("proxies"));
++            if (members != null) {
++                List<Object> kept = new ArrayList<>();
++                for (Object member : members) {
++                    String target = member == null ? "" : String.valueOf(member);
++                    if (names.contains(target) || MIHOMO_BUILTINS.contains(target.toUpperCase(Locale.ROOT))) kept.add(member);
++                    else { touched = true; note(notices, "代理组「" + groupName + "」引用的节点或组「" + target + "」未定义，启动前已从组内移除"); }
++                }
++                if (kept.size() != members.size()) group.put("proxies", kept);
++            }
++            List<Object> uses = list(group.get("use"));
++            if (uses != null) {
++                List<Object> kept = new ArrayList<>();
++                for (Object use : uses) {
++                    String target = use == null ? "" : String.valueOf(use);
++                    if (providers.contains(target)) kept.add(use);
++                    else { touched = true; note(notices, "代理组「" + groupName + "」引用的节点集合（proxy-provider）「" + target + "」未定义，启动前已移除"); }
++                }
++                if (kept.size() != uses.size()) { if (kept.isEmpty()) group.remove("use"); else group.put("use", kept); }
++            }
++            if (touched && emptyMihomoGroup(group)) {
++                group.put("proxies", new ArrayList<>(Collections.singletonList("DIRECT")));
++                note(notices, "代理组「" + groupName + "」清理后没有可用成员，已回退为 DIRECT（引用它的规则和组保持有效）");
++            }
++            changed |= touched;
++            cleaned.add(touched ? group : g);
++        }
++        if (!changed) return new Result(yaml, notices, false);
++
++        int[] block = topLevelBlock(yaml, "proxy-groups");
++        if (block == null) {
++            notices.clear();
++            note(notices, "检测到失效的代理组引用，但 proxy-groups 段出现多次或格式特殊，未自动清理");
++            return new Result(yaml, notices, false);
++        }
++        String original = yaml.substring(block[0], block[1]);
++        if (anchorUsedOutside(original, yaml.substring(0, block[0]) + yaml.substring(block[1]))) {
++            notices.clear();
++            note(notices, "检测到失效的代理组引用，但 proxy-groups 段定义了被其他段引用的 YAML 锚点，未自动清理");
++            return new Result(yaml, notices, false);
++        }
++        Map<String, Object> wrapper = new LinkedHashMap<>();
++        wrapper.put("proxy-groups", cleaned);
++        String dumped = dumper().dump(wrapper);
++        if (!dumped.endsWith("\n")) dumped += "\n";
++        String rewritten = yaml.substring(0, block[0]) + dumped + yaml.substring(block[1]);
++        return new Result(rewritten, notices, true);
++    }
++
++    static boolean emptyMihomoGroup(Map<String, Object> group) {
++        List<Object> members = list(group.get("proxies"));
++        List<Object> uses = list(group.get("use"));
++        if (members != null && !members.isEmpty()) return false;
++        if (uses != null && !uses.isEmpty()) return false;
++        for (String key : new String[]{"include-all", "include-all-proxies", "include-all-providers"})
++            if (Boolean.TRUE.equals(group.get(key))) return false;
++        return true;
++    }
++
++    // ------------------------------------------------------------------ sing-box JSON (parsed)
++
++    /** Cleans selector/urltest members in place; returns the notices (empty when nothing changed). */
++    static List<String> singBox(Map<String, Object> root) {
++        List<String> notices = new ArrayList<>();
++        if (root == null) return notices;
++        List<Object> outbounds = list(root.get("outbounds"));
++        if (outbounds == null) return notices;
++        Set<String> tags = new HashSet<>();
++        String direct = null;
++        for (Object o : outbounds) {
++            Map<String, Object> m = map(o);
++            if (m == null || m.get("tag") == null) continue;
++            String tag = String.valueOf(m.get("tag"));
++            tags.add(tag);
++            if (direct == null && "direct".equals(String.valueOf(m.get("type")))) direct = tag;
++        }
++        List<Object> endpoints = list(root.get("endpoints"));
++        if (endpoints != null) for (Object o : endpoints) { Map<String, Object> m = map(o); if (m != null && m.get("tag") != null) tags.add(String.valueOf(m.get("tag"))); }
++        boolean addDirect = false;
++        String fallback = direct == null ? "hetu-direct" : direct;
++        for (Object o : outbounds) {
++            Map<String, Object> m = map(o);
++            if (m == null) continue;
++            String type = String.valueOf(m.get("type"));
++            if (!"selector".equals(type) && !"urltest".equals(type)) continue;
++            String tag = m.get("tag") == null ? "?" : String.valueOf(m.get("tag"));
++            List<Object> members = list(m.get("outbounds"));
++            boolean touched = false;
++            if (members != null) {
++                List<Object> kept = new ArrayList<>();
++                for (Object member : members) {
++                    String target = member == null ? "" : String.valueOf(member);
++                    if (tags.contains(target)) kept.add(member);
++                    else { touched = true; note(notices, "sing-box 出站「" + tag + "」引用的出站「" + target + "」未定义，启动前已移除"); }
++                }
++                if (touched) m.put("outbounds", kept);
++                members = kept;
++            }
++            Object def = m.get("default");
++            if (def != null && (members == null || !members.contains(def))) {
++                m.remove("default");
++                touched = true;
++                note(notices, "sing-box 出站「" + tag + "」的默认出站「" + def + "」已失效，启动前已移除");
++            }
++            boolean providerBacked = m.containsKey("providers") || m.containsKey("use_all_providers") || m.containsKey("include");
++            if (touched && (members == null || members.isEmpty()) && !providerBacked) {
++                m.put("outbounds", new ArrayList<>(Collections.singletonList(fallback)));
++                if (direct == null) addDirect = true;
++                note(notices, "sing-box 出站「" + tag + "」清理后没有可用成员，已回退为直连出站「" + fallback + "」");
++            }
++        }
++        if (addDirect && !tags.contains(fallback)) {
++            Map<String, Object> d = new LinkedHashMap<>();
++            d.put("type", "direct"); d.put("tag", fallback);
++            outbounds.add(d);
++            root.put("outbounds", outbounds);
++        }
++        return notices;
++    }
++
++    // ------------------------------------------------------------------ helpers
++
++    private static void note(List<String> notices, String text) {
++        if (notices.size() < MAX_NOTICES) notices.add(text);
++        else if (notices.size() == MAX_NOTICES) notices.add("……其余失效引用同样已移除");
++    }
++
++    static Yaml loader() {
++        LoaderOptions options = new LoaderOptions();
++        options.setAllowDuplicateKeys(true);
++        options.setMaxAliasesForCollections(10_000);
++        options.setCodePointLimit(16 * 1024 * 1024);
++        return new Yaml(new SafeConstructor(options));
++    }
++
++    private static Yaml dumper() {
++        DumperOptions options = new DumperOptions();
++        options.setDefaultFlowStyle(DumperOptions.FlowStyle.BLOCK);
++        options.setIndent(2);
++        options.setIndicatorIndent(0);
++        options.setAllowUnicode(true);
++        options.setWidth(Integer.MAX_VALUE);
++        options.setSplitLines(false);
++        options.setPrettyFlow(false);
++        return new Yaml(new SafeConstructor(new LoaderOptions()), new Representer(options), options);
++    }
++
++    @SuppressWarnings("unchecked")
++    static List<Object> list(Object o) { return o instanceof List ? (List<Object>) o : null; }
++
++    @SuppressWarnings("unchecked")
++    static Map<String, Object> map(Object o) { return o instanceof Map ? (Map<String, Object>) o : null; }
++
++    private static String name(Object o) {
++        Map<String, Object> m = map(o);
++        return m == null || m.get("name") == null ? null : String.valueOf(m.get("name"));
++    }
++
++    /**
++     * [start, end) of the single top-level block KEY (key line through the line before the next top-level
++     * key). Column-0 sequence items, comments and blank lines stay inside. Null when the key occurs more
++     * than once or not at all.
++     */
++    static int[] topLevelBlock(String text, String key) {
++        Pattern head = Pattern.compile("^" + Pattern.quote(key) + "\\s*:");
++        int start = -1, end = -1, pos = 0, found = 0;
++        while (pos <= text.length()) {
++            int nl = text.indexOf('\n', pos);
++            int lineEnd = nl < 0 ? text.length() : nl + 1;
++            String line = text.substring(pos, nl < 0 ? text.length() : nl);
++            boolean topLevel = !line.isEmpty() && line.charAt(0) != ' ' && line.charAt(0) != '\t' && line.charAt(0) != '#'
++                    && line.charAt(0) != '-' && line.charAt(0) != '\r' && line.charAt(0) != ']' && line.charAt(0) != '}';
++            if (topLevel) {
++                if (head.matcher(line).find()) {
++                    found++;
++                    if (start >= 0 && end < 0) end = pos;
++                    start = pos; end = -1;
++                } else if (start >= 0 && end < 0) {
++                    end = pos;
++                }
++            }
++            if (nl < 0) break;
++            pos = lineEnd;
++        }
++        if (found != 1 || start < 0) return null;
++        if (end < 0) end = text.length();
++        // Leave trailing blank/comment lines to the following block (they are not group content).
++        while (end > start) {
++            int prevEnd = end;
++            if (prevEnd > start && text.charAt(prevEnd - 1) == '\n') prevEnd--;
++            int lineStart = text.lastIndexOf('\n', prevEnd - 1) + 1;
++            if (lineStart <= start) break;
++            String line = text.substring(lineStart, prevEnd).trim();
++            if (!line.isEmpty() && !line.startsWith("#")) break;
++            end = lineStart;
++        }
++        return new int[]{start, end};
++    }
++
++    private static final Pattern ANCHOR = Pattern.compile("(?:^|[\\s\\[{,:-])&([^\\s\\[\\]{},]+)");
++
++    static boolean anchorUsedOutside(String block, String rest) {
++        Matcher m = ANCHOR.matcher(block);
++        while (m.find()) {
++            if (Pattern.compile("\\*" + Pattern.quote(m.group(1)) + "(?![^\\s\\[\\]{},])").matcher(rest).find()) return true;
++        }
++        return false;
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java
 new file mode 100644
 index 0000000..14f2211
@@ -2574,6 +3027,72 @@ index 0000000..14f2211
 +                }
 +                return Double.parseDouble(t);
 +            } catch (NumberFormatException x) { throw error("JSON 数字无效"); }
++        }
++    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java
+new file mode 100644
+index 0000000..b231fee
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java
+@@ -0,0 +1,60 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.Locale;
++
++/**
++ * 资源限制 → cgroup 硬限制 (default off). The existing memory limit (GOMEMLIMIT, a soft Go GC target)
++ * and I/O priority (ionice) stay as they are; when this switch is on, the same values are also enforced
++ * by the kernel: memcg {@code memory.max} and an I/O weight, cgroup v2 first with a v1 fallback
++ * ({@code memory.limit_in_bytes} / {@code blkio.weight}). hetu-root.sh reports what applied in
++ * tuning-status and core.log; a partial failure only warns. Pure JVM.
++ */
++final class CoreResourceLimits {
++    private CoreResourceLimits() {}
++
++    static final String PREF_ENABLED = "proxyCgroupLimitEnabled";
++    static final String PREFIX = "cg:";
++
++    /** The start argument: VALUE unchanged when off or empty, "cg:VALUE" when the cgroup switch is on. */
++    static String argument(String value, boolean cgroup) {
++        String v = value == null ? "" : value.trim();
++        if (v.isEmpty() || !cgroup) return v;
++        return v.startsWith(PREFIX) ? v : PREFIX + v;
++    }
++
++    /** cgroup v2 io.weight for an ionice best-effort level 0-7 (0 = highest): 200 … 25, default 100 at level 4. */
++    static int ioWeightV2(int level) { return (8 - clamp(level)) * 25; }
++
++    /** cgroup v1 blkio.weight for the same level: 1000 … 125, default 500 at level 4. */
++    static int blkioWeightV1(int level) { return (8 - clamp(level)) * 125; }
++
++    private static int clamp(int level) { return Math.max(0, Math.min(7, level)); }
++
++    /** Readable summary of a tuning-status line, e.g. "memcg=v2:268435456 iocg=failed". */
++    static String describe(String tuningStatus) {
++        if (tuningStatus == null || tuningStatus.trim().isEmpty() || "none".equals(tuningStatus.trim())) return "";
++        StringBuilder out = new StringBuilder();
++        for (String part : tuningStatus.trim().split("\\s+")) {
++            String text = null;
++            if (part.startsWith("memcg=v2:") || part.startsWith("memcg=v1:")) {
++                text = "内存硬限制（cgroup " + part.substring(6, 8) + "）" + mib(part.substring(9));
++            } else if (part.equals("memcg=failed")) {
++                text = "内存硬限制未生效（设备不支持 memcg）";
++            } else if (part.startsWith("iocg=v2:") || part.startsWith("iocg=v1:")) {
++                text = "I/O 权重（cgroup " + part.substring(5, 7) + "）" + part.substring(8);
++            } else if (part.equals("iocg=failed")) {
++                text = "I/O 权重未生效（设备不支持 io/blkio 控制器）";
++            }
++            if (text != null) out.append(out.length() == 0 ? "" : "；").append(text);
++        }
++        return out.toString();
++    }
++
++    private static String mib(String bytes) {
++        try {
++            return String.format(Locale.ROOT, " %d MiB", Long.parseLong(bytes) / (1024L * 1024L));
++        } catch (NumberFormatException invalid) {
++            return " " + bytes;
 +        }
 +    }
 +}
@@ -3145,6 +3664,25 @@ index 17eab36..a7bd311 100644
      private static void move(File source,File target)throws IOException{
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+index 65d651c..737190c 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
+@@ -163,6 +163,14 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         onEnabled = { putBool("proxyIoWeightEnabled", it) },
+                         onValue = { putString("proxyIoWeight", it) },
+                     )
++                    // Opt-in: the two values above also become kernel limits (memcg memory.max, io weight).
++                    val cgroup = prefs.getBoolean(CoreResourceLimits.PREF_ENABLED, false)
++                    val cgroupLive = if (cgroup && live.running) CoreResourceLimits.describe(prefs.getString("proxyRootTuning", "").orEmpty()) else ""
++                    val cgroupAbout = ht("同时把上面的内存限制和 I/O 权重交给内核执行（memcg memory.max 与 io 权重，优先 cgroup v2，不支持时用 v1）；核心超出内存上限时可能被系统结束。默认关闭，重启代理后生效")
++                    OtherSwitch(
++                        "cgroup 硬限制", cgroup, icon = HxIcons.MemoryStick,
++                        subtitle = if (cgroupLive.isEmpty()) cgroupAbout else "$cgroupAbout。$cgroupLive",
++                    ) { putBool(CoreResourceLimits.PREF_ENABLED, it) }
+                 }
+             }
+         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 index 4f004b9..7b85ffc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
@@ -3450,10 +3988,10 @@ index 76318e4..618767e 100644
          try {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
 new file mode 100644
-index 0000000..0b3b0d4
+index 0000000..276b420
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java
-@@ -0,0 +1,1877 @@
+@@ -0,0 +1,1932 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.io.IOException;
@@ -3584,6 +4122,8 @@ index 0000000..0b3b0d4
 +            this.nodes = nodes; this.fakeIpV4 = fakeIpV4; this.fakeIpV6 = fakeIpV6; this.adblockApplied = adblockApplied;
 +        }
 +        String warningText() { return String.join("；", warnings); }
++        /** Dangling group/outbound references removed before start (also contained in warnings). */
++        List<String> cleanupNotices = Collections.emptyList();
 +    }
 +
 +    // ------------------------------------------------------------------ source classification
@@ -3607,9 +4147,46 @@ index 0000000..0b3b0d4
 +        return text != null && !looksJson(text) && hasTopLevelKey(text, "server") && !isMihomoYaml(text);
 +    }
 +
++    /** sing-box written in YAML: top-level sing-box sections and none of the Clash/Mihomo keys. */
++    static boolean isSingBoxYaml(String text) {
++        if (text == null || looksJson(text) || isMihomoYaml(text)) return false;
++        if (!hasTopLevelKey(text, "outbounds") && !hasTopLevelKey(text, "endpoints")) return false;
++        return true;
++    }
++
++    /** A sing-box YAML document converted to the JSON the core reads (sing-box itself accepts only JSON). */
++    static String singBoxYamlToJson(String text) throws IOException {
++        Object root;
++        try {
++            root = ConfigReferenceCleaner.loader().load(text);
++        } catch (YAMLException invalid) {
++            throw new IOException("sing-box YAML 无法解析：" + invalid.getMessage());
++        }
++        if (!(root instanceof Map)) throw new IOException("sing-box YAML 顶层必须是映射");
++        return CoreJson.write(jsonSafe(root, 0));
++    }
++
++    private static Object jsonSafe(Object v, int depth) throws IOException {
++        if (depth > CoreJson.MAX_DEPTH) throw new IOException("sing-box YAML 嵌套过深");
++        if (v instanceof Map) {
++            LinkedHashMap<String, Object> out = new LinkedHashMap<>();
++            for (Map.Entry<?, ?> e : ((Map<?, ?>) v).entrySet()) out.put(String.valueOf(e.getKey()), jsonSafe(e.getValue(), depth + 1));
++            return out;
++        }
++        if (v instanceof List) {
++            List<Object> out = new ArrayList<>();
++            for (Object o : (List<?>) v) out.add(jsonSafe(o, depth + 1));
++            return out;
++        }
++        if (v == null || v instanceof String || v instanceof Boolean || v instanceof Number) return v;
++        if (v instanceof byte[]) throw new IOException("sing-box YAML 不支持二进制值");
++        return String.valueOf(v);
++    }
++
 +    static boolean isNativeFor(ProxyRuntimeProfile.Core core, String text) {
 +        switch (kind(core)) {
-+            case SING_BOX: case XRAY: case V2RAY: return looksJson(text);
++            case SING_BOX: return looksJson(text) || isSingBoxYaml(text);
++            case XRAY: case V2RAY: return looksJson(text);
 +            case HYSTERIA: return isHysteriaYaml(text);
 +            default: return true;
 +        }
@@ -3629,7 +4206,14 @@ index 0000000..0b3b0d4
 +            if (BundledCoreTemplates.hasPlaceholderNode(source))
 +                warnings.add("配置仍含内置模板的占位节点（example.invalid），请先在配置编辑器中填入你自己的服务器");
 +            switch (k) {
-+                case SING_BOX: return nativeSingBox(source, o, warnings);
++                case SING_BOX: {
++                    String json = source;
++                    if (!looksJson(source)) {
++                        json = singBoxYamlToJson(source);
++                        warnings.add("sing-box 配置为 YAML 写法，已在校验和启动前转换为 JSON");
++                    }
++                    return nativeSingBox(json, o, warnings);
++                }
 +                case XRAY: return nativeXray(source, o, warnings, false);
 +                case V2RAY: return nativeXray(source, o, warnings, true);
 +                case HYSTERIA: return nativeHysteria(source, o, warnings);
@@ -3640,14 +4224,19 @@ index 0000000..0b3b0d4
 +            String expected = k == Kind.HYSTERIA ? "Hysteria 2 客户端 YAML" : core.label + " JSON";
 +            throw new IOException("配置既不是 " + expected + "，也不是可转换的 Clash/Mihomo YAML");
 +        }
-+        Profile profile = Profile.parse(source, fetcher, warnings);
++        ConfigReferenceCleaner.Result cleaned = ConfigReferenceCleaner.mihomo(source);
++        warnings.addAll(cleaned.notices);
++        Profile profile = Profile.parse(cleaned.text, fetcher, warnings);
++        Result converted;
 +        switch (k) {
-+            case SING_BOX: return SingBox.convert(profile, o, warnings);
-+            case XRAY: return XrayConv.convert(profile, o, warnings, false);
-+            case V2RAY: return XrayConv.convert(profile, o, warnings, true);
-+            case HYSTERIA: return Hysteria.convert(profile, o, warnings);
++            case SING_BOX: converted = SingBox.convert(profile, o, warnings); break;
++            case XRAY: converted = XrayConv.convert(profile, o, warnings, false); break;
++            case V2RAY: converted = XrayConv.convert(profile, o, warnings, true); break;
++            case HYSTERIA: converted = Hysteria.convert(profile, o, warnings); break;
 +            default: throw new IOException("未知核心");
 +        }
++        if (cleaned.changed) converted.cleanupNotices = cleaned.notices;
++        return converted;
 +    }
 +
 +    // ------------------------------------------------------------------ helpers
@@ -5248,6 +5837,8 @@ index 0000000..0b3b0d4
 +
 +    static Result nativeSingBox(String source, Options o, List<String> warnings) throws IOException {
 +        Map<String, Object> root = CoreJson.parseObject(source);
++        List<String> cleanup = ConfigReferenceCleaner.singBox(root);
++        warnings.addAll(cleanup);
 +        if (root.containsKey("inbounds")) warnings.add("已由河图接管 sing-box 入站（TPROXY/DNS/本地探针）");
 +        root.put("inbounds", SingBox.inbounds(o));
 +        List<Object> outbounds = asList(root.get("outbounds"));
@@ -5277,7 +5868,9 @@ index 0000000..0b3b0d4
 +        if (experimental == null) { experimental = new LinkedHashMap<>(); root.put("experimental", experimental); }
 +        experimental.put("clash_api", map("external_controller", "127.0.0.1:" + o.controllerPort, "secret", o.secret, "default_mode", "rule"));
 +        if (!experimental.containsKey("cache_file")) experimental.put("cache_file", map("enabled", true, "path", "cache.db", "store_fakeip", true));
-+        return new Result(CoreJson.write(root), true, warnings, outbounds.size(), "", "", adblock);
++        Result result = new Result(CoreJson.write(root), true, warnings, outbounds.size(), "", "", adblock);
++        result.cleanupNotices = cleanup;
++        return result;
 +    }
 +
 +    static Result nativeXray(String source, Options o, List<String> warnings, boolean v2ray) throws IOException {
@@ -6932,7 +7525,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..f6eb5cc 100644
+index 9cd82da..7a0575b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -7115,17 +7708,26 @@ index 9cd82da..f6eb5cc 100644
          if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE&&
                  profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
              throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
-@@ -329,7 +408,8 @@ final class RootProxyManager {
+@@ -329,15 +408,150 @@ final class RootProxyManager {
          int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
          String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
          Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
 -        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface);
++        // Groups naming a node/group/provider the file no longer defines would stop Mihomo
++        // ("proxy not found"): strip those references from the private copy and say so.
++        ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
++        source=cleaned.text;
 +        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
 +                prefs.getBoolean("proxyRecommendedDns",false));
          RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
          // Private comments carry an already validated routing projection into start/boot.
          // Keep the established startup argument protocol and the user's source untouched.
-@@ -338,6 +418,125 @@ final class RootProxyManager {
+         String startup=fakeIps.privateStartup(generated.yaml);
++        if(cleaned.changed)startup=StartupDiagnostics.header(cleaned.notices)+startup;
++        recordStartupDiagnostics(cleaned.notices,safeDiagnostics(()->StartupDiagnostics.mihomo(cleaned.text,generated.yaml,profile,
++                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
++                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
+         writeStartupCopy(startup);
          return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
      }
 
@@ -7156,9 +7758,16 @@ index 9cd82da..f6eb5cc 100644
 +                .putInt("proxyCoreConversionNodes",built.nodes)
 +                .putString("proxyCoreConversionSource",selected.core.id+"/"+selected.name).apply();
 +        RootFakeIpRanges fakeIps=nativeFakeIps(profile,built.fakeIpV4);
++        final String nativeSource=source;
++        final ProxyRuntimeProfile nativeProfile=profile;
++        recordStartupDiagnostics(built.cleanupNotices,safeDiagnostics(()->StartupDiagnostics.nativeCore(nativeProfile.core.label,built.nativeSource,nativeSource,
++                options.tproxyPort,options.redirectPort,options.dnsPort,ProxyCoreConfig.clashApi(nativeProfile.core)?controllerPort:0,
++                controllerPort==fixedControllerPort,fakeIps.ipv4)));
 +        // The startup copy keeps the established protocol: native payload + the terminal
 +        // fake-IP block, which hetu-root.sh strips again before the core reads its file.
-+        String startup=built.config+(built.config.endsWith("\n")?"":"\n")
++        // Cleanup notices lead the copy as comments; hetu-root.sh drops them from the core's file.
++        String startup=(built.cleanupNotices.isEmpty()?"":StartupDiagnostics.header(built.cleanupNotices))
++                +built.config+(built.config.endsWith("\n")?"":"\n")
 +                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
 +                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
 +        writeStartupCopy(startup);
@@ -7251,7 +7860,15 @@ index 9cd82da..f6eb5cc 100644
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
          return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
                  +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
-@@ -378,8 +577,14 @@ final class RootProxyManager {
+@@ -346,6 +560,7 @@ final class RootProxyManager {
+                 +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
+                 +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
+                 +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
++                +(prefs.getBoolean(CoreResourceLimits.PREF_ENABLED,false)?"|cgroup=1":"")
+                 +"|systemDns="+bit(prefs.getBoolean("proxyDnsSystemResolver",true))
+                 +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
+                 +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
+@@ -378,8 +593,14 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -7267,7 +7884,7 @@ index 9cd82da..f6eb5cc 100644
          if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
      }
 
-@@ -389,6 +594,9 @@ final class RootProxyManager {
+@@ -389,6 +610,9 @@ final class RootProxyManager {
              RootBridge.requireWorkerThread();
              if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
              ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
@@ -7277,7 +7894,7 @@ index 9cd82da..f6eb5cc 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +612,7 @@ final class RootProxyManager {
+@@ -404,7 +628,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -7286,7 +7903,7 @@ index 9cd82da..f6eb5cc 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,7 +620,7 @@ final class RootProxyManager {
+@@ -412,7 +636,7 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -7295,7 +7912,7 @@ index 9cd82da..f6eb5cc 100644
              prefs.edit()
                      .putString("proxyRootTopologyFingerprint",nextFingerprint)
                      .putString("proxyRootAppliedSettings",p.settingsSignature)
-@@ -469,29 +677,84 @@ final class RootProxyManager {
+@@ -469,29 +693,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -7388,7 +8005,7 @@ index 9cd82da..f6eb5cc 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -505,24 +768,44 @@ final class RootProxyManager {
+@@ -505,24 +784,44 @@ final class RootProxyManager {
          return startIfWanted(profile,()->true);
      }
      JSONObject startIfWanted(ProxyRuntimeProfile profile,java.util.function.BooleanSupplier currentNetwork)throws Exception{
@@ -7441,7 +8058,7 @@ index 9cd82da..f6eb5cc 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +818,11 @@ final class RootProxyManager {
+@@ -535,7 +834,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -7454,7 +8071,7 @@ index 9cd82da..f6eb5cc 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +831,8 @@ final class RootProxyManager {
+@@ -544,7 +847,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -7464,7 +8081,7 @@ index 9cd82da..f6eb5cc 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +840,7 @@ final class RootProxyManager {
+@@ -552,7 +856,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -7473,7 +8090,7 @@ index 9cd82da..f6eb5cc 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -575,20 +863,31 @@ final class RootProxyManager {
+@@ -575,20 +879,31 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -7512,7 +8129,7 @@ index 9cd82da..f6eb5cc 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +897,7 @@ final class RootProxyManager {
+@@ -598,7 +913,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -7521,7 +8138,7 @@ index 9cd82da..f6eb5cc 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +922,6 @@ final class RootProxyManager {
+@@ -623,7 +938,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -7529,7 +8146,18 @@ index 9cd82da..f6eb5cc 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -659,15 +957,26 @@ final class RootProxyManager {
+@@ -649,8 +963,8 @@ final class RootProxyManager {
+         String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
+         String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
+         String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
+-        String mem=prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"";
+-        String ioWeight=prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"";
++        String mem=cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"");
++        String ioWeight=cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"");
+         String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
+         JSONObject result;
+         String[] bootArgs=new String[]{
+@@ -659,15 +973,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -7558,7 +8186,7 @@ index 9cd82da..f6eb5cc 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,6 +1006,10 @@ final class RootProxyManager {
+@@ -697,6 +1022,16 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -7566,10 +8194,16 @@ index 9cd82da..f6eb5cc 100644
 +            String shown=conversionWarnings.length()>900?conversionWarnings.substring(0,900)+"…":conversionWarnings;
 +            warning=(warning.isEmpty()?"":warning+"；")+profile.core.label+" 配置："+shown;
 +        }
++        // Native cores already carry the cleanup in their conversion warnings above.
++        String cleanupNotices=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?prefs.getString("proxyConfigCleanupNotices",""):"";
++        if(cleanupNotices!=null&&!cleanupNotices.isEmpty()){
++            String shown=cleanupNotices.length()>900?cleanupNotices.substring(0,900)+"…":cleanupNotices;
++            warning=(warning.isEmpty()?"":warning+"；")+"失效引用已自动清理："+shown;
++        }
          result.put("sourceConfig",p.source.name)
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
-@@ -723,10 +1036,17 @@ final class RootProxyManager {
+@@ -723,10 +1058,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -7587,7 +8221,7 @@ index 9cd82da..f6eb5cc 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -749,11 +1069,18 @@ final class RootProxyManager {
+@@ -749,11 +1091,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -7606,7 +8240,7 @@ index 9cd82da..f6eb5cc 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1088,49 @@ final class RootProxyManager {
+@@ -761,10 +1110,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -7657,7 +8291,26 @@ index 9cd82da..f6eb5cc 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -789,10 +1155,12 @@ final class RootProxyManager {
+@@ -777,8 +1165,16 @@ final class RootProxyManager {
+                 bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
+                 bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
+                 bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
+-                prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"",
+-                prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"",bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
++                cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):""),
++                cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):""),bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
++    }
++
++    /**
++     * 资源限制 → cgroup 硬限制 (default off): the same memory / I/O value with a "cg:" prefix, which
++     * hetu-root.sh turns into memcg memory.max and an io weight (cgroup v2, v1 fallback) for the core.
++     */
++    private String cgroupTuning(String value){
++        return CoreResourceLimits.argument(value,prefs.getBoolean(CoreResourceLimits.PREF_ENABLED,false));
+     }
+
+     private void installAutostart(Prepared p,String[] args)throws Exception{
+@@ -789,10 +1185,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -7672,7 +8325,7 @@ index 9cd82da..f6eb5cc 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1170,40 @@ final class RootProxyManager {
+@@ -802,20 +1200,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -7718,7 +8371,7 @@ index 9cd82da..f6eb5cc 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1213,26 @@ final class RootProxyManager {
+@@ -825,19 +1243,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -7749,7 +8402,7 @@ index 9cd82da..f6eb5cc 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1240,40 @@ final class RootProxyManager {
+@@ -845,31 +1270,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -7806,7 +8459,7 @@ index 9cd82da..f6eb5cc 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1283,7 @@ final class RootProxyManager {
+@@ -879,7 +1313,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -7815,7 +8468,7 @@ index 9cd82da..f6eb5cc 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1343,7 @@ final class RootProxyManager {
+@@ -939,7 +1373,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -7824,7 +8477,7 @@ index 9cd82da..f6eb5cc 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1425,7 @@ final class RootProxyManager {
+@@ -1021,7 +1455,7 @@ final class RootProxyManager {
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -7833,7 +8486,7 @@ index 9cd82da..f6eb5cc 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1463,7 @@ final class RootProxyManager {
+@@ -1059,7 +1493,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -7842,7 +8495,7 @@ index 9cd82da..f6eb5cc 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1475,22 @@ final class RootProxyManager {
+@@ -1071,22 +1505,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -7870,7 +8523,7 @@ index 9cd82da..f6eb5cc 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1503,7 @@ final class RootProxyManager {
+@@ -1099,7 +1533,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -7879,7 +8532,7 @@ index 9cd82da..f6eb5cc 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1551,7 @@ final class RootProxyManager {
+@@ -1147,7 +1581,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -7888,7 +8541,7 @@ index 9cd82da..f6eb5cc 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1561,7 @@ final class RootProxyManager {
+@@ -1157,7 +1591,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -7897,7 +8550,39 @@ index 9cd82da..f6eb5cc 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1207,10 +1611,14 @@ final class RootProxyManager {
+@@ -1194,6 +1628,31 @@ final class RootProxyManager {
+     }
+     File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
+
++    /** Diagnostics are explanatory only: a failure to describe the sources never blocks a start. */
++    private static List<String> safeDiagnostics(java.util.concurrent.Callable<List<String>> build){
++        try{return build.call();}catch(Exception failed){return Collections.singletonList("[来源] 无法生成来源诊断："+failed.getMessage());}
++    }
++
++    /**
++     * 启动诊断: reference cleanup + where ports / DNS / fake-IP came from, kept for the 启动配置 page
++     * (prefs) and as a small private log next to the startup copy. The start warning repeats the cleanup.
++     */
++    private void recordStartupDiagnostics(List<String> cleanupNotices,List<String> sourceLines){
++        String report=StartupDiagnostics.report(cleanupNotices,sourceLines);
++        prefs.edit().putString("proxyStartupDiagnostics",report)
++                .putLong("proxyStartupDiagnosticsAt",System.currentTimeMillis())
++                .putString("proxyConfigCleanupNotices",String.join("；",cleanupNotices)).apply();
++        try{
++            File log=new File(startupFile().getParentFile(),"startup-diagnostics.log");
++            File dir=log.getParentFile();
++            if(dir!=null&&(dir.isDirectory()||dir.mkdirs())){
++                try(FileOutputStream out=new FileOutputStream(log,false)){out.write(report.getBytes(StandardCharsets.UTF_8));}
++            }
++        }catch(IOException ignored){
++            // The prefs copy above is what the page shows.
++        }
++    }
++
+     private void writeStartupCopy(String text)throws IOException{
+         File target=startupFile(),dir=target.getParentFile();
+         if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
+@@ -1207,10 +1666,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -7914,7 +8599,7 @@ index 9cd82da..f6eb5cc 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1632,10 @@ final class RootProxyManager {
+@@ -1224,6 +1687,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -7925,7 +8610,7 @@ index 9cd82da..f6eb5cc 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1653,7 @@ final class RootProxyManager {
+@@ -1241,7 +1708,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -7934,7 +8619,7 @@ index 9cd82da..f6eb5cc 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1663,46 @@ final class RootProxyManager {
+@@ -1251,11 +1718,46 @@ final class RootProxyManager {
          }
      }
 
@@ -7982,7 +8667,7 @@ index 9cd82da..f6eb5cc 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1716,121 @@ final class RootProxyManager {
+@@ -1269,14 +1771,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -8107,7 +8792,7 @@ index 9cd82da..f6eb5cc 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +1843,7 @@ final class RootProxyManager {
+@@ -1289,7 +1898,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -8116,7 +8801,7 @@ index 9cd82da..f6eb5cc 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +1867,7 @@ final class RootProxyManager {
+@@ -1313,7 +1922,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -8125,7 +8810,7 @@ index 9cd82da..f6eb5cc 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +1887,28 @@ final class RootProxyManager {
+@@ -1333,13 +1942,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -8155,7 +8840,7 @@ index 9cd82da..f6eb5cc 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +1935,28 @@ final class RootProxyManager {
+@@ -1366,13 +1990,28 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -8184,7 +8869,7 @@ index 9cd82da..f6eb5cc 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +1968,12 @@ final class RootProxyManager {
+@@ -1384,7 +2023,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -8198,7 +8883,7 @@ index 9cd82da..f6eb5cc 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +1982,13 @@ final class RootProxyManager {
+@@ -1393,6 +2037,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -8212,7 +8897,7 @@ index 9cd82da..f6eb5cc 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2008,44 @@ final class RootProxyManager {
+@@ -1412,14 +2063,44 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -8522,6 +9207,149 @@ index 0000000..07fab10
 +        start = end
 +    }
 +    return result
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java
+new file mode 100644
+index 0000000..18b60e4
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupDiagnostics.java
+@@ -0,0 +1,137 @@
++package io.github.xgl34222220.hetu;
++
++import java.util.*;
++import org.yaml.snakeyaml.error.YAMLException;
++
++/**
++ * Where each startup value came from: listener ports, the DNS listener and mode, and the fake-IP range,
++ * each tagged as set by the selected config file, by Hetu's runtime override, or by a default.
++ *
++ * <p>The lines are recorded at every prepare (the 启动配置 page shows them as 启动诊断, and they are
++ * kept in the app's startup-diagnostics log). Reference-cleanup notices additionally go into the private
++ * startup copy as {@code # HETU_NOTICE: } comments, which hetu-root.sh copies into core.log right after it
++ * truncates the log; without a cleanup the startup copy stays byte-identical. Pure JVM.
++ */
++final class StartupDiagnostics {
++    private StartupDiagnostics() {}
++
++    static final String NOTICE_PREFIX = "# HETU_NOTICE: ";
++    static final int MAX_LINES = 64;
++    static final String SRC_CONFIG = "配置文件", SRC_HETU = "河图运行时覆写", SRC_DEFAULT = "默认值", SRC_APP = "河图设置";
++
++    /** The full diagnostics text: cleanup notices first, then the source lines. */
++    static String report(List<String> cleanupNotices, List<String> sourceLines) {
++        StringBuilder out = new StringBuilder();
++        for (String s : cleanupNotices) out.append("[清理] ").append(sanitize(s)).append('\n');
++        for (String s : sourceLines) out.append(sanitize(s)).append('\n');
++        return out.toString();
++    }
++
++    static String line(String what, String value, String source, String detail) {
++        return "[来源] " + what + " = " + value + " ← " + source + (detail == null || detail.isEmpty() ? "" : "（" + detail + "）");
++    }
++
++    /** Mihomo / Mihomo Smart: SOURCE is the selected file (after reference cleanup), FINAL the generated copy. */
++    static List<String> mihomo(String source, String finalYaml, ProxyRuntimeProfile profile, int tproxyPort, int redirectPort,
++                               boolean dnsTakeover, int dnsPort, int controllerPort, boolean controllerReused,
++                               String fakeIpV4, String fakeIpV6) {
++        List<String> out = new ArrayList<>();
++        int sourceTp = MihomoStartupConfig.detectScalarPort(source, "tproxy-port");
++        int sourceRp = MihomoStartupConfig.detectScalarPort(source, "redir-port");
++        out.add(portLine("TPROXY 端口", tproxyPort, sourceTp, "tproxy-port", profile.mode.label));
++        out.add(portLine("Redirect 端口", redirectPort, sourceRp, "redir-port", profile.mode.label));
++        Map<String, Object> srcDns = dns(source), finalDns = dns(finalYaml);
++        String srcListen = scalar(srcDns, "listen");
++        if (dnsTakeover) {
++            out.add(line("DNS 监听", "127.0.0.1:" + dnsPort, SRC_HETU,
++                    srcListen.isEmpty() ? "配置文件未设置 dns.listen" : "配置文件的 dns.listen " + srcListen + " 不用于 Root 接管"));
++        } else {
++            out.add(line("DNS 监听", srcListen.isEmpty() ? "未设置" : srcListen, srcListen.isEmpty() ? SRC_DEFAULT : SRC_CONFIG, "DNS 接管已关闭"));
++        }
++        String srcMode = scalar(srcDns, "enhanced-mode"), finalMode = scalar(finalDns, "enhanced-mode");
++        boolean dnsEnabled = finalDns != null && !"false".equalsIgnoreCase(scalar(finalDns, "enable"));
++        if (finalDns == null) out.add(line("DNS 模式", "未启用内置 DNS", SRC_DEFAULT, "配置文件没有 dns 段"));
++        else if (!dnsEnabled) out.add(line("DNS 模式", "内置 DNS 已关闭", SRC_CONFIG, "dns.enable: false"));
++        else if (finalMode.isEmpty()) out.add(line("DNS 模式", "redir-host", SRC_DEFAULT, "配置文件未设置 dns.enhanced-mode，按 Mihomo 默认"));
++        else if (finalMode.equals(srcMode)) out.add(line("DNS 模式", finalMode, SRC_CONFIG, "dns.enhanced-mode"));
++        else out.add(line("DNS 模式", finalMode, SRC_HETU, srcMode.isEmpty() ? "配置文件未设置" : "配置文件为 " + srcMode));
++        boolean fakeIp = dnsEnabled && "fake-ip".equalsIgnoreCase(finalMode);
++        if (fakeIp) {
++            String srcRange = scalar(srcDns, "fake-ip-range");
++            String v4 = fakeIpV4 == null || fakeIpV4.isEmpty() ? "未使用" : fakeIpV4;
++            out.add(line("Fake-IP 范围（IPv4）", v4, srcRange.isEmpty() ? SRC_DEFAULT : SRC_CONFIG,
++                    srcRange.isEmpty() ? "配置文件未设置 dns.fake-ip-range" : "dns.fake-ip-range"));
++            String srcRange6 = scalar(srcDns, "fake-ip-range6");
++            if (fakeIpV6 != null && !fakeIpV6.isEmpty())
++                out.add(line("Fake-IP 范围（IPv6）", fakeIpV6, srcRange6.isEmpty() ? SRC_DEFAULT : SRC_CONFIG,
++                        srcRange6.isEmpty() ? "配置文件未设置 dns.fake-ip-range6" : "dns.fake-ip-range6"));
++        } else {
++            out.add(line("Fake-IP 范围", "未使用", finalDns == null || finalMode.isEmpty() ? SRC_DEFAULT : SRC_CONFIG, "DNS 模式不是 fake-ip"));
++        }
++        out.add(line("控制接口端口", "127.0.0.1:" + controllerPort, SRC_HETU, controllerReused ? "沿用当前运行的端口" : "启动时自动选择空闲端口"));
++        return out;
++    }
++
++    /** sing-box / Xray / V2Fly / Hysteria: Hetu owns every ingress; the fake-IP range comes from the source or a default. */
++    static List<String> nativeCore(String coreLabel, boolean nativeSource, String source, int tproxyPort, int redirectPort, int dnsPort,
++                                   int controllerPort, boolean controllerReused, String fakeIpV4) {
++        List<String> out = new ArrayList<>();
++        String taken = nativeSource ? "已接管 " + coreLabel + " 配置中的入站" : "由 Clash/Mihomo 配置转换";
++        out.add(tproxyPort > 0 ? line("TPROXY 端口", String.valueOf(tproxyPort), SRC_HETU, taken) : line("TPROXY 端口", "未启用", SRC_HETU, "当前模式不需要"));
++        out.add(redirectPort > 0 ? line("Redirect 端口", String.valueOf(redirectPort), SRC_HETU, taken) : line("Redirect 端口", "未启用", SRC_HETU, "当前模式不需要"));
++        out.add(dnsPort > 0 ? line("DNS 监听", "127.0.0.1:" + dnsPort, SRC_HETU, "河图 DNS 入站") : line("DNS 监听", "未启用", SRC_APP, "DNS 接管已关闭"));
++        if (fakeIpV4 == null || fakeIpV4.isEmpty()) {
++            out.add(line("Fake-IP 范围", "未使用", nativeSource ? SRC_CONFIG : SRC_DEFAULT, nativeSource ? "原生配置未声明河图可识别的 fake-IP" : "转换后的 DNS 不使用 fake-ip"));
++        } else {
++            String range = nativeSource ? "" : scalar(dns(source), "fake-ip-range");
++            boolean fromSource = !range.isEmpty();
++            out.add(line("Fake-IP 范围（IPv4）", fakeIpV4, fromSource ? SRC_CONFIG : SRC_DEFAULT,
++                    fromSource ? "dns.fake-ip-range" : "配置文件未设置，使用默认 " + ProxyCoreConfig.DEFAULT_FAKE_IP_V4));
++        }
++        out.add(controllerPort > 0 ? line("控制接口端口", "127.0.0.1:" + controllerPort, SRC_HETU, controllerReused ? "沿用当前运行的端口" : "启动时自动选择空闲端口")
++                : line("控制接口端口", "未启用", SRC_HETU, coreLabel + " 无控制接口"));
++        return out;
++    }
++
++    /** Comment header for the private startup copy; empty when no reference was cleaned. */
++    static String header(List<String> cleanupNotices) {
++        StringBuilder out = new StringBuilder();
++        int n = 0;
++        for (String s : cleanupNotices) {
++            if (n++ >= MAX_LINES) break;
++            out.append(NOTICE_PREFIX).append(sanitize("[清理] " + s)).append('\n');
++        }
++        return out.toString();
++    }
++
++    /** One line, no control characters, bounded; safe inside a YAML comment and a shell `sed`. */
++    static String sanitize(String s) {
++        StringBuilder b = new StringBuilder();
++        for (int i = 0; i < s.length() && b.length() < 400; i++) {
++            char c = s.charAt(i);
++            b.append(c < 0x20 || c == 0x7f || c == 0x2028 || c == 0x2029 ? ' ' : c);
++        }
++        return b.toString();
++    }
++
++    private static String portLine(String what, int port, int sourcePort, String key, String modeLabel) {
++        if (port <= 0) return line(what, "未启用", SRC_HETU, modeLabel + " 模式不需要" + (sourcePort > 0 ? "；配置文件的 " + key + ": " + sourcePort + " 已忽略" : ""));
++        return line(what, String.valueOf(port), SRC_HETU, sourcePort > 0 ? "配置文件的 " + key + ": " + sourcePort + " 已被替换" : "配置文件未设置 " + key);
++    }
++
++    static Map<String, Object> dns(String yaml) {
++        if (yaml == null || ProxyCoreConfig.looksJson(yaml) || !MihomoStartupConfig.hasTopLevelKey(yaml, "dns")) return null;
++        try {
++            Object root = ConfigReferenceCleaner.loader().load(yaml);
++            return root instanceof Map ? ConfigReferenceCleaner.map(((Map<?, ?>) root).get("dns")) : null;
++        } catch (YAMLException | ClassCastException invalid) {
++            return null;
++        }
++    }
++
++    static String scalar(Map<String, Object> m, String key) {
++        if (m == null) return "";
++        Object v = m.get(key);
++        return v == null || v instanceof Map || v instanceof List ? "" : String.valueOf(v).trim();
++    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ToolsRuntimeBridge.kt
 index e4053e5..72b8798 100644
@@ -10132,7 +10960,7 @@ index 2b1a624..265b68d 100644
              }
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..adead59 100644
+index 250b8a8..43394dc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -10184,7 +11012,31 @@ index 250b8a8..adead59 100644
      /* ---------------- messages ---------------- */
      private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
      val messages: SharedFlow<String> = _messages
-@@ -398,7 +417,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -369,6 +388,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             latestNodeProbe[node] = owner
+             delays[node] = value
+             measuredAt[node] = stamp
++            probeRunReadings[owner]?.put(node, value)
++        }
++    }
++
++    /** 测速历史: the readings each group / 全部 probe run (by owner) applied. Main thread only. */
++    private val probeRunReadings = HashMap<Long, MutableMap<String, Long>>()
++
++    /** Keeps one finished probe run in the speed-test history; observing only, never changes the probe. */
++    private fun recordProbeRun(owner: Long, title: String, targets: List<String>) {
++        val readings = probeRunReadings.remove(owner) ?: return
++        if (targets.isEmpty()) return
++        try {
++            SpeedTestHistory.add(getApplication(), SpeedTestHistory.latencyRecord(title, targets, readings, System.currentTimeMillis()))
++        } catch (cancel: CancellationException) {
++            throw cancel
++        } catch (_: Exception) {
++            // History is best effort.
+         }
+     }
+
+@@ -398,7 +434,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  }
              }
              while (isActive) {
@@ -10196,7 +11048,7 @@ index 250b8a8..adead59 100644
                  delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
              }
          }
-@@ -412,19 +434,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -412,19 +451,71 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          pollJob = null
      }
 
@@ -10270,7 +11122,7 @@ index 250b8a8..adead59 100644
      private fun initialRuntime(): ProxyRuntimeSnapshot = ProxyRuntimeSnapshot(
          running = prefs.getBoolean("proxyUiLastRunning", false),
          elapsedSeconds = prefs.getLong("proxyUiLastElapsed", 0L),
-@@ -449,15 +523,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -449,15 +540,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Returns the fresh, unmerged readback; cached groups cannot acknowledge a selection. */
      suspend fun refreshNow(): ProxyComposeState? {
@@ -10306,7 +11158,7 @@ index 250b8a8..adead59 100644
              // A later stop/config/state update owns the UI. The next fresh poll can still apply.
              if (superseded()) return null
              // The existing worker status read supplies authority. A cached
-@@ -509,7 +600,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -509,7 +617,26 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  rateHistory.clear()
                  upHistory.clear()
              }
@@ -10334,7 +11186,7 @@ index 250b8a8..adead59 100644
 
              var sampleValid = next.running
              val sampled = if (next.running) {
-@@ -560,17 +670,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -560,17 +687,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              }
 
              if (superseded()) return null
@@ -10352,7 +11204,7 @@ index 250b8a8..adead59 100644
              if (controllerSampleValid) {
                  lastAt = now
                  lastUp = next.uploadTotal
-@@ -579,7 +678,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -579,7 +695,6 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                  try { ProxyApiHistoryStore.record(app, upRate, downRate, next.connections) } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { }
                  if (superseded()) return null
              }
@@ -10360,7 +11212,7 @@ index 250b8a8..adead59 100644
              persistSnapshot(next, sampled)
              return next
          } catch (cancel: CancellationException) {
-@@ -591,7 +689,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -591,7 +706,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      private fun persistSnapshot(next: ProxyComposeState, sampled: ProxyRuntimeSnapshot) {
@@ -10371,7 +11223,7 @@ index 250b8a8..adead59 100644
              .putBoolean("proxyUiLastRunning", next.running)
              .putString("proxyUiLastConfig", next.config)
              .putLong("proxyUiLastElapsed", sampled.elapsedSeconds)
-@@ -677,9 +778,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -677,9 +795,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          viewModelScope.launch {
              operationText = if (stopping) "正在停止…" else "正在启动…"
              try {
@@ -10394,7 +11246,7 @@ index 250b8a8..adead59 100644
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
-@@ -746,6 +857,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +874,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -10408,7 +11260,7 @@ index 250b8a8..adead59 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -764,8 +882,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +899,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -10443,7 +11295,7 @@ index 250b8a8..adead59 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -778,6 +922,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -778,6 +939,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -10459,7 +11311,7 @@ index 250b8a8..adead59 100644
      fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
 
      fun bumpSettings() { syncRequestSettings(); settingsRevision++ }
-@@ -785,6 +938,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -785,6 +955,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
@@ -10467,7 +11319,7 @@ index 250b8a8..adead59 100644
          val request = activeRuntimeRequest() ?: return
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +981,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,12 +998,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -10487,7 +11339,7 @@ index 250b8a8..adead59 100644
          val request = activeRuntimeRequest() ?: return
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
-@@ -843,6 +1002,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1019,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -10496,7 +11348,10 @@ index 250b8a8..adead59 100644
          val request = activeRuntimeRequest() ?: return
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
-@@ -852,10 +1013,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         if (targets.isEmpty()) return
+         val owner = ++requestSequence
++        probeRunReadings[owner] = LinkedHashMap()
+         groupProbeOwners[group.name] = owner
          testingGroups[group.name] = true
          holdNodeProbes(owner, targets)
          viewModelScope.launch {
@@ -10522,7 +11377,7 @@ index 250b8a8..adead59 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,11 +1036,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1054,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -10538,9 +11393,11 @@ index 250b8a8..adead59 100644
 +                landed.close()
 +                progress.cancel()
                  releaseNodeProbes(owner, targets)
++                recordProbeRun(owner, "策略组 ${group.name}", targets)
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
-@@ -878,6 +1057,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+                     testingGroups.remove(group.name)
+@@ -878,6 +1076,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -10549,7 +11406,11 @@ index 250b8a8..adead59 100644
          val request = activeRuntimeRequest() ?: return
          if (testingAll) return
          val owner = ++requestSequence
-@@ -888,17 +1069,36 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -885,21 +1085,42 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+             providers.flatMap { it.nodes } + delays.keys).distinct()
+             .filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }
+         allProbeOwner = owner
++        probeRunReadings[owner] = LinkedHashMap()
          holdNodeProbes(owner, targets)
          testingAll = true
          viewModelScope.launch {
@@ -10586,9 +11447,11 @@ index 250b8a8..adead59 100644
 +                landed.close()
 +                progress.cancel()
                  releaseNodeProbes(owner, targets)
++                recordProbeRun(owner, "全部节点", targets)
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
-@@ -1263,6 +1463,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         }
+@@ -1263,6 +1484,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -11327,10 +12190,10 @@ index 0000000..6c667a6
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..99cb927
+index 0000000..d704778
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,548 @@
+@@ -0,0 +1,560 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -11426,6 +12289,9 @@ index 0000000..99cb927
 +    var down by mutableStateOf<Pair<Double, Long>?>(null)
 +    var up by mutableStateOf<Pair<Double, Long>?>(null)
 +    var error by mutableStateOf<String?>(null)
++    /** Bytes moved so far in each direction (from live samples), for the history of a stopped run. */
++    var liveBytesDown = 0L
++    var liveBytesUp = 0L
 +    val downSamples: SnapshotStateList<Float> = mutableStateListOf()
 +    val upSamples: SnapshotStateList<Float> = mutableStateListOf()
 +
@@ -11433,7 +12299,7 @@ index 0000000..99cb927
 +
 +    fun reset() {
 +        phase = SpeedPhase.Meta; meta = null; metaKnown = false; latency = -1L; live = 0.0
-+        down = null; up = null; error = null; downSamples.clear(); upSamples.clear()
++        down = null; up = null; error = null; downSamples.clear(); upSamples.clear(); liveBytesDown = 0L; liveBytesUp = 0L
 +    }
 +
 +    fun accept(event: SpeedEvent) {
@@ -11443,6 +12309,7 @@ index 0000000..99cb927
 +            is SpeedEvent.Latency -> latency = event.millis
 +            is SpeedEvent.Live -> {
 +                live = event.mbps
++                if (event.upload) liveBytesUp = event.bytes else liveBytesDown = event.bytes
 +                val list = if (event.upload) upSamples else downSamples
 +                list.add(event.mbps.toFloat())
 +                if (list.size > SAMPLE_CAP) list.removeAt(0)
@@ -11536,6 +12403,7 @@ index 0000000..99cb927
 +    val speed = remember { SpeedUiState() }
 +    var speedRun by remember { mutableIntStateOf(0) }
 +    var speedActive by remember { mutableStateOf(false) }
++    var historyVersion by remember { mutableIntStateOf(0) }
 +    LaunchedEffect(speedRun, speedActive) {
 +        if (!speedActive) {
 +            if (speed.running) speed.phase = if (speed.down != null) SpeedPhase.Done else SpeedPhase.Idle
@@ -11547,6 +12415,12 @@ index 0000000..99cb927
 +            val port = withContext(Dispatchers.IO) { NetworkTest.proxyPort(context) }
 +            SpeedTest.run(port).collect { speed.accept(it) }
 +        } finally {
++            // 测速历史: keep this run (complete or stopped), additive to the test itself.
++            if (speed.down != null || speed.latency >= 0 || speed.error != null) {
++                SpeedTestHistory.add(context, SpeedTestHistory.bandwidthRecord("网速测试", speed.latency, speed.down, speed.up,
++                    speed.liveBytesDown, speed.liveBytesUp, speed.error, System.currentTimeMillis()))
++                historyVersion++
++            }
 +            // A late finish of an older run must not stop the one that replaced it.
 +            if (speedRun == generation) speedActive = false
 +        }
@@ -11620,6 +12494,7 @@ index 0000000..99cb927
 +            item(key = "speed-exit") { SpeedExitCard(speed) }
 +            item(key = "speed-result") { SpeedResultCard(speed) }
 +            item(key = "speed-chart") { SpeedChartCard(speed) }
++            item(key = "speed-history") { SpeedTestHistorySection(historyVersion) }
 +        }
 +    }
 +}
@@ -12841,7 +13716,7 @@ index 2b4638e..4841af8 100644
              selected = profile.core.id,
              onPick = { putString("proxyBaseCore", it); choice = null },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
-index ce5f550..65650a3 100644
+index ce5f550..94de2a1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 @@ -1,19 +1,17 @@
@@ -12866,11 +13741,13 @@ index ce5f550..65650a3 100644
  import androidx.compose.runtime.Composable
  import androidx.compose.runtime.LaunchedEffect
  import androidx.compose.runtime.getValue
-@@ -47,11 +45,27 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -47,11 +45,29 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
      var text by remember { mutableStateOf("") }
      var busy by remember { mutableStateOf(false) }
      var message by remember { mutableStateOf("") }
 +    var copyFailed by remember { mutableStateOf(false) }
++    // 启动诊断: reference cleanup and where ports / DNS / fake-IP came from, recorded at prepare.
++    var diagnostics by remember { mutableStateOf(prefs.getString("proxyStartupDiagnostics", "").orEmpty()) }
      val c = LocalHomeColors.current
 
 +    fun copy() {
@@ -12894,7 +13771,15 @@ index ce5f550..65650a3 100644
          scope.launch {
              try {
                  text = withContext(Dispatchers.IO) {
-@@ -67,6 +81,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -59,6 +75,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+                     manager.startupConfig()
+                 }
+                 message = if (regenerate) "启动配置已重新生成（未重启代理）" else ""
++                diagnostics = prefs.getString("proxyStartupDiagnostics", "").orEmpty()
+             } catch (cancel: CancellationException) { throw cancel }
+             catch (error: Exception) { message = error.message ?: "尚未生成启动配置" }
+             finally { busy = false }
+@@ -67,6 +84,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
      LaunchedEffect(Unit) { load(false) }
      val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/yaml")) { uri ->
          if (uri != null) scope.launch {
@@ -12902,7 +13787,7 @@ index ce5f550..65650a3 100644
              try {
                  withContext(Dispatchers.IO) {
                      context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-@@ -87,26 +102,23 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -87,26 +105,34 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                                  if (busy) HxSpinner(18.dp)
                              }
                          }
@@ -12918,6 +13803,17 @@ index ce5f550..65650a3 100644
          if (message.isNotBlank()) item(key = "message") {
 -            HxBanner(message, tone = HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
 +            HxBanner(message, tone = if (copyFailed) HxTone.Bad else HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
++        }
++        if (diagnostics.isNotBlank()) item(key = "diagnostics") {
++            SettingsSection {
++                Box(Modifier.fillMaxWidth().homeGlassPanel().padding(horizontal = 18.dp, vertical = 16.dp)) {
++                    androidx.compose.foundation.layout.Column {
++                        androidx.compose.material3.Text(ht("启动诊断"), color = c.t1, style = HomeType.label)
++                        androidx.compose.foundation.layout.Spacer(Modifier.padding(top = 6.dp))
++                        androidx.compose.material3.Text(diagnostics.trimEnd(), color = c.t2, style = HomeType.caption)
++                    }
++                }
++            }
          }
          item(key = "config") {
              SettingsSection {
@@ -12936,6 +13832,345 @@ index ce5f550..65650a3 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt
+new file mode 100644
+index 0000000..e1e69ff
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt
+@@ -0,0 +1,209 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import org.json.JSONArray
++import org.json.JSONObject
++import java.util.Locale
++
++/**
++ * 测速历史: every finished (or stopped) test run is kept so it can be looked at again later.
++ *
++ * Two kinds of run are recorded:
++ *  * [SpeedRunKind.Latency] — a node delay test (one strategy group or 全部). Per node: delay in ms, or
++ *    timeout / no response. The core's controller does not report bytes, so the traffic is an estimate
++ *    from the number of probes and is always marked 估算.
++ *  * [SpeedRunKind.Bandwidth] — the 网速 test. Bytes are the real counters; the run is marked 估算 when it
++ *    was stopped early or the sample is too small to be a reliable rate.
++ *
++ * Separate preference file (not part of settings backup), newest first, at most [MAX_RUNS] runs and
++ * [MAX_NODES] nodes per run. Additive: it only observes results; the probes themselves are unchanged.
++ */
++internal enum class SpeedRunKind { Latency, Bandwidth }
++
++/** delayMs: > 0 measured, [TIMEOUT] the node timed out, [NO_RESPONSE] no result came back for it. */
++internal data class SpeedNodeSample(val name: String, val delayMs: Long) {
++    companion object {
++        const val TIMEOUT = -1L
++        const val NO_RESPONSE = -2L
++    }
++}
++
++internal data class SpeedRunRecord(
++    val id: Long,
++    val at: Long,
++    val kind: SpeedRunKind,
++    val title: String,
++    val nodes: List<SpeedNodeSample> = emptyList(),
++    val latencyMs: Long = -1L,
++    val downMbps: Double? = null,
++    val upMbps: Double? = null,
++    val bytesDown: Long = 0L,
++    val bytesUp: Long = 0L,
++    val estimated: Boolean = false,
++    val hint: String = "",
++) {
++    val ok: Int get() = nodes.count { it.delayMs > 0 }
++    val timeouts: Int get() = nodes.count { it.delayMs == SpeedNodeSample.TIMEOUT }
++    val noResponse: Int get() = nodes.count { it.delayMs <= SpeedNodeSample.NO_RESPONSE }
++    val best: SpeedNodeSample? get() = nodes.filter { it.delayMs > 0 }.minByOrNull { it.delayMs }
++}
++
++internal object SpeedTestHistory {
++    const val PREFS = "hetu_speed_history"
++    private const val KEY = "runsV1"
++    const val MAX_RUNS = 30
++    const val MAX_NODES = 300
++
++    /** Estimated wire bytes of one delay probe through a proxy (proxy + TLS handshake and one small HTTP exchange). */
++    const val PROBE_UP_BYTES = 1_536L
++    const val PROBE_DOWN_BYTES = 4_096L
++    /** A timed-out probe still sent its handshake; count it as about one third of a full exchange. */
++    const val TIMEOUT_UP_BYTES = 768L
++    const val TIMEOUT_DOWN_BYTES = 1_024L
++    /** Below this a bandwidth phase is too short to be a trustworthy rate. */
++    const val RELIABLE_SAMPLE_BYTES = 2L * 1024 * 1024
++
++    /** One delay-test run. [results] holds only the readings this run produced; absent targets got no response. */
++    fun latencyRecord(title: String, targets: List<String>, results: Map<String, Long>, now: Long): SpeedRunRecord {
++        val nodes = targets.distinct().take(MAX_NODES).map { name ->
++            val v = results[name]
++            SpeedNodeSample(name, when {
++                v == null -> SpeedNodeSample.NO_RESPONSE
++                v > 0 -> v
++                v == SpeedNodeSample.TIMEOUT -> SpeedNodeSample.TIMEOUT
++                else -> SpeedNodeSample.NO_RESPONSE
++            })
++        }
++        var up = 0L
++        var down = 0L
++        nodes.forEach {
++            when {
++                it.delayMs > 0 -> { up += PROBE_UP_BYTES; down += PROBE_DOWN_BYTES }
++                it.delayMs == SpeedNodeSample.TIMEOUT -> { up += TIMEOUT_UP_BYTES; down += TIMEOUT_DOWN_BYTES }
++            }
++        }
++        val ok = nodes.count { it.delayMs > 0 }
++        val silent = nodes.count { it.delayMs <= SpeedNodeSample.NO_RESPONSE }
++        val hint = when {
++            nodes.isNotEmpty() && ok == 0 && silent == nodes.size -> "所有节点均无响应：请确认代理正在运行、控制接口可用，然后重试"
++            nodes.isNotEmpty() && ok == 0 -> "所有节点均超时：请检查订阅节点是否有效，或测速地址能否经代理访问"
++            silent > 0 -> "$silent 个节点没有返回结果（未计入超时）"
++            else -> ""
++        }
++        return SpeedRunRecord(now, now, SpeedRunKind.Latency, title, nodes, bytesDown = down, bytesUp = up, estimated = true, hint = hint)
++    }
++
++    /** One 网速 run, complete or stopped. */
++    fun bandwidthRecord(
++        title: String, latencyMs: Long, down: Pair<Double, Long>?, up: Pair<Double, Long>?,
++        liveBytesDown: Long, liveBytesUp: Long, error: String?, now: Long,
++    ): SpeedRunRecord {
++        val bytesDown = down?.second ?: liveBytesDown
++        val bytesUp = up?.second ?: liveBytesUp
++        val incomplete = down == null || up == null
++        val small = (down != null && down.second < RELIABLE_SAMPLE_BYTES) || (up != null && up.second < RELIABLE_SAMPLE_BYTES / 4)
++        val hint = when {
++            !error.isNullOrBlank() -> error
++            down == null && latencyMs < 0 -> "测速服务器没有响应：请检查网络或当前节点"
++            incomplete -> "测速未完成，结果仅为已完成阶段"
++            small -> "样本过少，速率为估算值"
++            else -> ""
++        }
++        return SpeedRunRecord(now, now, SpeedRunKind.Bandwidth, title, latencyMs = latencyMs, downMbps = down?.first, upMbps = up?.first,
++            bytesDown = bytesDown.coerceAtLeast(0), bytesUp = bytesUp.coerceAtLeast(0), estimated = incomplete || small || !error.isNullOrBlank(), hint = hint)
++    }
++
++    fun load(context: Context): List<SpeedRunRecord> =
++        decode(context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY, "").orEmpty())
++
++    @Synchronized
++    fun add(context: Context, record: SpeedRunRecord) {
++        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++        val runs = decode(prefs.getString(KEY, "").orEmpty())
++        val id = if (runs.any { it.id == record.id }) (runs.maxOf { it.id } + 1) else record.id
++        prefs.edit().putString(KEY, encode(listOf(record.copy(id = id)) + runs)).apply()
++    }
++
++    @Synchronized
++    fun delete(context: Context, id: Long) {
++        val prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
++        prefs.edit().putString(KEY, encode(decode(prefs.getString(KEY, "").orEmpty()).filter { it.id != id })).apply()
++    }
++
++    @Synchronized
++    fun clear(context: Context) {
++        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY).apply()
++    }
++
++    fun encode(runs: List<SpeedRunRecord>): String {
++        val array = JSONArray()
++        runs.sortedByDescending { it.at }.take(MAX_RUNS).forEach { r ->
++            val o = JSONObject()
++                .put("id", r.id).put("at", r.at).put("kind", r.kind.name).put("title", r.title)
++                .put("latency", r.latencyMs).put("bytesDown", r.bytesDown).put("bytesUp", r.bytesUp)
++                .put("estimated", r.estimated).put("hint", r.hint)
++            r.downMbps?.let { o.put("down", it) }
++            r.upMbps?.let { o.put("up", it) }
++            if (r.nodes.isNotEmpty()) {
++                val nodes = JSONArray()
++                r.nodes.take(MAX_NODES).forEach { nodes.put(JSONArray().put(it.name).put(it.delayMs)) }
++                o.put("nodes", nodes)
++            }
++            array.put(o)
++        }
++        return array.toString()
++    }
++
++    fun decode(text: String): List<SpeedRunRecord> {
++        if (text.isBlank()) return emptyList()
++        return try {
++            val array = JSONArray(text)
++            (0 until array.length()).mapNotNull { i ->
++                val o = array.optJSONObject(i) ?: return@mapNotNull null
++                val kind = runCatching { SpeedRunKind.valueOf(o.optString("kind")) }.getOrNull() ?: return@mapNotNull null
++                val nodesJson = o.optJSONArray("nodes")
++                val nodes = if (nodesJson == null) emptyList() else (0 until nodesJson.length()).mapNotNull { j ->
++                    val pair = nodesJson.optJSONArray(j) ?: return@mapNotNull null
++                    SpeedNodeSample(pair.optString(0), pair.optLong(1, SpeedNodeSample.NO_RESPONSE))
++                }
++                SpeedRunRecord(
++                    id = o.optLong("id"), at = o.optLong("at"), kind = kind, title = o.optString("title"), nodes = nodes,
++                    latencyMs = o.optLong("latency", -1L),
++                    downMbps = if (o.has("down")) o.optDouble("down") else null,
++                    upMbps = if (o.has("up")) o.optDouble("up") else null,
++                    bytesDown = o.optLong("bytesDown"), bytesUp = o.optLong("bytesUp"),
++                    estimated = o.optBoolean("estimated"), hint = o.optString("hint"),
++                )
++            }.sortedByDescending { it.at }.take(MAX_RUNS)
++        } catch (_: Exception) {
++            emptyList()
++        }
++    }
++
++    /** "↓ 1.2 MB ↑ 300 KB" plus 估算 when the numbers are not measured counters. */
++    fun trafficText(r: SpeedRunRecord): String =
++        "本次流量 ↓ ${HxFormat.bytes(r.bytesDown)} ↑ ${HxFormat.bytes(r.bytesUp)}" + if (r.estimated) "（估算）" else ""
++
++    fun summary(r: SpeedRunRecord): String = when (r.kind) {
++        SpeedRunKind.Latency -> buildString {
++            append("${r.ok}/${r.nodes.size} 可用")
++            if (r.timeouts > 0) append(" · ${r.timeouts} 超时")
++            if (r.noResponse > 0) append(" · ${r.noResponse} 无响应")
++            r.best?.let { append(" · 最快 ${it.name} ${it.delayMs} ms") }
++        }
++        SpeedRunKind.Bandwidth -> buildString {
++            append("↓ ").append(r.downMbps?.let { "${formatMbps(it)} Mbps" } ?: "—")
++            append(" · ↑ ").append(r.upMbps?.let { "${formatMbps(it)} Mbps" } ?: "—")
++            if (r.latencyMs >= 0) append(" · ${r.latencyMs} ms")
++        }
++    }
++
++    fun delayText(sample: SpeedNodeSample): String = when {
++        sample.delayMs > 0 -> "${sample.delayMs} ms"
++        sample.delayMs == SpeedNodeSample.TIMEOUT -> "超时"
++        else -> "无响应"
++    }
++
++    fun timeText(at: Long): String =
++        java.text.SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(java.util.Date(at))
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt
+new file mode 100644
+index 0000000..ceb2282
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt
+@@ -0,0 +1,118 @@
++package io.github.xgl34222220.hetu
++
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.padding
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableLongStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import io.github.xgl34222220.hetu.home.HomeRowDims
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.fill
++import io.github.xgl34222220.hetu.home.homeTap
++import io.github.xgl34222220.hetu.home.warnText
++import io.github.xgl34222220.hetu.ui.ht
++
++/**
++ * 测速历史 on the 网速 tab: node delay runs and 网速 runs, newest first. A row expands to its per-node
++ * readings; each run can be deleted and the whole history cleared. [version] reloads the list after a
++ * new run was recorded on this page.
++ */
++@Composable
++internal fun SpeedTestHistorySection(version: Int) {
++    val context = LocalContext.current
++    val c = LocalHomeColors.current
++    var reload by remember { mutableIntStateOf(0) }
++    val runs = remember(version, reload) { SpeedTestHistory.load(context) }
++    var open by remember { mutableLongStateOf(0L) }
++    var confirmClear by remember { mutableStateOf(false) }
++    HxSection(ht("测速历史"), trailing = {
++        if (runs.isNotEmpty()) Text(
++            ht("清空"), Modifier.homeTap { confirmClear = true }.padding(horizontal = 8.dp, vertical = 4.dp),
++            color = c.accent, style = HomeType.noteStrong,
++        )
++    }) {
++        HxGroup {
++            if (runs.isEmpty()) {
++                Text(
++                    ht("还没有测速记录：策略组测速和网速测试完成后会保存在这里"),
++                    Modifier.fillMaxWidth().padding(horizontal = HomeRowDims.start, vertical = 14.dp),
++                    color = c.t3, style = HomeType.caption,
++                )
++            }
++            runs.forEachIndexed { index, run ->
++                if (index > 0) HxDivider(0.dp)
++                SpeedHistoryRow(run, expanded = open == run.id, onToggle = { open = if (open == run.id) 0L else run.id }) {
++                    SpeedTestHistory.delete(context, run.id)
++                    if (open == run.id) open = 0L
++                    reload++
++                }
++            }
++        }
++        Text(
++            ht("最多保留最近 %s 次。节点测速的流量按探测次数估算；网速测试的流量为实测值，未完成或样本过少时标注“估算”。").fill(SpeedTestHistory.MAX_RUNS.toString()),
++            Modifier.padding(horizontal = 16.dp).padding(top = 8.dp),
++            color = c.t3, style = HomeType.caption,
++        )
++    }
++    if (confirmClear) HxConfirmDialog(
++        title = "清空测速历史？",
++        message = "所有已保存的测速记录都会删除，无法恢复。",
++        confirmLabel = "清空",
++        danger = true,
++        onConfirm = { SpeedTestHistory.clear(context); open = 0L; reload++; confirmClear = false },
++        onDismiss = { confirmClear = false },
++    )
++}
++
++@Composable
++private fun SpeedHistoryRow(run: SpeedRunRecord, expanded: Boolean, onToggle: () -> Unit, onDelete: () -> Unit) {
++    val c = LocalHomeColors.current
++    Column(
++        Modifier.fillMaxWidth().homeTap { onToggle() }.heightIn(min = 54.dp)
++            .padding(horizontal = HomeRowDims.start, vertical = 10.dp).semantics(mergeDescendants = true) {},
++        verticalArrangement = Arrangement.spacedBy(2.dp),
++    ) {
++        Row(verticalAlignment = Alignment.CenterVertically) {
++            Text(run.title, Modifier.weight(1f), color = c.t1, style = HomeType.label, maxLines = 1, overflow = TextOverflow.Ellipsis)
++            Text(SpeedTestHistory.timeText(run.at), color = c.t3, style = HomeType.caption)
++        }
++        Text(SpeedTestHistory.summary(run), color = c.t2, style = HomeType.caption, maxLines = if (expanded) 3 else 1, overflow = TextOverflow.Ellipsis)
++        Text(ht(SpeedTestHistory.trafficText(run)), color = if (run.estimated) c.warnText else c.t3, style = HomeType.caption)
++        if (run.hint.isNotBlank()) Text(run.hint, color = if (run.ok == 0 && run.kind == SpeedRunKind.Latency) c.badText else c.t3, style = HomeType.caption)
++        if (expanded) {
++            run.nodes.sortedWith(compareBy<SpeedNodeSample> { if (it.delayMs > 0) 0 else 1 }.thenBy { if (it.delayMs > 0) it.delayMs else 0L })
++                .take(60).forEach { node ->
++                    Row(Modifier.fillMaxWidth().padding(top = 2.dp), verticalAlignment = Alignment.CenterVertically) {
++                        Text(node.name, Modifier.weight(1f), color = c.t2, style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                        Text(
++                            ht(SpeedTestHistory.delayText(node)),
++                            color = when { node.delayMs > 0 -> c.t1; node.delayMs == SpeedNodeSample.TIMEOUT -> c.warnText; else -> c.badText },
++                            style = HomeType.caption,
++                        )
++                    }
++                }
++            if (run.nodes.size > 60) Text(ht("另有 %s 个节点未显示").fill((run.nodes.size - 60).toString()), color = c.t3, style = HomeType.caption)
++            Text(
++                ht("删除这条记录"), Modifier.padding(top = 6.dp).homeTap { onDelete() }.padding(vertical = 4.dp),
++                color = c.badText, style = HomeType.noteStrong,
++            )
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt
 new file mode 100644
 index 0000000..65065ca
@@ -20903,6 +22138,216 @@ index f8d36e9..0a8c1cc 100644
          capture("03A-034-core-three-cards")
          touch("Mihomo"); expect("Mihomo Smart"); expect("其他可管理核心")
          capture("core-mihomo-variant-picker")
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConfigHygiene103Test.java b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConfigHygiene103Test.java
+new file mode 100644
+index 0000000..6dedc26
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ConfigHygiene103Test.java
+@@ -0,0 +1,204 @@
++package io.github.xgl34222220.hetu;
++
++import static org.junit.Assert.*;
++
++import java.util.*;
++import org.junit.Test;
++import org.yaml.snakeyaml.LoaderOptions;
++import org.yaml.snakeyaml.Yaml;
++import org.yaml.snakeyaml.constructor.SafeConstructor;
++
++/**
++ * Parity batch A, pure JVM: dangling proxy-reference cleanup (Mihomo YAML and sing-box JSON), sing-box
++ * written as YAML, startup source diagnostics and the opt-in cgroup argument. Synthetic configs only;
++ * no network, core or Root operation.
++ */
++public class ConfigHygiene103Test {
++    private static final String HEAD = "mixed-port: 7890\n# keep this comment\nproxies:\n"
++            + "  - {name: hk, type: ss, server: 1.1.1.1, port: 443, cipher: aes-128-gcm, password: x}\n"
++            + "  - {name: jp, type: ss, server: 2.2.2.2, port: 443, cipher: aes-128-gcm, password: x}\n"
++            + "proxy-providers:\n  sub:\n    type: file\n    path: ./sub.yaml\n";
++    private static final String TAIL = "rules:\n  - DOMAIN-SUFFIX,example.com,Auto\n  - MATCH,Select\n";
++
++    private static ProxyRuntimeProfile profile(ProxyRuntimeProfile.Core core) {
++        return new ProxyRuntimeProfile(core, ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.Ipv6.ENABLE,
++                ProxyRuntimeProfile.AppScope.BLACKLIST, ProxyRuntimeProfile.DnsHijack.TPROXY, true, true, true, false, false);
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> load(String yaml) {
++        return (Map<String, Object>) new Yaml(new SafeConstructor(new LoaderOptions())).load(yaml);
++    }
++
++    @SuppressWarnings("unchecked")
++    private static Map<String, Object> group(Map<String, Object> root, String name) {
++        for (Object g : (List<Object>) root.get("proxy-groups"))
++            if (name.equals(((Map<String, Object>) g).get("name"))) return (Map<String, Object>) g;
++        throw new AssertionError("group missing: " + name);
++    }
++
++    @Test public void danglingMihomoMembersAndProvidersAreStrippedAndEmptyGroupFallsBackToDirect() throws Exception {
++        String groups = "proxy-groups:\n"
++                + "  - name: Select\n    type: select\n    proxies: [Auto, hk, gone-node, DIRECT]\n"
++                + "  - name: Auto\n    type: url-test\n    use: [sub, gone-sub]\n    proxies: [jp]\n"
++                + "  - name: Lost\n    type: select\n    proxies: [old-1, old-2]\n    use: [old-sub]\n";
++        String yaml = HEAD + groups + TAIL;
++        ConfigReferenceCleaner.Result r = ConfigReferenceCleaner.mihomo(yaml);
++        assertTrue(r.changed);
++        assertTrue("everything outside proxy-groups is byte-identical", r.text.startsWith(HEAD) && r.text.endsWith(TAIL));
++        Map<String, Object> root = load(r.text);
++        assertEquals(Arrays.asList("Auto", "hk", "DIRECT"), group(root, "Select").get("proxies"));
++        assertEquals(Collections.singletonList("sub"), group(root, "Auto").get("use"));
++        assertEquals(Collections.singletonList("jp"), group(root, "Auto").get("proxies"));
++        assertEquals("an emptied group keeps its name for rules and falls back to DIRECT",
++                Collections.singletonList("DIRECT"), group(root, "Lost").get("proxies"));
++        assertFalse(group(root, "Lost").containsKey("use"));
++        String all = String.join("\n", r.notices);
++        for (String token : new String[]{"gone-node", "gone-sub", "old-1", "old-2", "old-sub", "回退为 DIRECT"}) assertTrue(token, all.contains(token));
++        assertEquals(6, r.notices.size());
++        // The cleaned copy is a valid Mihomo source for the startup generator.
++        MihomoStartupConfig.Result generated = MihomoStartupConfig.generate(r.text, profile(ProxyRuntimeProfile.Core.MIHOMO));
++        assertFalse(generated.yaml.contains("gone-node"));
++        assertTrue(generated.yaml.contains("tproxy-port: 19898"));
++    }
++
++    @Test public void cleanConfigsAreReturnedUntouched() {
++        String yaml = HEAD + "proxy-groups:\n- name: Select\n  type: select\n  proxies: [hk, jp, REJECT, PASS]\n- name: Auto\n  type: url-test\n  use: [sub]\n" + TAIL;
++        ConfigReferenceCleaner.Result r = ConfigReferenceCleaner.mihomo(yaml);
++        assertFalse(r.changed);
++        assertSame(yaml, r.text);
++        assertTrue(r.notices.isEmpty());
++        assertFalse(ConfigReferenceCleaner.mihomo("mixed-port: 1\n").changed);
++        assertFalse("malformed YAML is left to the core check", ConfigReferenceCleaner.mihomo("proxy-groups: [\n").changed);
++    }
++
++    @Test public void columnZeroSequencesAndIncludeAllGroupsAreHandled() {
++        String yaml = HEAD + "proxy-groups:\n- name: Every\n  type: select\n  include-all: true\n  proxies: [missing]\n- name: Keep\n  type: select\n  proxies: [hk]\n\n# kept comment\n" + TAIL;
++        ConfigReferenceCleaner.Result r = ConfigReferenceCleaner.mihomo(yaml);
++        assertTrue(r.changed);
++        Map<String, Object> root = load(r.text);
++        assertEquals("include-all still supplies members: no DIRECT fallback", Collections.emptyList(), group(root, "Every").get("proxies"));
++        assertEquals(Collections.singletonList("hk"), group(root, "Keep").get("proxies"));
++        assertTrue("trailing blank and comment lines stay with the next block", r.text.endsWith("  - hk\n\n# kept comment\n" + TAIL));
++    }
++
++    @Test public void anchorsUsedOutsideOrDuplicatedBlocksAreNotRewritten() {
++        String anchored = HEAD + "proxy-groups:\n  - &base {name: A, type: select, proxies: [nope]}\n" + TAIL + "extra: *base\n";
++        ConfigReferenceCleaner.Result a = ConfigReferenceCleaner.mihomo(anchored);
++        assertFalse(a.changed);
++        assertSame(anchored, a.text);
++        assertTrue(a.notices.get(0).contains("锚点"));
++        String twice = HEAD + "proxy-groups:\n  - {name: A, type: select, proxies: [nope]}\n" + "proxy-groups:\n  - {name: B, type: select, proxies: [nope]}\n" + TAIL;
++        ConfigReferenceCleaner.Result t = ConfigReferenceCleaner.mihomo(twice);
++        assertFalse(t.changed);
++        assertSame(twice, t.text);
++        // An alias inside the block that points at an anchor elsewhere is resolved and still cleaned.
++        String merged = "base: &b {type: select}\n" + HEAD + "proxy-groups:\n  - {<<: *b, name: M, proxies: [hk, nope]}\n" + TAIL;
++        ConfigReferenceCleaner.Result m = ConfigReferenceCleaner.mihomo(merged);
++        assertTrue(m.changed);
++        assertEquals(Collections.singletonList("hk"), group(load(m.text), "M").get("proxies"));
++        assertEquals("select", group(load(m.text), "M").get("type"));
++    }
++
++    @Test @SuppressWarnings("unchecked")
++    public void singBoxSelectorReferencesAreCleanedWithDirectFallback() throws Exception {
++        String json = "{\"outbounds\":[{\"type\":\"selector\",\"tag\":\"proxy\",\"outbounds\":[\"a\",\"gone\"],\"default\":\"gone\"},"
++                + "{\"type\":\"urltest\",\"tag\":\"auto\",\"outbounds\":[\"x\",\"y\"]},"
++                + "{\"type\":\"shadowsocks\",\"tag\":\"a\",\"server\":\"1.1.1.1\",\"server_port\":443,\"method\":\"aes-128-gcm\",\"password\":\"p\"}]}";
++        Map<String, Object> root = CoreJson.parseObject(json);
++        List<String> notices = ConfigReferenceCleaner.singBox(root);
++        List<Object> outbounds = (List<Object>) root.get("outbounds");
++        Map<String, Object> proxy = (Map<String, Object>) outbounds.get(0), auto = (Map<String, Object>) outbounds.get(1);
++        assertEquals(Collections.singletonList("a"), proxy.get("outbounds"));
++        assertFalse(proxy.containsKey("default"));
++        assertEquals(Collections.singletonList("hetu-direct"), auto.get("outbounds"));
++        Map<String, Object> added = (Map<String, Object>) outbounds.get(outbounds.size() - 1);
++        assertEquals("direct", added.get("type"));
++        assertEquals("hetu-direct", added.get("tag"));
++        assertEquals(5, notices.size());
++        assertTrue(ConfigReferenceCleaner.singBox(CoreJson.parseObject("{\"outbounds\":[{\"type\":\"direct\",\"tag\":\"d\"}]}")).isEmpty());
++
++        ProxyCoreConfig.Result built = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, json, options(), url -> null);
++        assertEquals(5, built.cleanupNotices.size());
++        assertTrue(built.warningText().contains("gone"));
++        assertFalse(CoreJson.write(CoreJson.parseObject(built.config)).contains("\"gone\""));
++    }
++
++    @Test @SuppressWarnings("unchecked")
++    public void singBoxYamlIsConvertedToJsonBeforeCheckAndStart() throws Exception {
++        String yaml = "log:\n  level: info\noutbounds:\n  - type: selector\n    tag: proxy\n    outbounds: [a]\n"
++                + "  - type: shadowsocks\n    tag: a\n    server: 1.1.1.1\n    server_port: 443\n    method: aes-128-gcm\n    password: p\n"
++                + "route:\n  final: proxy\n  rules:\n    - domain_suffix: [example.com]\n      outbound: a\n";
++        assertTrue(ProxyCoreConfig.isSingBoxYaml(yaml));
++        assertTrue(ProxyCoreConfig.isNativeFor(ProxyRuntimeProfile.Core.SING_BOX, yaml));
++        assertFalse("Xray stays JSON-only", ProxyCoreConfig.isNativeFor(ProxyRuntimeProfile.Core.XRAY, yaml));
++        String mihomo = HEAD + "proxy-groups:\n  - {name: S, type: select, proxies: [hk]}\n" + TAIL;
++        assertFalse("a Clash/Mihomo profile is still converted, not read as sing-box YAML", ProxyCoreConfig.isSingBoxYaml(mihomo));
++
++        ProxyCoreConfig.Result built = ProxyCoreConfig.build(ProxyRuntimeProfile.Core.SING_BOX, yaml, options(), url -> null);
++        assertTrue(built.nativeSource);
++        assertTrue(built.warningText().contains("YAML"));
++        Map<String, Object> root = CoreJson.parseObject(built.config);
++        assertEquals(443L, ((Number) ((Map<String, Object>) ((List<Object>) root.get("outbounds")).get(1)).get("server_port")).longValue());
++        assertEquals("proxy", ((Map<String, Object>) root.get("route")).get("final"));
++        assertNotNull("Hetu ingress replaces inbounds", root.get("inbounds"));
++        assertTrue(ProxyCoreConfig.singBoxYamlToJson("a: [1, true, x]\n").replaceAll("\\s", "").equals("{\"a\":[1,true,\"x\"]}"));
++        try { ProxyCoreConfig.singBoxYamlToJson("- 1\n"); fail("a top-level list is not a sing-box config"); }
++        catch (java.io.IOException expected) { assertTrue(expected.getMessage().contains("映射")); }
++    }
++
++    @Test public void startupDiagnosticsNameTheSourceOfPortsDnsAndFakeIp() throws Exception {
++        String source = "tproxy-port: 7893\ndns:\n  enable: true\n  listen: 0.0.0.0:1053\n  enhanced-mode: fake-ip\n  fake-ip-range: 28.0.0.1/8\n" + HEAD
++                + "proxy-groups:\n  - {name: S, type: select, proxies: [hk]}\n" + TAIL;
++        MihomoStartupConfig.Result generated = MihomoStartupConfig.generate(source, profile(ProxyRuntimeProfile.Core.MIHOMO));
++        List<String> lines = StartupDiagnostics.mihomo(source, generated.yaml, profile(ProxyRuntimeProfile.Core.MIHOMO),
++                generated.tproxyPort, generated.redirectPort, true, MihomoStartupConfig.DNS_PORT, 29090, false, "28.0.0.1/8", "");
++        String all = String.join("\n", lines);
++        assertTrue(all, all.contains("TPROXY 端口 = 19898 ← 河图运行时覆写（配置文件的 tproxy-port: 7893 已被替换）"));
++        assertTrue(all, all.contains("Redirect 端口 = 未启用"));
++        assertTrue(all, all.contains("DNS 监听 = 127.0.0.1:11053 ← 河图运行时覆写（配置文件的 dns.listen 0.0.0.0:1053 不用于 Root 接管）"));
++        assertTrue(all, all.contains("DNS 模式 = fake-ip ← 配置文件"));
++        assertTrue(all, all.contains("Fake-IP 范围（IPv4） = 28.0.0.1/8 ← 配置文件"));
++        assertTrue(all, all.contains("控制接口端口 = 127.0.0.1:29090 ← 河图运行时覆写（启动时自动选择空闲端口）"));
++
++        String plain = "dns:\n  enable: true\n" + HEAD + "proxy-groups:\n  - {name: S, type: select, proxies: [hk]}\n" + TAIL;
++        MihomoStartupConfig.Result g2 = MihomoStartupConfig.generate(plain, profile(ProxyRuntimeProfile.Core.MIHOMO));
++        String d2 = String.join("\n", StartupDiagnostics.mihomo(plain, g2.yaml, profile(ProxyRuntimeProfile.Core.MIHOMO),
++                g2.tproxyPort, g2.redirectPort, false, MihomoStartupConfig.DNS_PORT, 29091, true, "", ""));
++        assertTrue(d2, d2.contains("DNS 模式 = redir-host ← 默认值"));
++        assertTrue(d2, d2.contains("配置文件未设置 tproxy-port"));
++        assertTrue(d2, d2.contains("沿用当前运行的端口"));
++
++        String n = String.join("\n", StartupDiagnostics.nativeCore("sing-box", false, plain, 19898, 0, 11053, 29090, false, "198.18.0.1/16"));
++        assertTrue(n, n.contains("Fake-IP 范围（IPv4） = 198.18.0.1/16 ← 默认值"));
++        assertTrue(n, n.contains("Redirect 端口 = 未启用"));
++
++        String header = StartupDiagnostics.header(Arrays.asList("组「a\nb」", "x"));
++        assertEquals("# HETU_NOTICE: [清理] 组「a b」\n# HETU_NOTICE: [清理] x\n", header);
++        assertEquals("", StartupDiagnostics.header(Collections.emptyList()));
++        assertEquals("[清理] c\n[来源] l\n", StartupDiagnostics.report(Collections.singletonList("c"), Collections.singletonList("[来源] l")));
++        // A cleanup header in front of a Mihomo startup copy is only YAML comments.
++        assertEquals(load(generated.yaml).get("tproxy-port"), load(header + generated.yaml).get("tproxy-port"));
++    }
++
++    @Test public void cgroupLimitArgumentIsOptInAndMapsWeights() {
++        assertEquals("", CoreResourceLimits.argument("", true));
++        assertEquals("256M", CoreResourceLimits.argument("256M", false));
++        assertEquals("cg:256M", CoreResourceLimits.argument(" 256M ", true));
++        assertEquals("cg:4", CoreResourceLimits.argument("cg:4", true));
++        assertEquals(200, CoreResourceLimits.ioWeightV2(0));
++        assertEquals(100, CoreResourceLimits.ioWeightV2(4));
++        assertEquals(25, CoreResourceLimits.ioWeightV2(7));
++        assertEquals(1000, CoreResourceLimits.blkioWeightV1(0));
++        assertEquals(500, CoreResourceLimits.blkioWeightV1(4));
++        assertEquals("内存硬限制（cgroup v2） 256 MiB；I/O 权重未生效（设备不支持 io/blkio 控制器）",
++                CoreResourceLimits.describe("io=applied:4 memory=applied:268435456 memcg=v2:268435456 iocg=failed"));
++        assertEquals("", CoreResourceLimits.describe("none"));
++    }
++
++    private static ProxyCoreConfig.Options options() {
++        ProxyCoreConfig.Options o = new ProxyCoreConfig.Options();
++        o.tproxyPort = 19898; o.dnsPort = 11053; o.controllerPort = 29090; o.egressPort = 29150; o.secret = "s";
++        return o;
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
 index 366297a..e224bf7 100644
 --- a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt
@@ -26040,6 +27485,116 @@ index 0000000..26fe85b
 +        release.countDown()
 +        eventually("Confirmed snapshot follows") { job.isCompleted && vm.state.panelReady }
 +        assertEquals("other", vm.state.groups.single().now)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestHistory103Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestHistory103Test.kt
+new file mode 100644
+index 0000000..3cf4789
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedTestHistory103Test.kt
+@@ -0,0 +1,104 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/** 测速历史: records, estimate flags, no-response hints, persistence, retention cap, delete and clear. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class SpeedTestHistory103Test {
++    private val context: Application get() = ApplicationProvider.getApplicationContext()
++
++    @Before fun reset() { SpeedTestHistory.clear(context) }
++
++    @Test fun latencyRunKeepsPerNodeDelaysTimeoutsAndEstimatedTraffic() {
++        val record = SpeedTestHistory.latencyRecord("策略组 Proxy", listOf("hk", "jp", "us", "sg", "hk"),
++            mapOf("hk" to 120L, "jp" to 45L, "us" to -1L), 1_000L)
++        assertEquals(SpeedRunKind.Latency, record.kind)
++        assertEquals(listOf("hk", "jp", "us", "sg"), record.nodes.map { it.name })
++        assertEquals(2, record.ok)
++        assertEquals(1, record.timeouts)
++        assertEquals("sg never answered: no response, not a timeout", 1, record.noResponse)
++        assertEquals("jp", record.best?.name)
++        assertTrue("controller probes report no bytes: always 估算", record.estimated)
++        assertEquals(2 * SpeedTestHistory.PROBE_DOWN_BYTES + SpeedTestHistory.TIMEOUT_DOWN_BYTES, record.bytesDown)
++        assertEquals(2 * SpeedTestHistory.PROBE_UP_BYTES + SpeedTestHistory.TIMEOUT_UP_BYTES, record.bytesUp)
++        assertTrue(record.hint.contains("1 个节点没有返回结果"))
++        assertTrue(SpeedTestHistory.summary(record).startsWith("2/4 可用 · 1 超时 · 1 无响应 · 最快 jp 45 ms"))
++        assertTrue(SpeedTestHistory.trafficText(record).endsWith("（估算）"))
++        assertEquals("超时", SpeedTestHistory.delayText(record.nodes[2]))
++        assertEquals("无响应", SpeedTestHistory.delayText(record.nodes[3]))
++    }
++
++    @Test fun silentAndAllTimeoutRunsExplainWhatToCheck() {
++        val silent = SpeedTestHistory.latencyRecord("全部节点", listOf("a", "b"), emptyMap(), 1L)
++        assertTrue(silent.hint.startsWith("所有节点均无响应"))
++        assertEquals(0L, silent.bytesDown)
++        val timeouts = SpeedTestHistory.latencyRecord("全部节点", listOf("a", "b"), mapOf("a" to -1L, "b" to -1L), 1L)
++        assertTrue(timeouts.hint.startsWith("所有节点均超时"))
++        assertEquals("", SpeedTestHistory.latencyRecord("g", listOf("a"), mapOf("a" to 9L), 1L).hint)
++    }
++
++    @Test fun bandwidthRunMarksIncompleteOrSmallSamplesAsEstimated() {
++        val full = SpeedTestHistory.bandwidthRecord("网速测试", 30L, 95.5 to 40_000_000L, 20.0 to 9_000_000L, 0L, 0L, null, 5L)
++        assertFalse(full.estimated)
++        assertEquals(40_000_000L, full.bytesDown)
++        assertEquals("", full.hint)
++        assertEquals("本次流量 ↓ ${HxFormat.bytes(40_000_000L)} ↑ ${HxFormat.bytes(9_000_000L)}", SpeedTestHistory.trafficText(full))
++        val stopped = SpeedTestHistory.bandwidthRecord("网速测试", 30L, 50.0 to 30_000_000L, null, 30_000_000L, 1_000_000L, null, 6L)
++        assertTrue(stopped.estimated)
++        assertNull(stopped.upMbps)
++        assertEquals("live counter of the unfinished phase", 1_000_000L, stopped.bytesUp)
++        assertTrue(stopped.hint.contains("未完成"))
++        val small = SpeedTestHistory.bandwidthRecord("网速测试", 30L, 1.0 to 500_000L, 0.5 to 100_000L, 0L, 0L, null, 7L)
++        assertTrue(small.estimated)
++        assertTrue(small.hint.contains("样本过少"))
++        val dead = SpeedTestHistory.bandwidthRecord("网速测试", -1L, null, null, 0L, 0L, null, 8L)
++        assertTrue(dead.hint.contains("没有响应"))
++        val failed = SpeedTestHistory.bandwidthRecord("网速测试", 20L, null, null, 0L, 0L, "连接被重置", 9L)
++        assertEquals("连接被重置", failed.hint)
++        assertTrue(failed.estimated)
++    }
++
++    @Test fun historyPersistsNewestFirstWithCapDeleteAndClear() {
++        repeat(SpeedTestHistory.MAX_RUNS + 5) { i ->
++            SpeedTestHistory.add(context, SpeedTestHistory.latencyRecord("g$i", listOf("a"), mapOf("a" to (i + 1).toLong()), 10_000L + i))
++        }
++        val runs = SpeedTestHistory.load(context)
++        assertEquals(SpeedTestHistory.MAX_RUNS, runs.size)
++        assertEquals("g${SpeedTestHistory.MAX_RUNS + 4}", runs.first().title)
++        assertEquals("oldest runs drop out", "g5", runs.last().title)
++        assertEquals((SpeedTestHistory.MAX_RUNS + 5).toLong(), runs.first().nodes.single().delayMs)
++        SpeedTestHistory.delete(context, runs.first().id)
++        assertEquals(SpeedTestHistory.MAX_RUNS - 1, SpeedTestHistory.load(context).size)
++        assertFalse(SpeedTestHistory.load(context).any { it.id == runs.first().id })
++        // Same timestamp twice keeps both runs (distinct ids).
++        SpeedTestHistory.clear(context)
++        val bw = SpeedTestHistory.bandwidthRecord("网速测试", 12L, 10.0 to 9_000_000L, 2.0 to 3_000_000L, 0L, 0L, null, 77L)
++        SpeedTestHistory.add(context, bw); SpeedTestHistory.add(context, bw)
++        val two = SpeedTestHistory.load(context)
++        assertEquals(2, two.size)
++        assertEquals(2, two.map { it.id }.toSet().size)
++        assertEquals(10.0, two.first().downMbps!!, 0.0001)
++        assertEquals(12L, two.first().latencyMs)
++        SpeedTestHistory.clear(context)
++        assertTrue(SpeedTestHistory.load(context).isEmpty())
++        assertTrue("damaged data is ignored, not a crash", SpeedTestHistory.decode("{not json").isEmpty())
++    }
++
++    @Test fun historyLivesOutsideTheSettingsPreferences() {
++        SpeedTestHistory.add(context, SpeedTestHistory.latencyRecord("g", listOf("a"), mapOf("a" to 5L), 1L))
++        val settings = context.getSharedPreferences("hetu", 0).all.keys
++        assertFalse(settings.any { it.contains("runsV1") })
++        assertEquals(1, SpeedTestHistory.load(context).size)
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedtestCoreTemplates102Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/SpeedtestCoreTemplates102Test.kt

@@ -163,6 +163,14 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         onEnabled = { putBool("proxyIoWeightEnabled", it) },
                         onValue = { putString("proxyIoWeight", it) },
                     )
+                    // Opt-in: the two values above also become kernel limits (memcg memory.max, io weight).
+                    val cgroup = prefs.getBoolean(CoreResourceLimits.PREF_ENABLED, false)
+                    val cgroupLive = if (cgroup && live.running) CoreResourceLimits.describe(prefs.getString("proxyRootTuning", "").orEmpty()) else ""
+                    val cgroupAbout = ht("同时把上面的内存限制和 I/O 权重交给内核执行（memcg memory.max 与 io 权重，优先 cgroup v2，不支持时用 v1）；核心超出内存上限时可能被系统结束。默认关闭，重启代理后生效")
+                    OtherSwitch(
+                        "cgroup 硬限制", cgroup, icon = HxIcons.MemoryStick,
+                        subtitle = if (cgroupLive.isEmpty()) cgroupAbout else "$cgroupAbout。$cgroupLive",
+                    ) { putBool(CoreResourceLimits.PREF_ENABLED, it) }
                 }
             }
         }

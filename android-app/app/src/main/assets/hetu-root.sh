@@ -11,6 +11,17 @@ SESSION="$RUN/session.state"
 LOG="$RUN/core.log"
 CHECKLOG="$RUN/config-check.log"
 IPV6_STATE="$RUN/ipv6.state"
+# rp_filter / ip_forward values changed for this session (path<TAB>original<TAB>set), restored on stop.
+SYSCTL_NET=/proc/sys/net
+SYSCTL_TUNE_STATE="$RUN/sysctl-tune.state"
+# Opt-in cgroup limits for the core (memcg memory.max / io weight, v2 first, v1 fallback).
+CG_MOUNTS=/proc/mounts
+CG_V1_MEMORY="/dev/memcg /sys/fs/cgroup/memory"
+CG_V1_BLKIO="/dev/blkio /sys/fs/cgroup/blkio"
+CG_STATE="$RUN/cgroup.state"
+START_CG_MEM=0
+START_CG_IO=0
+NS_NOTES=""
 V6_CONF=/proc/sys/net/ipv6/conf
 NET_STATE="$RUN/net.state"
 WATCHDOG_PID="$RUN/watchdog.pid"
@@ -284,6 +295,7 @@ rollback_start(){
     cleanup_confirmed || RB_FAILED=1
   fi
   restorev6 || RB_FAILED=1
+  net_sysctl_restore; cgroup_release
   if [ "$RB_FAILED" = 0 ]; then rm -f "$SESSION"; else
     printf '%s\n' 'rollback-incomplete' > "$RUN/rollback-state"
   fi
@@ -611,6 +623,7 @@ stop_transaction(){
   stopcore || SC_FAILED=1
   cleanup_confirmed || SC_FAILED=1
   restorev6 || SC_FAILED=1
+  net_sysctl_restore; cgroup_release
   [ "$SC_FAILED" = 0 ] || return 1
   rm -f "$SESSION"
 }
@@ -749,6 +762,131 @@ v6disabled(){
     [ "$V6_V" = 1 ] || return 1
   done
   [ "$V6_FOUND" = 1 ]
+}
+
+# TPROXY replies and shared (tethered) traffic arrive on an interface the reverse-path check may
+# reject when rp_filter is strict (1) somewhere. The kernel uses max(all, iface), so loose mode is
+# all=2. Only a strict setup is touched, ip_forward only when it is off for sharing, and the journal
+# is written before the first change. Restore puts back an original only while the value is still
+# the one written here (netd or the user may have changed it since). Never fails a start or stop.
+net_sysctl_apply(){
+  NS_NOTES=""
+  NS_RP=0; case "$START_MODE" in tproxy|enhance) NS_RP=1;; esac
+  [ "${NEED_TP:-0}" != 1 ] || NS_RP=1; [ "$START_SHARE" != 1 ] || NS_RP=1
+  NS_J=""; NS_TAB=$(printf '\t')
+  if [ "$NS_RP" = 1 ] && [ -w "$SYSCTL_NET/ipv4/conf/all/rp_filter" ]; then
+    NS_STRICT=0
+    for NS_P in "$SYSCTL_NET"/ipv4/conf/*/rp_filter; do
+      [ -e "$NS_P" ] || continue; NS_V=""; read -r NS_V < "$NS_P" 2>/dev/null || continue
+      [ "$NS_V" != 1 ] || NS_STRICT=1
+    done
+    NS_ALL=""; read -r NS_ALL < "$SYSCTL_NET/ipv4/conf/all/rp_filter" 2>/dev/null || NS_ALL=""
+    case "$NS_ALL" in 0|1) [ "$NS_STRICT" != 1 ] || NS_J="${NS_J}$SYSCTL_NET/ipv4/conf/all/rp_filter${NS_TAB}$NS_ALL${NS_TAB}2
+";; esac
+  fi
+  if [ "$START_SHARE" = 1 ] && [ -w "$SYSCTL_NET/ipv4/ip_forward" ]; then
+    NS_F=""; read -r NS_F < "$SYSCTL_NET/ipv4/ip_forward" 2>/dev/null || NS_F=""
+    [ "$NS_F" != 0 ] || NS_J="${NS_J}$SYSCTL_NET/ipv4/ip_forward${NS_TAB}0${NS_TAB}1
+"
+  fi
+  [ -n "$NS_J" ] || return 0
+  printf '%s' "$NS_J" > "$SYSCTL_TUNE_STATE.new.$$" && mv -f "$SYSCTL_TUNE_STATE.new.$$" "$SYSCTL_TUNE_STATE" || { rm -f "$SYSCTL_TUNE_STATE.new.$$"; NS_NOTES="rp_filter/ip_forward 未调整：无法记录原值"; return 0; }
+  while IFS="$NS_TAB" read -r NS_P NS_OLD NS_SET; do
+    [ -n "$NS_P" ] || continue
+    if printf '%s\n' "$NS_SET" > "$NS_P" 2>/dev/null; then NS_NOTES="${NS_NOTES:+$NS_NOTES；}${NS_P#$SYSCTL_NET/ipv4/} $NS_OLD→$NS_SET（停止后恢复）"
+    else NS_NOTES="${NS_NOTES:+$NS_NOTES；}${NS_P#$SYSCTL_NET/ipv4/} 写入失败，保持 $NS_OLD"; fi
+  done < "$SYSCTL_TUNE_STATE"
+  return 0
+}
+net_sysctl_restore(){
+  [ -f "$SYSCTL_TUNE_STATE" ] || return 0
+  NR_TAB=$(printf '\t'); NR_FAILED=0
+  while IFS="$NR_TAB" read -r NR_P NR_OLD NR_SET; do
+    case "$NR_P" in "$SYSCTL_NET"/ipv4/conf/*/rp_filter|"$SYSCTL_NET"/ipv4/ip_forward) ;; *) continue;; esac
+    case "$NR_OLD:$NR_SET" in [0-2]:[0-2]) ;; *) continue;; esac
+    [ -e "$NR_P" ] || continue
+    NR_NOW=""; read -r NR_NOW < "$NR_P" 2>/dev/null || { NR_FAILED=1; continue; }
+    [ "$NR_NOW" = "$NR_SET" ] || continue
+    printf '%s\n' "$NR_OLD" > "$NR_P" 2>/dev/null || NR_FAILED=1
+  done < "$SYSCTL_TUNE_STATE"
+  # A failed write keeps the journal so the next stop/start retries it.
+  [ "$NR_FAILED" != 0 ] || rm -f "$SYSCTL_TUNE_STATE"
+  return 0
+}
+# START_MEM / START_IO carry a "cg:" prefix when 资源限制 → cgroup 硬限制 is on (App setting, default off).
+tuning_cgroup_flags(){
+  START_CG_MEM=0; START_CG_IO=0
+  case "$START_MEM" in cg:*) START_MEM=${START_MEM#cg:}; START_CG_MEM=1;; esac
+  case "$START_IO" in cg:*) START_IO=${START_IO#cg:}; START_CG_IO=1;; esac
+  [ -n "$START_MEM" ] || START_CG_MEM=0; [ -n "$START_IO" ] || START_CG_IO=0
+  return 0
+}
+cg_v1_dir(){
+  for CV_D in $1; do [ -d "$CV_D" ] && [ -e "$CV_D/$2" ] && { printf '%s' "$CV_D"; return 0; }; done
+  return 1
+}
+cg_join(){
+  # $1 cgroup dir, $2 pid. v2 has cgroup.procs; v1 accepts cgroup.procs or tasks.
+  if [ -e "$1/cgroup.procs" ]; then printf '%s\n' "$2" > "$1/cgroup.procs" 2>/dev/null && return 0; fi
+  [ -e "$1/tasks" ] && printf '%s\n' "$2" > "$1/tasks" 2>/dev/null
+}
+cg_record(){ grep -qxF "$1" "$CG_STATE" 2>/dev/null || printf '%s\n' "$1" >> "$CG_STATE" 2>/dev/null || true; }
+core_cgroup(){
+  CG_PID="$1"; CG_REPORT=""; CG_MEM_DONE=0; CG_IO_DONE=0
+  [ "$START_CG_MEM" = 1 ] || [ "$START_CG_IO" = 1 ] || return 0
+  CG_V2=$(awk '$3=="cgroup2" {print $2; exit}' "$CG_MOUNTS" 2>/dev/null)
+  if [ -n "$CG_V2" ] && [ -d "$CG_V2" ]; then
+    CG_DIR="$CG_V2/hetu_core"
+    [ "$START_CG_MEM" != 1 ] || printf '+memory\n' > "$CG_V2/cgroup.subtree_control" 2>/dev/null || true
+    [ "$START_CG_IO" != 1 ] || printf '+io\n' > "$CG_V2/cgroup.subtree_control" 2>/dev/null || true
+    if mkdir -p "$CG_DIR" 2>/dev/null; then
+      cg_record "$CG_DIR"
+      if [ "$START_CG_MEM" = 1 ] && [ -e "$CG_DIR/memory.max" ] && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.max" 2>/dev/null; then CG_MEM_DONE=1; fi
+      if [ "$START_CG_IO" = 1 ] && [ -e "$CG_DIR/io.weight" ] && printf 'default %s\n' "$(( (8-START_IO)*25 ))" > "$CG_DIR/io.weight" 2>/dev/null; then CG_IO_DONE=1; fi
+      if [ "$CG_MEM_DONE$CG_IO_DONE" != 00 ]; then
+        if cg_join "$CG_DIR" "$CG_PID"; then
+          [ "$CG_MEM_DONE" != 1 ] || CG_REPORT="${CG_REPORT}memcg=v2:$START_MEM_BYTES "
+          [ "$CG_IO_DONE" != 1 ] || CG_REPORT="${CG_REPORT}iocg=v2:$(( (8-START_IO)*25 )) "
+        else CG_MEM_DONE=0; CG_IO_DONE=0; fi
+      fi
+    fi
+  fi
+  if [ "$START_CG_MEM" = 1 ] && [ "$CG_MEM_DONE" != 1 ]; then
+    CG_BASE=$(cg_v1_dir "$CG_V1_MEMORY" memory.limit_in_bytes) && CG_DIR="$CG_BASE/hetu_core" && mkdir -p "$CG_DIR" 2>/dev/null &&
+      cg_record "$CG_DIR" && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.limit_in_bytes" 2>/dev/null && cg_join "$CG_DIR" "$CG_PID" &&
+      { CG_MEM_DONE=1; CG_REPORT="${CG_REPORT}memcg=v1:$START_MEM_BYTES "; }
+    [ "$CG_MEM_DONE" = 1 ] || CG_REPORT="${CG_REPORT}memcg=failed "
+  fi
+  if [ "$START_CG_IO" = 1 ] && [ "$CG_IO_DONE" != 1 ]; then
+    CG_BASE=$(cg_v1_dir "$CG_V1_BLKIO" blkio.weight) && CG_DIR="$CG_BASE/hetu_core" && mkdir -p "$CG_DIR" 2>/dev/null &&
+      cg_record "$CG_DIR" && printf '%s\n' "$(( (8-START_IO)*125 ))" > "$CG_DIR/blkio.weight" 2>/dev/null && cg_join "$CG_DIR" "$CG_PID" &&
+      { CG_IO_DONE=1; CG_REPORT="${CG_REPORT}iocg=v1:$(( (8-START_IO)*125 )) "; }
+    [ "$CG_IO_DONE" = 1 ] || CG_REPORT="${CG_REPORT}iocg=failed "
+  fi
+  CG_TUNED=$(head -n 1 "$RUN/tuning-status" 2>/dev/null || true); [ "$CG_TUNED" != none ] || CG_TUNED=""
+  printf '%s\n' "$CG_TUNED$CG_REPORT" > "$RUN/tuning-status" 2>/dev/null || true
+  printf '[河图] cgroup 资源限制：%s\n' "$CG_REPORT" >> "$LOG" 2>/dev/null || true
+  return 0
+}
+# After the core exited: remove the (now empty) Hetu cgroups. Best effort, never fails a stop.
+cgroup_release(){
+  [ -f "$CG_STATE" ] || return 0
+  CR_LEFT=""
+  while read -r CR_D; do
+    case "$CR_D" in */hetu_core) ;; *) continue;; esac
+    [ -d "$CR_D" ] || continue
+    rmdir "$CR_D" 2>/dev/null || CR_LEFT="$CR_LEFT$CR_D
+"
+  done < "$CG_STATE"
+  if [ -n "$CR_LEFT" ]; then printf '%s' "$CR_LEFT" > "$CG_STATE" 2>/dev/null || true; else rm -f "$CG_STATE"; fi
+  return 0
+}
+# Lines the App put into the startup copy (dangling-reference cleanup) and this start's own notes
+# go to the top of the fresh core log, so the core log explains why the core saw a changed group.
+start_log_notices(){
+  grep '^# HETU_NOTICE: ' "$1" 2>/dev/null | head -n 64 | sed 's/^# HETU_NOTICE: /[河图] /' >> "$LOG" 2>/dev/null || true
+  [ -z "$NS_NOTES" ] || printf '[河图] 网络参数：%s\n' "$NS_NOTES" >> "$LOG" 2>/dev/null || true
+  return 0
 }
 
 split_safe_uids(){
@@ -1559,6 +1697,10 @@ core_payload(){
     CP_LINES=$(wc -l < "$CP_SRC") || return 1
     head -n $((CP_LINES-5)) "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }
   else cat "$CP_SRC" > "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$"; return 1; }; fi
+  # Leading reference-cleanup notices are Hetu comments (copied into core.log), not core input.
+  if grep -q '^# HETU_NOTICE: ' "$CP_OUT.new.$$" 2>/dev/null; then
+    sed '/^# HETU_NOTICE: /d' "$CP_OUT.new.$$" > "$CP_OUT.new.$$.n" && mv -f "$CP_OUT.new.$$.n" "$CP_OUT.new.$$" || { rm -f "$CP_OUT.new.$$" "$CP_OUT.new.$$.n"; return 1; }
+  fi
   chmod 600 "$CP_OUT.new.$$" 2>/dev/null || true
   mv -f "$CP_OUT.new.$$" "$CP_OUT" || return 1
   printf '%s' "$CP_OUT"
@@ -1717,7 +1859,9 @@ watchdog(){
       if atomic_kill_guard 4 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS" && atomic_kill_guard 6 "$S" "$UIDS" "$SHARE" "$CIDRS" "$IFACES" "$DUIDS" "$DGIDS" "$MACS"; then RESULT="killswitch-active"; else RESULT="killswitch-failed"; fi
     elif cleanup_confirmed && restorev6; then
       RESULT="network-restored"; rm -f "$MODEFILE" "$SESSION"
+      net_sysctl_restore
     fi
+    cgroup_release
     rm -f "$PIDFILE"
     date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true
     printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
@@ -2071,6 +2215,7 @@ start(){
   unset HETU_GMS_APPIDS HETU_PRIVATE_DNS_MODE
   START_DNS_TCP="${24:-1}"; START_DNS_UDP="${25:-1}"; START_PERF="${26:-0}"; START_CPU="${27:-}"; START_MEM="${28:-}"; START_IO="${29:-}"
   bool "$START_DNS_TCP" && bool "$START_DNS_UDP" && bool "$START_PERF" || fail "扩展开关必须是 0 或 1"
+  tuning_cgroup_flags
   tuning_valid || fail "$TUNE_ERROR"
   DNS_PROTOS=""; [ "$START_DNS_TCP" = 0 ] || DNS_PROTOS=tcp; [ "$START_DNS_UDP" = 0 ] || DNS_PROTOS="${DNS_PROTOS:+$DNS_PROTOS }udp"
   # Neither protocol captured is the same as DNS takeover switched off.
@@ -2126,8 +2271,10 @@ start(){
   fi
   start_stage "cleanup-network"
   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+  net_sysctl_restore
   start_stage "stop-old-core"
   stopcore || fail "旧核心未确认退出"; rm -f "$CRASH_STATE" "$SESSION"
+  cgroup_release
   start_stage "check-ports"
   check_start_ports "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"
   markused "$BYPASS_MARK" && fail "安全出站 mark 已被其他网络规则占用，未接管网络"
@@ -2137,10 +2284,12 @@ start(){
     install_v6_disable "$START_SHARE" || { fail "IPv6 禁用保护安装失败，未启动代理"; }
     # No all/default/rmnet sysctl writes: netd owns the physical network.
   fi
+  start_stage "rp-filter"
+  net_sysctl_apply
 
   mkdir -p "$RUN/rules" "$RUN/proxy_provider" "$RUN/ruleset" "$RUN/ui" || { fail "无法创建 Mihomo 运行缓存目录"; }
   start_stage "launch-core"
-  : > "$LOG" || fail "无法准备核心日志"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
+  : > "$LOG" || fail "无法准备核心日志"; start_log_notices "$START_CFG"; core_launch || fail "核心启动失败"; printf '%s\n' "$START_PID" > "$PIDFILE" || fail "无法记录核心PID"; printf '%s\n' "$START_MODE" > "$MODEFILE" || fail "无法记录运行模式"; write_session "$START_MODE" "$START_V6" "$START_DNS" "$START_DP" "$START_SCOPE" "$START_SHARE" "$START_KILL" "$START_SESSION_CP" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "无法记录运行会话"
   core_identity_confirm "$START_PID" || { rm -f "$RUN/state/identity.cache" 2>/dev/null; fail "核心隔离身份验证失败"; }
   start_stage "wait-listeners"
   wait_ready "$START_PID" "$START_MODE" "$START_TP" "$START_RP" "$START_TCP" "$START_UDP" "$START_DNS" "$START_DP" "$START_CP"; READY_RC=$?
@@ -2157,6 +2306,7 @@ start(){
   fi
 
   core_tune "$START_PID"
+  core_cgroup "$START_PID"
   # Capture rules are recorded and committed in one iptables-restore per family/table. If a
   # commit is refused (old iptables-restore, missing match module, ...) the partial state is
   # swept and the same rules are installed one by one, exactly as before.
@@ -2243,6 +2393,7 @@ status_heal_body(){
   stopwatchdog
   cleanup_confirmed || HB_FAILED=1
   restorev6 || HB_FAILED=1
+  net_sysctl_restore; cgroup_release
   [ "$HB_FAILED" = 0 ] || return 1
   rm -f "$MODEFILE" "$SESSION" "$PIDFILE"
   date '+%Y-%m-%dT%H:%M:%S%z core exited; network-restored by status self-heal' > "$CRASH_STATE" 2>/dev/null || true
