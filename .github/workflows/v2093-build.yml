@@ -212,6 +212,8 @@ jobs:
 
         python3 tools/qa/test_daemon_traffic93.py -v 2>&1 | tee out/verification/daemon-traffic93-tests.txt
 
+        python3 tools/qa/test_baseline_profile93.py -v 2>&1 | tee out/verification/baseline-profile93-tests.txt
+
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter
       run: python3 tools/qa/test_filter_export.py --before out/verification/v2075-adblock.java
@@ -439,6 +441,12 @@ jobs:
         if-no-files-found: error
         name: Hetu-APK
         path: out/*.apk
+    - name: Upload R8 mapping of the shipped release (baseline profile retrace)
+      uses: actions/upload-artifact@v4
+      with:
+        if-no-files-found: error
+        name: Hetu-V20.93-R8-mapping
+        path: android-app/app/build/outputs/mapping/release/mapping.txt
     - uses: actions/upload-artifact@v4
       with:
         compression-level: 0
@@ -520,6 +528,10 @@ jobs:
       with:
         name: Hetu-APK
         path: release-candidate
+    - uses: actions/download-artifact@v4
+      with:
+        name: Hetu-V20.93-R8-mapping
+        path: r8-mapping
     - name: Prepare official AOSP emulator
       run: 'set -euo pipefail
 
@@ -572,6 +584,8 @@ jobs:
         HETU_EXPECTED_VERSION: '2093'
         HETU_EXPECT_NEW_UI: '1'
         HETU_RELEASE_SMOKE: '1'
+        # Real baseline profile: ART-recorded journeys on the release APK, retraced with its R8 mapping.
+        HETU_BASELINE_PROFILE: ${{ matrix.api == 35 && '1' || '' }}
         HETU_NATIVE_SOAK90_SECONDS: ${{ matrix.api == 36 && '900' || '' }}
       run: 'set -euo pipefail
 
