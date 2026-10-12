@@ -10,6 +10,31 @@ import java.util.concurrent.*;
 /** One monotonic budget for metadata, queueing, fallback URLs and every leaf in a wave. */
 final class LatencyProbeBudget implements AutoCloseable {
     static final long DEFAULT_TIMEOUT_MS = 20_000;
+    /** Per-node core timeout passed as ?timeout= to /proxies/{name}/delay and /group/{name}/delay. */
+    static final long NODE_TIMEOUT_MS = 5_000;
+    /** Leaf probes in flight per wave (pinned by the V20.95 scheduling contract). */
+    static final int WAVE_CONCURRENCY = 6;
+    /** Upper bound of one wave, however many nodes it holds. */
+    static final long MAX_WAVE_TIMEOUT_MS = 150_000;
+    // One leaf slot: the core's 5 s timeout plus the controller response margin.
+    private static final long LEAF_SLOT_MS = NODE_TIMEOUT_MS + 1_500;
+    // Snapshot reads (/proxies + /providers/proxies) before the first leaf starts.
+    private static final long METADATA_MS = 4_000;
+
+    /**
+     * Total budget of one wave over {@code targets} leaves. The old fixed 20 s budget let only
+     * ~22 dead nodes (6 in flight x 5 s each) finish before the whole test reported 已到时限,
+     * so large subscriptions always ended as a partial wave. A wave now gets one full slot per
+     * round of {@link #WAVE_CONCURRENCY} leaves, plus half again for one retry of transport
+     * failures; small waves keep the established 20 s floor.
+     */
+    static long waveTimeoutMs(int targets) {
+        if (targets <= 0) return DEFAULT_TIMEOUT_MS;
+        long rounds = (targets + WAVE_CONCURRENCY - 1) / WAVE_CONCURRENCY;
+        long firstPass = METADATA_MS + rounds * LEAF_SLOT_MS;
+        long retry = Math.max(LEAF_SLOT_MS, firstPass / 2);
+        return Math.max(DEFAULT_TIMEOUT_MS, Math.min(MAX_WAVE_TIMEOUT_MS, firstPass + retry));
+    }
     static final ThreadLocal<LatencyProbeBudget> CURRENT = new ThreadLocal<>();
     private static final ScheduledExecutorService TIMER = Executors.newSingleThreadScheduledExecutor(r -> {
         Thread t = new Thread(r, "hetu-probe-deadline"); t.setDaemon(true); return t;

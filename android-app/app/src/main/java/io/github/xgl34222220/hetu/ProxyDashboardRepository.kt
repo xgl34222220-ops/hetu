@@ -350,7 +350,8 @@ internal class ProxyDashboardRepository(context: Context) {
     }
 
     /** Every provider leaf is included, with bounded requests to the correct core endpoint. */
-    suspend fun globalDelay(onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
+    suspend fun globalDelay(targetHint: Int = 0, onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
+        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targetHint)) {
         val snapshot = probeSnapshot(force = true)
         val targets = snapshot.proxies.keys().asSequence().filter { name ->
             val node = snapshot.proxies.optJSONObject(name)
@@ -364,35 +365,50 @@ internal class ProxyDashboardRepository(context: Context) {
         onResult: ((String, Long) -> Unit)? = null): Map<String, Long> {
         val results = LinkedHashMap<String, Long>()
         val pending = targets.distinct()
-        val next = java.util.concurrent.atomic.AtomicInteger()
+        val transient = java.util.Collections.synchronizedList(mutableListOf<String>())
         // A fixed worker pool keeps the six-request limit without a batch barrier:
         // each free worker can reach later healthy nodes while a sibling is slow.
-        coroutineScope {
-            List(minOf(6, pending.size)) { async {
-                while (true) {
-                    coroutineContext.ensureActive()
-                    if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
-                    val index = next.getAndIncrement()
-                    if (index >= pending.size) break
-                    val node = pending[index]
-                    try {
-                        val value = measuredProbe(node, snapshot)
+        suspend fun pass(nodes: List<String>, retry: Boolean) {
+            val next = java.util.concurrent.atomic.AtomicInteger()
+            coroutineScope {
+                List(minOf(LatencyProbeBudget.WAVE_CONCURRENCY, nodes.size)) { async {
+                    while (true) {
                         coroutineContext.ensureActive()
-                        synchronized(results) { results[node] = value }
-                        // Each leaf can be shown as soon as it lands, but only while the
-                        // wave's identity is still current; the final map keeps its guard.
-                        if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
-                            onResult(node, value)
+                        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) break
+                        val index = next.getAndIncrement()
+                        if (index >= nodes.size) break
+                        val node = nodes[index]
+                        try {
+                            val value = measuredProbe(node, snapshot)
+                            coroutineContext.ensureActive()
+                            synchronized(results) { results[node] = value }
+                            // Each leaf can be shown as soon as it lands, but only while the
+                            // wave's identity is still current; the final map keeps its guard.
+                            if (onResult != null && snapshot.identity.stable && probeIdentity(routeBound = snapshot.identity.routeBound) == snapshot.identity)
+                                onResult(node, value)
+                        }
+                        catch (cancel: CancellationException) { throw cancel }
+                        // A controller/transport error has no new node measurement. Keep
+                        // successful siblings and let callers retain this node's old value.
+                        // A lost reply (socket timeout/reset while the core was busy) gets one
+                        // retry after the first pass; core answers (504/503/401) never do.
+                        catch (error: IOException) {
+                            if (!retry && transientProbeFailure(error) &&
+                                LatencyProbeBudget.CURRENT.get()?.expired() != true) transient += node
+                        }
                     }
-                    catch (cancel: CancellationException) { throw cancel }
-                    // A controller/transport error has no new node measurement. Keep
-                    // successful siblings and let callers retain this node's old value.
-                    catch (_: IOException) { }
-                }
-            } }.awaitAll()
+                } }.awaitAll()
+            }
         }
+        pass(pending, retry = false)
         requireCurrentProbe(snapshot.identity)
-        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap())
+        // Only an unfinished first pass is 「已到时限」; a retry cut short keeps the first answers.
+        if (LatencyProbeBudget.CURRENT.get()?.expired() == true) throw IncompleteLatencyProbe(results.toMap(), pending.size)
+        val again = synchronized(transient) { transient.filter { it !in results } }
+        if (again.isNotEmpty()) {
+            pass(again, retry = true)
+            requireCurrentProbe(snapshot.identity)
+        }
         return results
     }
 
@@ -423,7 +439,8 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
      * pin, which could briefly reroute live traffic.
      */
     suspend fun groupDelay(group: ProxyGroupUi, targets: List<String>,
-        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> = latencyProbeOperation {
+        onResult: ((String, Long) -> Unit)? = null): Map<String, Long> =
+        latencyProbeOperation(LatencyProbeBudget.waveTimeoutMs(targets.distinct().size)) {
         if (group.type.equals("Selector", ignoreCase = true)) return@latencyProbeOperation groupDelay(group.name)
         val snapshot = probeSnapshot(force = true)
         if (coreGroupWaveKeepsSelection(snapshot.proxies.optJSONObject(group.name)))
@@ -476,7 +493,7 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
             when {
                 error is MihomoControllerClient.ControllerHttpException && error.statusCode == 504 -> JSONObject()
                 error is MihomoControllerClient.ControllerHttpException && error.statusCode == 401 -> throw error
-                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() })
+                LatencyProbeBudget.CURRENT.get()?.expired() == true -> throw IncompleteLatencyProbe(synchronized(results) { results.toMap() }, pending.size)
                 else -> { requireCurrentProbe(snapshot.identity); return@coroutineScope null }
             }
         }
@@ -734,3 +751,15 @@ internal fun selectionConnectionIds(snapshot: JSONObject, group: String): List<S
     }
 
 }
+
+/**
+ * A request that produced no core answer because the reply was lost in transport (read timeout,
+ * reset, refused while the core was saturated). Core answers, credential errors, superseded
+ * runtimes and the wave's own deadline are never retried.
+ */
+internal fun transientProbeFailure(error: IOException): Boolean =
+    error !is MihomoControllerClient.ControllerHttpException &&
+        error !is MihomoControllerClient.DelayFailure &&
+        error !is IncompleteLatencyProbe &&
+        (error is java.net.SocketTimeoutException || error is java.net.SocketException ||
+            error is java.io.EOFException || error.cause is java.net.SocketTimeoutException)

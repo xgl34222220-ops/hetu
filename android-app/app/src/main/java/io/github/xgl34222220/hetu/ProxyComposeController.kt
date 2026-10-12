@@ -601,7 +601,7 @@ internal class ProxyComposeController(context: Context) {
             ProxyConfigUi(
                 name = it.name,
                 selected = it.name == selected,
-                bundled = it.name == ProxyConfigLibrary.BUNDLED_NAME,
+                bundled = ProxyConfigLibrary.isBundled(it.name),
             )
         }
     }

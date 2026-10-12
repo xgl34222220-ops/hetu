@@ -317,7 +317,10 @@ final class MihomoControllerClient {
             raw.flush();
 
             BufferedInputStream in=new BufferedInputStream(socket.getInputStream());
-            String status=readLine(in);if(status==null||!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
+            String status=readLine(in);
+            // A connection closed before any reply byte is a lost reply (retryable), not a malformed one.
+            if(status==null)throw new EOFException("Mihomo 控制接口返回无效 HTTP 响应");
+            if(!status.startsWith("HTTP/"))throw new IOException("Mihomo 控制接口返回无效 HTTP 响应");
             String[] bits=status.split(" ",3);if(bits.length<2)throw new IOException("Mihomo 控制接口状态行无效");
             int code;try{code=Integer.parseInt(bits[1]);}catch(NumberFormatException e){throw new IOException("Mihomo 控制接口状态码无效");}
             HashMap<String,String> headers=new HashMap<>();String line;

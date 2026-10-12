@@ -96,6 +96,10 @@ AUTHORIZED_FILES = frozenset((
     *(RES + folder + '/hetu_splash_' + kind + '.webp'
       for folder in ('drawable-nodpi', 'drawable-night-nodpi') for kind in ('art', 'icon')),
     RES + 'values-v31/styles.xml', RES + 'values-night-v31/styles.xml',
+    # 2026-10-12 speed-test / core-template authorization: built-in starter configs for sing-box,
+    # Xray, V2Fly and Hysteria (pure-Java template holder) listed by the config library next to
+    # Mihomo's built-in; latency waves keep their existing six-request limit.
+    PACKAGE + 'BundledCoreTemplates.java', PACKAGE + 'ProxyConfigLibrary.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

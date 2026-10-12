@@ -1078,13 +1078,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 }
             }
             try {
-                val result = repo.globalDelay { node, value -> landed.trySend(node to value) }
+                val result = repo.globalDelay(targets.size) { node, value -> landed.trySend(node to value) }
                 val stamp = SystemClock.elapsedRealtime()
                 result.forEach { (node, value) -> applyNodeProbe(request, owner, node, value, stamp) }
                 val ok = result.values.count { it > 0L }
+                // A per-node 超时 is that node's own reading (-1), never the whole test's 已到时限.
+                val timedOut = result.values.count { it == -1L }
                 if (currentRuntimeRequest(request)) {
                     if (result.isEmpty()) toast("测速未取得有效结果，已保留上次读数，请检查控制接口后重试")
-                    else toast("测速完成：$ok / ${result.size} 个节点可用")
+                    else toast("测速完成：$ok / ${result.size} 个节点可用" + if (timedOut > 0) "，$timedOut 个节点超时" else "")
                 }
             } catch (partial: IncompleteLatencyProbe) {
                 val stamp = SystemClock.elapsedRealtime()

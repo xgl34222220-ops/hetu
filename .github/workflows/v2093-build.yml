@@ -199,6 +199,7 @@ jobs:
         python3 tools/qa/test_cnip93.py -v 2>&1 | tee out/verification/cnip93-tests.txt
 
         python3 tools/qa/test_adblock93.py -v 2>&1 | tee out/verification/adblock93-tests.txt
+        python3 tools/qa/test_core_templates93.py -v 2>&1 | tee out/verification/core-templates93-tests.txt
 
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter

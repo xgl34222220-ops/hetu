@@ -169,6 +169,9 @@ final class ProxyCoreConfig {
             throw new IOException(core.label + " 仅支持 Root TPROXY / Redirect 模式");
         List<String> warnings = new ArrayList<>();
         if (isNativeFor(core, source)) {
+            // The built-in starter template (BundledCoreTemplates) ships placeholder nodes on example.invalid.
+            if (BundledCoreTemplates.hasPlaceholderNode(source))
+                warnings.add("配置仍含内置模板的占位节点（example.invalid），请先在配置编辑器中填入你自己的服务器");
             switch (k) {
                 case SING_BOX: return nativeSingBox(source, o, warnings);
                 case XRAY: return nativeXray(source, o, warnings, false);
