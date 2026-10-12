@@ -34,7 +34,8 @@
 - 入站端口 19898 / 19797 / 11053（`MihomoStartupConfig`，RootProxyManager 传给 hetu-root.sh），sing-box clash_api 127.0.0.1:29090；
   启动时河图仍会替换自己负责的入站与控制接口。
 - 占位节点只用保留域 `example.invalid`、全零 UUID；无真实服务器或凭据。仍含占位节点启动时给出明确警告。
-- 配置库为该内核列出模板（带「内置」标记，不可删除/重命名），**不自动选中**：未选择时启动仍转换所选 Mihomo 配置，老用户行为不变。
+- 配置库为该内核列出模板（带「内置」标记，不可删除/重命名）。列出与启动都不会选中模板。
+- 用户决定（2026-10-12，集成到 PR #33 时）：用户在「代理核心」里**主动选择**非 Mihomo 核心（sing-box/reF1nd/Xray/V2Fly/Hysteria）且该核心尚未选中自己的配置时，自动选中它的内置模板（`ProxyConfigLibrary.adoptTemplateOnCoreSelect`）；已选自己配置的核心与 Mihomo/Smart 用户不受影响；未重新选择核心的老用户启动时仍转换所选 Mihomo 配置。测试：`CoreTemplateAutoSelect104Test`、`test_core_templates93.py`。
 
 ## 未在真机验证
 - 大订阅（数十至上百节点）下真机「全部测速」耗时与提示；sing-box clash_api 实机测速。

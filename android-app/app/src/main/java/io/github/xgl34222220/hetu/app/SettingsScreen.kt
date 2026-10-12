@@ -497,7 +497,13 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
                 }
             },
             selected = profile.core.id,
-            onPick = { putString("proxyBaseCore", it); choice = null },
+            onPick = {
+                // A non-Mihomo core with no config of its own starts on its built-in template (内置);
+                // selected before the core is saved so one dirty check sees both changes.
+                ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(it))
+                putString("proxyBaseCore", it)
+                choice = null
+            },
             onDismiss = { choice = null },
         )
         "mode" -> HxChoiceSheet(

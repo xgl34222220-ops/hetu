@@ -10,6 +10,8 @@ No network, Root or device. The templates are read straight from the shipped Jav
 * every reference resolves (outbound / rule-set / DNS server tags), China traffic is routed direct,
   and the only server is the reserved example.invalid placeholder (no real server or credential);
 * the library lists the template without selecting it, and built-ins cannot be renamed or deleted;
+* picking a non-Mihomo core with no config of its own selects its template (user decision 2026-10-12);
+   Mihomo / Smart picks never do;
 * the wave budget scales with node count while keeping the 20 s floor and six-request concurrency.
 
 When HETU_CORE_BIN_DIR holds sing-box / xray / v2ray / hysteria binaries for this host, each template
@@ -161,6 +163,18 @@ class CoreTemplates93Test(unittest.TestCase):
         source = TEMPLATES.read_text()
         for core, name in (('SING_BOX', 'sing-box.json'), ('XRAY', 'Xray.json'), ('V2FLY', 'V2Fly.json'), ('HYSTERIA', 'Hysteria.yaml')):
             self.assertIn('static final String %s_NAME = "河图内置-%s";' % (core, name), source)
+
+    def test_core_pick_adopts_template_only_for_non_mihomo_without_own_selection(self):
+        library = (PKG / 'ProxyConfigLibrary.java').read_text()
+        body = re.search(r'String adoptTemplateOnCoreSelect\(.*?\n    }\n', library, re.S).group(0)
+        self.assertIn('core==ProxyRuntimeProfile.Core.MIHOMO||core==ProxyRuntimeProfile.Core.MIHOMO_SMART)return null;', body)
+        self.assertIn('selected(core)!=null)return null;', body, 'an existing own selection is kept')
+        self.assertIn('select(core,name)', body)
+        settings = (PKG / 'app/SettingsScreen.kt').read_text()
+        pick = settings.index('ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(it))')
+        self.assertLess(pick, settings.index('putString("proxyBaseCore", it)', pick), 'template selected before the core is saved')
+        controller = (PKG / 'ProxyComposeController.kt').read_text()
+        self.assertIn('configs.adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(id))', controller)
 
     def test_wave_budget_scales_and_keeps_floor_and_concurrency(self):
         budget = (PKG / 'LatencyProbeBudget.java').read_text()

@@ -45,9 +45,9 @@ final class ProxyConfigLibrary {
     }
 
     /**
-     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable, but never
-     * selected implicitly. Without a selection the start keeps converting the selected Mihomo profile
-     * (RootProxyManager.prepareNativeCore), so existing users do not silently move to placeholder nodes.
+     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable. Listing
+     * or starting never selects it; only the user's own core pick does (see {@link #adoptTemplateOnCoreSelect}).
+     * Without a selection the start keeps converting the selected Mihomo profile (RootProxyManager.prepareNativeCore).
      */
     private void ensureCoreTemplate(ProxyRuntimeProfile.Core core){
         String name=BundledCoreTemplates.name(core),text=BundledCoreTemplates.text(core);
@@ -56,6 +56,18 @@ final class ProxyConfigLibrary {
             File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,name);
             if(!target.isFile())writeStreamAtomic(target,new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
         }catch(Exception ignored){}
+    }
+    /**
+     * The user just picked {@code core} as the proxy core. For sing-box / reF1nd / Xray / V2Fly / Hysteria
+     * with no config of its own selected, select that core's built-in template (内置) so the pick lands on a
+     * config of the chosen core. Mihomo / Smart, and a core that already has its own selection, are left
+     * untouched. Returns the selected template name, or null when nothing changed.
+     */
+    String adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core core){
+        if(core==null||core==ProxyRuntimeProfile.Core.MIHOMO||core==ProxyRuntimeProfile.Core.MIHOMO_SMART)return null;
+        String name=BundledCoreTemplates.name(core);
+        if(name==null||selected(core)!=null)return null;
+        try{select(core,name);return name;}catch(IOException e){return null;}
     }
     static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
 

@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "3669bff076fcc00bf21deb6906599a0bb2eda7fa5656c572a7c22fbed32f181b",
+  "patchSha256": "c37cf265827e07c2f94ab49ab17ba88325deb7bbe37923502bade1f3d5c4a6d6",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -341,6 +341,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt",
@@ -401,8 +402,8 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java": "7862107a5c1f879917dca20fb108d8779139bf2eaec8ff0727ef715c4fd54ed2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java": "c73a22aeb47a82323af1672ac46e1faec2e135ea56284eea7ceb728fb046e7ad",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "bfcb3a7a91120371556d85b9022002624a73b829512621209bc121050945c7be",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "5ea863ae362201880bfd1b4d17ac5ed1c32ab397330dfce58e2604a185d45dc5",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "561d863d49967d664ec64f4e08f2f190432194f94b09b5561e093d738ae5c295",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "d53969465bd14cd0295e8bf90ced30fac2520fb5d65ed928f47b2609e0ce756a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "5292d86f63a23b590d9cd1f4d509ee51b4deee14b702a1bfe934b8720ab4c383",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "0d7d1884c75dde624828a02fe1859818ab35189052ae9e70238c4f5255ff8e7c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java": "7ef38360be0c27582578529a55f2950d19537ba73b023175b0ca555327a494bb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreDownloadManager.kt": "88c570032274e0557fad10d66c61859f01b4624f1b44fe4f76f6cf530b343e74",
@@ -442,7 +443,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt": "8eb08686b1a06800db7cdd882b28f7873a44e25f9a3276d4d490baf486981407",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt": "0ff61317c9385fb15a43c51eedb1e9b366e2f6b824305623eb741bb02777ea79",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt": "c41aea6529941003806fe5c98041dc5d74cc76ee985cd282580866da0a40ec22",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt": "076ef9dc3a977a7dd4aabd50dc9f9d16ef31a1e3f25a2ff89dcdade0a29e3f2c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt": "4605145971970cce58d3ba9febfbcd849ff8fbdab99d7860690f04cb3906dc02",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt": "3fd595ad1018ec1e1c3ebc8544bd48d40bfb67415695acb7ec79472e5f0e65fb",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt": "577b9b11c54c8e765d7547431e3678c44d42f44f0e94c8adf5efb99160e4a755",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt": "1c126edf928debb8f896ad33f8049e94cff0ff6b0eb14fcdea6e9b9b74a77879",
@@ -510,6 +511,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ControllerReadStateTest.kt": "dba4f530d43b9b961a7d8e074ef1d7bc4f89705e1afda99fa176405c4b570c6e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt": "4de3065bf8a50b5c03b04fb2686df205bec805a998336bfe20a760708cb797aa",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt": "de82e83fe1ed9f8bff17083ac49ccc1bea321ea444002ca4f145d4f0765f91b6",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt": "1969c955f361135b59aa202715bf61e9fa56f7ce8a6039dcdeff2391d64990ca",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "3c486b54085b8cca752183314d02d066eff04e93e4675c2466c733c462cc3d0e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt": "fe813de466b743b21adab864049561f93ff399a173eb618ad1ebbaabbf74fbd8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765",
@@ -976,7 +978,7 @@
     "tools/qa/test_cnip93.py": "50870a1963f664c5eb24125e073c2a7747344d24b80177a716034a11a9402be6",
     "tools/qa/test_core_identity_dns.py": "033f03fe73e3f1d32f7f9ba87f3b413256806fa230e46968da0dfd357b4fc451",
     "tools/qa/test_core_support93.py": "5baf826e05bddc8f40a2bcb1a82620019122467a953a35e353cc271313a8c89d",
-    "tools/qa/test_core_templates93.py": "d88a974f777ceec7f548b3c47f428a2459d0f634832697bb0c4f25257d491c33",
+    "tools/qa/test_core_templates93.py": "d9cc2b75403721e8d95380c6a6fa9732582266b74a692e6fde43dc3636313226",
     "tools/qa/test_fake_ip_private_routing.py": "771ed95a27d136f1bd3df5f1dc71a81c2ecf1e2fbc42238ae93d6dd105d5f8db",
     "tools/qa/test_fast_start93.py": "8a3014b5841151e49ddc8f03bd31d06e5b2c449b19c44ac0ff599c61195af796",
     "tools/qa/test_netmatch93.py": "c27218a7c93976697ec6089ef1dc7734d120a50134fa6d4ef67e5521a610d585",
@@ -2355,6 +2357,15 @@
         "settingsConfigMenuOpensViewAndEditInPlace"
       ]
     },
+    "io.github.xgl34222220.hetu.CoreTemplateAutoSelect104Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt",
+      "methods": [
+        "pickingANonMihomoCoreWithoutItsOwnConfigSelectsItsBuiltInTemplate",
+        "aCoreThatAlreadyHasItsOwnConfigKeepsIt",
+        "aSelectionWhoseFileIsGoneCountsAsNoConfig",
+        "mihomoAndSmartUsersAreUntouched"
+      ]
+    },
     "io.github.xgl34222220.hetu.CrossRepositoryMutation91Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/CrossRepositoryMutation91Test.kt",
       "methods": [
@@ -3443,8 +3454,8 @@
       ]
     }
   },
-  "expectedUnitTests": 883,
-  "expectedTestXmlFiles": 98,
+  "expectedUnitTests": 887,
+  "expectedTestXmlFiles": 99,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
   "signingUnchanged": true,

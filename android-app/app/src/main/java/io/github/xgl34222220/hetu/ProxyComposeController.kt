@@ -584,7 +584,10 @@ internal class ProxyComposeController(context: Context) {
         "disable" to "禁用本机 IPv6",
     )
 
-    fun setCore(id: String) { prefs.edit().putString("proxyBaseCore", id).apply() }
+    fun setCore(id: String) {
+        configs.adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(id))
+        prefs.edit().putString("proxyBaseCore", id).apply()
+    }
     fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
     fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
     fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }

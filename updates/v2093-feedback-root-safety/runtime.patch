@@ -4063,7 +4063,7 @@ index 65d651c..737190c 100644
              }
          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..7b85ffc 100644
+index 4f004b9..619a89d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -4215,7 +4215,19 @@ index 4f004b9..7b85ffc 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -532,13 +601,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -515,7 +584,10 @@ internal class ProxyComposeController(context: Context) {
+         "disable" to "禁用本机 IPv6",
+     )
+
+-    fun setCore(id: String) { prefs.edit().putString("proxyBaseCore", id).apply() }
++    fun setCore(id: String) {
++        configs.adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(id))
++        prefs.edit().putString("proxyBaseCore", id).apply()
++    }
+     fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
+     fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
+     fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
+@@ -532,13 +604,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -4238,7 +4250,7 @@ index 4f004b9..7b85ffc 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -683,6 +759,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +762,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -4249,7 +4261,7 @@ index 4f004b9..7b85ffc 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +869,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +872,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -4257,7 +4269,7 @@ index 4f004b9..7b85ffc 100644
              )
          }
          return out
-@@ -813,6 +894,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +897,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -4277,7 +4289,7 @@ index 4f004b9..7b85ffc 100644
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
-index 34aa171..522f9d4 100644
+index 34aa171..7fe8410 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java
 @@ -36,7 +36,7 @@ final class ProxyConfigLibrary {
@@ -4289,14 +4301,14 @@ index 34aa171..522f9d4 100644
          try{
              File d=dir(core);if(!d.isDirectory()&&!d.mkdirs())return;File target=new File(d,BUNDLED_NAME);
              if(!target.isFile())try(InputStream in=BundledProxyConfig.open()){writeStreamAtomic(target,in);}
-@@ -44,6 +44,21 @@ final class ProxyConfigLibrary {
+@@ -44,6 +44,33 @@ final class ProxyConfigLibrary {
          }catch(Exception ignored){}
      }
 
 +    /**
-+     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable, but never
-+     * selected implicitly. Without a selection the start keeps converting the selected Mihomo profile
-+     * (RootProxyManager.prepareNativeCore), so existing users do not silently move to placeholder nodes.
++     * sing-box / Xray / V2Fly / Hysteria: the built-in starter template is listed and selectable. Listing
++     * or starting never selects it; only the user's own core pick does (see {@link #adoptTemplateOnCoreSelect}).
++     * Without a selection the start keeps converting the selected Mihomo profile (RootProxyManager.prepareNativeCore).
 +     */
 +    private void ensureCoreTemplate(ProxyRuntimeProfile.Core core){
 +        String name=BundledCoreTemplates.name(core),text=BundledCoreTemplates.text(core);
@@ -4306,12 +4318,24 @@ index 34aa171..522f9d4 100644
 +            if(!target.isFile())writeStreamAtomic(target,new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
 +        }catch(Exception ignored){}
 +    }
++    /**
++     * The user just picked {@code core} as the proxy core. For sing-box / reF1nd / Xray / V2Fly / Hysteria
++     * with no config of its own selected, select that core's built-in template (内置) so the pick lands on a
++     * config of the chosen core. Mihomo / Smart, and a core that already has its own selection, are left
++     * untouched. Returns the selected template name, or null when nothing changed.
++     */
++    String adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core core){
++        if(core==null||core==ProxyRuntimeProfile.Core.MIHOMO||core==ProxyRuntimeProfile.Core.MIHOMO_SMART)return null;
++        String name=BundledCoreTemplates.name(core);
++        if(name==null||selected(core)!=null)return null;
++        try{select(core,name);return name;}catch(IOException e){return null;}
++    }
 +    static boolean isBundled(String name){return BUNDLED_NAME.equals(name)||BundledCoreTemplates.isBundledName(name);}
 +
      List<Entry> list(ProxyRuntimeProfile.Core core){ensureBundled(core);File[] files=dir(core).listFiles(File::isFile);ArrayList<Entry> out=new ArrayList<>();if(files!=null)for(File f:files)if(coreAccepts(core,f.getName()))out.add(new Entry(core,f.getName(),f));out.sort(Comparator.comparing(e->e.name,CollatorHolder.ORDER));return out;}
      Entry selected(ProxyRuntimeProfile.Core core){ensureBundled(core);String n=prefs.getString(key(core),"");if(n.isEmpty())return null;File f=new File(dir(core),n);return f.isFile()&&coreAccepts(core,n)?new Entry(core,n,f):null;}
      void select(ProxyRuntimeProfile.Core core,String name)throws IOException{ensureBundled(core);String n=safeName(name);File f=new File(dir(core),n);if(!f.isFile()||!coreAccepts(core,n))throw new IOException("配置不存在或格式不属于当前核心");prefs.edit().putString(key(core),n).apply();}
-@@ -64,14 +79,14 @@ final class ProxyConfigLibrary {
+@@ -64,14 +91,14 @@ final class ProxyConfigLibrary {
      void write(Entry e,String text)throws IOException{if(e==null)throw new IOException("尚未选择配置");if(text==null||text.trim().isEmpty())throw new IOException("配置不能为空");byte[] b=text.getBytes(StandardCharsets.UTF_8);if(b.length>LIMIT)throw new IOException("配置超过 4 MiB");File d=e.file.getParentFile();if(d!=null&&!d.isDirectory()&&!d.mkdirs())throw new IOException("无法创建配置目录");File tmp=new File(d,e.file.getName()+".new");try(FileOutputStream out=new FileOutputStream(tmp,false)){out.write(b);out.getFD().sync();}catch(IOException x){tmp.delete();throw x;}replaceAtomic(tmp,e.file);}
      void delete(Entry e)throws IOException{
          if(e==null)return;
@@ -15456,7 +15480,7 @@ index 0000000..b0c70e2
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
-index 2b4638e..4841af8 100644
+index 2b4638e..e745381 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 @@ -393,21 +393,22 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
@@ -15504,7 +15528,7 @@ index 2b4638e..4841af8 100644
              }
          }
          if (pending) {
-@@ -485,38 +483,18 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
+@@ -485,41 +483,27 @@ internal fun NetworkSettingsScreen(vm: HetuViewModel) {
      }
 
      when (choice) {
@@ -15550,7 +15574,17 @@ index 2b4638e..4841af8 100644
 +                }
              },
              selected = profile.core.id,
-             onPick = { putString("proxyBaseCore", it); choice = null },
+-            onPick = { putString("proxyBaseCore", it); choice = null },
++            onPick = {
++                // A non-Mihomo core with no config of its own starts on its built-in template (内置);
++                // selected before the core is saved so one dirty check sees both changes.
++                ProxyConfigLibrary(context).adoptTemplateOnCoreSelect(ProxyRuntimeProfile.Core.from(it))
++                putString("proxyBaseCore", it)
++                choice = null
++            },
+             onDismiss = { choice = null },
+         )
+         "mode" -> HxChoiceSheet(
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 index ce5f550..94de2a1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
@@ -25170,6 +25204,96 @@ index 0000000..0ae5f90
 +    @Test fun settingsConfigMenuOpensViewAndEditInPlace() {
 +        assertEquals(listOf("查看", "编辑", "导出", "重命名", "删除"), settingsConfigMenu(ProxyConfigUi("自用_tproxy.yaml", selected = true, bundled = false)))
 +        assertEquals(listOf("查看", "编辑", "导出"), settingsConfigMenu(ProxyConfigUi("config.yaml", selected = false, bundled = true)))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt
+new file mode 100644
+index 0000000..6d23862
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt
+@@ -0,0 +1,84 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.test.core.app.ApplicationProvider
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertNull
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import java.io.File
++
++/**
++ * 用户决定：选择非 Mihomo 核心（sing-box / reF1nd / Xray / V2Fly / Hysteria）且该核心尚未选中自己的配置时，
++ * 自动选中它的内置模板；已有自己配置的核心与 Mihomo / Smart 用户不受影响。
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class CoreTemplateAutoSelect104Test {
++    private val context: Context = ApplicationProvider.getApplicationContext()
++    private val prefs get() = context.getSharedPreferences("hetu", 0)
++    private val nonMihomo = listOf(ProxyRuntimeProfile.Core.SING_BOX, ProxyRuntimeProfile.Core.SING_BOX_REF1ND,
++        ProxyRuntimeProfile.Core.XRAY, ProxyRuntimeProfile.Core.V2FLY, ProxyRuntimeProfile.Core.HYSTERIA)
++
++    @Before fun reset() {
++        prefs.edit().clear().commit()
++        File(context.filesDir, "hetu/configs").deleteRecursively()
++    }
++
++    @Test fun pickingANonMihomoCoreWithoutItsOwnConfigSelectsItsBuiltInTemplate() {
++        val library = ProxyConfigLibrary(context)
++        for (core in nonMihomo) {
++            assertNull(library.selected(core))
++            val name = BundledCoreTemplates.name(core)!!
++            assertEquals(name, library.adoptTemplateOnCoreSelect(core))
++            assertEquals(name, library.selected(core)!!.name)
++            assertEquals(name, prefs.getString("proxySelectedConfig.${core.id}", ""))
++            // Picking the same core again keeps the selection and reports no change.
++            assertNull(library.adoptTemplateOnCoreSelect(core))
++            assertEquals(name, library.selected(core)!!.name)
++        }
++    }
++
++    @Test fun aCoreThatAlreadyHasItsOwnConfigKeepsIt() {
++        val library = ProxyConfigLibrary(context)
++        val own = mapOf(
++            ProxyRuntimeProfile.Core.SING_BOX to ("mine.json" to "{\"outbounds\":[{\"type\":\"direct\",\"tag\":\"d\"}]}"),
++            ProxyRuntimeProfile.Core.XRAY to ("mine.json" to "{\"outbounds\":[{\"protocol\":\"freedom\"}]}"),
++            ProxyRuntimeProfile.Core.HYSTERIA to ("mine.yaml" to "server: node.example.com:443\nauth: x\n"),
++        )
++        for ((core, file) in own) {
++            val entry = library.importConfig(core, file.first, file.second.byteInputStream())
++            library.select(core, entry.name)
++            assertNull(library.adoptTemplateOnCoreSelect(core))
++            assertEquals(entry.name, library.selected(core)!!.name)
++        }
++    }
++
++    @Test fun aSelectionWhoseFileIsGoneCountsAsNoConfig() {
++        val library = ProxyConfigLibrary(context)
++        val core = ProxyRuntimeProfile.Core.V2FLY
++        prefs.edit().putString("proxySelectedConfig.${core.id}", "deleted.json").commit()
++        assertNull(library.selected(core))
++        assertEquals(BundledCoreTemplates.V2FLY_NAME, library.adoptTemplateOnCoreSelect(core))
++        assertEquals(BundledCoreTemplates.V2FLY_NAME, library.selected(core)!!.name)
++    }
++
++    @Test fun mihomoAndSmartUsersAreUntouched() {
++        val library = ProxyConfigLibrary(context)
++        val mihomo = ProxyRuntimeProfile.Core.MIHOMO
++        val smart = ProxyRuntimeProfile.Core.MIHOMO_SMART
++        val before = library.selected(mihomo)?.name
++        assertNull(library.adoptTemplateOnCoreSelect(mihomo))
++        assertNull(library.adoptTemplateOnCoreSelect(smart))
++        assertEquals(before, library.selected(mihomo)?.name)
++        val smartKey = prefs.getString("proxySelectedConfig.${smart.id}", null)
++        assertNull(library.adoptTemplateOnCoreSelect(smart))
++        assertEquals(smartKey, prefs.getString("proxySelectedConfig.${smart.id}", null))
++        // Choosing Mihomo never selects a non-Mihomo template behind the user's back.
++        for (core in nonMihomo) assertNull(library.selected(core))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt
