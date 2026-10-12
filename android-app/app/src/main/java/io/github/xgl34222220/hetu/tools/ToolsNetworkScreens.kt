@@ -105,9 +105,10 @@ internal fun ToolsDiscardChangesDialogCard(onConfirm: () -> Unit, onCancel: () -
 /**
  * 共享网络 (工具 › 共享网络). Stateless: edits go to the draft in [state], ✓ saves it.
  *
- * Every switch below the master switch means “direct”: an interface or a downstream device
- * that is switched on bypasses the proxy. Device switches and the MAC list edit the same set.
- * With the master switch off the three lower cards fade back and are inert.
+ * Interface switches choose the tether ingress the Root rules are scoped to (stored apart from
+ * 绕过规则; the upstream is never offered). MAC mode: blacklist (listed devices direct) or
+ * whitelist (only listed devices proxied); device switches and the MAC list edit the list of the
+ * current mode. With the master switch off the lower cards fade back and are inert.
  */
 @Composable
 internal fun ToolsShareScreen(
@@ -123,7 +124,6 @@ internal fun ToolsShareScreen(
     val draft = state.draft
     val ready = state.load is ToolsLoad.Ready
     val editable = ready && !state.saving
-    val macs = draft.macs.map { it.trim().lowercase() }
     val stagger = rememberHomeStagger()
     ToolsPage(
         title = "共享网络",
@@ -143,30 +143,49 @@ internal fun ToolsShareScreen(
                 ToolsButton("重新读取", onRetry, kind = HomeButtonKind.Primary, icon = HomeIcons.RefreshCw)
             }
             ToolsLoad.Ready -> {
-                ToolsInfoCard("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。", Modifier.homeEnter(stagger, 0))
+                ToolsInfoCard("开启后河图只接管所选共享接口（热点 / USB / 以太网共享）进入的流量；上行网络不会被当作共享入口。接口与 MAC 名单在 Root 层生效，修改后重启代理。", Modifier.homeEnter(stagger, 0))
                 HomeCard(Modifier.fillMaxWidth().homeEnter(stagger, 1)) {
                     ToolsSwitchRow("启用共享网络", draft.enabled, { onDraftChange(draft.copy(enabled = it)) }, icon = ToolsIcons.Wifi, subtitle = "将共享流量纳入透明代理", enabled = editable)
                 }
                 val lower = editable && draft.enabled
+                val whitelist = draft.whitelist
+                val listed = (if (whitelist) draft.onlyMacs else draft.macs).map { it.trim().lowercase() }
+                fun setListed(next: List<String>) = onDraftChange(if (whitelist) draft.copy(onlyMacs = next) else draft.copy(macs = next))
                 val presence = .5f + .5f * homeAnimatedFraction(if (draft.enabled) 1f else 0f, "tools-share-lower")
                 Column(Modifier.alpha(presence).homeEnter(stagger, 2), verticalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
                     HomeCard(Modifier.fillMaxWidth()) {
                         ToolsCardTitle("共享网络接口")
                         if (state.interfaces.isEmpty()) {
                             Text(state.note.ifBlank { ht("没有检测到正在共享的接口。") }, Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, bottom = 16.dp), color = c.t2, style = HomeType.note)
+                        } else if (state.note.isNotBlank()) {
+                            Text(state.note, Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, bottom = 10.dp), color = c.t2, style = HomeType.note)
                         }
                         state.interfaces.forEachIndexed { index, item ->
                             if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
-                            val direct = item.name in draft.directInterfaces
+                            val scoped = item.name in draft.sharedInterfaces
                             ToolsSwitchRow(
-                                item.name, direct,
-                                { on -> onDraftChange(draft.copy(directInterfaces = if (on) draft.directInterfaces + item.name else draft.directInterfaces - item.name)) },
+                                item.name, scoped,
+                                { on -> onDraftChange(draft.copy(sharedInterfaces = if (on) draft.sharedInterfaces + item.name else draft.sharedInterfaces - item.name)) },
                                 rawContent = true,
                                 icon = ToolsIcons.Link,
-                                subtitle = ht(if (direct) "直连" else "接管") + if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
-                                enabled = lower,
+                                subtitle = ht(if (item.upstream) "上行网络，不能作为共享入口" else if (scoped) "接管" else "不接管") +
+                                    if (item.state.isBlank()) "" else " · ${ht("状态")} ${item.state}",
+                                enabled = lower && (!item.upstream || scoped),
                             )
                         }
+                        if (draft.sharedInterfaces.isEmpty()) {
+                            Text(ht("未指定接口时兼容旧行为：接管所有转发入口。建议勾选实际的共享接口。"), Modifier.padding(start = HomeRowDims.start, end = HomeRowDims.start, top = 6.dp, bottom = 14.dp), color = c.t2, style = HomeType.note)
+                        }
+                    }
+                    HomeCard(Modifier.fillMaxWidth()) {
+                        ToolsCardTitle("MAC 名单模式")
+                        ToolsSwitchRow(
+                            "仅代理名单内设备", whitelist,
+                            { on -> onDraftChange(draft.copy(macMode = if (on) "only" else "direct")) },
+                            icon = ToolsFeatureIcons.ShieldCheck,
+                            subtitle = if (whitelist) "白名单：名单外设备直连；名单为空时不代理任何共享设备" else "黑名单：名单内设备直连，其余设备走代理",
+                            enabled = lower,
+                        )
                     }
                     HomeCard(Modifier.fillMaxWidth()) {
                         ToolsCardTitle("下游设备")
@@ -177,28 +196,30 @@ internal fun ToolsShareScreen(
                             if (index > 0) HomeRowDivider(start = HomeRowDims.textStart)
                             val mac = client.mac.lowercase()
                             ToolsSwitchRow(
-                                client.ip, mac in macs,
-                                { on -> onDraftChange(draft.copy(macs = if (on) draft.macs + mac else draft.macs.filter { it.trim().lowercase() != mac })) },
+                                client.hostname.ifBlank { client.ip }, mac in listed,
+                                { on -> setListed(if (on) (if (whitelist) draft.onlyMacs else draft.macs) + mac else (if (whitelist) draft.onlyMacs else draft.macs).filter { it.trim().lowercase() != mac }) },
                                 rawContent = true,
                                 icon = ToolsFeatureIcons.Laptop,
-                                subtitle = listOf(client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
+                                subtitle = listOf(if (client.hostname.isBlank()) "" else client.ip, client.mac, client.iface, client.state).filter { it.isNotBlank() }.joinToString(" · "),
                                 monospaceSubtitle = true,
                                 enabled = lower,
                             )
                         }
                     }
                     HomeCard(Modifier.fillMaxWidth()) {
-                        ToolsCardTitle("MAC 列表")
+                        ToolsCardTitle(if (whitelist) "MAC 白名单" else "MAC 直连名单")
+                        val values = if (whitelist) draft.onlyMacs else draft.macs
                         ToolsListEditor(
-                            label = "MAC 地址", values = draft.macs, placeholder = "aa:bb:cc:dd:ee:ff", enabled = lower,
-                            onChange = { index, value -> onDraftChange(draft.copy(macs = draft.macs.replaced(index, value))) },
-                            onRemove = { index -> onDraftChange(draft.copy(macs = draft.macs.without(index))) },
-                            onAdd = { onDraftChange(draft.copy(macs = draft.macs + "")) },
+                            label = "MAC 地址", values = values, placeholder = "aa:bb:cc:dd:ee:ff", enabled = lower,
+                            onChange = { index, value -> setListed(values.replaced(index, value)) },
+                            onRemove = { index -> setListed(values.without(index)) },
+                            onAdd = { setListed(values + "") },
                         )
                     }
                 }
                 ToolsNote(
-                    ht("名单内设备在 TPROXY、Redirect、DNS、UDP 防泄漏与 QUIC 链中优先直连。") + ht("最多 %d 个 MAC。").replace("%d", ToolsFeatureRules.MaxMacs.toString()),
+                    ht(if (whitelist) "白名单设备在 TPROXY、Redirect、DNS、UDP 防泄漏、QUIC 与 Kill Switch 链中走代理，其余共享设备直连。" else "名单内设备在 TPROXY、Redirect、DNS、UDP 防泄漏与 QUIC 链中优先直连。") +
+                        ht("最多 %d 个 MAC。").replace("%d", ToolsFeatureRules.MaxMacs.toString()),
                     Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
                 )
             }

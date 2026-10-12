@@ -144,17 +144,28 @@ internal data class ToolsBypassState(
 
 /* ---------------------------- 共享网络 (38) ---------------------------- */
 
-internal data class ToolsShareInterface(val name: String, val state: String = "")
-internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "")
+internal data class ToolsShareInterface(val name: String, val state: String = "", val tether: Boolean = true, val upstream: Boolean = false)
+internal data class ToolsShareClient(val ip: String, val mac: String, val iface: String = "", val state: String = "", val hostname: String = "")
 
 internal data class ToolsShareSettings(
     val enabled: Boolean = false,
-    /** Shared interfaces that bypass the proxy. */
+    /** Legacy: shared interfaces that bypassed the proxy through 绕过规则. No longer written by this page. */
     val directInterfaces: Set<String> = emptySet(),
-    /** Downstream devices that bypass the proxy, lower-case MACs. */
+    /** Downstream devices that bypass the proxy (blacklist mode), lower-case MACs. */
     val macs: List<String> = emptyList(),
+    /** Tether ingress the shared interception is scoped to; empty = every forwarded ingress (legacy). */
+    val sharedInterfaces: Set<String> = emptySet(),
+    /** "direct" = listed devices bypass (blacklist); "only" = only listed devices are proxied (whitelist). */
+    val macMode: String = "direct",
+    /** Whitelist, lower-case MACs. Kept apart from [macs] so switching mode loses neither list. */
+    val onlyMacs: List<String> = emptyList(),
 ) {
-    fun normalized(): ToolsShareSettings = copy(macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean())
+    fun normalized(): ToolsShareSettings = copy(
+        macs = macs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
+        onlyMacs = onlyMacs.map { it.trim().lowercase(Locale.ROOT) }.clean(),
+        macMode = if (macMode == "only") "only" else "direct",
+    )
+    val whitelist: Boolean get() = macMode == "only"
 }
 
 internal class ToolsShareSnapshot(
@@ -363,6 +374,9 @@ internal object ToolsFeatureRules {
     fun shareError(settings: ToolsShareSettings): String? {
         settings.macs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
         if (settings.macs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
+        settings.onlyMacs.firstOrNull { !mac.matches(it) }?.let { return "MAC 格式无效：$it" }
+        if (settings.onlyMacs.size > MaxMacs) return "最多 $MaxMacs 个 MAC"
+        if (settings.sharedInterfaces.size > 16) return "共享接口最多 16 个"
         return null
     }
 

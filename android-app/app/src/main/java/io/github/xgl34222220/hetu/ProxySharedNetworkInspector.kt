@@ -7,6 +7,10 @@ import kotlinx.coroutines.withContext
 internal data class SharedInterfaceUi(
     val name: String,
     val state: String,
+    /** A tether ingress candidate (reported tethered, or a tether-like name), never the upstream. */
+    val tether: Boolean = false,
+    /** Carries the default route right now: never offered as a shared interface. */
+    val upstream: Boolean = false,
 )
 
 internal data class SharedClientUi(
@@ -14,12 +18,15 @@ internal data class SharedClientUi(
     val mac: String,
     val iface: String,
     val state: String,
+    /** From the DHCP lease (dnsmasq) when readable. */
+    val hostname: String = "",
 )
 
 internal data class SharedNetworkSnapshot(
     val interfaces: List<SharedInterfaceUi> = emptyList(),
     val clients: List<SharedClientUi> = emptyList(),
     val error: String = "",
+    val upstream: List<String> = emptyList(),
 )
 
 internal object ProxySharedNetworkInspector {
@@ -48,6 +55,15 @@ internal object ProxySharedNetworkInspector {
                   if(dev!="" && mac!="")printf "C\t%s\t%s\t%s\t%s\n",ip,mac,dev,st;
                 }'
             fi
+            for a in 8.8.8.8 2001:4860:4860::8888; do
+              d=${'$'}(ip route get "${'$'}a" 2>/dev/null | awk '{for(i=1;i<NF;i++) if(${'$'}i=="dev"){print ${'$'}(i+1); exit}}')
+              [ -z "${'$'}d" ] || printf 'U\t%s\n' "${'$'}d"
+            done
+            { dumpsys tethering 2>/dev/null || dumpsys connectivity 2>/dev/null; } | head -n 600 | grep -i 'tethered' | head -n 40 | awk '{print "T\t" ${'$'}0}'
+            for f in /data/misc/dhcp/dnsmasq.leases /data/misc/dhcp/dnsmasq.leases.* /data/vendor/dhcp/dnsmasq.leases; do
+              [ -r "${'$'}f" ] && head -n 128 "${'$'}f" | awk '{print "L\t" ${'$'}0}'
+            done
+            exit 0
         """.trimIndent()
         val result = RootBridge.rootShell(context.applicationContext, command, 8_000L)
         if (!result.ok()) {
@@ -55,13 +71,29 @@ internal object ProxySharedNetworkInspector {
         }
         val interfaces = LinkedHashMap<String, SharedInterfaceUi>()
         val clients = LinkedHashMap<String, SharedClientUi>()
+        val upstream = LinkedHashSet<String>()
+        val tetherText = StringBuilder()
+        val leaseText = StringBuilder()
+        result.output.lineSequence().forEach { line ->
+            when {
+                line.startsWith("U\t") -> line.removePrefix("U\t").trim().takeIf { ifaceSafe.matches(it) }?.let { upstream += it }
+                line.startsWith("T\t") -> tetherText.append(line.removePrefix("T\t")).append('\n')
+                line.startsWith("L\t") -> leaseText.append(line.removePrefix("L\t")).append('\n')
+            }
+        }
+        val tethered = SharedNetworkRules.tetheredInterfaces(tetherText.toString())
+        val leases = SharedNetworkRules.parseLeases(leaseText.toString()).associateBy { it.mac }
         result.output.lineSequence().forEach { line ->
             val parts = line.split('\t')
             when (parts.firstOrNull()) {
                 "I" -> if (parts.size >= 3) {
                     val name = parts[1].trim()
                     if (ifaceSafe.matches(name)) {
-                        interfaces[name] = SharedInterfaceUi(name, parts[2].trim().ifBlank { "unknown" })
+                        interfaces[name] = SharedInterfaceUi(
+                            name, parts[2].trim().ifBlank { "unknown" },
+                            tether = SharedNetworkRules.tetherCandidate(name, upstream, tethered),
+                            upstream = name in upstream,
+                        )
                     }
                 }
                 "C" -> if (parts.size >= 5) {
@@ -72,7 +104,7 @@ internal object ProxySharedNetworkInspector {
                     if (ipSafe.matches(ip) && macSafe.matches(mac) && ifaceSafe.matches(iface) &&
                         mac != "00:00:00:00:00:00" && mac != "ff:ff:ff:ff:ff:ff"
                     ) {
-                        clients["$mac|$iface"] = SharedClientUi(ip, mac, iface, state)
+                        clients["$mac|$iface"] = SharedClientUi(ip, mac, iface, state, leases[mac]?.hostname.orEmpty())
                     }
                 }
             }
@@ -80,6 +112,7 @@ internal object ProxySharedNetworkInspector {
         SharedNetworkSnapshot(
             interfaces = interfaces.values.sortedWith(compareByDescending<SharedInterfaceUi> { it.state == "up" }.thenBy { it.name }),
             clients = clients.values.sortedWith(compareBy<SharedClientUi> { it.iface }.thenBy { it.ip }),
+            upstream = upstream.toList(),
         )
     }
 }

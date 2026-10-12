@@ -58,6 +58,9 @@ private object Keys {
     const val BypassInterfaces = "proxyBypassInterfaces"
     const val SharedNetwork = "proxySharedNetwork"
     const val SharedMacs = "proxySharedBypassMacs"
+    const val SharedInterfaces = "proxySharedInterfaces"
+    const val SharedMacMode = "proxySharedMacMode"
+    const val SharedOnlyMacs = "proxySharedOnlyMacs"
     const val CnIp = "proxyCnIpDirect"
     const val CnIpKernelV4 = "proxyCnIpKernelV4"
     const val CnIpKernelV6 = "proxyCnIpKernelV6"
@@ -186,31 +189,49 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             /* ------------------------------ 共享网络 ------------------------------ */
             loadShare = {
                 val live = ProxySharedNetworkInspector.inspect(app)
-                val names = live.interfaces.map { it.name }.toSet()
+                val shared = prefs.strings(Keys.SharedInterfaces)
+                // Only tether ingress is offered (never the upstream / cellular link); a saved name
+                // that is not up right now stays visible so it can be switched off.
+                val offered = live.interfaces.filter { (it.tether && !it.upstream) || it.name in shared }
+                    .map { ToolsShareInterface(it.name, it.state, it.tether, it.upstream) } +
+                    (shared - live.interfaces.map { it.name }.toSet()).sorted().map { ToolsShareInterface(it, "未连接") }
+                // 绕过规则 interfaces that carry the default route make this device's own traffic direct.
+                val upstreamBypass = prefs.strings(Keys.BypassInterfaces).filter { name ->
+                    live.upstream.any { up -> up == name || (name.endsWith("+") && up.startsWith(name.dropLast(1))) }
+                }
+                val note = listOf(
+                    live.error,
+                    if (upstreamBypass.isEmpty()) "" else "绕过规则中的 " + upstreamBypass.joinToString("、") + " 是当前上行网络：本机经它的流量全部直连。请在「绕过规则」中确认。",
+                ).filter { it.isNotBlank() }.joinToString("\n")
                 ToolsShareSnapshot(
                     settings = ToolsShareSettings(
                         enabled = prefs.getBoolean(Keys.SharedNetwork, false),
-                        // The interface set is shared with 绕过规则; only names that are being shared show up here.
-                        directInterfaces = prefs.strings(Keys.BypassInterfaces).intersect(names),
                         macs = prefs.strings(Keys.SharedMacs).sorted(),
+                        sharedInterfaces = shared,
+                        macMode = if (prefs.getString(Keys.SharedMacMode, "direct") == "only") "only" else "direct",
+                        onlyMacs = prefs.strings(Keys.SharedOnlyMacs).sorted(),
                     ),
-                    interfaces = live.interfaces.map { ToolsShareInterface(it.name, it.state) },
-                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state) },
-                    note = live.error,
+                    interfaces = offered,
+                    clients = live.clients.map { ToolsShareClient(it.ip, it.mac, it.iface, it.state, it.hostname) },
+                    note = note,
                 )
             },
             saveShare = { value ->
-                val live = ProxySharedNetworkInspector.inspect(app).interfaces.map { it.name }.toSet()
-                // Keep the bypass interfaces that are not shared interfaces: they belong to 绕过规则.
-                val interfaces = TreeSet((prefs.strings(Keys.BypassInterfaces) - live) + value.directInterfaces)
+                // Shared interfaces live in their own key. 绕过规则 (proxyBypassInterfaces) is never
+                // written here any more: an upstream such as wlan0 ticked as "shared" used to make
+                // this device's own Wi-Fi traffic direct.
+                val normalized = value.normalized()
                 prefs.edit()
-                    .putBoolean(Keys.SharedNetwork, value.enabled)
-                    .putStringSet(Keys.BypassInterfaces, interfaces)
-                    .putStringSet(Keys.SharedMacs, TreeSet(value.macs))
+                    .putBoolean(Keys.SharedNetwork, normalized.enabled)
+                    .putStringSet(Keys.SharedMacs, TreeSet(normalized.macs))
+                    .putStringSet(Keys.SharedInterfaces, TreeSet(normalized.sharedInterfaces))
+                    .putString(Keys.SharedMacMode, normalized.macMode)
+                    .putStringSet(Keys.SharedOnlyMacs, TreeSet(normalized.onlyMacs))
                     .apply()
                 dirty(Keys.SharedNetwork)
-                dirty(Keys.BypassInterfaces)
                 dirty(Keys.SharedMacs)
+                // Not runtime-signature keys: mark the restart notice explicitly (as CNIP does).
+                prefs.edit().putBoolean("proxyRootSettingsDirty", true).apply()
             },
 
             /* ------------------------------ CNIP ------------------------------ */

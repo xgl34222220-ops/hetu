@@ -105,6 +105,11 @@ AUTHORIZED_FILES = frozenset((
     # plus the 资源限制 switch for the cgroup limit on the advanced proxy settings page.
     PACKAGE + 'ConfigReferenceCleaner.java', PACKAGE + 'StartupDiagnostics.java', PACKAGE + 'CoreResourceLimits.java',
     PACKAGE + 'ProxyAdvancedSettingsActivity.kt',
+    # 2026-10-12 network-match / shared-network parity authorization: the network-match page and
+    # the shared-network inspector, plus two pure-Java rule classes (no Android API) for the
+    # SIM/MCC+MNC conditions, switch-config/run-script actions and the shared ingress policy.
+    PACKAGE + 'ProxyNetworkAutomationActivity.kt', PACKAGE + 'ProxySharedNetworkInspector.kt',
+    PACKAGE + 'NetworkMatchRules.java', PACKAGE + 'SharedNetworkRules.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
