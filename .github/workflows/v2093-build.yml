@@ -204,6 +204,7 @@ jobs:
         python3 tools/qa/test_netshare93.py -v 2>&1 | tee out/verification/netshare93-tests.txt
 
         python3 tools/qa/test_netmatch93.py -v 2>&1 | tee out/verification/netmatch93-tests.txt
+        python3 tools/qa/test_override_js93.py -v 2>&1 | tee out/verification/override-js93-tests.txt
 
         '
     - name: Reproduce cache eviction on old production exporter and verify new exporter

@@ -245,6 +245,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                 HomeIconButton(ToolsIcons.Trash2, "删除", { if (!busy) deleteTarget = script }, enabled = !busy, tint = c.t2, glyph = 22.dp)
             }
         }
+        // JS override scripts applied to the config before every start; last, so the hooks and
+        // managed scripts above keep their positions.
+        item("override-scripts") { OverrideScriptsSection() }
     }
 
     if (menuOpen) {

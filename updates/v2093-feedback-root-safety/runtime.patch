@@ -8054,7 +8054,7 @@ index 7ebf26f..7b4be3f 100644
      private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
              "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
-index e5290b9..d48b8a5 100644
+index e5290b9..0a177cf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
 @@ -179,25 +179,26 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
@@ -8101,6 +8101,16 @@ index e5290b9..d48b8a5 100644
                  }
              }
          }
+@@ -244,6 +245,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+                 HomeIconButton(ToolsIcons.Trash2, "删除", { if (!busy) deleteTarget = script }, enabled = !busy, tint = c.t2, glyph = 22.dp)
+             }
+         }
++        // JS override scripts applied to the config before every start; last, so the hooks and
++        // managed scripts above keep their positions.
++        item("override-scripts") { OverrideScriptsSection() }
+     }
+
+     if (menuOpen) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt
 index 190ce6c..4f03ba6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt
@@ -8269,7 +8279,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..4254597 100644
+index 9cd82da..2363adc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -8352,7 +8362,17 @@ index 9cd82da..4254597 100644
      static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
      private final Context context;
      private final SharedPreferences prefs;
-@@ -129,7 +193,7 @@ final class RootProxyManager {
+@@ -63,6 +127,9 @@ final class RootProxyManager {
+         final RootFakeIpRanges fakeIps;
+         final String startup,settingsSignature;
+         final int tproxyPort,redirectPort,controllerPort;
++        /** JS override scripts (覆写脚本) outcome of this preparation; empty when none is enabled. */
++        String overrideNotice="";
++        boolean overrideFallback;
+         Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
+             profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
+         }
+@@ -129,7 +196,7 @@ final class RootProxyManager {
      }
 
      private String detectDefaultInterface()throws IOException{
@@ -8361,7 +8381,7 @@ index 9cd82da..4254597 100644
                  "set -- $(ip route get 1.1.1.1 2>/dev/null); while [ \"$#\" -gt 1 ]; do if [ \"$1\" = dev ]; then printf '%s' \"$2\"; break; fi; shift; done",5000L);
          String iface=result.output==null?"":result.output.trim();
          if(!iface.matches("[A-Za-z0-9_.:@-]{1,32}"))throw new IOException("eBPF 无法识别当前默认出口接口");
-@@ -155,7 +219,7 @@ final class RootProxyManager {
+@@ -155,7 +222,7 @@ final class RootProxyManager {
 
      private boolean runtimeCoreCurrent(String token){
          try{
@@ -8370,7 +8390,7 @@ index 9cd82da..4254597 100644
                      "if [ -x "+RootBridge.quote(BIN)+" ] && [ -r "+RootBridge.quote(CORE_TOKEN)+" ] && [ \"$(cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null)\" = "+RootBridge.quote(token)+" ]; then printf 1; else printf 0; fi",
                      4000L);
              return result.ok()&&"1".equals(result.output.trim());
-@@ -167,7 +231,7 @@ final class RootProxyManager {
+@@ -167,7 +234,7 @@ final class RootProxyManager {
      private RootStartupProbe.Result probeStartupRuntime(){
          try{
              RootBridge.requireWorkerThread();
@@ -8379,7 +8399,7 @@ index 9cd82da..4254597 100644
                      RootStartupProbe.command(ROOT+"/run/core.pid",BIN,CORE_TOKEN),4000L);
              return RootStartupProbe.parse(result.ok(),result.output);
          }catch(Exception ignored){return RootStartupProbe.parse(false,"");}
-@@ -177,7 +241,7 @@ final class RootProxyManager {
+@@ -177,7 +244,7 @@ final class RootProxyManager {
          try{
              RootBridge.requireWorkerThread();
              String command=ProxyContinuity.coreProbeCommand(ROOT+"/run/core.pid",BIN);
@@ -8388,7 +8408,7 @@ index 9cd82da..4254597 100644
              ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
              return ProxyContinuity.preserveRunning(state,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
-@@ -217,11 +281,13 @@ final class RootProxyManager {
+@@ -217,11 +284,13 @@ final class RootProxyManager {
                      .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
                      .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
                      .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
@@ -8403,7 +8423,7 @@ index 9cd82da..4254597 100644
          if(!r.ok())throw new IOException("无法初始化河图运行目录："+r.output.trim());
          return ROOT;
          }finally{CONTROL_LOCK.unlock();}
-@@ -256,6 +322,9 @@ final class RootProxyManager {
+@@ -256,6 +325,9 @@ final class RootProxyManager {
              if(!prefs.getBoolean("proxyAdblockChain",true))return "广告过滤串联未开启";
              JSONObject state=status();
              if(!state.optBoolean("running",false))return "规则已保存；代理下次启动时自动使用新规则";
@@ -8413,7 +8433,7 @@ index 9cd82da..4254597 100644
              ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
              String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
-@@ -267,7 +336,13 @@ final class RootProxyManager {
+@@ -267,7 +339,13 @@ final class RootProxyManager {
                      +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
                      +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
                      +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
@@ -8428,7 +8448,7 @@ index 9cd82da..4254597 100644
              if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
              int port=liveControllerPort(state);
-@@ -276,6 +351,10 @@ final class RootProxyManager {
+@@ -276,6 +354,10 @@ final class RootProxyManager {
              try{
                  controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                  controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
@@ -8439,7 +8459,7 @@ index 9cd82da..4254597 100644
                  verifyAdblockRuntime(controller,true,snapshot.count);
              }catch(Exception providerError){
                  // Do not reload the entire proxy after a provider error: this can
-@@ -309,10 +388,10 @@ final class RootProxyManager {
+@@ -309,19 +391,23 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -8452,7 +8472,23 @@ index 9cd82da..4254597 100644
          if(profile.mode!=ProxyRuntimeProfile.Mode.TPROXY&&profile.mode!=ProxyRuntimeProfile.Mode.REDIRECT&&profile.mode!=ProxyRuntimeProfile.Mode.ENHANCE&&
                  profile.mode!=ProxyRuntimeProfile.Mode.TUN&&profile.mode!=ProxyRuntimeProfile.Mode.EBPF)
              throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
-@@ -329,15 +408,150 @@ final class RootProxyManager {
+
+         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
+-        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
+-        String source=configs.read(selected);
+-        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
++        // Without a selected profile, enabled override scripts generate the config from an empty one.
++        boolean scriptsOnly=selected==null&&OverrideScriptStart.hasEnabled(context);
++        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
++        String source=selected==null?"":configs.read(selected);
++        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
+         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
++        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,false,true);
++        if(override!=null)source=override.text;
+         // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
+         // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
+         RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
+@@ -329,13 +415,172 @@ final class RootProxyManager {
          int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
          String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
          Set<String> tunPackages=profile.mode==ProxyRuntimeProfile.Mode.TUN?selectedTunPackages():Collections.emptySet();
@@ -8472,9 +8508,29 @@ index 9cd82da..4254597 100644
 +                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
 +                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
          writeStartupCopy(startup);
-         return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
-     }
-
+-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
++        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature),override);
++    }
++
++    /**
++     * Applies the enabled JS override scripts to the source before Hetu writes its required
++     * parameters. Null when none is enabled. A failing script never blocks the start: the
++     * unmodified source is used and the notice is reported — except when no profile is selected,
++     * where there is no unmodified config to fall back to.
++     */
++    private OverrideScriptStart.Applied overrideScripts(ProxyRuntimeProfile profile,ProxyConfigLibrary.Entry selected,String source,boolean json,boolean supported)throws IOException{
++        OverrideScriptStart.Applied applied=OverrideScriptStart.apply(context,profile.core.id,supported,selected==null?null:selected.name,source,json);
++        if(applied==null)return null;
++        if(selected==null&&(applied.fallback||applied.text.trim().isEmpty()))
++            throw new IOException("未选择配置文件，覆写脚本也没有生成可用配置："+applied.notice);
++        return applied;
++    }
++
++    private static Prepared withOverride(Prepared p,OverrideScriptStart.Applied override){
++        if(override!=null){p.overrideNotice=override.notice;p.overrideFallback=override.fallback;}
++        return p;
++    }
++
 +
 +    /**
 +     * sing-box / Xray / V2Fly / Hysteria: a native config for that core when the user selected one,
@@ -8484,10 +8540,15 @@ index 9cd82da..4254597 100644
 +    private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
 +        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
 +        if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
-+        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
-+        String source=configs.read(selected);
-+        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
++        boolean scriptable=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX;
++        boolean scriptsOnly=selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
++        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
++        String source=selected==null?"":configs.read(selected);
++        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
 +        if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
++        // sing-box: a native JSON source is scripted as JSON, a Mihomo YAML source before conversion.
++        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
++        if(override!=null)source=override.text;
 +        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
 +        ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
 +        int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
@@ -8500,7 +8561,7 @@ index 9cd82da..4254597 100644
 +        prefs.edit().putString("proxyCoreConversionWarnings",built.warningText())
 +                .putBoolean("proxyCoreConversionNative",built.nativeSource)
 +                .putInt("proxyCoreConversionNodes",built.nodes)
-+                .putString("proxyCoreConversionSource",selected.core.id+"/"+selected.name).apply();
++                .putString("proxyCoreConversionSource",selected==null?"override-scripts":selected.core.id+"/"+selected.name).apply();
 +        RootFakeIpRanges fakeIps=nativeFakeIps(profile,built.fakeIpV4);
 +        final String nativeSource=source;
 +        final ProxyRuntimeProfile nativeProfile=profile;
@@ -8515,7 +8576,7 @@ index 9cd82da..4254597 100644
 +                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
 +                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
 +        writeStartupCopy(startup);
-+        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature);
++        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
 +    private ProxyCoreConfig.Options nativeOptions(ProxyRuntimeProfile profile,int controllerPort,ProxyAdblockRules.Snapshot adblock)throws IOException{
@@ -8599,12 +8660,10 @@ index 9cd82da..4254597 100644
 +            if(cache.isFile())return new String(Files.readAllBytes(cache.toPath()),StandardCharsets.UTF_8);
 +            return null;
 +        }finally{if(connection!=null)connection.disconnect();}
-+    }
-+
+     }
+
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
-         return profile.core.id+"|"+profile.mode.id+"|"+profile.ipv6.id+"|"+profile.dnsHijack.id
-                 +"|tcp="+bit(profile.tcp)+"|udp="+bit(profile.udp)+"|quic="+bit(profile.quicBlocked)
-@@ -346,6 +560,7 @@ final class RootProxyManager {
+@@ -346,6 +591,7 @@ final class RootProxyManager {
                  +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                  +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                  +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
@@ -8612,7 +8671,7 @@ index 9cd82da..4254597 100644
                  +"|systemDns="+bit(prefs.getBoolean("proxyDnsSystemResolver",true))
                  +"|scope="+policy.appScope+"|uids="+policy.uidRanges+"|share="+bit(policy.sharedNetwork)
                  +"|kill="+bit(policy.killSwitch)+"|cidrs="+policy.cidrs+"|ifaces="+policy.interfaces
-@@ -378,8 +593,14 @@ final class RootProxyManager {
+@@ -378,8 +624,14 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -8628,7 +8687,7 @@ index 9cd82da..4254597 100644
          if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
      }
 
-@@ -389,6 +610,9 @@ final class RootProxyManager {
+@@ -389,6 +641,9 @@ final class RootProxyManager {
              RootBridge.requireWorkerThread();
              if(!coreAliveFast())throw new IOException("代理未运行，无法热重载");
              ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
@@ -8638,7 +8697,7 @@ index 9cd82da..4254597 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +628,7 @@ final class RootProxyManager {
+@@ -404,7 +659,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -8647,7 +8706,7 @@ index 9cd82da..4254597 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,7 +636,7 @@ final class RootProxyManager {
+@@ -412,7 +667,7 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -8656,7 +8715,7 @@ index 9cd82da..4254597 100644
              prefs.edit()
                      .putString("proxyRootTopologyFingerprint",nextFingerprint)
                      .putString("proxyRootAppliedSettings",p.settingsSignature)
-@@ -469,29 +693,84 @@ final class RootProxyManager {
+@@ -469,29 +724,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -8749,7 +8808,7 @@ index 9cd82da..4254597 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -501,28 +780,81 @@ final class RootProxyManager {
+@@ -501,28 +811,81 @@ final class RootProxyManager {
              return stop();
          }finally{CONTROL_LOCK.unlock();}
      }
@@ -8839,7 +8898,7 @@ index 9cd82da..4254597 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +867,11 @@ final class RootProxyManager {
+@@ -535,7 +898,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -8852,7 +8911,7 @@ index 9cd82da..4254597 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +880,8 @@ final class RootProxyManager {
+@@ -544,7 +911,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -8862,7 +8921,7 @@ index 9cd82da..4254597 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +889,7 @@ final class RootProxyManager {
+@@ -552,7 +920,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -8871,10 +8930,11 @@ index 9cd82da..4254597 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -575,20 +912,31 @@ final class RootProxyManager {
+@@ -575,20 +943,32 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
++        if(!p.overrideNotice.isEmpty())stage(progress,p.overrideNotice);
 +        // A core that cannot run the adblock chain (Hysteria) starts without it, explicitly.
 +        if(profile.adblockChain&&!p.profile.adblockChain)profile=p.profile;
 +        String conversionWarnings=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.MIHOMO?"":prefs.getString("proxyCoreConversionWarnings","");
@@ -8910,7 +8970,7 @@ index 9cd82da..4254597 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +946,7 @@ final class RootProxyManager {
+@@ -598,7 +978,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -8919,7 +8979,7 @@ index 9cd82da..4254597 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +971,6 @@ final class RootProxyManager {
+@@ -623,7 +1003,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -8927,7 +8987,7 @@ index 9cd82da..4254597 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -649,8 +996,8 @@ final class RootProxyManager {
+@@ -649,8 +1028,8 @@ final class RootProxyManager {
          String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
          String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
          String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
@@ -8938,7 +8998,7 @@ index 9cd82da..4254597 100644
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
          String[] bootArgs=new String[]{
-@@ -659,15 +1006,26 @@ final class RootProxyManager {
+@@ -659,15 +1038,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -8967,10 +9027,11 @@ index 9cd82da..4254597 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,6 +1055,16 @@ final class RootProxyManager {
+@@ -697,7 +1087,21 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
+-        result.put("sourceConfig",p.source.name)
 +        if(conversionWarnings!=null&&!conversionWarnings.isEmpty()){
 +            String shown=conversionWarnings.length()>900?conversionWarnings.substring(0,900)+"…":conversionWarnings;
 +            warning=(warning.isEmpty()?"":warning+"；")+profile.core.label+" 配置："+shown;
@@ -8981,10 +9042,15 @@ index 9cd82da..4254597 100644
 +            String shown=cleanupNotices.length()>900?cleanupNotices.substring(0,900)+"…":cleanupNotices;
 +            warning=(warning.isEmpty()?"":warning+"；")+"失效引用已自动清理："+shown;
 +        }
-         result.put("sourceConfig",p.source.name)
++        if(!p.overrideNotice.isEmpty()){
++            result.put("overrideScripts",p.overrideNotice);
++            if(p.overrideFallback)warning=(warning.isEmpty()?"":warning+"；")+p.overrideNotice;
++        }
++        result.put("sourceConfig",p.source==null?"":p.source.name)
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
-@@ -723,10 +1091,17 @@ final class RootProxyManager {
+                 .put("dnsHijack",profile.dnsHijack.id)
+@@ -723,10 +1127,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -9002,7 +9068,7 @@ index 9cd82da..4254597 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -749,11 +1124,18 @@ final class RootProxyManager {
+@@ -749,11 +1160,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -9021,7 +9087,7 @@ index 9cd82da..4254597 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1143,49 @@ final class RootProxyManager {
+@@ -761,10 +1179,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -9072,7 +9138,7 @@ index 9cd82da..4254597 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1198,16 @@ final class RootProxyManager {
+@@ -777,8 +1234,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -9091,7 +9157,7 @@ index 9cd82da..4254597 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1218,12 @@ final class RootProxyManager {
+@@ -789,10 +1254,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -9106,7 +9172,7 @@ index 9cd82da..4254597 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1233,40 @@ final class RootProxyManager {
+@@ -802,20 +1269,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -9152,7 +9218,7 @@ index 9cd82da..4254597 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1276,26 @@ final class RootProxyManager {
+@@ -825,19 +1312,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -9183,7 +9249,7 @@ index 9cd82da..4254597 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1303,40 @@ final class RootProxyManager {
+@@ -845,31 +1339,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -9240,7 +9306,7 @@ index 9cd82da..4254597 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1346,7 @@ final class RootProxyManager {
+@@ -879,7 +1382,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -9249,7 +9315,7 @@ index 9cd82da..4254597 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1406,7 @@ final class RootProxyManager {
+@@ -939,7 +1442,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -9258,7 +9324,7 @@ index 9cd82da..4254597 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1488,7 @@ final class RootProxyManager {
+@@ -1021,7 +1524,7 @@ final class RootProxyManager {
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -9267,7 +9333,7 @@ index 9cd82da..4254597 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1526,7 @@ final class RootProxyManager {
+@@ -1059,7 +1562,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -9276,7 +9342,7 @@ index 9cd82da..4254597 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1538,22 @@ final class RootProxyManager {
+@@ -1071,22 +1574,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -9304,7 +9370,7 @@ index 9cd82da..4254597 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1566,7 @@ final class RootProxyManager {
+@@ -1099,7 +1602,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -9313,7 +9379,7 @@ index 9cd82da..4254597 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1614,7 @@ final class RootProxyManager {
+@@ -1147,7 +1650,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -9322,7 +9388,7 @@ index 9cd82da..4254597 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1624,7 @@ final class RootProxyManager {
+@@ -1157,7 +1660,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -9331,7 +9397,7 @@ index 9cd82da..4254597 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1194,6 +1661,31 @@ final class RootProxyManager {
+@@ -1194,6 +1697,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -9363,7 +9429,7 @@ index 9cd82da..4254597 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +1699,14 @@ final class RootProxyManager {
+@@ -1207,10 +1735,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -9380,7 +9446,7 @@ index 9cd82da..4254597 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1720,10 @@ final class RootProxyManager {
+@@ -1224,6 +1756,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -9391,7 +9457,7 @@ index 9cd82da..4254597 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1741,7 @@ final class RootProxyManager {
+@@ -1241,7 +1777,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -9400,7 +9466,7 @@ index 9cd82da..4254597 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1751,46 @@ final class RootProxyManager {
+@@ -1251,11 +1787,46 @@ final class RootProxyManager {
          }
      }
 
@@ -9448,7 +9514,7 @@ index 9cd82da..4254597 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1804,121 @@ final class RootProxyManager {
+@@ -1269,14 +1840,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -9573,7 +9639,7 @@ index 9cd82da..4254597 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +1931,7 @@ final class RootProxyManager {
+@@ -1289,7 +1967,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -9582,7 +9648,7 @@ index 9cd82da..4254597 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +1955,7 @@ final class RootProxyManager {
+@@ -1313,7 +1991,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -9591,7 +9657,7 @@ index 9cd82da..4254597 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +1975,28 @@ final class RootProxyManager {
+@@ -1333,13 +2011,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -9621,7 +9687,7 @@ index 9cd82da..4254597 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2023,39 @@ final class RootProxyManager {
+@@ -1366,13 +2059,39 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -9661,7 +9727,7 @@ index 9cd82da..4254597 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2067,12 @@ final class RootProxyManager {
+@@ -1384,7 +2103,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -9675,7 +9741,7 @@ index 9cd82da..4254597 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2081,13 @@ final class RootProxyManager {
+@@ -1393,6 +2117,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -9689,7 +9755,7 @@ index 9cd82da..4254597 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2107,44 @@ final class RootProxyManager {
+@@ -1412,14 +2143,44 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -11894,6 +11960,92 @@ index 2b1a624..265b68d 100644
                  }
              }
          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt
+new file mode 100644
+index 0000000..57df735
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt
+@@ -0,0 +1,80 @@
++package io.github.xgl34222220.hetu
++
++import io.github.rosemoe.sora.lang.EmptyLanguage
++import io.github.rosemoe.sora.lang.analysis.AnalyzeManager
++import io.github.rosemoe.sora.lang.analysis.SimpleAnalyzeManager
++import io.github.rosemoe.sora.lang.styling.MappedSpans
++import io.github.rosemoe.sora.lang.styling.Styles
++import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
++
++/**
++ * JavaScript lexical presentation for override scripts, on the color slots of [HetuYamlLanguage]
++ * (keywords = key color, strings = value color, numbers/atoms = literal color, comments).
++ * Read-only presentation: no formatter, completion or text rewriting.
++ */
++internal class HetuJsLanguage : EmptyLanguage() {
++    private val analyzer = Analyzer()
++    override fun useTab(): Boolean = false
++    override fun getAnalyzeManager(): AnalyzeManager = analyzer
++    override fun destroy() { analyzer.destroy() }
++
++    private class Analyzer : SimpleAnalyzeManager<Void>() {
++        override fun analyze(source: StringBuilder, delegate: SimpleAnalyzeManager<Void>.Delegate<Void>): Styles? {
++            val spans = MappedSpans.Builder()
++            val lines = source.toString().split("\n")
++            val inComment = booleanArrayOf(false)
++            for (row in lines.indices) {
++                if (delegate.isCancelled) return null
++                val colors = colorLine(lines[row], inComment)
++                spans.addIfNeeded(row, 0, (if (colors.isEmpty()) EditorColorScheme.TEXT_NORMAL else colors[0]).toLong())
++                for (col in 1 until colors.size) if (colors[col] != colors[col - 1]) spans.addIfNeeded(row, col, colors[col].toLong())
++            }
++            spans.determine(lines.size - 1)
++            return Styles(spans.build())
++        }
++    }
++
++    companion object {
++        private val KEYWORD = Regex("\\b(?:function|return|const|let|var|if|else|for|while|do|of|in|new|typeof|instanceof|switch|case|break|continue|default|try|catch|finally|throw|async|await|class|extends|this|delete|void|yield)\\b")
++        private val ATOM = Regex("\\b(?:true|false|null|undefined|NaN|Infinity)\\b|(?<![\\w$])(?:0[xX][0-9a-fA-F]+|\\d+(?:\\.\\d+)?(?:[eE][-+]?\\d+)?)(?![\\w$])")
++
++        /** Color IDs per character of one line; [inComment] carries an open block comment across lines. */
++        fun colorLine(line: String, inComment: BooleanArray): IntArray {
++            val out = IntArray(line.length) { EditorColorScheme.TEXT_NORMAL }
++            ATOM.findAll(line).forEach { out.fill(HetuYamlLanguage.YAML_LITERAL, it.range.first, it.range.last + 1) }
++            KEYWORD.findAll(line).forEach { out.fill(HetuYamlLanguage.YAML_KEY, it.range.first, it.range.last + 1) }
++            var i = 0
++            while (i < line.length) {
++                if (inComment[0]) {
++                    val end = line.indexOf("*/", i)
++                    val stop = if (end < 0) line.length else end + 2
++                    out.fill(HetuYamlLanguage.YAML_COMMENT, i, stop)
++                    if (end >= 0) inComment[0] = false
++                    i = stop
++                    continue
++                }
++                val c = line[i]
++                if (c == '/' && i + 1 < line.length && line[i + 1] == '/') {
++                    out.fill(HetuYamlLanguage.YAML_COMMENT, i, out.size)
++                    break
++                }
++                if (c == '/' && i + 1 < line.length && line[i + 1] == '*') {
++                    inComment[0] = true
++                    out.fill(HetuYamlLanguage.YAML_COMMENT, i, i + 2)
++                    i += 2
++                    continue
++                }
++                if (c == '"' || c == '\'' || c == '`') {
++                    val start = i
++                    while (++i < line.length) {
++                        if (line[i] == '\\') { i++; continue }
++                        if (line[i] == c) break
++                    }
++                    out.fill(HetuYamlLanguage.YAML_VALUE, start, minOf(i + 1, out.size))
++                }
++                i++
++            }
++            return out
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 index 250b8a8..43394dc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
@@ -14347,6 +14499,755 @@ index df92493..134c3e9 100644
          ),
      )
  }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt
+new file mode 100644
+index 0000000..e526ede
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt
+@@ -0,0 +1,386 @@
++package io.github.xgl34222220.hetu
++
++import org.yaml.snakeyaml.DumperOptions
++import org.yaml.snakeyaml.LoaderOptions
++import org.yaml.snakeyaml.Yaml
++import org.yaml.snakeyaml.constructor.SafeConstructor
++import org.yaml.snakeyaml.error.YAMLException
++import org.yaml.snakeyaml.representer.Representer
++import java.io.File
++import java.io.IOException
++import java.io.StringReader
++import java.nio.charset.StandardCharsets
++import java.util.concurrent.Callable
++import java.util.concurrent.ExecutionException
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.TimeoutException
++
++/**
++ * JavaScript override scripts ("覆写脚本"): before a start, every enabled script runs in order as
++ * `main(config, profile)` and returns the configuration object the next one receives. Pure JVM
++ * (no Android API) so ordering, fallback and deadlines are host tested with a fake engine; the
++ * shipped engine is [WebViewOverrideEngine] (Android System WebView, a platform component).
++ */
++internal data class OverrideScript(val id: String, val name: String, val enabled: Boolean, val source: String = "")
++
++internal class OverrideScriptException(message: String) : IOException(message)
++
++/** One JS evaluation. Implementations must honour [timeoutMs]; the pipeline also enforces it. */
++internal interface OverrideScriptEngine : AutoCloseable {
++    /** Runs `main(config, profile)` of [source]; returns the result object as JSON text. */
++    @Throws(Exception::class)
++    fun evaluate(name: String, source: String, configJson: String, profileJson: String, timeoutMs: Long, maxResultChars: Int): Evaluation
++    override fun close() {}
++
++    data class Evaluation(val json: String, val logs: List<String> = emptyList())
++}
++
++internal object OverrideScriptLimits {
++    const val SCRIPT_TIMEOUT_MS = 3_000L
++    /** Engine start (WebView creation) plus marshalling, on top of the script's own budget. */
++    const val ENGINE_GRACE_MS = 6_000L
++    const val MAX_SCRIPT_CHARS = 64 * 1024
++    const val MAX_SCRIPTS = 32
++    /** Input and result size cap (the source config itself is limited to 4 MiB). */
++    const val MAX_CONFIG_CHARS = 8 * 1024 * 1024
++    const val MAX_LOG_LINES = 200
++}
++
++internal enum class OverrideFormat(val id: String) { YAML("yaml"), JSON("json") }
++
++internal data class OverrideStepResult(val id: String, val name: String, val ok: Boolean, val millis: Long, val detail: String, val logs: List<String> = emptyList())
++
++internal data class OverrideOutcome(
++    /** The text the start continues with: the scripts' result, or the unmodified source on failure. */
++    val text: String,
++    val applied: Boolean,
++    val fallback: Boolean,
++    val steps: List<OverrideStepResult>,
++) {
++    val enabled get() = steps.size
++    val failed get() = steps.count { !it.ok }
++    /** Shown on the start result and in the scripts page. Empty when nothing ran. */
++    val notice: String get() = when {
++        steps.isEmpty() -> ""
++        fallback -> {
++            val bad = steps.firstOrNull { !it.ok }
++            "覆写脚本失败，已使用未修改的配置启动：" + (bad?.let { it.name + "：" + it.detail } ?: "未知错误")
++        }
++        else -> "覆写脚本：已启用 $enabled 个，已应用 ${steps.count { it.ok }} 个"
++    }
++}
++
++internal object OverrideScriptPipeline {
++    /**
++     * Applies [scripts] (already filtered to the enabled ones, in order) to [source].
++     * Any failure — syntax error, exception, timeout, wrong result type or size — discards every
++     * script's change: the start continues with the unmodified [source] and [OverrideOutcome.fallback].
++     * An empty [source] is an empty configuration (no profile selected; the scripts generate it).
++     */
++    fun apply(
++        format: OverrideFormat,
++        source: String,
++        profile: Map<String, Any?>?,
++        scripts: List<OverrideScript>,
++        engine: OverrideScriptEngine,
++        timeoutMs: Long = OverrideScriptLimits.SCRIPT_TIMEOUT_MS,
++        graceMs: Long = OverrideScriptLimits.ENGINE_GRACE_MS,
++        clock: () -> Long = System::currentTimeMillis,
++    ): OverrideOutcome {
++        if (scripts.isEmpty()) return OverrideOutcome(source, applied = false, fallback = false, steps = emptyList())
++        val steps = ArrayList<OverrideStepResult>()
++        fun fail(script: OverrideScript, started: Long, detail: String, logs: List<String> = emptyList()): OverrideOutcome {
++            steps += OverrideStepResult(script.id, script.name, false, clock() - started, detail, logs)
++            return OverrideOutcome(source, applied = false, fallback = true, steps = steps)
++        }
++        var configJson = try {
++            toJson(format, source)
++        } catch (failure: IOException) {
++            return fail(scripts.first(), clock(), "配置无法转换为对象：" + (failure.message ?: "解析失败"))
++        }
++        val profileJson = if (profile == null) "null" else CoreJson.write(profile).trim()
++        // One worker thread owns the engine; a stuck engine is closed and the start goes on.
++        val executor = Executors.newSingleThreadExecutor { runnable -> Thread(runnable, "hetu-override-js").apply { isDaemon = true } }
++        try {
++            for (script in scripts) {
++                val started = clock()
++                if (script.source.length > OverrideScriptLimits.MAX_SCRIPT_CHARS) return fail(script, started, "脚本超过 64 KiB")
++                if (configJson.length > OverrideScriptLimits.MAX_CONFIG_CHARS) return fail(script, started, "配置过大（超过 8 MiB）")
++                val input = configJson
++                val future = executor.submit(Callable {
++                    engine.evaluate(script.name, script.source, input, profileJson, timeoutMs, OverrideScriptLimits.MAX_CONFIG_CHARS)
++                })
++                val evaluation = try {
++                    future.get(timeoutMs + graceMs, TimeUnit.MILLISECONDS)
++                } catch (_: TimeoutException) {
++                    future.cancel(true)
++                    runCatching { engine.close() }
++                    return fail(script, started, "脚本执行超时（${timeoutMs} ms），已终止")
++                } catch (failure: ExecutionException) {
++                    val cause = failure.cause ?: failure
++                    return fail(script, started, cause.message?.takeIf { it.isNotBlank() } ?: cause.javaClass.simpleName)
++                } catch (interrupted: InterruptedException) {
++                    future.cancel(true)
++                    Thread.currentThread().interrupt()
++                    throw IOException("启动已取消", interrupted)
++                }
++                val logs = evaluation.logs.take(OverrideScriptLimits.MAX_LOG_LINES)
++                if (evaluation.json.length > OverrideScriptLimits.MAX_CONFIG_CHARS) return fail(script, started, "返回的配置过大（超过 8 MiB）", logs)
++                val result = try { CoreJson.parse(evaluation.json) } catch (failure: IOException) {
++                    return fail(script, started, "返回值不是有效 JSON：" + (failure.message ?: ""), logs)
++                }
++                if (result !is Map<*, *>) return fail(script, started, "main 必须返回配置对象（键值映射）", logs)
++                configJson = evaluation.json
++                steps += OverrideStepResult(script.id, script.name, true, clock() - started, "已应用", logs)
++            }
++            val text = try { fromJson(format, configJson) } catch (failure: IOException) {
++                steps[steps.lastIndex] = steps.last().copy(ok = false, detail = "结果无法写回 ${format.id.uppercase()}：" + (failure.message ?: ""))
++                return OverrideOutcome(source, applied = false, fallback = true, steps = steps)
++            }
++            return OverrideOutcome(text, applied = true, fallback = false, steps = steps)
++        } finally {
++            executor.shutdownNow()
++        }
++    }
++
++    // ------------------------------------------------------------------ YAML/JSON <-> object
++
++    fun toJson(format: OverrideFormat, source: String): String {
++        if (source.isBlank()) return "{}"
++        val root: Any? = when (format) {
++            OverrideFormat.JSON -> CoreJson.parse(source)
++            OverrideFormat.YAML -> try {
++                val options = LoaderOptions().apply {
++                    codePointLimit = 16 * 1024 * 1024
++                    maxAliasesForCollections = 4096
++                    nestingDepthLimit = 60
++                }
++                Yaml(SafeConstructor(options)).load<Any?>(StringReader(source))
++            } catch (invalid: YAMLException) {
++                throw IOException("YAML 语法或结构解析失败")
++            }
++        }
++        if (root == null) return "{}"
++        if (root !is Map<*, *>) throw IOException("配置根节点应为键值映射")
++        return CoreJson.write(normalize(root, 0))
++    }
++
++    fun fromJson(format: OverrideFormat, json: String): String {
++        val root = CoreJson.parse(json) as? Map<*, *> ?: throw IOException("配置根节点应为键值映射")
++        return when (format) {
++            OverrideFormat.JSON -> CoreJson.write(root)
++            OverrideFormat.YAML -> {
++                val options = DumperOptions().apply {
++                    defaultFlowStyle = DumperOptions.FlowStyle.BLOCK
++                    isAllowUnicode = true
++                    splitLines = false
++                    width = Int.MAX_VALUE
++                    indent = 2
++                    indicatorIndent = 0
++                }
++                Yaml(Representer(options), options).dump(root)
++            }
++        }
++    }
++
++    /** YAML scalars JSON has no type for (timestamps, binary) become strings; keys become strings. */
++    private fun normalize(value: Any?, depth: Int): Any? {
++        if (depth > CoreJson.MAX_DEPTH) throw IOException("配置嵌套过深")
++        return when (value) {
++            null, is String, is Boolean -> value
++            is Number -> if (value is Double && (value.isNaN() || value.isInfinite())) value.toString()
++                else if (value is Float && (value.isNaN() || value.isInfinite())) value.toString() else value
++            is Map<*, *> -> LinkedHashMap<String, Any?>().also { out -> value.forEach { (k, v) -> out[k.toString()] = normalize(v, depth + 1) } }
++            is Collection<*> -> value.map { normalize(it, depth + 1) }
++            is ByteArray -> String(value, StandardCharsets.UTF_8)
++            is java.util.Date -> java.time.format.DateTimeFormatter.ISO_INSTANT.format(value.toInstant())
++            else -> value.toString()
++        }
++    }
++}
++
++/**
++ * Scripts live in the App's private files (`files/override-scripts`): one `<id>.js` per script and
++ * `scripts.json` holding name, enabled flag and order. Nothing here needs Root.
++ */
++internal class OverrideScriptStore(val dir: File) {
++    private val manifest get() = File(dir, "scripts.json")
++    private val lastRun get() = File(dir, "last-run.json")
++
++    @Synchronized fun list(): List<OverrideScript> {
++        val file = manifest
++        if (!file.isFile) return emptyList()
++        val root = runCatching { CoreJson.parse(file.readText()) }.getOrNull() as? Map<*, *> ?: return emptyList()
++        val items = root["scripts"] as? List<*> ?: return emptyList()
++        return items.mapNotNull { item ->
++            val m = item as? Map<*, *> ?: return@mapNotNull null
++            val id = (m["id"] as? String)?.takeIf(::validId) ?: return@mapNotNull null
++            OverrideScript(id, (m["name"] as? String)?.ifBlank { null } ?: id, m["enabled"] != false)
++        }.distinctBy { it.id }
++    }
++
++    @Synchronized fun read(id: String): String {
++        require(validId(id)) { "脚本标识无效" }
++        val file = File(dir, "$id.js")
++        return if (file.isFile) file.readText() else ""
++    }
++
++    /** Enabled scripts in order, with their sources. */
++    @Synchronized fun enabled(): List<OverrideScript> = list().filter { it.enabled }.map { it.copy(source = read(it.id)) }
++
++    @Synchronized fun hasEnabled(): Boolean = list().any { it.enabled }
++
++    @Synchronized fun add(name: String, source: String, enabled: Boolean = true): OverrideScript {
++        val scripts = list()
++        require(scripts.size < OverrideScriptLimits.MAX_SCRIPTS) { "最多 ${OverrideScriptLimits.MAX_SCRIPTS} 个覆写脚本" }
++        checkSource(source)
++        var id: String
++        do { id = "s" + java.lang.Long.toHexString(System.nanoTime() xor (Math.random() * Long.MAX_VALUE).toLong()).takeLast(10) } while (scripts.any { it.id == id })
++        val script = OverrideScript(id, cleanName(name), enabled)
++        writeAtomic(File(dir, "$id.js"), source)
++        save(scripts + script)
++        return script
++    }
++
++    @Synchronized fun update(id: String, name: String, source: String) {
++        checkSource(source)
++        val scripts = list()
++        require(scripts.any { it.id == id }) { "脚本不存在" }
++        writeAtomic(File(dir, "$id.js"), source)
++        save(scripts.map { if (it.id == id) it.copy(name = cleanName(name)) else it })
++    }
++
++    @Synchronized fun setEnabled(id: String, enabled: Boolean) = save(list().map { if (it.id == id) it.copy(enabled = enabled) else it })
++
++    /** Moves the script by [delta] positions (negative = earlier); clamped to the list. */
++    @Synchronized fun move(id: String, delta: Int) {
++        val scripts = list().toMutableList()
++        val from = scripts.indexOfFirst { it.id == id }
++        if (from < 0) return
++        val to = (from + delta).coerceIn(0, scripts.lastIndex)
++        if (to == from) return
++        scripts.add(to, scripts.removeAt(from))
++        save(scripts)
++    }
++
++    @Synchronized fun delete(id: String) {
++        require(validId(id)) { "脚本标识无效" }
++        save(list().filterNot { it.id == id })
++        File(dir, "$id.js").delete()
++    }
++
++    @Synchronized fun recordRun(outcome: OverrideOutcome, at: Long = System.currentTimeMillis()) {
++        if (outcome.steps.isEmpty()) return
++        val steps = outcome.steps.map { linkedMapOf<String, Any?>("id" to it.id, "name" to it.name, "ok" to it.ok, "millis" to it.millis, "detail" to it.detail, "logs" to it.logs) }
++        writeAtomic(lastRun, CoreJson.write(linkedMapOf("at" to at, "fallback" to outcome.fallback, "notice" to outcome.notice, "steps" to steps)))
++    }
++
++    /** The last start's outcome: (time, notice, fallback, per-script results). */
++    @Synchronized fun lastRun(): LastRun? {
++        val root = runCatching { CoreJson.parse(lastRun.readText()) }.getOrNull() as? Map<*, *> ?: return null
++        val steps = (root["steps"] as? List<*>).orEmpty().mapNotNull { item ->
++            val m = item as? Map<*, *> ?: return@mapNotNull null
++            OverrideStepResult(m["id"] as? String ?: "", m["name"] as? String ?: "", m["ok"] == true,
++                (m["millis"] as? Number)?.toLong() ?: 0L, m["detail"] as? String ?: "",
++                (m["logs"] as? List<*>).orEmpty().map { it.toString() })
++        }
++        return LastRun((root["at"] as? Number)?.toLong() ?: 0L, root["notice"] as? String ?: "", root["fallback"] == true, steps)
++    }
++
++    data class LastRun(val at: Long, val notice: String, val fallback: Boolean, val steps: List<OverrideStepResult>)
++
++    private fun save(scripts: List<OverrideScript>) {
++        val items = scripts.map { linkedMapOf<String, Any?>("id" to it.id, "name" to it.name, "enabled" to it.enabled) }
++        writeAtomic(manifest, CoreJson.write(linkedMapOf("schema" to 1, "scripts" to items)))
++    }
++
++    private fun writeAtomic(target: File, text: String) {
++        if (!dir.isDirectory && !dir.mkdirs()) throw IOException("无法创建覆写脚本目录")
++        val tmp = File(dir, target.name + ".tmp")
++        tmp.writeText(text)
++        if (!tmp.renameTo(target)) { target.delete(); if (!tmp.renameTo(target)) throw IOException("覆写脚本保存失败") }
++    }
++
++    companion object {
++        fun validId(id: String) = id.matches(Regex("[a-z0-9]{1,24}"))
++        fun cleanName(name: String): String = name.replace(Regex("[\\r\\n\\t]"), " ").trim().take(64).ifBlank { "未命名脚本" }
++        fun checkSource(source: String) {
++            require(source.length <= OverrideScriptLimits.MAX_SCRIPT_CHARS) { "脚本最多 64 KiB" }
++        }
++    }
++}
++
++/** Starter scripts offered when adding a new one. Original Hetu examples. */
++internal object OverrideScriptExamples {
++    data class Example(val title: String, val source: String)
++
++    val BLANK = Example("空白脚本", """
++        // 覆写脚本：启动前按顺序执行，返回修改后的配置对象。
++        // config  当前配置（Mihomo YAML 或 sing-box JSON 转成的对象）
++        // profile 当前配置文件信息 { name, core, format }；未选择配置文件时为 null
++        function main(config, profile) {
++          return config;
++        }
++    """.trimIndent() + "\n")
++
++    val ADD_RULE = Example("添加规则", """
++        // 在规则最前面加入自定义规则（Mihomo）。
++        function main(config, profile) {
++          const mine = [
++            "DOMAIN-SUFFIX,example.com,DIRECT",
++            "DOMAIN-KEYWORD,tracker,REJECT",
++          ];
++          config.rules = mine.concat(Array.isArray(config.rules) ? config.rules : []);
++          return config;
++        }
++    """.trimIndent() + "\n")
++
++    val SET_DNS = Example("设置 DNS", """
++        // 统一 DNS（Mihomo）：fake-ip 模式，国内/国外分别解析。
++        function main(config, profile) {
++          config.dns = Object.assign({}, config.dns, {
++            enable: true,
++            ipv6: false,
++            "enhanced-mode": "fake-ip",
++            "default-nameserver": ["223.5.5.5", "119.29.29.29"],
++            nameserver: ["https://dns.alidns.com/dns-query", "https://doh.pub/dns-query"],
++            fallback: ["https://1.1.1.1/dns-query", "https://dns.google/dns-query"],
++          });
++          return config;
++        }
++    """.trimIndent() + "\n")
++
++    val MERGE_PROXIES = Example("合并节点", """
++        // 追加自建节点并放进新的选择组（Mihomo）；同名节点不会重复添加。
++        function main(config, profile) {
++          const extra = [
++            { name: "自建-SS", type: "ss", server: "203.0.113.10", port: 8388, cipher: "aes-128-gcm", password: "change-me" },
++          ];
++          const proxies = Array.isArray(config.proxies) ? config.proxies : [];
++          const names = new Set(proxies.map(p => p.name));
++          for (const p of extra) if (!names.has(p.name)) proxies.push(p);
++          config.proxies = proxies;
++          const groups = Array.isArray(config["proxy-groups"]) ? config["proxy-groups"] : [];
++          if (!groups.some(g => g.name === "自建")) {
++            groups.unshift({ name: "自建", type: "select", proxies: extra.map(p => p.name).concat(["DIRECT"]) });
++          }
++          config["proxy-groups"] = groups;
++          return config;
++        }
++    """.trimIndent() + "\n")
++
++    val SING_BOX_RULE = Example("sing-box 路由规则", """
++        // sing-box：在 route.rules 最前面加入直连规则。
++        function main(config, profile) {
++          if (!profile || profile.format !== "json") return config;
++          config.route = config.route || {};
++          const rules = Array.isArray(config.route.rules) ? config.route.rules : [];
++          rules.unshift({ domain_suffix: ["example.com"], outbound: "direct" });
++          config.route.rules = rules;
++          return config;
++        }
++    """.trimIndent() + "\n")
++
++    val ALL = listOf(BLANK, ADD_RULE, SET_DNS, MERGE_PROXIES, SING_BOX_RULE)
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
+new file mode 100644
+index 0000000..77f75d6
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
+@@ -0,0 +1,351 @@
++package io.github.xgl34222220.hetu
++
++import android.graphics.Typeface
++import androidx.activity.compose.rememberLauncherForActivityResult
++import androidx.activity.result.contract.ActivityResultContracts
++import androidx.compose.foundation.background
++import androidx.compose.foundation.clickable
++import androidx.compose.foundation.horizontalScroll
++import androidx.compose.foundation.interaction.MutableInteractionSource
++import androidx.compose.foundation.layout.Arrangement
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.Column
++import androidx.compose.foundation.layout.Row
++import androidx.compose.foundation.layout.Spacer
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.foundation.layout.fillMaxWidth
++import androidx.compose.foundation.layout.height
++import androidx.compose.foundation.layout.heightIn
++import androidx.compose.foundation.layout.imePadding
++import androidx.compose.foundation.layout.padding
++import androidx.compose.foundation.layout.size
++import androidx.compose.foundation.layout.widthIn
++import androidx.compose.foundation.rememberScrollState
++import androidx.compose.foundation.shape.RoundedCornerShape
++import androidx.compose.foundation.text.BasicTextField
++import androidx.compose.foundation.verticalScroll
++import androidx.compose.material3.Icon
++import androidx.compose.material3.Text
++import androidx.compose.runtime.Composable
++import androidx.compose.runtime.getValue
++import androidx.compose.runtime.mutableIntStateOf
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.runtime.produceState
++import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberCoroutineScope
++import androidx.compose.runtime.setValue
++import androidx.compose.ui.Alignment
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.clip
++import androidx.compose.ui.graphics.SolidColor
++import androidx.compose.ui.graphics.toArgb
++import androidx.compose.ui.platform.LocalContext
++import androidx.compose.ui.semantics.Role
++import androidx.compose.ui.semantics.contentDescription
++import androidx.compose.ui.semantics.heading
++import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.text.font.FontWeight
++import androidx.compose.ui.text.style.TextOverflow
++import androidx.compose.ui.unit.dp
++import androidx.compose.ui.unit.sp
++import androidx.compose.ui.viewinterop.AndroidView
++import io.github.rosemoe.sora.widget.CodeEditor
++import io.github.rosemoe.sora.widget.schemes.EditorColorScheme
++import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
++import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
++import io.github.xgl34222220.hetu.home.HomeButton
++import io.github.xgl34222220.hetu.home.HomeButtonKind
++import io.github.xgl34222220.hetu.home.HomeDims
++import io.github.xgl34222220.hetu.home.HomeIconButton
++import io.github.xgl34222220.hetu.home.HomePill
++import io.github.xgl34222220.hetu.home.HomeRowDims
++import io.github.xgl34222220.hetu.home.HomeRowSubStyle
++import io.github.xgl34222220.hetu.home.HomeTone
++import io.github.xgl34222220.hetu.home.HomeType
++import io.github.xgl34222220.hetu.home.LocalHomeColors
++import io.github.xgl34222220.hetu.home.badText
++import io.github.xgl34222220.hetu.home.homeRowPressTint
++import io.github.xgl34222220.hetu.panel.PanelIcons
++import io.github.xgl34222220.hetu.tools.ToolsIcons
++import io.github.xgl34222220.hetu.ui.ht
++import kotlinx.coroutines.CancellationException
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.withContext
++import java.text.SimpleDateFormat
++import java.util.Date
++import java.util.Locale
++
++private class OverrideDraft(val id: String?, val name: String, val source: String)
++
++private val overrideJsSymbols = listOf("{", "}", "(", ")", "[", "]", ";", ":", ".", ",", "\"", "'", "=", "=>", "!", "&&", "||")
++
++/**
++ * The «覆写脚本» section of the scripts page: JS scripts applied in order before every start.
++ * Self-contained (own IO, sheets and feedback) so the fixed hooks and managed shell scripts above
++ * are untouched. App-private files only; nothing here needs Root.
++ */
++@Composable
++internal fun OverrideScriptsSection() {
++    val context = LocalContext.current
++    val c = LocalHomeColors.current
++    val scope = rememberCoroutineScope()
++    val store = remember { WebViewOverrideEngine.store(context) }
++    var revision by remember { mutableIntStateOf(0) }
++    var busy by remember { mutableStateOf(false) }
++    var message by remember { mutableStateOf("") }
++    var messageError by remember { mutableStateOf(false) }
++    var draft by remember { mutableStateOf<OverrideDraft?>(null) }
++    var deleteTarget by remember { mutableStateOf<OverrideScript?>(null) }
++    var showLastRun by remember { mutableStateOf(false) }
++    val scripts by produceState(initialValue = emptyList<OverrideScript>(), revision) {
++        value = try { withContext(Dispatchers.IO) { store.list() } }
++        catch (cancel: CancellationException) { throw cancel }
++        catch (failure: Exception) { message = failure.message ?: "覆写脚本读取失败"; messageError = true; emptyList() }
++    }
++    val lastRun by produceState<OverrideScriptStore.LastRun?>(initialValue = null, revision) {
++        value = runCatching { withContext(Dispatchers.IO) { store.lastRun() } }.getOrNull()
++    }
++
++    fun act(done: String? = null, block: suspend () -> Unit) {
++        if (busy) return
++        scope.launch {
++            busy = true; messageError = false; message = ""
++            try { block(); if (done != null) message = done; revision++ }
++            catch (cancel: CancellationException) { throw cancel }
++            catch (failure: Exception) { message = failure.message ?: "操作失败"; messageError = true }
++            finally { busy = false }
++        }
++    }
++
++    val importer = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
++        if (uri == null) return@rememberLauncherForActivityResult
++        act {
++            val input = ProxyScriptImport.read(context, uri)
++            require(input.name.endsWith(".js", ignoreCase = true)) { "仅支持 .js 文件" }
++            val text = String(input.bytes, Charsets.UTF_8)
++            withContext(Dispatchers.IO) { store.add(input.name.removeSuffix(".js").removeSuffix(".JS"), text) }
++            message = "已导入覆写脚本 " + input.name
++        }
++    }
++
++    Column(Modifier.fillMaxWidth()) {
++        Row(
++            Modifier.fillMaxWidth().padding(start = HomeDims.gutter + 16.dp, end = HomeDims.gutter).padding(top = 12.dp, bottom = 6.dp),
++            verticalAlignment = Alignment.CenterVertically,
++        ) {
++            Text(ht("覆写脚本"), Modifier.weight(1f).semantics { heading() }, color = c.t1, style = HomeType.section)
++            HomeIconButton(ToolsIcons.Download, "导入覆写脚本", {
++                launchDocumentPicker({ messageError = true; message = it }) { importer.launch(arrayOf("application/javascript", "text/javascript", "text/*", "application/octet-stream")) }
++            }, enabled = !busy, tint = c.t1, glyph = 22.dp)
++            HomeButton("新建", { if (!busy) draft = OverrideDraft(null, "", OverrideScriptExamples.BLANK.source) },
++                kind = HomeButtonKind.Ghost, icon = ToolsIcons.Plus, enabled = !busy, height = 44.dp)
++        }
++        Text(
++            ht("每次启动前按顺序执行 main(config, profile)，返回修改后的配置；河图必需的端口与接管参数随后写入。任一脚本出错或超时，本次使用未修改的配置启动。未选择配置文件时，配置完全由脚本生成。"),
++            Modifier.padding(horizontal = HomeDims.gutter + 16.dp).padding(bottom = 10.dp), color = c.t2, style = HomeType.note,
++        )
++        if (message.isNotBlank()) {
++            HetuTaskFeedback(message, error = messageError, busy = busy, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
++        }
++        lastRun?.takeIf { it.notice.isNotBlank() }?.let { run ->
++            SettingsSection {
++                SettingsGroup {
++                    SettingsRow(
++                        ht("上次启动"),
++                        subtitle = formatRunTime(run.at) + " · " + run.notice,
++                        icon = if (run.fallback) HxIcons.CircleStop else HxIcons.SquareCheckBig,
++                        iconTint = if (run.fallback) c.badText else c.t1,
++                        onClick = { showLastRun = true },
++                    )
++                }
++            }
++        }
++        if (scripts.isEmpty()) {
++            SettingsSection {
++                SettingsGroup {
++                    SettingsRow(ht("暂无覆写脚本"), subtitle = ht("新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。"), icon = HxIcons.Code, enabled = false)
++                }
++            }
++        }
++        scripts.forEachIndexed { index, script ->
++            val step = lastRun?.steps?.firstOrNull { it.id == script.id }
++            val rowSource = remember(script.id) { MutableInteractionSource() }
++            Row(
++                Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
++                    .clip(HomeDims.cardShape).background(c.surface).heightIn(min = 80.dp)
++                    .homeRowPressTint(rowSource)
++                    .clickable(interactionSource = rowSource, indication = null, enabled = !busy, role = Role.Button, onClickLabel = "编辑") {
++                        act { val text = withContext(Dispatchers.IO) { store.read(script.id) }; draft = OverrideDraft(script.id, script.name, text) }
++                    }
++                    .padding(start = HomeRowDims.start, end = 4.dp, top = 10.dp, bottom = 10.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                Icon(HxIcons.Code, null, Modifier.size(HomeRowDims.icon), tint = if (script.enabled) c.t1 else c.t3)
++                Spacer(Modifier.size(HomeRowDims.iconGap, 1.dp))
++                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
++                    Text(script.name, color = if (script.enabled) c.t1 else c.t2, style = HomeType.rowTitle, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                    val state = when {
++                        !script.enabled -> "已停用"
++                        step == null -> "第 ${index + 1} 个执行"
++                        step.ok -> "第 ${index + 1} 个执行 · 上次 ${step.millis} ms"
++                        else -> "上次失败：" + step.detail
++                    }
++                    Text(ht(state), color = if (step != null && !step.ok && script.enabled) c.badText else c.t2, style = HomeRowSubStyle, maxLines = 2, overflow = TextOverflow.Ellipsis)
++                }
++                HomeIconButton(PanelIcons.ChevronUp, "上移", { act { withContext(Dispatchers.IO) { store.move(script.id, -1) } } },
++                    Modifier.size(40.dp), enabled = !busy && index > 0, tint = c.t2, glyph = 20.dp)
++                HomeIconButton(PanelIcons.ChevronDown, "下移", { act { withContext(Dispatchers.IO) { store.move(script.id, 1) } } },
++                    Modifier.size(40.dp), enabled = !busy && index < scripts.lastIndex, tint = c.t2, glyph = 20.dp)
++                HxSwitch(script.enabled, { on -> act { withContext(Dispatchers.IO) { store.setEnabled(script.id, on) } } }, enabled = !busy)
++                HomeIconButton(ToolsIcons.Trash2, "删除覆写脚本", { if (!busy) deleteTarget = script }, Modifier.size(40.dp), enabled = !busy, tint = c.t2, glyph = 20.dp)
++            }
++        }
++    }
++
++    draft?.let { current ->
++        OverrideScriptEditorSheet(current, busy, onDismiss = { if (!busy) draft = null }) { name, source ->
++            act(if (current.id == null) "覆写脚本已添加，下次启动生效" else "覆写脚本已保存，下次启动生效") {
++                withContext(Dispatchers.IO) {
++                    if (current.id == null) store.add(name, source) else store.update(current.id, name, source)
++                }
++                draft = null
++            }
++        }
++    }
++
++    deleteTarget?.let { target ->
++        HxConfirmDialog(
++            title = "删除覆写脚本",
++            message = "确定删除 “" + target.name + "” 吗？",
++            confirmLabel = "删除",
++            danger = true,
++            onConfirm = { act("已删除 " + target.name) { withContext(Dispatchers.IO) { store.delete(target.id) }; deleteTarget = null } },
++            onDismiss = { if (!busy) deleteTarget = null },
++        )
++    }
++
++    if (showLastRun) {
++        lastRun?.let { run ->
++            HxSheet(onDismiss = { showLastRun = false }, title = ht("覆写脚本运行结果")) {
++                Column(
++                    Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 20.dp).padding(bottom = 16.dp),
++                    verticalArrangement = Arrangement.spacedBy(12.dp),
++                ) {
++                    Text(formatRunTime(run.at) + "\n" + run.notice, color = if (run.fallback) c.badText else c.t1, style = HomeType.note)
++                    run.steps.forEach { step ->
++                        Column(
++                            Modifier.fillMaxWidth().clip(HomeDims.innerShape).background(if (c.dark) c.sunken else c.bg).padding(14.dp),
++                            verticalArrangement = Arrangement.spacedBy(4.dp),
++                        ) {
++                            Text((if (step.ok) "✓ " else "✗ ") + step.name + " · " + step.millis + " ms", color = if (step.ok) c.t1 else c.badText, style = HomeType.rowTitle)
++                            Text(step.detail, color = c.t2, style = HomeType.note)
++                            if (step.logs.isNotEmpty()) Text(step.logs.joinToString("\n"), color = c.t2, style = HomeType.mono.copy(fontSize = 12.sp, lineHeight = 17.sp))
++                        }
++                    }
++                }
++            }
++        }
++    }
++}
++
++private fun formatRunTime(at: Long): String =
++    if (at <= 0L) "" else SimpleDateFormat("MM-dd HH:mm:ss", Locale.ROOT).format(Date(at))
++
++/** Name, examples and the native code editor (same sora editor as the YAML workbench, JS lexer). */
++@Composable
++private fun OverrideScriptEditorSheet(draft: OverrideDraft, busy: Boolean, onDismiss: () -> Unit, onSave: (String, String) -> Unit) {
++    val c = LocalHomeColors.current
++    var name by remember(draft) { mutableStateOf(draft.name) }
++    var editor by remember { mutableStateOf<CodeEditor?>(null) }
++    var problem by remember { mutableStateOf("") }
++    val editorColors = remember(c.dark, c.sunken, c.bg) {
++        HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
++            val background = (if (c.dark) c.sunken else c.bg).toArgb()
++            setColor(EditorColorScheme.WHOLE_BACKGROUND, background)
++            setColor(EditorColorScheme.LINE_NUMBER_BACKGROUND, background)
++        }
++    }
++    HxSheet(onDismiss = onDismiss, title = ht(if (draft.id == null) "新建覆写脚本" else "编辑覆写脚本")) {
++        Column(
++            Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 12.dp),
++            verticalArrangement = Arrangement.spacedBy(12.dp),
++        ) {
++            val nameLabel = ht("脚本名称")
++            BasicTextField(
++                value = name,
++                onValueChange = { if (it.length <= 64) name = it.replace("\n", "") },
++                singleLine = true,
++                enabled = !busy,
++                modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(HomeDims.controlShape)
++                    .background(if (c.dark) c.sunken else c.bg).semantics { contentDescription = nameLabel }.padding(horizontal = 14.dp, vertical = 13.dp),
++                textStyle = HomeType.body.copy(color = c.t1),
++                cursorBrush = SolidColor(c.accent),
++                decorationBox = { inner -> Box { if (name.isEmpty()) Text(nameLabel, color = c.t3, style = HomeType.body); inner() } },
++            )
++            if (draft.id == null) {
++                Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
++                    OverrideScriptExamples.ALL.forEach { example ->
++                        HomePill(ht(example.title), tone = HomeTone.Neutral, height = 32.dp, onClick = {
++                            editor?.setText(example.source)
++                            if (name.isBlank() || OverrideScriptExamples.ALL.any { it.title == name }) name = example.title
++                        })
++                    }
++                }
++            }
++            Box(Modifier.fillMaxWidth().height(340.dp).clip(HomeDims.controlShape).background(if (c.dark) c.sunken else c.bg)) {
++                AndroidView(
++                    factory = { viewContext ->
++                        CodeEditor(viewContext).apply {
++                            setEditorLanguage(HetuJsLanguage())
++                            setText(draft.source)
++                            setSoftKeyboardEnabled(true)
++                            typefaceText = Typeface.MONOSPACE
++                            setTextSize(13f)
++                            setLineSpacingMultiplier(1.35f)
++                            setLineNumberEnabled(true)
++                            setWordwrap(false)
++                            setTabWidth(2)
++                            setHighlightCurrentLine(true)
++                            setDividerWidth(0f)
++                            colorScheme = editorColors
++                            editor = this
++                        }
++                    },
++                    modifier = Modifier.fillMaxSize().padding(vertical = 8.dp),
++                    update = { native ->
++                        if (native.colorScheme !== editorColors) native.colorScheme = editorColors
++                        if (native.isEditable == busy) native.setEditable(!busy)
++                    },
++                    onRelease = { native -> if (editor === native) editor = null; native.release() },
++                )
++            }
++            Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
++                overrideJsSymbols.forEach { symbol ->
++                    val keySource = remember { MutableInteractionSource() }
++                    Box(
++                        Modifier.heightIn(min = 40.dp).widthIn(min = 40.dp).clip(RoundedCornerShape(12.dp)).background(if (c.dark) c.sunken else c.bg)
++                            .homeRowPressTint(keySource)
++                            .clickable(interactionSource = keySource, indication = null, enabled = !busy, role = Role.Button, onClickLabel = "输入 $symbol") {
++                                editor?.let { if (it.isEditable) { it.insertText(symbol, symbol.length); it.requestFocus() } }
++                            }.padding(horizontal = 9.dp),
++                        contentAlignment = Alignment.Center,
++                    ) { Text(symbol, color = c.t1, style = HomeType.mono.copy(fontSize = 15.sp, fontWeight = FontWeight.SemiBold)) }
++                }
++            }
++            if (problem.isNotBlank()) Text(problem, color = c.badText, style = HomeType.note)
++            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
++                HomeButton("取消", onDismiss, Modifier.weight(1f), kind = HomeButtonKind.Soft, enabled = !busy)
++                HomeButton(if (busy) "处理中" else "保存", {
++                    val text = editor?.text?.toString() ?: draft.source
++                    problem = when {
++                        text.length > OverrideScriptLimits.MAX_SCRIPT_CHARS -> "脚本最多 64 KiB"
++                        !Regex("\\bmain\\b").containsMatchIn(text) -> "脚本需要定义 main(config, profile) 函数"
++                        else -> ""
++                    }
++                    if (problem.isEmpty()) onSave(name, text)
++                }, Modifier.weight(1f), kind = HomeButtonKind.Primary, enabled = !busy)
++            }
++        }
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
 index 820f6b5..3f00dcf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/PanelToolsScreens.kt
@@ -15250,6 +16151,269 @@ index b41cf98..e1fa2eb 100644
                                  icon = Icons.Rounded.Router,
                              )
                          }
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
+new file mode 100644
+index 0000000..9e29412
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
+@@ -0,0 +1,257 @@
++package io.github.xgl34222220.hetu
++
++import android.annotation.SuppressLint
++import android.content.Context
++import android.os.Handler
++import android.os.Looper
++import android.webkit.JavascriptInterface
++import android.webkit.RenderProcessGoneDetail
++import android.webkit.WebResourceRequest
++import android.webkit.WebResourceResponse
++import android.webkit.WebView
++import android.webkit.WebViewClient
++import java.io.ByteArrayInputStream
++import java.io.File
++import java.util.concurrent.CountDownLatch
++import java.util.concurrent.TimeUnit
++import java.util.concurrent.atomic.AtomicReference
++
++/**
++ * Runs override scripts in the Android System WebView, a platform component (no bundled engine,
++ * native library or new dependency). One offscreen WebView per start; every script runs in its own
++ * dedicated Web Worker that is terminated on timeout, so an endless loop cannot block the page.
++ * Network loads are blocked (blockNetworkLoads, a CSP of `default-src 'none'` and an interceptor
++ * that answers every request with 403): a script only sees the config and profile it is given.
++ */
++internal class WebViewOverrideEngine(context: Context) : OverrideScriptEngine {
++    private val app = context.applicationContext
++    private val main = Handler(Looper.getMainLooper())
++    @Volatile private var webView: WebView? = null
++    private val bridge = Bridge()
++    @Volatile private var ready: CountDownLatch? = null
++    @Volatile private var crashed: String? = null
++
++    private class Job(val source: String, val config: String, val profile: String, val timeoutMs: Long, val maxChars: Int)
++    private class Reply(val ok: Boolean, val payload: String, val logs: List<String>)
++
++    private inner class Bridge {
++        @Volatile var job: Job? = null
++        val reply = AtomicReference<Reply?>(null)
++        @Volatile var done: CountDownLatch? = null
++
++        @JavascriptInterface fun ready() { this@WebViewOverrideEngine.ready?.countDown() }
++
++        @JavascriptInterface fun job(): String {
++            val j = job ?: return "null"
++            return "{\"timeoutMs\":" + j.timeoutMs + ",\"maxChars\":" + j.maxChars +
++                ",\"source\":" + quote(j.source) + ",\"config\":" + quote(j.config) + ",\"profile\":" + quote(j.profile) + "}"
++        }
++
++        @JavascriptInterface fun finish(ok: Boolean, payload: String?, logs: String?) {
++            val lines = logs.orEmpty().split('\n').filter { it.isNotEmpty() }.take(OverrideScriptLimits.MAX_LOG_LINES)
++            if (reply.compareAndSet(null, Reply(ok, payload.orEmpty(), lines))) done?.countDown()
++        }
++    }
++
++    override fun evaluate(name: String, source: String, configJson: String, profileJson: String, timeoutMs: Long, maxResultChars: Int): OverrideScriptEngine.Evaluation {
++        check(Looper.myLooper() != Looper.getMainLooper()) { "覆写脚本不能在主线程等待" }
++        ensureStarted()
++        val done = CountDownLatch(1)
++        bridge.reply.set(null)
++        bridge.done = done
++        bridge.job = Job(source, configJson, profileJson, timeoutMs, maxResultChars)
++        main.post { webView?.evaluateJavascript("__hetuRun()", null) }
++        // The page terminates the worker at timeoutMs; this deadline only covers a hung page.
++        val answered = done.await(timeoutMs + 2_000L, TimeUnit.MILLISECONDS)
++        bridge.job = null
++        crashed?.let { throw OverrideScriptException(it) }
++        if (!answered) { close(); throw OverrideScriptException("脚本执行超时（${timeoutMs} ms），已终止") }
++        val reply = bridge.reply.get() ?: throw OverrideScriptException("脚本没有返回结果")
++        if (!reply.ok) throw OverrideScriptException(reply.payload.ifBlank { "脚本执行失败" })
++        return OverrideScriptEngine.Evaluation(reply.payload, reply.logs)
++    }
++
++    @SuppressLint("SetJavaScriptEnabled", "JavascriptInterface")
++    private fun ensureStarted() {
++        if (webView != null && crashed == null) return
++        crashed = null
++        val latch = CountDownLatch(1)
++        ready = latch
++        val failure = AtomicReference<Throwable?>(null)
++        main.post {
++            try {
++                val view = WebView(app)
++                view.settings.apply {
++                    javaScriptEnabled = true
++                    blockNetworkLoads = true
++                    allowFileAccess = false
++                    allowContentAccess = false
++                    domStorageEnabled = false
++                    javaScriptCanOpenWindowsAutomatically = false
++                }
++                view.webViewClient = object : WebViewClient() {
++                    override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
++                        if (request.url.toString().startsWith(BASE_URL)) return null
++                        return WebResourceResponse("text/plain", "utf-8", 403, "Forbidden", emptyMap(), ByteArrayInputStream(ByteArray(0)))
++                    }
++                    override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
++                        crashed = if (detail.didCrash()) "WebView 渲染进程崩溃，脚本可能占用了过多内存" else "WebView 渲染进程被系统回收（内存不足）"
++                        bridge.done?.countDown(); ready?.countDown()
++                        if (webView === view) webView = null
++                        runCatching { view.destroy() }
++                        return true
++                    }
++                }
++                view.addJavascriptInterface(bridge, "HetuOverrideHost")
++                view.loadDataWithBaseURL(BASE_URL, HTML, "text/html", "utf-8", null)
++                webView = view
++            } catch (error: Throwable) {
++                failure.set(error)
++                latch.countDown()
++            }
++        }
++        if (!latch.await(OverrideScriptLimits.ENGINE_GRACE_MS - 1_000L, TimeUnit.MILLISECONDS)) {
++            close(); throw OverrideScriptException("系统 WebView 启动超时，无法执行覆写脚本")
++        }
++        failure.get()?.let { throw OverrideScriptException("系统 WebView 不可用：" + (it.message ?: it.javaClass.simpleName)) }
++        crashed?.let { throw OverrideScriptException(it) }
++    }
++
++    override fun close() {
++        val view = webView ?: return
++        webView = null
++        main.post { runCatching { view.removeJavascriptInterface("HetuOverrideHost"); view.stopLoading(); view.destroy() } }
++    }
++
++    companion object {
++        private const val BASE_URL = "https://override.hetu.invalid/"
++
++        fun store(context: Context) = OverrideScriptStore(File(context.applicationContext.filesDir, "override-scripts"))
++
++        fun quote(text: String): String {
++            val out = StringBuilder(text.length + 16)
++            CoreJson.string(out, text)
++            return out.toString()
++        }
++
++        // HETU-OVERRIDE-WORKER-BEGIN
++        /** Runs inside a dedicated worker. Also loaded by tools/qa/test_override_js93.py under Node. */
++        const val WORKER_JS = """
++var __hetuLogs = [];
++function __hetuText(v) {
++  if (typeof v === 'string') return v;
++  try { var s = JSON.stringify(v); return s === undefined ? String(v) : s; } catch (e) { return String(v); }
++}
++function __hetuLog() {
++  if (__hetuLogs.length >= 200) return;
++  var parts = [];
++  for (var i = 0; i < arguments.length; i++) parts.push(__hetuText(arguments[i]));
++  __hetuLogs.push(parts.join(' ').replace(/\n/g, ' ').slice(0, 2000));
++}
++var console = { log: __hetuLog, info: __hetuLog, warn: __hetuLog, error: __hetuLog, debug: __hetuLog };
++function __hetuError(err) {
++  if (err && typeof err === 'object' && err.name && err.message) return err.name + ': ' + err.message;
++  return String(err);
++}
++function __hetuEvaluate(source, configText, profileText, maxChars) {
++  return Promise.resolve().then(function () {
++    var config = JSON.parse(configText);
++    var profile = profileText ? JSON.parse(profileText) : null;
++    var main = (new Function('console', source + '\n;return typeof main === "function" ? main : undefined;'))(console);
++    if (typeof main !== 'function') throw new Error('脚本没有定义 main(config, profile) 函数');
++    return main(config, profile);
++  }).then(function (result) {
++    if (result === null || typeof result !== 'object' || Array.isArray(result)) throw new Error('main 必须返回配置对象（键值映射）');
++    var text = JSON.stringify(result);
++    if (typeof text !== 'string') throw new Error('返回的配置无法序列化为 JSON');
++    if (text.length > maxChars) throw new Error('返回的配置过大（超过 ' + Math.floor(maxChars / 1048576) + ' MiB）');
++    return text;
++  });
++}
++if (typeof self !== 'undefined' && typeof importScripts === 'function') {
++  self.onmessage = function (e) {
++    var d = e.data;
++    __hetuEvaluate(d.source, d.config, d.profile, d.maxChars).then(function (text) {
++      self.postMessage({ ok: true, text: text, logs: __hetuLogs });
++    }, function (err) {
++      self.postMessage({ ok: false, error: __hetuError(err), logs: __hetuLogs });
++    });
++  };
++}
++"""
++        // HETU-OVERRIDE-WORKER-END
++
++        // HETU-OVERRIDE-HARNESS-BEGIN
++        /** The page: one worker per script, terminated when the script's time is up. */
++        const val HARNESS_JS = """
++var __hetuWorkerUrl = null;
++function __hetuNewWorker() {
++  if (!__hetuWorkerUrl) {
++    var code = document.getElementById('hetu-worker').textContent;
++    __hetuWorkerUrl = URL.createObjectURL(new Blob([code], { type: 'text/javascript' }));
++  }
++  return new Worker(__hetuWorkerUrl);
++}
++function __hetuRunJob(job, done) {
++  var settled = false, worker = null, timer = null;
++  function finish(ok, payload, logs) {
++    if (settled) return;
++    settled = true;
++    if (timer !== null) clearTimeout(timer);
++    try { if (worker) worker.terminate(); } catch (e) {}
++    done(ok, payload, (logs || []).join('\n'));
++  }
++  try { worker = __hetuNewWorker(); } catch (e) { finish(false, '无法创建脚本工作线程：' + e); return; }
++  timer = setTimeout(function () { finish(false, '脚本执行超时（' + job.timeoutMs + ' ms），已终止'); }, job.timeoutMs);
++  worker.onmessage = function (e) {
++    var m = e.data || {};
++    finish(!!m.ok, String(m.ok ? m.text : m.error), m.logs);
++  };
++  worker.onerror = function (e) {
++    if (e && e.preventDefault) e.preventDefault();
++    finish(false, '脚本错误：' + ((e && e.message) || e));
++  };
++  worker.postMessage({ source: job.source, config: job.config, profile: job.profile, maxChars: job.maxChars });
++}
++function __hetuRun() {
++  var job = JSON.parse(HetuOverrideHost.job());
++  if (!job) return;
++  __hetuRunJob(job, function (ok, payload, logs) { HetuOverrideHost.finish(ok, payload, logs); });
++}
++"""
++        // HETU-OVERRIDE-HARNESS-END
++
++        private val HTML = "<!doctype html><html><head><meta charset=\"utf-8\">" +
++            "<meta http-equiv=\"Content-Security-Policy\" content=\"default-src 'none'; script-src 'unsafe-inline' 'unsafe-eval' blob:; worker-src blob:; connect-src 'none'\">" +
++            "<script id=\"hetu-worker\" type=\"text/plain\">" + WORKER_JS + "</script>" +
++            "<script>" + HARNESS_JS + "</script></head><body onload=\"HetuOverrideHost.ready()\"></body></html>"
++    }
++}
++
++/** The start path's entry (called from RootProxyManager.prepare on its worker thread). */
++internal object OverrideScriptStart {
++    class Applied(@JvmField val text: String, @JvmField val notice: String, @JvmField val fallback: Boolean)
++
++    @JvmStatic fun hasEnabled(context: Context): Boolean = runCatching { WebViewOverrideEngine.store(context).hasEnabled() }.getOrDefault(false)
++
++    /**
++     * Runs the enabled scripts on [source] for a Mihomo ([json] = false) or sing-box source.
++     * Returns null when no script is enabled, so the start path stays byte-for-byte unchanged.
++     * [sourceName] is null when no profile is selected: the scripts start from an empty config.
++     */
++    @JvmStatic fun apply(context: Context, coreId: String, supported: Boolean, sourceName: String?, source: String, json: Boolean): Applied? {
++        val store = WebViewOverrideEngine.store(context)
++        val scripts = try { store.enabled() } catch (failure: Exception) {
++            return Applied(source, "覆写脚本读取失败，已使用未修改的配置：" + (failure.message ?: failure.javaClass.simpleName), true)
++        }
++        if (scripts.isEmpty()) return null
++        if (!supported) return Applied(source, "覆写脚本只对 Mihomo / sing-box 生效，本次未执行", true)
++        val format = if (json) OverrideFormat.JSON else OverrideFormat.YAML
++        val profile: Map<String, Any?>? = sourceName?.let { linkedMapOf("name" to it, "core" to coreId, "format" to format.id) }
++        val outcome = WebViewOverrideEngine(context).use { engine ->
++            OverrideScriptPipeline.apply(format, source, profile, scripts, engine)
++        }
++        runCatching { store.recordRun(outcome) }
++        return Applied(outcome.text, outcome.notice, outcome.fallback)
++    }
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 index 0ceaa23..42638f4 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
@@ -25925,6 +27089,220 @@ index 0000000..cd3ad28
 +        // Every detector belongs to a row of the existing catalogue (grouped as before).
 +        val rows = setOf("chatgpt", "claude", "gemini", "tiktok", "bilibili", "disney", "hulu", "netflix", "spotify", "twitch", "youtube", "apple", "github", "steam")
 +        assertEquals(rows, NetworkUnlock.checkIds)
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt
+new file mode 100644
+index 0000000..038d302
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt
+@@ -0,0 +1,208 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertTrue
++import org.junit.Rule
++import org.junit.Test
++import org.junit.rules.TemporaryFolder
++import org.yaml.snakeyaml.Yaml
++import java.util.Collections
++
++/**
++ * JS override scripts: apply order, all-or-nothing fallback to the unmodified source, the
++ * pipeline's own deadline, result validation and the private script store. The fake engine
++ * stands in for the WebView engine (whose JS is exercised under Node by tools/qa/test_override_js93.py).
++ */
++class OverrideScriptPipeline102Test {
++    @get:Rule val temporary = TemporaryFolder()
++
++    private class FakeEngine(val behaviour: (String, MutableMap<String, Any?>, String) -> Any?) : OverrideScriptEngine {
++        val calls: MutableList<String> = Collections.synchronizedList(mutableListOf())
++        val inputs: MutableList<String> = Collections.synchronizedList(mutableListOf())
++        @Volatile var closed = 0
++        override fun evaluate(name: String, source: String, configJson: String, profileJson: String, timeoutMs: Long, maxResultChars: Int): OverrideScriptEngine.Evaluation {
++            calls += name
++            inputs += configJson
++            @Suppress("UNCHECKED_CAST")
++            val config = CoreJson.parseObject(configJson) as MutableMap<String, Any?>
++            val out = behaviour(source, config, profileJson)
++            return OverrideScriptEngine.Evaluation(if (out is String) out else CoreJson.write(out), listOf("log:$name"))
++        }
++        override fun close() { closed++ }
++    }
++
++    private fun script(name: String, source: String = name) = OverrideScript(name, name, true, source)
++
++    /** "prepend:X" puts rule X first; "throw:msg" fails like a JS exception. */
++    private val ruleEngine get() = FakeEngine { source, config, _ ->
++        when {
++            source.startsWith("prepend:") -> {
++                @Suppress("UNCHECKED_CAST")
++                val rules = (config["rules"] as? List<Any?>).orEmpty()
++                config["rules"] = listOf(source.removePrefix("prepend:")) + rules
++                config
++            }
++            source.startsWith("throw:") -> throw OverrideScriptException("Error: " + source.removePrefix("throw:"))
++            else -> config
++        }
++    }
++
++    private val yamlSource = "mixed-port: 7890\nproxies:\n  - {name: a, type: ss, server: 1.2.3.4, port: 443, cipher: aes-128-gcm, password: p}\nrules:\n  - MATCH,DIRECT\n"
++
++    @Suppress("UNCHECKED_CAST")
++    private fun yamlRules(text: String) = (Yaml().load<Any>(text) as Map<String, Any?>)["rules"] as List<String>
++
++    @Test fun enabledScriptsApplyInOrderAndEachSeesThePreviousResult() {
++        val engine = ruleEngine
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, mapOf("name" to "sub.yaml"),
++            listOf(script("first", "prepend:DOMAIN,a.example,DIRECT"), script("second", "prepend:DOMAIN,b.example,REJECT")), engine)
++        assertTrue(outcome.applied); assertFalse(outcome.fallback)
++        assertEquals(listOf("first", "second"), engine.calls)
++        assertEquals(listOf("DOMAIN,b.example,REJECT", "DOMAIN,a.example,DIRECT", "MATCH,DIRECT"), yamlRules(outcome.text))
++        assertTrue("second script receives the first one's output", engine.inputs[1].contains("a.example"))
++        assertEquals(7890, (Yaml().load<Map<String, Any?>>(outcome.text))["mixed-port"])
++        assertEquals("覆写脚本：已启用 2 个，已应用 2 个", outcome.notice)
++        assertEquals(listOf("log:first"), outcome.steps[0].logs)
++    }
++
++    @Test fun anyFailureDiscardsEveryChangeAndKeepsTheUnmodifiedSource() {
++        val engine = ruleEngine
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null,
++            listOf(script("ok", "prepend:DOMAIN,a.example,DIRECT"), script("bad", "throw:boom"), script("never", "prepend:X")), engine)
++        assertTrue(outcome.fallback); assertFalse(outcome.applied)
++        assertEquals("unmodified source bytes", yamlSource, outcome.text)
++        assertEquals("a failing script stops the chain", listOf("ok", "bad"), engine.calls)
++        assertTrue(outcome.steps[0].ok); assertFalse(outcome.steps[1].ok)
++        assertTrue(outcome.steps[1].detail, outcome.steps[1].detail.contains("boom"))
++        assertTrue(outcome.notice, outcome.notice.startsWith("覆写脚本失败，已使用未修改的配置启动") && outcome.notice.contains("bad"))
++    }
++
++    @Test fun aStuckEngineIsAbandonedAtTheDeadlineClosedAndTheStartFallsBack() {
++        val engine = FakeEngine { _, _, _ -> Thread.sleep(30_000); emptyMap<String, Any?>() }
++        val started = System.nanoTime()
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null, listOf(script("loop")), engine,
++            timeoutMs = 200, graceMs = 300)
++        val elapsedMs = (System.nanoTime() - started) / 1_000_000
++        assertTrue("deadline must bound the start, took $elapsedMs ms", elapsedMs < 5_000)
++        assertTrue(outcome.fallback)
++        assertEquals(yamlSource, outcome.text)
++        assertTrue(outcome.steps.single().detail, outcome.steps.single().detail.contains("超时"))
++        assertTrue("the engine (WebView) is torn down", engine.closed >= 1)
++    }
++
++    @Test fun resultMustBeAMappingOfBoundedSize() {
++        for (bad in listOf("[1,2]", "null", "42", "\"text\"")) {
++            val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null, listOf(script("s")), FakeEngine { _, _, _ -> bad })
++            assertTrue(bad, outcome.fallback)
++            assertEquals(yamlSource, outcome.text)
++            assertTrue(outcome.steps.single().detail, outcome.steps.single().detail.contains("配置对象"))
++        }
++        val huge = "{\"x\":\"" + "a".repeat(OverrideScriptLimits.MAX_CONFIG_CHARS) + "\"}"
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null, listOf(script("s")), FakeEngine { _, _, _ -> huge })
++        assertTrue(outcome.fallback)
++        assertTrue(outcome.steps.single().detail, outcome.steps.single().detail.contains("过大"))
++        val invalid = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null, listOf(script("s")), FakeEngine { _, _, _ -> "{oops" })
++        assertTrue(invalid.fallback)
++    }
++
++    @Test fun noProfileStartsFromAnEmptyConfigAndPassesNullProfile() {
++        var seenProfile = ""
++        val engine = FakeEngine { _, config, profile ->
++            seenProfile = profile
++            config["proxies"] = listOf(mapOf("name" to "gen", "type" to "socks5", "server" to "127.0.0.1", "port" to 1080))
++            config["rules"] = listOf("MATCH,gen")
++            config
++        }
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, "", null, listOf(script("gen")), engine)
++        assertEquals("{}", engine.inputs.single().trim())
++        assertEquals("null", seenProfile)
++        assertTrue(outcome.applied)
++        assertEquals(listOf("MATCH,gen"), yamlRules(outcome.text))
++    }
++
++    @Test fun profileInformationReachesTheScript() {
++        var seen = ""
++        OverrideScriptPipeline.apply(OverrideFormat.JSON, "{\"outbounds\":[]}", linkedMapOf("name" to "box.json", "core" to "sing-box", "format" to "json"),
++            listOf(script("p")), FakeEngine { _, c, p -> seen = p; c })
++        val profile = CoreJson.parseObject(seen)
++        assertEquals("box.json", profile["name"]); assertEquals("sing-box", profile["core"]); assertEquals("json", profile["format"])
++    }
++
++    @Test fun singBoxJsoncIsScriptedAsJson() {
++        val source = "// sing-box\n{\n  \"outbounds\": [{\"type\": \"direct\", \"tag\": \"direct\"}], # note\n  \"route\": {\"rules\": []}\n}\n"
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.JSON, source, null, listOf(script("r")), FakeEngine { _, c, _ ->
++            @Suppress("UNCHECKED_CAST") val route = c["route"] as MutableMap<String, Any?>
++            route["rules"] = listOf(mapOf("domain_suffix" to listOf("example.com"), "outbound" to "direct")); c
++        })
++        assertTrue(outcome.applied)
++        val result = CoreJson.parseObject(outcome.text)
++        @Suppress("UNCHECKED_CAST") val rules = (result["route"] as Map<String, Any?>)["rules"] as List<Map<String, Any?>>
++        assertEquals("direct", rules.single()["outbound"])
++    }
++
++    @Test fun withoutEnabledScriptsTheSourceIsUntouchedAndNoEngineRuns() {
++        val engine = ruleEngine
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null, emptyList(), engine)
++        assertEquals(yamlSource, outcome.text)
++        assertFalse(outcome.applied); assertFalse(outcome.fallback)
++        assertEquals("", outcome.notice)
++        assertTrue(engine.calls.isEmpty())
++    }
++
++    @Test fun invalidSourceYamlFallsBackWithoutRunningScripts() {
++        val engine = ruleEngine
++        val broken = "rules: [unterminated\n"
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, broken, null, listOf(script("s")), engine)
++        assertTrue(outcome.fallback); assertEquals(broken, outcome.text); assertTrue(engine.calls.isEmpty())
++    }
++
++    @Test fun storeKeepsOrderEnabledStateAndLastRunInPrivateFiles() {
++        val store = OverrideScriptStore(temporary.newFolder("override-scripts"))
++        val a = store.add("A", "function main(c){return c}")
++        val b = store.add("B", "function main(c){c.b=1;return c}")
++        val c = store.add("C", "function main(c){return c}", enabled = false)
++        assertEquals(listOf("A", "B", "C"), store.list().map { it.name })
++        store.move(c.id, -2)
++        assertEquals(listOf("C", "A", "B"), store.list().map { it.name })
++        store.move(c.id, -1)
++        assertEquals("clamped at the top", listOf("C", "A", "B"), store.list().map { it.name })
++        assertEquals("only enabled scripts, in order, with sources", listOf("A", "B"), store.enabled().map { it.name })
++        assertTrue(store.enabled()[1].source.contains("c.b=1"))
++        store.setEnabled(c.id, true); store.setEnabled(a.id, false)
++        assertEquals(listOf("C", "B"), store.enabled().map { it.name })
++        store.update(b.id, "B2", "function main(c){return c}")
++        assertEquals("B2", store.list().first { it.id == b.id }.name)
++        store.delete(a.id)
++        assertEquals(listOf("C", "B2"), store.list().map { it.name })
++        assertTrue(store.hasEnabled())
++        val reopened = OverrideScriptStore(store.dir)
++        assertEquals(listOf(c.id, b.id), reopened.list().map { it.id })
++
++        val outcome = OverrideScriptPipeline.apply(OverrideFormat.YAML, yamlSource, null,
++            listOf(script("x", "prepend:A"), script("y", "throw:bad")), ruleEngine)
++        reopened.recordRun(outcome, at = 1234L)
++        val last = reopened.lastRun()
++        assertNotNull(last)
++        last!!
++        assertEquals(1234L, last.at); assertTrue(last.fallback)
++        assertEquals(listOf(true, false), last.steps.map { it.ok })
++        assertEquals(outcome.notice, last.notice)
++    }
++
++    @Test fun storeRejectsOversizedScriptsAndTooManyScripts() {
++        val store = OverrideScriptStore(temporary.newFolder("limits"))
++        try { store.add("big", "x".repeat(OverrideScriptLimits.MAX_SCRIPT_CHARS + 1)); throw AssertionError("oversized script accepted") }
++        catch (_: IllegalArgumentException) {}
++        repeat(OverrideScriptLimits.MAX_SCRIPTS) { store.add("s$it", "function main(c){return c}") }
++        try { store.add("one-more", "function main(c){return c}"); throw AssertionError("script limit not enforced") }
++        catch (_: IllegalArgumentException) {}
++        assertEquals(OverrideScriptLimits.MAX_SCRIPTS, store.list().size)
++    }
++
++    @Test fun shippedExamplesDefineMain() {
++        assertEquals(5, OverrideScriptExamples.ALL.size)
++        OverrideScriptExamples.ALL.forEach { assertTrue(it.title, it.source.contains("function main(config, profile)")) }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/PanelActionSafetyTest.kt
