@@ -116,6 +116,20 @@ CN_CHAIN=""
 CNIP_STATE=off
 CNIP_REASON=""
 
+# Opt-in eBPF rule matcher (default off). The App writes $BASE/policy/ebpf (ENABLED=1) and deploys
+# the loader and object from assets/hetu-bpf to $BASE/bin. When enabled and every probe passes, the
+# per-UID owner rules and the custom bypass networks collapse into one `-m bpf --object-pinned`
+# rule each, backed by pinned maps that ebpf-update rewrites without touching iptables. Any probe
+# failure keeps the established owner/CIDR rules unchanged (status ebpf=fallback reason=...).
+EBPF_PIN=/sys/fs/bpf/hetu
+EBPF_TOOL="$BASE/bin/hetu-bpf"
+EBPF_OBJECT="$BASE/bin/hetu_match.o"
+EBPF_LISTS="$RUN/state/ebpf-lists"
+EBPF_STATE=off
+EBPF_REASON=""
+# 1 only while capture rules are built for an active matcher; the Kill Switch guard never uses it.
+EBPF_RULES=0
+
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
@@ -567,7 +581,7 @@ sweep_policy_routes(){
     for SR_T in $SR_TABLES; do ip -"$SR_F" route flush table "$SR_T" >/dev/null 2>&1 || true; done
   done
 }
-cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; cnip_sweep_sets keep; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
+cleanup(){ MARK=""; MASK=""; TABLE=""; PREF=""; loadnet >/dev/null 2>&1 || true; cleanup_snapshot_begin; sweep_rules; cleanup4; cleanup6; cleanlegacy; sweep_policy_routes; CLEAN_SNAPSHOT_ACTIVE=0; cnip_sweep_sets keep; ebpf_unload || true; ip link del hetu0 >/dev/null 2>&1 || true; rm -f "$NET_STATE"; MARK=""; MASK=""; TABLE=""; PREF=""; }
 
 cleanup_verify(){
   for CC_BIN in xt4 xt6; do
@@ -577,6 +591,7 @@ cleanup_verify(){
       CC_RULES=$(cleanup_snapshot_read "$CC_BIN" "$CC_XT") || return 1
       if printf '%s\n' "$CC_RULES" | grep -Eq '(^-N |^-A | -j | -g )(HETU_|BICHEN_)'; then return 1; fi
       if printf '%s\n' "$CC_RULES" | grep -q -- '--match-set hetu_'; then return 1; fi
+      if printf '%s\n' "$CC_RULES" | grep -qF -- "--object-pinned $EBPF_PIN/"; then return 1; fi
     done
   done
   # Independent of net.state: no fwmark rule may still point at a Hetu table.
@@ -1091,8 +1106,8 @@ core_return(){
   [ -n "$CORE_GID" ] || return 0
   "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
 }
-blacklist_returns(){ BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; [ "$S" = blacklist ] || return 0; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
-direct_uid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
+blacklist_returns(){ BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; [ "$S" = blacklist ] || return 0; [ "$EBPF_RULES" != 1 ] || { ebpf_return "$BIN" "$T" "$C" hetu_uid_list; return; }; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
+direct_uid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ "$EBPF_RULES" != 1 ] || { ebpf_return "$BIN" "$T" "$C" hetu_uid_direct; return; }; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do owner_return "$BIN" "$T" "$C" --uid-owner "$U" || return 1; done; }
 direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
 system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
 # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
@@ -1116,12 +1131,14 @@ append_scoped(){
 # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
 scoped_mark(){
   BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
-  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" --dport "$DPORT" -j MARK --set-xmark "$MARKV" || return 1; else "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" -j MARK --set-xmark "$MARKV" || return 1; fi; done
+  if [ "$S" = whitelist ] && [ "$EBPF_RULES" = 1 ]; then if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p "$PROTO" --dport "$DPORT" -j MARK --set-xmark "$MARKV" || return 1; else "$BIN" -t "$T" -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p "$PROTO" -j MARK --set-xmark "$MARKV" || return 1; fi
+  elif [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" --dport "$DPORT" -j MARK --set-xmark "$MARKV" || return 1; else "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" -j MARK --set-xmark "$MARKV" || return 1; fi; done
   else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j MARK --set-xmark "$MARKV" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j MARK --set-xmark "$MARKV" || return 1; fi; fi
 }
 scoped_redirect(){
   BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; TO="$8"
-  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; done
+  if [ "$S" = whitelist ] && [ "$EBPF_RULES" = 1 ]; then if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi
+  elif [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -m owner --uid-owner "$U" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; done
   else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
 }
 # Explicit protocol disabling should report an unavailable UDP path immediately.
@@ -1129,17 +1146,21 @@ scoped_redirect(){
 # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
 scoped_reject_quic(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
-  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 443 -j REJECT || return 1; done
+  if [ "$S" = whitelist ] && [ "$EBPF_RULES" = 1 ]; then "$BIN" -t filter -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p udp --dport 443 -j REJECT || return 1
+  elif [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp --dport 443 -j REJECT || return 1; done
   else "$BIN" -t filter -A "$C" -p udp --dport 443 -j REJECT || return 1; fi
 }
 scoped_reject_all(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
-  if [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -j REJECT || return 1; done
+  if [ "$S" = whitelist ] && [ "$EBPF_RULES" = 1 ]; then "$BIN" -t filter -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -j REJECT || return 1
+  elif [ "$S" = whitelist ]; then OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -j REJECT || return 1; done
   else "$BIN" -t filter -A "$C" -j REJECT || return 1; fi
 }
 scoped_reject_unmarked_udp(){
   BIN="$1"; C="$2"; S="$3"; LIST="$4"
-  if [ "$S" = whitelist ]; then
+  if [ "$S" = whitelist ] && [ "$EBPF_RULES" = 1 ]; then
+    "$BIN" -t filter -A "$C" -m bpf --object-pinned "$EBPF_PIN/prog_hetu_uid_list" -p udp -j REJECT || return 1
+  elif [ "$S" = whitelist ]; then
     OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
     for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
   else
@@ -1151,12 +1172,14 @@ bypass4(){
   C="$1"; T="$2"; CIDRS="$3"
   OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
   for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  [ "$EBPF_RULES" != 1 ] || { ebpf_return xt4 "$T" "$C" hetu_bypass4; return; }
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) ;; *) xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 bypass6(){
   C="$1"; T="$2"; CIDRS="$3"
   OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V6; IFS=$OLDIFS
   for NET in "$@"; do xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
+  [ "$EBPF_RULES" != 1 ] || { ebpf_return xt6 "$T" "$C" hetu_bypass6; return; }
   [ -z "$CIDRS" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $CIDRS; IFS=$OLDIFS; for NET in "$@"; do case "$NET" in *:*) xt6 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1;; esac; done
 }
 
@@ -1323,6 +1346,105 @@ cnip_reload(){ (
   printf '%s cnip-reload failed=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$CR_FAILED" "$CNIP_REASON" >> "$RUN/cnip.log" 2>/dev/null || true
   if [ "$CR_FAILED" = 0 ]; then printf '{"ok":true,"reloaded":true,"cnip":"ipset","message":"CNIP ipset 已热更新"}\n'
   else printf '{"ok":false,"reloaded":false,"cnip":"ipset","message":"CNIP 新数据无效或导入失败，继续使用原集合"}\n'; fi
+); }
+
+# ---------------------------------------------------------------- eBPF rule matcher (opt-in)
+ebpf_policy_enabled(){ [ "$(sed -n 's/^ENABLED=//p' "$BASE/policy/ebpf" 2>/dev/null | head -n 1)" = 1 ]; }
+ebpf_tool(){ if [ "$START_ACTIVE" = 1 ]; then timeout -s TERM -k 1 10 "$EBPF_TOOL" "$@"; else "$EBPF_TOOL" "$@"; fi; }
+# The loader prints one reason token on failure; keep only safe characters of its last line.
+ebpf_reason(){ printf '%s\n' "$1" | tail -n 1 | tr -cd 'a-z0-9-' | cut -c1-48; }
+ebpf_fallback(){ EBPF_STATE=fallback; EBPF_REASON="${1:-error}"; EBPF_RULES=0; ebpf_unload; }
+# xt_bpf must accept a pinned program in every table family this session will use.
+ebpf_xt_probe(){
+  EX_BIN="$1"; EX_PROG="$2"
+  "$EX_BIN" -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; "$EX_BIN" -t mangle -F HETU_PROBE >/dev/null 2>&1 || true
+  "$EX_BIN" -t mangle -A HETU_PROBE -m bpf --object-pinned "$EBPF_PIN/prog_$EX_PROG" -j RETURN >/dev/null 2>&1; EX_RC=$?
+  "$EX_BIN" -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; "$EX_BIN" -t mangle -X HETU_PROBE >/dev/null 2>&1 || true
+  return "$EX_RC"
+}
+# Map contents for one session: direct UIDs (bit 0), the app-scope list (bit 1, only for
+# blacklist/whitelist) and the custom bypass networks.
+ebpf_sync(){
+  ES_LIST="$2"; [ "$4" != core ] || ES_LIST=""
+  ES_OUT=$(ebpf_tool sync-uid "$EBPF_PIN" "$1" "$ES_LIST" 2>/dev/null) || { EBPF_REASON=$(ebpf_reason "$ES_OUT"); return 1; }
+  ES_OUT=$(ebpf_tool sync-cidr "$EBPF_PIN" "$3" 2>/dev/null) || { EBPF_REASON=$(ebpf_reason "$ES_OUT"); return 1; }
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  printf 'DIRECT=%s\nLIST=%s\nCIDRS=%s\nSCOPE=%s\n' "$1" "$2" "$3" "$4" > "$EBPF_LISTS.new.$$" 2>/dev/null && mv -f "$EBPF_LISTS.new.$$" "$EBPF_LISTS" 2>/dev/null || true
+}
+# Start: decide whether this session's capture rules use the matcher. Never fails the start.
+ebpf_prepare(){
+  EBPF_STATE=off; EBPF_REASON=""; EBPF_RULES=0
+  ebpf_policy_enabled || return 0
+  case "$START_MODE" in tproxy|redirect|enhance) ;; *) ebpf_fallback "mode-$START_MODE"; return 0;; esac
+  { [ -x "$EBPF_TOOL" ] && [ -r "$EBPF_OBJECT" ]; } || { ebpf_fallback payload-missing; return 0; }
+  # bpf(2), socket-uid helper, LPM maps, a mounted bpffs and pin/get under SELinux.
+  EP_OUT=$(ebpf_tool probe "$EBPF_PIN" 2>/dev/null) || { ebpf_fallback "$(ebpf_reason "$EP_OUT")"; return 0; }
+  EP_OUT=$(ebpf_tool load "$EBPF_OBJECT" "$EBPF_PIN" 2>/dev/null) || { ebpf_fallback "$(ebpf_reason "$EP_OUT")"; return 0; }
+  ebpf_xt_probe xt4 hetu_uid_direct && ebpf_xt_probe xt4 hetu_bypass4 || { ebpf_fallback xt-bpf-unsupported; return 0; }
+  if { [ "$START_V6" = enable ] || [ "$START_V6" = strict ]; } && v6supported && has ip6tables; then
+    ebpf_xt_probe xt6 hetu_uid_direct && ebpf_xt_probe xt6 hetu_bypass6 || { ebpf_fallback xt6-bpf-unsupported; return 0; }
+  fi
+  ebpf_sync "$START_DIRECT_UIDS" "$START_UIDS" "$START_CIDRS" "$START_SCOPE" || { ebpf_fallback "$EBPF_REASON"; return 0; }
+  EBPF_STATE=active; EBPF_REASON=""; EBPF_RULES=1
+}
+# One rule in place of a per-UID/per-network loop. Same fake-IP exclusion as owner_return.
+ebpf_return(){
+  ER_BIN="$1"; ER_T="$2"; ER_C="$3"; ER_PROG="$4"; ER_FAKE=$(fake_range "$ER_BIN")
+  if [ -n "$ER_FAKE" ] && [ "$ER_PROG" != hetu_bypass4 ] && [ "$ER_PROG" != hetu_bypass6 ]; then
+    "$ER_BIN" -t "$ER_T" -A "$ER_C" ! -d "$ER_FAKE" -m bpf --object-pinned "$EBPF_PIN/prog_$ER_PROG" -j RETURN
+  else "$ER_BIN" -t "$ER_T" -A "$ER_C" -m bpf --object-pinned "$EBPF_PIN/prog_$ER_PROG" -j RETURN; fi
+}
+ebpf_rules_reference_pins(){
+  for ERP_BIN in xt4q xt6q; do
+    if [ "$ERP_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    for ERP_T in mangle nat filter; do
+      ERP_RULES=$("$ERP_BIN" -t "$ERP_T" -S 2>&1); ERP_RC=$?
+      if [ "$ERP_RC" != 0 ]; then case "$ERP_RULES" in *"Table does not exist"*) continue;; *) return 0;; esac; fi
+      printf '%s\n' "$ERP_RULES" | grep -qF -- "--object-pinned $EBPF_PIN/" && return 0
+    done
+  done
+  return 1
+}
+# Pins go only after no rule references them: xtables re-opens every pinned path whenever a
+# table is replaced, so a dangling path would block later changes to that table. Only this
+# matcher's names are removed.
+ebpf_unload(){
+  [ -d "$EBPF_PIN" ] || return 0
+  ! ebpf_rules_reference_pins || return 1
+  if [ -x "$EBPF_TOOL" ] && "$EBPF_TOOL" unload "$EBPF_PIN" >/dev/null 2>&1; then return 0; fi
+  rm -f "$EBPF_PIN"/prog_* "$EBPF_PIN"/map_* "$EBPF_PIN"/probe_* >/dev/null 2>&1 || true
+  rmdir "$EBPF_PIN" >/dev/null 2>&1 || true
+  [ ! -d "$EBPF_PIN" ]
+}
+ebpf_load_session(){
+  EBPF_STATE=$(sed -n 's/^EBPF_MATCH=//p' "$SESSION" 2>/dev/null | head -n 1)
+  case "$EBPF_STATE" in active|fallback) ;; *) EBPF_STATE=off;; esac
+  EBPF_REASON=$(sed -n 's/^EBPF_REASON=//p' "$SESSION" 2>/dev/null | head -n 1 | tr -cd 'a-z0-9-')
+}
+# Hot update: rewrite the pinned maps of the running session; iptables stays untouched.
+# No arguments re-syncs the lists recorded by the last start/update.
+ebpf_update(){ (
+  trap 'release_lock' EXIT
+  ebpf_load_session
+  if [ "$EBPF_STATE" != active ]; then printf '{"ok":true,"updated":false,"ebpf":"%s","ebpfReason":"%s","message":"eBPF 匹配未生效，新列表在下次启动时应用"}\n' "$EBPF_STATE" "$EBPF_REASON"; exit 0; fi
+  EU_SCOPE=$(sed -n 's/^APP_SCOPE=//p' "$SESSION" 2>/dev/null | head -n 1); scope "$EU_SCOPE" || EU_SCOPE=core
+  if [ "$#" = 3 ]; then EU_DIRECT="$1"; EU_LIST="$2"; EU_CIDRS="$3"
+  else
+    [ -r "$EBPF_LISTS" ] || { printf '{"ok":false,"updated":false,"ebpf":"active","message":"缺少 eBPF 列表记录，请重启代理"}\n'; exit 0; }
+    EU_DIRECT=$(sed -n 's/^DIRECT=//p' "$EBPF_LISTS" | head -n 1); EU_LIST=$(sed -n 's/^LIST=//p' "$EBPF_LISTS" | head -n 1); EU_CIDRS=$(sed -n 's/^CIDRS=//p' "$EBPF_LISTS" | head -n 1)
+  fi
+  split_safe_uids "$EU_DIRECT" && split_safe_uids "$EU_LIST" && split_safe_cidrs "$EU_CIDRS" || { printf '{"ok":false,"updated":false,"ebpf":"active","message":"eBPF 更新列表无效，保留原映射"}\n'; exit 0; }
+  [ "$EU_SCOPE" != whitelist ] || [ -n "$EU_LIST" ] || { printf '{"ok":false,"updated":false,"ebpf":"active","message":"仅所选应用代理模式没有可用 UID，保留原映射"}\n'; exit 0; }
+  acquire_lock || { printf '{"ok":false,"message":"运行事务正在执行，请稍后重试"}\n'; exit 0; }
+  ebpf_load_session
+  [ "$EBPF_STATE" = active ] || { printf '{"ok":true,"updated":false,"ebpf":"%s","message":"eBPF 匹配未生效"}\n' "$EBPF_STATE"; exit 0; }
+  if ! ebpf_sync "$EU_DIRECT" "$EU_LIST" "$EU_CIDRS" "$EU_SCOPE"; then
+    printf '%s ebpf-update failed %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$EBPF_REASON" >> "$RUN/ebpf.log" 2>/dev/null || true
+    printf '{"ok":false,"updated":false,"ebpf":"active","ebpfReason":"%s","message":"eBPF 映射更新失败"}\n' "$EBPF_REASON"; exit 0
+  fi
+  EU_COUNT=$("$EBPF_TOOL" count "$EBPF_PIN" 2>/dev/null | head -n 1 | tr -cd 'a-z0-9= ')
+  printf '%s ebpf-update ok %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$EU_COUNT" >> "$RUN/ebpf.log" 2>/dev/null || true
+  printf '{"ok":true,"updated":true,"ebpf":"active","ebpfEntries":"%s","message":"eBPF 映射已热更新，iptables 规则未改动"}\n' "$EU_COUNT"
 ); }
 
 probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
@@ -1733,6 +1855,8 @@ revoke_bootstrap(){
 # then let xtables commit the entire guard atomically. Never flush a live guard.
 atomic_kill_guard(){ (
   KG_FAMILY="$1"; shift
+  # The guard outlives capture rules and pins (crash, rollback): always plain owner/CIDR rules.
+  EBPF_RULES=0
   if [ "$KG_FAMILY" = 6 ] && ! v6supported; then exit 0; fi
   KG_BIN=xt4; KG_RESTORE=iptables-restore
   if [ "$KG_FAMILY" = 6 ]; then KG_BIN=xt6; KG_RESTORE=ip6tables-restore; fi
@@ -2404,6 +2528,10 @@ start(){
   # Capture rules are recorded and committed in one iptables-restore per family/table. If a
   # commit is refused (old iptables-restore, missing match module, ...) the partial state is
   # swept and the same rules are installed one by one, exactly as before.
+  # Opt-in eBPF matcher: loaded after the start's cleanup (which drops stale pins) and before
+  # any capture rule references it. Every failure falls back to the owner/CIDR rules.
+  start_stage "ebpf-matcher"
+  ebpf_prepare
   start_stage "install-capture-batch"
   xt_batch_begin || fail "无法准备防火墙批量规则"
   XT_BATCH=1; install_capture_rules; XT_BATCH=0
@@ -2433,6 +2561,7 @@ start(){
   # health_record would invalidate every status check and disable owned-rule repair.
   printf 'CORE_GID=%s\nSYSTEM_DNS=%s\nDOT_GUARD=%s\nPRIVATE_DNS=%s\nDNS_PROTOS=%s\n' "$CORE_GID" "$SYSTEM_DNS" "$DOT_GUARD" "$PRIVATE_DNS" "$DNS_PROTOS" >> "$SESSION" || { fail "无法记录 DNS 接管状态，已停止本次启动"; }
   printf 'CNIP=%s\nCNIP_V4=%s\nCNIP_V6=%s\nCNIP_FORCE=%s\nCNIP_REASON=%s\nCNIP_TCPONLY=%s\n' "$CNIP_STATE" "$CN4_ON" "$CN6_ON" "$CN_FORCE" "$CNIP_REASON" "$([ "$CNIP_STATE" = ipset ] && echo "$CN_TCPONLY" || echo 0)" >> "$SESSION" || { fail "无法记录 CNIP 状态，已停止本次启动"; }
+  printf 'EBPF_MATCH=%s\nEBPF_REASON=%s\n' "$EBPF_STATE" "$EBPF_REASON" >> "$SESSION" || { fail "无法记录 eBPF 匹配状态，已停止本次启动"; }
   printf 'SHARE_SCOPED=%s\nSHARE_IFACES=%s\nSHARE_MAC_MODE=%s\nSHARE_ONLY_MACS=%s\nSHARE_DROPPED=%s\n' "$SHR_SCOPED" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" >> "$SESSION" || { fail "无法记录共享网络范围，已停止本次启动"; }
   printf 'GOOGLE_FIREWALL_CLEAN=%s\n' "$START_VENDOR_CLEAN" >> "$SESSION" || { fail "无法记录 Google 防火墙设置，已停止本次启动"; }
   transaction_current || fail "启动事务已撤销"
@@ -2456,7 +2585,7 @@ start(){
   transaction_current || fail "启动事务已撤销"
   rm -f "$START_ERROR"; start_stage "running"
   START_ACTIVE=0
-  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE"
+  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE,ebpf=$EBPF_STATE${EBPF_REASON:+,ebpfReason=$EBPF_REASON}"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
 
@@ -2666,7 +2795,8 @@ status(){
     case "$CNIP4N$CNIP6N" in *[!0-9]*) CNIP4N=0; CNIP6N=0;; esac
     if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
   fi
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED"
+  ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -2796,6 +2926,8 @@ health_collect(){
   fi
   H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
   case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
+  # Capture rules of an active eBPF matcher reference its pins; a lost pin cannot be rebuilt here.
+  if [ "$(sed -n 's/^EBPF_MATCH=//p' "$SESSION" | head -n 1)" = active ] && [ ! -d "$EBPF_PIN" ]; then health_fault ebpf-pins; fi
   H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
   if [ "$H_SS" != 0 ]; then health_unknown socket-read
   else
@@ -2905,7 +3037,7 @@ health_repair(){ (
   pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
   # Missing metadata or listeners cannot safely be reconstructed from preferences.
   # Keep the core and its existing connections; report instead of restart-looping.
-  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*|*core-*|*watchdog-*) exit 0;; esac
+  case "$H_REASON" in *routing-journal*|*listener-*|*native-device*|*core-*|*watchdog-*|*ebpf-*) exit 0;; esac
   printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
   printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
   if [ -s "$RUN/network-manifest/net" ]; then
@@ -2974,6 +3106,9 @@ case "${1:-status}" in
   network-health) health_json;;
   # Hot swap of the CN sets (App after deploying new lists; watchdog with "auto").
   cnip-reload) { [ "$#" = 1 ] || [ "$#" = 2 ]; } || fail "参数错误"; root; cnip_reload;;
+  # Hot update of the eBPF matcher maps (direct UIDs, app-scope UIDs, bypass networks); no arguments
+  # re-syncs the recorded lists. iptables rules are never rebuilt here.
+  ebpf-update) { [ "$#" = 1 ] || [ "$#" = 4 ]; } || fail "参数错误"; root; shift; ebpf_update "$@";;
   repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
   watchdog) { [ "$#" = 12 ]; } || exit 0; root; watchdog "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11:-}" "${12:-}";;
   *) fail "未知 Root 代理操作";;
