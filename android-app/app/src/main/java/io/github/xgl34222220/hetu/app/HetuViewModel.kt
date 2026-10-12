@@ -855,9 +855,9 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             operationText = "正在重启…"
             ProxyRuntimeSettings.beginApply(prefs)
             try {
-                controller.restart { operationText = it }
+                val result = controller.restart { operationText = it }
                 prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
-                toast("已重启，设置已生效")
+                toast(if (result.optBoolean("ebpfHotUpdate", false)) "名单已通过 eBPF 热更新，无需重启" else "已重启，设置已生效")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {

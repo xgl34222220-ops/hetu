@@ -131,6 +131,9 @@ AUTHORIZED_FILES = frozenset((
     PACKAGE + 'ProxyNetworkAutomationActivity.kt', PACKAGE + 'ProxySharedNetworkInspector.kt',
     PACKAGE + 'NetworkMatchRules.java', PACKAGE + 'SharedNetworkRules.java',
     *EBPF_FILES,
+    # 2026-10-13 eBPF matcher App side (same authorization): the pure-Java helper (no Android API)
+    # for payload/policy deployment fragments, reason text and the hot-update decision.
+    PACKAGE + 'EbpfMatcher.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

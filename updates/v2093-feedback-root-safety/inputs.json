@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "042543c6e4bc37512699575b0c5951058227d80209639adbb088cd38db5cf202",
+  "patchSha256": "a900da355800e7ad0875e55fc4cf443ec7b91e69c5dc680f5ac7b378e447337f",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -228,6 +228,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
@@ -345,6 +346,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt",
@@ -401,14 +403,15 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java": "42abec6c799194e627bc640d841d47b7417b7dd723b1251298f0f5f21329ad9b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreResourceLimits.java": "9754331163e28e9e71fcfd567e028d172d8dcb979b94270008b82446a00ffea5",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java": "7d299c89ceea5d1d7893a2ec7c25f5d8a45e3ff3d4355d631d83055895f1d7cc",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "290cfd6c3e6516d60587685846d7a6f4287e2fd2ce519b46361bd6a9619c7d8c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "1c5044a075945a5c9f8c8335b57e1a57dfd1fb3fa0953ff9d1580173b82c9a23",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "37233948ca74af90ee3e43db4e6a137388024f1a8f5bd48ce8a0b770f1001cf5",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "def2c39426ad1185ec0ab84baa3cc988e73d478b59af6dca2f667c11a7f57312",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java": "7862107a5c1f879917dca20fb108d8779139bf2eaec8ff0727ef715c4fd54ed2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java": "c73a22aeb47a82323af1672ac46e1faec2e135ea56284eea7ceb728fb046e7ad",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "bfcb3a7a91120371556d85b9022002624a73b829512621209bc121050945c7be",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "d53969465bd14cd0295e8bf90ced30fac2520fb5d65ed928f47b2609e0ce756a",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "73fe9fdea9ca6606884b60228e116166151b42fa5415b846a5a7e0f23f84f67f",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "262433177cb39f9fae7f379b50679746ce6bc9af9797ba4f936f378f845a0722",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "5292d86f63a23b590d9cd1f4d509ee51b4deee14b702a1bfe934b8720ab4c383",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyControlEpoch.java": "0d7d1884c75dde624828a02fe1859818ab35189052ae9e70238c4f5255ff8e7c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyCoreConfig.java": "7ef38360be0c27582578529a55f2950d19537ba73b023175b0ca555327a494bb",
@@ -422,7 +425,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt": "7546cec18a7768dd1b3657f6df3b30f598f94f5ed597a9425809405bf7599eda",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt": "6aa568dc059fcac303684e23aac44dd6816fdc57aac2cecc8225d683b32e6b65",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "b859e7a9ccb46afcecc39db3af95f11de115bc9fe90a4e4e70a039446f1b8b21",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "34671113212b0d470240edd1cbc083649334aeedc66940753401bbfb8e0a8b34",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java": "f7c0f8e9734614f98dad0f6e9fd1e76172b99052cec076febe9650e771de0217",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java": "47ce0f0006a5e9696437d14182290d850c2396e70fbc51ebf75d5c00ef6008e1",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "fac701e2eb748ea2dc013d8908901ac07ae62abaeb58b5a184f1fd4e924549d7",
@@ -435,7 +438,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CoreConceptComponents.kt": "2dd0d538e4e5c545d09073d5a2ef042284049d11e9ec08fdbed11559dcb4e7a6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt": "914ea5ca51c40d89bc8898bcd79fa979d2c1a1afe3e088a0c5e406b1acad0a23",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt": "8035cf57a89d6020ec52cf140450822458ffd94f5f03c1bd1004df68187d0fcb",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "8771093a19049b46ea68b5af30ed42949d6b145240293bc6159326640677432c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt": "146c52321b7f8c709b165450c7682e8d8586c861e458a0886daaaefc622a5e4e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "08bf2cb919f648eca5e9fa0cc2ccbdb713b87b8599e967c7a32421d1669643de",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "cdefabb9fb7c89bf3e08c1ba82374e8b43768cca5bca48834891ca26e47aa6d7",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt": "f6bb5c1d68438be89c0882104e8604ae9d59648e9bff3eb548567c8497d09bd6",
@@ -518,6 +521,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreGroupWave99Test.kt": "4de3065bf8a50b5c03b04fb2686df205bec805a998336bfe20a760708cb797aa",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreRuntimeSupport93Test.kt": "de82e83fe1ed9f8bff17083ac49ccc1bea321ea444002ca4f145d4f0765f91b6",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/CoreTemplateAutoSelect104Test.kt": "1969c955f361135b59aa202715bf61e9fa56f7ce8a6039dcdeff2391d64990ca",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt": "b5e09693afca6e224708e3e3ce5c3b56118ed6e42bd4f4e45e5a800fbe6a443d",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "3c486b54085b8cca752183314d02d066eff04e93e4675c2466c733c462cc3d0e",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt": "fe813de466b743b21adab864049561f93ff399a173eb618ad1ebbaabbf74fbd8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765",
@@ -964,7 +968,7 @@
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "683509722dda5b159f26c2eb8859d40e7326f8cd5268bcee0546f15933d74044",
-    ".github/scripts/continuity93_source_scope.py": "5c2b725bdf12cd1f4e0e89ec15150b1d8309aa9d8bdef8e842194fbe48b67539",
+    ".github/scripts/continuity93_source_scope.py": "d0ec60fc3259cba0721353c334bf4b5b187ab0a47c1696ffb9833196a8e600cb",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/run_continuity93_baseline_hosts.py": "ce03bed2220d77cbacb453051b3a735a972bd5d28607fc31dfbb549e73d9b8cc",
@@ -2417,6 +2421,21 @@
         "programmingErrorsAreNotSwallowed"
       ]
     },
+    "io.github.xgl34222220.hetu.EbpfMatcherApp105Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt",
+      "methods": [
+        "loaderAssetFollowsTheFirstSupportedAbiWithALoader",
+        "policyFileIsWrittenAndRemovedLikeCnip",
+        "payloadsAreInstalledWithModesThroughTemporaryFiles",
+        "aDigestMismatchFailsTheDeploymentAndLeavesNoTarget",
+        "updateArgumentsAreStartArguments19And14And17",
+        "onlyTheMapFieldsMayDifferForAHotUpdate",
+        "baseSignatureIgnoresOnlyTheAppListAndBypassCidrs",
+        "everyReasonTokenHasChineseText",
+        "switchSubtitleReportsTheRunningSession",
+        "advancedSettingsSwitchDefaultsOffAndDeploymentIsGatedByIt"
+      ]
+    },
     "io.github.xgl34222220.hetu.FirstSnapshotPerformance95Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt",
       "methods": [
@@ -3462,8 +3481,8 @@
       ]
     }
   },
-  "expectedUnitTests": 887,
-  "expectedTestXmlFiles": 99,
+  "expectedUnitTests": 897,
+  "expectedTestXmlFiles": 100,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
   "signingUnchanged": true,
