@@ -598,7 +598,8 @@ final class RootProxyManager {
                 +"|sharedMacs="+policy.sharedBypassMacs
                 +"|direct="+policy.directUidRanges+"|directGids="+policy.directGidRanges
                 +"|fake4="+fakeIps.ipv4+"|fake6="+fakeIps.ipv6
-                +"|lan4="+fakeIps.ipv4BypassCidrs+"|lan6="+fakeIps.ipv6BypassCidrs;
+                +"|lan4="+fakeIps.ipv4BypassCidrs+"|lan6="+fakeIps.ipv6BypassCidrs
+                +(prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false)?"|ebpf=1":"");
     }
 
     private void installHotReloadFiles(Prepared p)throws Exception{
@@ -633,6 +634,55 @@ final class RootProxyManager {
         }
         RootBridge.Result installed=boundedRootShell(context,cmd.toString(),15000L);
         if(!installed.ok())throw new IOException("无法写入热重载配置："+installed.output.trim());
+    }
+
+    /**
+     * Applies a changed app list / DIRECT apps / bypass CIDRs to a running eBPF session without a
+     * restart: `hetu-root.sh ebpf-update` with the same strings as start arguments 19, 14 and 17.
+     * Returns null whenever that is not the whole change (the caller restarts): the switch is off,
+     * the core is not running, any other setting or the startup config changed, the session is not
+     * ebpf=active, or the script answers updated:false / fails.
+     */
+    JSONObject ebpfHotUpdate(ProxyRuntimeProfile profile)throws Exception{
+        RootBridge.requireWorkerThread();
+        if(!prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false))return null;
+        CONTROL_LOCK.lock();
+        try{
+            if(!coreAliveFast())return null;
+            ProxyRuntimeProfile.Core running=ProxyRuntimeProfile.Core.from(prefs.getString("proxyRootRuntimeCore",profile.core.id));
+            if(running!=profile.core)return null;
+            // Nothing pending: a plain 「重启」 (also from the notification) stays a real restart.
+            String applied=prefs.getString("proxyRootAppliedSettings","");
+            if(applied==null||applied.isEmpty()||applied.equals(ProxyRuntimeSettings.captureRequest(profile,prefs)))return null;
+            String base=ProxyRuntimeSettings.signature(profile,EbpfMatcher.withoutLists(prefs.getAll()));
+            if(!base.equals(prefs.getString(EbpfMatcher.APPLIED_BASE_KEY,"")))return null;
+            Prepared p;
+            try{p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));}
+            catch(Exception notHot){return null;}
+            String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
+            if(!EbpfMatcher.onlyListsChanged(prefs.getString("proxyRootTopologyFingerprint",""),nextFingerprint))return null;
+            if(!validationFingerprint(p).equals(prefs.getString("proxyRootValidatedFingerprint","")))return null;
+            JSONObject state=runJsonAllowMissing("status",new JSONObject().put("ok",true).put("running",false));
+            if(!state.optBoolean("running",false)||!EbpfMatcher.hotUpdatable(state.optString("ebpf",""))
+                    ||"pins-missing".equals(state.optString("ebpfReason","")))return null;
+            JSONObject result;
+            try{result=runJsonWithTimeout(20000L,EbpfMatcher.updateArgs(p.policy.directUidRanges,p.policy.uidRanges,p.policy.cidrs));}
+            catch(Exception failed){return null;}
+            if(!result.optBoolean("ok",false)||!result.optBoolean("updated",false))return null;
+            prefs.edit()
+                    .putString("proxyRootTopologyFingerprint",nextFingerprint)
+                    .putString("proxyRootAppliedSettings",p.settingsSignature)
+                    .putInt("proxyAutoDirectPackageCount",p.policy.directPackages.size())
+                    .remove(ProxyRuntimeSettings.DIRTY_KEY)
+                    .putString(EbpfMatcher.PREF_STATE,"active").putString(EbpfMatcher.PREF_REASON,"")
+                    .apply();
+            String bootWarning=refreshAutostart(p,autostartArgs(p));
+            result.put("ebpfHotUpdate",true);
+            if(!bootWarning.isEmpty())result.put("warning",bootWarning);
+            return result;
+        }finally{
+            CONTROL_LOCK.unlock();
+        }
     }
 
     String reloadCurrentConfig()throws Exception{
@@ -671,6 +721,7 @@ final class RootProxyManager {
             prefs.edit()
                     .putString("proxyRootTopologyFingerprint",nextFingerprint)
                     .putString("proxyRootAppliedSettings",p.settingsSignature)
+                    .putString(EbpfMatcher.APPLIED_BASE_KEY,ProxyRuntimeSettings.signature(profile,EbpfMatcher.withoutLists(prefs.getAll())))
                     .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                     .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                     .putBoolean("proxyAdblockLastEffective",effective)
@@ -931,6 +982,7 @@ final class RootProxyManager {
         // during the transaction remain pending; fallback health is reported
         // separately through the effective/error fields, not a restart loop.
         String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
+        String requestedBaseSignature=ProxyRuntimeSettings.signature(profile,EbpfMatcher.withoutLists(prefs.getAll()));
         trace.next("configuration");
         Prepared p;
         try{
@@ -1149,6 +1201,7 @@ final class RootProxyManager {
                 // their own effective/error fields; they must not create an endless "restart again"
                 // loop by leaving the generic settings signature permanently different.
                 .putString("proxyRootAppliedSettings",requestedSettingsSignature)
+                .putString(EbpfMatcher.APPLIED_BASE_KEY,requestedBaseSignature)
                 .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                 .remove(ProxyRuntimeSettings.DIRTY_KEY)
                 .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
@@ -2083,6 +2136,11 @@ final class RootProxyManager {
         // Root monitor daemon policy (network match + traffic history while the App is killed):
         // a file as well, so boot plans keep it; a failed write never fails the deployment.
         cmd.append("; { ").append(DaemonMonitorBridge.exportCommand(prefs)).append("; } || :");
+        // eBPF rule matcher (opt-in, default off): the policy file like policy/cnip; the loader and
+        // object are deployed only while it is on (hetu-root.sh ignores them when it is off).
+        boolean ebpf=prefs.getBoolean(EbpfMatcher.PREF_ENABLED,false);
+        cmd.append(EbpfMatcher.policyCommand(policyDir,ebpf));
+        if(ebpf)appendEbpfPayloads(cmd,stage,deploySuffix);
         if(deployCore){
             if(shellDecidesCore)cmd.append("; if [ -x ").append(RootBridge.quote(BIN)).append(" ] && [ \"$(cat ").append(RootBridge.quote(CORE_TOKEN))
                     .append(" 2>/dev/null)\" = ").append(RootBridge.quote(coreToken)).append(" ]; then :; else :");
@@ -2147,6 +2205,23 @@ final class RootProxyManager {
                     .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
         }
         return cmd.toString();
+    }
+
+    /**
+     * assets/hetu-bpf/<abi>/hetu-bpf → bin/hetu-bpf (0700) and assets/hetu-bpf/hetu_match.o →
+     * bin/hetu_match.o (0600). An ABI without a loader deploys nothing: the start then records
+     * ebpf=fallback (payload-missing) and keeps the iptables owner/CIDR rules.
+     */
+    private void appendEbpfPayloads(StringBuilder cmd,File stage,String deploySuffix)throws IOException{
+        String loaderAsset=EbpfMatcher.loaderAsset(Build.SUPPORTED_ABIS);
+        if(loaderAsset==null)return;
+        File loader=new File(stage,EbpfMatcher.LOADER_NAME),object=new File(stage,EbpfMatcher.OBJECT_NAME);
+        try{
+            copyAsset(loaderAsset,loader,true);
+            copyAsset(EbpfMatcher.OBJECT_ASSET,object,false);
+        }catch(FileNotFoundException missing){return;}
+        cmd.append(EbpfMatcher.payloadCommand(ROOT+"/bin",loader.getAbsolutePath(),RuntimeCompatibility14.sha256(loader),
+                object.getAbsolutePath(),RuntimeCompatibility14.sha256(object),deploySuffix));
     }
 
     /** hetu-root.sh reads which CLI bin/core speaks from this file (absent = Mihomo). */

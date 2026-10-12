@@ -326,6 +326,9 @@ internal class ProxyComposeController(context: Context) {
                     .putString("proxyRootVendorFirewall", status.optString("vendorFirewall", ""))
                     .putString("proxyRootVendorFirewallDetail", status.optString("vendorFirewallDetail", ""))
                     .putString("proxyRootTuning", status.optString("tuning", ""))
+                    // eBPF 规则匹配: off | active | fallback and the fallback reason (blank before phase-2 scripts).
+                    .putString(EbpfMatcher.PREF_STATE, status.optString("ebpf", ""))
+                    .putString(EbpfMatcher.PREF_REASON, status.optString("ebpfReason", ""))
                     .putBoolean("proxyRootStatusRunning", status.optBoolean("running", false))
                 val livePort = status.optInt("controllerPort", 0)
                 if (livePort in 29090..29149) edit.putInt("proxyControllerPort", livePort)
@@ -504,6 +507,13 @@ internal class ProxyComposeController(context: Context) {
     suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
         LegacyAppMigrator.migrateIfNeeded(app)
         val profile = ProxyRuntimeProfile.load(prefs)
+        // Only the app list / DIRECT apps / bypass CIDRs changed and the session matches with eBPF:
+        // rewrite its maps in place. Anything else (or updated:false) takes the normal restart.
+        root.ebpfHotUpdate(profile)?.let { hot ->
+            onProgress("已通过 eBPF 热更新名单…")
+            check(ProxyRuntimeSettings.acknowledgeApplied(prefs, true)) { "名单已热更新，但应用状态未能保存" }
+            return@withContext hot
+        }
         val selected = configs.selected(profile.core)
         onProgress("执行服务启动前脚本…")
         ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")

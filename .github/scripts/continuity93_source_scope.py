@@ -13,6 +13,7 @@ import re
 import subprocess
 
 import continuity92_source_scope as prior
+from verify_packaged_runtime import EBPF_PAYLOADS
 
 ROOT = prior.ROOT
 BASE_COMMIT = 'cffeff08ee38c7220922bdb36de81b621c935daf'
@@ -54,6 +55,25 @@ RELEASE_BUILD_DELTA = (
 '''),
 )
 RES = 'android-app/app/src/main/res/'
+# 2026-10-13 eBPF matcher authorization (user-approved extension of this gate): three new runtime
+# payloads under assets/hetu-bpf, added beside the unchanged original 23. Their bytes are pinned
+# (verify_packaged_runtime.EBPF_PAYLOADS) and must be the reproducible build of the pinned
+# native/ebpf sources below (protected flag ebpfPayloadsFromSource). nativePayloadsUnchanged keeps
+# its meaning: no original native payload changes.
+EBPF_FILES = frozenset('android-app/app/src/main/' + name for name in EBPF_PAYLOADS)
+EBPF_SOURCE_SHA256 = {
+    'native/ebpf/build.sh': '84c7baabc89b9b64a40075168af19f3f271ee0e09b3205542c3cf755811b4b31',
+    'native/ebpf/hetu_match.c': '6894382415e89690e1bd339668f22e03894c1902065f10d969034e59017aecc9',
+    'native/ebpf/loader/bpf.go': 'eb9b49f5279da3825983ceda86a1ffee12b94dfabb35d794b5e117790dc1c89f',
+    'native/ebpf/loader/elf.go': '8fc8439405d069481d8290d91e90e8729ffd4d6a352a025adde1e8123f7b39cc',
+    'native/ebpf/loader/elf_test.go': '679d1e5720d4edea6bc8b824e911ec1d518daa017aa14a80f3743d3c16b3d00b',
+    'native/ebpf/loader/go.mod': 'f83b045d0d732bf55b3bb67502faf67bbc3f90e393327dfefc7dcd4a4556522b',
+    'native/ebpf/loader/lists.go': 'bbc2ab8d07e1946f09f59ebc75849e9fa9f3f4be5c6713d68a32bae7a335c2bf',
+    'native/ebpf/loader/lists_test.go': '07067656ef3e889b28c1c560bdaabb45ebb2c95e28ae9c10ac7aabc988956eab',
+    'native/ebpf/loader/main.go': '887c8eda7989fc7e1201d232b1694969ae8f71bc7ee90e0fc21642ebfe1964d3',
+    'native/ebpf/loader/sys_amd64.go': 'e3bd41140ed61c27c5f68357e28c3fb3540b195b501e45729e18f6e444f54dc7',
+    'native/ebpf/loader/sys_arm64.go': 'bbee487efa05311c8be7f8103706c99a96576e441ecfc38331d3d823c2c51fb5',
+}
 AUTHORIZED_FILES = frozenset((
     BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT,
     PACKAGE + 'RootAutostart.java', PACKAGE + 'RootProxyManager.java',
@@ -115,6 +135,10 @@ AUTHORIZED_FILES = frozenset((
     # killed; the pure-Java policy/hand-off/batch rules (no Android API), the App bridge and the
     # multi-dimension history tables of the existing traffic history store.
     PACKAGE + 'DaemonMonitorPolicy.java', PACKAGE + 'app/DaemonMonitorBridge.kt', PACKAGE + 'ProxyApiHistoryStore.kt',
+    *EBPF_FILES,
+    # 2026-10-13 eBPF matcher App side (same authorization): the pure-Java helper (no Android API)
+    # for payload/policy deployment fragments, reason text and the hot-update decision.
+    PACKAGE + 'EbpfMatcher.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'
@@ -127,6 +151,7 @@ PROTECTED_FLAGS = (
     'runtimeRevisionTestChangedOnly153To154', 'old17BootTestBodiesPreserved',
     'old26RootHealthTestBodiesPreserved', 'oldRecoveryStressAssertionsAndBudgetsPreserved',
     'allOriginalRecoveryArtifactsPreserved',
+    'ebpfPayloadsFromSource',
 )
 HOST_FIXTURE = 'tools/qa/test_root_autostart.py'
 HOST_NEW_TEST = 'tools/qa/test_root_safety93.py'
@@ -310,6 +335,20 @@ def other_payloads(previous, root=ROOT):
     return {name: previous[name] for name in sorted(names - {ROOT_SCRIPT, AUTOSTART_SCRIPT})}
 
 
+def validate_ebpf_payloads(changes, root=ROOT):
+    ebpf = {name: changes[name] for name in sorted(EBPF_FILES & set(changes))}
+    if not ebpf:
+        return ebpf
+    assert set(ebpf) == EBPF_FILES, 'eBPF payloads must be sealed all together'
+    for name, value in ebpf.items():
+        assert value == EBPF_PAYLOADS[name.removeprefix('android-app/app/src/main/')], 'eBPF payload is not the pinned source build: ' + name
+    root = Path(root)
+    sources = {str(path.relative_to(root)) for path in (root / 'native/ebpf').rglob('*') if path.is_file()}
+    assert sources == set(EBPF_SOURCE_SHA256), 'eBPF source set differs from the pinned native/ebpf sources'
+    assert all(digest(root / name) == value for name, value in EBPF_SOURCE_SHA256.items()), 'eBPF source bytes changed'
+    return ebpf
+
+
 def committed_bytes(name, root=ROOT):
     return subprocess.check_output(['git', 'show', BASE_COMMIT + ':' + name], cwd=root)
 
@@ -388,6 +427,8 @@ def validate_layer(layer, previous, root=ROOT):
     assert layer['runtimePayloadCount'] == 23
     assert layer['other21RuntimePayloadFiles'] == other_payloads(previous, root)
     assert not set(layer['other21RuntimePayloadFiles']) & set(changes)
+    assert not EBPF_FILES & set(layer['other21RuntimePayloadFiles']) and not EBPF_FILES & set(previous)
+    validate_ebpf_payloads(changes, root)
     assert layer['rootScriptSha256'] == changes.get(ROOT_SCRIPT, previous[ROOT_SCRIPT]) and layer['autostartScriptSha256'] == changes.get(AUTOSTART_SCRIPT, previous[AUTOSTART_SCRIPT])
     assert layer['authorizedRootPayloadDeltas'] == {name: {'before': previous[name], 'after': changes.get(name, previous[name])}
                                                  for name in (ROOT_SCRIPT, AUTOSTART_SCRIPT)}

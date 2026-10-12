@@ -5,7 +5,7 @@ import json
 import os
 import subprocess
 
-from continuity93_source_scope import ROOT, LAYER_FOLDER, validate_checkout
+from continuity93_source_scope import ROOT, LAYER_FOLDER, validate_checkout, EBPF_FILES
 
 
 if __name__ == '__main__':
@@ -26,9 +26,15 @@ if __name__ == '__main__':
             print('--tests')
             print(cls)
     elif args.mode == 'runtime-snapshot':
+        # 2026-10-13 eBPF authorization: the three pinned eBPF payloads ride along only when the
+        # sealed layer records them; the original 23 entries are checked exactly as before.
+        ebpf = sorted(EBPF_FILES & set(layer['changedOrAddedFiles']))
+        assert ebpf in ([], sorted(EBPF_FILES)), 'eBPF payloads must be sealed all together'
         subprocess.run(['python3', str(ROOT / '.github/scripts/verify_packaged_runtime.py'), 'snapshot',
-                        '--script-sha256', layer['rootScriptSha256'], '--autostart-sha256', layer['autostartScriptSha256']], cwd=ROOT, check=True)
+                        '--script-sha256', layer['rootScriptSha256'], '--autostart-sha256', layer['autostartScriptSha256'],
+                        *(['--ebpf'] if ebpf else [])], cwd=ROOT, check=True)
         snapshot = json.loads((ROOT / 'out/verification/packaged-runtime.json').read_text())
-        assert snapshot['originalPayloadCount'] == 22 and len(snapshot['expected']) == 23
+        assert snapshot['originalPayloadCount'] == 22 and len(snapshot['expected']) == 23 + len(ebpf)
+        assert snapshot['ebpfPayloadsFromSource'] is bool(ebpf)
     else:
         print(json.dumps({'requiredEffectiveInputs': len(final), 'allAvailableInputsMatch': True, 'completeSourceRequiredByBuild': True}))

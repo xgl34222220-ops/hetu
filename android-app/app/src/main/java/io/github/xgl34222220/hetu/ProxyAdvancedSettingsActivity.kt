@@ -192,6 +192,19 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 }
             }
         }
+
+        item(key = "matcher") {
+            SettingsSection {
+                SettingsGroup(title = ht("规则匹配")) {
+                    // Opt-in kernel matcher for the app list and bypass networks; a policy file read at start.
+                    val ebpf = prefs.getBoolean(EbpfMatcher.PREF_ENABLED, false)
+                    OtherSwitch(
+                        "eBPF 规则匹配", ebpf, icon = ToolsIcons.Cpu,
+                        subtitle = ht(EbpfMatcher.describe(ebpf, live.running, live.ebpf, live.ebpfReason)),
+                    ) { prefs.edit().putBoolean(EbpfMatcher.PREF_ENABLED, it).apply(); revision++ }
+                }
+            }
+        }
     }
 
     if (choice == "dns") {
@@ -247,6 +260,8 @@ private class OtherLiveState(
     private val tuningReport: String,
     private val firewall: String,
     val firewallDetail: String,
+    val ebpf: String = "",
+    val ebpfReason: String = "",
 ) {
     /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
     fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
@@ -264,6 +279,8 @@ private class OtherLiveState(
             tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
             firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
             firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
+            ebpf = prefs.getString(EbpfMatcher.PREF_STATE, "").orEmpty(),
+            ebpfReason = prefs.getString(EbpfMatcher.PREF_REASON, "").orEmpty(),
         )
     }
 }
