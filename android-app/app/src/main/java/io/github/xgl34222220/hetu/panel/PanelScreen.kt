@@ -51,6 +51,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.dp
 import io.github.xgl34222220.hetu.home.HomeBarBackdrop
 import io.github.xgl34222220.hetu.home.HomeBarGlass
@@ -109,6 +110,11 @@ internal fun PanelScreen(
     val density = LocalDensity.current
     val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
     val bottomPad = contentPadding.calculateBottomPadding()
+    // Measured height of the 策略 floating stack (定位当前节点 + 收起节点). While it is shown the list
+    // reserves that room too, so the right column's delays and the last row can scroll clear of it.
+    var fabStack by remember { mutableStateOf(0.dp) }
+    val fabShown = view.tab == PanelTab.Groups && data.running && view.expandedGroups.isNotEmpty() && data.readError.isBlank() && !data.loading && data.core.supports(PanelTab.Groups)
+    val listBottom = if (fabShown && fabStack > 0.dp) maxOf(bottomPad, bottomPad.coerceAtLeast(16.dp) + fabStack + 12.dp) else bottomPad
     // The title block follows the font scale, so a large system font never spills into the tabs.
     val titleHeight = with(density) { HomeType.largeTitle.lineHeight.toDp() } + 8.dp
     val titlePx = with(density) { titleHeight.toPx() }
@@ -151,7 +157,7 @@ internal fun PanelScreen(
         LazyColumn(
             modifier = Modifier.fillMaxSize().homeGlassSource(glass),
             state = listState,
-            contentPadding = PaddingValues(top = statusTop + PanelDims.barHeight, bottom = bottomPad),
+            contentPadding = PaddingValues(top = statusTop + PanelDims.barHeight, bottom = listBottom),
         ) {
             // The header itself is drawn above the list; these two items only reserve its room.
             item(key = "panel-title") { Spacer(Modifier.height(titleHeight)) }
@@ -245,7 +251,8 @@ internal fun PanelScreen(
         SideEffect { if (openGroup != null) lastOpen = openGroup }
         val shownGroup = openGroup ?: lastOpen
         Column(
-            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp)),
+            Modifier.align(Alignment.BottomEnd).padding(end = HomeDims.gutter, bottom = bottomPad.coerceAtLeast(16.dp))
+                .onSizeChanged { size -> fabStack = with(density) { size.height.toDp() } },
             horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             HomePop(openGroup != null) {

@@ -166,8 +166,10 @@ internal fun LazyListScope.panelConnectionsTab(
     }
     item(key = "conn-header") {
         val c = LocalHomeColors.current
-        PanelSectionHeader("连接详情", Modifier.panelGutter().padding(bottom = 4.dp), count = PanelLogic.connectionCount(data, view, list.size).toString()) {
-            HomeIconButton(HomeIcons.X, "全部断开", onCloseAll, tint = c.t1)
+        // A plain heading (not accent, which reads as a link) and the unlink glyph used by 断开此连接:
+        // an × here looked like “close this section”, but it disconnects everything (confirmed by a dialog).
+        PanelSectionHeader("活动连接", Modifier.panelGutter().padding(bottom = 4.dp), count = PanelLogic.connectionCount(data, view, list.size).toString(), titleColor = c.t1) {
+            HomeIconButton(PanelIcons.Unlink, "全部断开", onCloseAll, tint = c.bad)
         }
     }
     if (view.groupByApp) {

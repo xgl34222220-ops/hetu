@@ -1216,7 +1216,12 @@ private val vocabularyWechat = """
 打开微信设置|Open WeChat settings|開啟微信設定|Открыть настройки WeChat
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat).joinToString("\n")
+// 2026-10-13 audit3 UI: config editor go-to-line from a validation error (G2).
+private val vocabularyAudit3Ui = """
+跳到第 %d 行|Go to line %d|跳至第 %d 行|К строке %d
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {
