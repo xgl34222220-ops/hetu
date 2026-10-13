@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "65423281508e1b2bad709a1fbbff5f8c085d429813f0f68d3b2f89cd0f374080",
+  "patchSha256": "f8ed80b83b43deee0b9fd1c76241b7f94b828f39ccd7b7d47700df4d9f169275",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -546,7 +546,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/DaemonTrafficHistory105Test.kt": "d0a4f47beded2d4230ef760a6e31262bbb469adf99cb5c91306783e1a40d91b9",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/EbpfMatcherApp105Test.kt": "b5e09693afca6e224708e3e3ce5c3b56118ed6e42bd4f4e45e5a800fbe6a443d",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/FirstSnapshotPerformance95Test.kt": "3c486b54085b8cca752183314d02d066eff04e93e4675c2466c733c462cc3d0e",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt": "f6a3a61f6823a15fa745f4a23fa9bd77c75afb4142a8f405232815006843452d",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt": "72d7db6ae7f5c56f103fec0672241ff0a51d1b7fa7c8542b8e248b737ad68152",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/GlassDockFeedback93Test.kt": "fe813de466b743b21adab864049561f93ff399a173eb618ad1ebbaabbf74fbd8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeFirstSnapshot93Test.kt": "86875618748de0fb6a91abd6edea125a1dd7bc1f19e855cf904602d4809ca765",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/HomeReadiness93Shadows.java": "e87ae72a46563ccba7e36ac3b0a5293abad93a8dd70ef92248ca2d1323629a6a",

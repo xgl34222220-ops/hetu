@@ -75221,14 +75221,15 @@ index 0000000..549e953
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt
 new file mode 100644
-index 0000000..1273b6f
+index 0000000..9267b1d
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/FuncPolish106Test.kt
-@@ -0,0 +1,140 @@
+@@ -0,0 +1,141 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
 +import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.ui.translateHetuText
 +import java.io.File
 +import kotlinx.coroutines.Dispatchers
 +import kotlinx.coroutines.launch

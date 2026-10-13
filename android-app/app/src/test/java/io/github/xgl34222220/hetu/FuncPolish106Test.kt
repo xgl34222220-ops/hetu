@@ -2,6 +2,7 @@ package io.github.xgl34222220.hetu
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
+import io.github.xgl34222220.hetu.ui.translateHetuText
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
