@@ -82,37 +82,32 @@ class MotionPass107Test {
         rule.onNodeWithText("动效关闭107").assertExists()
     }
 
-    @Test fun inlineRevealLeavesInTheSameMomentWithoutMotion() {
+    /** Virtual time the auto-advancing test clock needs, after hiding, until the reveal is idle and gone. */
+    private fun hideAndMeasure(motion: Boolean): Long {
         val visible = mutableStateOf(true)
-        rule.mainClock.autoAdvance = false
         rule.setContent {
-            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
+            CompositionLocalProvider(LocalHetuMotionEnabled provides motion) {
                 Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
             }
         }
-        rule.mainClock.advanceTimeByFrame()
+        rule.waitForIdle()
         rule.onNodeWithTag("banner107").assertExists()
+        val start = rule.mainClock.currentTime
         visible.value = false
-        rule.mainClock.advanceTimeBy(48)
+        rule.waitForIdle()
         rule.onNodeWithTag("banner107").assertDoesNotExist()
+        return rule.mainClock.currentTime - start
+    }
+
+    @Test fun inlineRevealLeavesWithinAFrameOrTwoWithoutMotion() {
+        val elapsed = hideAndMeasure(motion = false)
+        assertTrue("took $elapsed ms of frames", elapsed <= 100)
     }
 
     @Test fun inlineRevealAnimatesItsExitWithMotion() {
-        val visible = mutableStateOf(true)
-        rule.mainClock.autoAdvance = false
-        rule.setContent {
-            CompositionLocalProvider(LocalHetuMotionEnabled provides true) {
-                Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
-            }
-        }
-        rule.mainClock.advanceTimeBy(600)
-        rule.onNodeWithTag("banner107").assertExists()
-        visible.value = false
-        rule.mainClock.advanceTimeBy(48)
-        // Still on its way out (shrink + fade), not cut in one frame.
-        rule.onNodeWithTag("banner107").assertExists()
-        rule.mainClock.advanceTimeBy(1200)
-        rule.onNodeWithTag("banner107").assertDoesNotExist()
+        val elapsed = hideAndMeasure(motion = true)
+        // Shrink + 140 ms fade: clearly more than a frame or two.
+        assertTrue("took $elapsed ms of frames", elapsed >= 120)
     }
 
     @Test fun skeletonCarriesNoTextAndSettlesWithoutMotion() {

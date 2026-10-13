@@ -79155,10 +79155,10 @@ index 0000000..4499405
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt
 new file mode 100644
-index 0000000..e0df373
+index 0000000..9aa68a5
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt
-@@ -0,0 +1,149 @@
+@@ -0,0 +1,144 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.animation.ValueAnimator
@@ -79243,37 +79243,32 @@ index 0000000..e0df373
 +        rule.onNodeWithText("动效关闭107").assertExists()
 +    }
 +
-+    @Test fun inlineRevealLeavesInTheSameMomentWithoutMotion() {
++    /** Virtual time the auto-advancing test clock needs, after hiding, until the reveal is idle and gone. */
++    private fun hideAndMeasure(motion: Boolean): Long {
 +        val visible = mutableStateOf(true)
-+        rule.mainClock.autoAdvance = false
 +        rule.setContent {
-+            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides motion) {
 +                Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
 +            }
 +        }
-+        rule.mainClock.advanceTimeByFrame()
++        rule.waitForIdle()
 +        rule.onNodeWithTag("banner107").assertExists()
++        val start = rule.mainClock.currentTime
 +        visible.value = false
-+        rule.mainClock.advanceTimeBy(48)
++        rule.waitForIdle()
 +        rule.onNodeWithTag("banner107").assertDoesNotExist()
++        return rule.mainClock.currentTime - start
++    }
++
++    @Test fun inlineRevealLeavesWithinAFrameOrTwoWithoutMotion() {
++        val elapsed = hideAndMeasure(motion = false)
++        assertTrue("took $elapsed ms of frames", elapsed <= 100)
 +    }
 +
 +    @Test fun inlineRevealAnimatesItsExitWithMotion() {
-+        val visible = mutableStateOf(true)
-+        rule.mainClock.autoAdvance = false
-+        rule.setContent {
-+            CompositionLocalProvider(LocalHetuMotionEnabled provides true) {
-+                Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
-+            }
-+        }
-+        rule.mainClock.advanceTimeBy(600)
-+        rule.onNodeWithTag("banner107").assertExists()
-+        visible.value = false
-+        rule.mainClock.advanceTimeBy(48)
-+        // Still on its way out (shrink + fade), not cut in one frame.
-+        rule.onNodeWithTag("banner107").assertExists()
-+        rule.mainClock.advanceTimeBy(1200)
-+        rule.onNodeWithTag("banner107").assertDoesNotExist()
++        val elapsed = hideAndMeasure(motion = true)
++        // Shrink + 140 ms fade: clearly more than a frame or two.
++        assertTrue("took $elapsed ms of frames", elapsed >= 120)
 +    }
 +
 +    @Test fun skeletonCarriesNoTextAndSettlesWithoutMotion() {

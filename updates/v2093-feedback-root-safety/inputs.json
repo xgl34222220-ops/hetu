@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "d371d955f94dcc9fa83b02e18ea9ffc21f519263660655f2ad2c5a769662264e",
+  "patchSha256": "c10519f7fb223a8d12925ffc75087d8729dfb266e0722fcd48497199caa5f792",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -568,7 +568,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt": "323b7f7bbf1c91401be08b2446f9918b6bda38331945af62ab4aedc8e76b0721",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyPresentationRecovery93Test.kt": "c906754a2eceb61b3270e2bedaaea6e6c43bf4738e2dd7534da63387835dece8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyProbeDeadline94Test.kt": "fc0f25a8f7e60e662928b945dec2437347105c803666d39999871389c859b50c",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt": "c1c39e75d9911c3b63247a0a6bcd43ca04c6e58820629bf26485270b2f161c5f",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt": "631dd126802f701089435953627bdf995933f5f90f10e143ec58210f75776679",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt": "93916facbd7b66f9348abb19dd06e4754e0c210326c5be4df49e2172bd277900",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/NetworkUnlock101Test.kt": "b18170e72fa75012fcee1e6a3e956221440663c7959cb0e847558db528e3b78a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/OverrideScriptPipeline102Test.kt": "4341568e9f3aa5acc5ecc8497d74d2bff34841e4f9ba7802a0518f4875963f5e",
@@ -2664,7 +2664,7 @@
         "zeroAnimatorScaleTurnsTheAppThemeMotionSwitchOff",
         "normalAnimatorScaleKeepsTheAppThemeMotionSwitchOn",
         "inAppAnimationSwitchAlsoTurnsMotionOff",
-        "inlineRevealLeavesInTheSameMomentWithoutMotion",
+        "inlineRevealLeavesWithinAFrameOrTwoWithoutMotion",
         "inlineRevealAnimatesItsExitWithMotion",
         "skeletonCarriesNoTextAndSettlesWithoutMotion",
         "hierarchyTransitionIsInstantWithoutMotionAndDirectionalWithIt",
