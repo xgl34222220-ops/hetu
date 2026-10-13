@@ -484,6 +484,35 @@ jobs:
         if-no-files-found: error
         name: Hetu-APK
         path: out/*.apk
+    # 2026-10-13 arm64 release authorization: the user-facing release APK carries only arm64-v8a
+    # (lib/arm64-v8a + assets/mihomo-root/arm64-v8a + assets/hetu-bpf/arm64-v8a). It is derived from the
+    # verified universal release above by dropping the other-ABI entries (no entry rewritten, no payload
+    # byte changed) and re-signing with the same CI identity. Hetu-APK stays universal for the x86_64
+    # API 35/36 emulator smoke and the existing payload/release assertions.
+    - name: Package arm64-v8a-only release APK
+      run: 'set -euo pipefail
+
+        python3 .github/scripts/test_package_arm64_release.py -v
+
+        VERSION=$(grep -oP ''versionName = "\K[^"]+'' android-app/app/build.gradle.kts)
+
+        mkdir -p out/arm64
+
+        python3 .github/scripts/package_arm64_release.py "out/Hetu-$VERSION.apk" "out/arm64/Hetu-$VERSION-arm64-v8a.apk" --report out/arm64/release-arm64-apk.json
+
+        sha256sum out/arm64/*.apk
+
+        '
+    - uses: actions/upload-artifact@v4
+      with:
+        compression-level: 0
+        if-no-files-found: error
+        name: Hetu-APK-arm64
+        path: 'out/arm64/*.apk
+
+          out/arm64/release-arm64-apk.json
+
+          '
     - name: Upload R8 mapping of the shipped release (baseline profile retrace)
       uses: actions/upload-artifact@v4
       with:
