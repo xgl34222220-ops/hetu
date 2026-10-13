@@ -212,6 +212,20 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 }
             }
         }
+
+        item(key = "wechat") {
+            SettingsSection {
+                SettingsGroup(title = ht("消息")) {
+                    // Opt-in kernel bypass for WeChat's UID; 仅所选应用 keeps the user's own selection.
+                    val wechatDirect = prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT, false)
+                    OtherSwitch(
+                        "微信直连（绕过核心）", wechatDirect, enabled = wechatDirect || profile.appScope.id != "whitelist", icon = HomeIcons.Server,
+                        subtitle = if (profile.appScope.id == "whitelist") ht("仅所选应用模式下由应用名单决定微信是否代理")
+                            else ht("微信流量在内核直接放行，不经过核心与代理节点，避免长连接被节点或 NAT 静默断开导致消息延迟。默认关闭，重启代理后生效"),
+                    ) { putBool(WechatTransport.PREF_KERNEL_DIRECT, it) }
+                }
+            }
+        }
     }
 
     if (choice == "dns") {

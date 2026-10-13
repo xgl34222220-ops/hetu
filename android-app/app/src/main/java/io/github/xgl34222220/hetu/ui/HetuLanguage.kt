@@ -1183,7 +1183,17 @@ gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，
 不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup).joinToString("\n")
+// 2026-10-13 WeChat message latency: kernel-bypass switch and the battery hint on 诊断与维护.
+private val vocabularyWechat = """
+消息|Messaging|訊息|Сообщения
+微信直连（绕过核心）|WeChat direct (bypass the core)|微信直連（繞過核心）|WeChat напрямую (в обход ядра)
+仅所选应用模式下由应用名单决定微信是否代理|In selected-apps-only mode the app list decides whether WeChat is proxied|僅所選應用模式下由應用名單決定微信是否代理|В режиме «только выбранные приложения» проксирование WeChat определяет список приложений
+微信流量在内核直接放行，不经过核心与代理节点，避免长连接被节点或 NAT 静默断开导致消息延迟。默认关闭，重启代理后生效|WeChat traffic is passed in the kernel without the core or a proxy node, so its long connection is not silently dropped by a node or NAT and messages are not delayed. Off by default; takes effect after a proxy restart|微信流量在核心層直接放行，不經過核心與代理節點，避免長連線被節點或 NAT 靜默中斷導致訊息延遲。預設關閉，重新啟動代理後生效|Трафик WeChat пропускается в ядре ОС мимо ядра прокси и узла, поэтому долгое соединение не обрывается узлом или NAT и сообщения не задерживаются. По умолчанию выключено; действует после перезапуска прокси
+微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动|WeChat is not exempt from battery optimization: the system may freeze it while the screen is off and messages arrive only at the next wake-up. In WeChat's app settings set battery to Unrestricted and allow auto-start|微信未加入電池最佳化白名單：鎖定螢幕後系統可能凍結微信，訊息會在下次喚醒時才到達。請在微信的應用程式設定把電池改為「不受限制」並允許自動啟動|WeChat не исключён из оптимизации батареи: при выключенном экране система может заморозить его, и сообщения придут только при следующем пробуждении. В настройках WeChat выберите «Без ограничений» для батареи и разрешите автозапуск
+打开微信设置|Open WeChat settings|開啟微信設定|Открыть настройки WeChat
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyWechat).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

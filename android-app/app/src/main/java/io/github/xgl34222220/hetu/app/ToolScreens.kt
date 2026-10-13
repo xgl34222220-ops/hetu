@@ -840,6 +840,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmRecover by remember { mutableStateOf(false) }
+    // WeChat installed but battery-optimized: the most common cause of late WeChat pushes on its own.
+    val wechatBatteryHint = remember {
+        val installed = runCatching { context.packageManager.getApplicationInfo(WechatTransport.PACKAGE, 0) }.isSuccess
+        val power = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
+        WechatTransport.batteryHint(installed, power?.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE)) != null
+    }
 
     fun task(key: String, block: suspend () -> Unit) {
         if (busy != null) return
@@ -889,6 +895,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     }
                 }
             }
+        }
+        if (wechatBatteryHint) item(key = "wechat-battery") {
+            HxBanner(
+                ht("微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动"),
+                tone = HxTone.Warn,
+                modifier = Modifier.padding(horizontal = HomeDims.gutter, vertical = 6.dp),
+                actionLabel = ht("打开微信设置"),
+                onAction = {
+                    runCatching {
+                        context.startActivity(
+                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", WechatTransport.PACKAGE, null))
+                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                        )
+                    }
+                },
+            )
         }
         item(key = "inspect") {
             SettingsSection {

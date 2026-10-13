@@ -95,6 +95,17 @@ final class MihomoStartupConfig {
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
             boolean recommendedDns)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,recommendedDns,false);
+    }
+
+    /**
+     * [wechatTransport] (the Root start passes true): WeChat/Tencent names get real addresses in
+     * fake-ip mode and WeChat transport domains go DIRECT before the final MATCH unless the source
+     * already routes WeChat itself (see WechatTransport). Source rules keep their order and win.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -172,10 +183,18 @@ final class MihomoStartupConfig {
         // enable: false / an explicit value are respected (UI explains the consequence).
         if(profile.adblockChain&&hasTopLevelKey(yaml,"sniffer"))
             yaml=AdblockDnsPolicy.ensureParsePureIp(yaml);
+        String wechatNote="";
+        if(wechatTransport){
+            WechatTransport.Result fake=WechatTransport.ensureFakeIpFilter(yaml);
+            WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
+            yaml=trimOne(rules.yaml);
+            wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
+        }
 
         int tp=0,rp=0;
         StringBuilder override=new StringBuilder();
         override.append("\n# --- Hetu runtime isolation; source file is unchanged ---\n");
+        override.append(wechatNote);
         switch(profile.mode){
             case TPROXY:
                 tp=TPROXY_PORT;

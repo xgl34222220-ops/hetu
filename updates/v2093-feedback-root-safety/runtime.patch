@@ -51122,6 +51122,22 @@ index 0000000..a77eeba
 +        throw error
 +    } finally { if (inherited == null) budget.close() }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java
+index 34494b0..2a315f4 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java
+@@ -12,7 +12,10 @@ final class MessagingFilterPolicy {
+     private static final String[] TRANSPORT_HOSTS = {
+             "long.weixin.qq.com", "short.weixin.qq.com", "sh2tjlong.weixin.qq.com",
+             "szlong.weixin.qq.com", "szshort.weixin.qq.com", "szextshort.weixin.qq.com",
+-            "extshort.weixin.qq.com", "minorshort.weixin.qq.com", "dns.weixin.qq.com"
++            "extshort.weixin.qq.com", "minorshort.weixin.qq.com", "dns.weixin.qq.com",
++            // Hong Kong/Macau/overseas-region WeChat accounts are served by the hk* transports.
++            "hklong.weixin.qq.com", "hkshort.weixin.qq.com", "hkextshort.weixin.qq.com",
++            "hkminorshort.weixin.qq.com", "hkshort6.weixin.qq.com", "szminorshort.weixin.qq.com"
+     };
+
+     static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
 index f104cef..2380e94 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java
@@ -51296,10 +51312,10 @@ index f104cef..2380e94 100644
 
      private static String readLine(InputStream in)throws IOException{
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-index 71d5484..3804a2a 100644
+index 71d5484..6e44a8c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java
-@@ -69,6 +69,32 @@ final class MihomoStartupConfig {
+@@ -69,6 +69,43 @@ final class MihomoStartupConfig {
 
      static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
              ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface)throws IOException{
@@ -51329,10 +51345,21 @@ index 71d5484..3804a2a 100644
 +    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
 +            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
 +            boolean recommendedDns)throws IOException{
++        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,recommendedDns,false);
++    }
++
++    /**
++     * [wechatTransport] (the Root start passes true): WeChat/Tencent names get real addresses in
++     * fake-ip mode and WeChat transport domains go DIRECT before the final MATCH unless the source
++     * already routes WeChat itself (see WechatTransport). Source rules keep their order and win.
++     */
++    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
++            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
++            boolean recommendedDns,boolean wechatTransport)throws IOException{
          if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
          if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
          if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
-@@ -116,6 +142,12 @@ final class MihomoStartupConfig {
+@@ -116,6 +153,12 @@ final class MihomoStartupConfig {
          // filtering chain is enabled. The user's source YAML remains untouched.
          if(profile.adblockChain) yaml=removeTopLevelScalar(yaml,"log-level");
 
@@ -51345,7 +51372,7 @@ index 71d5484..3804a2a 100644
          // Both Root DNS modes terminate DNS in Mihomo's private built-in resolver.
          // This preserves fake-ip / respect-rules and prevents plaintext DNS from being sent
          // as an ordinary transparent UDP flow. The source's 1053 listener is never reused.
-@@ -136,6 +168,10 @@ final class MihomoStartupConfig {
+@@ -136,10 +179,22 @@ final class MihomoStartupConfig {
              yaml=ensureAdblock(yaml);
          if(profile.cnIpDirect)
              yaml=ensureCnIpDirect(yaml);
@@ -51353,10 +51380,22 @@ index 71d5484..3804a2a 100644
 +        // enable: false / an explicit value are respected (UI explains the consequence).
 +        if(profile.adblockChain&&hasTopLevelKey(yaml,"sniffer"))
 +            yaml=AdblockDnsPolicy.ensureParsePureIp(yaml);
++        String wechatNote="";
++        if(wechatTransport){
++            WechatTransport.Result fake=WechatTransport.ensureFakeIpFilter(yaml);
++            WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
++            yaml=trimOne(rules.yaml);
++            wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
++        }
 
          int tp=0,rp=0;
          StringBuilder override=new StringBuilder();
-@@ -372,12 +408,16 @@ final class MihomoStartupConfig {
+         override.append("\n# --- Hetu runtime isolation; source file is unchanged ---\n");
++        override.append(wechatNote);
+         switch(profile.mode){
+             case TPROXY:
+                 tp=TPROXY_PORT;
+@@ -372,12 +427,16 @@ final class MihomoStartupConfig {
      /** Merge the local effective Hetu ad-block snapshot into the private startup copy. */
      private static String ensureAdblock(String source)throws IOException{
          String yaml=normalize(source);
@@ -51375,7 +51414,7 @@ index 71d5484..3804a2a 100644
          String[] lines=normalize(source).split("\n",-1);
          int index=-1;Matcher found=null;Pattern top=Pattern.compile("^rule-providers\\s*:(.*)$");
          for(int i=0;i<lines.length;i++){if(indent(lines[i])!=0)continue;Matcher m=top.matcher(lines[i]);if(m.find()){index=i;found=m;break;}}
-@@ -391,7 +431,13 @@ final class MihomoStartupConfig {
+@@ -391,7 +450,13 @@ final class MihomoStartupConfig {
                  "    type: file\n"+
                  "    behavior: domain\n"+
                  "    format: text\n"+
@@ -51390,7 +51429,7 @@ index 71d5484..3804a2a 100644
          if(index<0){String base=trimOne(source);return base+(base.isEmpty()?"":"\n")+"rule-providers:\n"+providerBlock;}
          String rest=found.group(1).trim();
          if(rest.startsWith("#"))rest="";
-@@ -400,7 +446,8 @@ final class MihomoStartupConfig {
+@@ -400,7 +465,8 @@ final class MihomoStartupConfig {
          for(int i=index+1;i<lines.length;i++){String t=lines[i].trim();if(t.isEmpty()||t.startsWith("#"))continue;if(indent(lines[i])==0){end=i;break;}}
          for(int i=index+1;i<end;i++){
              String t=lines[i].trim();
@@ -51719,7 +51758,7 @@ index 17eab36..a7bd311 100644
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 65d651c..449c5ea 100644
+index 65d651c..01b5b79 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 @@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51757,7 +51796,7 @@ index 65d651c..449c5ea 100644
                  }
              }
          }
-@@ -184,6 +196,22 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -184,6 +196,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                  }
              }
          }
@@ -51777,10 +51816,24 @@ index 65d651c..449c5ea 100644
 +                }
 +            }
 +        }
++
++        item(key = "wechat") {
++            SettingsSection {
++                SettingsGroup(title = ht("消息")) {
++                    // Opt-in kernel bypass for WeChat's UID; 仅所选应用 keeps the user's own selection.
++                    val wechatDirect = prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT, false)
++                    OtherSwitch(
++                        "微信直连（绕过核心）", wechatDirect, enabled = wechatDirect || profile.appScope.id != "whitelist", icon = HomeIcons.Server,
++                        subtitle = if (profile.appScope.id == "whitelist") ht("仅所选应用模式下由应用名单决定微信是否代理")
++                            else ht("微信流量在内核直接放行，不经过核心与代理节点，避免长连接被节点或 NAT 静默断开导致消息延迟。默认关闭，重启代理后生效"),
++                    ) { putBool(WechatTransport.PREF_KERNEL_DIRECT, it) }
++                }
++            }
++        }
      }
 
      if (choice == "dns") {
-@@ -239,6 +267,8 @@ private class OtherLiveState(
+@@ -239,6 +281,8 @@ private class OtherLiveState(
      private val tuningReport: String,
      private val firewall: String,
      val firewallDetail: String,
@@ -51789,7 +51842,7 @@ index 65d651c..449c5ea 100644
  ) {
      /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
      fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
-@@ -256,6 +286,8 @@ private class OtherLiveState(
+@@ -256,6 +300,8 @@ private class OtherLiveState(
              tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
              firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
              firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
@@ -56987,7 +57040,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..e787b63 100644
+index 9cd82da..28c18ac 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -57167,7 +57220,7 @@ index 9cd82da..e787b63 100644
                  verifyAdblockRuntime(controller,true,snapshot.count);
              }catch(Exception providerError){
                  // Do not reload the entire proxy after a provider error: this can
-@@ -302,6 +384,21 @@ final class RootProxyManager {
+@@ -302,6 +384,24 @@ final class RootProxyManager {
          }
      }
 
@@ -57178,7 +57231,10 @@ index 9cd82da..e787b63 100644
 +    // RootProxyPolicy (outside this source layer) reports its whitelist refusal only as an
 +    // IOException message; it is typed here, once, so callers never match the wording.
 +    private RootProxyPolicy loadPolicy(ProxyRuntimeProfile profile)throws IOException{
-+        try{return RootProxyPolicy.load(context,prefs,profile);}
++        // 微信直连（绕过核心）: opt-in, the WeChat UID joins the Root direct UIDs (never in 仅所选应用).
++        Set<String> wechatDirect=WechatTransport.kernelDirectPackages(
++                prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT,false),profile.appScope.id);
++        try{return RootProxyPolicy.load(context,prefs,profile,wechatDirect);}
 +        catch(IOException error){
 +            String message=error.getMessage();
 +            if(profile.appScope==ProxyRuntimeProfile.AppScope.WHITELIST&&message!=null&&message.startsWith("当前是“仅所选应用代理”"))
@@ -57189,7 +57245,7 @@ index 9cd82da..e787b63 100644
      Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
          return prepare(profile,0);
      }
-@@ -309,33 +406,196 @@ final class RootProxyManager {
+@@ -309,33 +409,196 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -57229,7 +57285,7 @@ index 9cd82da..e787b63 100644
 +        ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
 +        source=cleaned.text;
 +        MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
-+                prefs.getBoolean("proxyRecommendedDns",false));
++                prefs.getBoolean("proxyRecommendedDns",false),true);
          RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
          // Private comments carry an already validated routing projection into start/boot.
          // Keep the established startup argument protocol and the user's source untouched.
@@ -57238,7 +57294,8 @@ index 9cd82da..e787b63 100644
 +        recordStartupDiagnostics(cleaned.notices,safeDiagnostics(()->StartupDiagnostics.mihomo(cleaned.text,generated.yaml,profile,
 +                generated.tproxyPort,generated.redirectPort,profile.dnsHijack!=ProxyRuntimeProfile.DnsHijack.OFF&&prefs.getBoolean("proxyMihomoDnsForward",true),
 +                MihomoStartupConfig.DNS_PORT,controllerPort,controllerPort==fixedControllerPort,fakeIps.ipv4,fakeIps.ipv6)));
-+        writeStartupCopy(startup);
+         writeStartupCopy(startup);
+-        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
 +        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
@@ -57305,8 +57362,7 @@ index 9cd82da..e787b63 100644
 +                +built.config+(built.config.endsWith("\n")?"":"\n")
 +                +"# HETU_FAKE_IP_POLICY=1\n# HETU_FAKE_IP_V4="+fakeIps.ipv4+"\n# HETU_FAKE_IP_V6="+fakeIps.ipv6
 +                +"\n# HETU_LAN_RETURN_V4="+fakeIps.ipv4BypassCidrs+"\n# HETU_LAN_RETURN_V6="+fakeIps.ipv6BypassCidrs+"\n";
-         writeStartupCopy(startup);
--        return new Prepared(profile,selected,policy,adblock,fakeIps,startup,generated.tproxyPort,generated.redirectPort,controllerPort,settingsSignature);
++        writeStartupCopy(startup);
 +        return withOverride(new Prepared(profile,selected,policy,adblock,fakeIps,startup,options.tproxyPort,options.redirectPort,controllerPort,settingsSignature),override);
 +    }
 +
@@ -57394,7 +57450,7 @@ index 9cd82da..e787b63 100644
      }
 
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
-@@ -346,13 +606,15 @@ final class RootProxyManager {
+@@ -346,13 +609,15 @@ final class RootProxyManager {
                  +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                  +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                  +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
@@ -57411,7 +57467,7 @@ index 9cd82da..e787b63 100644
      }
 
      private void installHotReloadFiles(Prepared p)throws Exception{
-@@ -378,17 +640,75 @@ final class RootProxyManager {
+@@ -378,17 +643,75 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -57488,7 +57544,7 @@ index 9cd82da..e787b63 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +724,7 @@ final class RootProxyManager {
+@@ -404,7 +727,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -57497,7 +57553,7 @@ index 9cd82da..e787b63 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,10 +732,11 @@ final class RootProxyManager {
+@@ -412,10 +735,11 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -57510,7 +57566,7 @@ index 9cd82da..e787b63 100644
                      .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                      .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                      .putBoolean("proxyAdblockLastEffective",effective)
-@@ -469,29 +790,84 @@ final class RootProxyManager {
+@@ -469,29 +793,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -57603,7 +57659,7 @@ index 9cd82da..e787b63 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -501,28 +877,81 @@ final class RootProxyManager {
+@@ -501,28 +880,81 @@ final class RootProxyManager {
              return stop();
          }finally{CONTROL_LOCK.unlock();}
      }
@@ -57693,7 +57749,7 @@ index 9cd82da..e787b63 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +964,11 @@ final class RootProxyManager {
+@@ -535,7 +967,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -57706,7 +57762,7 @@ index 9cd82da..e787b63 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +977,8 @@ final class RootProxyManager {
+@@ -544,7 +980,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -57716,7 +57772,7 @@ index 9cd82da..e787b63 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +986,7 @@ final class RootProxyManager {
+@@ -552,7 +989,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -57725,7 +57781,7 @@ index 9cd82da..e787b63 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -563,6 +997,7 @@ final class RootProxyManager {
+@@ -563,6 +1000,7 @@ final class RootProxyManager {
          // during the transaction remain pending; fallback health is reported
          // separately through the effective/error fields, not a restart loop.
          String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
@@ -57733,7 +57789,7 @@ index 9cd82da..e787b63 100644
          trace.next("configuration");
          Prepared p;
          try{
-@@ -575,20 +1010,32 @@ final class RootProxyManager {
+@@ -575,20 +1013,32 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -57773,7 +57829,7 @@ index 9cd82da..e787b63 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +1045,7 @@ final class RootProxyManager {
+@@ -598,7 +1048,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -57782,7 +57838,7 @@ index 9cd82da..e787b63 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +1070,6 @@ final class RootProxyManager {
+@@ -623,7 +1073,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -57790,7 +57846,7 @@ index 9cd82da..e787b63 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -649,8 +1095,8 @@ final class RootProxyManager {
+@@ -649,8 +1098,8 @@ final class RootProxyManager {
          String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
          String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
          String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
@@ -57801,7 +57857,7 @@ index 9cd82da..e787b63 100644
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
          String[] bootArgs=new String[]{
-@@ -659,15 +1105,26 @@ final class RootProxyManager {
+@@ -659,15 +1108,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -57830,7 +57886,7 @@ index 9cd82da..e787b63 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,7 +1154,21 @@ final class RootProxyManager {
+@@ -697,7 +1157,21 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -57853,7 +57909,7 @@ index 9cd82da..e787b63 100644
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
                  .put("dnsHijack",profile.dnsHijack.id)
-@@ -723,10 +1194,17 @@ final class RootProxyManager {
+@@ -723,10 +1197,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -57871,7 +57927,7 @@ index 9cd82da..e787b63 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -738,6 +1216,7 @@ final class RootProxyManager {
+@@ -738,6 +1219,7 @@ final class RootProxyManager {
                  // their own effective/error fields; they must not create an endless "restart again"
                  // loop by leaving the generic settings signature permanently different.
                  .putString("proxyRootAppliedSettings",requestedSettingsSignature)
@@ -57879,7 +57935,7 @@ index 9cd82da..e787b63 100644
                  .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                  .remove(ProxyRuntimeSettings.DIRTY_KEY)
                  .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
-@@ -749,11 +1228,18 @@ final class RootProxyManager {
+@@ -749,11 +1231,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -57898,15 +57954,15 @@ index 9cd82da..e787b63 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1247,49 @@ final class RootProxyManager {
+@@ -761,10 +1250,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
 -            }finally{CONTROL_LOCK.unlock();}
 +            }finally{if(ownIntent)START_INTENT.remove();CONTROL_LOCK.unlock();}
-         }
-     }
-
++        }
++    }
++
 +    private void recoverFailedHandoff(boolean nativeSucceeded,boolean nativeAttempted,boolean coordinatorEntered)throws Exception{
 +        if(nativeSucceeded){
 +            rollbackUnpublishedStart();
@@ -57920,9 +57976,9 @@ index 9cd82da..e787b63 100644
 +                prefs.edit().putString("proxyAutoRecoveryError","启动结果未确认，已保留代理与过滤接管现场；请检查后停止")
 +                        .putString("proxyNetworkIntegrity","unknown").apply();
 +            }
-+        }
-+    }
-+
+         }
+     }
+
 +    private void rollbackUnpublishedStart()throws Exception{
 +        // Still owns CONTROL_LOCK: a newer start cannot be destroyed by this cleanup.
 +        Long previousStop=STOP_DEADLINE.get();
@@ -57949,7 +58005,7 @@ index 9cd82da..e787b63 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1302,16 @@ final class RootProxyManager {
+@@ -777,8 +1305,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -57968,7 +58024,7 @@ index 9cd82da..e787b63 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1322,12 @@ final class RootProxyManager {
+@@ -789,10 +1325,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -57983,7 +58039,7 @@ index 9cd82da..e787b63 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1337,40 @@ final class RootProxyManager {
+@@ -802,20 +1340,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -58029,7 +58085,7 @@ index 9cd82da..e787b63 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1380,26 @@ final class RootProxyManager {
+@@ -825,19 +1383,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -58060,7 +58116,7 @@ index 9cd82da..e787b63 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1407,40 @@ final class RootProxyManager {
+@@ -845,31 +1410,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -58117,7 +58173,7 @@ index 9cd82da..e787b63 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1450,7 @@ final class RootProxyManager {
+@@ -879,7 +1453,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -58126,7 +58182,7 @@ index 9cd82da..e787b63 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1510,7 @@ final class RootProxyManager {
+@@ -939,7 +1513,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -58135,7 +58191,14 @@ index 9cd82da..e787b63 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1021,7 +1592,7 @@ final class RootProxyManager {
+@@ -1015,13 +1589,14 @@ final class RootProxyManager {
+     String diagnostics(){
+         RootBridge.requireWorkerThread();
+         DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
++        int wechatProxied=0,wechatDirect=0;
+         report.section("上次应用闪退（本地记录）",AppCrashReport.read(context),16384);
+         report.section("网络事件记录（本地，可独立于 Root 读取）",new ProxyNetworkJournal(context).report(prefs),65536);
+         StringBuilder events=new StringBuilder("time=").append(new Date())
                  .append("\napp=").append(BuildConfig.VERSION_NAME)
                  .append("\nexpectedCore=").append(expectedCoreToken(ProxyRuntimeProfile.load(prefs).core));
          try{
@@ -58144,7 +58207,7 @@ index 9cd82da..e787b63 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1630,7 @@ final class RootProxyManager {
+@@ -1059,7 +1634,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -58153,7 +58216,7 @@ index 9cd82da..e787b63 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1642,22 @@ final class RootProxyManager {
+@@ -1071,22 +1646,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -58181,7 +58244,7 @@ index 9cd82da..e787b63 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1670,7 @@ final class RootProxyManager {
+@@ -1099,7 +1674,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -58190,7 +58253,19 @@ index 9cd82da..e787b63 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1147,7 +1718,7 @@ final class RootProxyManager {
+@@ -1127,6 +1702,11 @@ final class RootProxyManager {
+                 // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
+                 if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
+                 StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
++                if(wechat){
++                    JSONArray chains=connection.optJSONArray("chains");
++                    if(chains!=null&&chains.length()>0&&!"DIRECT".equalsIgnoreCase(chains.optString(0)))wechatProxied++;
++                    else wechatDirect++;
++                }
+                 int number=wechat?++count:googleConnection?++googleCount:++otherCount;
+                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
+                         .append(" uid=").append(metadata.optInt("uid",-1))
+@@ -1147,7 +1727,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -58199,7 +58274,7 @@ index 9cd82da..e787b63 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1728,7 @@ final class RootProxyManager {
+@@ -1157,7 +1737,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -58208,7 +58283,23 @@ index 9cd82da..e787b63 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1194,6 +1765,31 @@ final class RootProxyManager {
+@@ -1167,6 +1747,15 @@ final class RootProxyManager {
+                     +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
+             device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
+             report.section("系统网络与消息排查线索",device,2500);
++            boolean wechatInstalled=true;
++            try{context.getPackageManager().getApplicationInfo(WechatTransport.PACKAGE,0);}catch(Exception missing){wechatInstalled=false;}
++            Boolean exempt=power==null?null:power.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE);
++            String keepAlive=boundedRootShell(context,"grep -E '^disable-keep-alive:' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true",3000L).output;
++            java.util.List<String> hints=WechatTransport.hints(wechatInstalled,exempt,wechatProxied,wechatDirect,
++                    prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT,false),
++                    prefs.getBoolean("proxyCnIpKernelV4",false)||prefs.getBoolean("proxyCnIpKernelV6",false),
++                    profile.appScope.id,keepAlive!=null&&keepAlive.contains("true"));
++            report.section("微信消息延迟排查提示",hints.isEmpty()?"未发现明显问题":String.join("\n",hints),2500);
+             MihomoControllerClient controller=new MihomoControllerClient(context);
+             String mode14=controller.configs().optString("mode","unknown");
+             JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
+@@ -1194,6 +1783,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -58240,7 +58331,7 @@ index 9cd82da..e787b63 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +1803,14 @@ final class RootProxyManager {
+@@ -1207,10 +1821,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -58257,7 +58348,7 @@ index 9cd82da..e787b63 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1824,10 @@ final class RootProxyManager {
+@@ -1224,6 +1842,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -58268,7 +58359,7 @@ index 9cd82da..e787b63 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1845,7 @@ final class RootProxyManager {
+@@ -1241,7 +1863,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -58277,7 +58368,7 @@ index 9cd82da..e787b63 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1855,46 @@ final class RootProxyManager {
+@@ -1251,11 +1873,46 @@ final class RootProxyManager {
          }
      }
 
@@ -58325,7 +58416,7 @@ index 9cd82da..e787b63 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1908,121 @@ final class RootProxyManager {
+@@ -1269,14 +1926,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -58450,7 +58541,7 @@ index 9cd82da..e787b63 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2035,7 @@ final class RootProxyManager {
+@@ -1289,7 +2053,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -58459,7 +58550,7 @@ index 9cd82da..e787b63 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2059,7 @@ final class RootProxyManager {
+@@ -1313,7 +2077,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -58468,7 +58559,7 @@ index 9cd82da..e787b63 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2079,28 @@ final class RootProxyManager {
+@@ -1333,13 +2097,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -58498,7 +58589,7 @@ index 9cd82da..e787b63 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2127,47 @@ final class RootProxyManager {
+@@ -1366,13 +2145,47 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -58546,7 +58637,7 @@ index 9cd82da..e787b63 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2179,12 @@ final class RootProxyManager {
+@@ -1384,7 +2197,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -58560,7 +58651,7 @@ index 9cd82da..e787b63 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2193,13 @@ final class RootProxyManager {
+@@ -1393,6 +2211,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -58574,7 +58665,7 @@ index 9cd82da..e787b63 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2219,61 @@ final class RootProxyManager {
+@@ -1412,14 +2237,61 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -66819,7 +66910,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..65274bc 100644
+index b41cf98..f65b6cf 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -238,12 +238,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -66929,6 +67020,42 @@ index b41cf98..65274bc 100644
  }
 
  /* ------------------------------------------------------------------ */
+@@ -820,6 +840,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
+     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
+     var confirmRecover by remember { mutableStateOf(false) }
++    // WeChat installed but battery-optimized: the most common cause of late WeChat pushes on its own.
++    val wechatBatteryHint = remember {
++        val installed = runCatching { context.packageManager.getApplicationInfo(WechatTransport.PACKAGE, 0) }.isSuccess
++        val power = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
++        WechatTransport.batteryHint(installed, power?.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE)) != null
++    }
+
+     fun task(key: String, block: suspend () -> Unit) {
+         if (busy != null) return
+@@ -870,6 +896,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                 }
+             }
+         }
++        if (wechatBatteryHint) item(key = "wechat-battery") {
++            HxBanner(
++                ht("微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动"),
++                tone = HxTone.Warn,
++                modifier = Modifier.padding(horizontal = HomeDims.gutter, vertical = 6.dp),
++                actionLabel = ht("打开微信设置"),
++                onAction = {
++                    runCatching {
++                        context.startActivity(
++                            Intent(android.provider.Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", WechatTransport.PACKAGE, null))
++                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
++                        )
++                    }
++                },
++            )
++        }
+         item(key = "inspect") {
+             SettingsSection {
+                 SettingsGroup(title = ht("查看")) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
 new file mode 100644
 index 0000000..9e29412
@@ -67191,6 +67318,265 @@ index 0000000..9e29412
 +        runCatching { store.recordRun(outcome) }
 +        return Applied(outcome.text, outcome.notice, outcome.fallback)
 +    }
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt
+new file mode 100644
+index 0000000..c824968
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt
+@@ -0,0 +1,253 @@
++package io.github.xgl34222220.hetu
++
++import java.util.Locale
++
++/**
++ * WeChat message-latency policy for the private Mihomo runtime copy (pure Kotlin, no Android API).
++ *
++ * WeChat (com.tencent.mm, Tencent mars) keeps one long TCP link (port 80/443/8080) to
++ * long/hklong.weixin.qq.com or sglong.wechat.com and is pushed over it; a link that dies silently
++ * is only noticed at the next app heartbeat, which is when "late" messages arrive. Two defaults keep
++ * that link off the proxy path without overriding anything the user wrote:
++ *
++ *  - [ensureFakeIpFilter]: in fake-ip mode WeChat/Tencent names get real addresses. A fake address
++ *    (198.18.0.0/16) can never match the kernel CN ipset bypass, always pulls a bypassed UID back
++ *    into the core (owner RETURNs exclude the fake range), and is cached by mars' own DNS cache, so
++ *    it black-holes the link after a core restart or once the proxy is stopped.
++ *  - [insertDirectRules]: WeChat transport domains go DIRECT right before the final MATCH, unless
++ *    the source already routes WeChat/QQ itself (any rule naming weixin/wechat/qq.com/com.tencent.mm).
++ *    Earlier source rules always win; `CN-IP ... no-resolve` rules cannot match a fake-ip domain
++ *    flow and the HK/SG servers are not CN addresses, so without this they fall to MATCH (proxy).
++ *
++ * The kernel-level bypass of the whole app is opt-in ([PREF_KERNEL_DIRECT], default off).
++ */
++object WechatTransport {
++    const val PACKAGE = "com.tencent.mm"
++    /** Opt-in: WeChat's UID bypasses the core in the kernel (Root direct UID), off by default. */
++    const val PREF_KERNEL_DIRECT = "proxyWechatKernelDirect"
++
++    /** fake-ip-filter (blacklist mode) entries: real addresses for WeChat and Tencent QQ names. */
++    @JvmField val FAKE_IP_FILTER: List<String> = listOf("+.weixin.qq.com", "+.qq.com", "+.wechat.com")
++    /** fake-ip-filter-mode: rule entries, placed first so a trailing MATCH,fake-ip cannot shadow them. */
++    @JvmField val FAKE_IP_RULES: List<String> = listOf("DOMAIN-SUFFIX,qq.com,real-ip", "DOMAIN-SUFFIX,wechat.com,real-ip")
++    /** Routing rules inserted before the final MATCH when the source has no WeChat policy. */
++    @JvmField val DIRECT_RULES: List<String> = listOf("DOMAIN-SUFFIX,weixin.qq.com,DIRECT", "DOMAIN-SUFFIX,wechat.com,DIRECT")
++
++    private val RULE_MARKERS = listOf("weixin", "wechat", "com.tencent.mm", "tencent")
++
++    class Result(@JvmField val yaml: String, @JvmField val state: String)
++
++    /** Packages the opt-in kernel bypass adds; never in 仅所选应用 (whitelist) where the user's selection rules. */
++    @JvmStatic
++    fun kernelDirectPackages(enabled: Boolean, appScope: String): Set<String> =
++        if (enabled && appScope != "whitelist") setOf(PACKAGE) else emptySet()
++
++    /* ------------------------------ fake-ip-filter ------------------------------ */
++
++    /**
++     * States: no-dns, inline-dns, not-fake-ip, whitelist-kept, inline-skipped, user-entry (the list already
++     * names qq.com / weixin / wechat), filter (blacklist entries added), rule (rule-mode entries added).
++     */
++    @JvmStatic
++    fun ensureFakeIpFilter(source: String?): Result {
++        val yaml = normalize(source)
++        val lines = yaml.split("\n").toMutableList()
++        val start = lines.indexOfFirst { indent(it) == 0 && key(it.trim()) == "dns" }
++        if (start < 0) return Result(yaml, "no-dns")
++        if (value(lines[start]).isNotEmpty()) return Result(yaml, "inline-dns")
++        val end = blockEnd(lines, start)
++        val child = childIndent(lines, start, end)
++        val enhanced = findChild(lines, start, end, child, "enhanced-mode")
++        if (enhanced < 0 || !unquote(value(lines[enhanced])).equals("fake-ip", ignoreCase = true)) return Result(yaml, "not-fake-ip")
++        val modeLine = findChild(lines, start, end, child, "fake-ip-filter-mode")
++        val mode = if (modeLine < 0) "blacklist" else unquote(value(lines[modeLine])).lowercase(Locale.ROOT)
++        if (mode == "whitelist") return Result(yaml, "whitelist-kept")
++        val rule = mode == "rule"
++        val items = if (rule) FAKE_IP_RULES else FAKE_IP_FILTER
++        val filter = findChild(lines, start, end, child, "fake-ip-filter")
++        if (filter >= 0) {
++            val rest = value(lines[filter])
++            when {
++                rest.isEmpty() -> {
++                    var g = -1
++                    for (i in filter + 1 until end) {
++                        val t = lines[i].trim()
++                        if (t.isEmpty() || t.startsWith("#")) continue
++                        val ind = indent(lines[i])
++                        if (ind > child || (ind == child && t.startsWith("-"))) {
++                            if (filterNamesWechat(t)) return Result(yaml, "user-entry")
++                            if (g < 0 && t.startsWith("-")) g = ind
++                        } else break
++                    }
++                    if (g < 0) g = child + 2
++                    val entries = items.map { spaces(g) + "- '" + it + "'" }
++                    // Rule mode is first-match: our real-ip entries go first. Blacklist order is irrelevant.
++                    lines.addAll(filter + 1, entries)
++                }
++                rest == "[]" -> {
++                    lines[filter] = spaces(child) + "fake-ip-filter:"
++                    lines.addAll(filter + 1, items.map { spaces(child + 2) + "- '" + it + "'" })
++                }
++                else -> return Result(yaml, "inline-skipped")
++            }
++        } else {
++            var at = lastContentLine(lines, start, end) + 1
++            lines.add(at++, spaces(child) + "fake-ip-filter:")
++            for (item in items) lines.add(at++, spaces(child + 2) + "- '" + item + "'")
++            if (!rule) for (d in AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER) lines.add(at++, spaces(child + 2) + "- '" + d + "'")
++        }
++        return Result(lines.joinToString("\n"), if (rule) "rule" else "filter")
++    }
++
++    /* ------------------------------ routing rules ------------------------------ */
++
++    /** States: no-rules, inline-skipped, user-policy, inserted. */
++    @JvmStatic
++    fun insertDirectRules(source: String?): Result {
++        val yaml = normalize(source)
++        val lines = yaml.split("\n")
++        val index = lines.indexOfFirst { indent(it) == 0 && key(it.trim()) == "rules" }
++        if (index < 0) return Result(yaml, "no-rules")
++        val rest = value(lines[index])
++        if (rest.isNotEmpty() && rest != "[]") return Result(yaml, "inline-skipped")
++        var end = lines.size
++        for (i in index + 1 until lines.size) {
++            val t = lines[i].trim()
++            if (t.isEmpty() || t.startsWith("#")) continue
++            if (indent(lines[i]) == 0 && !t.startsWith("-")) { end = i; break }
++        }
++        var listIndent = "  "
++        var insertion = end
++        for (i in index + 1 until end) {
++            val t = lines[i].trim()
++            if (!t.startsWith("-")) continue
++            listIndent = spaces(indent(lines[i]))
++            val scalar = unquote(stripComment(t.substring(1).trim()))
++            if (ruleNamesWechat(scalar)) return Result(yaml, "user-policy")
++            val type = scalar.substringBefore(',').trim().uppercase(Locale.ROOT)
++            if (type == "MATCH" || type == "FINAL") { insertion = i; break }
++        }
++        val out = StringBuilder()
++        for (i in lines.indices) {
++            if (i == insertion) for (r in DIRECT_RULES) out.append(listIndent).append("- ").append(r).append('\n')
++            out.append(if (i == index && rest == "[]") "rules:" else lines[i])
++            if (i < lines.size - 1) out.append('\n')
++        }
++        if (insertion >= lines.size) {
++            if (!out.endsWith("\n")) out.append('\n')
++            for (r in DIRECT_RULES) out.append(listIndent).append("- ").append(r).append('\n')
++        }
++        return Result(out.toString(), "inserted")
++    }
++
++    /* ------------------------------ diagnostics ------------------------------ */
++
++    /** Battery hint for the 诊断与维护 page; null when WeChat is absent, exempt, or unknown. */
++    @JvmStatic
++    fun batteryHint(installed: Boolean, batteryExempt: Boolean?): String? =
++        if (installed && batteryExempt == false)
++            "微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动"
++        else null
++
++    /**
++     * Ranked, plain hints for the 消息与网络诊断 report. [proxiedConnections] counts WeChat flows whose
++     * chain is not DIRECT; [fakeIpState] is [ensureFakeIpFilter]'s state for the running copy.
++     */
++    @JvmStatic
++    fun hints(installed: Boolean, batteryExempt: Boolean?, proxiedConnections: Int, directConnections: Int,
++              kernelDirect: Boolean, cnipKernel: Boolean, appScope: String, disableKeepAlive: Boolean): List<String> {
++        val out = ArrayList<String>()
++        if (!installed) { out.add("未检测到微信（com.tencent.mm）"); return out }
++        batteryHint(installed, batteryExempt)?.let { out.add(it) }
++        if (proxiedConnections > 0)
++            out.add("有 $proxiedConnections 条微信连接经代理节点转发：节点或运营商 NAT 空闲超时会静默断开长连接，消息要等微信下次心跳重连后才到。建议在配置里让微信直连，或开启「微信直连（绕过核心）」")
++        if (!kernelDirect && appScope == "core" && !cnipKernel)
++            out.add("微信流量仍全部经过核心；开启「微信直连（绕过核心）」或「中国 IP 内核直连」可让微信长连接不经核心")
++        if (disableKeepAlive)
++            out.add("运行配置禁用了 TCP 保活（disable-keep-alive: true），经核心转发的空闲长连接断开后不能及时发现")
++        if (proxiedConnections == 0 && directConnections > 0)
++            out.add("当前识别到的微信连接都是直连")
++        return out
++    }
++
++    /* ------------------------------ helpers ------------------------------ */
++
++    /** A source rule that already decides WeChat/QQ traffic (domain, process or a named list). */
++    private fun ruleNamesWechat(rule: String): Boolean {
++        val lower = rule.lowercase(Locale.ROOT).replace(" ", "")
++        return RULE_MARKERS.any { lower.contains(it) } || lower.contains(",qq.com,") || lower.endsWith(",qq.com")
++    }
++
++    /** A source fake-ip-filter entry that already decides WeChat/QQ names. */
++    private fun filterNamesWechat(entry: String): Boolean {
++        val lower = entry.lowercase(Locale.ROOT)
++        return lower.contains("qq.com") || lower.contains("weixin") || lower.contains("wechat")
++    }
++
++    private fun normalize(s: String?): String = (s ?: "").replace("\r\n", "\n").replace('\r', '\n')
++
++    private fun blockEnd(lines: List<String>, start: Int): Int {
++        for (i in start + 1 until lines.size) {
++            val t = lines[i].trim()
++            if (t.isEmpty() || t.startsWith("#")) continue
++            if (indent(lines[i]) == 0) return i
++        }
++        return lines.size
++    }
++
++    private fun childIndent(lines: List<String>, start: Int, end: Int): Int {
++        var child = Int.MAX_VALUE
++        for (i in start + 1 until end) {
++            val t = lines[i].trim()
++            if (t.isEmpty() || t.startsWith("#")) continue
++            child = minOf(child, indent(lines[i]))
++        }
++        return if (child == Int.MAX_VALUE || child == 0) 2 else child
++    }
++
++    private fun findChild(lines: List<String>, start: Int, end: Int, child: Int, name: String): Int {
++        for (i in start + 1 until end) if (indent(lines[i]) == child && key(lines[i].trim()) == name) return i
++        return -1
++    }
++
++    private fun lastContentLine(lines: List<String>, start: Int, end: Int): Int {
++        var last = start
++        for (i in start + 1 until end) if (lines[i].trim().isNotEmpty()) last = i
++        return last
++    }
++
++    private fun key(trimmed: String): String {
++        if (trimmed.startsWith("-") || trimmed.startsWith("#")) return ""
++        val colon = trimmed.indexOf(':')
++        if (colon <= 0) return ""
++        return unquote(trimmed.substring(0, colon).trim())
++    }
++
++    private fun value(line: String): String {
++        val t = line.trim()
++        val colon = t.indexOf(':')
++        if (colon < 0) return ""
++        return stripComment(t.substring(colon + 1).trim())
++    }
++
++    private fun stripComment(rest: String): String {
++        var single = false
++        var dbl = false
++        for (i in rest.indices) {
++            val c = rest[i]
++            if (c == '\'' && !dbl) single = !single
++            else if (c == '"' && !single) dbl = !dbl
++            else if (c == '#' && !single && !dbl && (i == 0 || rest[i - 1].isWhitespace())) return rest.substring(0, i).trim()
++        }
++        return rest.trim()
++    }
++
++    private fun unquote(v: String): String {
++        val t = v.trim()
++        if (t.length >= 2 && ((t.first() == '"' && t.last() == '"') || (t.first() == '\'' && t.last() == '\''))) return t.substring(1, t.length - 1).trim()
++        return t
++    }
++
++    private fun indent(s: String): Int { var n = 0; while (n < s.length && (s[n] == ' ' || s[n] == '\t')) n++; return n }
++    private fun spaces(n: Int): String = " ".repeat(n)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 index 0ceaa23..56fb053 100644
@@ -71226,7 +71612,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..7ce11a8 100644
+index 578ce9d..00e1a09 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -71273,7 +71659,7 @@ index 578ce9d..7ce11a8 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,217 @@ private val vocabularyConnection = """
+@@ -969,16 +990,227 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -71471,7 +71857,17 @@ index 578ce9d..7ce11a8 100644
 +不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup).joinToString("\n")
++// 2026-10-13 WeChat message latency: kernel-bypass switch and the battery hint on 诊断与维护.
++private val vocabularyWechat = """
++消息|Messaging|訊息|Сообщения
++微信直连（绕过核心）|WeChat direct (bypass the core)|微信直連（繞過核心）|WeChat напрямую (в обход ядра)
++仅所选应用模式下由应用名单决定微信是否代理|In selected-apps-only mode the app list decides whether WeChat is proxied|僅所選應用模式下由應用名單決定微信是否代理|В режиме «только выбранные приложения» проксирование WeChat определяет список приложений
++微信流量在内核直接放行，不经过核心与代理节点，避免长连接被节点或 NAT 静默断开导致消息延迟。默认关闭，重启代理后生效|WeChat traffic is passed in the kernel without the core or a proxy node, so its long connection is not silently dropped by a node or NAT and messages are not delayed. Off by default; takes effect after a proxy restart|微信流量在核心層直接放行，不經過核心與代理節點，避免長連線被節點或 NAT 靜默中斷導致訊息延遲。預設關閉，重新啟動代理後生效|Трафик WeChat пропускается в ядре ОС мимо ядра прокси и узла, поэтому долгое соединение не обрывается узлом или NAT и сообщения не задерживаются. По умолчанию выключено; действует после перезапуска прокси
++微信未加入电池优化白名单：锁屏后系统可能冻结微信，消息会在下次唤醒时才到达。请在微信的应用设置里把电池改为「无限制」并允许自启动|WeChat is not exempt from battery optimization: the system may freeze it while the screen is off and messages arrive only at the next wake-up. In WeChat's app settings set battery to Unrestricted and allow auto-start|微信未加入電池最佳化白名單：鎖定螢幕後系統可能凍結微信，訊息會在下次喚醒時才到達。請在微信的應用程式設定把電池改為「不受限制」並允許自動啟動|WeChat не исключён из оптимизации батареи: при выключенном экране система может заморозить его, и сообщения придут только при следующем пробуждении. В настройках WeChat выберите «Без ограничений» для батареи и разрешите автозапуск
++打开微信设置|Open WeChat settings|開啟微信設定|Открыть настройки WeChat
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyWechat).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -83405,6 +83801,139 @@ index 0000000..eaa1fdc
 +        assertEquals(HomeGlyphMode.Attention, degraded.homeHeroGlyphMode())
 +        // Running keeps its stricter reading.
 +        assertEquals(HomeGlyphMode.Unconfirmed, HomeUiState(status = HomeStatus.Running(600)).homeHeroGlyphMode())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt
+new file mode 100644
+index 0000000..865e754
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt
+@@ -0,0 +1,127 @@
++package io.github.xgl34222220.hetu
++
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import org.yaml.snakeyaml.Yaml
++
++/** WeChat message latency (2026-10-13): fake-ip-filter, DIRECT rules, kernel bypass opt-in, hints. */
++class WechatLatency107Test {
++    private val base = "mode: rule\nproxies: []\nproxy-groups:\n  - name: P\n    type: select\n    proxies: [DIRECT]\n"
++
++    @Suppress("UNCHECKED_CAST")
++    private fun dns(yaml: String): Map<String, Any?> = (Yaml().load<Map<String, Any?>>(yaml)["dns"] as Map<String, Any?>)
++
++    @Suppress("UNCHECKED_CAST")
++    private fun rules(yaml: String): List<String> = Yaml().load<Map<String, Any?>>(yaml)["rules"] as List<String>
++
++    private fun profile(cn: Boolean = false, adblock: Boolean = false) = ProxyRuntimeProfile(
++        ProxyRuntimeProfile.Core.MIHOMO, ProxyRuntimeProfile.Mode.TPROXY, ProxyRuntimeProfile.Ipv6.DISABLE,
++        ProxyRuntimeProfile.AppScope.CORE, ProxyRuntimeProfile.DnsHijack.TPROXY,
++        true, true, true, false, cn, adblock)
++
++    private fun gen(source: String, wechat: Boolean, cn: Boolean = false): String =
++        MihomoStartupConfig.generate(source, profile(cn), "secret", MihomoStartupConfig.CONTROLLER_PORT,
++            ProxyRuntimeProfile.AppScope.CORE, emptySet(), emptySet(), "", false, wechat).yaml
++
++    @Test
++    fun fakeIpBlacklistGetsWechatRealIpEntriesAndKeepsUserEntries() {
++        val out = WechatTransport.ensureFakeIpFilter("dns:\n  enable: true\n  enhanced-mode: fake-ip\n  fake-ip-filter:\n    - '*.lan'\n")
++        assertEquals("filter", out.state)
++        assertEquals(listOf("+.weixin.qq.com", "+.qq.com", "+.wechat.com", "*.lan"), dns(out.yaml)["fake-ip-filter"])
++    }
++
++    @Test
++    fun fakeIpFilterCreatedWithMihomoDefaultsAndRuleModeGoesFirst() {
++        val created = WechatTransport.ensureFakeIpFilter("dns:\n  enable: true\n  enhanced-mode: fake-ip\n")
++        assertEquals(WechatTransport.FAKE_IP_FILTER + AdblockDnsPolicy.MIHOMO_DEFAULT_FAKE_IP_FILTER, dns(created.yaml)["fake-ip-filter"])
++        val rule = WechatTransport.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: rule\n  fake-ip-filter:\n  - GEOSITE,cn,real-ip\n  - MATCH,fake-ip\n")
++        assertEquals("rule", rule.state)
++        assertEquals(WechatTransport.FAKE_IP_RULES + listOf("GEOSITE,cn,real-ip", "MATCH,fake-ip"), dns(rule.yaml)["fake-ip-filter"])
++        val empty = WechatTransport.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter: []\n")
++        assertEquals(WechatTransport.FAKE_IP_FILTER, dns(empty.yaml)["fake-ip-filter"])
++    }
++
++    @Test
++    fun fakeIpFilterRespectsWhitelistRedirHostInlineAndUserEntries() {
++        val white = "dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter-mode: whitelist\n  fake-ip-filter:\n    - '+.google.com'\n"
++        assertEquals("whitelist-kept", WechatTransport.ensureFakeIpFilter(white).state)
++        assertEquals(white, WechatTransport.ensureFakeIpFilter(white).yaml)
++        assertEquals("not-fake-ip", WechatTransport.ensureFakeIpFilter("dns:\n  enhanced-mode: redir-host\n").state)
++        assertEquals("no-dns", WechatTransport.ensureFakeIpFilter("mode: rule\n").state)
++        assertEquals("inline-skipped", WechatTransport.ensureFakeIpFilter("dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter: ['+.lan']\n").state)
++        val user = "dns:\n  enhanced-mode: fake-ip\n  fake-ip-filter:\n    - '+.qq.com'\n"
++        assertEquals("user-entry", WechatTransport.ensureFakeIpFilter(user).state)
++        assertEquals(user, WechatTransport.ensureFakeIpFilter(user).yaml)
++    }
++
++    @Test
++    fun directRulesGoRightBeforeFinalMatchAndNeverOverrideWechatPolicy() {
++        val out = WechatTransport.insertDirectRules(base + "rules:\n  - GEOIP,CN,DIRECT\n  - MATCH,P\n")
++        assertEquals("inserted", out.state)
++        assertEquals(listOf("GEOIP,CN,DIRECT") + WechatTransport.DIRECT_RULES + "MATCH,P", rules(out.yaml))
++        for (own in listOf("DOMAIN-SUFFIX,weixin.qq.com,P", "PROCESS-NAME,com.tencent.mm,P", "RULE-SET,WeChat,P", "DOMAIN-SUFFIX,qq.com,DIRECT")) {
++            val src = base + "rules:\n  - $own\n  - MATCH,P\n"
++            val kept = WechatTransport.insertDirectRules(src)
++            assertEquals(own, "user-policy", kept.state)
++            assertEquals(src, kept.yaml)
++        }
++        assertEquals("inline-skipped", WechatTransport.insertDirectRules("rules: ['MATCH,DIRECT']\n").state)
++        assertEquals("no-rules", WechatTransport.insertDirectRules(base).state)
++        val unindented = WechatTransport.insertDirectRules("rules:\n- MATCH,P\ndns:\n  enable: true\n")
++        assertEquals(WechatTransport.DIRECT_RULES + "MATCH,P", rules(unindented.yaml))
++        val noMatch = WechatTransport.insertDirectRules("rules:\n  - GEOIP,CN,DIRECT\n")
++        assertEquals(listOf("GEOIP,CN,DIRECT") + WechatTransport.DIRECT_RULES, rules(noMatch.yaml))
++    }
++
++    @Test
++    fun startupCopyAppliesWechatTransportOnlyWhenAsked() {
++        val source = base + "dns:\n  enable: true\n  enhanced-mode: fake-ip\n  nameserver:\n    - 223.5.5.5\nrules:\n  - MATCH,P\n"
++        val off = gen(source, false)
++        assertFalse(off.contains("hetu-wechat-transport"))
++        assertFalse(off.contains("weixin.qq.com"))
++        val on = gen(source, true, cn = true)
++        assertTrue(on, on.contains("# hetu-wechat-transport: fake-ip=filter rules=inserted"))
++        assertTrue((dns(on)["fake-ip-filter"] as List<*>).containsAll(WechatTransport.FAKE_IP_FILTER))
++        val r = rules(on)
++        // Source order is kept: CNIP rules and WeChat rules both sit before the final MATCH.
++        assertEquals("MATCH,P", r.last())
++        assertTrue(r.indexOf("DOMAIN-SUFFIX,weixin.qq.com,DIRECT") in 0 until r.size - 1)
++        assertTrue(r.contains("RULE-SET,hetu-cn-v4,DIRECT,no-resolve"))
++    }
++
++    @Test
++    fun kernelBypassIsOptInAndNeverOverridesSelectedAppsOnly() {
++        assertEquals(emptySet<String>(), WechatTransport.kernelDirectPackages(false, "core"))
++        assertEquals(setOf("com.tencent.mm"), WechatTransport.kernelDirectPackages(true, "core"))
++        assertEquals(setOf("com.tencent.mm"), WechatTransport.kernelDirectPackages(true, "blacklist"))
++        assertEquals(emptySet<String>(), WechatTransport.kernelDirectPackages(true, "whitelist"))
++    }
++
++    @Test
++    fun messageTransportExceptionsCoverHongKongHostsOnlyUnderWeixin() {
++        val exceptions = MessagingFilterPolicy.subscriptionExceptions(emptySet())
++        for (host in listOf("long.weixin.qq.com", "hklong.weixin.qq.com", "hkshort.weixin.qq.com", "hkextshort.weixin.qq.com"))
++            assertTrue(host, exceptions.contains(host))
++        assertTrue(exceptions.all { it.endsWith(".weixin.qq.com") })
++        assertTrue(MessagingFilterPolicy.subscriptionExceptions(setOf("weixin.qq.com")).isEmpty())
++        assertFalse(MessagingFilterPolicy.subscriptionExceptions(setOf("hklong.weixin.qq.com")).contains("hklong.weixin.qq.com"))
++    }
++
++    @Test
++    fun diagnosticHintsNameBatteryProxiedFlowsAndKeepAlive() {
++        assertNull(WechatTransport.batteryHint(true, true))
++        assertNull(WechatTransport.batteryHint(false, false))
++        assertNull(WechatTransport.batteryHint(true, null))
++        val hints = WechatTransport.hints(true, false, 3, 1, false, false, "core", true)
++        assertTrue(hints[0].contains("电池优化"))
++        assertTrue(hints.any { it.contains("3 条微信连接经代理节点") })
++        assertTrue(hints.any { it.contains("微信直连（绕过核心）") })
++        assertTrue(hints.any { it.contains("disable-keep-alive") })
++        val clean = WechatTransport.hints(true, true, 0, 2, true, false, "core", false)
++        assertEquals(listOf("当前识别到的微信连接都是直连"), clean)
++        assertEquals(listOf("未检测到微信（com.tencent.mm）"), WechatTransport.hints(false, null, 0, 0, false, false, "core", false))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen106Test.kt

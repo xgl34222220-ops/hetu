@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "d9b02bcec936e4c37875ecc588ba3b3699fbdcbd9e85569b9a51ecf8b1d99e43",
+  "patchSha256": "964fe95c90757c1d96c364aff5c338f204f070645de47316bd9149bd38628aa2",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -232,6 +232,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java",
@@ -298,6 +299,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt",
@@ -394,6 +396,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish106Test.kt",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen106Test.kt",
     "android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml",
     "android-app/app/src/test/resources/multicore/golden/hysteria-native-out.yaml",
@@ -427,11 +430,12 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/EbpfMatcher.java": "684b8a98da0d7d708c8b1493e86a66449ed73c093d8a684e218b716dca04b822",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeBudget.java": "290cfd6c3e6516d60587685846d7a6f4287e2fd2ce519b46361bd6a9619c7d8c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LatencyProbeOperation.kt": "1c5044a075945a5c9f8c8335b57e1a57dfd1fb3fa0953ff9d1580173b82c9a23",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java": "0bf4b1c3eba055d8c598493546331d988ae622aec04bddf1c242b8943de0577f",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoControllerClient.java": "37233948ca74af90ee3e43db4e6a137388024f1a8f5bd48ce8a0b770f1001cf5",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "def2c39426ad1185ec0ab84baa3cc988e73d478b59af6dca2f667c11a7f57312",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoStartupConfig.java": "cfa41cf218cc4026c6e0d3aa50b8fe4409e683489d080a6bdc3238f1265921ec",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/NetworkMatchRules.java": "7862107a5c1f879917dca20fb108d8779139bf2eaec8ff0727ef715c4fd54ed2",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdblockRules.java": "c73a22aeb47a82323af1672ac46e1faec2e135ea56284eea7ceb728fb046e7ad",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "9f38397b0b9555b3e81d5a16cac2da58e0094166a2c238880ad18712da38e09c",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt": "026e29578d39d250f0d258d62f53cbfdb34150e2987f78334bb058a9183e489e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt": "b6284ff9bd73366147c1b0aaf0732961bc493862745158a89c851d8cc7264615",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt": "490cbf43e2e369cfed3f4cf2f153a1c8e4f389f4ea70868012b4322f87e83fdd",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyConfigLibrary.java": "5292d86f63a23b590d9cd1f4d509ee51b4deee14b702a1bfe934b8720ab4c383",
@@ -448,7 +452,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt": "cc60c0ae900720524e9dfe9fb4b03a923d442ded2bc8f37666b10976263f215c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxySharedNetworkInspector.kt": "6aa568dc059fcac303684e23aac44dd6816fdc57aac2cecc8225d683b32e6b65",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootAutostart.java": "00462e6f4359d644992bec54ba6a215f47d1e91b55635d956515c5994c81340f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "13d73d91a831d9d3661069b194c8a9de4e57e23a63e26f63ed6c6314e1ff728b",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java": "86c7bd6ad5c26b3ba42e17009e95b5ef2621b463d33d1aa3d1edcea68f68323e",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/SharedNetworkRules.java": "f7c0f8e9734614f98dad0f6e9fd1e76172b99052cec076febe9650e771de0217",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartPrelude.java": "47ce0f0006a5e9696437d14182290d850c2396e70fbc51ebf75d5c00ef6008e1",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt": "375aeaae46bab55321029c843bdd9d5435e12aea6aac8ac38c099ecb4e164d83",
@@ -491,8 +495,9 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt": "577b9b11c54c8e765d7547431e3678c44d42f44f0e94c8adf5efb99160e4a755",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt": "1c126edf928debb8f896ad33f8049e94cff0ff6b0eb14fcdea6e9b9b74a77879",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt": "924ee8ae5c62ca0653310632cd17feec92513c9b16423fd718bb20e6f66413e4",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": "8ae81ce34050dc220dcc459c7e7da0d26aad7f3ea7140c0cf1d3cf137239cc0d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": "a6c4dea003ccb194b6b3097fa282d295393e1b8b1179b73b294e7d8382427099",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt": "9f92c521c9636512d07769f551eb5065b167319f221ecaf54407f97cee245d85",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt": "803d6126a5cd5bd639875edcf40f93e02af86b85ff553167e32d81a9b3235b19",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt": "aaf5a10a384de32a23af929ce21fbc4a4bba7e92a8f1ba5144c424b203bda7ac",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt": "18179bd6f5d41e1c6c905fdb53fd58fa4fb43795b0a4e4f2bf51949fbbdda337",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeCoreUnsupported.kt": "4581473f8bb18c112aec84c98bca75d9f832f944916344a86e3b8d7594d6cb0a",
@@ -525,7 +530,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "977aa383c73f6c66d30cc2ddf3df51421fc78f80fc197163d6653257f54c2386",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt": "44dab937842d3d3506430adfd7c167701f8854ddc3739db2f3450b999d61fe55",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt": "27156949f43fcd8565692166ceab7e610183c70781c39b75f7776750bac902d3",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "28513fed215861a4a6364e9351c460c9362af1b4284e973fc6688fcf10f54737",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "bd9efda92e1606f17687183dab7c3566fbf89b35df68b28a032f0c30f9270290",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt": "3365c80d47b122f6af5c1b3c5257b204f293d64a100fd10ea41407f050c6b095",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt": "d22a4a190bd2a7e8e1150aa2f9b290fd8c80d58ebb2704f13896c87414844229",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt": "8574033a0e4ce3b3bd1842b8e88111dba7155390f23a6d40c3c4632415689311",
@@ -589,6 +594,7 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/StartupConfigViewerFeedbackTest.kt": "058058942a456c9119017c4e57fdba7ae8e90023a9f1d06407d5b36eca03f040",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/StrategyLoadSpeed96Test.kt": "4632a2702c2bf9be46aedd40c2fcb587eb189276d48ff7f8befd36cc39d531a1",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish106Test.kt": "ad8d94adda458394dc0848f94b3894cb496401ad3de6b3039b2b77ebd951ad3c",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt": "2e8abef0fbe7d4c00e24b5b373e2bbee49862603dfa53eb8b1502aef12e69211",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen106Test.kt": "159ea98ec5a1e8f8183fc80401ab6c6f51b384906ee66b84d95619a0399e0534",
     "android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml": "9b4e06ce36cae5007ff27c0ac64753ab184cb712042224cd9b3119badcf0f713",
     "android-app/app/src/test/resources/multicore/golden/hysteria-native-out.yaml": "feb3041010a02272507782d520a90a315491bad52eda2a6c94cd0bd6aa143ea2",
@@ -673,7 +679,6 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LegacyAppMigrator.java": "d55cb6b054e8c31abb856b78e045704d1327a6cb17feabadf268090d12ae8cf4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LiquidWorkspace.kt": "b5a723374c0c25a9118d0ad3c54ac00e8e33feed480da6f65e55c6256fba35a4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/LuoShuSurfaceDrawable.java": "446505e84c3b6b560890337a3ddc357cae93f92c0e31331e2738b5bbbba8f200",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/MessagingFilterPolicy.java": "e99cc1b1a171531356993a0e99c06b6023857114cf41b81c65885fcb45c322fc",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoNative.java": "6871d040f753e0836ab4984c4bc5bd3df6b3c3629c40d83c86221dd6598b6963",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MihomoVpnService.java": "b966f7b83c82616714acf59ca624d3b87b99974fa1266ce3abec4139857ff3a4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/MonitoringWorkspace.kt": "4967ffdc6fc2a58f88ccbf009ed27537f1adf3b1fdf5abb5da781c0d24b84c10",
@@ -998,7 +1003,7 @@
   },
   "evidenceSourcesSha256": {
     ".github/scripts/continuity93_ci_config.py": "683509722dda5b159f26c2eb8859d40e7326f8cd5268bcee0546f15933d74044",
-    ".github/scripts/continuity93_source_scope.py": "d25ee685b577ffe82a673701df5eb60886f439fb04a958ec636daf42b39655e6",
+    ".github/scripts/continuity93_source_scope.py": "b37561d7c793644e9805312bd1971c62593ec840950822035df1863d6f7f883a",
     ".github/scripts/generate_continuity93_source_layer.py": "f23855d35a40a3a8a453e7bd3109e2424471a3a188ccefb54fbff6a7912aba55",
     ".github/scripts/prepare_new_ui_source.py": "65199ec9a40faa48a51756501f51fa030a362dcaabd3de499af841fb8b6ee7e1",
     ".github/scripts/profile_release_continuity93.py": "96b94e3fd145432812a08ef08699ab7a3a851dc564ff34800d3d083e4eca0e17",
@@ -1035,7 +1040,8 @@
     "tools/qa/test_parity_small93.py": "b3faf714686b60d40123bdb3051c708a70c08eee328f6f83fd5cd72ed2ddd615",
     "tools/qa/test_root_autostart.py": "ceb85df4182eff2385db3c55447f21ffd12b3c95f4319c92577d00a84b9da44d",
     "tools/qa/test_root_health.py": "85be8d096212d55952ec7d495eff6c9bbab416094422868fc0032f19fce5a06d",
-    "tools/qa/test_root_safety93.py": "ecd1c91d2e25b1c4038e006506c62ce3cad22d1f83740f2df6c437380f59f447"
+    "tools/qa/test_root_safety93.py": "ecd1c91d2e25b1c4038e006506c62ce3cad22d1f83740f2df6c437380f59f447",
+    "tools/qa/test_wechat_latency93.py": "8e7d519a9fb2c4a6f7aa75d8e876428dbdd0c2689974c71e5bc5b8b66858966d"
   },
   "recoveredArtifactHashes": {
     "docs/qa/v2093-recovery-20261008/README.md": "b90f6e3f44bb13f8f6c82777294afb24e452aeeb671be843507ea61ac7f90813",
@@ -3488,6 +3494,19 @@
         "failedOrAddresslessResponseIsRejected"
       ]
     },
+    "io.github.xgl34222220.hetu.WechatLatency107Test": {
+      "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/WechatLatency107Test.kt",
+      "methods": [
+        "fakeIpBlacklistGetsWechatRealIpEntriesAndKeepsUserEntries",
+        "fakeIpFilterCreatedWithMihomoDefaultsAndRuleModeGoesFirst",
+        "fakeIpFilterRespectsWhitelistRedirHostInlineAndUserEntries",
+        "directRulesGoRightBeforeFinalMatchAndNeverOverrideWechatPolicy",
+        "startupCopyAppliesWechatTransportOnlyWhenAsked",
+        "kernelBypassIsOptInAndNeverOverridesSelectedAppsOnly",
+        "messageTransportExceptionsCoverHongKongHostsOnlyUnderWeixin",
+        "diagnosticHintsNameBatteryProxiedFlowsAndKeepAlive"
+      ]
+    },
     "io.github.xgl34222220.hetu.tools.ToolsAdblockScreen106Test": {
       "source": "android-app/app/src/test/java/io/github/xgl34222220/hetu/tools/ToolsAdblockScreen106Test.kt",
       "methods": [
@@ -3571,8 +3590,8 @@
       ]
     }
   },
-  "expectedUnitTests": 927,
-  "expectedTestXmlFiles": 105,
+  "expectedUnitTests": 935,
+  "expectedTestXmlFiles": 106,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
   "signingUnchanged": true,
