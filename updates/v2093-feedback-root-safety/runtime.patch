@@ -51758,18 +51758,37 @@ index 17eab36..a7bd311 100644
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 65d651c..01b5b79 100644
+index 65d651c..76c888d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -17,14 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
  import androidx.compose.foundation.text.KeyboardOptions
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
 +import androidx.compose.runtime.LaunchedEffect
  import androidx.compose.runtime.getValue
  import androidx.compose.runtime.mutableIntStateOf
  import androidx.compose.runtime.mutableStateOf
-@@ -69,7 +70,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.focus.onFocusChanged
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.heading
+@@ -42,6 +46,7 @@ import io.github.xgl34222220.hetu.home.HomeRowDims
+ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
++import io.github.xgl34222220.hetu.home.badText
+ import io.github.xgl34222220.hetu.home.fill
+ import io.github.xgl34222220.hetu.home.homeRowPressTint
+ import io.github.xgl34222220.hetu.panel.PanelIcons
+@@ -69,7 +74,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
      var choice by remember { mutableStateOf<String?>(null) }
      val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
      // What the running core last reported. Cached by the status probe; blank on a runtime that predates these fields.
@@ -51781,9 +51800,33 @@ index 65d651c..01b5b79 100644
 
      fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
-@@ -163,6 +167,14 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -140,6 +148,13 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Ascii,
+                         onEnabled = { putBool("proxyCpuAffinityEnabled", it) },
+                         onValue = { putString("proxyCpuAffinity", it) },
++                        validate = HxResourceLimits::cpuError,
++                        advice = { value ->
++                            HxResourceLimits.cpuBeyondDevice(value)?.let {
++                                val cores = Runtime.getRuntime().availableProcessors()
++                                ht(HxResourceLimits.CPU_BEYOND_DEVICE).fill(cores, cores - 1)
++                            }
++                        },
+                     )
+                     ResourceSetting(
+                         title = "内存限制",
+@@ -151,6 +166,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Ascii,
+                         onEnabled = { putBool("proxyMemoryLimitEnabled", it) },
+                         onValue = { putString("proxyMemoryLimit", it) },
++                        validate = HxResourceLimits::memoryError,
+                     )
+                     ResourceSetting(
+                         title = "磁盘 I/O 权重",
+@@ -162,7 +178,16 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Number,
                          onEnabled = { putBool("proxyIoWeightEnabled", it) },
                          onValue = { putString("proxyIoWeight", it) },
++                        validate = HxResourceLimits::ioError,
                      )
 +                    // Opt-in: the two values above also become kernel limits (memcg memory.max, io weight).
 +                    val cgroup = prefs.getBoolean(CoreResourceLimits.PREF_ENABLED, false)
@@ -51796,7 +51839,7 @@ index 65d651c..01b5b79 100644
                  }
              }
          }
-@@ -184,6 +196,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -184,6 +209,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                  }
              }
          }
@@ -51833,7 +51876,7 @@ index 65d651c..01b5b79 100644
      }
 
      if (choice == "dns") {
-@@ -239,6 +281,8 @@ private class OtherLiveState(
+@@ -239,6 +294,8 @@ private class OtherLiveState(
      private val tuningReport: String,
      private val firewall: String,
      val firewallDetail: String,
@@ -51842,7 +51885,7 @@ index 65d651c..01b5b79 100644
  ) {
      /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
      fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
-@@ -256,6 +300,8 @@ private class OtherLiveState(
+@@ -256,11 +313,18 @@ private class OtherLiveState(
              tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
              firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
              firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
@@ -51851,6 +51894,62 @@ index 65d651c..01b5b79 100644
          )
      }
  }
+
+-/** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
++/**
++ * A limit: its switch, and under it the value the limit uses. The field rests while the switch is off.
++ * The field edits a draft checked by the start script's own rules ([validate]); only a value the
++ * script accepts reaches prefs (and marks a restart pending), once typing pauses, the field loses
++ * focus or the page closes. An invalid draft shows its error and is never written.
++ */
+ @Composable
+ private fun ResourceSetting(
+     title: String,
+@@ -272,13 +336,42 @@ private fun ResourceSetting(
+     subtitle: String? = null,
+     onEnabled: (Boolean) -> Unit,
+     onValue: (String) -> Unit,
++    validate: (String) -> String? = { null },
++    advice: @Composable (String) -> String? = { null },
+ ) {
++    val c = LocalHomeColors.current
++    var draft by remember(value) { mutableStateOf(value) }
++    val stored by rememberUpdatedState(value)
++    val latest by rememberUpdatedState(draft)
++    val write by rememberUpdatedState(onValue)
++    val check by rememberUpdatedState(validate)
++    fun commit() { if (latest != stored && check(latest) == null) write(latest) }
++    LaunchedEffect(draft, value) {
++        if (draft != value && validate(draft) == null) { kotlinx.coroutines.delay(RESOURCE_COMMIT_DELAY_MS); commit() }
++    }
++    DisposableEffect(Unit) { onDispose { commit() } }
++    var focused by remember { mutableStateOf(false) }
++    val error = if (enabled) validate(draft) else null
++    val note = if (enabled && error == null) advice(draft) else null
++    val start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start
+     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+         SettingsSwitchRow(ht(title), enabled, onEnabled, subtitle = subtitle, compact = true, icon = icon)
+         SettingsInput(
+-            value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
++            value = draft, onValueChange = { draft = it }, enabled = enabled, placeholder = hint, error = error != null,
+             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+-            modifier = Modifier.padding(start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start, end = HomeRowDims.end + 2.dp),
++            modifier = Modifier.padding(start = start, end = HomeRowDims.end + 2.dp).onFocusChanged {
++                if (focused && !it.hasFocus) commit()
++                focused = it.hasFocus
++            },
+         )
++        (error ?: note)?.let { message ->
++            Text(
++                if (error != null) ht(message) else message,
++                Modifier.padding(start = start + 2.dp, end = HomeRowDims.end + 2.dp, top = 6.dp),
++                color = if (error != null) c.badText else c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium),
++            )
++        }
+     }
+ }
++
++private const val RESOURCE_COMMIT_DELAY_MS = 1_200L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
 index 738ebf5..428a4cc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
@@ -63552,6 +63651,105 @@ index 0000000..f3d1e7c
 +    fun delayMs(homeOrPanel: Boolean, running: Boolean, operationActive: Boolean, runningHint: Boolean): Long =
 +        if (running || operationActive || runningHint) activeDelayMs(homeOrPanel) else IdleDelayMs
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt
+new file mode 100644
+index 0000000..a5842a9
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt
+@@ -0,0 +1,93 @@
++package io.github.xgl34222220.hetu
++
++import java.math.BigInteger
++import java.util.Locale
++
++/**
++ * 高级代理配置 › 资源限制, checked by the rules hetu-root.sh applies when the proxy starts
++ * (`cpu_mask`, `mem_bytes`, `tuning_valid`), so a value the script would refuse is caught while
++ * typing instead of at the next start. An empty value means "no limit" there, as in the script.
++ */
++internal object HxResourceLimits {
++    const val CPU_ERROR = "CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）"
++    const val MEMORY_ERROR = "内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M"
++    const val MEMORY_MAX_ERROR = "内存限制不能超过 16G"
++    const val IO_ERROR = "磁盘 I/O 权重应为 0-7"
++    const val CPU_BEYOND_DEVICE = "本机可用 %s 个 CPU（0-%s），超出的编号不会生效"
++
++    private val MIN_MEMORY = BigInteger.valueOf(33_554_432L)
++    private val MAX_MEMORY = BigInteger.valueOf(17_179_869_184L)
++
++    /** The affinity mask `cpu_mask` would print, or null where it fails. */
++    fun cpuMask(value: String): Long? {
++        if (value.isEmpty() || value.any { it !in '0'..'9' && it != ',' && it != '-' }) return null
++        // `IFS=, set -- $1` drops one trailing empty field ("0," is "0"); any other empty part fails.
++        val parts = value.split(',').let { if (it.size > 1 && it.last().isEmpty()) it.dropLast(1) else it }
++        var mask = 0L
++        for (part in parts) {
++            if (part.isEmpty() || part.startsWith('-') || part.endsWith('-') || part.count { it == '-' } > 1) return null
++            val a = part.substringBefore('-')
++            val b = part.substringAfter('-', a)
++            if (listOf(a, b).any { (it.length > 1 && it[0] == '0') || it.length > 2 }) return null
++            val from = a.toInt()
++            val to = b.toInt()
++            if (from > to || to > 23) return null
++            for (cpu in from..to) mask = mask or (1L shl cpu)
++        }
++        return mask.takeIf { it > 0L }
++    }
++
++    /** Bytes `mem_bytes` would print (32M to 16G, K/M/G with an optional B or iB), or null where it fails. */
++    fun memoryBytes(value: String): Long? = memoryValue(value)?.takeIf { it >= MIN_MEMORY && it <= MAX_MEMORY }?.toLong()
++
++    private fun memoryValue(value: String): BigInteger? {
++        val upper = value.uppercase(Locale.ROOT).replace(Regex("I?B$"), "")
++        val match = Regex("^([0-9]+)([KMG]?)$").matchEntire(upper) ?: return null
++        val unit = when (match.groupValues[2]) { "K" -> 1_024L; "M" -> 1_048_576L; "G" -> 1_073_741_824L; else -> 1L }
++        return BigInteger(match.groupValues[1]).multiply(BigInteger.valueOf(unit))
++    }
++
++    fun cpuError(value: String): String? = if (value.isEmpty() || cpuMask(value) != null) null else CPU_ERROR
++
++    fun memoryError(value: String): String? {
++        if (value.isEmpty()) return null
++        val bytes = memoryValue(value) ?: return MEMORY_ERROR
++        return when {
++            bytes < MIN_MEMORY -> MEMORY_ERROR
++            bytes > MAX_MEMORY -> MEMORY_MAX_ERROR
++            else -> null
++        }
++    }
++
++    fun ioError(value: String): String? = if (value.isEmpty() || (value.length == 1 && value[0] in '0'..'7')) null else IO_ERROR
++
++    /** Highest CPU the value names when it is past this device's last one; the script still accepts it. */
++    fun cpuBeyondDevice(value: String, available: Int = Runtime.getRuntime().availableProcessors()): Int? {
++        val mask = cpuMask(value) ?: return null
++        val highest = 63 - java.lang.Long.numberOfLeadingZeros(mask)
++        return highest.takeIf { available > 0 && it >= available }
++    }
++}
++
++/** What the notification shows for [template]: every `{name}` the status service fills, replaced the same way. */
++internal fun hxNotificationPreview(template: String, values: Map<String, String>): String {
++    var text = template
++    values.forEach { (key, value) -> text = text.replace("{$key}", value) }
++    return text
++}
++
++/** Stand-in values for the notification preview, in the formats the status service uses. */
++internal fun hxNotificationPreviewValues(): Map<String, String> = mapOf(
++    "status" to "运行中",
++    "uptime" to HxFormat.duration(5_025L),
++    "upload" to HxFormat.speed(48_000L),
++    "download" to HxFormat.speed(1_260_000L),
++    "upload_total" to HxFormat.bytes(86_000_000L),
++    "download_total" to HxFormat.bytes(1_420_000_000L),
++    "cpu" to String.format(Locale.US, "%.1f%%", 3.2f),
++    "memory" to HxFormat.bytes(62_000_000L),
++    "connections" to "42",
++    "config" to "config.yaml",
++    "core" to "mihomo",
++    "mode" to "rule",
++)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
 new file mode 100644
 index 0000000..7d49de3
@@ -67548,10 +67746,18 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..3bffe1b 100644
+index b41cf98..67b60f9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-@@ -207,7 +207,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.home.HomeButton
+@@ -207,7 +208,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
              }
          }
          item(key = "error") {
@@ -67560,7 +67766,7 @@ index b41cf98..3bffe1b 100644
                  HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
              }
          }
-@@ -238,12 +238,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -238,12 +239,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var refresh by remember { mutableIntStateOf(0) }
      var loading by remember { mutableStateOf(true) }
      var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
@@ -67578,7 +67784,7 @@ index b41cf98..3bffe1b 100644
 
      LaunchedEffect(refresh) {
          loading = true
-@@ -263,9 +267,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -263,9 +268,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      }
 
      fun saveIfaces(next: Set<String>) {
@@ -67591,7 +67797,7 @@ index b41cf98..3bffe1b 100644
      }
 
      fun saveMacs(values: List<String>): Boolean {
-@@ -286,21 +290,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -286,21 +291,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          return true
      }
 
@@ -67623,7 +67829,7 @@ index b41cf98..3bffe1b 100644
          },
      ) {
          item(key = "note") { HxNote("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root PREROUTING / FORWARD 层生效，修改后重启代理。") }
-@@ -321,14 +327,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -321,14 +328,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      when {
                          loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
                          snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
@@ -67643,7 +67849,7 @@ index b41cf98..3bffe1b 100644
                                  icon = Icons.Rounded.Router,
                              )
                          }
-@@ -364,12 +370,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -364,12 +371,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "macs") {
              SettingsSection {
                  HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
@@ -67671,7 +67877,7 @@ index b41cf98..3bffe1b 100644
  }
 
  /* ------------------------------------------------------------------ */
-@@ -464,14 +484,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -464,14 +485,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
          path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
      }
      BackHandler(enabled = path != root) { goUp() }
@@ -67690,7 +67896,7 @@ index b41cf98..3bffe1b 100644
          label = "folder",
      ) { shown ->
          FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })
-@@ -820,6 +838,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -820,6 +839,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
      var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
      var confirmRecover by remember { mutableStateOf(false) }
@@ -67703,7 +67909,7 @@ index b41cf98..3bffe1b 100644
 
      fun task(key: String, block: suspend () -> Unit) {
          if (busy != null) return
-@@ -870,6 +894,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -870,6 +895,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  }
              }
          }
@@ -67726,6 +67932,68 @@ index b41cf98..3bffe1b 100644
          item(key = "inspect") {
              SettingsSection {
                  SettingsGroup(title = ht("查看")) {
+@@ -976,6 +1017,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
+     val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
+         actions.toList() != initialActions || labels.toList() != initialLabels
++    // Leaving with an edited switch, template or quick button asks first. The refresh and target
++    // menus stay plain drafts that 返回 discards, as notificationMenusAreDraftsAndBackDiscards pins.
++    val unsavedEdits = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate ||
++        actions.toList() != initialActions || labels.toList() != initialLabels
++    var confirmLeave by remember { mutableStateOf(false) }
++    val previewValues = remember { hxNotificationPreviewValues() }
+
+     val targetOptions = listOf(
+         "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
+@@ -1008,11 +1055,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         vm.toast("通知设置已保存")
+         onBack()
+     }
++    BackHandler(enabled = unsavedEdits) { confirmLeave = true }
+
+     HxPage(
+         title = ht("通知详细设置"),
+         largeTitle = false,
+-        onBack = onBack,
++        onBack = { if (unsavedEdits) confirmLeave = true else onBack() },
+         actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
+     ) {
+         item(key = "master") {
+@@ -1068,6 +1116,18 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                             )
+                         }
+                     }
++                    // The notification as the service would render the two templates, with stand-in values.
++                    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
++                        Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
++                        Text(
++                            hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
++                            color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
++                        )
++                        Text(
++                            hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
++                            Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
++                        )
++                    }
+                 }
+             }
+         }
+@@ -1118,4 +1178,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             )
+         }
+     }
++
++    if (confirmLeave) {
++        HxConfirmDialog(
++            title = "放弃修改？",
++            message = "通知设置的修改还没有保存。",
++            confirmLabel = "放弃",
++            danger = true,
++            onConfirm = { confirmLeave = false; onBack() },
++            onDismiss = { confirmLeave = false },
++        )
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
 new file mode 100644
 index 0000000..9e29412
@@ -72688,7 +72956,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..a6621bf 100644
+index 578ce9d..b8f3968 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -72735,7 +73003,7 @@ index 578ce9d..a6621bf 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,250 @@ private val vocabularyConnection = """
+@@ -969,16 +990,261 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -72966,7 +73234,18 @@ index 578ce9d..a6621bf 100644
 +打开微信设置|Open WeChat settings|開啟微信設定|Открыть настройки WeChat
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat).joinToString("\n")
++// 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
++private val vocabularyAudit3Settings = """
++预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
++通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
++CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)
++内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M|Invalid memory limit: enter a value such as 128M or 1G, at least 32M|記憶體限制格式無效：請填寫 128M、1G 這樣的值，且不低於 32M|Неверный лимит памяти: укажите значение вроде 128M или 1G, не меньше 32M
++内存限制不能超过 16G|The memory limit cannot exceed 16G|記憶體限制不能超過 16G|Лимит памяти не может превышать 16G
++磁盘 I/O 权重应为 0-7|Disk I/O weight must be 0-7|磁碟 I/O 權重應為 0-7|Вес дискового ввода-вывода должен быть от 0 до 7
++本机可用 %s 个 CPU（0-%s），超出的编号不会生效|This device has %s CPUs (0-%s); numbers beyond them have no effect|本機可用 %s 個 CPU（0-%s），超出的編號不會生效|На устройстве доступно CPU: %s (0-%s); номера сверх этого не действуют
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Settings).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -76797,6 +77076,169 @@ index 0000000..2bb498c
 +        assertTrue(AdblockVerification.hints(chain(hits = 0, miss = 0)).single().contains("还没有检查过任何连接"))
 +        assertTrue(AdblockVerification.hints(chain(hits = 0, miss = 42)).single().contains("已检查 42 个连接"))
 +        assertTrue(AdblockVerification.hints(chain(hits = 0, fromController = false)).isEmpty())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
+new file mode 100644
+index 0000000..9231847
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
+@@ -0,0 +1,157 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.test.hasClickAction
++import androidx.compose.ui.test.hasContentDescription
++import androidx.compose.ui.test.hasSetTextAction
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.test.performTextReplacement
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import java.io.File
++import java.util.concurrent.TimeUnit
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/**
++ * 2026-10-13 audit3 settings (G3/G4): the notification page asks before dropping edited text or
++ * quick buttons and previews the rendered templates; 资源限制 inputs are checked by the same rules
++ * hetu-root.sh applies at start and only a valid value is written.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++class Audit3Settings107Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++    private var vm: HetuViewModel? = null
++
++    @Before fun clean() {
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putString("appearance", "light").putBoolean("hetuDynamicColor", false).putBoolean("enableBlur", false).commit()
++    }
++
++    @After fun finish() { vm?.onBackground() }
++
++    @Test fun cpuAffinityFollowsTheStartScriptRules() {
++        assertEquals(0xffL, HxResourceLimits.cpuMask("0-7"))
++        assertEquals(0x75L, HxResourceLimits.cpuMask("0,2,4-6"))
++        assertEquals(1L shl 23, HxResourceLimits.cpuMask("23"))
++        assertEquals(1L, HxResourceLimits.cpuMask("0,"))
++        listOf("0~3", "01", "0-24", "3-1", "-1", "1-", "0--2", "0-1-2", "0,,2", ",0", "100", " 0", "0 - 3").forEach {
++            assertNull("accepted $it", HxResourceLimits.cpuMask(it))
++            assertEquals(HxResourceLimits.CPU_ERROR, HxResourceLimits.cpuError(it))
++        }
++        assertNull(HxResourceLimits.cpuError(""))
++        assertNull(HxResourceLimits.cpuError("0-3"))
++        assertEquals(15, HxResourceLimits.cpuBeyondDevice("0-15", available = 8))
++        assertNull(HxResourceLimits.cpuBeyondDevice("0-7", available = 8))
++        assertNull(HxResourceLimits.cpuBeyondDevice("0~7", available = 8))
++    }
++
++    @Test fun memoryAndIoFollowTheStartScriptRules() {
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128M"))
++        assertEquals(1_073_741_824L, HxResourceLimits.memoryBytes("1g"))
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128MB"))
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128MiB"))
++        assertEquals(33_554_432L, HxResourceLimits.memoryBytes("32M"))
++        assertEquals(17_179_869_184L, HxResourceLimits.memoryBytes("16G"))
++        listOf("100", "31M", "1.5G", "128 M", "M", "128T").forEach { assertEquals("$it", HxResourceLimits.MEMORY_ERROR, HxResourceLimits.memoryError(it)) }
++        assertEquals(HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.memoryError("17G"))
++        assertNull(HxResourceLimits.memoryError(""))
++        assertNull(HxResourceLimits.memoryError("100M"))
++        ('0'..'7').forEach { assertNull(HxResourceLimits.ioError(it.toString())) }
++        listOf("8", "9", "07", "-1", " 4").forEach { assertEquals(it, HxResourceLimits.IO_ERROR, HxResourceLimits.ioError(it)) }
++        assertNull(HxResourceLimits.ioError(""))
++    }
++
++    /** The Kotlin rules give the verdicts (and the CPU mask) of the script's own cpu_mask / mem_bytes. */
++    @Test fun kotlinRulesMatchTheRootScriptFunctions() {
++        val script = File("src/main/assets/hetu-root.sh").readText()
++        fun function(name: String) = Regex("""(?ms)^$name\(\)\{\n.*?^\}\n""").find(script)!!.value
++        val functions = function("cpu_mask") + function("mem_bytes")
++        fun run(call: String, value: String): String? {
++            val process = ProcessBuilder("sh", "-c", "$functions\n$call \"\$1\"", "sh", value).redirectErrorStream(true).start()
++            assertTrue(process.waitFor(10, TimeUnit.SECONDS))
++            val out = process.inputStream.bufferedReader().readText().trim()
++            return out.takeIf { process.exitValue() == 0 }
++        }
++        listOf("0-7", "0,2,4-6", "23", "0,", "0~3", "01", "0-24", "3-1", "-1", "0--2", "0,,2", ",0", "100", "7-7").forEach { value ->
++            assertEquals("cpu $value", run("cpu_mask", value), HxResourceLimits.cpuMask(value)?.let { java.lang.Long.toHexString(it) })
++        }
++        listOf("128M", "1g", "128MB", "128MiB", "32M", "16G", "17G", "100", "31M", "1.5G", "M", "33554432").forEach { value ->
++            assertEquals("mem $value", run("mem_bytes", value), HxResourceLimits.memoryBytes(value)?.toString())
++        }
++        assertTrue(script.contains("case \"\$START_IO\" in [0-7]) ;;"))
++        // The UI reports the script's own wording.
++        assertTrue(script.contains(HxResourceLimits.CPU_ERROR) && script.contains(HxResourceLimits.MEMORY_ERROR) && script.contains(HxResourceLimits.IO_ERROR))
++    }
++
++    @Test fun resourceFieldsWriteOnlyValidDraftsAndShowTheError() {
++        val page = source("ProxyAdvancedSettingsActivity.kt")
++        assertTrue(page.contains("validate = HxResourceLimits::cpuError"))
++        assertTrue(page.contains("validate = HxResourceLimits::memoryError"))
++        assertTrue(page.contains("validate = HxResourceLimits::ioError"))
++        assertTrue(page.contains("value = draft, onValueChange = { draft = it }"))
++        assertTrue(page.contains("fun commit() { if (latest != stored && check(latest) == null) write(latest) }"))
++        assertFalse("each keystroke must not reach prefs", page.contains("value = value, onValueChange = onValue"))
++    }
++
++    @Test fun notificationPreviewRendersEveryVariable() {
++        val values = hxNotificationPreviewValues()
++        val all = listOf("status", "uptime", "upload", "download", "upload_total", "download_total", "cpu", "memory", "connections", "config", "core", "mode")
++        assertEquals(all.toSet(), values.keys)
++        val body = hxNotificationPreview(ProxyStatusNotificationService.DEFAULT_TEMPLATE, values)
++        assertFalse(body, body.contains("{"))
++        assertTrue(body.startsWith("运行中 · "))
++        assertEquals("河图 · 运行中", hxNotificationPreview(ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE, values))
++        assertEquals("{unknown} 42", hxNotificationPreview("{unknown} {connections}", values))
++    }
++
++    @Test fun newWordsTranslate() {
++        listOf("预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
++            HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.IO_ERROR, HxResourceLimits.CPU_BEYOND_DEVICE).forEach { key ->
++            listOf("en", "zh-TW", "ru").forEach { lang -> assertTrue("$lang: $key", translateHetuText(key, lang) != key) }
++        }
++        listOf("en", "zh-TW", "ru").forEach { lang -> assertEquals(2, Regex("%s").findAll(translateHetuText(HxResourceLimits.CPU_BEYOND_DEVICE, lang)).count()) }
++    }
++
++    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
++        val model = HetuViewModel(app).also { vm = it }
++        var left = false
++        rule.setContent {
++            HetuAppTheme("light", false) {
++                CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides model.blurEnabled) {
++                    NotificationSettingsScreen(model) { left = true }
++                }
++            }
++        }
++        rule.onNodeWithText("预览 · 示例值").assertExists()
++        rule.onNodeWithText("河图 · 运行中").assertExists()
++        rule.onAllNodes(hasSetTextAction())[1].performTextReplacement("{status} 测试107")
++        rule.onNodeWithText("运行中 测试107").assertExists()
++        rule.onNode(hasClickAction() and hasContentDescription("返回")).performClick()
++        rule.waitForIdle()
++        assertFalse(left)
++        rule.onNodeWithText("放弃修改？").assertExists()
++        rule.onAllNodesWithText("放弃")[0].performClick()
++        rule.waitForIdle()
++        assertTrue(left)
++        assertEquals(ProxyStatusNotificationService.DEFAULT_TEMPLATE,
++            app.getSharedPreferences("hetu", 0).getString(ProxyStatusNotificationService.PREF_TEMPLATE, ProxyStatusNotificationService.DEFAULT_TEMPLATE))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt

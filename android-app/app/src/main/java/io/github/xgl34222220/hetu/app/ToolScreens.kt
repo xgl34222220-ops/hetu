@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeButton
@@ -1016,6 +1017,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
     val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
         actions.toList() != initialActions || labels.toList() != initialLabels
+    // Leaving with an edited switch, template or quick button asks first. The refresh and target
+    // menus stay plain drafts that 返回 discards, as notificationMenusAreDraftsAndBackDiscards pins.
+    val unsavedEdits = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate ||
+        actions.toList() != initialActions || labels.toList() != initialLabels
+    var confirmLeave by remember { mutableStateOf(false) }
+    val previewValues = remember { hxNotificationPreviewValues() }
 
     val targetOptions = listOf(
         "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
@@ -1048,11 +1055,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         vm.toast("通知设置已保存")
         onBack()
     }
+    BackHandler(enabled = unsavedEdits) { confirmLeave = true }
 
     HxPage(
         title = ht("通知详细设置"),
         largeTitle = false,
-        onBack = onBack,
+        onBack = { if (unsavedEdits) confirmLeave = true else onBack() },
         actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
     ) {
         item(key = "master") {
@@ -1108,6 +1116,18 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                             )
                         }
                     }
+                    // The notification as the service would render the two templates, with stand-in values.
+                    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
+                        Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
+                        Text(
+                            hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
+                            color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        )
+                        Text(
+                            hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
+                            Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
+                        )
+                    }
                 }
             }
         }
@@ -1157,5 +1177,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 onDismiss = { picker = null },
             )
         }
+    }
+
+    if (confirmLeave) {
+        HxConfirmDialog(
+            title = "放弃修改？",
+            message = "通知设置的修改还没有保存。",
+            confirmLabel = "放弃",
+            danger = true,
+            onConfirm = { confirmLeave = false; onBack() },
+            onDismiss = { confirmLeave = false },
+        )
     }
 }
