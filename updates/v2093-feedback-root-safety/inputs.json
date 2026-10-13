@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "f5a91baab86847875f8d7718e909e753b11b77c2bb1533f03bf0048076f108da",
+  "patchSha256": "d371d955f94dcc9fa83b02e18ea9ffc21f519263660655f2ad2c5a769662264e",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -470,7 +470,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt": "2725f19204b446f38c5d09f0c0c59ae8629f705a0801063b530e839e0121ae70",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxFriendlyError.kt": "b5c6a8fcabc428121e461193eab7d983b88ee33f11b56fdf4f286b88bf8032a6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt": "156c2c2951f09c514be09b3064bcd0aff85e4e15f15590a168280673ee7b342f",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "031e9023de0c536122113b86ffe77315fef4c4165d233e3fe6d95f7376872b02",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt": "7cd282b9fd070105e4b31c229a1ae95b9eafd8d002446e98a10a9d71b62afa4c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPollCadence.kt": "ab6e5beabc3ef3e57408b139eb52a3ee0e0ed34582f47471468834ad50986033",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt": "aa2a8559994e836d334e576c9bdb1e07b519d08a20d76d0d5c334f8584ed5399",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt": "cc496640da0ec80346948bb269617865ec6331d1f2c132d600efe09f2b8d588a",

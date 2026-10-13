@@ -621,8 +621,7 @@ internal fun HxSwipeAction(
 /**
  * Inline banners, form errors and "unsaved changes" rows that come and go inside a list item.
  * Expands from the top and fades (enter 220 ms / exit 140 ms on the calm glide spring);
- * with motion off it appears and disappears in the same frame. The content itself is the
- * same node either way.
+ * with motion off it is a plain conditional Box (appears / disappears on the next frame).
  */
 @Composable
 internal fun HxVisibility(
@@ -631,6 +630,11 @@ internal fun HxVisibility(
     content: @Composable () -> Unit,
 ) {
     val motion = hxMotion()
+    // Motion off: no transition at all, the content is simply there or not on the next frame.
+    if (!motion) {
+        if (visible) Box(modifier) { content() }
+        return
+    }
     androidx.compose.animation.AnimatedVisibility(
         visible = visible,
         modifier = modifier,
