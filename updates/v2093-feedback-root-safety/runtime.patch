@@ -55167,7 +55167,7 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
-index 2c5e10f..a9eb33e 100644
+index 2c5e10f..d1ec88c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyLogViewerActivity.kt
 @@ -6,6 +6,9 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
@@ -55218,7 +55218,7 @@ index 2c5e10f..a9eb33e 100644
  private fun hxLineLevel(line: String): String {
      val l = line.lowercase()
      return when {
-@@ -408,22 +426,31 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -408,38 +426,66 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var level by rememberSaveable { mutableStateOf("all") }
      val lifecycle = LocalLifecycleOwner.current
 
@@ -55254,7 +55254,12 @@ index 2c5e10f..a9eb33e 100644
              }
              error = ""
          } catch (cancel: CancellationException) {
-@@ -435,11 +462,30 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             throw cancel
+         } catch (failure: Exception) {
+-            error = failure.message ?: "日志读取失败"
++            error = hxErrorMessage(failure, "日志读取失败")
+         } finally {
+             loading = false
          }
      }
      val lines = remember(content, query, level, newestFirst) {
@@ -55278,7 +55283,7 @@ index 2c5e10f..a9eb33e 100644
 +            } catch (cancel: CancellationException) {
 +                throw cancel
 +            } catch (failure: Exception) {
-+                vm.toast(failure.message ?: "日志导出失败")
++                vm.toast(hxErrorMessage(failure, "日志导出失败"))
 +            }
 +        }
 +    }
@@ -55287,10 +55292,14 @@ index 2c5e10f..a9eb33e 100644
 
      HxPage(
          title = selected?.name ?: "core.log",
-@@ -455,6 +501,25 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -454,7 +500,28 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                 if (!searching) query = ""
              })
              HxBarAction(HxIcons.FolderOpen, "选择日志", onClick = { pickFile = true }, anchorMenu = true)
-             HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+-            HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
++            // Live refresh flips `loading` every 2 s; only the first read (nothing shown yet) disables the
++            // file actions, so they do not blink while the open file is re-tailed.
++            HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !hxLogFirstRead(loading, content))
 +            Box {
 +                HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { moreMenu = true }, anchorMenu = true)
 +                if (moreMenu) {
@@ -55299,7 +55308,7 @@ index 2c5e10f..a9eb33e 100644
 +                        HxMenuItem(label = ht("导出当前日志"), icon = ToolsIcons.Share, enabled = selected != null && content.isNotEmpty(), onClick = {
 +                            close { exporter.launch(selected?.name ?: "core.log") }
 +                        })
-+                        HxMenuItem(label = ht("加载更早 1600 行"), icon = ToolsIcons.Download, enabled = canLoadEarlier && !loading, onClick = {
++                        HxMenuItem(label = ht("加载更早 1600 行"), icon = ToolsIcons.Download, enabled = canLoadEarlier && !hxLogFirstRead(loading, content), onClick = {
 +                            close { tailLines = (tailLines + LOG_TAIL_PAGE).coerceAtMost(LOG_TAIL_MAX) }
 +                        })
 +                    }
@@ -55313,8 +55322,20 @@ index 2c5e10f..a9eb33e 100644
          },
      ) {
          item(key = "controls") {
-@@ -479,7 +544,8 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -472,14 +539,19 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                 )
+             }
+         }
+-        if (error.isNotBlank()) {
++        if (error.isNotBlank() && files.isNotEmpty()) {
+             item(key = "error") { HxBanner(error, tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) }
+         }
+         when {
              loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(6) }
++            // A failed listing is not "no logs yet": say so and offer a retry instead of the empty hint.
++            files.isEmpty() && error.isNotBlank() -> item(key = "read-error") {
++                HxEmpty(PanelIcons.SearchX, "日志读取失败", error, action = { HxButton(ht("重试"), { revision++ }, tone = HxTone.Accent) })
++            }
              files.isEmpty() -> item(key = "none") { HxEmpty(PanelIcons.ScrollText, "暂无日志文件", ht("代理运行后会在运行目录生成日志")) }
              lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
 -            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { _, line -> HxLogLine(line) }
@@ -55323,6 +55344,15 @@ index 2c5e10f..a9eb33e 100644
          }
      }
 
+@@ -508,7 +580,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                     } catch (cancel: CancellationException) {
+                         throw cancel
+                     } catch (failure: Exception) {
+-                        vm.toast(failure.message ?: "日志清空失败")
++                        vm.toast(hxErrorMessage(failure, "日志清空失败"))
+                     }
+                 }
+             },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
 index 9aa0aba..e31f4d2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
@@ -59337,7 +59367,7 @@ index e4053e5..72b8798 100644
      }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
-index e16a145..edac26a 100644
+index e16a145..d07985f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 @@ -1,5 +1,6 @@
@@ -59347,7 +59377,16 @@ index e16a145..edac26a 100644
  import androidx.compose.foundation.horizontalScroll
  import androidx.compose.foundation.rememberScrollState
 
-@@ -63,6 +64,8 @@ internal fun HxToggleChip(label: String, selected: Boolean, onChange: (Boolean)
+@@ -49,6 +50,8 @@ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.ui.HetuHaptic
+ import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
++import io.github.xgl34222220.hetu.ui.ht
++import io.github.xgl34222220.hetu.home.fill
+
+ /* ------------------------------------------------------------------ */
+ /*  Small toggle chip                                                   */
+@@ -63,6 +66,8 @@ internal fun HxToggleChip(label: String, selected: Boolean, onChange: (Boolean)
      val source = remember { MutableInteractionSource() }
      Box(
          Modifier
@@ -59356,7 +59395,7 @@ index e16a145..edac26a 100644
              .hxPressScale(source, .94f)
              .heightIn(min = 40.dp)
              .clip(Hx.pillShape)
-@@ -209,6 +212,56 @@ internal class RankState(dimension: String, sort: String) {
+@@ -209,6 +214,56 @@ internal class RankState(dimension: String, sort: String) {
      var sort by mutableStateOf(sort)
      var historical by mutableStateOf(false)
      var history by mutableStateOf<List<TrafficRank>>(emptyList())
@@ -59413,7 +59452,7 @@ index e16a145..edac26a 100644
  }
 
  @Composable
-@@ -218,47 +271,138 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
+@@ -218,47 +273,138 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
          RankState(
              vm.prefs.getString("overviewRankDimension", "host").orEmpty().ifBlank { "host" },
              vm.prefs.getString("overviewRankSort", "count").orEmpty().ifBlank { "count" },
@@ -59574,7 +59613,7 @@ index e16a145..edac26a 100644
      if (rows.isEmpty()) {
          item(key = "rank-empty") { HxEmpty(Icons.Rounded.QueryStats, if (rank.historical) "暂无已采集的历史" else "暂无实时连接") }
      }
-@@ -309,4 +453,44 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
+@@ -309,4 +455,44 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
              )
          }
      }
@@ -59597,15 +59636,15 @@ index e16a145..edac26a 100644
 +    val format = remember(rank.range) {
 +        java.text.SimpleDateFormat(if (rank.range > 86_400_000L) "M/d HH:mm" else "HH:mm", java.util.Locale.getDefault())
 +    }
-+    HxGroup(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), title = "流量分布 · " + historyBucketLabel(rank.range)) {
++    HxGroup(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), title = ht("流量分布") + " · " + ht(historyBucketLabel(rank.range))) {
 +        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp)) {
 +            Row(verticalAlignment = Alignment.CenterVertically) {
-+                Text("↓ 下行", style = MaterialTheme.typography.labelSmall, color = c.accent)
++                Text(ht("↓ 下行"), style = MaterialTheme.typography.labelSmall, color = c.accent)
 +                Spacer(Modifier.width(10.dp))
-+                Text("↑ 上行", style = MaterialTheme.typography.labelSmall, color = c.warn)
++                Text(ht("↑ 上行"), style = MaterialTheme.typography.labelSmall, color = c.warn)
 +                Spacer(Modifier.weight(1f))
 +                Text(
-+                    "峰值 " + HxFormat.bytes(slots.maxOf { it.second + it.third }),
++                    ht("峰值 %s").fill(HxFormat.bytes(slots.maxOf { it.second + it.third })),
 +                    style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textMuted,
 +                )
 +            }
@@ -61446,7 +61485,7 @@ index 0000000..57df735
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..1bc614a 100644
+index 250b8a8..2365982 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -61894,7 +61933,7 @@ index 250b8a8..1bc614a 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,18 +967,31 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,19 +967,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -61924,11 +61963,13 @@ index 250b8a8..1bc614a 100644
      /* ---------------- proxies ---------------- */
 
      fun select(group: String, node: String) {
+-        val request = activeRuntimeRequest() ?: return
 +        if (refuseRestoredGroups()) return
-         val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
-@@ -827,12 +1034,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         if (current.now == node || current.nodes.none { it.name == node }) return
+@@ -827,13 +1034,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -61943,18 +61984,21 @@ index 250b8a8..1bc614a 100644
      }
 
      fun testNode(node: String) {
+-        val request = activeRuntimeRequest() ?: return
 +        if (refuseRestoredGroups()) return
 +        if (latencyUnsupported()) return
-         val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
+         holdNodeProbes(owner, listOf(node))
 @@ -843,19 +1055,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
+-        val request = activeRuntimeRequest() ?: return
 +        if (refuseRestoredGroups()) return
 +        if (latencyUnsupported()) return
-         val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
          if (testingGroups[group.name] == true) return
          val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
          if (targets.isEmpty()) return
@@ -62007,16 +62051,17 @@ index 250b8a8..1bc614a 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,6 +1112,8 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1112,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
+-        val request = activeRuntimeRequest() ?: return
 +        if (refuseRestoredGroups()) return
 +        if (latencyUnsupported()) return
-         val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
          if (testingAll) return
          val owner = ++requestSequence
-@@ -885,21 +1121,42 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+         val targets = (state.groups.flatMap { it.nodes.map { node -> node.name } } +
              providers.flatMap { it.nodes } + delays.keys).distinct()
              .filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }
          allProbeOwner = owner
@@ -62062,7 +62107,24 @@ index 250b8a8..1bc614a 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -940,7 +1197,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,16 +1188,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     var logsLoading by mutableStateOf(false)
+         private set
+
++    /** Raw text behind [logEntries]: an unchanged quiet re-read skips parsing and list recomposition. */
++    private var lastRuntimeLog: String? = null
++
+     fun loadLogs(quiet: Boolean = false) {
+         if (logsLoading) return
+         logsLoading = true
+         viewModelScope.launch {
+             try {
+-                logEntries = refParseLogs19(inspector.runtimeLog())
++                val raw = inspector.runtimeLog()
++                if (!hxLogUnchanged(quiet, lastRuntimeLog, raw)) {
++                    logEntries = refParseLogs19(raw)
++                    lastRuntimeLog = raw
++                }
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62071,7 +62133,7 @@ index 250b8a8..1bc614a 100644
              } finally {
                  logsLoading = false
              }
-@@ -964,7 +1221,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1228,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62080,7 +62142,7 @@ index 250b8a8..1bc614a 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1238,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1245,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62089,7 +62151,7 @@ index 250b8a8..1bc614a 100644
              }
          }
      }
-@@ -995,7 +1252,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1259,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62098,7 +62160,7 @@ index 250b8a8..1bc614a 100644
              }
          }
      }
-@@ -1014,7 +1271,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1278,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62107,7 +62169,7 @@ index 250b8a8..1bc614a 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1290,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1297,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62116,7 +62178,16 @@ index 250b8a8..1bc614a 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1073,7 +1330,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1305,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+     }
+
+     fun updateRuleSet(name: String) {
+-        val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("规则集更新"))
+         if (ruleSetTasks[name]?.running == true) return
+         val owner = ++requestSequence
+         ruleSetTaskOwners[name] = owner
+@@ -1073,7 +1337,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -62125,7 +62196,7 @@ index 250b8a8..1bc614a 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1391,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1398,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62134,7 +62205,7 @@ index 250b8a8..1bc614a 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1158,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1158,13 +1422,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62143,7 +62214,14 @@ index 250b8a8..1bc614a 100644
              }
          }
      }
-@@ -1193,7 +1450,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+
+     fun updateProvider(name: String) {
+-        val request = activeRuntimeRequest() ?: return
++        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("订阅更新"))
+         if (providerTasks[name]?.running == true) return
+         val owner = ++requestSequence
+         providerTaskOwners[name] = owner
+@@ -1193,7 +1457,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -62152,7 +62230,7 @@ index 250b8a8..1bc614a 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1246,7 +1503,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1246,7 +1510,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62161,7 +62239,7 @@ index 250b8a8..1bc614a 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1263,6 +1520,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1527,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -62859,6 +62937,53 @@ index 241408e..5d22844 100644
  /* ------------------------------------------------------------------ */
  /*  Interaction helpers                                                 */
  /* ------------------------------------------------------------------ */
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt
+new file mode 100644
+index 0000000..3798192
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPolish2.kt
+@@ -0,0 +1,41 @@
++package io.github.xgl34222220.hetu
++
++/*
++ * Second polish round (2026-10-13): small pure decisions shared by the panel, log and network-test
++ * pages, kept here so they can be unit-tested without composing a screen.
++ */
++
++/**
++ * A quiet (polling) re-read of the runtime log whose text did not change since the last parse:
++ * the caller keeps the current entries instead of re-parsing and recomposing the whole list.
++ * A manual (non-quiet) read always re-parses.
++ */
++internal fun hxLogUnchanged(quiet: Boolean, previous: String?, raw: String): Boolean =
++    quiet && previous != null && previous == raw
++
++/**
++ * The log page's first read, before anything is shown. Live refresh flips `loading` every 2 s;
++ * only this first read disables the file actions (清空 / 加载更早), so they do not blink.
++ */
++internal fun hxLogFirstRead(loading: Boolean, content: String): Boolean = loading && content.isEmpty()
++
++/**
++ * What an empty traffic-trend chart says instead of a blank 148 dp area: nothing when there is a
++ * curve to draw, otherwise why there is none (both series switched off, or no traffic sampled yet).
++ */
++internal fun hxTrendEmptyLabel(seriesShown: Int, peak: Float): String? = when {
++    seriesShown == 0 -> "已隐藏上行与下行"
++    peak <= 0f -> "等待流量数据"
++    else -> null
++}
++
++/**
++ * The 连通性 summary: "x/y 可用" from whatever finished, prefixed with 测试中断 when the run
++ * itself failed (no network, port probe error), so a row of dashes is never left unexplained.
++ */
++internal fun hxNetTestSummary(ok: Int, total: Int, finished: Int, failed: Boolean, available: String, interrupted: String): String = when {
++    failed && finished == 0 -> interrupted
++    failed -> "$interrupted · $ok/$total $available"
++    finished == 0 -> ""
++    else -> "$ok/$total $available"
++}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPollCadence.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPollCadence.kt
 new file mode 100644
 index 0000000..f3d1e7c
@@ -63631,10 +63756,10 @@ index 0000000..6c667a6
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
 new file mode 100644
-index 0000000..d704778
+index 0000000..4931395
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestScreen.kt
-@@ -0,0 +1,560 @@
+@@ -0,0 +1,562 @@
 +package io.github.xgl34222220.hetu
 +
 +import androidx.compose.animation.core.animateFloatAsState
@@ -63790,12 +63915,15 @@ index 0000000..d704778
 +    var exits by remember { mutableStateOf<ExitIps?>(null) }
 +    var exitTesting by remember { mutableStateOf(false) }
 +    val availableLabel = ht("可用")
++    val interruptedLabel = ht("测试中断")
++    var runFailed by remember { mutableStateOf(false) }
 +    val unlockIds = remember { NetworkUnlock.checkIds }
 +
 +    LaunchedEffect(runId) {
 +        if (runId == 0) return@LaunchedEffect
 +        testing = true
 +        summary = ""
++        runFailed = false
 +        rows.forEach { (id, holder) -> holder.value = NetRowState(testing = true, unlocking = id in unlockIds) }
 +        exits = null
 +        exitTesting = true
@@ -63830,13 +63958,12 @@ index 0000000..d704778
 +        } catch (_: Exception) {
 +            rows.values.forEach { if (it.value.testing || it.value.unlocking) it.value = it.value.copy(testing = false, unlocking = false) }
 +            exitTesting = false
++            runFailed = true
 +        } finally {
 +            testing = false
 +            val done = rows.values.mapNotNull { it.value.result }
-+            if (done.isNotEmpty()) {
-+                val ok = done.count { it.ok && !it.blocked }
-+                summary = "$ok/${NetworkTest.sites.size} $availableLabel"
-+            }
++            // A run that failed outright (no network, port probe error) says so instead of leaving dashes.
++            summary = hxNetTestSummary(done.count { it.ok && !it.blocked }, NetworkTest.sites.size, done.size, runFailed, availableLabel, interruptedLabel)
 +        }
 +    }
 +
@@ -63907,7 +64034,7 @@ index 0000000..d704778
 +                        },
 +                        Modifier.weight(1f), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis,
 +                    )
-+                    if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
++                    if (summary.isNotBlank()) Text(summary, color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1)
 +                }
 +            }
 +            item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
@@ -64002,14 +64129,14 @@ index 0000000..d704778
 +            }
 +        }
 +        Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
-+            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
++            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
 +            if (state.testing) {
 +                Row(verticalAlignment = Alignment.CenterVertically) {
 +                    HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
 +                    Spacer(Modifier.width(6.dp))
-+                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +                }
-+            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
++            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
 +        }
 +    }
 +}
@@ -64093,7 +64220,7 @@ index 0000000..d704778
 +                    SpeedPhase.Download -> ht("正在测量下载…")
 +                    SpeedPhase.Upload -> ht("正在测量上传…")
 +                    SpeedPhase.Done -> ht("下载速率")
-+                    SpeedPhase.Failed -> speed.error ?: ht("测速失败")
++                    SpeedPhase.Failed -> speed.error?.let { ht(it) } ?: ht("测速失败")
 +                },
 +                color = if (speed.phase == SpeedPhase.Failed) c.badText else c.t3, style = HomeType.caption,
 +            )
@@ -68232,7 +68359,7 @@ index 0000000..bcd5c0c
 +    return state.isAtLeast(Lifecycle.State.STARTED)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
-index 9f66ac0..8965c73 100644
+index 9f66ac0..3150c67 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelAdapter.kt
 @@ -20,6 +20,7 @@ import androidx.compose.runtime.mutableStateMapOf
@@ -68270,7 +68397,12 @@ index 9f66ac0..8965c73 100644
      val initialView = remember { loadView(prefs, selectorPrefs) }
      var latestView by remember { mutableStateOf(initialView) }
      val tab = PanelTab.entries.firstOrNull { it.name == selectedTab.name } ?: PanelTab.Groups
-@@ -118,9 +117,11 @@ internal fun HetuPanelV2(
+@@ -114,13 +113,15 @@ internal fun HetuPanelV2(
+     fun say(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
+     fun launchSafely(failure: String, block: suspend CoroutineScope.() -> Unit) {
+         scope.launch {
+-            try { block() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { say(error.message ?: failure) }
++            try { block() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, failure)) }
          }
      }
 
@@ -68283,6 +68415,15 @@ index 9f66ac0..8965c73 100644
          try {
              when (tab) {
                  PanelTab.Overview -> { providers = repo.providers(); if (rules.isEmpty()) rules = repo.rules() }
+@@ -133,7 +134,7 @@ internal fun HetuPanelV2(
+         } catch (cancel: CancellationException) {
+             throw cancel
+         } catch (error: Exception) {
+-            say(error.message ?: "数据读取失败")
++            say(io.github.xgl34222220.hetu.hxErrorMessage(error, "数据读取失败"))
+         }
+     }
+     LaunchedEffect(state.uploadTotal, state.downloadTotal, state.connections) {
 @@ -144,11 +145,11 @@ internal fun HetuPanelV2(
      LaunchedEffect(state.groups) { state.groups.forEach { g -> if (selectedLocal[g.name] == g.now) selectedLocal.remove(g.name) } }
 
@@ -68298,6 +68439,60 @@ index 9f66ac0..8965c73 100644
      val groupsByName = remember(state.groups) { state.groups.associateBy { it.name } }
 
      val actions = PanelActions(
+@@ -165,7 +166,7 @@ internal fun HetuPanelV2(
+                     throw cancel
+                 } catch (error: Exception) {
+                     if (before == null) selectedLocal.remove(group) else selectedLocal[group] = before
+-                    say(error.message ?: "切换失败")
++                    say(io.github.xgl34222220.hetu.hxErrorMessage(error, "切换失败"))
+                 }
+             }
+         },
+@@ -187,7 +188,7 @@ internal fun HetuPanelV2(
+                 } catch (cancel: CancellationException) {
+                     throw cancel
+                 } catch (error: Exception) {
+-                    subscriptionUpdates[name] = PanelUpdate.Failed(error.message ?: "更新失败")
++                    subscriptionUpdates[name] = PanelUpdate.Failed(io.github.xgl34222220.hetu.hxErrorMessage(error, "更新失败"))
+                 }
+             }
+         },
+@@ -196,7 +197,7 @@ internal fun HetuPanelV2(
+             scope.launch {
+                 try { providers = repo.refreshSubscriptions(); say("订阅已更新") }
+                 catch (cancel: CancellationException) { throw cancel }
+-                catch (error: Exception) { say(error.message ?: "订阅更新失败") }
++                catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, "订阅更新失败")) }
+                 finally { subscriptionUpdates.clear() }
+             }
+         },
+@@ -213,7 +214,7 @@ internal fun HetuPanelV2(
+                 } catch (cancel: CancellationException) {
+                     throw cancel
+                 } catch (error: Exception) {
+-                    ruleSetUpdates[name] = PanelUpdate.Failed(error.message ?: "更新失败")
++                    ruleSetUpdates[name] = PanelUpdate.Failed(io.github.xgl34222220.hetu.hxErrorMessage(error, "更新失败"))
+                 }
+             }
+         },
+@@ -222,7 +223,7 @@ internal fun HetuPanelV2(
+             scope.launch {
+                 try { ruleSets = repo.refreshRuleSets(); say("规则集已更新") }
+                 catch (cancel: CancellationException) { throw cancel }
+-                catch (error: Exception) { say(error.message ?: "规则集更新失败") }
++                catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, "规则集更新失败")) }
+                 finally { ruleSetUpdates.clear() }
+             }
+         },
+@@ -247,7 +248,7 @@ internal fun HetuPanelV2(
+                     } catch (cancel: CancellationException) {
+                         throw cancel
+                     } catch (error: Exception) {
+-                        say(error.message ?: "刷新失败")
++                        say(io.github.xgl34222220.hetu.hxErrorMessage(error, "刷新失败"))
+                     } finally {
+                         refreshing = false
+                     }
 @@ -256,23 +257,22 @@ internal fun HetuPanelV2(
          },
      )
@@ -68648,7 +68843,7 @@ index 9f66ac0..8965c73 100644
              PanelRoute(data, tab, { next -> vm.openPanel(when (next) {
                  PanelTab.Overview -> "overview"; PanelTab.Groups -> "proxies"; PanelTab.Subscriptions -> "providers"
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
-index b187a2f..62dacb2 100644
+index b187a2f..0092e9d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelComponents.kt
 @@ -1,9 +1,18 @@
@@ -68679,7 +68874,15 @@ index b187a2f..62dacb2 100644
  import androidx.compose.ui.text.AnnotatedString
  import androidx.compose.ui.text.SpanStyle
  import androidx.compose.ui.text.TextStyle
-@@ -411,41 +422,67 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
+@@ -210,6 +221,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
+         modifier
+             .fillMaxWidth()
+             .onSizeChanged { viewport = it.width }
++            .panelHorizontalEdgeFade(scroll)
+             .horizontalScroll(scroll)
+             .panelGutter()
+             .drawBehind {
+@@ -411,41 +423,67 @@ internal fun panelHighlight(text: String, query: String): AnnotatedString {
   * only and gets a comfortable touch box that grows up and to the left of it.
   */
  @Composable
@@ -68762,15 +68965,49 @@ index b187a2f..62dacb2 100644
          contentAlignment = Alignment.BottomEnd,
      ) { capsule() }
  }
-@@ -464,7 +501,7 @@ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, val
+@@ -455,8 +493,8 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier,
+ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, valueColor: Color = LocalHomeColors.current.t1, style: TextStyle = PanelType.stat) {
+     val c = LocalHomeColors.current
+     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
+-        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1)
+-        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1)
++        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+     }
+ }
+
+@@ -464,9 +502,9 @@ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, val
  internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
      val c = LocalHomeColors.current
      Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
 -        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1)
 +        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
          Spacer(Modifier.weight(1f))
-         if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+-        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
++        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
          if (trailing != null) trailing()
+     }
+ }
+@@ -616,8 +654,18 @@ internal class PanelTrendSeries(val values: List<Float>, val color: Color, val f
+  * the baseline; every series draws itself in from the left once per [reveal] run.
+  */
+ @Composable
+-internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }) {
++internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }, emptyLabel: String? = null) {
+     val base = LocalHomeColors.current.line2
++    // No curve to draw: say why (series hidden / nothing sampled yet) instead of a blank area.
++    if (emptyLabel != null) {
++        val c = LocalHomeColors.current
++        Box(modifier.fillMaxWidth().height(height).drawBehind {
++            drawLine(base, Offset(0f, size.height - .5f), Offset(size.width, size.height - .5f), strokeWidth = 1.dp.toPx())
++        }, contentAlignment = Alignment.Center) {
++            Text(ht(emptyLabel), color = c.t3, style = HomeType.note, maxLines = 2, overflow = TextOverflow.Ellipsis)
++        }
++        return
++    }
+     Canvas(modifier.fillMaxWidth().height(height)) {
+         val w = size.width
+         val h = size.height
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelCoreGate.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelCoreGate.kt
 new file mode 100644
 index 0000000..28a7c8a
@@ -69127,6 +69364,52 @@ index 0000000..15ff606
 +    if (value.isEmpty()) return null
 +    return if (value.length >= 16 && value[4] == '-' && value[7] == '-') value.substring(5, 16).replace('T', ' ') else value.replace('T', ' ')
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelEdgeFade.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelEdgeFade.kt
+new file mode 100644
+index 0000000..99b3b19
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelEdgeFade.kt
+@@ -0,0 +1,40 @@
++package io.github.xgl34222220.hetu.panel
++
++import androidx.compose.foundation.ScrollState
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.draw.drawWithContent
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.BlendMode
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.Color
++import androidx.compose.ui.graphics.CompositingStrategy
++import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.unit.Dp
++import androidx.compose.ui.unit.dp
++
++/**
++ * Fades the leading/trailing [width] of a horizontally scrolling row while more content lies in
++ * that direction, so a clipped last tab reads as "scroll for more" instead of being cut off.
++ * Place it before `horizontalScroll` (it masks the viewport). The scroll position is read only
++ * in the draw phase: scrolling redraws the mask without recomposing the row.
++ */
++internal fun Modifier.panelHorizontalEdgeFade(scroll: ScrollState, width: Dp = 24.dp): Modifier =
++    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
++        .drawWithContent {
++            drawContent()
++            val w = width.toPx().coerceAtMost(size.width / 3f)
++            if (w <= 0f) return@drawWithContent
++            if (scroll.value > 0) {
++                drawRect(
++                    Brush.horizontalGradient(listOf(Color.Transparent, Color.Black), startX = 0f, endX = w),
++                    size = Size(w, size.height), blendMode = BlendMode.DstIn,
++                )
++            }
++            if (scroll.value < scroll.maxValue) {
++                drawRect(
++                    Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - w, endX = size.width),
++                    topLeft = Offset(size.width - w, 0f), size = Size(w, size.height), blendMode = BlendMode.DstIn,
++                )
++            }
++        }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
 index c95890c..5099f52 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelGroupsTab.kt
@@ -69340,20 +69623,22 @@ index c95890c..5099f52 100644
 +    Crossfade(busy, animationSpec = tween(140), label = "panelSwap") { shown -> content(shown) }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-index 253b603..c2bed70 100644
+index 253b603..0d89032 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelListTabs.kt
-@@ -21,6 +21,9 @@ import androidx.compose.material3.Icon
+@@ -21,6 +21,11 @@ import androidx.compose.material3.Icon
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
  import androidx.compose.runtime.getValue
 +import androidx.compose.runtime.remember
++import androidx.compose.runtime.setValue
++import androidx.compose.runtime.mutableStateOf
 +import androidx.compose.ui.layout.layout
 +import kotlin.math.roundToInt
  import androidx.compose.ui.Alignment
  import androidx.compose.ui.Modifier
  import androidx.compose.ui.draw.clip
-@@ -28,6 +31,8 @@ import androidx.compose.ui.graphics.Color
+@@ -28,6 +33,8 @@ import androidx.compose.ui.graphics.Color
  import androidx.compose.ui.graphics.graphicsLayer
  import androidx.compose.ui.graphics.vector.ImageVector
  import androidx.compose.ui.semantics.Role
@@ -69362,7 +69647,62 @@ index 253b603..c2bed70 100644
  import androidx.compose.ui.text.font.FontWeight
  import androidx.compose.ui.text.style.TextOverflow
  import androidx.compose.ui.unit.dp
-@@ -183,12 +188,12 @@ internal fun LazyListScope.panelConnectionsTab(
+@@ -76,6 +83,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
+         val sub = items[index]
+         val c = LocalHomeColors.current
+         val motion = LocalHomeMotionEnabled.current
++        // Tapping the one-line failure capsule shows the whole reason under the header.
++        var showReason by remember(sub.update) { mutableStateOf(false) }
+         HomeCard(ListCard.then(hetuAnimateItem(motion)).homeEnter(stagger, index)) {
+             Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 10.dp, bottom = 16.dp)) {
+                 Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.touch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+@@ -83,7 +92,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
+                     when (val state = sub.update) {
+                         PanelUpdate.Updating -> HomePill(ht("更新中"), height = 30.dp, style = HomeType.buttonSmall, leading = { HomeSpinner(size = 15.dp, strokeWidth = 2.dp) })
+                         is PanelUpdate.Failed -> {
+-                            HomePill(ht("更新失败：%s").fill(state.reason), Modifier.weight(1f, fill = false), tone = HomeTone.Bad, icon = HomeIcons.CircleAlert, height = 30.dp)
++                            HomePill(ht("更新失败：%s").fill(state.reason), Modifier.weight(1f, fill = false), tone = HomeTone.Bad, icon = HomeIcons.CircleAlert, height = 30.dp,
++                                onClick = { showReason = !showReason })
+                             HomePill(ht("重试"), height = 30.dp, style = HomeType.buttonSmall, onClick = { onUpdate(sub.name) })
+                         }
+                         PanelUpdate.Idle -> {
+@@ -92,9 +102,13 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
+                         }
+                     }
+                 }
++                val failure = sub.update as? PanelUpdate.Failed
++                if (showReason && failure != null) {
++                    Text(ht("更新失败：%s").fill(failure.reason), Modifier.fillMaxWidth().padding(bottom = 6.dp), color = c.badText, style = HomeType.note)
++                }
+                 Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
+-                    Text(ht("到期 %s").fill(sub.expire ?: HomeFormat.Dash), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
+-                    Text(ht("更新于 %s").fill(sub.updatedAt ?: HomeFormat.Dash), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
++                    Text(ht("到期 %s").fill(sub.expire ?: HomeFormat.Dash), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(ht("更新于 %s").fill(sub.updatedAt ?: HomeFormat.Dash), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+                 Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 14.dp)) {
+                     PanelStat(HomeFormat.bytes(sub.uploadBytes), null, "上传", style = PanelType.statSmall)
+@@ -103,8 +117,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
+                 }
+                 HomeProgressBar(sub.usedFraction)
+                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
+-                    Text(ht("已用 %s").fill(HomeFormat.bytes(sub.usedBytes)), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
+-                    Text(ht("总计 %s").fill(if (sub.totalBytes > 0L) HomeFormat.bytes(sub.totalBytes) else HomeFormat.Dash), color = c.t2, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
++                    Text(ht("已用 %s").fill(HomeFormat.bytes(sub.usedBytes)), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(ht("总计 %s").fill(if (sub.totalBytes > 0L) HomeFormat.bytes(sub.totalBytes) else HomeFormat.Dash), color = c.t2, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+             }
+         }
+@@ -173,7 +187,7 @@ internal fun LazyListScope.panelConnectionsTab(
+                         Column(Modifier.weight(1f)) {
+                             Text(if (group.app == PanelLogic.UnattributedApp) ht(group.app) else group.app, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+-                                Text(ht("%d 个连接").fill(group.connections.size), color = c.t2, style = HomeType.rowSub, maxLines = 1)
++                                Text(ht("%d 个连接").fill(group.connections.size), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                                 FlowTotal(PanelIcons.ArrowDown, HomeFormat.bytes(group.connections.sumOf { it.downloadTotalBytes }))
+                                 FlowTotal(PanelIcons.ArrowUp, HomeFormat.bytes(group.connections.sumOf { it.uploadTotalBytes }))
+                             }
+@@ -183,12 +197,12 @@ internal fun LazyListScope.panelConnectionsTab(
                  }
              }
              if (open) items(count = group.connections.size, key = { "conn:" + group.app + ":" + group.connections[it].id }) {
@@ -69377,7 +69717,12 @@ index 253b603..c2bed70 100644
          }
      }
  }
-@@ -202,8 +207,9 @@ private fun FlowTotal(icon: ImageVector, text: String) {
+@@ -198,27 +212,28 @@ private fun FlowTotal(icon: ImageVector, text: String) {
+     val c = LocalHomeColors.current
+     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
+         Icon(icon, null, Modifier.size(13.dp), tint = c.t2)
+-        Text(text, color = c.t2, style = HomeType.rowSub, maxLines = 1)
++        Text(text, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
      }
  }
 
@@ -69388,9 +69733,10 @@ index 253b603..c2bed70 100644
      val c = LocalHomeColors.current
      HomeCard(modifier, onClick = { onOpen(conn.id) }, clickLabel = "连接详情", shape = PanelDims.groupShape) {
          Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
-@@ -211,14 +217,14 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                  Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                 if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
+-                if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
++                if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
              }
 -            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1)
 +            if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
@@ -69405,7 +69751,7 @@ index 253b603..c2bed70 100644
                  Text(
                      conn.chain.joinToString(" / ").ifEmpty { "DIRECT" }, Modifier.weight(1f),
                      color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis,
-@@ -234,10 +240,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
+@@ -234,10 +249,10 @@ private fun ConnectionCard(conn: PanelConnection, data: PanelData, modifier: Mod
 
  /** The icon of the strategy group that carries the connection, when the host supplies group artwork. */
  @Composable
@@ -69418,7 +69764,18 @@ index 253b603..c2bed70 100644
      slot(group, Modifier.size(16.dp))
  }
 
-@@ -273,19 +279,42 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
+@@ -246,8 +261,8 @@ private fun FlowStat(icon: ImageVector, tint: Color, rate: String, total: String
+     val c = LocalHomeColors.current
+     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
+         Icon(icon, null, Modifier.size(15.dp), tint = tint)
+-        Text(rate, color = c.t1, style = PanelType.tiny.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+-        Text(ht("总计 %s").fill(total), color = c.t2, style = PanelType.tiny, maxLines = 1)
++        Text(rate, color = c.t1, style = PanelType.tiny.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
++        Text(ht("总计 %s").fill(total), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
+     }
+ }
+
+@@ -273,19 +288,42 @@ internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String,
      items(count = items.size, contentType = { "rule" }) { index ->
          val rule = items[index]
          val c = LocalHomeColors.current
@@ -69470,6 +69827,42 @@ index 253b603..c2bed70 100644
      item(key = "rules-note") {
          val c = LocalHomeColors.current
          val shown = if (items.size < total) ht("，此处显示 %d 条").fill(items.size) else ""
+@@ -310,18 +348,23 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
+         val c = LocalHomeColors.current
+         val haptics = LocalHomeHaptics.current
+         val motion = LocalHomeMotionEnabled.current
++        var showReason by remember(set.update) { mutableStateOf(false) }
+         HomeCard(ListCard.then(hetuAnimateItem(motion)).homeEnter(stagger, index), shape = PanelDims.groupShape) {
+             Row(Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(start = HomeDims.cardPadding, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
+                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                         Text(panelHighlight(set.name, query), Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1)
++                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     }
+                     Text(set.meta, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     when (val state = set.update) {
+                         PanelUpdate.Updating -> Text(ht("更新中"), color = c.t1, style = PanelType.groupSummary)
+-                        is PanelUpdate.Failed -> Text(ht("更新失败：%s").fill(state.reason), color = c.badText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+-                        PanelUpdate.Idle -> Text(ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash), color = c.t1, style = PanelType.groupSummary, maxLines = 1)
++                        // Tap toggles the whole reason (one line by default).
++                        is PanelUpdate.Failed -> Text(ht("更新失败：%s").fill(state.reason),
++                            Modifier.homeTap(onClickLabel = ht(if (showReason) "收起" else "查看完整原因"), role = Role.Button) { showReason = !showReason },
++                            color = c.badText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium),
++                            maxLines = if (showReason) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
++                        PanelUpdate.Idle -> Text(ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash), color = c.t1, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                     }
+                 }
+                 when (set.update) {
+@@ -399,7 +442,7 @@ internal fun LazyListScope.panelLogsTab(
+                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                     HomePill(entry.level.label, tone = entry.level.tone())
+                     Spacer(Modifier.weight(1f))
+-                    Text(entry.time, color = c.t2, style = PanelType.groupSummary, maxLines = 1)
++                    Text(entry.time, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+                 Text(panelHighlight(entry.message, view.needle), color = c.t1, style = PanelType.log, maxLines = if (open || !entry.foldable) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
+                 if (entry.foldable) Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
 index 3e938c4..49ecea1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelModels.kt
@@ -69565,6 +69958,79 @@ index 3e938c4..49ecea1 100644
  }
 
  /** Two-letter region code from a node name; the table and the emoji detection live in [HomeRegions]. */
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
+index 2a4844e..8ec06cb 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelOverviewTab.kt
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu.panel
+
++import io.github.xgl34222220.hetu.hxTrendEmptyLabel
+ import androidx.compose.foundation.background
+ import androidx.compose.foundation.layout.Arrangement
+ import androidx.compose.foundation.layout.Box
+@@ -83,7 +84,7 @@ internal fun LazyListScope.panelOverviewTab(
+             Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 16.dp, bottom = 16.dp)) {
+                 Row(Modifier.fillMaxWidth().padding(bottom = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                     Text(ht("订阅"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle)
+-                    if (sub.expire != null) Text(ht("到期 %s").fill(sub.expire), color = c.t2, style = HomeType.rowSub, maxLines = 1)
++                    if (sub.expire != null) Text(ht("到期 %s").fill(sub.expire), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+                 Row(Modifier.fillMaxWidth()) {
+                     val (used, usedUnit) = split(HomeFormat.bytes(sub.usedBytes))
+@@ -95,8 +96,8 @@ internal fun LazyListScope.panelOverviewTab(
+                 }
+                 HomeProgressBar(sub.usedFraction, Modifier.padding(top = 16.dp, bottom = 12.dp))
+                 Row(Modifier.fillMaxWidth()) {
+-                    Text(ht("%d 个订阅").fill(sub.subscriptionCount), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub, maxLines = 1)
+-                    Text(ht("%d 个节点").fill(sub.nodeCount), color = c.t2, style = HomeType.rowSub, maxLines = 1)
++                    Text(ht("%d 个订阅").fill(sub.subscriptionCount), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                    Text(ht("%d 个节点").fill(sub.nodeCount), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 }
+             }
+         }
+@@ -112,10 +113,10 @@ internal fun LazyListScope.panelOverviewTab(
+         val c = LocalHomeColors.current
+         HomeCard(card.homeEnter(stagger, 3)) {
+             Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.rowMinHeightSmall).padding(horizontal = HomeDims.cardPadding), verticalAlignment = Alignment.CenterVertically) {
+-                Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1)
+-                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1)
++                Text(ht("总流量"), Modifier.weight(1f), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
++                Text(ht("上行") + " " + HomeFormat.bytes(overview.uploadTotalBytes), color = c.goodText, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 Text("/", Modifier.padding(horizontal = 9.dp), color = c.t2, style = HomeType.value)
+-                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1)
++                Text(ht("下行") + " " + HomeFormat.bytes(overview.downloadTotalBytes), color = c.accent, style = HomeType.value, maxLines = 1, overflow = TextOverflow.Ellipsis)
+             }
+         }
+     }
+@@ -136,12 +137,14 @@ internal fun LazyListScope.panelOverviewTab(
+                             height = 32.dp, leading = { HomeStatusDot(if (view.showDownloadTrend) c.accent else c.t3, size = 7.dp) })
+                     }
+                 }
++                val trend = buildList {
++                    if (view.showDownloadTrend) add(PanelTrendSeries(overview.downloadTrend, c.accent, fill = true))
++                    if (view.showUploadTrend) add(PanelTrendSeries(overview.uploadTrend, c.good, fill = false))
++                }
+                 PanelTrendChart(
+-                    buildList {
+-                        if (view.showDownloadTrend) add(PanelTrendSeries(overview.downloadTrend, c.accent, fill = true))
+-                        if (view.showUploadTrend) add(PanelTrendSeries(overview.uploadTrend, c.good, fill = false))
+-                    },
++                    trend,
+                     reveal = reveal,
++                    emptyLabel = hxTrendEmptyLabel(trend.size, trend.maxOfOrNull { s -> s.values.maxOrNull() ?: 0f } ?: 0f),
+                 )
+             }
+         }
+@@ -204,7 +207,7 @@ private fun SpeedCard(label: String, value: String, icon: ImageVector, tint: Col
+             }
+             Spacer(Modifier.width(12.dp))
+             Column {
+-                Text(ht(label), color = c.t2, style = HomeType.note, maxLines = 1)
++                Text(ht(label), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                 HomeRollingText(value, tint, HomeType.metric, alignment = Alignment.CenterStart)
+             }
+         }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
 index fb308a8..5931531 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/panel/PanelScreen.kt
@@ -70088,6 +70554,19 @@ index d256004..cadffea 100644
      )
  }
 
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
+index 47a2394..2d21e90 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAppsScreen.kt
+@@ -228,7 +228,7 @@ private fun AppRow(
+         }
+         if (app.uid >= 0) {
+             Spacer(Modifier.width(10.dp))
+-            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1)
++            Text("#${app.uid}", color = c.accent, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
+         }
+         Spacer(Modifier.width(12.dp))
+         ToolsCheckCircle(checked)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
 index 67585f1..2702aa2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsCoresScreen.kt
@@ -70221,7 +70700,7 @@ index ee40a76..8c39531 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
-index f575100..e3ab27a 100644
+index f575100..e818d42 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsFeatureAdapter.kt
 @@ -23,6 +23,7 @@ import androidx.compose.runtime.setValue
@@ -70245,6 +70724,15 @@ index f575100..e3ab27a 100644
      const val AdblockChain = "proxyAdblockChain"
      const val AdblockFallback = "proxyAdblockFallbackEnabled"
      const val Cname = "cnameProtection"
+@@ -116,7 +122,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
+                     } catch (cancel: CancellationException) {
+                         throw cancel
+                     } catch (error: Exception) {
+-                        error.message ?: "导入失败"
++                        io.github.xgl34222220.hetu.hxErrorMessage(error, "导入失败")
+                     }
+                     request.second(message)
+                 }
 @@ -183,39 +189,81 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
              /* ------------------------------ 共享网络 ------------------------------ */
              loadShare = {
@@ -70335,7 +70823,7 @@ index f575100..e3ab27a 100644
 +            repairSessionRecord = {
 +                try { proxy.repairSessionRecord() }
 +                catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-+                catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
++                catch (error: Exception) { io.github.xgl34222220.hetu.hxErrorMessage(error, "运行记录未修复，请查看网络诊断") }
 +            },
              runPreflight = {
                  val (passed, message) = ToolsRuntimeBridge.preflight(app)
@@ -71226,7 +71714,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..7ce11a8 100644
+index 578ce9d..51513f6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -71273,7 +71761,7 @@ index 578ce9d..7ce11a8 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,217 @@ private val vocabularyConnection = """
+@@ -969,16 +990,240 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -71471,7 +71959,30 @@ index 578ce9d..7ce11a8 100644
 +不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup).joinToString("\n")
++private val vocabularyPolish2 = """
++测试中断|Test interrupted|測試中斷|Тест прерван
++等待流量数据|Waiting for traffic data|等待流量資料|Ожидание данных трафика
++已隐藏上行与下行|Upload and download are hidden|已隱藏上行與下行|Отдача и загрузка скрыты
++查看完整原因|Show full reason|查看完整原因|Показать причину полностью
++切换节点需要代理运行中|Switching nodes requires the proxy to be running|切換節點需要代理執行中|Для смены узла прокси должен работать
++测速需要代理运行中|Latency tests require the proxy to be running|測速需要代理執行中|Для теста задержки прокси должен работать
++订阅更新需要代理运行中|Updating subscriptions requires the proxy to be running|訂閱更新需要代理執行中|Для обновления подписок прокси должен работать
++规则集更新需要代理运行中|Updating rule sets requires the proxy to be running|規則集更新需要代理執行中|Для обновления наборов правил прокси должен работать
++请等待当前操作完成|Please wait for the current operation to finish|請等待目前操作完成|Дождитесь завершения текущей операции
++流量分布|Traffic distribution|流量分布|Распределение трафика
++每 5 分钟|Every 5 minutes|每 5 分鐘|Каждые 5 минут
++每小时|Hourly|每小時|Каждый час
++每 6 小时|Every 6 hours|每 6 小時|Каждые 6 часов
++每天|Daily|每天|Ежедневно
++峰值 %s|Peak %s|峰值 %s|Пик %s
++↓ 下行|↓ Download|↓ 下行|↓ Загрузка
++↑ 上行|↑ Upload|↑ 上行|↑ Отдача
++日志导出失败|Log export failed|日誌匯出失敗|Не удалось экспортировать журнал
++日志清空失败|Failed to clear log|日誌清空失敗|Не удалось очистить журнал
++导入失败|Import failed|匯入失敗|Ошибка импорта
++"""
++
++private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -80498,6 +81009,155 @@ index 0000000..324c39a
 +        assertEquals(1, tests)
 +        assertEquals(0, parentClicks)
 +        capture("delay-result-settled")
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt
+new file mode 100644
+index 0000000..8e7b6e2
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Polish2106Test.kt
+@@ -0,0 +1,143 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import java.io.File
++import kotlinx.coroutines.Dispatchers
++import kotlinx.coroutines.launch
++import kotlinx.coroutines.runBlocking
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/**
++ * 2026-10-13 second polish round (work/polish2-audit.md): feedback for per-item actions that cannot
++ * run, the unchanged-log short cut, log-page action state, the empty trend chart, the network-test
++ * interruption summary, friendly errors on the log/tools/panel paths and the new word-table rows.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class Polish2106Test {
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++
++    @Before fun clean() { app.getSharedPreferences("hetu", 0).edit().clear().commit() }
++
++    /* F1 */
++    @Test fun perItemActionsThatCannotRunExplainWhyInsteadOfReturningSilently() = runBlocking {
++        val vm = HetuViewModel(app)
++        val seen = mutableListOf<String>()
++        val collector = launch(Dispatchers.Unconfined) { vm.messages.collect { seen += it } }
++        try {
++            assertFalse(vm.state.running)
++            vm.updateProvider("机场订阅")
++            vm.updateRuleSet("reject")
++            vm.testNode("香港 01")
++            vm.testAll()
++        } finally { collector.cancel() }
++        assertTrue(seen.toString(), seen.contains("订阅更新需要代理运行中"))
++        assertTrue(seen.toString(), seen.contains("规则集更新需要代理运行中"))
++        // testNode/testAll may first stop at the core-capability notice (no Clash controller); either way nothing starts.
++        assertTrue(vm.providerTasks.isEmpty())
++        assertTrue(vm.ruleSetTasks.isEmpty())
++        assertTrue(vm.testingNodes.isEmpty())
++        assertFalse(vm.testingAll)
++        val model = source("app/HetuViewModel.kt")
++        for (what in listOf("切换节点", "测速", "订阅更新", "规则集更新")) {
++            assertTrue(what, model.contains("activeRuntimeRequest() ?: return toast(runtimeUnavailableText(\"$what\"))"))
++        }
++        assertFalse("No per-item entry returns silently any more",
++            Regex("""fun (select|testNode|testGroup|testAll|updateProvider|updateRuleSet)\([^)]*\) \{[^}]*?activeRuntimeRequest\(\) \?: return\n""").containsMatchIn(model))
++    }
++
++    /* F2 */
++    @Test fun unchangedQuietLogReadSkipsParsingButManualReadsAlwaysParse() {
++        assertTrue(hxLogUnchanged(quiet = true, previous = "a\nb", raw = "a\nb"))
++        assertFalse(hxLogUnchanged(quiet = true, previous = "a\nb", raw = "a\nb\nc"))
++        assertFalse("First read always parses", hxLogUnchanged(quiet = true, previous = null, raw = ""))
++        assertFalse("A manual refresh always parses", hxLogUnchanged(quiet = false, previous = "a", raw = "a"))
++        val model = source("app/HetuViewModel.kt")
++        assertTrue(model.contains("if (!hxLogUnchanged(quiet, lastRuntimeLog, raw)) {"))
++    }
++
++    /* V5 / V6 / F3 (log page) */
++    @Test fun logPageActionsDoNotBlinkDuringLiveRefreshAndReadFailureOffersRetry() {
++        assertTrue(hxLogFirstRead(loading = true, content = ""))
++        assertFalse("A live re-tail keeps actions enabled", hxLogFirstRead(loading = true, content = "line"))
++        assertFalse(hxLogFirstRead(loading = false, content = ""))
++        val viewer = source("ProxyLogViewerActivity.kt")
++        assertTrue(viewer.contains("enabled = selected != null && !hxLogFirstRead(loading, content)"))
++        assertTrue(viewer.contains("enabled = canLoadEarlier && !hxLogFirstRead(loading, content)"))
++        assertTrue(viewer.contains("files.isEmpty() && error.isNotBlank() -> item(key = \"read-error\")"))
++        assertTrue(viewer.contains("hxErrorMessage(failure, \"日志导出失败\")"))
++        assertTrue(viewer.contains("hxErrorMessage(failure, \"日志清空失败\")"))
++        assertTrue(viewer.contains("error = hxErrorMessage(failure, \"日志读取失败\")"))
++    }
++
++    /* V2 */
++    @Test fun emptyTrendChartSaysWhyInsteadOfStayingBlank() {
++        assertEquals("已隐藏上行与下行", hxTrendEmptyLabel(seriesShown = 0, peak = 0f))
++        assertEquals("已隐藏上行与下行", hxTrendEmptyLabel(seriesShown = 0, peak = 9f))
++        assertEquals("等待流量数据", hxTrendEmptyLabel(seriesShown = 2, peak = 0f))
++        assertNull(hxTrendEmptyLabel(seriesShown = 1, peak = 1f))
++        assertTrue(source("panel/PanelOverviewTab.kt").contains("emptyLabel = hxTrendEmptyLabel(trend.size"))
++    }
++
++    /* F4 */
++    @Test fun failedNetworkTestRunIsReportedWithWhateverFinished() {
++        assertEquals("", hxNetTestSummary(0, 30, 0, failed = false, available = "可用", interrupted = "测试中断"))
++        assertEquals("12/30 可用", hxNetTestSummary(12, 30, 20, failed = false, available = "可用", interrupted = "测试中断"))
++        assertEquals("测试中断", hxNetTestSummary(0, 30, 0, failed = true, available = "可用", interrupted = "测试中断"))
++        assertEquals("测试中断 · 3/30 可用", hxNetTestSummary(3, 30, 5, failed = true, available = "可用", interrupted = "测试中断"))
++        val screen = source("app/NetworkTestScreen.kt")
++        assertTrue(screen.contains("runFailed = true"))
++        assertTrue(screen.contains("speed.error?.let { ht(it) }"))
++    }
++
++    /* V1 / V3 / V4 */
++    @Test fun panelTabsFadeAtTheEdgesAndFailuresCanBeReadInFull() {
++        val components = source("panel/PanelComponents.kt")
++        val fade = components.indexOf(".panelHorizontalEdgeFade(scroll)")
++        assertTrue("The fade masks the viewport, so it sits before horizontalScroll", fade in 0 until components.indexOf(".horizontalScroll(scroll)"))
++        val lists = source("panel/PanelListTabs.kt")
++        assertTrue(lists.contains("onClick = { showReason = !showReason })"))
++        assertTrue(lists.contains("maxLines = if (showReason) Int.MAX_VALUE else 1"))
++        // User-facing one-line texts on the panel tabs end with an ellipsis instead of a hard clip.
++        for (path in listOf("panel/PanelListTabs.kt", "panel/PanelOverviewTab.kt")) {
++            val clipped = source(path).lines().filter { "Text(" in it && "maxLines = 1" in it && "overflow" !in it }
++            assertTrue("$path: $clipped", clipped.isEmpty())
++        }
++    }
++
++    /* F3 (tools / panel defaults) */
++    @Test fun rawJvmErrorsNoLongerReachToolsAndPanelMessages() {
++        val tools = source("tools/ToolsFeatureAdapter.kt")
++        assertFalse(tools.contains("error.message ?: \"导入失败\""))
++        assertFalse(tools.contains("error.message ?: \"运行记录未修复"))
++        val panel = source("panel/PanelAdapter.kt")
++        assertFalse(Regex("""error\.message \?:""").containsMatchIn(panel))
++        assertEquals("导入失败", hxErrorMessage(java.io.IOException(), "导入失败"))
++    }
++
++    /* word table */
++    @Test fun polish2StringsTranslateToAllThreeLanguages() {
++        val keys = listOf("测试中断", "等待流量数据", "已隐藏上行与下行", "查看完整原因", "切换节点需要代理运行中", "测速需要代理运行中",
++            "订阅更新需要代理运行中", "规则集更新需要代理运行中", "请等待当前操作完成", "流量分布", "每 5 分钟", "每小时", "每 6 小时",
++            "每天", "峰值 %s", "↓ 下行", "↑ 上行", "日志导出失败", "日志清空失败", "导入失败")
++        for (key in keys) {
++            assertTrue("$key en", translateHetuText(key, "en") != key)
++            assertTrue("$key ru", translateHetuText(key, "ru") != key)
++            assertTrue("$key zh-TW", translateHetuText(key, "zh-TW").isNotBlank())
++            assertEquals(key, translateHetuText(key, "zh-CN"))
++        }
++        assertTrue(translateHetuText("峰值 %s", "en").contains("%s"))
++        assertTrue(source("app/ActivityExtras.kt").contains("ht(\"流量分布\") + \" · \" + ht(historyBucketLabel(rank.range))"))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProbeSchedulingPerformance95Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/ProbeSchedulingPerformance95Test.kt

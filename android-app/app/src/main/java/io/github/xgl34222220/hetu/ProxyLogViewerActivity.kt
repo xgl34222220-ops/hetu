@@ -456,7 +456,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (failure: Exception) {
-            error = failure.message ?: "日志读取失败"
+            error = hxErrorMessage(failure, "日志读取失败")
         } finally {
             loading = false
         }
@@ -480,7 +480,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (failure: Exception) {
-                vm.toast(failure.message ?: "日志导出失败")
+                vm.toast(hxErrorMessage(failure, "日志导出失败"))
             }
         }
     }
@@ -500,7 +500,9 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 if (!searching) query = ""
             })
             HxBarAction(HxIcons.FolderOpen, "选择日志", onClick = { pickFile = true }, anchorMenu = true)
-            HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+            // Live refresh flips `loading` every 2 s; only the first read (nothing shown yet) disables the
+            // file actions, so they do not blink while the open file is re-tailed.
+            HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !hxLogFirstRead(loading, content))
             Box {
                 HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { moreMenu = true }, anchorMenu = true)
                 if (moreMenu) {
@@ -509,7 +511,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         HxMenuItem(label = ht("导出当前日志"), icon = ToolsIcons.Share, enabled = selected != null && content.isNotEmpty(), onClick = {
                             close { exporter.launch(selected?.name ?: "core.log") }
                         })
-                        HxMenuItem(label = ht("加载更早 1600 行"), icon = ToolsIcons.Download, enabled = canLoadEarlier && !loading, onClick = {
+                        HxMenuItem(label = ht("加载更早 1600 行"), icon = ToolsIcons.Download, enabled = canLoadEarlier && !hxLogFirstRead(loading, content), onClick = {
                             close { tailLines = (tailLines + LOG_TAIL_PAGE).coerceAtMost(LOG_TAIL_MAX) }
                         })
                     }
@@ -537,11 +539,15 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 )
             }
         }
-        if (error.isNotBlank()) {
+        if (error.isNotBlank() && files.isNotEmpty()) {
             item(key = "error") { HxBanner(error, tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap)) }
         }
         when {
             loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(6) }
+            // A failed listing is not "no logs yet": say so and offer a retry instead of the empty hint.
+            files.isEmpty() && error.isNotBlank() -> item(key = "read-error") {
+                HxEmpty(PanelIcons.SearchX, "日志读取失败", error, action = { HxButton(ht("重试"), { revision++ }, tone = HxTone.Accent) })
+            }
             files.isEmpty() -> item(key = "none") { HxEmpty(PanelIcons.ScrollText, "暂无日志文件", ht("代理运行后会在运行目录生成日志")) }
             lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
             // Keys follow the line itself (plus its occurrence), so a refresh that appends lines keeps the list in place.
@@ -574,7 +580,7 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (failure: Exception) {
-                        vm.toast(failure.message ?: "日志清空失败")
+                        vm.toast(hxErrorMessage(failure, "日志清空失败"))
                     }
                 }
             },

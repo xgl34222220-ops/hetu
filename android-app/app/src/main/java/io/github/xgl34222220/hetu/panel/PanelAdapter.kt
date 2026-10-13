@@ -113,7 +113,7 @@ internal fun HetuPanelV2(
     fun say(text: String) = Toast.makeText(context, text, Toast.LENGTH_SHORT).show()
     fun launchSafely(failure: String, block: suspend CoroutineScope.() -> Unit) {
         scope.launch {
-            try { block() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { say(error.message ?: failure) }
+            try { block() } catch (cancel: CancellationException) { throw cancel } catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, failure)) }
         }
     }
 
@@ -134,7 +134,7 @@ internal fun HetuPanelV2(
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
-            say(error.message ?: "数据读取失败")
+            say(io.github.xgl34222220.hetu.hxErrorMessage(error, "数据读取失败"))
         }
     }
     LaunchedEffect(state.uploadTotal, state.downloadTotal, state.connections) {
@@ -166,7 +166,7 @@ internal fun HetuPanelV2(
                     throw cancel
                 } catch (error: Exception) {
                     if (before == null) selectedLocal.remove(group) else selectedLocal[group] = before
-                    say(error.message ?: "切换失败")
+                    say(io.github.xgl34222220.hetu.hxErrorMessage(error, "切换失败"))
                 }
             }
         },
@@ -188,7 +188,7 @@ internal fun HetuPanelV2(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    subscriptionUpdates[name] = PanelUpdate.Failed(error.message ?: "更新失败")
+                    subscriptionUpdates[name] = PanelUpdate.Failed(io.github.xgl34222220.hetu.hxErrorMessage(error, "更新失败"))
                 }
             }
         },
@@ -197,7 +197,7 @@ internal fun HetuPanelV2(
             scope.launch {
                 try { providers = repo.refreshSubscriptions(); say("订阅已更新") }
                 catch (cancel: CancellationException) { throw cancel }
-                catch (error: Exception) { say(error.message ?: "订阅更新失败") }
+                catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, "订阅更新失败")) }
                 finally { subscriptionUpdates.clear() }
             }
         },
@@ -214,7 +214,7 @@ internal fun HetuPanelV2(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    ruleSetUpdates[name] = PanelUpdate.Failed(error.message ?: "更新失败")
+                    ruleSetUpdates[name] = PanelUpdate.Failed(io.github.xgl34222220.hetu.hxErrorMessage(error, "更新失败"))
                 }
             }
         },
@@ -223,7 +223,7 @@ internal fun HetuPanelV2(
             scope.launch {
                 try { ruleSets = repo.refreshRuleSets(); say("规则集已更新") }
                 catch (cancel: CancellationException) { throw cancel }
-                catch (error: Exception) { say(error.message ?: "规则集更新失败") }
+                catch (error: Exception) { say(io.github.xgl34222220.hetu.hxErrorMessage(error, "规则集更新失败")) }
                 finally { ruleSetUpdates.clear() }
             }
         },
@@ -248,7 +248,7 @@ internal fun HetuPanelV2(
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {
-                        say(error.message ?: "刷新失败")
+                        say(io.github.xgl34222220.hetu.hxErrorMessage(error, "刷新失败"))
                     } finally {
                         refreshing = false
                     }

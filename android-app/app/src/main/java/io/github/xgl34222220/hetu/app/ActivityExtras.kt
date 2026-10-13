@@ -50,6 +50,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.ui.HetuHaptic
 import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
+import io.github.xgl34222220.hetu.ui.ht
+import io.github.xgl34222220.hetu.home.fill
 
 /* ------------------------------------------------------------------ */
 /*  Small toggle chip                                                   */
@@ -472,15 +474,15 @@ private fun HxTrafficDistribution(rank: RankState) {
     val format = remember(rank.range) {
         java.text.SimpleDateFormat(if (rank.range > 86_400_000L) "M/d HH:mm" else "HH:mm", java.util.Locale.getDefault())
     }
-    HxGroup(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), title = "流量分布 · " + historyBucketLabel(rank.range)) {
+    HxGroup(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), title = ht("流量分布") + " · " + ht(historyBucketLabel(rank.range))) {
         Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text("↓ 下行", style = MaterialTheme.typography.labelSmall, color = c.accent)
+                Text(ht("↓ 下行"), style = MaterialTheme.typography.labelSmall, color = c.accent)
                 Spacer(Modifier.width(10.dp))
-                Text("↑ 上行", style = MaterialTheme.typography.labelSmall, color = c.warn)
+                Text(ht("↑ 上行"), style = MaterialTheme.typography.labelSmall, color = c.warn)
                 Spacer(Modifier.weight(1f))
                 Text(
-                    "峰值 " + HxFormat.bytes(slots.maxOf { it.second + it.third }),
+                    ht("峰值 %s").fill(HxFormat.bytes(slots.maxOf { it.second + it.third })),
                     style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textMuted,
                 )
             }

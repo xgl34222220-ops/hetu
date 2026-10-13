@@ -22,6 +22,8 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.layout.layout
 import kotlin.math.roundToInt
 import androidx.compose.ui.Alignment
@@ -81,6 +83,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
         val sub = items[index]
         val c = LocalHomeColors.current
         val motion = LocalHomeMotionEnabled.current
+        // Tapping the one-line failure capsule shows the whole reason under the header.
+        var showReason by remember(sub.update) { mutableStateOf(false) }
         HomeCard(ListCard.then(hetuAnimateItem(motion)).homeEnter(stagger, index)) {
             Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 10.dp, bottom = 16.dp)) {
                 Row(Modifier.fillMaxWidth().heightIn(min = HomeDims.touch), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -88,7 +92,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
                     when (val state = sub.update) {
                         PanelUpdate.Updating -> HomePill(ht("更新中"), height = 30.dp, style = HomeType.buttonSmall, leading = { HomeSpinner(size = 15.dp, strokeWidth = 2.dp) })
                         is PanelUpdate.Failed -> {
-                            HomePill(ht("更新失败：%s").fill(state.reason), Modifier.weight(1f, fill = false), tone = HomeTone.Bad, icon = HomeIcons.CircleAlert, height = 30.dp)
+                            HomePill(ht("更新失败：%s").fill(state.reason), Modifier.weight(1f, fill = false), tone = HomeTone.Bad, icon = HomeIcons.CircleAlert, height = 30.dp,
+                                onClick = { showReason = !showReason })
                             HomePill(ht("重试"), height = 30.dp, style = HomeType.buttonSmall, onClick = { onUpdate(sub.name) })
                         }
                         PanelUpdate.Idle -> {
@@ -97,9 +102,13 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
                         }
                     }
                 }
+                val failure = sub.update as? PanelUpdate.Failed
+                if (showReason && failure != null) {
+                    Text(ht("更新失败：%s").fill(failure.reason), Modifier.fillMaxWidth().padding(bottom = 6.dp), color = c.badText, style = HomeType.note)
+                }
                 Row(Modifier.fillMaxWidth().padding(top = 2.dp)) {
-                    Text(ht("到期 %s").fill(sub.expire ?: HomeFormat.Dash), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
-                    Text(ht("更新于 %s").fill(sub.updatedAt ?: HomeFormat.Dash), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
+                    Text(ht("到期 %s").fill(sub.expire ?: HomeFormat.Dash), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(ht("更新于 %s").fill(sub.updatedAt ?: HomeFormat.Dash), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Row(Modifier.fillMaxWidth().padding(top = 14.dp, bottom = 14.dp)) {
                     PanelStat(HomeFormat.bytes(sub.uploadBytes), null, "上传", style = PanelType.statSmall)
@@ -108,8 +117,8 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
                 }
                 HomeProgressBar(sub.usedFraction)
                 Row(Modifier.fillMaxWidth().padding(top = 12.dp)) {
-                    Text(ht("已用 %s").fill(HomeFormat.bytes(sub.usedBytes)), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
-                    Text(ht("总计 %s").fill(if (sub.totalBytes > 0L) HomeFormat.bytes(sub.totalBytes) else HomeFormat.Dash), color = c.t2, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1)
+                    Text(ht("已用 %s").fill(HomeFormat.bytes(sub.usedBytes)), Modifier.weight(1f), color = c.t1, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(ht("总计 %s").fill(if (sub.totalBytes > 0L) HomeFormat.bytes(sub.totalBytes) else HomeFormat.Dash), color = c.t2, style = HomeType.rowSub.copy(fontSize = PanelType.groupSummary.fontSize), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
             }
         }
@@ -178,7 +187,7 @@ internal fun LazyListScope.panelConnectionsTab(
                         Column(Modifier.weight(1f)) {
                             Text(if (group.app == PanelLogic.UnattributedApp) ht(group.app) else group.app, color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                Text(ht("%d 个连接").fill(group.connections.size), color = c.t2, style = HomeType.rowSub, maxLines = 1)
+                                Text(ht("%d 个连接").fill(group.connections.size), color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                 FlowTotal(PanelIcons.ArrowDown, HomeFormat.bytes(group.connections.sumOf { it.downloadTotalBytes }))
                                 FlowTotal(PanelIcons.ArrowUp, HomeFormat.bytes(group.connections.sumOf { it.uploadTotalBytes }))
                             }
@@ -203,7 +212,7 @@ private fun FlowTotal(icon: ImageVector, text: String) {
     val c = LocalHomeColors.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(2.dp)) {
         Icon(icon, null, Modifier.size(13.dp), tint = c.t2)
-        Text(text, color = c.t2, style = HomeType.rowSub, maxLines = 1)
+        Text(text, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -215,7 +224,7 @@ private fun ConnectionCard(conn: PanelConnection, groups: List<PanelGroup>, modi
         Column(Modifier.padding(start = 16.dp, end = 16.dp, top = 11.dp, bottom = 12.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(conn.host, Modifier.weight(1f), color = c.t1, style = PanelType.host, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1)
+                if (conn.timeLabel != null) Text(conn.timeLabel, color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             if (conn.meta.isNotEmpty()) Text(conn.meta, Modifier.padding(top = 2.dp), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(Modifier.fillMaxWidth().padding(top = 7.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -252,8 +261,8 @@ private fun FlowStat(icon: ImageVector, tint: Color, rate: String, total: String
     val c = LocalHomeColors.current
     Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(5.dp)) {
         Icon(icon, null, Modifier.size(15.dp), tint = tint)
-        Text(rate, color = c.t1, style = PanelType.tiny.copy(fontWeight = FontWeight.Medium), maxLines = 1)
-        Text(ht("总计 %s").fill(total), color = c.t2, style = PanelType.tiny, maxLines = 1)
+        Text(rate, color = c.t1, style = PanelType.tiny.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht("总计 %s").fill(total), color = c.t2, style = PanelType.tiny, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -339,18 +348,23 @@ internal fun LazyListScope.panelRuleSetsTab(items: List<PanelRuleSet>, query: St
         val c = LocalHomeColors.current
         val haptics = LocalHomeHaptics.current
         val motion = LocalHomeMotionEnabled.current
+        var showReason by remember(set.update) { mutableStateOf(false) }
         HomeCard(ListCard.then(hetuAnimateItem(motion)).homeEnter(stagger, index), shape = PanelDims.groupShape) {
             Row(Modifier.fillMaxWidth().heightIn(min = 82.dp).padding(start = HomeDims.cardPadding, end = 8.dp, top = 10.dp, bottom = 10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(1.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(panelHighlight(set.name, query), Modifier.weight(1f, fill = false), color = c.t1, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+                        Text(ht("%d 条规则").fill(set.ruleCount), color = c.accent, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                     Text(set.meta, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     when (val state = set.update) {
                         PanelUpdate.Updating -> Text(ht("更新中"), color = c.t1, style = PanelType.groupSummary)
-                        is PanelUpdate.Failed -> Text(ht("更新失败：%s").fill(state.reason), color = c.badText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
-                        PanelUpdate.Idle -> Text(ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash), color = c.t1, style = PanelType.groupSummary, maxLines = 1)
+                        // Tap toggles the whole reason (one line by default).
+                        is PanelUpdate.Failed -> Text(ht("更新失败：%s").fill(state.reason),
+                            Modifier.homeTap(onClickLabel = ht(if (showReason) "收起" else "查看完整原因"), role = Role.Button) { showReason = !showReason },
+                            color = c.badText, style = PanelType.groupSummary.copy(fontWeight = FontWeight.Medium),
+                            maxLines = if (showReason) Int.MAX_VALUE else 1, overflow = TextOverflow.Ellipsis)
+                        PanelUpdate.Idle -> Text(ht("更新于 %s").fill(set.updatedAt ?: HomeFormat.Dash), color = c.t1, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 when (set.update) {
@@ -428,7 +442,7 @@ internal fun LazyListScope.panelLogsTab(
                 Row(Modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                     HomePill(entry.level.label, tone = entry.level.tone())
                     Spacer(Modifier.weight(1f))
-                    Text(entry.time, color = c.t2, style = PanelType.groupSummary, maxLines = 1)
+                    Text(entry.time, color = c.t2, style = PanelType.groupSummary, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
                 Text(panelHighlight(entry.message, view.needle), color = c.t1, style = PanelType.log, maxLines = if (open || !entry.foldable) Int.MAX_VALUE else 2, overflow = TextOverflow.Ellipsis)
                 if (entry.foldable) Row(Modifier.fillMaxWidth().padding(top = 8.dp), horizontalArrangement = Arrangement.End) {
