@@ -60309,21 +60309,20 @@ index 0000000..b779c0c
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-index 63c8e03..3efaabd 100644
+index 63c8e03..fc20a79 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-@@ -65,6 +65,10 @@ import androidx.compose.ui.unit.sp
+@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.sp
  import androidx.compose.ui.viewinterop.AndroidView
  import androidx.lifecycle.ViewModelProvider
  import io.github.rosemoe.sora.event.ContentChangeEvent
 +import io.github.rosemoe.sora.event.PublishSearchResultEvent
-+import io.github.xgl34222220.hetu.YamlWorkbenchSearch
 +import io.github.xgl34222220.hetu.home.fill
 +import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
  import io.github.rosemoe.sora.widget.CodeEditor
  import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
  import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
-@@ -99,11 +103,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
+@@ -99,11 +102,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
  import io.github.xgl34222220.hetu.ui.ht
  import kotlinx.coroutines.CancellationException
  import kotlinx.coroutines.Dispatchers
@@ -60336,7 +60335,7 @@ index 63c8e03..3efaabd 100644
 
  /* ------------------------------------------------------------------ */
  /*  Config library + subscriptions                                      */
-@@ -137,7 +140,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -137,7 +139,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
          } catch (cancel: CancellationException) {
              throw cancel
          } catch (error: Exception) {
@@ -60345,7 +60344,7 @@ index 63c8e03..3efaabd 100644
          } finally {
              loading = false
          }
-@@ -155,7 +158,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -155,7 +157,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -60354,7 +60353,7 @@ index 63c8e03..3efaabd 100644
              } finally {
                  busy = false
              }
-@@ -178,10 +181,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -178,10 +180,10 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
      }
 
      if (form == "import") {
@@ -60367,7 +60366,7 @@ index 63c8e03..3efaabd 100644
              form = null
          }
          return
-@@ -208,7 +211,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+@@ -208,7 +210,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
              HxSection {
                  HxGroup(title = ht("配置管理")) {
                      if (loading && configs.isEmpty()) {
@@ -60377,7 +60376,7 @@ index 63c8e03..3efaabd 100644
                      }
                      configs.forEach { config ->
                          // Tap to make it the current config; hold, or use ···, for everything else.
-@@ -353,7 +357,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -353,7 +356,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
                  else vm.controller.updateSubscription(subscription.name, url.trim())
                  onSaved()
              } catch (cancel: CancellationException) { throw cancel }
@@ -60386,7 +60385,7 @@ index 63c8e03..3efaabd 100644
              finally { busy = false }
          }
      }
-@@ -387,7 +391,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -387,7 +390,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
  }
 
  @Composable
@@ -60395,7 +60394,7 @@ index 63c8e03..3efaabd 100644
      val context = LocalContext.current
      val c = LocalHomeColors.current
      val scope = rememberCoroutineScope()
-@@ -395,28 +399,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -395,28 +398,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
      var uri by remember { mutableStateOf<Uri?>(null) }
      var fileName by remember { mutableStateOf("") }
      var url by remember { mutableStateOf("") }
@@ -60461,7 +60460,7 @@ index 63c8e03..3efaabd 100644
              finally { busy = false }
          }
      }
-@@ -425,10 +460,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -425,10 +459,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
          item("mode") {
              HxSection {
                  HomeSegmented(
@@ -60474,7 +60473,7 @@ index 63c8e03..3efaabd 100644
                  )
              }
          }
-@@ -443,6 +478,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -443,6 +477,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                          )
                          Spacer(Modifier.height(22.dp))
                          HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 旅行.yaml", enabled = !busy)
@@ -60514,7 +60513,7 @@ index 63c8e03..3efaabd 100644
                      } else {
                          Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
                          Spacer(Modifier.height(8.dp))
-@@ -475,7 +543,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -475,7 +542,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                      }
                      Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                          Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.t3)
@@ -60523,7 +60522,7 @@ index 63c8e03..3efaabd 100644
                      }
                      HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
                  }
-@@ -504,7 +572,8 @@ internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
+@@ -504,7 +571,8 @@ internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
          value.length <= 4096 && value.none { it.isWhitespace() || it.isISOControl() }
  }.getOrDefault(false)
 
@@ -60533,7 +60532,7 @@ index 63c8e03..3efaabd 100644
      val uri = Uri.parse(url)
      val host = uri.host.orEmpty()
      if (host.isBlank()) url.take(40) else "${uri.scheme}://$host/…"
-@@ -532,46 +601,6 @@ private fun normalizeConfigName(raw: String): String {
+@@ -532,46 +600,6 @@ private fun normalizeConfigName(raw: String): String {
      return name
  }
 
@@ -60580,7 +60579,7 @@ index 63c8e03..3efaabd 100644
  /* ------------------------------------------------------------------ */
  /*  Providers (live subscription usage)                                 */
  /* ------------------------------------------------------------------ */
-@@ -634,18 +663,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
+@@ -634,18 +662,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 
  private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
 
@@ -60616,7 +60615,7 @@ index 63c8e03..3efaabd 100644
      val nav = if (onBackOverride == null) LocalNav.current else null
      val context = LocalContext.current
      val scope = rememberCoroutineScope()
-@@ -663,6 +706,13 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -663,6 +705,13 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      var confirmLeave by remember { mutableStateOf(false) }
      var confirmReload by remember { mutableStateOf(false) }
      var showOutline by remember { mutableStateOf(false) }
@@ -60630,7 +60629,7 @@ index 63c8e03..3efaabd 100644
      val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
      val editorColors = remember(c.dark, c.surface) {
          HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
-@@ -678,14 +728,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -678,14 +727,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          loadFailure = null
          source = null
          try {
@@ -60655,7 +60654,7 @@ index 63c8e03..3efaabd 100644
      fun leave() {
          if (saving) return
          if (dirty) confirmLeave = true
-@@ -695,7 +753,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -695,7 +752,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          conflict = null
          if (dirty) confirmReload = true else loadRevision++
      }
@@ -60664,7 +60663,7 @@ index 63c8e03..3efaabd 100644
 
      // Returning from another editor must never silently replace this page's draft.
      val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
-@@ -705,7 +763,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -705,7 +762,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                  val expected = source
                  if (expected != null && !loading && !saving) scope.launch {
                      try {
@@ -60673,7 +60672,7 @@ index 63c8e03..3efaabd 100644
                          if (latest.core != expected.core || latest.name != expected.name)
                              conflict = HxConfigSourceConflict(true, latest.name)
                          else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
-@@ -734,29 +792,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -734,29 +791,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          val expected = source ?: return
          val current = editor?.text?.toString() ?: return
          if (saving || validating) return
@@ -60757,7 +60756,7 @@ index 63c8e03..3efaabd 100644
              finally { saving = false }
          }
      }
-@@ -765,8 +863,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -765,8 +862,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
          Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
              HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
@@ -60771,7 +60770,7 @@ index 63c8e03..3efaabd 100644
                  HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
                  enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
              )
-@@ -775,7 +876,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -775,7 +875,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
              HomeRowLayout(
                  AnnotatedString(source?.name ?: ht("读取配置")),
@@ -60780,7 +60779,7 @@ index 63c8e03..3efaabd 100644
                  icon = ToolsIcons.FileCog,
                  iconTint = if (source == null) c.t3 else c.t1,
                  subtitleColor = if (dirty) c.warnText else c.t2,
-@@ -786,20 +887,31 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -786,20 +886,31 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
              Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
              verticalAlignment = Alignment.CenterVertically,
          ) {
@@ -60789,7 +60788,8 @@ index 63c8e03..3efaabd 100644
 +            ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
 +            ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
              ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
-             ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
+-            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
++            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, onClick = ::validate)
 +            ConfigEditorAction(ToolsIcons.Search, "搜索", Modifier.weight(1f), ready, active = search) { search = !search }
 +            ConfigEditorAction(ToolsFeatureIcons.ArrowUpDown, "跳行", Modifier.weight(1f), ready) {
 +                jumpLine = ((editor?.cursor?.leftLine ?: 0) + 1).toString(); jump = true
@@ -60816,7 +60816,7 @@ index 63c8e03..3efaabd 100644
                  loadFailure != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                      HomeEmptyState(HomeIcons.CircleAlert, "配置读取失败", loadFailure.orEmpty(), topPadding = 0.dp, verbatimSubtitle = true) {
                          HxButton("重新读取", { loadRevision++ }, icon = HomeIcons.RefreshCw)
-@@ -811,7 +923,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -811,7 +922,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                              CodeEditor(viewContext).apply {
                                  setEditorLanguage(HetuYamlLanguage())
                                  setText(initial.text)
@@ -60825,7 +60825,7 @@ index 63c8e03..3efaabd 100644
                                  setSoftKeyboardEnabled(true)
                                  typefaceText = Typeface.MONOSPACE
                                  setTextSize(14f)
-@@ -825,18 +937,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -825,18 +936,22 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                                  setHighlightCurrentLine(true)
                                  colorScheme = editorColors
                                  subscribeAlways<ContentChangeEvent> { dirty = this.text.toString() != source?.text }
@@ -60850,7 +60850,7 @@ index 63c8e03..3efaabd 100644
              .clip(HomeDims.cardShape).background(c.surface)
              .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
              HxYamlSymbols.forEach { symbol ->
-@@ -893,6 +1009,19 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -893,6 +1008,19 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
              }
          }
      }
@@ -60870,7 +60870,7 @@ index 63c8e03..3efaabd 100644
      if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
          "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
          onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
-@@ -904,7 +1033,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -904,7 +1032,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
  /** One tool of the editor: a glyph over its name; a spinner takes the glyph's place while it works. */
  @Composable
  private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier,
@@ -60879,7 +60879,7 @@ index 63c8e03..3efaabd 100644
      val c = LocalHomeColors.current
      val haptics = LocalHomeHaptics.current
      val source = remember { MutableInteractionSource() }
-@@ -916,9 +1045,9 @@ private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVe
+@@ -916,9 +1044,9 @@ private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVe
          horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
      ) {
          Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
@@ -71735,14 +71735,14 @@ index 47a2394..2d21e90 100644
          Spacer(Modifier.width(12.dp))
          ToolsCheckCircle(checked)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
-index 210d888..78ed86b 100644
+index 210d888..1c67825 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsConfigScreen.kt
 @@ -24,6 +24,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
  import io.github.xgl34222220.hetu.home.homeEnter
  import io.github.xgl34222220.hetu.home.rememberHomeStagger
  import io.github.xgl34222220.hetu.home.warnText
-+import io.github.xgl34222220.hetu.app.maskUrl
++import io.github.xgl34222220.hetu.maskUrl
  import io.github.xgl34222220.hetu.ui.ht
 
  /**
@@ -77021,14 +77021,13 @@ index 0000000..2bb498c
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt
 new file mode 100644
-index 0000000..95b38bd
+index 0000000..f6bad29
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt
-@@ -0,0 +1,89 @@
+@@ -0,0 +1,88 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
-+import io.github.xgl34222220.hetu.app.maskUrl
 +import io.github.xgl34222220.hetu.panel.PanelLogFilter
 +import io.github.xgl34222220.hetu.panel.PanelLogLevel
 +import io.github.xgl34222220.hetu.tools.ToolsYaml

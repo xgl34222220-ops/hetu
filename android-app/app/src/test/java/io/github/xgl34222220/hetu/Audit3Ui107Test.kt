@@ -1,7 +1,6 @@
 package io.github.xgl34222220.hetu
 
 import android.app.Application
-import io.github.xgl34222220.hetu.app.maskUrl
 import io.github.xgl34222220.hetu.panel.PanelLogFilter
 import io.github.xgl34222220.hetu.panel.PanelLogLevel
 import io.github.xgl34222220.hetu.tools.ToolsYaml

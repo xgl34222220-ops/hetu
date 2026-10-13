@@ -66,7 +66,6 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModelProvider
 import io.github.rosemoe.sora.event.ContentChangeEvent
 import io.github.rosemoe.sora.event.PublishSearchResultEvent
-import io.github.xgl34222220.hetu.YamlWorkbenchSearch
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
 import io.github.rosemoe.sora.widget.CodeEditor
@@ -890,7 +889,7 @@ internal fun ConfigEditorScreen(
             ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
             ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
             ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
-            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
+            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, onClick = ::validate)
             ConfigEditorAction(ToolsIcons.Search, "搜索", Modifier.weight(1f), ready, active = search) { search = !search }
             ConfigEditorAction(ToolsFeatureIcons.ArrowUpDown, "跳行", Modifier.weight(1f), ready) {
                 jumpLine = ((editor?.cursor?.leftLine ?: 0) + 1).toString(); jump = true

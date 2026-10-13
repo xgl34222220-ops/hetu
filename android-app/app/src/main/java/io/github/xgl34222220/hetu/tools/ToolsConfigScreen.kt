@@ -24,7 +24,7 @@ import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.home.warnText
-import io.github.xgl34222220.hetu.app.maskUrl
+import io.github.xgl34222220.hetu.maskUrl
 import io.github.xgl34222220.hetu.ui.ht
 
 /**
