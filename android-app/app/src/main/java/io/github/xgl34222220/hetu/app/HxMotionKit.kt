@@ -69,6 +69,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
@@ -93,6 +94,18 @@ import kotlinx.coroutines.delay
 
 /** Whether frosted-glass bars are drawn (user switch 「模糊效果」). */
 internal val LocalHxBlur = staticCompositionLocalOf { true }
+
+/**
+ * The one motion switch every helper here reads: false when the system animator duration
+ * scale is 0 (「移除动画」), the in-app 动画 switch is off, or power saving / low-RAM degrades
+ * the UI ([HetuAppTheme] folds all three into [io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled]).
+ * With it false every helper renders its final state at once and starts no frame loop.
+ */
+@Composable
+internal fun hxMotion(): Boolean = io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
+
+/** Whether a perpetual (ambient) animation may run: only while it is visibly active and motion is allowed. */
+internal fun hxAmbientAllowed(motion: Boolean, active: Boolean): Boolean = motion && active
 
 /* ------------------------------------------------------------------ */
 /*  Depth                                                               */
@@ -124,7 +137,9 @@ internal class HxStagger(played: Boolean) {
 @Composable
 internal fun rememberHxStagger(): HxStagger {
     val saved = rememberSaveable { mutableStateOf(false) }
-    val stagger = remember { HxStagger(saved.value) }
+    // With motion off (system 「移除动画」, the in-app switch, power saving) nothing ever rises.
+    val motion = hxMotion()
+    val stagger = remember { HxStagger(saved.value || !motion) }
     LaunchedEffect(Unit) {
         delay(900)
         stagger.played = true
@@ -135,7 +150,7 @@ internal fun rememberHxStagger(): HxStagger {
 
 @Composable
 internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
-    if (stagger.played) return this
+    if (stagger.played || !hxMotion()) return this
     val progress = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
         delay(40L * index.coerceAtMost(8))
@@ -158,6 +173,8 @@ internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
 /** Each digit rolls up or down to its new value, like an odometer. */
 @Composable
 internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
+    // Same nodes with motion on or off (tests and TalkBack read one tree); only the specs change.
+    val motion = hxMotion()
     Row(modifier) {
         val length = text.length
         text.forEachIndexed { index, char ->
@@ -165,7 +182,10 @@ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifie
                 AnimatedContent(
                     targetState = char,
                     transitionSpec = {
-                        if (initialState.isDigit() && targetState.isDigit()) {
+                        if (!motion) {
+                            androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
+                                .using(SizeTransform(clip = true) { _, _ -> androidx.compose.animation.core.snap() })
+                        } else if (initialState.isDigit() && targetState.isDigit()) {
                             val up = targetState > initialState
                             (slideInVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { h -> if (up) h else -h } + fadeIn(tween(HxMotion.Medium)))
                                 .togetherWith(slideOutVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { h -> if (up) -h else h } + fadeOut(tween(HxMotion.Short)))
@@ -190,6 +210,7 @@ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifie
 @Composable
 internal fun rememberHxShimmer(): Brush {
     val c = Hx.colors
+    if (!hxMotion()) return Brush.linearGradient(listOf(c.surfaceMuted, c.surfaceMuted))
     val transition = rememberInfiniteTransition(label = "shimmer")
     val x by transition.animateFloat(
         initialValue = -1f,
@@ -267,11 +288,12 @@ internal fun HxDock(
     // Liquid pill: the edge facing the destination leads, the other trails, so the pill
     // stretches across and settles back into one slot.
     val forward = rememberHxDirection(index)
-    val lead = spring<Dp>(dampingRatio = .8f, stiffness = 620f)
-    val trail = spring<Dp>(dampingRatio = .82f, stiffness = 230f)
+    val motion = hxMotion()
+    val lead: androidx.compose.animation.core.AnimationSpec<Dp> = if (motion) spring(dampingRatio = .8f, stiffness = 620f) else androidx.compose.animation.core.snap()
+    val trail: androidx.compose.animation.core.AnimationSpec<Dp> = if (motion) spring(dampingRatio = .82f, stiffness = 230f) else androidx.compose.animation.core.snap()
     val indicatorLeft by animateDpAsState(itemWidth * index, if (forward) trail else lead, label = "dockLeft")
     val indicatorRight by animateDpAsState(itemWidth * (index + 1), if (forward) lead else trail, label = "dockRight")
-    val hide by animateFloatAsState(if (visible) 0f else 1f, spring(dampingRatio = .9f, stiffness = 380f), label = "dockHide")
+    val hide by animateFloatAsState(if (visible) 0f else 1f, if (motion) spring(dampingRatio = .9f, stiffness = 380f) else androidx.compose.animation.core.snap(), label = "dockHide")
     val blur = LocalHxBlur.current && io.github.xgl34222220.hetu.ui.LocalHetuGlassEffectsEnabled.current && hazeState != null
     Box(
         modifier
@@ -331,10 +353,10 @@ internal fun HxDock(
         Row(Modifier.fillMaxSize()) {
             items.forEach { item ->
                 val active = item.key == selected
-                val tint by animateColorAsState(if (active) c.accent else c.text.copy(alpha = .92f), tween(HxMotion.Medium), label = "dockTint")
+                val tint by animateColorAsState(if (active) c.accent else c.text.copy(alpha = .92f), if (motion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "dockTint")
                 val bounce = remember { Animatable(1f) }
                 LaunchedEffect(active) {
-                    if (active) {
+                    if (active && motion) {
                         bounce.snapTo(.90f)
                         bounce.animateTo(1f, spring(dampingRatio = .45f, stiffness = Spring.StiffnessMedium))
                     }
@@ -383,13 +405,23 @@ internal fun HxDock(
  */
 @Composable
 internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifier: Modifier = Modifier) {
-    val transition = rememberInfiniteTransition(label = "ring")
-    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "ringAngle")
-    val breath by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "ringBreath")
-    val busyAlpha by animateFloatAsState(if (busy) 1f else 0f, tween(HxMotion.Medium), label = "busyAlpha")
-    val haloAlpha by animateFloatAsState(if (breathing && !busy) 1f else 0f, tween(HxMotion.Long), label = "haloAlpha")
+    val motion = hxMotion()
+    // Perpetual values exist only while something moves; at rest (or with motion off) the
+    // ring asks for no frames at all. They are read in the draw phase only.
+    val spinning = motion && busy
+    val breathingNow = motion && breathing && !busy
+    val angleState = if (spinning) {
+        rememberInfiniteTransition(label = "ring").animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "ringAngle")
+    } else null
+    val breathState = if (breathingNow) {
+        rememberInfiniteTransition(label = "ringHalo").animateFloat(0f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "ringBreath")
+    } else null
+    val busyAlpha by animateFloatAsState(if (busy) 1f else 0f, if (motion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "busyAlpha")
+    val haloAlpha by animateFloatAsState(if (breathing && !busy) 1f else 0f, if (motion) tween(HxMotion.Long) else androidx.compose.animation.core.snap(), label = "haloAlpha")
     androidx.compose.foundation.Canvas(modifier) {
         val stroke = 3.dp.toPx()
+        val angle = angleState?.value ?: -90f
+        val breath = breathState?.value ?: 0f
         if (haloAlpha > 0f) {
             val grow = 1f + breath * .08f
             drawCircle(
@@ -415,9 +447,14 @@ internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifi
 @Composable
 internal fun rememberHxAurora(active: Boolean): Brush {
     val c = Hx.colors
-    val transition = rememberInfiniteTransition(label = "aurora")
-    val t by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "auroraT")
-    val strength by animateFloatAsState(if (active) 1f else 0f, tween(700), label = "auroraStrength")
+    val motion = hxMotion()
+    // The drift runs only while the wash is shown and motion is allowed; otherwise it rests mid-way.
+    val t = if (motion && active) {
+        val transition = rememberInfiniteTransition(label = "aurora")
+        val drift by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "auroraT")
+        drift
+    } else .5f
+    val strength by animateFloatAsState(if (active) 1f else 0f, if (motion) tween(700) else androidx.compose.animation.core.snap(), label = "auroraStrength")
     val a = c.accentSoft.copy(alpha = .9f * strength)
     val b = c.goodSoft.copy(alpha = .55f * strength)
     return Brush.linearGradient(
@@ -493,18 +530,22 @@ internal fun HxSwipeAction(
     val actionTint by animateColorAsState(if (armed) Color.White else c.bad, tween(HxMotion.Short), label = "swipeTint")
     val actionBg by animateColorAsState(if (armed) c.bad else c.badSoft, tween(HxMotion.Short), label = "swipeBg")
 
+    val motion = hxMotion()
     suspend fun settle(velocity: Float) {
         if (armed || velocity < -2600f) {
             haptics.perform(HetuHaptic.Confirm)
-            animate(offset, -widthPx.toFloat(), animationSpec = tween(HxMotion.Short, easing = HxMotion.Exit)) { v, _ -> offset = v }
+            if (motion) animate(offset, -widthPx.toFloat(), animationSpec = tween(HxMotion.Short, easing = HxMotion.Exit)) { v, _ -> offset = v }
+            else offset = -widthPx.toFloat()
             armed = false
             onAction()
             // Normally the row is gone by now; if the action failed, bring it back.
             delay(1400)
-            animate(offset, 0f, animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
+            if (motion) animate(offset, 0f, animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
+            else offset = 0f
         } else {
             armed = false
-            animate(offset, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = Spring.StiffnessMedium)) { v, _ -> offset = v }
+            if (motion) animate(offset, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = Spring.StiffnessMedium)) { v, _ -> offset = v }
+            else offset = 0f
         }
     }
 
@@ -572,3 +613,153 @@ internal fun HxSwipeAction(
         ) { content() }
     }
 }
+
+/* ------------------------------------------------------------------ */
+/*  Motion pass 2026-10: shared, motion-aware building blocks           */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Inline banners, form errors and "unsaved changes" rows that come and go inside a list item.
+ * Expands from the top and fades (enter 220 ms / exit 140 ms on the calm glide spring);
+ * with motion off it is a plain conditional Box (appears / disappears on the next frame).
+ */
+@Composable
+internal fun HxVisibility(
+    visible: Boolean,
+    modifier: Modifier = Modifier,
+    content: @Composable () -> Unit,
+) {
+    val motion = hxMotion()
+    // Motion off: no transition at all, the content is simply there or not on the next frame.
+    if (!motion) {
+        if (visible) Box(modifier) { content() }
+        return
+    }
+    androidx.compose.animation.AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = if (motion) {
+            androidx.compose.animation.expandVertically(spring(dampingRatio = .86f, stiffness = 420f), expandFrom = Alignment.Top) +
+                fadeIn(tween(220, easing = HxMotion.Emphasized))
+        } else androidx.compose.animation.EnterTransition.None,
+        exit = if (motion) {
+            androidx.compose.animation.shrinkVertically(spring(dampingRatio = .9f, stiffness = 520f), shrinkTowards = Alignment.Top) +
+                fadeOut(tween(140, easing = HxMotion.Exit))
+        } else androidx.compose.animation.ExitTransition.None,
+        label = "hx-visibility",
+    ) { content() }
+}
+
+/**
+ * Hierarchical content swap (folders, nested pickers): deeper slides in from the right a third
+ * of the width while the old level drifts a sixth the other way; going up mirrors it.
+ * [motion] false → instant swap.
+ */
+internal fun hxHierarchyTransition(deeper: Boolean, motion: Boolean): androidx.compose.animation.ContentTransform {
+    if (!motion) return androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
+    return (androidx.compose.animation.slideInHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) w / 3 else -w / 3 } +
+        fadeIn(tween(HxMotion.Medium)))
+        .togetherWith(
+            androidx.compose.animation.slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) -w / 6 else w / 6 } +
+                fadeOut(tween(HxMotion.Short)),
+        )
+}
+
+/** Width of the [index]th placeholder bar of a skeleton row, so a stack of rows reads as text, not stripes. */
+internal fun hxSkeletonWidth(index: Int, secondLine: Boolean): Float =
+    if (secondLine) (if (index % 2 == 0) .34f else .42f)
+    else when (index % 3) { 0 -> .62f; 1 -> .5f; else -> .7f }
+
+/**
+ * Placeholder rows for a list that is loading inside an existing card or group (configs, rule
+ * sources, the editor). Bars in the shape of an icon and two lines of text, under one slow light
+ * sweep. The sweep is a single infinite transition read in the draw phase only, so it never
+ * recomposes; with motion off the bars are static. Carries no text, so nothing a test or
+ * TalkBack looks for changes while it shows.
+ */
+@Composable
+internal fun HxSkeletonLines(
+    count: Int = 3,
+    modifier: Modifier = Modifier,
+    rowHeight: Dp = 60.dp,
+    icon: Boolean = true,
+) {
+    val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
+    val bar = if (c.dark) Color.White.copy(alpha = .07f) else c.sunken
+    val glow = if (c.dark) Color.White.copy(alpha = .05f) else c.surface.copy(alpha = .9f)
+    val shift = if (hxMotion()) {
+        rememberInfiniteTransition(label = "hx-skeleton").animateFloat(
+            initialValue = -1f,
+            targetValue = 2f,
+            animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
+            label = "hx-skeleton-shift",
+        )
+    } else null
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .hxSkeletonSweep(shift, glow),
+    ) {
+        repeat(count.coerceAtLeast(1)) { i ->
+            Row(
+                Modifier.fillMaxWidth().height(rowHeight).padding(horizontal = 18.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                if (icon) {
+                    Box(Modifier.size(26.dp).clip(RoundedCornerShape(8.dp)).background(bar))
+                    Spacer(Modifier.width(20.dp))
+                }
+                Column(Modifier.weight(1f)) {
+                    Box(Modifier.fillMaxWidth(hxSkeletonWidth(i, false)).height(13.dp).clip(Hx.pillShape).background(bar))
+                    Spacer(Modifier.height(9.dp))
+                    Box(Modifier.fillMaxWidth(hxSkeletonWidth(i, true)).height(10.dp).clip(Hx.pillShape).background(bar))
+                }
+            }
+        }
+    }
+}
+
+/** Draws the skeleton's light band over the bars; reads [shift] only while drawing. */
+private fun Modifier.hxSkeletonSweep(shift: androidx.compose.runtime.State<Float>?, glow: Color): Modifier =
+    if (shift == null) this else this.drawWithContent {
+        drawContent()
+        val band = size.width * .6f
+        val x = shift.value * size.width
+        drawRect(
+            brush = Brush.horizontalGradient(
+                colors = listOf(Color.Transparent, glow, Color.Transparent),
+                startX = x - band / 2f,
+                endX = x + band / 2f,
+            ),
+        )
+    }
+
+/**
+ * A small piece (busy ring, badge, check) that pops in when it is first composed: from
+ * [initialScale] and transparent to rest on a lightly overshooting spring, draw phase only.
+ * Leaves immediately. With [motion] false it is a no-op modifier.
+ */
+@Composable
+internal fun hxPopIn(motion: Boolean = hxMotion(), initialScale: Float = .6f): Modifier {
+    if (!motion) return Modifier
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(Unit) { progress.animateTo(1f, spring(dampingRatio = .62f, stiffness = 520f)) }
+    return Modifier.graphicsLayer {
+        val p = progress.value
+        alpha = p.coerceIn(0f, 1f)
+        val s = initialScale + (1f - initialScale) * p
+        scaleX = s
+        scaleY = s
+    }
+}
+
+/**
+ * Lazy-list rows of the Hx pages: inserted rows fade in (260 ms) and survivors glide to their
+ * new slot on the calm spring; removed rows leave at once. With motion off the row is placed
+ * directly, with no item animation node at all.
+ */
+@Composable
+internal fun androidx.compose.foundation.lazy.LazyItemScope.hxAnimateItem(motion: Boolean = hxMotion()): Modifier =
+    if (motion) Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
+    else Modifier

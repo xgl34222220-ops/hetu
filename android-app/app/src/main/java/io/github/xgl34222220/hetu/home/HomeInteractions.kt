@@ -18,6 +18,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
@@ -74,6 +78,13 @@ internal fun HomeRefreshBox(
 ) {
     val state = rememberPullToRefreshState()
     val colors = LocalHomeColors.current
+    val motion = LocalHomeMotionEnabled.current
+    // The page follows the finger a little while it is pulled (rubber-banded past the trigger
+    // point) and eases back once the refresh starts, so at rest — refreshing or not — nothing
+    // is offset. Both values are read in the layer only: pulling never recomposes the page.
+    val follow = androidx.compose.animation.core.animateFloatAsState(
+        if (refreshing || !motion) 0f else 1f, HomeMotion.glide(motion), label = "home-refresh-follow",
+    )
     PullToRefreshBox(
         isRefreshing = refreshing,
         onRefresh = { if (!refreshing) onRefresh() },
@@ -93,6 +104,14 @@ internal fun HomeRefreshBox(
                 color = colors.accent,
             )
         },
-        content = content,
-    )
+    ) {
+        Box(
+            Modifier.fillMaxSize().graphicsLayer {
+                val f = state.distanceFraction
+                val pull = f.coerceIn(0f, 1f) * 22.dp.toPx() + (f - 1f).coerceAtLeast(0f) * 8.dp.toPx()
+                translationY = pull * follow.value
+            },
+            content = content,
+        )
+    }
 }

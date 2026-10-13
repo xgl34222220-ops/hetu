@@ -170,7 +170,7 @@ private fun LazyListScope.ruleSetItems(vm: HetuViewModel, query: String = "", sh
             set = set,
             task = vm.ruleSetTasks[set.name],
             onUpdate = { vm.updateRuleSet(set.name) },
-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
+            modifier = Modifier.then(hxAnimateItem()),
         )
     }
 }
@@ -281,7 +281,7 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel, query: String = 
             p = p,
             task = vm.providerTasks[p.name],
             onUpdate = { vm.updateProvider(p.name) },
-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
+            modifier = Modifier.then(hxAnimateItem()),
         )
     }
 }
@@ -405,7 +405,7 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch
         item(key = "rules-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (vm.rules.isEmpty()) "没有规则" else "没有匹配的规则", if (query.isBlank()) null else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
     }
     itemsIndexed(list, key = { _, rule -> "r:" + rule.index }) { index, rule ->
-        Box(Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)) {
+        Box(Modifier.then(hxAnimateItem())) {
             RuleRow(rule, first = index == 0, last = index == list.lastIndex)
         }
     }

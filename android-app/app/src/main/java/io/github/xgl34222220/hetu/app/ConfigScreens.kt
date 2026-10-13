@@ -207,7 +207,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
             HxSection {
                 HxGroup(title = ht("配置管理")) {
                     if (loading && configs.isEmpty()) {
-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
+                        // First read: rows in the shape of config entries instead of a spinner.
+                        HxSkeletonLines(count = 3)
                     }
                     configs.forEach { config ->
                         // Tap to make it the current config; hold, or use ···, for everything else.
@@ -881,7 +882,8 @@ internal fun ConfigEditorScreen(
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
             val initial = source
             when {
-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
+                // Reading the file: quiet code-line placeholders in the editor card instead of a spinner.
+                loading -> HxSkeletonLines(count = 6, modifier = Modifier.padding(top = 8.dp), rowHeight = 48.dp, icon = false)
                 loadFailure != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                     HomeEmptyState(HomeIcons.CircleAlert, "配置读取失败", loadFailure.orEmpty(), topPadding = 0.dp, verbatimSubtitle = true) {
                         HxButton("重新读取", { loadRevision++ }, icon = HomeIcons.RefreshCw)

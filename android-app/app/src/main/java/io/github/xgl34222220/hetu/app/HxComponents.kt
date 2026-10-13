@@ -466,7 +466,9 @@ private fun HxEmbeddedPage(
 @Composable
 internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
     val pressed by source.collectIsPressedAsState()
-    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HomeMotion.glide(LocalHomeMotionEnabled.current), label = "press")
+    val motion = LocalHomeMotionEnabled.current
+    // With motion off the surface does not dip at all (the ripple/tint still marks the press).
+    val scale by animateFloatAsState(if (pressed && motion) pressedScale else 1f, HomeMotion.glide(motion), label = "press")
     return this.graphicsLayer { scaleX = scale; scaleY = scale }
 }
 
