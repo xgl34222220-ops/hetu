@@ -123,27 +123,41 @@ class Audit3Settings107Test {
     }
 
     @Test fun newWordsTranslate() {
-        listOf("预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
+        listOf("预览", "收起预览", "预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
             HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.IO_ERROR, HxResourceLimits.CPU_BEYOND_DEVICE).forEach { key ->
             listOf("en", "zh-TW", "ru").forEach { lang -> assertTrue("$lang: $key", translateHetuText(key, lang) != key) }
         }
         listOf("en", "zh-TW", "ru").forEach { lang -> assertEquals(2, Regex("%s").findAll(translateHetuText(HxResourceLimits.CPU_BEYOND_DEVICE, lang)).count()) }
     }
 
-    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
+    private fun showNotifications(onBack: () -> Unit) {
         val model = HetuViewModel(app).also { vm = it }
-        var left = false
         rule.setContent {
             HetuAppTheme("light", false) {
                 CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides model.blurEnabled) {
-                    NotificationSettingsScreen(model) { left = true }
+                    NotificationSettingsScreen(model, onBack)
                 }
             }
         }
+    }
+
+    @Test fun previewChipShowsTheRenderedTemplatesWithoutEditing() {
+        showNotifications {}
+        // Closed by default: the page keeps its height so the quick buttons do not move.
+        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
+        rule.onNodeWithText("预览").performClick()
         rule.onNodeWithText("预览 · 示例值").assertExists()
         rule.onNodeWithText("河图 · 运行中").assertExists()
+        rule.onNodeWithText("收起预览").performClick()
+        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
+    }
+
+    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
+        var left = false
+        showNotifications { left = true }
         rule.onAllNodes(hasSetTextAction())[1].performTextReplacement("{status} 测试107")
         rule.onNodeWithText("运行中 测试107").assertExists()
+        rule.onNodeWithText("预览 · 示例值").assertExists()
         rule.onNode(hasClickAction() and hasContentDescription("返回")).performClick()
         rule.waitForIdle()
         assertFalse(left)

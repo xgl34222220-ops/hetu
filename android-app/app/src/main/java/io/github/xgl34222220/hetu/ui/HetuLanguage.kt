@@ -1218,6 +1218,8 @@ private val vocabularyWechat = """
 
 // 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
 private val vocabularyAudit3Settings = """
+预览|Preview|預覽|Предпросмотр
+收起预览|Hide preview|收合預覽|Скрыть предпросмотр
 预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
 通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
 CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)

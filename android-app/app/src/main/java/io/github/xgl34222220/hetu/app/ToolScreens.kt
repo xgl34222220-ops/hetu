@@ -1023,6 +1023,10 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         actions.toList() != initialActions || labels.toList() != initialLabels
     var confirmLeave by remember { mutableStateOf(false) }
     val previewValues = remember { hxNotificationPreviewValues() }
+    // The preview opens by itself once a template is edited, or from the 预览 chip. Closed it adds no
+    // height, so the quick buttons stay where the PDF frames and their pickers expect them.
+    var previewOpen by rememberSaveable { mutableStateOf(false) }
+    val showPreview = previewOpen || titleTemplate != initialTitle || template != initialTemplate
 
     val targetOptions = listOf(
         "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
@@ -1108,6 +1112,11 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
+                        HomePill(
+                            ht(if (showPreview) "收起预览" else "预览"), tone = HomeTone.Accent, height = 28.dp,
+                            style = HomeType.badge.copy(fontWeight = FontWeight.Medium),
+                            onClick = { previewOpen = !showPreview },
+                        )
                         NotificationVariables.forEach { variable ->
                             HomePill(
                                 variable, tone = HomeTone.Neutral, height = 28.dp,
@@ -1117,16 +1126,18 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                         }
                     }
                     // The notification as the service would render the two templates, with stand-in values.
-                    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
-                        Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
-                        Text(
-                            hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
-                            color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                        Text(
-                            hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
-                            Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
-                        )
+                    HxVisibility(showPreview) {
+                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
+                            Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
+                            Text(
+                                hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
+                                color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
+                            )
+                            Text(
+                                hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
+                                Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
+                            )
+                        }
                     }
                 }
             }

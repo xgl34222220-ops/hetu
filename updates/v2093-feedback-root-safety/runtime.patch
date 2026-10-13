@@ -67746,7 +67746,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..67b60f9 100644
+index b41cf98..894de18 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.Role
@@ -67932,7 +67932,7 @@ index b41cf98..67b60f9 100644
          item(key = "inspect") {
              SettingsSection {
                  SettingsGroup(title = ht("查看")) {
-@@ -976,6 +1017,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -976,6 +1017,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
      val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
          actions.toList() != initialActions || labels.toList() != initialLabels
@@ -67942,10 +67942,14 @@ index b41cf98..67b60f9 100644
 +        actions.toList() != initialActions || labels.toList() != initialLabels
 +    var confirmLeave by remember { mutableStateOf(false) }
 +    val previewValues = remember { hxNotificationPreviewValues() }
++    // The preview opens by itself once a template is edited, or from the 预览 chip. Closed it adds no
++    // height, so the quick buttons stay where the PDF frames and their pickers expect them.
++    var previewOpen by rememberSaveable { mutableStateOf(false) }
++    val showPreview = previewOpen || titleTemplate != initialTitle || template != initialTemplate
 
      val targetOptions = listOf(
          "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
-@@ -1008,11 +1055,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1008,11 +1059,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          vm.toast("通知设置已保存")
          onBack()
      }
@@ -67959,26 +67963,40 @@ index b41cf98..67b60f9 100644
          actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
      ) {
          item(key = "master") {
-@@ -1068,6 +1116,18 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1060,6 +1112,11 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                     ) {
++                        HomePill(
++                            ht(if (showPreview) "收起预览" else "预览"), tone = HomeTone.Accent, height = 28.dp,
++                            style = HomeType.badge.copy(fontWeight = FontWeight.Medium),
++                            onClick = { previewOpen = !showPreview },
++                        )
+                         NotificationVariables.forEach { variable ->
+                             HomePill(
+                                 variable, tone = HomeTone.Neutral, height = 28.dp,
+@@ -1068,6 +1125,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                              )
                          }
                      }
 +                    // The notification as the service would render the two templates, with stand-in values.
-+                    Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
-+                        Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
-+                        Text(
-+                            hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
-+                            color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
-+                        )
-+                        Text(
-+                            hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
-+                            Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
-+                        )
++                    HxVisibility(showPreview) {
++                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
++                            Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
++                            Text(
++                                hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
++                                color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
++                            )
++                            Text(
++                                hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
++                                Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
++                            )
++                        }
 +                    }
                  }
              }
          }
-@@ -1118,4 +1178,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1118,4 +1189,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              )
          }
      }
@@ -72956,7 +72974,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..b8f3968 100644
+index 578ce9d..a035d47 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -73003,7 +73021,7 @@ index 578ce9d..b8f3968 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,261 @@ private val vocabularyConnection = """
+@@ -969,16 +990,263 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -73236,6 +73254,8 @@ index 578ce9d..b8f3968 100644
 +
 +// 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
 +private val vocabularyAudit3Settings = """
++预览|Preview|預覽|Предпросмотр
++收起预览|Hide preview|收合預覽|Скрыть предпросмотр
 +预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
 +通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
 +CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)
@@ -77080,10 +77100,10 @@ index 0000000..2bb498c
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
 new file mode 100644
-index 0000000..9231847
+index 0000000..f9ead7a
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
-@@ -0,0 +1,157 @@
+@@ -0,0 +1,171 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
@@ -77209,27 +77229,41 @@ index 0000000..9231847
 +    }
 +
 +    @Test fun newWordsTranslate() {
-+        listOf("预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
++        listOf("预览", "收起预览", "预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
 +            HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.IO_ERROR, HxResourceLimits.CPU_BEYOND_DEVICE).forEach { key ->
 +            listOf("en", "zh-TW", "ru").forEach { lang -> assertTrue("$lang: $key", translateHetuText(key, lang) != key) }
 +        }
 +        listOf("en", "zh-TW", "ru").forEach { lang -> assertEquals(2, Regex("%s").findAll(translateHetuText(HxResourceLimits.CPU_BEYOND_DEVICE, lang)).count()) }
 +    }
 +
-+    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
++    private fun showNotifications(onBack: () -> Unit) {
 +        val model = HetuViewModel(app).also { vm = it }
-+        var left = false
 +        rule.setContent {
 +            HetuAppTheme("light", false) {
 +                CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides model.blurEnabled) {
-+                    NotificationSettingsScreen(model) { left = true }
++                    NotificationSettingsScreen(model, onBack)
 +                }
 +            }
 +        }
++    }
++
++    @Test fun previewChipShowsTheRenderedTemplatesWithoutEditing() {
++        showNotifications {}
++        // Closed by default: the page keeps its height so the quick buttons do not move.
++        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
++        rule.onNodeWithText("预览").performClick()
 +        rule.onNodeWithText("预览 · 示例值").assertExists()
 +        rule.onNodeWithText("河图 · 运行中").assertExists()
++        rule.onNodeWithText("收起预览").performClick()
++        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
++    }
++
++    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
++        var left = false
++        showNotifications { left = true }
 +        rule.onAllNodes(hasSetTextAction())[1].performTextReplacement("{status} 测试107")
 +        rule.onNodeWithText("运行中 测试107").assertExists()
++        rule.onNodeWithText("预览 · 示例值").assertExists()
 +        rule.onNode(hasClickAction() and hasContentDescription("返回")).performClick()
 +        rule.waitForIdle()
 +        assertFalse(left)

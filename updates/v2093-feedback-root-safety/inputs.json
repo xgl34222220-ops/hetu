@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "537c312b85fd4e3353b9b86e29c325b5dfff37d6cba38e1c1835768bef19d1f6",
+  "patchSha256": "9f5763e58cccadcd751e629c7d03cb7238161a83924c32ac27845c1db7894faf",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -505,7 +505,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistory.kt": "577b9b11c54c8e765d7547431e3678c44d42f44f0e94c8adf5efb99160e4a755",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SpeedTestHistorySection.kt": "1c126edf928debb8f896ad33f8049e94cff0ff6b0eb14fcdea6e9b9b74a77879",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/StrategySnapshotCache.kt": "924ee8ae5c62ca0653310632cd17feec92513c9b16423fd718bb20e6f66413e4",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": "a0003c5f0ceff4bb7bf66dee01e8dca074d66ec3cb8583c62e20a253d931db1d",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt": "232004ee94a0413473c64ecc250d15877c19b928b4d2fc887ef078f8d99ba180",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt": "9f92c521c9636512d07769f551eb5065b167319f221ecaf54407f97cee245d85",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WechatTransport.kt": "803d6126a5cd5bd639875edcf40f93e02af86b85ff553167e32d81a9b3235b19",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt": "aaf5a10a384de32a23af929ce21fbc4a4bba7e92a8f1ba5144c424b203bda7ac",
@@ -543,7 +543,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsScreen.kt": "977aa383c73f6c66d30cc2ddf3df51421fc78f80fc197163d6653257f54c2386",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuComposeController.kt": "44dab937842d3d3506430adfd7c167701f8854ddc3739db2f3450b999d61fe55",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuGlassDock.kt": "27156949f43fcd8565692166ceab7e610183c70781c39b75f7776750bac902d3",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "d923cafb674766a789b23f1c933a7df11925c18eaa9e33784bc5ae561eb00292",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt": "9799772021df345008d302e86547da22dc7833cea8ded1c9f4306c100cade69d",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt": "3365c80d47b122f6af5c1b3c5257b204f293d64a100fd10ea41407f050c6b095",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuTheme.kt": "d22a4a190bd2a7e8e1150aa2f9b290fd8c80d58ebb2704f13896c87414844229",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuUiKit.kt": "8574033a0e4ce3b3bd1842b8e88111dba7155390f23a6d40c3c4632415689311",
@@ -567,7 +567,7 @@
     "android-app/app/src/main/res/values-v31/styles.xml": "40b73c15797887d118c79a26541375c01b708def41aee2e1aba143492506c914",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockDnsLayer93Test.java": "1fc51996e6622d6bead2a6b534337802531268560b68bb074d0fbabb8c39386c",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockProbe93Test.kt": "9d1613b5013b8d74e92a4edc94cb53b79f393823372645b1bc9f8cc43f43f9cb",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt": "87e2d91aa9927791b691cb0e1d8ff1c8931c1d8a2f8b4f9fb0a611dfab6903d4",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt": "9481bba7dcf0dcfe14dffa06b52370f2f6e74e5529df4b3860f6973d584330e4",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "c0705d3e07febf290c7d0ea5ab2184e22330a0253d9d122b18c3da03995fef5a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConfigHygiene103Test.java": "e1be54c0a5cafb874bfebed081a08e6e167dd5e37ff1ea8ede8e53dcc48ca7c4",
@@ -2195,6 +2195,7 @@
         "resourceFieldsWriteOnlyValidDraftsAndShowTheError",
         "notificationPreviewRendersEveryVariable",
         "newWordsTranslate",
+        "previewChipShowsTheRenderedTemplatesWithoutEditing",
         "editedTemplateAsksBeforeLeavingAndShowsThePreview"
       ]
     },
@@ -3642,7 +3643,7 @@
       ]
     }
   },
-  "expectedUnitTests": 958,
+  "expectedUnitTests": 959,
   "expectedTestXmlFiles": 109,
   "manifestAndPermissionsUnchanged": true,
   "dependenciesChangedOnlyByProfileInstaller": true,
