@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..acb97a8 100644
+index 8a43698..c51c20d 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..acb97a8 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2095
-+        versionName = "1.1.1"
++        versionCode = 2096
++        versionName = "2.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -51758,18 +51758,37 @@ index 17eab36..a7bd311 100644
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 65d651c..01b5b79 100644
+index 65d651c..76c888d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
+@@ -17,14 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
  import androidx.compose.foundation.text.KeyboardOptions
  import androidx.compose.material3.Text
  import androidx.compose.runtime.Composable
++import androidx.compose.runtime.DisposableEffect
 +import androidx.compose.runtime.LaunchedEffect
  import androidx.compose.runtime.getValue
  import androidx.compose.runtime.mutableIntStateOf
  import androidx.compose.runtime.mutableStateOf
-@@ -69,7 +70,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+ import androidx.compose.runtime.remember
++import androidx.compose.runtime.rememberUpdatedState
+ import androidx.compose.runtime.setValue
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.focus.onFocusChanged
+ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.heading
+@@ -42,6 +46,7 @@ import io.github.xgl34222220.hetu.home.HomeRowDims
+ import io.github.xgl34222220.hetu.home.HomeType
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.home.LocalHomeHaptics
++import io.github.xgl34222220.hetu.home.badText
+ import io.github.xgl34222220.hetu.home.fill
+ import io.github.xgl34222220.hetu.home.homeRowPressTint
+ import io.github.xgl34222220.hetu.panel.PanelIcons
+@@ -69,7 +74,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
      var choice by remember { mutableStateOf<String?>(null) }
      val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
      // What the running core last reported. Cached by the status probe; blank on a runtime that predates these fields.
@@ -51781,9 +51800,33 @@ index 65d651c..01b5b79 100644
 
      fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
      fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
-@@ -163,6 +167,14 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -140,6 +148,13 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Ascii,
+                         onEnabled = { putBool("proxyCpuAffinityEnabled", it) },
+                         onValue = { putString("proxyCpuAffinity", it) },
++                        validate = HxResourceLimits::cpuError,
++                        advice = { value ->
++                            HxResourceLimits.cpuBeyondDevice(value)?.let {
++                                val cores = Runtime.getRuntime().availableProcessors()
++                                ht(HxResourceLimits.CPU_BEYOND_DEVICE).fill(cores, cores - 1)
++                            }
++                        },
+                     )
+                     ResourceSetting(
+                         title = "内存限制",
+@@ -151,6 +166,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Ascii,
+                         onEnabled = { putBool("proxyMemoryLimitEnabled", it) },
+                         onValue = { putString("proxyMemoryLimit", it) },
++                        validate = HxResourceLimits::memoryError,
+                     )
+                     ResourceSetting(
+                         title = "磁盘 I/O 权重",
+@@ -162,7 +178,16 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+                         keyboardType = KeyboardType.Number,
                          onEnabled = { putBool("proxyIoWeightEnabled", it) },
                          onValue = { putString("proxyIoWeight", it) },
++                        validate = HxResourceLimits::ioError,
                      )
 +                    // Opt-in: the two values above also become kernel limits (memcg memory.max, io weight).
 +                    val cgroup = prefs.getBoolean(CoreResourceLimits.PREF_ENABLED, false)
@@ -51796,7 +51839,7 @@ index 65d651c..01b5b79 100644
                  }
              }
          }
-@@ -184,6 +196,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -184,6 +209,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                  }
              }
          }
@@ -51833,7 +51876,7 @@ index 65d651c..01b5b79 100644
      }
 
      if (choice == "dns") {
-@@ -239,6 +281,8 @@ private class OtherLiveState(
+@@ -239,6 +294,8 @@ private class OtherLiveState(
      private val tuningReport: String,
      private val firewall: String,
      val firewallDetail: String,
@@ -51842,7 +51885,7 @@ index 65d651c..01b5b79 100644
  ) {
      /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
      fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
-@@ -256,6 +300,8 @@ private class OtherLiveState(
+@@ -256,11 +313,18 @@ private class OtherLiveState(
              tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
              firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
              firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
@@ -51851,6 +51894,62 @@ index 65d651c..01b5b79 100644
          )
      }
  }
+
+-/** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
++/**
++ * A limit: its switch, and under it the value the limit uses. The field rests while the switch is off.
++ * The field edits a draft checked by the start script's own rules ([validate]); only a value the
++ * script accepts reaches prefs (and marks a restart pending), once typing pauses, the field loses
++ * focus or the page closes. An invalid draft shows its error and is never written.
++ */
+ @Composable
+ private fun ResourceSetting(
+     title: String,
+@@ -272,13 +336,42 @@ private fun ResourceSetting(
+     subtitle: String? = null,
+     onEnabled: (Boolean) -> Unit,
+     onValue: (String) -> Unit,
++    validate: (String) -> String? = { null },
++    advice: @Composable (String) -> String? = { null },
+ ) {
++    val c = LocalHomeColors.current
++    var draft by remember(value) { mutableStateOf(value) }
++    val stored by rememberUpdatedState(value)
++    val latest by rememberUpdatedState(draft)
++    val write by rememberUpdatedState(onValue)
++    val check by rememberUpdatedState(validate)
++    fun commit() { if (latest != stored && check(latest) == null) write(latest) }
++    LaunchedEffect(draft, value) {
++        if (draft != value && validate(draft) == null) { kotlinx.coroutines.delay(RESOURCE_COMMIT_DELAY_MS); commit() }
++    }
++    DisposableEffect(Unit) { onDispose { commit() } }
++    var focused by remember { mutableStateOf(false) }
++    val error = if (enabled) validate(draft) else null
++    val note = if (enabled && error == null) advice(draft) else null
++    val start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start
+     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
+         SettingsSwitchRow(ht(title), enabled, onEnabled, subtitle = subtitle, compact = true, icon = icon)
+         SettingsInput(
+-            value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
++            value = draft, onValueChange = { draft = it }, enabled = enabled, placeholder = hint, error = error != null,
+             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+-            modifier = Modifier.padding(start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start, end = HomeRowDims.end + 2.dp),
++            modifier = Modifier.padding(start = start, end = HomeRowDims.end + 2.dp).onFocusChanged {
++                if (focused && !it.hasFocus) commit()
++                focused = it.hasFocus
++            },
+         )
++        (error ?: note)?.let { message ->
++            Text(
++                if (error != null) ht(message) else message,
++                Modifier.padding(start = start + 2.dp, end = HomeRowDims.end + 2.dp, top = 6.dp),
++                color = if (error != null) c.badText else c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium),
++            )
++        }
+     }
+ }
++
++private const val RESOURCE_COMMIT_DELAY_MS = 1_200L
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
 index 738ebf5..428a4cc 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyApiHistoryStore.kt
@@ -52039,7 +52138,7 @@ index 738ebf5..428a4cc 100644
      }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
-index 4f004b9..d5bb3ad 100644
+index 4f004b9..623be45 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyComposeController.kt
 @@ -68,6 +68,8 @@ internal data class ProxyRuleUi(
@@ -52200,7 +52299,7 @@ index 4f004b9..d5bb3ad 100644
              controllerReadFailed = controllerReadFailed,
              controllerError = controllerError,
              groups = groups,
-@@ -419,13 +505,15 @@ internal class ProxyComposeController(context: Context) {
+@@ -419,13 +505,38 @@ internal class ProxyComposeController(context: Context) {
              prefs.edit().putString("proxyBaseCore", "mihomo").apply()
              profile = ProxyRuntimeProfile.load(prefs)
          }
@@ -52211,8 +52310,31 @@ index 4f004b9..d5bb3ad 100644
 +        if (!configs.hasConfiguredSubscription(selected)) throw ProxyStartProblem.PlaceholderConfig()
 +        // The pre-start hook runs inside the single Root start invocation (no extra su when
 +        // no hook exists); a failing hook still refuses the start before the network changes.
++        // Audit G1: a completed start also keeps its effective source as 「上次可启动」 (never fails the start).
++        root.armLastGood()
 +        try {
-+            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
++            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true).also { root.rememberLastGood(it) }
++        } catch (scope: RootProxyManager.AppScopeException) {
++            throw ProxyStartProblem.AppScope(scope)
++        } finally {
++            root.disarmLastGood()
++        }
++    }
++
++    /**
++     * Audit G1: the failure sheet's 「用上次可启动的版本启动」. Starts the current core and mode from the
++     * copy [LastGoodConfig] kept after the core's last successful start; the selected config file is
++     * read by nothing and changed by nothing. Settings are the current ones.
++     */
++    suspend fun startLastGood(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
++        LegacyAppMigrator.migrateIfNeeded(app)
++        val profile = ProxyRuntimeProfile.load(prefs)
++        LastGoodConfig.info(prefs, profile.core.id)
++            ?: throw IOException("${profile.core.label} 还没有上次可启动的配置")
++        val source = LastGoodConfig.read(app, profile.core.id)
++            ?: throw IOException("上次可启动的配置副本已丢失或损坏")
++        try {
++            root.startManualLastGood(profile, RootProxyManager.Progress { onProgress(it) }, source)
 +        } catch (scope: RootProxyManager.AppScopeException) {
 +            throw ProxyStartProblem.AppScope(scope)
          }
@@ -52222,7 +52344,7 @@ index 4f004b9..d5bb3ad 100644
      }
 
      suspend fun reload(): String = withContext(Dispatchers.IO) {
-@@ -435,6 +523,13 @@ internal class ProxyComposeController(context: Context) {
+@@ -435,10 +546,22 @@ internal class ProxyComposeController(context: Context) {
      suspend fun restart(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
          LegacyAppMigrator.migrateIfNeeded(app)
          val profile = ProxyRuntimeProfile.load(prefs)
@@ -52236,7 +52358,17 @@ index 4f004b9..d5bb3ad 100644
          val selected = configs.selected(profile.core)
          onProgress("执行服务启动前脚本…")
          ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")
-@@ -515,7 +610,10 @@ internal class ProxyComposeController(context: Context) {
+-        val result = root.replaceRunningManually(profile, onProgress)
++        root.armLastGood()
++        val result = try {
++            root.replaceRunningManually(profile, onProgress).also { root.rememberLastGood(it) }
++        } finally {
++            root.disarmLastGood()
++        }
+         val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
+         check(replaced) { "重启未完成，请等待当前操作结束后重试" }
+         check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }
+@@ -515,7 +638,10 @@ internal class ProxyComposeController(context: Context) {
          "disable" to "禁用本机 IPv6",
      )
 
@@ -52248,7 +52380,7 @@ index 4f004b9..d5bb3ad 100644
      fun setMode(id: String) { prefs.edit().putString("proxyBaseMode", id).apply() }
      fun setIpv6(id: String) { prefs.edit().putString("proxyBaseIpv6", id).apply() }
      fun setAutoOverwrite(value: Boolean) { prefs.edit().putBoolean("proxyBaseAutoOverwrite", value).apply() }
-@@ -532,13 +630,20 @@ internal class ProxyComposeController(context: Context) {
+@@ -532,13 +658,20 @@ internal class ProxyComposeController(context: Context) {
              ProxyConfigUi(
                  name = it.name,
                  selected = it.name == selected,
@@ -52271,7 +52403,7 @@ index 4f004b9..d5bb3ad 100644
      }
 
      suspend fun deleteConfig(name: String) = withContext(Dispatchers.IO) {
-@@ -683,6 +788,10 @@ internal class ProxyComposeController(context: Context) {
+@@ -683,6 +816,10 @@ internal class ProxyComposeController(context: Context) {
 
      private data class AppIdentity(val uid: Int, val packageName: String, val label: String, val icon: Bitmap?)
 
@@ -52282,7 +52414,7 @@ index 4f004b9..d5bb3ad 100644
      private fun needsSocketUidFallback(root: JSONObject): Boolean {
          val array = root.optJSONArray("connections") ?: return false
          for (i in 0 until array.length()) {
-@@ -789,6 +898,7 @@ internal class ProxyComposeController(context: Context) {
+@@ -789,6 +926,7 @@ internal class ProxyComposeController(context: Context) {
                  size = r.optInt("size", -1),
                  disabled = extra?.optBoolean("disabled", false) ?: false,
                  hitCount = extra?.optLong("hitCount", 0L) ?: 0L,
@@ -52290,7 +52422,7 @@ index 4f004b9..d5bb3ad 100644
              )
          }
          return out
-@@ -813,6 +923,18 @@ internal class ProxyComposeController(context: Context) {
+@@ -813,6 +951,18 @@ internal class ProxyComposeController(context: Context) {
          return out.sortedBy { it.name.lowercase(Locale.ROOT) }
      }
 
@@ -52309,7 +52441,7 @@ index 4f004b9..d5bb3ad 100644
      private var lastIconSource: String? = null
      private var lastIconMap: Map<String, String> = emptyMap()
      @Synchronized
-@@ -824,19 +946,4 @@ internal class ProxyComposeController(context: Context) {
+@@ -824,19 +974,4 @@ internal class ProxyComposeController(context: Context) {
          return parsed
      }
 
@@ -57070,7 +57202,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..28c18ac 100644
+index 9cd82da..31e9607 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,6 +21,10 @@ final class RootProxyManager {
@@ -57084,7 +57216,7 @@ index 9cd82da..28c18ac 100644
      private static final String SCRIPT=ROOT+"/hetu-root.sh";
      private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
      private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
-@@ -30,8 +34,68 @@ final class RootProxyManager {
+@@ -30,8 +34,72 @@ final class RootProxyManager {
      private static final String LEGACY_MODULE="/data/adb/modules/bichen";
      private static final String LEGACY_MODULE_UPDATE="/data/adb/modules_update/bichen";
      private static final ProxyControlEpoch CONTROL_LOCK=new ProxyControlEpoch();
@@ -57147,13 +57279,17 @@ index 9cd82da..28c18ac 100644
 +        }
 +    }
      private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
++    /** Audit G1: armed by armLastGood; holds the effective source (override scripts applied) prepared on this thread. */
++    private static final ThreadLocal<String[]> PREPARED_SOURCE=new ThreadLocal<>();
++    /** Audit G1: set only by startManualLastGood; the start reads this text instead of the selected file. */
++    private static final ThreadLocal<String> LAST_GOOD_SOURCE=new ThreadLocal<>();
      static long observationTicket(){return CONTROL_LOCK.observe();}
 +    /** Read-only controller probes: invalid only during a real start/stop/reload transaction. */
 +    static long probeTicket(){return CONTROL_LOCK.transactionEpoch();}
      static boolean publishObservation(long ticket,Runnable publish){return CONTROL_LOCK.publish(ticket,publish);}
      private final Context context;
      private final SharedPreferences prefs;
-@@ -63,6 +127,9 @@ final class RootProxyManager {
+@@ -63,6 +131,9 @@ final class RootProxyManager {
          final RootFakeIpRanges fakeIps;
          final String startup,settingsSignature;
          final int tproxyPort,redirectPort,controllerPort;
@@ -57163,7 +57299,7 @@ index 9cd82da..28c18ac 100644
          Prepared(ProxyRuntimeProfile p,ProxyConfigLibrary.Entry s,RootProxyPolicy policy,ProxyAdblockRules.Snapshot adblock,RootFakeIpRanges fakeIps,String y,int tp,int rp,int cp,String signature){
              profile=p;source=s;this.policy=policy;this.adblock=adblock;this.fakeIps=fakeIps;startup=y;tproxyPort=tp;redirectPort=rp;controllerPort=cp;settingsSignature=signature;
          }
-@@ -129,7 +196,7 @@ final class RootProxyManager {
+@@ -129,7 +200,7 @@ final class RootProxyManager {
      }
 
      private String detectDefaultInterface()throws IOException{
@@ -57172,7 +57308,7 @@ index 9cd82da..28c18ac 100644
                  "set -- $(ip route get 1.1.1.1 2>/dev/null); while [ \"$#\" -gt 1 ]; do if [ \"$1\" = dev ]; then printf '%s' \"$2\"; break; fi; shift; done",5000L);
          String iface=result.output==null?"":result.output.trim();
          if(!iface.matches("[A-Za-z0-9_.:@-]{1,32}"))throw new IOException("eBPF 无法识别当前默认出口接口");
-@@ -155,7 +222,7 @@ final class RootProxyManager {
+@@ -155,7 +226,7 @@ final class RootProxyManager {
 
      private boolean runtimeCoreCurrent(String token){
          try{
@@ -57181,7 +57317,7 @@ index 9cd82da..28c18ac 100644
                      "if [ -x "+RootBridge.quote(BIN)+" ] && [ -r "+RootBridge.quote(CORE_TOKEN)+" ] && [ \"$(cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null)\" = "+RootBridge.quote(token)+" ]; then printf 1; else printf 0; fi",
                      4000L);
              return result.ok()&&"1".equals(result.output.trim());
-@@ -167,7 +234,7 @@ final class RootProxyManager {
+@@ -167,7 +238,7 @@ final class RootProxyManager {
      private RootStartupProbe.Result probeStartupRuntime(){
          try{
              RootBridge.requireWorkerThread();
@@ -57190,7 +57326,7 @@ index 9cd82da..28c18ac 100644
                      RootStartupProbe.command(ROOT+"/run/core.pid",BIN,CORE_TOKEN),4000L);
              return RootStartupProbe.parse(result.ok(),result.output);
          }catch(Exception ignored){return RootStartupProbe.parse(false,"");}
-@@ -177,7 +244,7 @@ final class RootProxyManager {
+@@ -177,7 +248,7 @@ final class RootProxyManager {
          try{
              RootBridge.requireWorkerThread();
              String command=ProxyContinuity.coreProbeCommand(ROOT+"/run/core.pid",BIN);
@@ -57199,7 +57335,7 @@ index 9cd82da..28c18ac 100644
              ProxyContinuity.ProcessState state=ProxyContinuity.processState(result.ok(),result.output);
              return ProxyContinuity.preserveRunning(state,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
-@@ -217,11 +284,13 @@ final class RootProxyManager {
+@@ -217,11 +288,13 @@ final class RootProxyManager {
                      .append("; mv -f ").append(RootBridge.quote(binTmp)).append(' ').append(RootBridge.quote(BIN))
                      .append("; printf %s ").append(RootBridge.quote(coreToken)).append(" > ").append(RootBridge.quote(CORE_TOKEN))
                      .append("; chmod 600 ").append(RootBridge.quote(CORE_TOKEN)).append("; chown 0:0 ").append(RootBridge.quote(CORE_TOKEN));
@@ -57214,7 +57350,7 @@ index 9cd82da..28c18ac 100644
          if(!r.ok())throw new IOException("无法初始化河图运行目录："+r.output.trim());
          return ROOT;
          }finally{CONTROL_LOCK.unlock();}
-@@ -256,6 +325,9 @@ final class RootProxyManager {
+@@ -256,6 +329,9 @@ final class RootProxyManager {
              if(!prefs.getBoolean("proxyAdblockChain",true))return "广告过滤串联未开启";
              JSONObject state=status();
              if(!state.optBoolean("running",false))return "规则已保存；代理下次启动时自动使用新规则";
@@ -57224,7 +57360,7 @@ index 9cd82da..28c18ac 100644
              ProxyAdblockRules.Snapshot snapshot=ProxyAdblockRules.export(context);
              String blockDst=ROOT+"/run/ruleset/hetu-adblock.txt";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt";
-@@ -267,7 +339,13 @@ final class RootProxyManager {
+@@ -267,7 +343,13 @@ final class RootProxyManager {
                      +"; chmod 600 "+RootBridge.quote(allowDst+suffix)+"; chown 0:0 "+RootBridge.quote(allowDst+suffix)
                      +"; mv -f "+RootBridge.quote(allowDst+suffix)+" "+RootBridge.quote(allowDst)
                      +"; mv -f "+RootBridge.quote(blockDst+suffix)+" "+RootBridge.quote(blockDst);
@@ -57239,7 +57375,7 @@ index 9cd82da..28c18ac 100644
              if(!copied.ok())throw new IOException("规则已更新，但写入运行目录失败："+copied.output.trim());
 
              int port=liveControllerPort(state);
-@@ -276,6 +354,10 @@ final class RootProxyManager {
+@@ -276,6 +358,10 @@ final class RootProxyManager {
              try{
                  controller.reloadLocalRuleProvider(ProxyAdblockRules.ALLOW_PROVIDER_NAME);
                  controller.reloadLocalRuleProvider(ProxyAdblockRules.PROVIDER_NAME);
@@ -57250,7 +57386,7 @@ index 9cd82da..28c18ac 100644
                  verifyAdblockRuntime(controller,true,snapshot.count);
              }catch(Exception providerError){
                  // Do not reload the entire proxy after a provider error: this can
-@@ -302,6 +384,24 @@ final class RootProxyManager {
+@@ -302,6 +388,24 @@ final class RootProxyManager {
          }
      }
 
@@ -57275,7 +57411,7 @@ index 9cd82da..28c18ac 100644
      Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
          return prepare(profile,0);
      }
-@@ -309,33 +409,196 @@ final class RootProxyManager {
+@@ -309,33 +413,247 @@ final class RootProxyManager {
      private Prepared prepare(ProxyRuntimeProfile profile,int fixedControllerPort)throws Exception{
          RootBridge.requireWorkerThread();
          String settingsSignature=ProxyRuntimeSettings.signature(profile,prefs.getAll());
@@ -57293,14 +57429,19 @@ index 9cd82da..28c18ac 100644
 -        if(selected==null)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
 -        String source=configs.read(selected);
 -        if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
++        // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
++        String lastGood=LAST_GOOD_SOURCE.get();
 +        // Without a selected profile, enabled override scripts generate the config from an empty one.
-+        boolean scriptsOnly=selected==null&&OverrideScriptStart.hasEnabled(context);
-+        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
-+        String source=selected==null?"":configs.read(selected);
++        boolean scriptsOnly=lastGood==null&&selected==null&&OverrideScriptStart.hasEnabled(context);
++        if(lastGood==null&&selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
++        String source=lastGood!=null?lastGood:selected==null?"":configs.read(selected);
 +        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
          if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
-+        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,false,true);
++        // The saved source already carries the override scripts' result.
++        OverrideScriptStart.Applied override=lastGood!=null?null:overrideScripts(profile,selected,source,false,true);
 +        if(override!=null)source=override.text;
++        String[] capture=PREPARED_SOURCE.get();
++        if(capture!=null)capture[0]=source;
          // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
          // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
 -        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
@@ -57348,6 +57489,47 @@ index 9cd82da..28c18ac 100644
 +        return p;
 +    }
 +
++    /**
++     * Audit G1: the user's Start from the failure sheet's 「用上次可启动的版本启动」. Same manual start
++     * (pre-start hook included), except that preparation reads [source], the saved effective source
++     * of an earlier successful start, instead of the selected config file, which stays untouched.
++     * A successful start records that this session runs from the copy (LastGoodConfig.active).
++     */
++    JSONObject startManualLastGood(ProxyRuntimeProfile profile,Progress progress,String source)throws Exception{
++        if(source==null||source.trim().isEmpty())throw new IOException("没有上次可启动的配置");
++        LAST_GOOD_SOURCE.set(source);
++        PRE_START_HOOK.set(Boolean.TRUE);
++        try{
++            JSONObject result=startOwned(profile,progress,false);
++            if(result.optBoolean("ok",false)&&!result.optBoolean("cancelled",false)&&result.has("sourceConfig")){
++                LastGoodConfig.markActive(prefs,profile.core.id,prefs.getString("proxyRootValidatedFingerprint",""));
++                result.put("lastGood",true);
++            }
++            return result;
++        }finally{PRE_START_HOOK.remove();LAST_GOOD_SOURCE.remove();}
++    }
++
++    /** Audit G1: the next preparations on this thread record their effective source for rememberLastGood. */
++    void armLastGood(){PREPARED_SOURCE.set(new String[1]);}
++    void disarmLastGood(){PREPARED_SOURCE.remove();}
++
++    /**
++     * Audit G1: after a completed manual start or restart on this (armed) thread, keeps the effective
++     * source that start prepared as the core's 「上次可启动」 copy. Results without a fresh preparation
++     * (cancelled, already running, eBPF hot update) keep the previous copy. Never throws.
++     */
++    void rememberLastGood(JSONObject result){
++        String[] capture=PREPARED_SOURCE.get();
++        String source=capture==null?null:capture[0];
++        try{
++            if(result==null||source==null||!result.optBoolean("ok",false)||result.optBoolean("cancelled",false)
++                    ||result.optBoolean("alreadyRunning",false)||!result.has("sourceConfig"))return;
++            String core=result.optString("core","");
++            if(core.isEmpty())return;
++            LastGoodConfig.save(context,core,result.optString("mode",""),result.optString("sourceConfig",""),source);
++        }catch(Exception ignored){}
++    }
++
 +
 +    /**
 +     * sing-box / Xray / V2Fly / Hysteria: a native config for that core when the user selected one,
@@ -57357,15 +57539,20 @@ index 9cd82da..28c18ac 100644
 +    private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
 +        ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
 +        if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
++        // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
++        String lastGood=LAST_GOOD_SOURCE.get();
 +        boolean scriptable=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX;
-+        boolean scriptsOnly=selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
-+        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
-+        String source=selected==null?"":configs.read(selected);
++        boolean scriptsOnly=lastGood==null&&selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
++        if(lastGood==null&&selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
++        String source=lastGood!=null?lastGood:selected==null?"":configs.read(selected);
 +        if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
 +        if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
 +        // sing-box: a native JSON source is scripted as JSON, a Mihomo YAML source before conversion.
-+        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
++        // The saved source already carries the override scripts' result.
++        OverrideScriptStart.Applied override=lastGood!=null?null:overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
 +        if(override!=null)source=override.text;
++        String[] capture=PREPARED_SOURCE.get();
++        if(capture!=null)capture[0]=source;
 +        RootProxyPolicy policy=loadPolicy(profile);
 +        ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
 +        int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
@@ -57480,7 +57667,7 @@ index 9cd82da..28c18ac 100644
      }
 
      private String topologyFingerprint(ProxyRuntimeProfile profile,RootProxyPolicy policy,RootFakeIpRanges fakeIps){
-@@ -346,13 +609,15 @@ final class RootProxyManager {
+@@ -346,13 +664,15 @@ final class RootProxyManager {
                  +"|perf="+bit(prefs.getBoolean("proxyPerformanceMode",false))+"|cpu="+prefs.getString("proxyCpuAffinity","")
                  +"|mem="+prefs.getString("proxyMemoryLimit","")+"|io="+prefs.getString("proxyIoWeight","")
                  +"|vendorClean="+bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))
@@ -57497,7 +57684,7 @@ index 9cd82da..28c18ac 100644
      }
 
      private void installHotReloadFiles(Prepared p)throws Exception{
-@@ -378,17 +643,75 @@ final class RootProxyManager {
+@@ -378,17 +698,75 @@ final class RootProxyManager {
                          .append("; chmod 600 ").append(RootBridge.quote(allowTmp)).append("; chown 0:0 ").append(RootBridge.quote(allowTmp))
                          .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst));
              }
@@ -57574,7 +57761,7 @@ index 9cd82da..28c18ac 100644
              int port=prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT);
              Prepared p=prepare(profile,port);
              String nextFingerprint=topologyFingerprint(profile,p.policy,p.fakeIps);
-@@ -404,7 +727,7 @@ final class RootProxyManager {
+@@ -404,7 +782,7 @@ final class RootProxyManager {
                  verifyAdblockRuntime(controller,profile.adblockChain,p.adblock==null?0:p.adblock.count);
                  effective=profile.adblockChain&&AdblockRuleInspection.isRuleMode(controller.configs().optString("mode", ""));
              }catch(Exception error){
@@ -57583,7 +57770,7 @@ index 9cd82da..28c18ac 100644
                          "if [ -f "+RootBridge.quote(CONFIG+".before-reload")+" ]; then mv -f "
                                  +RootBridge.quote(CONFIG+".before-reload")+" "+RootBridge.quote(CONFIG)+"; fi",
                          5000L);
-@@ -412,10 +735,11 @@ final class RootProxyManager {
+@@ -412,10 +790,11 @@ final class RootProxyManager {
                  prefs.edit().putString("proxyAdblockLastError","过滤设置未确认应用："+String.valueOf(error.getMessage())).apply();
                  throw error;
              }
@@ -57596,7 +57783,7 @@ index 9cd82da..28c18ac 100644
                      .putInt("proxyAdblockLastRuleCount",p.adblock==null?0:p.adblock.count)
                      .putString("proxyAdblockLastRevision",p.adblock==null?"":p.adblock.revision)
                      .putBoolean("proxyAdblockLastEffective",effective)
-@@ -469,29 +793,84 @@ final class RootProxyManager {
+@@ -469,29 +848,84 @@ final class RootProxyManager {
      JSONObject start(ProxyRuntimeProfile p)throws Exception{return startInternal(p,null,false);}
      JSONObject start(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startInternal(profile,progress,false);}
      JSONObject startManual(ProxyRuntimeProfile profile,Progress progress)throws Exception{return startOwned(profile,progress,false);}
@@ -57689,7 +57876,7 @@ index 9cd82da..28c18ac 100644
      }
      JSONObject stopIfAutomationOwned(java.util.function.BooleanSupplier currentDecision)throws Exception{
          CONTROL_LOCK.lock();
-@@ -501,28 +880,81 @@ final class RootProxyManager {
+@@ -501,28 +935,81 @@ final class RootProxyManager {
              return stop();
          }finally{CONTROL_LOCK.unlock();}
      }
@@ -57779,7 +57966,7 @@ index 9cd82da..28c18ac 100644
              if(initial.process==ProxyContinuity.ProcessState.DEAD){
                  // Clear stale health only on confirmed absence, never on a probe
                  // timeout, and do not revoke the user's boot recovery intent.
-@@ -535,7 +967,11 @@ final class RootProxyManager {
+@@ -535,7 +1022,11 @@ final class RootProxyManager {
              boolean existingRunning=ProxyContinuity.preserveRunning(initial.process,
                      prefs.getBoolean("proxyRootRuntimeRunning",false)&&prefs.getBoolean("proxyRootWanted",false));
              if(existingRunning&&!replaceRunning){
@@ -57792,7 +57979,7 @@ index 9cd82da..28c18ac 100644
                  ensureContinuityService(true);
                  trace.outcome="alreadyRunning";
                  int appliedRevision=prefs.getInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,0);
-@@ -544,7 +980,8 @@ final class RootProxyManager {
+@@ -544,7 +1035,8 @@ final class RootProxyManager {
                      liveMessage+="；当前网络仍使用旧运行版，请使用「重启」应用 fake-IP 路由修复";
                  JSONObject unchanged=new JSONObject().put("ok",true).put("running",true).put("alreadyRunning",true)
                          .put("message",liveMessage);
@@ -57802,7 +57989,7 @@ index 9cd82da..28c18ac 100644
                      try{setAutoStart(true);}catch(Exception error){unchanged.put("warning","开机脚本未安装："+error.getMessage());}
                  }
                  return unchanged;
-@@ -552,7 +989,7 @@ final class RootProxyManager {
+@@ -552,7 +1044,7 @@ final class RootProxyManager {
              if(replaceRunning) {
                  // Preserve the user's intent before any new preparation. The shell start transaction
                  // validates the new config before it cleans up the old core/network rules.
@@ -57811,7 +57998,7 @@ index 9cd82da..28c18ac 100644
                  stage(progress,"校验新版运行环境，确认可替换后再切换旧核心…");
              } else {
                  stage(progress,"检查配置、应用范围与绕过策略…");
-@@ -563,6 +1000,7 @@ final class RootProxyManager {
+@@ -563,6 +1055,7 @@ final class RootProxyManager {
          // during the transaction remain pending; fallback health is reported
          // separately through the effective/error fields, not a restart loop.
          String requestedSettingsSignature=ProxyRuntimeSettings.captureRequest(profile,prefs);
@@ -57819,7 +58006,7 @@ index 9cd82da..28c18ac 100644
          trace.next("configuration");
          Prepared p;
          try{
-@@ -575,20 +1013,32 @@ final class RootProxyManager {
+@@ -575,20 +1068,32 @@ final class RootProxyManager {
              p=prepare(profile,restartControllerPort);
          }
          RootProxyPolicy policy=p.policy;
@@ -57859,7 +58046,7 @@ index 9cd82da..28c18ac 100644
                  prefs.edit().putString("proxyRootValidatedFingerprint",validationKey).apply();
                  if(profile.adblockChain)prefs.edit().remove("proxyAdblockLastError").apply();
              }catch(Exception fullFailure){
-@@ -598,7 +1048,7 @@ final class RootProxyManager {
+@@ -598,7 +1103,7 @@ final class RootProxyManager {
                  Prepared fallback=prepare(fallbackProfile,restartControllerPort);
                  installRuntimeFiles(fallback,true);
                  String fallbackValidationKey=validationFingerprint(fallback);
@@ -57868,7 +58055,7 @@ index 9cd82da..28c18ac 100644
                  catch(Exception fallbackFailure){
                      throw new IOException((fullFailure.getMessage()==null?"最终配置校验失败":fullFailure.getMessage())+"；关闭广告串联后仍失败："+(fallbackFailure.getMessage()==null?"未知错误":fallbackFailure.getMessage()),fullFailure);
                  }
-@@ -623,7 +1073,6 @@ final class RootProxyManager {
+@@ -623,7 +1128,6 @@ final class RootProxyManager {
          stage(progress,capabilityKnown?"设备能力未变化，跳过重复探测…":"检查网络能力并启动核心…");
 
          trace.next("filterHandoff");
@@ -57876,7 +58063,7 @@ index 9cd82da..28c18ac 100644
          boolean independentFallback=prefs.getBoolean("proxyAdblockFallbackEnabled",false);
          if(profile.adblockChain||independentFallback||DnsVpnService.running){
              stage(progress,profile.adblockChain?"切换到代理串联去广告，暂停独立 DNS / hosts 过滤…":"暂停独立广告过滤，避免与 Root 代理并行…");
-@@ -649,8 +1098,8 @@ final class RootProxyManager {
+@@ -649,8 +1153,8 @@ final class RootProxyManager {
          String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
          String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
          String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
@@ -57887,7 +58074,7 @@ index 9cd82da..28c18ac 100644
          String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
          JSONObject result;
          String[] bootArgs=new String[]{
-@@ -659,15 +1108,26 @@ final class RootProxyManager {
+@@ -659,15 +1163,26 @@ final class RootProxyManager {
                  String.valueOf(MihomoStartupConfig.DNS_PORT),String.valueOf(p.controllerPort),
                  policy.appScope,policy.uidRanges,bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"1",bit(capabilityKnown),policy.directGidRanges,policy.sharedBypassMacs,
                  dnsTcp,dnsUdp,perf,cpu,mem,ioWeight,vendorClean};
@@ -57916,7 +58103,7 @@ index 9cd82da..28c18ac 100644
          trace.next("publishRuntime");
          stage(progress,"核心监听与网络接管已就绪，守护将持续复核运行状态…");
          if(!prefs.getBoolean("hetuLegacyRetired",false))retireLegacyInstallation(progress);
-@@ -697,7 +1157,21 @@ final class RootProxyManager {
+@@ -697,7 +1212,21 @@ final class RootProxyManager {
          if(legacyCleanupWarning!=null&&!legacyCleanupWarning.isEmpty()){
              warning=(warning.isEmpty()?"":warning+"；")+legacyCleanupWarning;
          }
@@ -57939,7 +58126,7 @@ index 9cd82da..28c18ac 100644
                  .put("core",profile.core.id)
                  .put("mode",profile.mode.id)
                  .put("dnsHijack",profile.dnsHijack.id)
-@@ -723,10 +1197,17 @@ final class RootProxyManager {
+@@ -723,10 +1252,17 @@ final class RootProxyManager {
                  .put("fakeIpV6",p.fakeIps.ipv6)
                  .put("bypassInterfaces",policy.interfaces);
          if(!warning.isEmpty())result.put("warning",warning);
@@ -57957,7 +58144,7 @@ index 9cd82da..28c18ac 100644
                  .putBoolean("proxyAdblockCounterArmed",profile.adblockChain)
                  .putInt("proxyAutoDirectPackageCount",policy.directPackages.size())
                  .putBoolean("proxyAdblockLastEffective",profile.adblockChain)
-@@ -738,6 +1219,7 @@ final class RootProxyManager {
+@@ -738,6 +1274,7 @@ final class RootProxyManager {
                  // their own effective/error fields; they must not create an endless "restart again"
                  // loop by leaving the generic settings signature permanently different.
                  .putString("proxyRootAppliedSettings",requestedSettingsSignature)
@@ -57965,7 +58152,7 @@ index 9cd82da..28c18ac 100644
                  .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                  .remove(ProxyRuntimeSettings.DIRTY_KEY)
                  .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
-@@ -749,11 +1231,18 @@ final class RootProxyManager {
+@@ -749,11 +1286,18 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -57984,7 +58171,7 @@ index 9cd82da..28c18ac 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1250,49 @@ final class RootProxyManager {
+@@ -761,10 +1305,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -58035,7 +58222,7 @@ index 9cd82da..28c18ac 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1305,16 @@ final class RootProxyManager {
+@@ -777,8 +1360,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -58054,7 +58241,7 @@ index 9cd82da..28c18ac 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1325,12 @@ final class RootProxyManager {
+@@ -789,10 +1380,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -58069,7 +58256,7 @@ index 9cd82da..28c18ac 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1340,40 @@ final class RootProxyManager {
+@@ -802,20 +1395,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -58115,7 +58302,7 @@ index 9cd82da..28c18ac 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1383,26 @@ final class RootProxyManager {
+@@ -825,19 +1438,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -58146,7 +58333,7 @@ index 9cd82da..28c18ac 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1410,40 @@ final class RootProxyManager {
+@@ -845,31 +1465,40 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -58203,7 +58390,7 @@ index 9cd82da..28c18ac 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1453,7 @@ final class RootProxyManager {
+@@ -879,7 +1508,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -58212,7 +58399,7 @@ index 9cd82da..28c18ac 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1513,7 @@ final class RootProxyManager {
+@@ -939,7 +1568,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -58221,7 +58408,7 @@ index 9cd82da..28c18ac 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1015,13 +1589,14 @@ final class RootProxyManager {
+@@ -1015,13 +1644,14 @@ final class RootProxyManager {
      String diagnostics(){
          RootBridge.requireWorkerThread();
          DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
@@ -58237,7 +58424,7 @@ index 9cd82da..28c18ac 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1634,7 @@ final class RootProxyManager {
+@@ -1059,7 +1689,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -58246,7 +58433,7 @@ index 9cd82da..28c18ac 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1646,22 @@ final class RootProxyManager {
+@@ -1071,22 +1701,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -58274,7 +58461,7 @@ index 9cd82da..28c18ac 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1674,7 @@ final class RootProxyManager {
+@@ -1099,7 +1729,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -58283,7 +58470,7 @@ index 9cd82da..28c18ac 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1127,6 +1702,11 @@ final class RootProxyManager {
+@@ -1127,6 +1757,11 @@ final class RootProxyManager {
                  // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
                  if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
                  StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
@@ -58295,7 +58482,7 @@ index 9cd82da..28c18ac 100644
                  int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                  destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                          .append(" uid=").append(metadata.optInt("uid",-1))
-@@ -1147,7 +1727,7 @@ final class RootProxyManager {
+@@ -1147,7 +1782,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -58304,7 +58491,7 @@ index 9cd82da..28c18ac 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1737,7 @@ final class RootProxyManager {
+@@ -1157,7 +1792,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -58313,7 +58500,7 @@ index 9cd82da..28c18ac 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1167,6 +1747,15 @@ final class RootProxyManager {
+@@ -1167,6 +1802,15 @@ final class RootProxyManager {
                      +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
              device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
              report.section("系统网络与消息排查线索",device,2500);
@@ -58329,7 +58516,7 @@ index 9cd82da..28c18ac 100644
              MihomoControllerClient controller=new MihomoControllerClient(context);
              String mode14=controller.configs().optString("mode","unknown");
              JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
-@@ -1194,6 +1783,31 @@ final class RootProxyManager {
+@@ -1194,6 +1838,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -58361,7 +58548,7 @@ index 9cd82da..28c18ac 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +1821,14 @@ final class RootProxyManager {
+@@ -1207,10 +1876,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -58378,7 +58565,7 @@ index 9cd82da..28c18ac 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1842,10 @@ final class RootProxyManager {
+@@ -1224,6 +1897,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -58389,7 +58576,7 @@ index 9cd82da..28c18ac 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1863,7 @@ final class RootProxyManager {
+@@ -1241,7 +1918,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -58398,7 +58585,7 @@ index 9cd82da..28c18ac 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1873,46 @@ final class RootProxyManager {
+@@ -1251,11 +1928,46 @@ final class RootProxyManager {
          }
      }
 
@@ -58446,7 +58633,7 @@ index 9cd82da..28c18ac 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1926,121 @@ final class RootProxyManager {
+@@ -1269,14 +1981,121 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -58571,7 +58758,7 @@ index 9cd82da..28c18ac 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2053,7 @@ final class RootProxyManager {
+@@ -1289,7 +2108,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -58580,7 +58767,7 @@ index 9cd82da..28c18ac 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2077,7 @@ final class RootProxyManager {
+@@ -1313,7 +2132,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -58589,7 +58776,7 @@ index 9cd82da..28c18ac 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2097,28 @@ final class RootProxyManager {
+@@ -1333,13 +2152,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -58619,7 +58806,7 @@ index 9cd82da..28c18ac 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2145,47 @@ final class RootProxyManager {
+@@ -1366,13 +2200,47 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -58667,7 +58854,7 @@ index 9cd82da..28c18ac 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2197,12 @@ final class RootProxyManager {
+@@ -1384,7 +2252,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -58681,7 +58868,7 @@ index 9cd82da..28c18ac 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2211,13 @@ final class RootProxyManager {
+@@ -1393,6 +2266,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -58695,7 +58882,7 @@ index 9cd82da..28c18ac 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2237,61 @@ final class RootProxyManager {
+@@ -1412,14 +2292,61 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -61800,7 +61987,7 @@ index 0000000..57df735
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
-index 250b8a8..2365982 100644
+index 250b8a8..3c7c470 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuViewModel.kt
 @@ -19,8 +19,10 @@ import kotlinx.coroutines.CancellationException
@@ -61864,13 +62051,13 @@ index 250b8a8..2365982 100644
 +        if (text.isBlank()) return
 +        explicitToastTones.remove(text)
 +        _messages.tryEmit(text)
-     }
++    }
 +    /** Posts [text] with a fixed colour instead of reading it from the wording. */
 +    fun toastAs(tone: HxTone, text: String) {
 +        if (text.isBlank()) return
 +        explicitToastTones[text] = tone
 +        _messages.tryEmit(text)
-+    }
+     }
 +    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
 +    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
@@ -62163,16 +62350,56 @@ index 250b8a8..2365982 100644
                          "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                      } else if (configProblem) {
                          reason
-@@ -700,7 +861,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -700,7 +861,47 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                      }
                  } else {
 -                    toast(reason)
 +                    toastAs(HxTone.Bad, reason)
++                }
++            } finally {
++                operation = null
++                operationText = ""
++                refreshNow()
++            }
++        }
++    }
++
++    /**
++     * Audit G1: 「用上次可启动的版本启动」 from the start-failure sheet. Starts from the copy kept after
++     * the core's last successful start; the user's config file is not modified. Same operation slot,
++     * progress text and failure sheet as a normal start; [toggle] itself is unchanged.
++     */
++    fun startLastGood() {
++        if (operation != null || state.running) return
++        invalidateRuntimeRequests()
++        operation = HxRunOp.Start
++        viewModelScope.launch {
++            operationText = "正在用上次可启动的版本启动…"
++            try {
++                val started = controller.startLastGood { operationText = it }
++                state = state.copy(running = true, healthObserved = false,
++                    message = started.optString("message", state.message))
++                startupError = null
++                toastAs(HxTone.Warn, "已用上次可启动的版本启动，源配置未修改")
++            } catch (cancel: CancellationException) {
++                throw cancel
++            } catch (error: Exception) {
++                val reason = errorText(error, "操作失败")
++                val kind = hxStartFailure(error)
++                operationText = "确认最终运行状态…"
++                val recovered = if (kind != HxStartFailure.Runtime) null else settleStart()
++                if (recovered != null) {
++                    state = recovered
++                } else {
++                    val diagnostics = if (kind != HxStartFailure.Runtime) "" else
++                        try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
++                    startupError = "上次可启动的版本也未能启动：$reason" +
++                        if (diagnostics.isBlank()) "" else "\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                  }
              } finally {
                  operation = null
-@@ -727,14 +888,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -727,14 +928,14 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              operationText = "正在重启…"
              ProxyRuntimeSettings.beginApply(prefs)
              try {
@@ -62190,7 +62417,7 @@ index 250b8a8..2365982 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -746,6 +907,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -746,6 +947,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      fun reload() {
          if (operation != null || !state.running) return
@@ -62204,7 +62431,7 @@ index 250b8a8..2365982 100644
          invalidateRuntimeRequests()
          operation = HxRunOp.Reload
          viewModelScope.launch {
-@@ -755,7 +923,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -755,7 +963,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62213,7 +62440,7 @@ index 250b8a8..2365982 100644
              } finally {
                  operation = null
                  operationText = ""
-@@ -764,8 +932,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -764,8 +972,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
          }
      }
 
@@ -62248,7 +62475,7 @@ index 250b8a8..2365982 100644
          viewModelScope.launch {
              try {
                  repo.setTrafficMode(mode)
-@@ -773,19 +967,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -773,19 +1007,32 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62284,7 +62511,7 @@ index 250b8a8..2365982 100644
          if (pendingSelection.containsKey(group)) return
          val current = state.groups.firstOrNull { it.name == group } ?: return
          if (current.now == node || current.nodes.none { it.name == node }) return
-@@ -827,13 +1034,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -827,13 +1074,18 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              applyNodeProbe(request, owner, node, if (failure.timedOut) -1L else -2L, SystemClock.elapsedRealtime())
          } catch (cancel: CancellationException) {
              throw cancel
@@ -62306,7 +62533,7 @@ index 250b8a8..2365982 100644
          if (testingNodes[node] == true) return
          val owner = ++requestSequence
          holdNodeProbes(owner, listOf(node))
-@@ -843,19 +1055,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -843,19 +1095,34 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testGroup(group: ProxyGroupUi) {
@@ -62345,7 +62572,7 @@ index 250b8a8..2365982 100644
                  val stamp = SystemClock.elapsedRealtime()
                  targets.forEach { node ->
                      // Missing/invalid entries are not authoritative timeouts. Keep old readings.
-@@ -863,12 +1090,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -863,12 +1130,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                          applyNodeProbe(request, owner, node, delay, stamp)
                      }
                  }
@@ -62366,7 +62593,7 @@ index 250b8a8..2365982 100644
                  if (groupProbeOwners[group.name] == owner) {
                      groupProbeOwners.remove(group.name)
                      testingGroups.remove(group.name)
-@@ -878,28 +1112,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -878,28 +1152,51 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun testAll() {
@@ -62422,7 +62649,7 @@ index 250b8a8..2365982 100644
                  if (allProbeOwner == owner) { allProbeOwner = null; testingAll = false }
              }
          }
-@@ -931,16 +1188,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -931,16 +1228,23 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      var logsLoading by mutableStateOf(false)
          private set
 
@@ -62448,7 +62675,7 @@ index 250b8a8..2365982 100644
              } finally {
                  logsLoading = false
              }
-@@ -964,7 +1228,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -964,7 +1268,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62457,7 +62684,7 @@ index 250b8a8..2365982 100644
              } finally {
                  if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
              }
-@@ -981,7 +1245,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -981,7 +1285,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62466,7 +62693,7 @@ index 250b8a8..2365982 100644
              }
          }
      }
-@@ -995,7 +1259,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -995,7 +1299,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62475,7 +62702,7 @@ index 250b8a8..2365982 100644
              }
          }
      }
-@@ -1014,7 +1278,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1014,7 +1318,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62484,7 +62711,7 @@ index 250b8a8..2365982 100644
              } finally {
                  if (latestRulesRead == owner) rulesLoading = false
              }
-@@ -1033,7 +1297,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1033,7 +1337,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62493,7 +62720,7 @@ index 250b8a8..2365982 100644
              } finally {
                  if (latestRuleSetsRead == owner) ruleSetsLoading = false
              }
-@@ -1041,7 +1305,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1041,7 +1345,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateRuleSet(name: String) {
@@ -62502,7 +62729,7 @@ index 250b8a8..2365982 100644
          if (ruleSetTasks[name]?.running == true) return
          val owner = ++requestSequence
          ruleSetTaskOwners[name] = owner
-@@ -1073,7 +1337,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1073,7 +1377,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
      /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
      fun updateAllRuleSets() {
@@ -62511,7 +62738,7 @@ index 250b8a8..2365982 100644
          if (ruleSetsUpdatingAll) return
          val owner = ++requestSequence
          ruleSetsUpdateAllOwner = owner
-@@ -1134,7 +1398,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1134,7 +1438,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62520,7 +62747,7 @@ index 250b8a8..2365982 100644
              } finally {
                  ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      ruleSetTaskOwners.remove(name)
-@@ -1158,13 +1422,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1158,13 +1462,13 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62536,7 +62763,7 @@ index 250b8a8..2365982 100644
          if (providerTasks[name]?.running == true) return
          val owner = ++requestSequence
          providerTaskOwners[name] = owner
-@@ -1193,7 +1457,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1193,7 +1497,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
      }
 
      fun updateAllProviders() {
@@ -62545,7 +62772,7 @@ index 250b8a8..2365982 100644
          if (providersUpdatingAll) return
          val owner = ++requestSequence
          providersUpdateAllOwner = owner
-@@ -1246,7 +1510,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1246,7 +1550,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              } catch (cancel: CancellationException) {
                  throw cancel
              } catch (error: Exception) {
@@ -62554,7 +62781,7 @@ index 250b8a8..2365982 100644
              } finally {
                  providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                      providerTaskOwners.remove(name)
-@@ -1263,6 +1527,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
+@@ -1263,6 +1567,21 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
              toast("$savedMessage，下次启动生效")
              return
          }
@@ -63659,6 +63886,105 @@ index 0000000..f3d1e7c
 +    fun delayMs(homeOrPanel: Boolean, running: Boolean, operationActive: Boolean, runningHint: Boolean): Long =
 +        if (running || operationActive || runningHint) activeDelayMs(homeOrPanel) else IdleDelayMs
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt
+new file mode 100644
+index 0000000..a5842a9
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxResourceLimits.kt
+@@ -0,0 +1,93 @@
++package io.github.xgl34222220.hetu
++
++import java.math.BigInteger
++import java.util.Locale
++
++/**
++ * 高级代理配置 › 资源限制, checked by the rules hetu-root.sh applies when the proxy starts
++ * (`cpu_mask`, `mem_bytes`, `tuning_valid`), so a value the script would refuse is caught while
++ * typing instead of at the next start. An empty value means "no limit" there, as in the script.
++ */
++internal object HxResourceLimits {
++    const val CPU_ERROR = "CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）"
++    const val MEMORY_ERROR = "内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M"
++    const val MEMORY_MAX_ERROR = "内存限制不能超过 16G"
++    const val IO_ERROR = "磁盘 I/O 权重应为 0-7"
++    const val CPU_BEYOND_DEVICE = "本机可用 %s 个 CPU（0-%s），超出的编号不会生效"
++
++    private val MIN_MEMORY = BigInteger.valueOf(33_554_432L)
++    private val MAX_MEMORY = BigInteger.valueOf(17_179_869_184L)
++
++    /** The affinity mask `cpu_mask` would print, or null where it fails. */
++    fun cpuMask(value: String): Long? {
++        if (value.isEmpty() || value.any { it !in '0'..'9' && it != ',' && it != '-' }) return null
++        // `IFS=, set -- $1` drops one trailing empty field ("0," is "0"); any other empty part fails.
++        val parts = value.split(',').let { if (it.size > 1 && it.last().isEmpty()) it.dropLast(1) else it }
++        var mask = 0L
++        for (part in parts) {
++            if (part.isEmpty() || part.startsWith('-') || part.endsWith('-') || part.count { it == '-' } > 1) return null
++            val a = part.substringBefore('-')
++            val b = part.substringAfter('-', a)
++            if (listOf(a, b).any { (it.length > 1 && it[0] == '0') || it.length > 2 }) return null
++            val from = a.toInt()
++            val to = b.toInt()
++            if (from > to || to > 23) return null
++            for (cpu in from..to) mask = mask or (1L shl cpu)
++        }
++        return mask.takeIf { it > 0L }
++    }
++
++    /** Bytes `mem_bytes` would print (32M to 16G, K/M/G with an optional B or iB), or null where it fails. */
++    fun memoryBytes(value: String): Long? = memoryValue(value)?.takeIf { it >= MIN_MEMORY && it <= MAX_MEMORY }?.toLong()
++
++    private fun memoryValue(value: String): BigInteger? {
++        val upper = value.uppercase(Locale.ROOT).replace(Regex("I?B$"), "")
++        val match = Regex("^([0-9]+)([KMG]?)$").matchEntire(upper) ?: return null
++        val unit = when (match.groupValues[2]) { "K" -> 1_024L; "M" -> 1_048_576L; "G" -> 1_073_741_824L; else -> 1L }
++        return BigInteger(match.groupValues[1]).multiply(BigInteger.valueOf(unit))
++    }
++
++    fun cpuError(value: String): String? = if (value.isEmpty() || cpuMask(value) != null) null else CPU_ERROR
++
++    fun memoryError(value: String): String? {
++        if (value.isEmpty()) return null
++        val bytes = memoryValue(value) ?: return MEMORY_ERROR
++        return when {
++            bytes < MIN_MEMORY -> MEMORY_ERROR
++            bytes > MAX_MEMORY -> MEMORY_MAX_ERROR
++            else -> null
++        }
++    }
++
++    fun ioError(value: String): String? = if (value.isEmpty() || (value.length == 1 && value[0] in '0'..'7')) null else IO_ERROR
++
++    /** Highest CPU the value names when it is past this device's last one; the script still accepts it. */
++    fun cpuBeyondDevice(value: String, available: Int = Runtime.getRuntime().availableProcessors()): Int? {
++        val mask = cpuMask(value) ?: return null
++        val highest = 63 - java.lang.Long.numberOfLeadingZeros(mask)
++        return highest.takeIf { available > 0 && it >= available }
++    }
++}
++
++/** What the notification shows for [template]: every `{name}` the status service fills, replaced the same way. */
++internal fun hxNotificationPreview(template: String, values: Map<String, String>): String {
++    var text = template
++    values.forEach { (key, value) -> text = text.replace("{$key}", value) }
++    return text
++}
++
++/** Stand-in values for the notification preview, in the formats the status service uses. */
++internal fun hxNotificationPreviewValues(): Map<String, String> = mapOf(
++    "status" to "运行中",
++    "uptime" to HxFormat.duration(5_025L),
++    "upload" to HxFormat.speed(48_000L),
++    "download" to HxFormat.speed(1_260_000L),
++    "upload_total" to HxFormat.bytes(86_000_000L),
++    "download_total" to HxFormat.bytes(1_420_000_000L),
++    "cpu" to String.format(Locale.US, "%.1f%%", 3.2f),
++    "memory" to HxFormat.bytes(62_000_000L),
++    "connections" to "42",
++    "config" to "config.yaml",
++    "core" to "mihomo",
++    "mode" to "rule",
++)
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
 new file mode 100644
 index 0000000..7d49de3
@@ -63796,6 +64122,141 @@ index 5a9c877..6802546 100644
      }
 -}
 \ No newline at end of file
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/LastGoodConfig.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/LastGoodConfig.kt
+new file mode 100644
+index 0000000..4ebb7ff
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/LastGoodConfig.kt
+@@ -0,0 +1,129 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.content.SharedPreferences
++import java.io.File
++import java.nio.charset.StandardCharsets
++import java.security.MessageDigest
++import org.json.JSONObject
++
++/**
++ * Audit G1 「上次可启动」: after a successful manual start or restart, the effective source of that
++ * start (the selected file's text with the enabled override scripts already applied) is kept in
++ * app-private storage, one copy per core, overwritten each time. When a later start fails, the
++ * failure sheet can start once more from that copy. The user's own config file is never written:
++ * the copy only replaces the text the start reads.
++ *
++ * Text: `files/hetu-last-good/<core>.src`. What it was (core, mode, config name, time, size,
++ * SHA-256) sits in the `hetu` preferences under [META_PREFIX]<core>; none of these keys is part of
++ * the runtime settings signature, so saving never marks settings as pending.
++ */
++object LastGoodConfig {
++    const val MAX_BYTES = 4 * 1024 * 1024
++    const val META_PREFIX = "proxyLastGoodMeta."
++    /** Set while the running session was started from the copy: the session's validation fingerprint. */
++    const val ACTIVE_KEY = "proxyLastGoodActive"
++    private const val FOLDER = "hetu-last-good"
++    /** Shown instead of a file name when override scripts generated the config without one. */
++    const val SCRIPTS_ONLY = "覆写脚本生成"
++
++    data class Info(
++        val core: String,
++        val mode: String,
++        val config: String,
++        val savedAt: Long,
++        val bytes: Int,
++        val sha256: String,
++    ) {
++        val label: String get() = config.ifBlank { SCRIPTS_ONLY }
++    }
++
++    private fun safeCore(core: String): String = core.replace(Regex("[^A-Za-z0-9._-]"), "_").ifBlank { "core" }
++
++    @JvmStatic fun file(context: Context, core: String): File =
++        File(File(context.filesDir, FOLDER), safeCore(core) + ".src")
++
++    @JvmStatic fun sha256(text: String): String =
++        MessageDigest.getInstance("SHA-256").digest(text.toByteArray(StandardCharsets.UTF_8))
++            .joinToString("") { "%02x".format(it.toInt() and 0xff) }
++
++    /**
++     * Keeps [source] as the core's last startable version. Never throws: a failed save leaves the
++     * previous copy (or none) in place and the start it follows is unaffected.
++     */
++    @JvmStatic @JvmOverloads fun save(context: Context, core: String, mode: String, config: String, source: String?, now: Long = System.currentTimeMillis()): Boolean {
++        if (source == null || source.isBlank()) return false
++        return try {
++            val bytes = source.toByteArray(StandardCharsets.UTF_8)
++            if (bytes.size > MAX_BYTES) return false
++            val target = file(context, core)
++            val folder = target.parentFile ?: return false
++            if (!folder.isDirectory && !folder.mkdirs()) return false
++            val temp = File(folder, target.name + ".tmp")
++            temp.writeBytes(bytes)
++            if (!temp.renameTo(target)) {
++                temp.delete()
++                return false
++            }
++            val meta = JSONObject()
++                .put("core", core).put("mode", mode).put("config", config)
++                .put("savedAt", now).put("bytes", bytes.size).put("sha256", sha256(source))
++            context.getSharedPreferences("hetu", Context.MODE_PRIVATE).edit()
++                .putString(META_PREFIX + core, meta.toString())
++                .remove(ACTIVE_KEY)
++                .commit()
++        } catch (_: Exception) {
++            false
++        }
++    }
++
++    /** What the core's copy is, from preferences only (no file access); null when none was saved. */
++    @JvmStatic fun info(prefs: SharedPreferences, core: String): Info? {
++        val raw = prefs.getString(META_PREFIX + core, null) ?: return null
++        return try {
++            val o = JSONObject(raw)
++            Info(o.optString("core", core), o.optString("mode", ""), o.optString("config", ""),
++                o.optLong("savedAt", 0L), o.optInt("bytes", 0), o.optString("sha256", ""))
++                .takeIf { it.sha256.isNotEmpty() && it.bytes > 0 }
++        } catch (_: Exception) {
++            null
++        }
++    }
++
++    /** The copy's text, or null when it is missing, too large or no longer matches its recorded SHA-256. */
++    @JvmStatic fun read(context: Context, core: String): String? {
++        val info = info(context.getSharedPreferences("hetu", Context.MODE_PRIVATE), core) ?: return null
++        return try {
++            val target = file(context, core)
++            if (!target.isFile || target.length() > MAX_BYTES) return null
++            val text = target.readText(StandardCharsets.UTF_8)
++            text.takeIf { it.isNotBlank() && sha256(it) == info.sha256 }
++        } catch (_: Exception) {
++            null
++        }
++    }
++
++    /** Records that the session with [fingerprint] (proxyRootValidatedFingerprint) runs from [core]'s copy. */
++    @JvmStatic fun markActive(prefs: SharedPreferences, core: String, fingerprint: String?) {
++        if (fingerprint.isNullOrEmpty()) return
++        prefs.edit().putString(ACTIVE_KEY, JSONObject().put("core", core).put("fingerprint", fingerprint).toString()).apply()
++    }
++
++    /**
++     * The copy the running session was started from, or null. Only true for that very session:
++     * any later start or restart publishes a different validation fingerprint (a normal successful
++     * start also clears the record through [save]).
++     */
++    @JvmStatic fun active(prefs: SharedPreferences, running: Boolean): Info? {
++        if (!running) return null
++        val raw = prefs.getString(ACTIVE_KEY, null) ?: return null
++        return try {
++            val o = JSONObject(raw)
++            val fingerprint = o.optString("fingerprint", "")
++            if (fingerprint.isEmpty() || fingerprint != prefs.getString("proxyRootValidatedFingerprint", "")) null
++            else info(prefs, o.optString("core", ""))
++        } catch (_: Exception) {
++            null
++        }
++    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/MiscScreens.kt
 index 1ee2881..f9d19cb 100644
@@ -65616,7 +66077,7 @@ index 0000000..078ba90
 +/** Joins row state: the latency row and the unlock check of the same service finish independently. */
 +internal fun mergeUnlockRegion(traceRegion: String?, unlock: UnlockResult?): String? = unlock?.region ?: traceRegion
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
-index df92493..b61a4b2 100644
+index df92493..0b9f347 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NewUiIntegration.kt
 @@ -1,6 +1,7 @@
@@ -65627,7 +66088,7 @@ index df92493..b61a4b2 100644
  import androidx.compose.ui.unit.Dp
  import io.github.xgl34222220.hetu.home.HetuHomeV2
  import io.github.xgl34222220.hetu.home.HomeWanExtras
-@@ -9,7 +10,8 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
+@@ -9,8 +10,15 @@ import io.github.xgl34222220.hetu.home.HomeWanExtras
  @Composable
  internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Unit) {
      val nav = LocalNav.current
@@ -65635,9 +66096,16 @@ index df92493..b61a4b2 100644
 +    val providers = vm.providers
 +    val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
      val rt = vm.runtime
++    // Audit G1: preferences only (no file access); re-read when a start ends or fails.
++    val lastGoodCore = remember(vm.startupError, vm.state.running, vm.operation) { ProxyRuntimeProfile.load(vm.prefs).core.id }
++    val lastGood = remember(lastGoodCore, vm.startupError, vm.state.running, vm.operation) {
++        LastGoodConfig.info(vm.prefs, lastGoodCore)?.let { io.github.xgl34222220.hetu.home.HomeLastGood(it.label, it.savedAt) }
++    }
++    val lastGoodRunning = remember(vm.state.running, vm.state.corePid, vm.operation) { LastGoodConfig.active(vm.prefs, vm.state.running)?.label }
      HetuHomeV2(
          data = CompactHomeData(
-@@ -41,7 +43,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+             running = vm.state.running, busy = vm.operation != null,
+@@ -41,7 +49,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
          onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
          onOpenSubscription = { vm.openPanel("providers") },
          onOpenBasicSettings = { nav.push(HxRoute.Network) },
@@ -65646,7 +66114,7 @@ index df92493..b61a4b2 100644
          onViewConfig = { nav.push(HxRoute.ConfigEditor) },
          onDismissStartupError = { vm.startupError = null }, onDetailVisibleChange = onDetail,
          cpuAffinity = rt.cpuAffinity, currentCpu = rt.currentCpu.takeIf { it >= 0 },
-@@ -52,12 +54,15 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
+@@ -52,12 +60,18 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
              state = rt.wanState, error = rt.wanError,
          ),
          operationText = vm.operationText,
@@ -65662,6 +66130,9 @@ index df92493..b61a4b2 100644
              runtimeMessage = vm.state.message,
 +            egressVerified = vm.state.running && vm.egressVerified,
          ),
++        lastGood = lastGood,
++        lastGoodRunning = lastGoodRunning,
++        onStartLastGood = vm::startLastGood,
      )
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScripts.kt
@@ -67655,10 +68126,18 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..3bffe1b 100644
+index b41cf98..894de18 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-@@ -207,7 +207,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -60,6 +60,7 @@ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.text.font.FontFamily
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.KeyboardType
++import androidx.compose.ui.text.style.TextOverflow
+ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.home.HomeButton
+@@ -207,7 +208,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
              }
          }
          item(key = "error") {
@@ -67667,7 +68146,7 @@ index b41cf98..3bffe1b 100644
                  HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
              }
          }
-@@ -238,12 +238,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -238,12 +239,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var refresh by remember { mutableIntStateOf(0) }
      var loading by remember { mutableStateOf(true) }
      var snapshot by remember { mutableStateOf(SharedNetworkSnapshot()) }
@@ -67685,7 +68164,7 @@ index b41cf98..3bffe1b 100644
 
      LaunchedEffect(refresh) {
          loading = true
-@@ -263,9 +267,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -263,9 +268,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      }
 
      fun saveIfaces(next: Set<String>) {
@@ -67698,7 +68177,7 @@ index b41cf98..3bffe1b 100644
      }
 
      fun saveMacs(values: List<String>): Boolean {
-@@ -286,21 +290,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -286,21 +291,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          return true
      }
 
@@ -67730,7 +68209,7 @@ index b41cf98..3bffe1b 100644
          },
      ) {
          item(key = "note") { HxNote("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root PREROUTING / FORWARD 层生效，修改后重启代理。") }
-@@ -321,14 +327,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -321,14 +328,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      when {
                          loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
                          snapshot.interfaces.isEmpty() -> SettingsRow(snapshot.error.ifBlank { "没有读取到活动接口" }, icon = Icons.Rounded.Cable)
@@ -67750,7 +68229,7 @@ index b41cf98..3bffe1b 100644
                                  icon = Icons.Rounded.Router,
                              )
                          }
-@@ -364,12 +370,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -364,12 +371,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "macs") {
              SettingsSection {
                  HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
@@ -67778,7 +68257,7 @@ index b41cf98..3bffe1b 100644
  }
 
  /* ------------------------------------------------------------------ */
-@@ -464,14 +484,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -464,14 +485,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
          path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
      }
      BackHandler(enabled = path != root) { goUp() }
@@ -67797,7 +68276,7 @@ index b41cf98..3bffe1b 100644
          label = "folder",
      ) { shown ->
          FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })
-@@ -820,6 +838,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -820,6 +839,12 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var preflight by remember { mutableStateOf<Pair<Boolean, String>?>(null) }
      var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
      var confirmRecover by remember { mutableStateOf(false) }
@@ -67810,7 +68289,7 @@ index b41cf98..3bffe1b 100644
 
      fun task(key: String, block: suspend () -> Unit) {
          if (busy != null) return
-@@ -870,6 +894,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -870,6 +895,22 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                  }
              }
          }
@@ -67833,6 +68312,86 @@ index b41cf98..3bffe1b 100644
          item(key = "inspect") {
              SettingsSection {
                  SettingsGroup(title = ht("查看")) {
+@@ -976,6 +1017,16 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     var picker by remember { mutableStateOf<Pair<String, Int>?>(null) }
+     val dirty = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate || refresh != initialRefresh || target != initialTarget ||
+         actions.toList() != initialActions || labels.toList() != initialLabels
++    // Leaving with an edited switch, template or quick button asks first. The refresh and target
++    // menus stay plain drafts that 返回 discards, as notificationMenusAreDraftsAndBackDiscards pins.
++    val unsavedEdits = enabled != initialEnabled || titleTemplate != initialTitle || template != initialTemplate ||
++        actions.toList() != initialActions || labels.toList() != initialLabels
++    var confirmLeave by remember { mutableStateOf(false) }
++    val previewValues = remember { hxNotificationPreviewValues() }
++    // The preview opens by itself once a template is edited, or from the 预览 chip. Closed it adds no
++    // height, so the quick buttons stay where the PDF frames and their pickers expect them.
++    var previewOpen by rememberSaveable { mutableStateOf(false) }
++    val showPreview = previewOpen || titleTemplate != initialTitle || template != initialTemplate
+
+     val targetOptions = listOf(
+         "Home" to "首页", "Panel" to "面板", "Strategy" to "策略",
+@@ -1008,11 +1059,12 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         vm.toast("通知设置已保存")
+         onBack()
+     }
++    BackHandler(enabled = unsavedEdits) { confirmLeave = true }
+
+     HxPage(
+         title = ht("通知详细设置"),
+         largeTitle = false,
+-        onBack = onBack,
++        onBack = { if (unsavedEdits) confirmLeave = true else onBack() },
+         actions = { HxBarAction(HomeIcons.Check, "保存", onClick = ::save, enabled = dirty) },
+     ) {
+         item(key = "master") {
+@@ -1060,6 +1112,11 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                         horizontalArrangement = Arrangement.spacedBy(6.dp),
+                     ) {
++                        HomePill(
++                            ht(if (showPreview) "收起预览" else "预览"), tone = HomeTone.Accent, height = 28.dp,
++                            style = HomeType.badge.copy(fontWeight = FontWeight.Medium),
++                            onClick = { previewOpen = !showPreview },
++                        )
+                         NotificationVariables.forEach { variable ->
+                             HomePill(
+                                 variable, tone = HomeTone.Neutral, height = 28.dp,
+@@ -1068,6 +1125,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                             )
+                         }
+                     }
++                    // The notification as the service would render the two templates, with stand-in values.
++                    HxVisibility(showPreview) {
++                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
++                            Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
++                            Text(
++                                hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
++                                color = c.t1, style = HomeType.body.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis,
++                            )
++                            Text(
++                                hxNotificationPreview(template.ifBlank { ProxyStatusNotificationService.DEFAULT_TEMPLATE }, previewValues),
++                                Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
++                            )
++                        }
++                    }
+                 }
+             }
+         }
+@@ -1118,4 +1189,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             )
+         }
+     }
++
++    if (confirmLeave) {
++        HxConfirmDialog(
++            title = "放弃修改？",
++            message = "通知设置的修改还没有保存。",
++            confirmLabel = "放弃",
++            danger = true,
++            onConfirm = { confirmLeave = false; onBack() },
++            onDismiss = { confirmLeave = false },
++        )
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
 new file mode 100644
 index 0000000..9e29412
@@ -68356,18 +68915,30 @@ index 0000000..c824968
 +    private fun spaces(n: Int): String = " ".repeat(n)
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-index 0ceaa23..56fb053 100644
+index 0ceaa23..b8cfe9d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeAdapter.kt
-@@ -94,6 +94,7 @@ internal fun HetuHomeV2(
+@@ -94,6 +94,10 @@ internal fun HetuHomeV2(
      wanExtras: HomeWanExtras? = null,
      operationText: String? = null,
      connection: HomeConnectionObservation = HomeConnectionObservation(),
 +    onUpdateProviders: () -> Unit = {},
++    lastGood: HomeLastGood? = null,
++    lastGoodRunning: String? = null,
++    onStartLastGood: () -> Unit = {},
  ) {
      val context = LocalContext.current
      val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
-@@ -140,16 +141,31 @@ internal fun HetuHomeV2(
+@@ -128,6 +132,8 @@ internal fun HetuHomeV2(
+     )
+     val state = mapped.copy(
+         connection = connection,
++        lastGood = lastGood,
++        lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
+         statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
+         wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
+             city = wanExtras.city.known(),
+@@ -140,16 +146,32 @@ internal fun HetuHomeV2(
          ),
      )
 
@@ -68389,6 +68960,7 @@ index 0ceaa23..56fb053 100644
 +    val viewConfig by rememberUpdatedState(onViewConfig)
 +    val dismissStartupError by rememberUpdatedState(onDismissStartupError)
 +    val updateProviders by rememberUpdatedState(onUpdateProviders)
++    val startLastGood by rememberUpdatedState(onStartLastGood)
 +    val actions = remember(context, prefs) {
          HomeActions(
 -            onStart = onToggle,
@@ -68408,7 +68980,7 @@ index 0ceaa23..56fb053 100644
              onNetSideChange = { side ->
                  netSide = side
                  prefs.edit().putString(PrefNetSide, if (side == HomeNetSide.Lan) "lan" else "wan").apply()
-@@ -158,31 +174,33 @@ internal fun HetuHomeV2(
+@@ -158,31 +180,34 @@ internal fun HetuHomeV2(
                  speedSource = source
                  prefs.edit().putString(PrefSpeedSource, source.id).apply()
              },
@@ -68437,6 +69009,7 @@ index 0ceaa23..56fb053 100644
              saveTargets = { config -> saveTargets(prefs, config) },
              resetTargets = { ProxyLatencyTargets.reset(prefs); loadTargets(prefs) },
 +            onUpdateProviders = { updateProviders() },
++            onStartLastGood = { startLastGood() },
          )
      }
 
@@ -68458,7 +69031,7 @@ index 0ceaa23..56fb053 100644
          ) {
              HomeRoute(
                  state = state.copy(ipRefreshing = data.refreshing),
-@@ -290,8 +308,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
+@@ -290,8 +315,11 @@ internal fun currentNode(groups: List<ProxyGroupUi>, mode: HomeProxyMode): HomeN
  @Composable
  private fun rememberLocalSpeed(enabled: Boolean): Pair<Long?, Long?> {
      var rates by remember { mutableStateOf<Pair<Long?, Long?>>(null to null) }
@@ -68471,7 +69044,7 @@ index 0ceaa23..56fb053 100644
          var lastTx = TrafficStats.getTotalTxBytes()
          var lastRx = TrafficStats.getTotalRxBytes()
          var lastAt = SystemClock.elapsedRealtime()
-@@ -321,8 +342,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
+@@ -321,8 +349,11 @@ private fun rememberResourceHistory(sampling: Boolean, cpu: Float, memoryBytes:
      val memoryPoints = remember { mutableStateListOf<Float?>() }
      val latestCpu by rememberUpdatedState(cpu)
      val latestMemory by rememberUpdatedState(memoryBytes)
@@ -68484,7 +69057,7 @@ index 0ceaa23..56fb053 100644
          while (true) {
              cpuPoints.add(latestCpu.takeIf { !it.isNaN() })
              memoryPoints.add(latestMemory.takeIf { it > 0L }?.let { it / 1_048_576f })
-@@ -418,3 +442,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
+@@ -418,3 +449,15 @@ internal fun HetuHomeKit(prefs: SharedPreferences, content: @Composable () -> Un
  }
 
  private data class ThemeChoice(val dark: Boolean, val pureBlack: Boolean, val accent: HomeAccent, val custom: Color?)
@@ -68915,7 +69488,7 @@ index 36f72fa..c751c37 100644
      return this.then(material)
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
-index 108ce15..5ecdc55 100644
+index 108ce15..99b7052 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeModels.kt
 @@ -132,11 +132,14 @@ internal data class HomeConnectionObservation(
@@ -68963,7 +69536,27 @@ index 108ce15..5ecdc55 100644
  }
 
  internal data class HomeUiState(
-@@ -247,6 +273,10 @@ internal class HomeActions(
+@@ -169,8 +195,19 @@ internal data class HomeUiState(
+     val downloadBytesPerSecond: Long? = null,
+     val subscription: HomeSubscription? = null,
+     val resource: HomeResource = HomeResource(),
++    /** Audit G1: the current core's 「上次可启动」 copy; the start-failure sheet offers it when present. */
++    val lastGood: HomeLastGood? = null,
++    /** Audit G1: set while the running session was started from that copy (its config name). */
++    val lastGoodRunning: String? = null,
+ )
+
++/** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
++internal data class HomeLastGood(val config: String, val savedAt: Long) {
++    /** 10-13 21:05 in the device time zone; empty when unknown. */
++    val savedText: String get() = if (savedAt <= 0L) "" else
++        java.text.SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(java.util.Date(savedAt))
++}
++
+ /* ------------------------------------------------------------------ */
+ /*  Direct-probe targets form                                           */
+ /* ------------------------------------------------------------------ */
+@@ -247,6 +284,10 @@ internal class HomeActions(
      val onOpenBasicSettings: () -> Unit = {},
      /** Config tag: opens 工具 › 配置管理. */
      val onOpenConfigs: () -> Unit = {},
@@ -68974,12 +69567,14 @@ index 108ce15..5ecdc55 100644
      /** “查看配置” in the start-failure sheet: opens the YAML editor at the reported line when known. */
      val onViewConfig: () -> Unit = {},
      val onDismissStartFailure: () -> Unit = {},
-@@ -254,6 +284,8 @@ internal class HomeActions(
+@@ -254,6 +295,10 @@ internal class HomeActions(
      val loadTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
      val saveTargets: (HomeTargetsConfig) -> Unit = {},
      val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
 +    /** Long press on the 订阅 card: 更新全部订阅 (the ViewModel explains when it cannot run). */
 +    val onUpdateProviders: () -> Unit = {},
++    /** Audit G1: 「用上次可启动的版本启动」 in the start-failure sheet. */
++    val onStartLastGood: () -> Unit = {},
  )
 
  /* ------------------------------------------------------------------ */
@@ -69017,7 +69612,7 @@ index ad9371b..bcf3421 100644
  }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
-index a6f5728..59d48c7 100644
+index a6f5728..4bbcfd1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeRoute.kt
 @@ -21,6 +21,7 @@ import androidx.compose.runtime.LaunchedEffect
@@ -69048,8 +69643,20 @@ index a6f5728..59d48c7 100644
                  onOpenTargets = { targets = actions.loadTargets(); feedback = null; destination = HomeDestination.Targets },
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
+@@ -147,9 +152,11 @@ internal fun HomeRoute(
+         HomeModalSheet(onDismiss = actions.onDismissStartFailure) {
+             HomeStartFailedSheetContent(
+                 detail = failure.detail,
++                lastGood = state.lastGood,
+                 onCopy = { haptics(HomeHaptic.Confirm); actions.onCopy("诊断信息", failure.detail) },
+                 onViewConfig = { actions.onDismissStartFailure(); actions.onViewConfig() },
+                 onRetry = { actions.onDismissStartFailure(); actions.onStart() },
++                onStartLastGood = { actions.onDismissStartFailure(); actions.onStartLastGood() },
+             )
+         }
+     }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..fb2a26b 100644
+index e31ca99..b3b9e4c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
@@ -69114,7 +69721,22 @@ index e31ca99..fb2a26b 100644
              if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
                  HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
                      Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
-@@ -167,21 +177,22 @@ internal fun HomeScreen(
+@@ -160,6 +170,14 @@ internal fun HomeScreen(
+                     textStyle = HomeType.button,
+                 )
+             }
++            // Audit G1: the session runs from the 「上次可启动」 copy, not from the (failing) source file.
++            HomeReveal(state.status.isLive && state.lastGoodRunning != null) {
++                HomeNotice(
++                    ht("正在运行上次可启动的版本（%s）· 源配置未修改").fill(state.lastGoodRunning.orEmpty()),
++                    HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
++                    actionLabel = "查看配置", onAction = actions.onViewConfig,
++                )
++            }
+             HomeReveal(state.status is HomeStatus.PendingRestart) {
+                 HomeNotice(
+                     ht("设置已修改，重启后生效"), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
+@@ -167,21 +185,22 @@ internal fun HomeScreen(
                  )
              }
 
@@ -69141,7 +69763,7 @@ index e31ca99..fb2a26b 100644
                  HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
              }
              Spacer(Modifier.height(8.dp))
-@@ -201,6 +212,22 @@ internal fun HomeScreen(
+@@ -201,6 +220,22 @@ internal fun HomeScreen(
 
  internal fun String.fill(vararg args: Any): String = String.format(Locale.ROOT, this, *args)
 
@@ -69164,7 +69786,7 @@ index e31ca99..fb2a26b 100644
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -230,7 +257,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -230,7 +265,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
      val line = when (status) {
          is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
          is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
@@ -69173,7 +69795,7 @@ index e31ca99..fb2a26b 100644
          HomeStatus.NotRunning, is HomeStatus.StartFailed -> ht("尚未启动代理")
      }
      val tint by animateColorAsState(
-@@ -256,7 +283,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -256,7 +291,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
          HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
          Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
              Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
@@ -69182,7 +69804,7 @@ index e31ca99..fb2a26b 100644
                  HomeRollingText(title, c.t1, HomeType.heroStatus, alignment = Alignment.CenterStart)
              }
              HomeRollingText(line, c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
-@@ -275,7 +302,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+@@ -275,7 +310,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
  private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
      val c = LocalHomeColors.current
      Row(
@@ -69191,7 +69813,7 @@ index e31ca99..fb2a26b 100644
          verticalAlignment = Alignment.CenterVertically,
          horizontalArrangement = Arrangement.spacedBy(2.dp),
      ) {
-@@ -287,8 +314,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -287,8 +322,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
  /** A running core becomes a healthy local glyph only after both observations succeeded. */
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
@@ -69207,7 +69829,7 @@ index e31ca99..fb2a26b 100644
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +380,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +388,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
@@ -69247,7 +69869,7 @@ index e31ca99..fb2a26b 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -378,64 +444,8 @@ private fun RowScope.ControlAction(
+@@ -378,64 +452,8 @@ private fun RowScope.ControlAction(
      ) {
          if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
          Text(text, color = tint, style = HomeType.control, maxLines = 1)
@@ -69314,7 +69936,7 @@ index e31ca99..fb2a26b 100644
      }
  }
 
-@@ -485,9 +495,11 @@ private fun MetricCard(
+@@ -485,9 +503,11 @@ private fun MetricCard(
      onClick: () -> Unit,
      clickLabel: String,
      header: @Composable RowScope.() -> Unit,
@@ -69327,7 +69949,7 @@ index e31ca99..fb2a26b 100644
          Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
              Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
              content()
-@@ -597,20 +609,27 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
+@@ -597,20 +617,27 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
  }
 
  @Composable
@@ -69360,7 +69982,7 @@ index e31ca99..fb2a26b 100644
      }
  }
 
-@@ -623,9 +642,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
+@@ -623,9 +650,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
          modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
          header = { MetricTitle("资源占用") },
      ) {
@@ -69386,6 +70008,51 @@ index e31ca99..fb2a26b 100644
      }
  }
 
+@@ -673,7 +713,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
+
+ /** 启动失败: the error text can be copied; two exits, open the config or try again. */
+ @Composable
+-internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) {
++internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) =
++    HomeStartFailedSheetContent(detail, null, onCopy, onViewConfig, onRetry, {})
++
++/**
++ * Audit G1: the same sheet; with a [lastGood] copy it also offers 「用上次可启动的版本启动」, which starts
++ * from that copy and leaves the source file as it is. Without one the sheet is exactly the one above.
++ */
++@Composable
++internal fun HomeStartFailedSheetContent(
++    detail: String,
++    lastGood: HomeLastGood?,
++    onCopy: () -> Unit,
++    onViewConfig: () -> Unit,
++    onRetry: () -> Unit,
++    onStartLastGood: () -> Unit,
++) {
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+     HomeSheetContent(
+@@ -692,5 +747,19 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
+             HomeButton("查看配置", onViewConfig, Modifier.weight(1f), kind = HomeButtonKind.Soft)
+             HomeButton("重新启动", onRetry, Modifier.weight(1f), kind = HomeButtonKind.Primary)
+         },
+-    ) { HomeCodeBox(detail, caption = "错误详情") }
++    ) {
++        HomeCodeBox(detail, caption = "错误详情")
++        if (lastGood != null) {
++            HomeSheetGroup(Modifier.padding(top = 10.dp)) {
++                Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
++                    Text(
++                        ht("上次可启动：%s").fill(listOf(lastGood.config, lastGood.savedText).filter { it.isNotBlank() }.joinToString(" · ")),
++                        color = c.t2, style = HomeType.rowSub,
++                    )
++                    Text(ht("只用于这次启动，不会修改当前配置文件"), color = c.t3, style = HomeType.caption)
++                    HomeButton("用上次可启动的版本启动", onStartLastGood, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft, tinted = true)
++                }
++            }
++        }
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
 index 552f3dd..cad6ae2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
@@ -72903,7 +73570,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..842f007 100644
+index 578ce9d..48bd347 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -72950,7 +73617,7 @@ index 578ce9d..842f007 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,255 @@ private val vocabularyConnection = """
+@@ -969,16 +990,278 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -73186,7 +73853,30 @@ index 578ce9d..842f007 100644
 +跳到第 %d 行|Go to line %d|跳至第 %d 行|К строке %d
 +""".trimIndent()
 +
-+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui).joinToString("\n")
++// 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
++private val vocabularyAudit3Settings = """
++预览|Preview|預覽|Предпросмотр
++收起预览|Hide preview|收合預覽|Скрыть предпросмотр
++预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
++通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
++CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)
++内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M|Invalid memory limit: enter a value such as 128M or 1G, at least 32M|記憶體限制格式無效：請填寫 128M、1G 這樣的值，且不低於 32M|Неверный лимит памяти: укажите значение вроде 128M или 1G, не меньше 32M
++内存限制不能超过 16G|The memory limit cannot exceed 16G|記憶體限制不能超過 16G|Лимит памяти не может превышать 16G
++磁盘 I/O 权重应为 0-7|Disk I/O weight must be 0-7|磁碟 I/O 權重應為 0-7|Вес дискового ввода-вывода должен быть от 0 до 7
++本机可用 %s 个 CPU（0-%s），超出的编号不会生效|This device has %s CPUs (0-%s); numbers beyond them have no effect|本機可用 %s 個 CPU（0-%s），超出的編號不會生效|На устройстве доступно CPU: %s (0-%s); номера сверх этого не действуют
++""".trimIndent()
++
++// 2026-10-13 audit G1: start from the last startable copy of the source config.
++private val vocabularyLastGood = """
++用上次可启动的版本启动|Start with the last working version|用上次可啟動的版本啟動|Запустить последнюю рабочую версию
++上次可启动：%s|Last working version: %s|上次可啟動：%s|Последняя рабочая версия: %s
++只用于这次启动，不会修改当前配置文件|Used for this start only; your current config file is not changed|只用於這次啟動，不會修改目前的設定檔|Только для этого запуска; текущий файл конфигурации не меняется
++正在运行上次可启动的版本（%s）· 源配置未修改|Running the last working version (%s) · source config unchanged|正在執行上次可啟動的版本（%s）· 來源設定未修改|Работает последняя рабочая версия (%s) · исходная конфигурация не изменена
++正在用上次可启动的版本启动…|Starting with the last working version…|正在用上次可啟動的版本啟動…|Запуск последней рабочей версии…
++已用上次可启动的版本启动，源配置未修改|Started with the last working version; source config unchanged|已用上次可啟動的版本啟動，來源設定未修改|Запущена последняя рабочая версия; исходная конфигурация не изменена
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {
@@ -77019,6 +77709,183 @@ index 0000000..2bb498c
 +        assertTrue(AdblockVerification.hints(chain(hits = 0, fromController = false)).isEmpty())
 +    }
 +}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
+new file mode 100644
+index 0000000..f9ead7a
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt
+@@ -0,0 +1,171 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.test.hasClickAction
++import androidx.compose.ui.test.hasContentDescription
++import androidx.compose.ui.test.hasSetTextAction
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.test.performTextReplacement
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import java.io.File
++import java.util.concurrent.TimeUnit
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/**
++ * 2026-10-13 audit3 settings (G3/G4): the notification page asks before dropping edited text or
++ * quick buttons and previews the rendered templates; 资源限制 inputs are checked by the same rules
++ * hetu-root.sh applies at start and only a valid value is written.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++class Audit3Settings107Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++    private var vm: HetuViewModel? = null
++
++    @Before fun clean() {
++        app.getSharedPreferences("hetu", 0).edit().clear()
++            .putString("appearance", "light").putBoolean("hetuDynamicColor", false).putBoolean("enableBlur", false).commit()
++    }
++
++    @After fun finish() { vm?.onBackground() }
++
++    @Test fun cpuAffinityFollowsTheStartScriptRules() {
++        assertEquals(0xffL, HxResourceLimits.cpuMask("0-7"))
++        assertEquals(0x75L, HxResourceLimits.cpuMask("0,2,4-6"))
++        assertEquals(1L shl 23, HxResourceLimits.cpuMask("23"))
++        assertEquals(1L, HxResourceLimits.cpuMask("0,"))
++        listOf("0~3", "01", "0-24", "3-1", "-1", "1-", "0--2", "0-1-2", "0,,2", ",0", "100", " 0", "0 - 3").forEach {
++            assertNull("accepted $it", HxResourceLimits.cpuMask(it))
++            assertEquals(HxResourceLimits.CPU_ERROR, HxResourceLimits.cpuError(it))
++        }
++        assertNull(HxResourceLimits.cpuError(""))
++        assertNull(HxResourceLimits.cpuError("0-3"))
++        assertEquals(15, HxResourceLimits.cpuBeyondDevice("0-15", available = 8))
++        assertNull(HxResourceLimits.cpuBeyondDevice("0-7", available = 8))
++        assertNull(HxResourceLimits.cpuBeyondDevice("0~7", available = 8))
++    }
++
++    @Test fun memoryAndIoFollowTheStartScriptRules() {
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128M"))
++        assertEquals(1_073_741_824L, HxResourceLimits.memoryBytes("1g"))
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128MB"))
++        assertEquals(134_217_728L, HxResourceLimits.memoryBytes("128MiB"))
++        assertEquals(33_554_432L, HxResourceLimits.memoryBytes("32M"))
++        assertEquals(17_179_869_184L, HxResourceLimits.memoryBytes("16G"))
++        listOf("100", "31M", "1.5G", "128 M", "M", "128T").forEach { assertEquals("$it", HxResourceLimits.MEMORY_ERROR, HxResourceLimits.memoryError(it)) }
++        assertEquals(HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.memoryError("17G"))
++        assertNull(HxResourceLimits.memoryError(""))
++        assertNull(HxResourceLimits.memoryError("100M"))
++        ('0'..'7').forEach { assertNull(HxResourceLimits.ioError(it.toString())) }
++        listOf("8", "9", "07", "-1", " 4").forEach { assertEquals(it, HxResourceLimits.IO_ERROR, HxResourceLimits.ioError(it)) }
++        assertNull(HxResourceLimits.ioError(""))
++    }
++
++    /** The Kotlin rules give the verdicts (and the CPU mask) of the script's own cpu_mask / mem_bytes. */
++    @Test fun kotlinRulesMatchTheRootScriptFunctions() {
++        val script = File("src/main/assets/hetu-root.sh").readText()
++        fun function(name: String) = Regex("""(?ms)^$name\(\)\{\n.*?^\}\n""").find(script)!!.value
++        val functions = function("cpu_mask") + function("mem_bytes")
++        fun run(call: String, value: String): String? {
++            val process = ProcessBuilder("sh", "-c", "$functions\n$call \"\$1\"", "sh", value).redirectErrorStream(true).start()
++            assertTrue(process.waitFor(10, TimeUnit.SECONDS))
++            val out = process.inputStream.bufferedReader().readText().trim()
++            return out.takeIf { process.exitValue() == 0 }
++        }
++        listOf("0-7", "0,2,4-6", "23", "0,", "0~3", "01", "0-24", "3-1", "-1", "0--2", "0,,2", ",0", "100", "7-7").forEach { value ->
++            assertEquals("cpu $value", run("cpu_mask", value), HxResourceLimits.cpuMask(value)?.let { java.lang.Long.toHexString(it) })
++        }
++        listOf("128M", "1g", "128MB", "128MiB", "32M", "16G", "17G", "100", "31M", "1.5G", "M", "33554432").forEach { value ->
++            assertEquals("mem $value", run("mem_bytes", value), HxResourceLimits.memoryBytes(value)?.toString())
++        }
++        assertTrue(script.contains("case \"\$START_IO\" in [0-7]) ;;"))
++        // The UI reports the script's own wording.
++        assertTrue(script.contains(HxResourceLimits.CPU_ERROR) && script.contains(HxResourceLimits.MEMORY_ERROR) && script.contains(HxResourceLimits.IO_ERROR))
++    }
++
++    @Test fun resourceFieldsWriteOnlyValidDraftsAndShowTheError() {
++        val page = source("ProxyAdvancedSettingsActivity.kt")
++        assertTrue(page.contains("validate = HxResourceLimits::cpuError"))
++        assertTrue(page.contains("validate = HxResourceLimits::memoryError"))
++        assertTrue(page.contains("validate = HxResourceLimits::ioError"))
++        assertTrue(page.contains("value = draft, onValueChange = { draft = it }"))
++        assertTrue(page.contains("fun commit() { if (latest != stored && check(latest) == null) write(latest) }"))
++        assertFalse("each keystroke must not reach prefs", page.contains("value = value, onValueChange = onValue"))
++    }
++
++    @Test fun notificationPreviewRendersEveryVariable() {
++        val values = hxNotificationPreviewValues()
++        val all = listOf("status", "uptime", "upload", "download", "upload_total", "download_total", "cpu", "memory", "connections", "config", "core", "mode")
++        assertEquals(all.toSet(), values.keys)
++        val body = hxNotificationPreview(ProxyStatusNotificationService.DEFAULT_TEMPLATE, values)
++        assertFalse(body, body.contains("{"))
++        assertTrue(body.startsWith("运行中 · "))
++        assertEquals("河图 · 运行中", hxNotificationPreview(ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE, values))
++        assertEquals("{unknown} 42", hxNotificationPreview("{unknown} {connections}", values))
++    }
++
++    @Test fun newWordsTranslate() {
++        listOf("预览", "收起预览", "预览 · 示例值", "通知设置的修改还没有保存。", HxResourceLimits.CPU_ERROR, HxResourceLimits.MEMORY_ERROR,
++            HxResourceLimits.MEMORY_MAX_ERROR, HxResourceLimits.IO_ERROR, HxResourceLimits.CPU_BEYOND_DEVICE).forEach { key ->
++            listOf("en", "zh-TW", "ru").forEach { lang -> assertTrue("$lang: $key", translateHetuText(key, lang) != key) }
++        }
++        listOf("en", "zh-TW", "ru").forEach { lang -> assertEquals(2, Regex("%s").findAll(translateHetuText(HxResourceLimits.CPU_BEYOND_DEVICE, lang)).count()) }
++    }
++
++    private fun showNotifications(onBack: () -> Unit) {
++        val model = HetuViewModel(app).also { vm = it }
++        rule.setContent {
++            HetuAppTheme("light", false) {
++                CompositionLocalProvider(LocalNav provides HxNav(), LocalHxBlur provides model.blurEnabled) {
++                    NotificationSettingsScreen(model, onBack)
++                }
++            }
++        }
++    }
++
++    @Test fun previewChipShowsTheRenderedTemplatesWithoutEditing() {
++        showNotifications {}
++        // Closed by default: the page keeps its height so the quick buttons do not move.
++        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
++        rule.onNodeWithText("预览").performClick()
++        rule.onNodeWithText("预览 · 示例值").assertExists()
++        rule.onNodeWithText("河图 · 运行中").assertExists()
++        rule.onNodeWithText("收起预览").performClick()
++        rule.onNodeWithText("预览 · 示例值").assertDoesNotExist()
++    }
++
++    @Test fun editedTemplateAsksBeforeLeavingAndShowsThePreview() {
++        var left = false
++        showNotifications { left = true }
++        rule.onAllNodes(hasSetTextAction())[1].performTextReplacement("{status} 测试107")
++        rule.onNodeWithText("运行中 测试107").assertExists()
++        rule.onNodeWithText("预览 · 示例值").assertExists()
++        rule.onNode(hasClickAction() and hasContentDescription("返回")).performClick()
++        rule.waitForIdle()
++        assertFalse(left)
++        rule.onNodeWithText("放弃修改？").assertExists()
++        rule.onAllNodesWithText("放弃")[0].performClick()
++        rule.waitForIdle()
++        assertTrue(left)
++        assertEquals(ProxyStatusNotificationService.DEFAULT_TEMPLATE,
++            app.getSharedPreferences("hetu", 0).getString(ProxyStatusNotificationService.PREF_TEMPLATE, ProxyStatusNotificationService.DEFAULT_TEMPLATE))
++    }
++}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt
 new file mode 100644
 index 0000000..f6bad29
@@ -79786,6 +80653,287 @@ index 0000000..640e57d
 +        assertTrue(configs.contains("hxErrorMessage(failure, \"配置导入失败\")"))
 +        assertTrue(source("tools/ToolsAdapter.kt").contains("hxErrorMessage(error, \"导出失败\")"))
 +        assertTrue(source("app/HetuViewModel.kt").contains("hxErrorMessage(error, fallback)"))
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LastGood107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LastGood107Test.kt
+new file mode 100644
+index 0000000..4448230
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LastGood107Test.kt
+@@ -0,0 +1,275 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import android.content.Context
++import androidx.activity.ComponentActivity
++import androidx.compose.foundation.layout.PaddingValues
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.ui.test.assertCountEquals
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithText
++import androidx.compose.ui.test.performClick
++import androidx.compose.ui.unit.dp
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.home.HomeActions
++import io.github.xgl34222220.hetu.home.HomeLastGood
++import io.github.xgl34222220.hetu.home.HomeScreen
++import io.github.xgl34222220.hetu.home.HomeStartFailedSheetContent
++import io.github.xgl34222220.hetu.home.HomeStatus
++import io.github.xgl34222220.hetu.home.HomeUiState
++import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
++import io.github.xgl34222220.hetu.ui.translateHetuText
++import java.io.ByteArrayInputStream
++import java.io.File
++import java.io.IOException
++import java.util.concurrent.Executors
++import java.util.concurrent.TimeUnit
++import org.json.JSONObject
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotNull
++import org.junit.Assert.assertNull
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/**
++ * 2026-10-13 audit G1 「上次可启动」: a successful manual start keeps its effective source in private
++ * storage; the start-failure sheet can start from that copy without touching the user's file, and
++ * home says so while that session runs. The privileged transport is the existing full-path fixture
++ * of RootStartTransaction93Test (reused, not changed); preparation and startInternal are real.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class,
++    shadows = [RootStartTransaction93BridgeShadow::class])
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class LastGood107Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++    private val prefs get() = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
++    private val workers = Executors.newSingleThreadExecutor()
++    private fun source(path: String) = File("src/main/java/io/github/xgl34222220/hetu/$path").readText()
++    private fun yaml(node: String) = """
++        mixed-port: 7890
++        mode: rule
++        proxies:
++          - name: $node
++            type: socks5
++            server: 127.0.0.1
++            port: 1080
++        proxy-groups:
++          - name: fixture-group
++            type: select
++            proxies: [$node]
++        rules:
++          - MATCH,fixture-group
++    """.trimIndent() + "\n"
++
++    @Before fun clean() {
++        RootStartTransaction93BridgeShadow.commands.clear()
++        RootStartTransaction93BridgeShadow.nativeStarts.set(0)
++        RootStartTransaction93BridgeShadow.nativeStops.set(0)
++        RootStartTransaction93BridgeShadow.readTokens.clear()
++        RootStartTransaction93BridgeShadow.cancelToken = ""
++        RootStartTransaction93BridgeShadow.tokenReadEntered = null
++        RootStartTransaction93BridgeShadow.tokenReadRelease = null
++        RootStartTransaction93BridgeShadow.bootInstallEntered = null
++        RootStartTransaction93BridgeShadow.bootInstallRelease = null
++        RootStartTransaction93BridgeShadow.deploymentAdvanceMillis = 0L
++        RootStartTransaction93BridgeShadow.cleanupOk = true
++        RootStartTransaction93BridgeShadow.preludeRefusal = null
++        DnsVpnService.running = false
++        prefs.edit().clear().putString("appearance", "light").putBoolean("enableBlur", false)
++            .putBoolean("proxyRootWanted", false).putBoolean("proxyRootRuntimeRunning", false)
++            .putBoolean("proxyRootAutoStart", false).putBoolean("proxyAdblockChain", false)
++            .putBoolean("proxyAdblockFallbackEnabled", false).putBoolean("vpnWanted", false)
++            .putBoolean("hetuLegacyRetired", true).putBoolean("proxyCnIpDirect", false)
++            .putString("proxyAppScope", "core").commit()
++        LastGoodConfig.file(app, "mihomo").delete()
++        android.provider.Settings.Global.putInt(app.contentResolver, android.provider.Settings.Global.BOOT_COUNT, 93)
++    }
++
++    @After fun finish() {
++        workers.shutdownNow()
++        assertTrue(workers.awaitTermination(8, TimeUnit.SECONDS))
++        DnsVpnService.running = false
++    }
++
++    @Test fun copyRoundTripsAndRejectsBlankOversizedAndTamperedText() {
++        assertFalse(LastGoodConfig.save(app, "mihomo", "tproxy", "a.yaml", "  \n"))
++        assertFalse(LastGoodConfig.save(app, "mihomo", "tproxy", "a.yaml", "x".repeat(LastGoodConfig.MAX_BYTES + 1)))
++        assertNull(LastGoodConfig.info(prefs, "mihomo"))
++        assertTrue(LastGoodConfig.save(app, "mihomo", "tproxy", "日常.yaml", "proxies: []\n", 1_000L))
++        val info = LastGoodConfig.info(prefs, "mihomo")!!
++        assertEquals("日常.yaml", info.label)
++        assertEquals("tproxy", info.mode)
++        assertEquals(1_000L, info.savedAt)
++        assertEquals("proxies: []\n", LastGoodConfig.read(app, "mihomo"))
++        assertNull("Another core has its own copy", LastGoodConfig.info(prefs, "sing-box"))
++        LastGoodConfig.file(app, "mihomo").writeText("proxies: [changed]\n")
++        assertNull("A copy that no longer matches its SHA-256 is never started", LastGoodConfig.read(app, "mihomo"))
++        assertTrue(LastGoodConfig.save(app, "mihomo", "tproxy", "", "proxies: []\n"))
++        assertEquals(LastGoodConfig.SCRIPTS_ONLY, LastGoodConfig.info(prefs, "mihomo")!!.label)
++    }
++
++    @Test fun savingTheCopyNeverMarksRuntimeSettingsPending() {
++        val before = ProxyRuntimeSettings.signature(prefs)
++        assertTrue(LastGoodConfig.save(app, "mihomo", "tproxy", "a.yaml", "proxies: []\n"))
++        LastGoodConfig.markActive(prefs, "mihomo", "fp")
++        assertEquals(before, ProxyRuntimeSettings.signature(prefs))
++    }
++
++    @Test fun activeOnlyForTheSessionThatWasStartedFromTheCopy() {
++        assertTrue(LastGoodConfig.save(app, "mihomo", "tproxy", "a.yaml", "proxies: []\n"))
++        prefs.edit().putString("proxyRootValidatedFingerprint", "session-1").commit()
++        LastGoodConfig.markActive(prefs, "mihomo", "session-1")
++        assertEquals("a.yaml", LastGoodConfig.active(prefs, running = true)?.label)
++        assertNull("Not running: nothing is shown", LastGoodConfig.active(prefs, running = false))
++        prefs.edit().putString("proxyRootValidatedFingerprint", "session-2").commit()
++        assertNull("A later start publishes another fingerprint", LastGoodConfig.active(prefs, running = true))
++        prefs.edit().putString("proxyRootValidatedFingerprint", "session-1").commit()
++        assertTrue(LastGoodConfig.save(app, "mihomo", "tproxy", "a.yaml", "proxies: []\n"))
++        assertNull("A normal successful start clears the record", LastGoodConfig.active(prefs, running = true))
++    }
++
++    @Test fun manualStartKeepsItsSourceAndLastGoodStartLeavesTheUserFileUntouched() {
++        val configs = ProxyConfigLibrary(app)
++        val entry = configs.importConfig(ProxyRuntimeProfile.Core.MIHOMO, "last-good-107.yaml",
++            ByteArrayInputStream(yaml("good-node").toByteArray(Charsets.UTF_8)))
++        ProxyCoreStore(app).importCore(ProxyRuntimeProfile.Core.MIHOMO, ByteArrayInputStream(ByteArray(1024) { 1 }))
++        val manager = RootProxyManager(app)
++        fun profile() = ProxyRuntimeProfile.load(prefs)
++        fun stopped() = prefs.edit().putBoolean("proxyRootWanted", false).putBoolean("proxyRootRuntimeRunning", false).commit()
++
++        // The unchanged entry point keeps nothing by itself.
++        val plain = workers.submit<JSONObject> { manager.startManual(profile(), null, true) }.get(10, TimeUnit.SECONDS)
++        assertTrue(plain.getBoolean("ok"))
++        assertNull(LastGoodConfig.info(prefs, "mihomo"))
++
++        // What ProxyComposeController.start does around the same call.
++        stopped(); RootStartTransaction93BridgeShadow.nativeStarts.set(0)
++        val armed = workers.submit<JSONObject> {
++            manager.armLastGood()
++            try { manager.startManual(profile(), null, true).also { manager.rememberLastGood(it) } } finally { manager.disarmLastGood() }
++        }.get(10, TimeUnit.SECONDS)
++        assertTrue(armed.getBoolean("ok"))
++        val info = LastGoodConfig.info(prefs, "mihomo")
++        assertNotNull(info)
++        assertEquals("last-good-107.yaml", info!!.config)
++        val copy = LastGoodConfig.read(app, "mihomo")!!
++        assertTrue(copy.contains("good-node"))
++
++        // The source is edited into something else; the fallback start must run the copy.
++        val edited = yaml("edited-node")
++        configs.write(entry, edited)
++        stopped(); RootStartTransaction93BridgeShadow.nativeStarts.set(0)
++        val fallback = workers.submit<JSONObject> { manager.startManualLastGood(profile(), null, copy) }.get(10, TimeUnit.SECONDS)
++        assertTrue(fallback.getBoolean("ok"))
++        assertTrue(fallback.optBoolean("lastGood", false))
++        assertEquals(1, RootStartTransaction93BridgeShadow.nativeStarts.get())
++        val startup = manager.startupConfig()
++        assertTrue(startup.contains("good-node"))
++        assertFalse(startup.contains("edited-node"))
++        assertEquals("The user's file is never written", edited, configs.read(configs.selected(ProxyRuntimeProfile.Core.MIHOMO)))
++        assertEquals("last-good-107.yaml", LastGoodConfig.active(prefs, running = true)?.config)
++        assertEquals("The copy itself is not replaced by the fallback start", copy, LastGoodConfig.read(app, "mihomo"))
++
++        // The next normal start reads the user's file again and ends the fallback indication.
++        stopped(); RootStartTransaction93BridgeShadow.nativeStarts.set(0)
++        workers.submit<JSONObject> {
++            manager.armLastGood()
++            try { manager.startManual(profile(), null, true).also { manager.rememberLastGood(it) } } finally { manager.disarmLastGood() }
++        }.get(10, TimeUnit.SECONDS)
++        assertTrue(manager.startupConfig().contains("edited-node"))
++        assertNull(LastGoodConfig.active(prefs, running = true))
++        assertTrue(LastGoodConfig.read(app, "mihomo")!!.contains("edited-node"))
++    }
++
++    @Test fun lastGoodStartWithoutACopyRefusesBeforeAnyRootCall() {
++        val manager = RootProxyManager(app)
++        val error = workers.submit<Throwable?> {
++            runCatching { manager.startManualLastGood(ProxyRuntimeProfile.load(prefs), null, " ") }.exceptionOrNull()
++        }.get(5, TimeUnit.SECONDS)
++        assertTrue(error is IOException)
++        assertEquals("没有上次可启动的配置", error!!.message)
++        assertTrue(RootStartTransaction93BridgeShadow.commands.isEmpty())
++    }
++
++    @Test fun failureSheetOffersTheCopyOnlyWhenOneExists() {
++        var lastGoodStarts = 0
++        var retries = 0
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) {
++                    androidx.compose.foundation.layout.Column {
++                        HomeStartFailedSheetContent("配置加载失败", {}, {}, { retries++ })
++                        HomeStartFailedSheetContent("配置加载失败", HomeLastGood("日常.yaml", 0L), {}, {}, {}, { lastGoodStarts++ })
++                    }
++                }
++            }
++        }
++        rule.onAllNodesWithText("用上次可启动的版本启动").assertCountEquals(1)
++        rule.onNodeWithText("上次可启动：日常.yaml").assertExists()
++        rule.onNodeWithText("只用于这次启动，不会修改当前配置文件").assertExists()
++        rule.onNodeWithText("用上次可启动的版本启动").performClick()
++        rule.waitForIdle()
++        assertEquals(1, lastGoodStarts)
++        assertEquals(0, retries)
++        rule.onAllNodesWithText("重新启动").assertCountEquals(2)
++    }
++
++    @Test fun homeSaysWhenTheSessionRunsFromTheCopy() {
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) {
++                    HomeScreen(HomeUiState(status = HomeStatus.Running(120), lastGoodRunning = "日常.yaml"), HomeActions(),
++                        {}, {}, {}, {}, contentPadding = PaddingValues(bottom = 16.dp), motion = false)
++                }
++            }
++        }
++        rule.onNodeWithText("正在运行上次可启动的版本（日常.yaml）· 源配置未修改").assertExists()
++    }
++
++    @Test fun homeWithoutTheCopyShowsNoFallbackNotice() {
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) {
++                    HomeScreen(HomeUiState(status = HomeStatus.Running(120)), HomeActions(),
++                        {}, {}, {}, {}, contentPadding = PaddingValues(bottom = 16.dp), motion = false)
++                }
++            }
++        }
++        rule.onAllNodesWithText("正在运行上次可启动的版本", substring = true).assertCountEquals(0)
++    }
++
++    @Test fun wordTableCoversTheNewTextAndTheStartPathKeepsItsShape() {
++        for (key in listOf("用上次可启动的版本启动", "上次可启动：%s", "只用于这次启动，不会修改当前配置文件",
++                "正在运行上次可启动的版本（%s）· 源配置未修改", "正在用上次可启动的版本启动…", "已用上次可启动的版本启动，源配置未修改")) {
++            listOf("en", "zh-TW", "ru").forEach { lang ->
++                val translated = translateHetuText(key, lang)
++                assertTrue("$key has no $lang entry", translated != key)
++                if (key.contains("%s")) assertTrue("$key → $lang lost %s", translated.contains("%s"))
++            }
++        }
++        val manager = source("RootProxyManager.java")
++        assertEquals(2, Regex("""overrideScripts\(profile,selected,source,""").findAll(manager).count())
++        assertEquals(2, Regex("""String source=lastGood!=null\?lastGood:selected==null\?"":configs\.read\(selected\);""").findAll(manager).count())
++        assertTrue(manager.contains("RootProxyPolicy policy=loadPolicy(profile);"))
++        val fallback = manager.substring(manager.indexOf("JSONObject startManualLastGood("), manager.indexOf("void armLastGood()"))
++        assertFalse("The fallback never writes or selects a config", Regex("""configs\.(write|select|importConfig)\(""").containsMatchIn(fallback))
++        val controller = source("ProxyComposeController.kt")
++        assertTrue(controller.contains("root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true).also { root.rememberLastGood(it) }"))
++        assertTrue(controller.contains("root.replaceRunningManually(profile, onProgress).also { root.rememberLastGood(it) }"))
++        val vm = source("app/HetuViewModel.kt")
++        assertTrue("toggle() is unchanged", vm.contains("val started = controller.start { operationText = it }"))
++        assertTrue(vm.contains("val started = controller.startLastGood { operationText = it }"))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/LatencyFeedbackRecovery93Test.kt

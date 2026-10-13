@@ -19,8 +19,8 @@ ROOT = prior.ROOT
 BASE_COMMIT = 'cffeff08ee38c7220922bdb36de81b621c935daf'
 ORIGINAL_TEST_HEAD = prior.ORIGINAL_TEST_HEAD
 # 2026-10-13: the user authorized shipping this layer as the official 1.0.0 release (versionCode 2094).
-# 2026-10-13: 1.1.1 release (versionCode 2095) = 1.0.0 + arm64-only APK, motion pass, polish2, WeChat latency fix.
-VERSION_CODE, VERSION_NAME = 2095, '1.1.1'
+# 2026-10-14: 2.0.0 release (versionCode 2096) = 1.1.1 + audit3 UI fixes, notification/resource-limit settings, last-good config fallback.
+VERSION_CODE, VERSION_NAME = 2096, '2.0.0'
 BUILD_FILE, ROOT_SCRIPT, AUTOSTART_SCRIPT = prior.BUILD_FILE, prior.ROOT_SCRIPT, prior.AUTOSTART_SCRIPT
 PACKAGE, TEST_ROOT = prior.PACKAGE, prior.TEST_ROOT
 EXTERNAL_PAYLOAD_FILES = prior.EXTERNAL_PAYLOAD_FILES
@@ -398,8 +398,8 @@ def allowed_change(name):
 
 
 def validate_version(before, after):
-    expected = before.replace('versionCode = 2092', 'versionCode = 2095', 1)
-    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "1.1.1"', 1)
+    expected = before.replace('versionCode = 2092', 'versionCode = 2096', 1)
+    expected = expected.replace('versionName = "0.12.19-v20-glass"', 'versionName = "2.0.0"', 1)
     assert before.count('versionCode = 2092') == before.count('versionName = "0.12.19-v20-glass"') == 1
     for old, new in RELEASE_BUILD_DELTA:
         assert expected.count(old) == 1, 'Pinned release-build anchor missing'
