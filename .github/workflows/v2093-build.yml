@@ -459,7 +459,7 @@ jobs:
 
         head -3 out/apk-transfer/apk-metadata.txt
 
-        grep -q "versionCode=''2094'' versionName=''1.0.0''" out/apk-transfer/apk-metadata.txt
+        grep -q "versionCode=''2095'' versionName=''1.1.1''" out/apk-transfer/apk-metadata.txt
 
         if grep -q "application-debuggable" out/apk-transfer/apk-metadata.txt; then echo "Shipped APK is debuggable"; exit 1; fi
 
@@ -653,7 +653,7 @@ jobs:
         '
     - name: Run installed APK navigation and native WebView smoke
       env:
-        HETU_EXPECTED_VERSION: '2094'
+        HETU_EXPECTED_VERSION: '2095'
         HETU_EXPECT_NEW_UI: '1'
         HETU_RELEASE_SMOKE: '1'
         # Real baseline profile: ART-recorded journeys on the release APK, retraced with its R8 mapping.
