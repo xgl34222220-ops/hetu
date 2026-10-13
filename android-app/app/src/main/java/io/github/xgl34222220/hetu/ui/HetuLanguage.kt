@@ -1234,7 +1234,17 @@ CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号�
 本机可用 %s 个 CPU（0-%s），超出的编号不会生效|This device has %s CPUs (0-%s); numbers beyond them have no effect|本機可用 %s 個 CPU（0-%s），超出的編號不會生效|На устройстве доступно CPU: %s (0-%s); номера сверх этого не действуют
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings).joinToString("\n")
+// 2026-10-13 audit G1: start from the last startable copy of the source config.
+private val vocabularyLastGood = """
+用上次可启动的版本启动|Start with the last working version|用上次可啟動的版本啟動|Запустить последнюю рабочую версию
+上次可启动：%s|Last working version: %s|上次可啟動：%s|Последняя рабочая версия: %s
+只用于这次启动，不会修改当前配置文件|Used for this start only; your current config file is not changed|只用於這次啟動，不會修改目前的設定檔|Только для этого запуска; текущий файл конфигурации не меняется
+正在运行上次可启动的版本（%s）· 源配置未修改|Running the last working version (%s) · source config unchanged|正在執行上次可啟動的版本（%s）· 來源設定未修改|Работает последняя рабочая версия (%s) · исходная конфигурация не изменена
+正在用上次可启动的版本启动…|Starting with the last working version…|正在用上次可啟動的版本啟動…|Запуск последней рабочей версии…
+已用上次可启动的版本启动，源配置未修改|Started with the last working version; source config unchanged|已用上次可啟動的版本啟動，來源設定未修改|Запущена последняя рабочая версия; исходная конфигурация не изменена
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

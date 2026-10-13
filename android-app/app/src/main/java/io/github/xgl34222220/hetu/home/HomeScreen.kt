@@ -170,6 +170,14 @@ internal fun HomeScreen(
                     textStyle = HomeType.button,
                 )
             }
+            // Audit G1: the session runs from the 「上次可启动」 copy, not from the (failing) source file.
+            HomeReveal(state.status.isLive && state.lastGoodRunning != null) {
+                HomeNotice(
+                    ht("正在运行上次可启动的版本（%s）· 源配置未修改").fill(state.lastGoodRunning.orEmpty()),
+                    HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
+                    actionLabel = "查看配置", onAction = actions.onViewConfig,
+                )
+            }
             HomeReveal(state.status is HomeStatus.PendingRestart) {
                 HomeNotice(
                     ht("设置已修改，重启后生效"), HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp),
@@ -705,7 +713,22 @@ internal fun HomeSpeedSourceSheetContent(selected: HomeSpeedSource, onSelect: (H
 
 /** 启动失败: the error text can be copied; two exits, open the config or try again. */
 @Composable
-internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) {
+internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onViewConfig: () -> Unit, onRetry: () -> Unit) =
+    HomeStartFailedSheetContent(detail, null, onCopy, onViewConfig, onRetry, {})
+
+/**
+ * Audit G1: the same sheet; with a [lastGood] copy it also offers 「用上次可启动的版本启动」, which starts
+ * from that copy and leaves the source file as it is. Without one the sheet is exactly the one above.
+ */
+@Composable
+internal fun HomeStartFailedSheetContent(
+    detail: String,
+    lastGood: HomeLastGood?,
+    onCopy: () -> Unit,
+    onViewConfig: () -> Unit,
+    onRetry: () -> Unit,
+    onStartLastGood: () -> Unit,
+) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     HomeSheetContent(
@@ -724,5 +747,19 @@ internal fun HomeStartFailedSheetContent(detail: String, onCopy: () -> Unit, onV
             HomeButton("查看配置", onViewConfig, Modifier.weight(1f), kind = HomeButtonKind.Soft)
             HomeButton("重新启动", onRetry, Modifier.weight(1f), kind = HomeButtonKind.Primary)
         },
-    ) { HomeCodeBox(detail, caption = "错误详情") }
+    ) {
+        HomeCodeBox(detail, caption = "错误详情")
+        if (lastGood != null) {
+            HomeSheetGroup(Modifier.padding(top = 10.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text(
+                        ht("上次可启动：%s").fill(listOf(lastGood.config, lastGood.savedText).filter { it.isNotBlank() }.joinToString(" · ")),
+                        color = c.t2, style = HomeType.rowSub,
+                    )
+                    Text(ht("只用于这次启动，不会修改当前配置文件"), color = c.t3, style = HomeType.caption)
+                    HomeButton("用上次可启动的版本启动", onStartLastGood, Modifier.fillMaxWidth(), kind = HomeButtonKind.Soft, tinted = true)
+                }
+            }
+        }
+    }
 }

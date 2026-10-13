@@ -152,9 +152,11 @@ internal fun HomeRoute(
         HomeModalSheet(onDismiss = actions.onDismissStartFailure) {
             HomeStartFailedSheetContent(
                 detail = failure.detail,
+                lastGood = state.lastGood,
                 onCopy = { haptics(HomeHaptic.Confirm); actions.onCopy("诊断信息", failure.detail) },
                 onViewConfig = { actions.onDismissStartFailure(); actions.onViewConfig() },
                 onRetry = { actions.onDismissStartFailure(); actions.onStart() },
+                onStartLastGood = { actions.onDismissStartFailure(); actions.onStartLastGood() },
             )
         }
     }
