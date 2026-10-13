@@ -93,6 +93,10 @@ final class RootProxyManager {
         }
     }
     private static final ReentrantLock HEALTH_CHECKER_LOCK=new ReentrantLock(true);
+    /** Audit G1: armed by armLastGood; holds the effective source (override scripts applied) prepared on this thread. */
+    private static final ThreadLocal<String[]> PREPARED_SOURCE=new ThreadLocal<>();
+    /** Audit G1: set only by startManualLastGood; the start reads this text instead of the selected file. */
+    private static final ThreadLocal<String> LAST_GOOD_SOURCE=new ThreadLocal<>();
     static long observationTicket(){return CONTROL_LOCK.observe();}
     /** Read-only controller probes: invalid only during a real start/stop/reload transaction. */
     static long probeTicket(){return CONTROL_LOCK.transactionEpoch();}
@@ -418,14 +422,19 @@ final class RootProxyManager {
             throw new IOException(profile.mode.label+" 的统一 Root 后端还未接入");
 
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
+        // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
+        String lastGood=LAST_GOOD_SOURCE.get();
         // Without a selected profile, enabled override scripts generate the config from an empty one.
-        boolean scriptsOnly=selected==null&&OverrideScriptStart.hasEnabled(context);
-        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
-        String source=selected==null?"":configs.read(selected);
+        boolean scriptsOnly=lastGood==null&&selected==null&&OverrideScriptStart.hasEnabled(context);
+        if(lastGood==null&&selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件");
+        String source=lastGood!=null?lastGood:selected==null?"":configs.read(selected);
         if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
-        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,false,true);
+        // The saved source already carries the override scripts' result.
+        OverrideScriptStart.Applied override=lastGood!=null?null:overrideScripts(profile,selected,source,false,true);
         if(override!=null)source=override.text;
+        String[] capture=PREPARED_SOURCE.get();
+        if(capture!=null)capture[0]=source;
         // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
         // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
         RootProxyPolicy policy=loadPolicy(profile);
@@ -470,6 +479,47 @@ final class RootProxyManager {
         return p;
     }
 
+    /**
+     * Audit G1: the user's Start from the failure sheet's 「用上次可启动的版本启动」. Same manual start
+     * (pre-start hook included), except that preparation reads [source], the saved effective source
+     * of an earlier successful start, instead of the selected config file, which stays untouched.
+     * A successful start records that this session runs from the copy (LastGoodConfig.active).
+     */
+    JSONObject startManualLastGood(ProxyRuntimeProfile profile,Progress progress,String source)throws Exception{
+        if(source==null||source.trim().isEmpty())throw new IOException("没有上次可启动的配置");
+        LAST_GOOD_SOURCE.set(source);
+        PRE_START_HOOK.set(Boolean.TRUE);
+        try{
+            JSONObject result=startOwned(profile,progress,false);
+            if(result.optBoolean("ok",false)&&!result.optBoolean("cancelled",false)&&result.has("sourceConfig")){
+                LastGoodConfig.markActive(prefs,profile.core.id,prefs.getString("proxyRootValidatedFingerprint",""));
+                result.put("lastGood",true);
+            }
+            return result;
+        }finally{PRE_START_HOOK.remove();LAST_GOOD_SOURCE.remove();}
+    }
+
+    /** Audit G1: the next preparations on this thread record their effective source for rememberLastGood. */
+    void armLastGood(){PREPARED_SOURCE.set(new String[1]);}
+    void disarmLastGood(){PREPARED_SOURCE.remove();}
+
+    /**
+     * Audit G1: after a completed manual start or restart on this (armed) thread, keeps the effective
+     * source that start prepared as the core's 「上次可启动」 copy. Results without a fresh preparation
+     * (cancelled, already running, eBPF hot update) keep the previous copy. Never throws.
+     */
+    void rememberLastGood(JSONObject result){
+        String[] capture=PREPARED_SOURCE.get();
+        String source=capture==null?null:capture[0];
+        try{
+            if(result==null||source==null||!result.optBoolean("ok",false)||result.optBoolean("cancelled",false)
+                    ||result.optBoolean("alreadyRunning",false)||!result.has("sourceConfig"))return;
+            String core=result.optString("core","");
+            if(core.isEmpty())return;
+            LastGoodConfig.save(context,core,result.optString("mode",""),result.optString("sourceConfig",""),source);
+        }catch(Exception ignored){}
+    }
+
 
     /**
      * sing-box / Xray / V2Fly / Hysteria: a native config for that core when the user selected one,
@@ -479,15 +529,20 @@ final class RootProxyManager {
     private Prepared prepareNativeCore(ProxyRuntimeProfile profile,int fixedControllerPort,String settingsSignature)throws Exception{
         ProxyConfigLibrary.Entry selected=configs.selected(profile.core);
         if(selected==null)selected=configs.selected(ProxyRuntimeProfile.Core.MIHOMO);
+        // Audit G1: a 「上次可启动」 start reads the saved effective source; the user's file is not touched.
+        String lastGood=LAST_GOOD_SOURCE.get();
         boolean scriptable=ProxyCoreConfig.kind(profile.core)==ProxyCoreConfig.Kind.SING_BOX;
-        boolean scriptsOnly=selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
-        if(selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
-        String source=selected==null?"":configs.read(selected);
+        boolean scriptsOnly=lastGood==null&&selected==null&&scriptable&&OverrideScriptStart.hasEnabled(context);
+        if(lastGood==null&&selected==null&&!scriptsOnly)throw new IOException("请先为 "+profile.core.label+" 选择配置文件，或在 Mihomo 配置中选择一个可转换的订阅");
+        String source=lastGood!=null?lastGood:selected==null?"":configs.read(selected);
         if(!scriptsOnly&&(source==null||source.trim().isEmpty()))throw new IOException("源配置为空");
         if(source.getBytes(StandardCharsets.UTF_8).length>4*1024*1024)throw new IOException("配置超过 4 MiB");
         // sing-box: a native JSON source is scripted as JSON, a Mihomo YAML source before conversion.
-        OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
+        // The saved source already carries the override scripts' result.
+        OverrideScriptStart.Applied override=lastGood!=null?null:overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
         if(override!=null)source=override.text;
+        String[] capture=PREPARED_SOURCE.get();
+        if(capture!=null)capture[0]=source;
         RootProxyPolicy policy=loadPolicy(profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();

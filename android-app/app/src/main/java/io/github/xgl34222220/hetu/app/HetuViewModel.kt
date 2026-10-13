@@ -871,6 +871,46 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    /**
+     * Audit G1: 「用上次可启动的版本启动」 from the start-failure sheet. Starts from the copy kept after
+     * the core's last successful start; the user's config file is not modified. Same operation slot,
+     * progress text and failure sheet as a normal start; [toggle] itself is unchanged.
+     */
+    fun startLastGood() {
+        if (operation != null || state.running) return
+        invalidateRuntimeRequests()
+        operation = HxRunOp.Start
+        viewModelScope.launch {
+            operationText = "正在用上次可启动的版本启动…"
+            try {
+                val started = controller.startLastGood { operationText = it }
+                state = state.copy(running = true, healthObserved = false,
+                    message = started.optString("message", state.message))
+                startupError = null
+                toastAs(HxTone.Warn, "已用上次可启动的版本启动，源配置未修改")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                val reason = errorText(error, "操作失败")
+                val kind = hxStartFailure(error)
+                operationText = "确认最终运行状态…"
+                val recovered = if (kind != HxStartFailure.Runtime) null else settleStart()
+                if (recovered != null) {
+                    state = recovered
+                } else {
+                    val diagnostics = if (kind != HxStartFailure.Runtime) "" else
+                        try { controller.diagnostics() } catch (cancel: CancellationException) { throw cancel } catch (_: Exception) { "" }
+                    startupError = "上次可启动的版本也未能启动：$reason" +
+                        if (diagnostics.isBlank()) "" else "\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
+                }
+            } finally {
+                operation = null
+                operationText = ""
+                refreshNow()
+            }
+        }
+    }
+
     private suspend fun settleStart(): ProxyComposeState? {
         for (wait in longArrayOf(350L, 1_050L, 1_800L)) {
             delay(wait)

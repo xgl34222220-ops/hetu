@@ -13,6 +13,12 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
     val providers = vm.providers
     val tracked = remember(providers) { providers.filter { it.hasSubscriptionInfo && it.total > 0L } }
     val rt = vm.runtime
+    // Audit G1: preferences only (no file access); re-read when a start ends or fails.
+    val lastGoodCore = remember(vm.startupError, vm.state.running, vm.operation) { ProxyRuntimeProfile.load(vm.prefs).core.id }
+    val lastGood = remember(lastGoodCore, vm.startupError, vm.state.running, vm.operation) {
+        LastGoodConfig.info(vm.prefs, lastGoodCore)?.let { io.github.xgl34222220.hetu.home.HomeLastGood(it.label, it.savedAt) }
+    }
+    val lastGoodRunning = remember(vm.state.running, vm.state.corePid, vm.operation) { LastGoodConfig.active(vm.prefs, vm.state.running)?.label }
     HetuHomeV2(
         data = CompactHomeData(
             running = vm.state.running, busy = vm.operation != null,
@@ -64,5 +70,8 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             runtimeMessage = vm.state.message,
             egressVerified = vm.state.running && vm.egressVerified,
         ),
+        lastGood = lastGood,
+        lastGoodRunning = lastGoodRunning,
+        onStartLastGood = vm::startLastGood,
     )
 }

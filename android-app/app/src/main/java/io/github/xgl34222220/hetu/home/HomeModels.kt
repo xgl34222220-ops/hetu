@@ -195,7 +195,18 @@ internal data class HomeUiState(
     val downloadBytesPerSecond: Long? = null,
     val subscription: HomeSubscription? = null,
     val resource: HomeResource = HomeResource(),
+    /** Audit G1: the current core's 「上次可启动」 copy; the start-failure sheet offers it when present. */
+    val lastGood: HomeLastGood? = null,
+    /** Audit G1: set while the running session was started from that copy (its config name). */
+    val lastGoodRunning: String? = null,
 )
+
+/** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
+internal data class HomeLastGood(val config: String, val savedAt: Long) {
+    /** 10-13 21:05 in the device time zone; empty when unknown. */
+    val savedText: String get() = if (savedAt <= 0L) "" else
+        java.text.SimpleDateFormat("MM-dd HH:mm", Locale.ROOT).format(java.util.Date(savedAt))
+}
 
 /* ------------------------------------------------------------------ */
 /*  Direct-probe targets form                                           */
@@ -286,6 +297,8 @@ internal class HomeActions(
     val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
     /** Long press on the 订阅 card: 更新全部订阅 (the ViewModel explains when it cannot run). */
     val onUpdateProviders: () -> Unit = {},
+    /** Audit G1: 「用上次可启动的版本启动」 in the start-failure sheet. */
+    val onStartLastGood: () -> Unit = {},
 )
 
 /* ------------------------------------------------------------------ */

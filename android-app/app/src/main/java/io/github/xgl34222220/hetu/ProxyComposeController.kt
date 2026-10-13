@@ -509,8 +509,31 @@ internal class ProxyComposeController(context: Context) {
         if (!configs.hasConfiguredSubscription(selected)) throw ProxyStartProblem.PlaceholderConfig()
         // The pre-start hook runs inside the single Root start invocation (no extra su when
         // no hook exists); a failing hook still refuses the start before the network changes.
+        // Audit G1: a completed start also keeps its effective source as 「上次可启动」 (never fails the start).
+        root.armLastGood()
         try {
-            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
+            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true).also { root.rememberLastGood(it) }
+        } catch (scope: RootProxyManager.AppScopeException) {
+            throw ProxyStartProblem.AppScope(scope)
+        } finally {
+            root.disarmLastGood()
+        }
+    }
+
+    /**
+     * Audit G1: the failure sheet's 「用上次可启动的版本启动」. Starts the current core and mode from the
+     * copy [LastGoodConfig] kept after the core's last successful start; the selected config file is
+     * read by nothing and changed by nothing. Settings are the current ones.
+     */
+    suspend fun startLastGood(onProgress: (String) -> Unit = {}) = withContext(Dispatchers.IO) {
+        LegacyAppMigrator.migrateIfNeeded(app)
+        val profile = ProxyRuntimeProfile.load(prefs)
+        LastGoodConfig.info(prefs, profile.core.id)
+            ?: throw IOException("${profile.core.label} 还没有上次可启动的配置")
+        val source = LastGoodConfig.read(app, profile.core.id)
+            ?: throw IOException("上次可启动的配置副本已丢失或损坏")
+        try {
+            root.startManualLastGood(profile, RootProxyManager.Progress { onProgress(it) }, source)
         } catch (scope: RootProxyManager.AppScopeException) {
             throw ProxyStartProblem.AppScope(scope)
         }
@@ -533,7 +556,12 @@ internal class ProxyComposeController(context: Context) {
         val selected = configs.selected(profile.core)
         onProgress("执行服务启动前脚本…")
         ProxyScriptHooks.run(app, "pre-start", profile.mode.id, selected?.name ?: "")
-        val result = root.replaceRunningManually(profile, onProgress)
+        root.armLastGood()
+        val result = try {
+            root.replaceRunningManually(profile, onProgress).also { root.rememberLastGood(it) }
+        } finally {
+            root.disarmLastGood()
+        }
         val replaced = result.optBoolean("ok", false) && !result.optBoolean("cancelled", false) && !result.optBoolean("alreadyRunning", false)
         check(replaced) { "重启未完成，请等待当前操作结束后重试" }
         check(ProxyRuntimeSettings.acknowledgeApplied(prefs, replaced)) { "重启已完成，但应用状态未能保存" }

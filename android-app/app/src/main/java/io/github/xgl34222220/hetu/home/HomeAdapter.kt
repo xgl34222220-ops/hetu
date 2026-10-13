@@ -95,6 +95,9 @@ internal fun HetuHomeV2(
     operationText: String? = null,
     connection: HomeConnectionObservation = HomeConnectionObservation(),
     onUpdateProviders: () -> Unit = {},
+    lastGood: HomeLastGood? = null,
+    lastGoodRunning: String? = null,
+    onStartLastGood: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -129,6 +132,8 @@ internal fun HetuHomeV2(
     )
     val state = mapped.copy(
         connection = connection,
+        lastGood = lastGood,
+        lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
         statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
         wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
             city = wanExtras.city.known(),
@@ -157,6 +162,7 @@ internal fun HetuHomeV2(
     val viewConfig by rememberUpdatedState(onViewConfig)
     val dismissStartupError by rememberUpdatedState(onDismissStartupError)
     val updateProviders by rememberUpdatedState(onUpdateProviders)
+    val startLastGood by rememberUpdatedState(onStartLastGood)
     val actions = remember(context, prefs) {
         HomeActions(
             onStart = { toggle() },
@@ -193,6 +199,7 @@ internal fun HetuHomeV2(
             saveTargets = { config -> saveTargets(prefs, config) },
             resetTargets = { ProxyLatencyTargets.reset(prefs); loadTargets(prefs) },
             onUpdateProviders = { updateProviders() },
+            onStartLastGood = { startLastGood() },
         )
     }
 
