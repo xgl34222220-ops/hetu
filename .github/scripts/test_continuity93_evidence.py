@@ -154,7 +154,7 @@ class Continuity93EvidenceTests(unittest.TestCase):
 
     def test_same_source_api35_and_api36_are_preserved(self):
         text = (scope.ROOT / '.github/workflows/v2093-build.yml').read_text()
-        self.assertIn("HETU_EXPECTED_VERSION: '2093'", text)
+        self.assertIn("HETU_EXPECTED_VERSION: '2094'", text)
         self.assertIn('        - 35\n        - 36', text)
         self.assertIn('needs: build', text)
         self.assertIn('name: Hetu-APK', text)
