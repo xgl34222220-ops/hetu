@@ -65,6 +65,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.ViewModelProvider
 import io.github.rosemoe.sora.event.ContentChangeEvent
+import io.github.rosemoe.sora.event.PublishSearchResultEvent
+import io.github.xgl34222220.hetu.home.fill
+import io.github.xgl34222220.hetu.tools.ToolsFeatureIcons
 import io.github.rosemoe.sora.widget.CodeEditor
 import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
@@ -568,7 +571,8 @@ internal fun hxConfigHttpUrl(raw: String): Boolean = runCatching {
         value.length <= 4096 && value.none { it.isWhitespace() || it.isISOControl() }
 }.getOrDefault(false)
 
-private fun maskUrl(url: String): String = runCatching {
+/** `scheme://host/…`: list rows never show the path or query, where subscription tokens live. */
+internal fun maskUrl(url: String): String = runCatching {
     val uri = Uri.parse(url)
     val host = uri.host.orEmpty()
     if (host.isBlank()) url.take(40) else "${uri.scheme}://$host/…"
@@ -701,6 +705,11 @@ internal fun ConfigEditorScreen(
     var confirmLeave by remember { mutableStateOf(false) }
     var confirmReload by remember { mutableStateOf(false) }
     var showOutline by remember { mutableStateOf(false) }
+    // Find in file and go-to-line, the same tools as the runtime-copy editor (audit3 G2).
+    var search by remember { mutableStateOf(false) }
+    var matches by remember { mutableIntStateOf(0) }
+    var jump by remember { mutableStateOf(false) }
+    var jumpLine by remember { mutableStateOf("") }
     // 查看 opens the same editor read-only; «编辑» in its bar unlocks it in place.
     var readOnly by remember { mutableStateOf(startReadOnly) }
     val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
@@ -726,6 +735,14 @@ internal fun ConfigEditorScreen(
         finally { loading = false }
     }
 
+    fun goToLine(line: Int) {
+        editor?.let { native ->
+            runCatching {
+                native.setSelection((line - 1).coerceIn(0, (native.text.lineCount - 1).coerceAtLeast(0)), 0)
+                native.ensureSelectionVisible()
+            }
+        }
+    }
     fun leave() {
         if (saving) return
         if (dirty) confirmLeave = true
@@ -735,7 +752,7 @@ internal fun ConfigEditorScreen(
         conflict = null
         if (dirty) confirmReload = true else loadRevision++
     }
-    BackHandler { leave() }
+    BackHandler { if (search) search = false else leave() }
 
     // Returning from another editor must never silently replace this page's draft.
     val lifecycle = androidx.lifecycle.compose.LocalLifecycleOwner.current
@@ -872,12 +889,22 @@ internal fun ConfigEditorScreen(
             ConfigEditorAction(ToolsIcons.Undo2, "撤销", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canUndo()) it.undo() } }
             ConfigEditorAction(ToolsIcons.Redo2, "重做", Modifier.weight(1f), ready && !readOnly) { editor?.let { if (it.canRedo()) it.redo() } }
             ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
-            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
+            ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, onClick = ::validate)
+            ConfigEditorAction(ToolsIcons.Search, "搜索", Modifier.weight(1f), ready, active = search) { search = !search }
+            ConfigEditorAction(ToolsFeatureIcons.ArrowUpDown, "跳行", Modifier.weight(1f), ready) {
+                jumpLine = ((editor?.cursor?.leftLine ?: 0) + 1).toString(); jump = true
+            }
         }
+        HomeReveal(search) {
+            Box(Modifier.padding(bottom = 10.dp)) { YamlWorkbenchSearch(editor, matches) { search = false } }
+        }
+        // A validator message naming a line («yaml: line 18: …») offers to jump straight there.
+        val problemLine = problem?.let { io.github.xgl34222220.hetu.tools.ToolsYaml.errorLine(it) }
         HomeReveal(problem != null) {
             HxBanner(problem.orEmpty(), tone = HxTone.Bad,
                 modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp),
-                actionLabel = "关闭提示", onAction = { problem = null })
+                actionLabel = if (problemLine != null) ht("跳到第 %d 行").fill(problemLine) else "关闭提示",
+                onAction = { if (problemLine != null) goToLine(problemLine); problem = null })
         }
         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
             val initial = source
@@ -909,6 +936,7 @@ internal fun ConfigEditorScreen(
                                 setHighlightCurrentLine(true)
                                 colorScheme = editorColors
                                 subscribeAlways<ContentChangeEvent> { dirty = this.text.toString() != source?.text }
+                                subscribeAlways<PublishSearchResultEvent> { matches = if (searcher.hasQuery()) searcher.matchedPositionCount else 0 }
                                 editor = this
                             }
                         },
@@ -923,7 +951,7 @@ internal fun ConfigEditorScreen(
             }
         }
         // The characters YAML needs and a phone keyboard hides, one tap each.
-        if (!readOnly) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
+        if (!readOnly && !search) Row(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp)
             .clip(HomeDims.cardShape).background(c.surface)
             .horizontalScroll(rememberScrollState()).padding(8.dp), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             HxYamlSymbols.forEach { symbol ->
@@ -980,6 +1008,19 @@ internal fun ConfigEditorScreen(
             }
         }
     }
+    if (jump) HxSheet(onDismiss = { jump = false }, title = ht("跳转到行")) {
+        Column(Modifier.fillMaxWidth().imePadding().padding(horizontal = 20.dp).padding(bottom = 4.dp)) {
+            HomeFormField(
+                "行号", jumpLine, { jumpLine = it.filter(Char::isDigit).take(8) },
+                hint = "共 ${editor?.text?.lineCount ?: 1} 行", keyboardType = KeyboardType.Number,
+            )
+            Spacer(Modifier.height(22.dp))
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                HomeButton("继续编辑", { jump = false }, Modifier.weight(1f), kind = HomeButtonKind.Soft)
+                HomeButton("前往", { goToLine(jumpLine.toIntOrNull() ?: 1); jump = false }, Modifier.weight(1f), kind = HomeButtonKind.Primary)
+            }
+        }
+    }
     if (confirmReload) HxConfirmDialog("放弃草稿并重新读取？",
         "重新读取后，本页未保存的修改将被替换。该操作读取当前配置的最新内容，不会覆盖源文件。", "放弃并读取", danger = true,
         onConfirm = { confirmReload = false; dirty = false; loadRevision++ }, onDismiss = { confirmReload = false })
@@ -991,7 +1032,7 @@ internal fun ConfigEditorScreen(
 /** One tool of the editor: a glyph over its name; a spinner takes the glyph's place while it works. */
 @Composable
 private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, modifier: Modifier,
-    enabled: Boolean, busy: Boolean = false, onClick: () -> Unit) {
+    enabled: Boolean, busy: Boolean = false, active: Boolean = false, onClick: () -> Unit) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val source = remember { MutableInteractionSource() }
@@ -1003,9 +1044,9 @@ private fun ConfigEditorAction(icon: androidx.compose.ui.graphics.vector.ImageVe
         horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(3.dp, Alignment.CenterVertically),
     ) {
         Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) {
-            if (busy) HxSpinner(20.dp) else Icon(icon, null, Modifier.size(22.dp), tint = c.t1)
+            if (busy) HxSpinner(20.dp) else Icon(icon, null, Modifier.size(22.dp), tint = if (active) c.accent else c.t1)
         }
-        Text(ht(label), color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+        Text(ht(label), color = if (active) c.accent else c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

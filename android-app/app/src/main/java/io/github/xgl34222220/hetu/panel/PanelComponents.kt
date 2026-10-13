@@ -499,10 +499,10 @@ internal fun RowScope.PanelStat(value: String, unit: String?, label: String, val
 }
 
 @Composable
-internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
+internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, count: String? = null, titleColor: Color? = null, trailing: (@Composable RowScope.() -> Unit)? = null) {
     val c = LocalHomeColors.current
     Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht(title), color = titleColor ?: c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
         if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailing != null) trailing()

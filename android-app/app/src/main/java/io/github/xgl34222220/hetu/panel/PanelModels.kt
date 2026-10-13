@@ -296,7 +296,8 @@ internal data class PanelApiSettings(
 internal enum class PanelConnFilter(val label: String) { All("全部"), Proxy("代理"), Direct("直连") }
 internal enum class PanelConnSort(val label: String) { Host("主机"), Rule("规则"), Type("类型"), Time("连接时间"), Down("下行"), Up("上行") }
 internal enum class PanelRankMode(val label: String) { Connections("按连接数"), Total("按总流量") }
-internal enum class PanelLogFilter(val label: String, val level: PanelLogLevel?) { All("全部", null), Info("INFO", PanelLogLevel.Info), Warn("WARN", PanelLogLevel.Warn), Error("ERROR", PanelLogLevel.Error) }
+/** Same names and order as the log-file viewer (全部 / 错误 / 警告 / 信息 / 调试); row badges keep INFO / WARN. */
+internal enum class PanelLogFilter(val label: String, val level: PanelLogLevel?) { All("全部", null), Error("错误", PanelLogLevel.Error), Warn("警告", PanelLogLevel.Warn), Info("信息", PanelLogLevel.Info), Debug("调试", PanelLogLevel.Debug) }
 internal enum class PanelLogOrder(val label: String) { Newest("最新在前"), Oldest("最早在前") }
 
 internal data class PanelViewState(
