@@ -245,6 +245,9 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val macs = remember { hxEntries(macOriginal) }
     var macError by remember { mutableStateOf<String?>(null) }
     val macDirty = macs.values().map { it.lowercase() }.sorted() != macSaved
+    // Switches apply at once; the MAC list waits for 保存. Leaving with unsaved MAC edits asks first.
+    var confirmLeave by remember { mutableStateOf(false) }
+    BackHandler(enabled = macDirty) { confirmLeave = true }
 
     LaunchedEffect(refresh) {
         loading = true
@@ -287,21 +290,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         return true
     }
 
+    fun saveMacList() {
+        if (saveMacs(macs.values())) {
+            haptics.perform(HetuHaptic.Confirm)
+            vm.toast("MAC 直连规则已保存，重启代理后生效")
+        }
+    }
+
     HxPage(
         title = ht("共享网络"),
         largeTitle = false,
         subtitle = ht("热点、USB 与局域网转发流量"),
-        onBack = onBack,
+        onBack = { if (macDirty) confirmLeave = true else onBack() },
         refreshing = loading && snapshot.interfaces.isNotEmpty(),
         onRefresh = { refresh++ },
         actions = {
             HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }, busy = loading)
-            HxBarAction(Icons.Rounded.Check, "保存 MAC", onClick = {
-                if (saveMacs(macs.values())) {
-                    haptics.perform(HetuHaptic.Confirm)
-                    vm.toast("MAC 直连规则已保存，重启代理后生效")
-                }
-            }, enabled = macDirty)
+            HxBarAction(Icons.Rounded.Check, "保存 MAC", onClick = ::saveMacList, enabled = macDirty)
         },
     ) {
         item(key = "note") { HxNote("开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root PREROUTING / FORWARD 层生效，修改后重启代理。") }
@@ -368,8 +373,22 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 AnimatedVisibility(macError != null) {
                     HxBanner(macError.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(top = 10.dp))
                 }
+                AnimatedVisibility(macDirty && macError == null) {
+                    HxBanner("MAC 列表有未保存的修改", tone = HxTone.Warn, actionLabel = "保存", onAction = ::saveMacList, modifier = Modifier.padding(top = 10.dp))
+                }
             }
         }
+    }
+
+    if (confirmLeave) {
+        HxConfirmDialog(
+            title = "放弃修改？",
+            message = "MAC 列表的修改还没有保存。",
+            confirmLabel = "放弃",
+            danger = true,
+            onConfirm = { confirmLeave = false; onBack() },
+            onDismiss = { confirmLeave = false },
+        )
     }
 }
 

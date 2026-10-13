@@ -1018,7 +1018,55 @@ private val vocabularyUiPolish = """
 已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享|Subscription URL parameters and secret are hidden; copy and export contain everything, so do not share them publicly|已隱藏訂閱連結參數與 secret；複製和匯出的是完整內容，請勿公開分享|Параметры ссылок подписки и secret скрыты; копирование и экспорт содержат всё — не публикуйте их
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish).joinToString("\n")
+// 2026-10-13 function polish: eBPF switch subtitle parts and reason tokens, log export, network type.
+private val vocabularyFuncPolish = """
+规则匹配|Rule matching|規則比對|Сопоставление правил
+eBPF 规则匹配|eBPF rule matching|eBPF 規則比對|Сопоставление правил eBPF
+用 eBPF 映射匹配分应用名单与绕过网段，名单变化时无需重启；设备不支持时自动回退到原 iptables 规则。默认关闭，重启代理后生效|Matches the per-app list and bypass networks with eBPF maps, so list changes need no restart; falls back to the iptables rules when the device lacks support. Off by default; takes effect after a proxy restart|以 eBPF 映射比對分應用名單與繞過網段，名單變更時無需重新啟動；裝置不支援時自動回退到原 iptables 規則。預設關閉，重新啟動代理後生效|Сопоставляет список приложений и обходные сети через карты eBPF, поэтому изменения списка не требуют перезапуска; без поддержки устройства используются правила iptables. По умолчанию выключено; действует после перезапуска прокси
+已生效：本次会话由 eBPF 匹配名单；只改应用名单或绕过网段时，「立即重启」会改为热更新，不中断连接|Active: this session matches the lists with eBPF; when only the app list or bypass networks change, Restart now updates them live without dropping connections|已生效：本次工作階段由 eBPF 比對名單；只改應用名單或繞過網段時，「立即重新啟動」會改為熱更新，不中斷連線|Активно: в этом сеансе списки сопоставляет eBPF; если меняются только список приложений или обходные сети, «Перезапустить» обновит их на лету без разрыва соединений
+本次会话未启用 eBPF 匹配，重启代理后生效|This session does not use eBPF matching; takes effect after a proxy restart|本次工作階段未啟用 eBPF 比對，重新啟動代理後生效|В этом сеансе eBPF не используется; действует после перезапуска прокси
+当前运行模式不支持 eBPF 规则匹配（仅 TPROXY / Redirect / Enhance）|The current run mode does not support eBPF rule matching (TPROXY / Redirect / Enhance only)|目前執行模式不支援 eBPF 規則比對（僅 TPROXY / Redirect / Enhance）|Текущий режим не поддерживает сопоставление eBPF (только TPROXY / Redirect / Enhance)
+已关闭，重启代理后停用 eBPF 匹配；本次会话仍由 eBPF 匹配名单|Turned off: eBPF matching stops after a proxy restart; this session still matches the lists with eBPF|已關閉，重新啟動代理後停用 eBPF 比對；本次工作階段仍由 eBPF 比對名單|Выключено: eBPF перестанет работать после перезапуска прокси; в этом сеансе списки всё ещё сопоставляет eBPF
+已启用但映射丢失：|Enabled but the maps are gone: |已啟用但映射遺失：|Включено, но карты потеряны: 
+未生效，已回退到 iptables 规则：|Not active, fell back to the iptables rules: |未生效，已回退到 iptables 規則：|Не активно, используются правила iptables: 
+未返回原因|No reason returned|未回傳原因|Причина не указана
+SELinux 拒绝了 bpf 调用|SELinux denied the bpf call|SELinux 拒絕了 bpf 呼叫|SELinux запретил вызов bpf
+系统没有挂载 bpf 文件系统|The bpf file system is not mounted|系統沒有掛載 bpf 檔案系統|Файловая система bpf не смонтирована
+内核不提供 bpf 系统调用|The kernel has no bpf system call|核心不提供 bpf 系統呼叫|Ядро не предоставляет системный вызов bpf
+内核不支持按应用 UID 匹配|The kernel cannot match by app UID|核心不支援依應用 UID 比對|Ядро не умеет сопоставлять по UID приложения
+内核不支持网段前缀映射|The kernel does not support prefix maps|核心不支援網段前綴映射|Ядро не поддерживает префиксные карты
+iptables 不支持 bpf 匹配|iptables does not support bpf matching|iptables 不支援 bpf 比對|iptables не поддерживает сопоставление bpf
+ip6tables 不支持 bpf 匹配|ip6tables does not support bpf matching|ip6tables 不支援 bpf 比對|ip6tables не поддерживает сопоставление bpf
+eBPF 组件未安装|eBPF components are not installed|eBPF 元件未安裝|Компоненты eBPF не установлены
+应用名单无效|The app list is invalid|應用名單無效|Список приложений недействителен
+绕过网段无效|The bypass networks are invalid|繞過網段無效|Обходные сети недействительны
+eBPF 程序文件无效|The eBPF program file is invalid|eBPF 程式檔案無效|Файл программы eBPF недействителен
+eBPF 映射已丢失，请重启代理|The eBPF maps are gone; restart the proxy|eBPF 映射已遺失，請重新啟動代理|Карты eBPF потеряны; перезапустите прокси
+旧的 eBPF 映射无法清理|Old eBPF maps could not be removed|舊的 eBPF 映射無法清理|Старые карты eBPF не удалось удалить
+eBPF 组件版本不匹配|eBPF component version mismatch|eBPF 元件版本不符|Несовпадение версии компонентов eBPF
+eBPF 组件运行出错|The eBPF component failed|eBPF 元件執行出錯|Ошибка компонента eBPF
+当前运行模式不支持（仅 TPROXY / Redirect / Enhance）|Not supported in the current run mode (TPROXY / Redirect / Enhance only)|目前執行模式不支援（僅 TPROXY / Redirect / Enhance）|Не поддерживается в текущем режиме (только TPROXY / Redirect / Enhance)
+内核拒绝加载 eBPF 程序|The kernel refused to load the eBPF program|核心拒絕載入 eBPF 程式|Ядро отказалось загружать программу eBPF
+内核无法创建 eBPF 映射|The kernel could not create the eBPF maps|核心無法建立 eBPF 映射|Ядро не смогло создать карты eBPF
+eBPF 映射写入失败|Writing the eBPF maps failed|eBPF 映射寫入失敗|Не удалось записать карты eBPF
+eBPF 映射读取失败|Reading the eBPF maps failed|eBPF 映射讀取失敗|Не удалось прочитать карты eBPF
+eBPF 映射无法固定到 bpf 文件系统|The eBPF maps could not be pinned to the bpf file system|eBPF 映射無法固定到 bpf 檔案系統|Карты eBPF не удалось закрепить в файловой системе bpf
+bpf 系统调用失败|The bpf system call failed|bpf 系統呼叫失敗|Системный вызов bpf не удался
+内核拒绝加载 eBPF 程序（权限不足）|The kernel refused to load the eBPF program (permission denied)|核心拒絕載入 eBPF 程式（權限不足）|Ядро отказалось загружать программу eBPF (нет прав)
+内核无法创建 eBPF 映射（权限不足）|The kernel could not create the eBPF maps (permission denied)|核心無法建立 eBPF 映射（權限不足）|Ядро не смогло создать карты eBPF (нет прав)
+eBPF 映射写入失败（权限不足）|Writing the eBPF maps failed (permission denied)|eBPF 映射寫入失敗（權限不足）|Не удалось записать карты eBPF (нет прав)
+eBPF 映射读取失败（权限不足）|Reading the eBPF maps failed (permission denied)|eBPF 映射讀取失敗（權限不足）|Не удалось прочитать карты eBPF (нет прав)
+eBPF 映射无法固定到 bpf 文件系统（权限不足）|The eBPF maps could not be pinned (permission denied)|eBPF 映射無法固定到 bpf 檔案系統（權限不足）|Карты eBPF не удалось закрепить (нет прав)
+bpf 系统调用失败（权限不足）|The bpf system call failed (permission denied)|bpf 系統呼叫失敗（權限不足）|Системный вызов bpf не удался (нет прав)
+导出当前日志|Export this log|匯出目前日誌|Экспортировать журнал
+加载更早 1600 行|Load 1600 earlier lines|載入更早 1600 行|Загрузить ещё 1600 строк
+Wi‑Fi（名称待网络匹配读取）|Wi‑Fi (name read by network automation)|Wi‑Fi（名稱待網路比對讀取）|Wi‑Fi (имя прочитает автоматизация сети)
+以太网|Ethernet|乙太網路|Ethernet
+无网络|No network|無網路|Нет сети
+尚未获取当前网络|Current network not read yet|尚未取得目前網路|Текущая сеть ещё не определена
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

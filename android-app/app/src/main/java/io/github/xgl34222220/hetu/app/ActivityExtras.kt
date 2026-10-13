@@ -217,6 +217,31 @@ internal class RankState(dimension: String, sort: String) {
     var totals by mutableStateOf(0L to 0L)
     var loading by mutableStateOf(false)
     var revision by mutableStateOf(0)
+    /** 历史采集 switch, re-read on every history read so the page follows a change made elsewhere. */
+    var historyEnabled by mutableStateOf(false)
+    /** Why the history read failed; null after a successful read. */
+    var error by mutableStateOf<String?>(null)
+    /** Rows a ranking shows: the top 20, or 100 after 「显示更多」. */
+    var limit by mutableStateOf(RankLimit)
+    /** Controller totals per slot over the window: (slot start ms, upload, download). */
+    var distribution by mutableStateOf<List<Triple<Long, Long, Long>>>(emptyList())
+}
+
+internal const val RankLimit = 20
+internal const val RankLimitMore = 100
+
+/** Slot of the time-distribution chart for each history window: 5 minutes, 1 hour, 6 hours, 1 day. */
+internal fun historyBucketSeconds(range: Long): Long = when {
+    range <= 3_600_000L -> 300L
+    range <= 86_400_000L -> 3_600L
+    range <= 7 * 86_400_000L -> 21_600L
+    else -> 86_400L
+}
+internal fun historyBucketLabel(range: Long): String = when (historyBucketSeconds(range)) {
+    300L -> "每 5 分钟"
+    3_600L -> "每小时"
+    21_600L -> "每 6 小时"
+    else -> "每天"
 }
 
 /** History windows offered on the ranking page; the retention setting bounds what exists. */
@@ -246,25 +271,29 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
         RankState(
             vm.prefs.getString("overviewRankDimension", "host").orEmpty().ifBlank { "host" },
             vm.prefs.getString("overviewRankSort", "count").orEmpty().ifBlank { "count" },
-        ).apply { range = vm.prefs.getLong("historyRankRange", 86_400_000L).takeIf { r -> historyRanges.any { it.first == r } } ?: 86_400_000L }
+        ).apply {
+            range = vm.prefs.getLong("historyRankRange", 86_400_000L).takeIf { r -> historyRanges.any { it.first == r } } ?: 86_400_000L
+            historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
+        }
     }
     val labels = remember { HashMap<String, String>() }
     LaunchedEffect(state.dimension, state.sort) {
         vm.prefs.edit().putString("overviewRankDimension", state.dimension).putString("overviewRankSort", state.sort).apply()
     }
     LaunchedEffect(state.range) { vm.prefs.edit().putLong("historyRankRange", state.range).apply() }
-    LaunchedEffect(state.historical, state.dimension, state.sort, state.range, state.revision) {
-        if (state.historical) {
+    LaunchedEffect(state.historical, state.dimension, state.sort, state.range, state.revision, state.limit) {
+        state.historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
+        if (state.historical && state.historyEnabled) {
             state.loading = true
             try {
                 // Closed minutes the Root daemon counted (also while the App was killed) first.
                 try { DaemonMonitorBridge.pullTraffic(context, force = state.revision > 0) } catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel } catch (_: Exception) { }
                 val since = System.currentTimeMillis() - state.range
                 var rows = if (state.dimension in DaemonMonitorPolicy.DIMENSIONS)
-                    ProxyApiHistoryStore.dimensionRanking(context, state.dimension, state.sort, since) else emptyList()
+                    ProxyApiHistoryStore.dimensionRanking(context, state.dimension, state.sort, since, state.limit) else emptyList()
                 // Without daemon data (older session, core without Clash API) the App-recorded history remains.
                 if (rows.isEmpty() && state.dimension in setOf("host", "app", "route"))
-                    rows = ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, since)
+                    rows = ProxyApiHistoryStore.ranking(context, state.dimension, state.sort, since, state.limit)
                 if (state.dimension == "app") rows = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     // A package seen both by name and by uid becomes one row (list keys stay unique).
                     rows.map { it.copy(name = historyLabel(context, it.name, labels)) }.groupBy { it.name }
@@ -273,10 +302,15 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
                 }
                 state.history = rows
                 state.totals = ProxyApiHistoryStore.rangeTotals(context, since)
+                state.distribution = ProxyApiHistoryStore.timeDistribution(context, since, historyBucketSeconds(state.range))
+                state.error = null
             } catch (cancel: kotlinx.coroutines.CancellationException) {
                 throw cancel
-            } catch (_: Exception) {
+            } catch (failure: Exception) {
+                // A failed read is not the same as nothing collected: say so and offer a retry.
                 state.history = emptyList()
+                state.distribution = emptyList()
+                state.error = failure.message?.takeIf { it.isNotBlank() } ?: failure.javaClass.simpleName
             } finally { state.loading = false }
         }
     }
@@ -284,7 +318,7 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
 }
 
 internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
-    val historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
+    val historyEnabled = rank.historyEnabled
     item(key = "rank-controls") {
         Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             if (rank.historical && historyEnabled) {
@@ -302,15 +336,40 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
                     onSelect = { rank.dimension = it },
                 )
             }
+            // Two explicit choices instead of chips whose label flips with the state.
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                HxToggleChip(if (rank.sort == "traffic") "按流量" else "按连接数", rank.sort == "traffic") {
-                    rank.sort = if (it) "traffic" else "count"
-                }
-                if (historyEnabled) {
-                    HxToggleChip(if (rank.historical) "历史 · " + historyRangeLabel(rank.range) else "实时", rank.historical) { rank.historical = it }
-                    if (rank.historical) HxToggleChip(if (rank.loading) "读取中…" else "刷新", false) { rank.revision++ }
-                } else {
-                    Text("在「测速与 API」开启历史采集可查看 24 小时排行", style = MaterialTheme.typography.bodySmall, color = Hx.colors.textMuted)
+                HxSegmented(
+                    options = listOf("count" to "按连接数", "traffic" to "按流量"),
+                    selected = if (rank.sort == "traffic") "traffic" else "count",
+                    onSelect = { rank.sort = it },
+                    modifier = Modifier.weight(1f),
+                )
+                if (historyEnabled) HxSegmented(
+                    options = listOf("live" to "实时", "history" to "历史"),
+                    selected = if (rank.historical) "history" else "live",
+                    onSelect = { rank.historical = it == "history" },
+                    modifier = Modifier.weight(1f),
+                )
+            }
+            if (!historyEnabled) {
+                HxBanner(
+                    "历史采集未开启：开启后由 Root 守护记录流量与连接，可查看 1 小时到 30 天的排行与时间分布",
+                    tone = HxTone.Neutral, actionLabel = "开启历史采集",
+                    onAction = {
+                        // Same preference the 测速与 API sheet saves.
+                        vm.prefs.edit().putBoolean("proxyApiHistoryEnabled", true).apply()
+                        rank.historyEnabled = true
+                        rank.historical = true
+                        rank.revision++
+                    },
+                )
+            } else if (rank.historical) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        "前 ${rank.limit} · " + historyRangeLabel(rank.range),
+                        style = MaterialTheme.typography.labelMedium, color = Hx.colors.textMuted, modifier = Modifier.weight(1f),
+                    )
+                    HxToggleChip(if (rank.loading) "读取中…" else "刷新", false) { rank.revision++ }
                 }
             }
             if (rank.historical && historyEnabled && (rank.totals.first > 0 || rank.totals.second > 0)) {
@@ -322,8 +381,28 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
             }
         }
     }
-    val rows = if (rank.historical && historyEnabled) rank.history
+    val historyShown = rank.historical && historyEnabled
+    val rows = if (historyShown) rank.history
         else rankConnections(vm.state.connections, if (rank.dimension in setOf("host", "app", "route")) rank.dimension else "host", rank.sort)
+    val failure = rank.error
+    if (historyShown && failure != null) {
+        item(key = "rank-error") {
+            HxBanner(
+                "历史读取失败：$failure", tone = HxTone.Bad, actionLabel = "重试", onAction = { rank.revision++ },
+                modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
+            )
+        }
+    } else if (historyShown && rows.isEmpty() && !rank.loading && !vm.state.running) {
+        item(key = "rank-daemon") {
+            HxBanner(
+                "代理未运行：Root 守护只在代理运行时采集，这段时间没有新数据", tone = HxTone.Warn,
+                modifier = Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
+            )
+        }
+    }
+    if (historyShown && failure == null && rank.distribution.any { it.second > 0L || it.third > 0L }) {
+        item(key = "rank-distribution") { HxTrafficDistribution(rank) }
+    }
     if (rows.isEmpty()) {
         item(key = "rank-empty") { HxEmpty(Icons.Rounded.QueryStats, if (rank.historical) "暂无已采集的历史" else "暂无实时连接") }
     }
@@ -372,6 +451,46 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
                 color = Hx.colors.textFaint,
                 modifier = Modifier.padding(start = 26.dp, top = 4.dp),
             )
+        }
+    }
+    if (historyShown && failure == null && rank.limit < RankLimitMore && rows.size >= rank.limit) {
+        item(key = "rank-more") {
+            HxButton(
+                "显示更多（前 $RankLimitMore）", { rank.limit = RankLimitMore },
+                Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(top = 4.dp, bottom = 10.dp),
+                filled = false, busy = rank.loading,
+            )
+        }
+    }
+}
+
+/** History mode: how the counted traffic spread over the window, on the existing traffic chart. */
+@Composable
+private fun HxTrafficDistribution(rank: RankState) {
+    val c = Hx.colors
+    val slots = rank.distribution
+    val format = remember(rank.range) {
+        java.text.SimpleDateFormat(if (rank.range > 86_400_000L) "M/d HH:mm" else "HH:mm", java.util.Locale.getDefault())
+    }
+    HxGroup(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), title = "流量分布 · " + historyBucketLabel(rank.range)) {
+        Column(Modifier.padding(horizontal = 16.dp).padding(bottom = 10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("↓ 下行", style = MaterialTheme.typography.labelSmall, color = c.accent)
+                Spacer(Modifier.width(10.dp))
+                Text("↑ 上行", style = MaterialTheme.typography.labelSmall, color = c.warn)
+                Spacer(Modifier.weight(1f))
+                Text(
+                    "峰值 " + HxFormat.bytes(slots.maxOf { it.second + it.third }),
+                    style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textMuted,
+                )
+            }
+            Spacer(Modifier.height(8.dp))
+            HxTrafficChart(slots.map { it.third }, slots.map { it.second }, c.accent, c.warn, Modifier.fillMaxWidth().height(120.dp))
+            Row(Modifier.padding(top = 6.dp)) {
+                Text(format.format(java.util.Date(slots.first().first)), style = MaterialTheme.typography.labelSmall.merge(HxNumberStyle), color = c.textFaint)
+                Spacer(Modifier.weight(1f))
+                Text("现在", style = MaterialTheme.typography.labelSmall, color = c.textFaint)
+            }
         }
     }
 }

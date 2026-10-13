@@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -40,6 +42,23 @@ internal fun Modifier.homeTap(
     val source = remember { MutableInteractionSource() }
     return hetuPressScale(source, enabled, pressedScale = .975f, motion = LocalHomeMotionEnabled.current)
         .clickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel, onClick = onClick)
+}
+
+/** [homeTap] with a long press as well (spoken as its own action by TalkBack). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+internal fun Modifier.homeTap(
+    enabled: Boolean = true,
+    role: Role = Role.Button,
+    onClickLabel: String? = null,
+    onLongClickLabel: String?,
+    onLongClick: () -> Unit,
+    onClick: () -> Unit,
+): Modifier {
+    val source = remember { MutableInteractionSource() }
+    return hetuPressScale(source, enabled, pressedScale = .975f, motion = LocalHomeMotionEnabled.current)
+        .combinedClickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel,
+            onLongClickLabel = onLongClickLabel, onLongClick = onLongClick, onClick = onClick)
 }
 
 /** A real nested-scroll refresh gesture; the caller owns its request and completion state. */

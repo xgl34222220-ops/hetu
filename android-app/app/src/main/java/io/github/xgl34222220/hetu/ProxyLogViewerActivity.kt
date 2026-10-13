@@ -6,6 +6,9 @@ import io.github.xgl34222220.hetu.ui.ReferenceModalBottomSheet as ModalBottomShe
 
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.ui.draw.clip
@@ -120,14 +123,19 @@ private suspend fun listLogFiles(context: android.content.Context): List<HetuLog
             .toList()
     }
 
+/** Lines read per page of a log; 「加载更早」 adds another page, up to [LOG_TAIL_MAX]. */
+internal const val LOG_TAIL_PAGE = 1600
+internal const val LOG_TAIL_MAX = 16_000
+
 private suspend fun readLogFile(
     context: android.content.Context,
     file: HetuLogFile,
+    lines: Int = LOG_TAIL_PAGE,
 ): String = withContext(Dispatchers.IO) {
     require(validLogPath(file.path)) { "日志路径无效" }
     val result = RootBridge.rootShell(
         context.applicationContext,
-        "tail -n 1600 " + logQuote(file.path) + " 2>/dev/null",
+        "tail -n " + lines.coerceIn(1, LOG_TAIL_MAX) + " " + logQuote(file.path) + " 2>/dev/null",
         8_000L,
     )
     if (!result.ok()) {
@@ -374,6 +382,16 @@ private fun ProxyLogViewerScreen(onBack: () -> Unit) {
 /*  Hx log files viewer                                                 */
 /* ------------------------------------------------------------------ */
 
+/** Each line with a stable key: the line plus how often it already occurred, counted from the oldest. */
+internal fun hxKeyedLogLines(lines: List<String>): List<Pair<String, String>> {
+    val seen = HashMap<String, Int>()
+    return lines.map { line ->
+        val n = (seen[line] ?: 0) + 1
+        seen[line] = n
+        "l:$n:$line" to line
+    }
+}
+
 private fun hxLineLevel(line: String): String {
     val l = line.lowercase()
     return when {
@@ -408,22 +426,31 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var level by rememberSaveable { mutableStateOf("all") }
     val lifecycle = LocalLifecycleOwner.current
 
+    // Live refresh re-reads only the open file; the file list (a Root `find`) is read on entry,
+    // on a manual refresh and after clearing.
+    var liveTick by remember { mutableIntStateOf(0) }
+    var listedRevision by remember { mutableIntStateOf(-1) }
+    var tailLines by rememberSaveable { mutableIntStateOf(LOG_TAIL_PAGE) }
+    var moreMenu by remember { mutableStateOf(false) }
     LaunchedEffect(autoRefresh, lifecycle) {
         if (autoRefresh) lifecycle.lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            while (true) { delay(2000); if (!loading) revision++ }
+            while (true) { delay(2000); if (!loading) liveTick++ }
         }
     }
-    LaunchedEffect(revision, selectedPath) {
+    LaunchedEffect(revision, liveTick, selectedPath, tailLines) {
         loading = true
         try {
-            files = listLogFiles(context)
+            if (listedRevision != revision || files.isEmpty()) {
+                files = listLogFiles(context)
+                listedRevision = revision
+            }
             val selected = files.firstOrNull { it.path == selectedPath } ?: files.firstOrNull()
             if (selected == null) {
                 selectedPath = ""
                 content = ""
             } else {
                 if (selectedPath != selected.path) selectedPath = selected.path
-                content = readLogFile(context, selected)
+                content = readLogFile(context, selected, tailLines)
             }
             error = ""
         } catch (cancel: CancellationException) {
@@ -435,11 +462,30 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
     }
     val lines = remember(content, query, level, newestFirst) {
-        content.lines()
-            .filter { it.isNotBlank() && (query.isBlank() || it.contains(query, true)) && (level == "all" || hxLineLevel(it) == level) }
+        hxKeyedLogLines(content.lines())
+            .filter { (_, it) -> it.isNotBlank() && (query.isBlank() || it.contains(query, true)) && (level == "all" || hxLineLevel(it) == level) }
             .let { if (newestFirst) it.asReversed() else it }
     }
     val selected = files.firstOrNull { it.path == selectedPath }
+    val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        val text = content
+        val name = selected?.name ?: "core.log"
+        if (uri != null) scope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    val output = context.contentResolver.openOutputStream(uri) ?: error("无法写入导出文件")
+                    output.use { it.write(text.toByteArray(Charsets.UTF_8)) }
+                }
+                vm.toast("已导出 $name")
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (failure: Exception) {
+                vm.toast(failure.message ?: "日志导出失败")
+            }
+        }
+    }
+    // A full page came back, so the file may hold older lines.
+    val canLoadEarlier = selected != null && tailLines < LOG_TAIL_MAX && content.lineSequence().count() >= tailLines
 
     HxPage(
         title = selected?.name ?: "core.log",
@@ -455,6 +501,25 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             })
             HxBarAction(HxIcons.FolderOpen, "选择日志", onClick = { pickFile = true }, anchorMenu = true)
             HxBarAction(ToolsIcons.Trash2, "清空当前日志", onClick = { clearConfirm = true }, enabled = selected != null && !loading)
+            Box {
+                HxBarAction(ToolsIcons.Ellipsis, "更多", onClick = { moreMenu = true }, anchorMenu = true)
+                if (moreMenu) {
+                    val anchor = remember { HxAnchor.take() }
+                    val entries: @Composable (close: (() -> Unit) -> Unit) -> Unit = { close ->
+                        HxMenuItem(label = ht("导出当前日志"), icon = ToolsIcons.Share, enabled = selected != null && content.isNotEmpty(), onClick = {
+                            close { exporter.launch(selected?.name ?: "core.log") }
+                        })
+                        HxMenuItem(label = ht("加载更早 1600 行"), icon = ToolsIcons.Download, enabled = canLoadEarlier && !loading, onClick = {
+                            close { tailLines = (tailLines + LOG_TAIL_PAGE).coerceAtMost(LOG_TAIL_MAX) }
+                        })
+                    }
+                    if (anchor != null) HxAnchoredMenu(anchor, { moreMenu = false }, anchorEndInset = 0.dp) { close -> entries { action -> close { moreMenu = false; action() } } }
+                    else HxSheet(onDismiss = { moreMenu = false }, title = ht("更多")) {
+                        val close = LocalHxSheetClose.current
+                        Column(Modifier.padding(horizontal = 8.dp)) { entries { action -> close { moreMenu = false; action() } } }
+                    }
+                }
+            }
         },
     ) {
         item(key = "controls") {
@@ -479,7 +544,8 @@ internal fun HxLogFilesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             loading && content.isEmpty() -> item(key = "loading") { HxSkeletonRows(6) }
             files.isEmpty() -> item(key = "none") { HxEmpty(PanelIcons.ScrollText, "暂无日志文件", ht("代理运行后会在运行目录生成日志")) }
             lines.isEmpty() -> item(key = "empty") { HxEmpty(PanelIcons.SearchX, "当前筛选条件下没有日志") }
-            else -> itemsIndexed(lines, key = { index, line -> "l:" + index + ":" + line.hashCode() }) { _, line -> HxLogLine(line) }
+            // Keys follow the line itself (plus its occurrence), so a refresh that appends lines keeps the list in place.
+            else -> items(lines, key = { it.first }) { (_, line) -> HxLogLine(line) }
         }
     }
 

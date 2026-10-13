@@ -17,6 +17,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -343,11 +344,14 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var actionKey by remember { mutableStateOf<String?>(null) }
     val enabled = remember(revision) { prefs.getBoolean("networkMatchEnabled", false) }
     val mobile = remember(revision) { prefs.getBoolean("networkMatchMobile", false) }
-    val environment = remember(revision) { prefs.getString("networkMatchLastEnvironment", "尚未获取当前网络").orEmpty() }
+    // The service's last reading when it has one; otherwise at least the network type the system reports.
+    val recordedEnvironment = remember(revision) { prefs.getString("networkMatchLastEnvironment", "").orEmpty() }
+    val liveType = remember(revision) { hxNetworkType(context) }
+    val environment = recordedEnvironment.ifBlank { hxNetworkTypeLabel(liveType) }
     // The service records "environment|matched|action" after each evaluation; only trust it for the environment shown.
-    val matched = remember(revision, environment) {
+    val matched = remember(revision, recordedEnvironment) {
         prefs.getString("networkMatchLastSig", "").orEmpty().split('|')
-            .takeIf { it.size >= 3 && it.dropLast(2).joinToString("|") == environment }
+            .takeIf { recordedEnvironment.isNotBlank() && it.size >= 3 && it.dropLast(2).joinToString("|") == recordedEnvironment }
             ?.let { it[it.size - 2].toBooleanStrictOrNull() }
     }
     val ssidOriginal = remember(revision) { prefs.getStringSet("networkMatchSsids", emptySet()).orEmpty().sorted() }
@@ -369,6 +373,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var targetChoices by remember { mutableStateOf<List<String>>(emptyList()) }
     fun values(list: List<HxEditEntry>) = list.map { it.text.trim() }.filter { it.isNotEmpty() }.sorted()
     val dirty = values(ssids) != ssidOriginal || values(bssids) != bssidOriginal || values(mccs) != mccOriginal
+    // Switches apply at once; the lists wait for 保存. Leaving with unsaved list edits asks first.
+    var confirmLeave by remember { mutableStateOf(false) }
+    BackHandler(enabled = dirty) { confirmLeave = true }
 
     fun refresh() { revision++ }
     fun service(action: String) {
@@ -453,7 +460,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         title = ht("网络匹配"),
         largeTitle = false,
         subtitle = ht("按当前网络环境自动启停代理"),
-        onBack = onBack,
+        onBack = { if (dirty) confirmLeave = true else onBack() },
         onRefresh = { requestWifiPermissions() },
         actions = {
             HxBarAction(HomeIcons.RefreshCw, "刷新当前网络", onClick = { requestWifiPermissions() })
@@ -465,8 +472,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 // What the phone is on right now: the thing every rule below is matched against.
                 SettingsGroup {
                     HomeRowLayout(
-                        AnnotatedString(ht("当前环境")), subtitle = environment,
-                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) ToolsIcons.RadioTower else PanelIcons.Globe,
+                        AnnotatedString(ht("当前环境")), subtitle = if (recordedEnvironment.isBlank()) ht(environment) else environment,
+                        icon = when (if (recordedEnvironment.isBlank()) liveType else HxNetworkType.fromLabel(recordedEnvironment)) {
+                            HxNetworkType.Wifi -> ToolsIcons.Wifi
+                            HxNetworkType.Cellular -> ToolsIcons.RadioTower
+                            else -> PanelIcons.Globe
+                        },
                         iconTint = home.accent,
                         trailing = {
                             when {
@@ -550,6 +561,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "mccmnc") {
             SettingsSection { HxEditableList("MCC+MNC（蜂窝网络时，默认数据卡或注册网络匹配即满足）", "MCC+MNC", "例如 46000", mccs) }
         }
+        if (dirty) item(key = "unsaved") {
+            HxBanner(
+                "匹配条件有未保存的修改", tone = HxTone.Warn, actionLabel = "保存", onAction = ::save,
+                modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap),
+            )
+        }
         item(key = "note") {
             HxBanner(
                 ht("部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。"),
@@ -557,6 +574,17 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 modifier = Modifier.padding(horizontal = HomeDims.gutter),
             )
         }
+    }
+
+    if (confirmLeave) {
+        HxConfirmDialog(
+            title = "放弃修改？",
+            message = "SSID / BSSID / MCC+MNC 的修改还没有保存。",
+            confirmLabel = "放弃",
+            danger = true,
+            onConfirm = { confirmLeave = false; onBack() },
+            onDismiss = { confirmLeave = false },
+        )
     }
 
     actionKey?.let { key ->
@@ -600,4 +628,42 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
             onDismiss = { targetPick = null },
         )
     }
+}
+
+/** Kind of network the phone is on, read from ConnectivityManager (ACCESS_NETWORK_STATE, already granted). */
+internal enum class HxNetworkType {
+    Wifi, Cellular, Ethernet, Other, None;
+
+    companion object {
+        /** The type a recorded environment line names (the service writes "Wi‑Fi …" / "移动数据 …"). */
+        fun fromLabel(label: String): HxNetworkType = when {
+            label.startsWith("Wi") -> Wifi
+            label.contains("移动") || label.contains("蜂窝") -> Cellular
+            label.contains("以太网") -> Ethernet
+            else -> Other
+        }
+    }
+}
+
+internal fun hxNetworkType(context: android.content.Context): HxNetworkType = try {
+    val cm = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as? android.net.ConnectivityManager
+    val caps = cm?.activeNetwork?.let { cm.getNetworkCapabilities(it) }
+    when {
+        cm == null -> HxNetworkType.Other
+        caps == null -> HxNetworkType.None
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI) -> HxNetworkType.Wifi
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_CELLULAR) -> HxNetworkType.Cellular
+        caps.hasTransport(android.net.NetworkCapabilities.TRANSPORT_ETHERNET) -> HxNetworkType.Ethernet
+        else -> HxNetworkType.Other
+    }
+} catch (_: Exception) {
+    HxNetworkType.Other
+}
+
+internal fun hxNetworkTypeLabel(type: HxNetworkType): String = when (type) {
+    HxNetworkType.Wifi -> "Wi‑Fi（名称待网络匹配读取）"
+    HxNetworkType.Cellular -> "移动数据"
+    HxNetworkType.Ethernet -> "以太网"
+    HxNetworkType.None -> "无网络"
+    HxNetworkType.Other -> "尚未获取当前网络"
 }
