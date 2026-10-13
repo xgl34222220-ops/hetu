@@ -116,6 +116,11 @@ private val DarkHx = HxColors(
 
 internal val LocalHx = staticCompositionLocalOf { LightHx }
 
+/* Node cards of the 策略组 page: one place for the selected / idle fills and the selected rim, light and dark. */
+internal val HxColors.nodeSelected: Color get() = if (dark) androidx.compose.ui.graphics.lerp(surfaceMuted, accentSoft, .42f) else Color(0xFFE5ECFF)
+internal val HxColors.nodeIdle: Color get() = if (dark) surfaceMuted else Color(0xFFE7E8F3)
+internal val HxColors.nodeSelectedRim: Color get() = if (dark) accent.copy(alpha = .55f) else Color(0xFF72A5FF)
+
 internal object Hx {
     val colors: HxColors
         @Composable get() = LocalHx.current

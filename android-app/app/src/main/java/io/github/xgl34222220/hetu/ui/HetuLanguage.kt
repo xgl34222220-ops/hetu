@@ -1004,7 +1004,21 @@ private val vocabularyConnection = """
 Web 界面|Web interface|Web 介面|Веб-интерфейс
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
+// 2026-10 UI polish (toast detail, home metric empties, network-match status, startup-config viewer).
+private val vocabularyUiPolish = """
+完整信息|Full message|完整訊息|Полное сообщение
+暂无订阅流量信息|No subscription usage yet|暫無訂閱流量資訊|Нет данных о трафике подписки
+未开启|Off|未開啟|Выключено
+已匹配|Matched|已匹配|Совпало
+未匹配|Not matched|未匹配|Не совпало
+停止代理|Stop proxy|停止代理|Остановить прокси
+隐藏密钥|Hide secrets|隱藏密鑰|Скрыть секреты
+显示密钥|Show secrets|顯示密鑰|Показать секреты
+不换行|No wrap|不換行|Без переноса
+已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享|Subscription URL parameters and secret are hidden; copy and export contain everything, so do not share them publicly|已隱藏訂閱連結參數與 secret；複製和匯出的是完整內容，請勿公開分享|Параметры ссылок подписки и secret скрыты; копирование и экспорт содержат всё — не публикуйте их
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

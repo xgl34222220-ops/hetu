@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 
@@ -63,6 +64,8 @@ internal fun HxToggleChip(label: String, selected: Boolean, onChange: (Boolean) 
     val source = remember { MutableInteractionSource() }
     Box(
         Modifier
+            // Drawn 40 dp tall; the slot around it is the 48 dp touch target.
+            .minimumInteractiveComponentSize()
             .hxPressScale(source, .94f)
             .heightIn(min = 40.dp)
             .clip(Hx.pillShape)

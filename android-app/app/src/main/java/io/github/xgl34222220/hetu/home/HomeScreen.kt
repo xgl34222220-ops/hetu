@@ -178,7 +178,7 @@ internal fun HomeScreen(
             }
 
             // WebUI · 日志 take the place the 当前节点 row used to hold.
-            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
+            HomeShortcutRow(state.status.isLive, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
             HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 
             Row(
@@ -283,7 +283,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
         HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
         Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
-                HomeStatusDot(tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
+                HomeStatusDot(if (status is HomeStatus.PendingRestart && glyph == HomeGlyphMode.On) c.warn else tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
                 HomeRollingText(title, c.t1, HomeType.heroStatus, alignment = Alignment.CenterStart)
             }
             HomeRollingText(line, c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
@@ -302,7 +302,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
 private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
     val c = LocalHomeColors.current
     Row(
-        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 25.dp),
+        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 32.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(2.dp),
     ) {
@@ -314,6 +314,12 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
 /** A running core becomes a healthy local glyph only after both observations succeeded. */
 internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
     if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
+    // Settings waiting for a restart are not a fault: the banner below says so, the ring stays on and
+    // only a real controller/takeover problem raises the mark.
+    if (status is HomeStatus.PendingRestart) return when (connection.health) {
+        HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
+        else -> HomeGlyphMode.On
+    }
     return when (connection.health) {
         HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
         HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
@@ -376,10 +382,11 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier: 
 
 /** WebUI and 日志, side by side where 当前节点 used to sit. WebUI opens the default dashboard; 日志 the log page. */
 @Composable
-private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
+private fun HomeShortcutRow(live: Boolean, actions: HomeActions, modifier: Modifier = Modifier) {
     Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
-        HomeShortcutCard("WebUI", ht("Web 界面"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
-        HomeShortcutCard(ht("日志"), ht("查看"), "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
+        // Subtitles say something the title does not: whether the panel can answer, and which log opens.
+        HomeShortcutCard("WebUI", ht(if (live) "打开面板" else "代理未运行"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
+        HomeShortcutCard(ht("日志"), "core.log", "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
     }
 }
 
@@ -607,12 +614,16 @@ private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen:
         header = {
             MetricTitle("订阅")
             Spacer(Modifier.weight(1f))
-            Text(sub?.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1)
         },
     ) {
-        MetricLine("已用", sub?.let { HomeFormat.bytes(it.usedBytes) })
-        MetricLine("总量", sub?.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
-        HomeProgressBar(sub?.usedFraction, Modifier.padding(top = 10.dp))
+        if (sub == null) {
+            MetricEmpty("暂无订阅流量信息")
+        } else {
+            MetricLine("已用", HomeFormat.bytes(sub.usedBytes))
+            MetricLine("总量", sub.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
+            HomeProgressBar(sub.usedFraction, Modifier.padding(top = 10.dp))
+        }
     }
 }
 
@@ -625,9 +636,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: () 
         modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
         header = { MetricTitle("资源占用") },
     ) {
-        MetricLine("内存", res.memoryBytes?.takeIf { live }?.let(HomeFormat::bytes))
-        MetricLine("CPU", cpu?.let(HomeFormat::percent))
-        HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
+        if (!live) {
+            MetricEmpty("代理未运行")
+        } else {
+            MetricLine("内存", res.memoryBytes?.let(HomeFormat::bytes))
+            MetricLine("CPU", cpu?.let(HomeFormat::percent))
+            HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
+        }
+    }
+}
+
+/** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
+@Composable
+private fun MetricEmpty(text: String) {
+    val c = LocalHomeColors.current
+    Box(Modifier.fillMaxWidth().height(75.dp), contentAlignment = Alignment.CenterStart) {
+        Text(ht(text), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -292,7 +292,7 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         largeTitle = false,
         subtitle = ht("热点、USB 与局域网转发流量"),
         onBack = onBack,
-        refreshing = loading,
+        refreshing = loading && snapshot.interfaces.isNotEmpty(),
         onRefresh = { refresh++ },
         actions = {
             HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }, busy = loading)

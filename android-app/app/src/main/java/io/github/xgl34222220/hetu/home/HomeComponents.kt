@@ -78,6 +78,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -515,13 +516,18 @@ internal fun HomeIconButton(
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
     val spoken = ht(label)
+    val working = ht("处理中")
     val angle = homeSpinAngle(spinning)
     Box(
         modifier
             .size(HomeDims.touch)
             .clip(CircleShape)
             .homeTap(enabled = enabled && !loading, onClickLabel = spoken, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
-            .semantics { contentDescription = spoken },
+            .semantics {
+                contentDescription = spoken
+                // The spinner alone says nothing to a screen reader.
+                if (loading) stateDescription = working
+            },
         contentAlignment = Alignment.Center,
     ) {
         if (loading) HomeSpinner(size = 20.dp, color = c.t2)

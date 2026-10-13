@@ -5,6 +5,8 @@ import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeRowLayout
 import io.github.xgl34222220.hetu.home.HomeStatusDot
+import io.github.xgl34222220.hetu.home.HomePill
+import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.panel.PanelIcons
 import io.github.xgl34222220.hetu.tools.ToolsIcons
@@ -342,6 +344,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
     val enabled = remember(revision) { prefs.getBoolean("networkMatchEnabled", false) }
     val mobile = remember(revision) { prefs.getBoolean("networkMatchMobile", false) }
     val environment = remember(revision) { prefs.getString("networkMatchLastEnvironment", "尚未获取当前网络").orEmpty() }
+    // The service records "environment|matched|action" after each evaluation; only trust it for the environment shown.
+    val matched = remember(revision, environment) {
+        prefs.getString("networkMatchLastSig", "").orEmpty().split('|')
+            .takeIf { it.size >= 3 && it.dropLast(2).joinToString("|") == environment }
+            ?.let { it[it.size - 2].toBooleanStrictOrNull() }
+    }
     val ssidOriginal = remember(revision) { prefs.getStringSet("networkMatchSsids", emptySet()).orEmpty().sorted() }
     val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
     val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
@@ -458,9 +466,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                 SettingsGroup {
                     HomeRowLayout(
                         AnnotatedString(ht("当前环境")), subtitle = environment,
-                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) HxIcons.Signal else PanelIcons.Globe,
+                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) ToolsIcons.RadioTower else PanelIcons.Globe,
                         iconTint = home.accent,
-                        trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
+                        trailing = {
+                            when {
+                                !enabled -> HomePill(ht("未开启"), tone = HomeTone.Neutral)
+                                matched == true -> HomePill(ht("已匹配"), tone = HomeTone.Good)
+                                matched == false -> HomePill(ht("未匹配"), tone = HomeTone.Neutral)
+                            }
+                        },
                     )
                     SettingsDivider()
                     val owns = daemon?.ownsNetworkMatch() == true
@@ -503,10 +517,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
                     SettingsDivider()
                     SettingsSwitchRow(ht("卡1 · 蜂窝数据"), "1" in simSlots, { toggleSlot("1", it) },
-                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
+                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Smartphone)
                     SettingsDivider()
                     SettingsSwitchRow(ht("卡2 · 蜂窝数据"), "2" in simSlots, { toggleSlot("2", it) },
-                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
+                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Smartphone)
                 }
             }
         }
@@ -550,7 +564,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
             title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
             referenceRadios = true,
             trailingReferenceRadios = key == "networkUnmatchAction",
-            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理")),
+            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动代理")), HxChoice("stop", ht("停止代理")),
                 HxChoice("switch", ht("切换配置…")), HxChoice("script", ht("运行脚本…"))),
             selected = NetworkMatchRules.parseAction(prefs.getString(key, if (key == "networkMatchAction") "start" else "none")).kind,
             onPick = { value ->

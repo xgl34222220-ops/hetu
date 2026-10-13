@@ -49,6 +49,11 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
     // 启动诊断: reference cleanup and where ports / DNS / fake-IP came from, recorded at prepare.
     var diagnostics by remember { mutableStateOf(prefs.getString("proxyStartupDiagnostics", "").orEmpty()) }
     val c = LocalHomeColors.current
+    // Display only: copy and export always use the untouched original.
+    var wrap by remember { mutableStateOf(false) }
+    var reveal by remember { mutableStateOf(false) }
+    val masked = remember(text) { maskStartupSecrets(text) }
+    val hidesSecrets = masked != text
 
     fun copy() {
         try {
@@ -95,7 +100,10 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
             catch (error: Exception) { message = error.message ?: "导出失败" }
         }
     }
-    HxPage(title = ht("启动配置"), subtitle = ht("河图生成的最终 Mihomo 运行副本"), largeTitle = false, onBack = onBack) {
+    HxPage(title = ht("启动配置"), subtitle = ht("河图生成的最终 Mihomo 运行副本"), largeTitle = false, onBack = onBack, actions = {
+        if (hidesSecrets) HxBarAction(if (reveal) HxIcons.EyeOff else HxIcons.Eye, if (reveal) "隐藏密钥" else "显示密钥", onClick = { reveal = !reveal })
+        HxBarAction(HxIcons.TextWrap, if (wrap) "不换行" else "自动换行", onClick = { wrap = !wrap })
+    }) {
         item(key = "actions") {
             SettingsSection {
                 SettingsGroup {
@@ -115,6 +123,10 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
         if (message.isNotBlank()) item(key = "message") {
             HxBanner(message, tone = if (copyFailed) HxTone.Bad else HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
         }
+        if (hidesSecrets && !reveal) item(key = "masked") {
+            HxBanner(ht("已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享"), tone = HxTone.Neutral,
+                modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
+        }
         if (diagnostics.isNotBlank()) item(key = "diagnostics") {
             SettingsSection {
                 Box(Modifier.fillMaxWidth().homeGlassPanel().padding(horizontal = 18.dp, vertical = 16.dp)) {
@@ -130,8 +142,8 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
             SettingsSection {
                 Box(Modifier.fillMaxWidth().heightIn(min = 320.dp).homeGlassPanel().padding(horizontal = 18.dp, vertical = 16.dp)) {
                     StartupConfigViewer(
-                        if (busy && text.isBlank()) ht("正在读取启动配置…") else text.ifBlank { ht("暂无启动配置") },
-                        color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono,
+                        if (busy && text.isBlank()) ht("正在读取启动配置…") else (if (reveal) text else masked).ifBlank { ht("暂无启动配置") },
+                        color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono, wrap = wrap,
                     )
                 }
             }
