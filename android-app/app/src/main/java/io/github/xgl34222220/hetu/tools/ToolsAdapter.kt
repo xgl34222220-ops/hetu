@@ -106,7 +106,7 @@ internal fun HetuToolsV2(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    toast(io.github.xgl34222220.hetu.app.hxErrorMessage(error, "导出失败"))
+                    toast(io.github.xgl34222220.hetu.hxErrorMessage(error, "导出失败"))
                 }
             }
         }

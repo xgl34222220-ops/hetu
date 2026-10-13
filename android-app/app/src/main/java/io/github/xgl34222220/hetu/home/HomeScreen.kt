@@ -626,7 +626,7 @@ private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen:
             MetricLine("已用", HomeFormat.bytes(sub.usedBytes))
             MetricLine("总量", sub.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
             // Under 10 % left: the bar turns to the warning red.
-            val low = sub.usedFraction > .9f
+            val low = (sub.usedFraction ?: 0f) > .9f
             HomeProgressBar(sub.usedFraction, Modifier.padding(top = 10.dp), color = if (low) c.badText else c.accent, track = if (low) c.badSoft else c.accentSoft)
         }
     }

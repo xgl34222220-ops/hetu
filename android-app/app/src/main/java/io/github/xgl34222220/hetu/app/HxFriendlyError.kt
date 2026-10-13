@@ -1,4 +1,4 @@
-package io.github.xgl34222220.hetu.app
+package io.github.xgl34222220.hetu
 
 import java.io.FileNotFoundException
 import java.net.ConnectException

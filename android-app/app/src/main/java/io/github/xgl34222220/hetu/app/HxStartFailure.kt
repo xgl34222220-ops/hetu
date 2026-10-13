@@ -1,6 +1,5 @@
-package io.github.xgl34222220.hetu.app
+package io.github.xgl34222220.hetu
 
-import io.github.xgl34222220.hetu.ProxyStartProblem
 
 /** How a failed manual start is handled; decided by the exception type, never by its wording. */
 internal enum class HxStartFailure {

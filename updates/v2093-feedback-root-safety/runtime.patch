@@ -62732,11 +62732,11 @@ index e337597..13067ef 100644
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxFriendlyError.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxFriendlyError.kt
 new file mode 100644
-index 0000000..da83972
+index 0000000..231ea48
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxFriendlyError.kt
 @@ -0,0 +1,77 @@
-+package io.github.xgl34222220.hetu.app
++package io.github.xgl34222220.hetu
 +
 +import java.io.FileNotFoundException
 +import java.net.ConnectException
@@ -62885,13 +62885,12 @@ index 0000000..f3d1e7c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
 new file mode 100644
-index 0000000..de4d7fc
+index 0000000..7d49de3
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxStartFailure.kt
-@@ -0,0 +1,27 @@
-+package io.github.xgl34222220.hetu.app
+@@ -0,0 +1,26 @@
++package io.github.xgl34222220.hetu
 +
-+import io.github.xgl34222220.hetu.ProxyStartProblem
 +
 +/** How a failed manual start is handled; decided by the exception type, never by its wording. */
 +internal enum class HxStartFailure {
@@ -67812,7 +67811,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..384dbca 100644
+index e31ca99..719d789 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
@@ -68114,7 +68113,7 @@ index e31ca99..384dbca 100644
 +            MetricLine("已用", HomeFormat.bytes(sub.usedBytes))
 +            MetricLine("总量", sub.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
 +            // Under 10 % left: the bar turns to the warning red.
-+            val low = sub.usedFraction > .9f
++            val low = (sub.usedFraction ?: 0f) > .9f
 +            HomeProgressBar(sub.usedFraction, Modifier.padding(top = 10.dp), color = if (low) c.badText else c.accent, track = if (low) c.badSoft else c.accentSoft)
 +        }
      }
@@ -69718,7 +69717,7 @@ index fb308a8..5931531 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
-index 800055c..8923f96 100644
+index 800055c..0bbdbc9 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/tools/ToolsAdapter.kt
 @@ -18,29 +18,23 @@ import androidx.compose.runtime.rememberUpdatedState
@@ -69767,7 +69766,7 @@ index 800055c..8923f96 100644
                      throw cancel
                  } catch (error: Exception) {
 -                    toast(error.message ?: "导出失败")
-+                    toast(io.github.xgl34222220.hetu.app.hxErrorMessage(error, "导出失败"))
++                    toast(io.github.xgl34222220.hetu.hxErrorMessage(error, "导出失败"))
                  }
              }
          }
@@ -77814,20 +77813,14 @@ index 0000000..59c1789
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/I18nCleanup106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/I18nCleanup106Test.kt
 new file mode 100644
-index 0000000..6f988e8
+index 0000000..640e57d
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/I18nCleanup106Test.kt
-@@ -0,0 +1,168 @@
+@@ -0,0 +1,162 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.app.Application
 +import androidx.test.core.app.ApplicationProvider
-+import io.github.xgl34222220.hetu.app.HetuViewModel
-+import io.github.xgl34222220.hetu.app.HxStartFailure
-+import io.github.xgl34222220.hetu.app.HxTone
-+import io.github.xgl34222220.hetu.app.hxErrorMessage
-+import io.github.xgl34222220.hetu.app.hxFriendlyError
-+import io.github.xgl34222220.hetu.app.hxStartFailure
 +import io.github.xgl34222220.hetu.ui.translateHetuText
 +import java.io.File
 +import java.io.FileNotFoundException

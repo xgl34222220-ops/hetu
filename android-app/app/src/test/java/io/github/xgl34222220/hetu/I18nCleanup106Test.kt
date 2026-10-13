@@ -2,12 +2,6 @@ package io.github.xgl34222220.hetu
 
 import android.app.Application
 import androidx.test.core.app.ApplicationProvider
-import io.github.xgl34222220.hetu.app.HetuViewModel
-import io.github.xgl34222220.hetu.app.HxStartFailure
-import io.github.xgl34222220.hetu.app.HxTone
-import io.github.xgl34222220.hetu.app.hxErrorMessage
-import io.github.xgl34222220.hetu.app.hxFriendlyError
-import io.github.xgl34222220.hetu.app.hxStartFailure
 import io.github.xgl34222220.hetu.ui.translateHetuText
 import java.io.File
 import java.io.FileNotFoundException
