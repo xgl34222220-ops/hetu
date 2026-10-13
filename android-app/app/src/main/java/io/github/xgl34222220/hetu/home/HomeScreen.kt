@@ -257,7 +257,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
     val line = when (status) {
         is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
         is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
-        HomeStatus.Starting, HomeStatus.Restarting, HomeStatus.Stopping -> state.statusDetail?.takeIf { it.isNotBlank() } ?: ht("请稍候…")
+        HomeStatus.Starting, HomeStatus.Restarting, HomeStatus.Stopping -> state.statusDetail?.takeIf { it.isNotBlank() }?.let { ht(it) } ?: ht("请稍候…")
         HomeStatus.NotRunning, is HomeStatus.StartFailed -> ht("尚未启动代理")
     }
     val tint by animateColorAsState(

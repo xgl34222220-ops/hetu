@@ -570,7 +570,7 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
         vm.messages.collectLatest { message ->
             floatingMessage = message
             shownMessage = message
-            if (hxToastTone(message) == HxTone.Bad) haptics.perform(HetuHaptic.Reject)
+            if (vm.toastTone(message) == HxTone.Bad) haptics.perform(HetuHaptic.Reject)
             // Longer messages stay a little longer so they can actually be read.
             delay((1500L + message.length * 45L).coerceAtMost(4200L))
             floatingMessage = null
@@ -587,7 +587,7 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
             fadeOut(tween(150)) +
             scaleOut(tween(180), targetScale = .9f) else ExitTransition.None,
     ) {
-        HxToast(shownMessage, onDismiss = { floatingMessage = null })
+        HxToast(shownMessage, tone = vm.toastTone(shownMessage), onDismiss = { floatingMessage = null })
     }
 }
 
@@ -636,11 +636,13 @@ internal fun hxToastTone(message: String): HxTone = when {
     else -> HxTone.Neutral
 }
 
-/** Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss. */
+/**
+ * Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss.
+ * [tone] is the poster's explicit tone ([HetuViewModel.toastAs]); the keyword reading is only the fallback.
+ */
 @Composable
-private fun HxToast(message: String, onDismiss: () -> Unit) {
+private fun HxToast(message: String, tone: HxTone = hxToastTone(message), onDismiss: () -> Unit) {
     val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
-    val tone = hxToastTone(message)
     var drag by remember { mutableStateOf(0f) }
     val shape = RoundedCornerShape(50)
     Row(

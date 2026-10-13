@@ -471,48 +471,6 @@ private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
 
 /* ---------------------------- shared ---------------------------- */
 
-@Composable
-private fun UpdateAllBar(summary: String, label: String, busy: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val c = Hx.colors
-    val haptics = rememberHetuHaptics()
-    val source = remember { MutableInteractionSource() }
-    val bg by animateColorAsState(
-        when {
-            busy -> c.surfaceMuted
-            enabled -> c.accent
-            else -> c.surfaceMuted
-        },
-        tween(HxMotion.Medium),
-        label = "updateAllBg",
-    )
-    val fg by animateColorAsState(if (enabled && !busy) c.onAccent else c.textMuted, tween(HxMotion.Medium), label = "updateAllFg")
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = Hx.gutter).padding(bottom = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(summary, style = MaterialTheme.typography.bodySmall, color = c.textMuted, modifier = Modifier.weight(1f))
-        Spacer(Modifier.width(8.dp))
-        Row(
-            Modifier
-                .hxPressScale(source, .95f)
-                .height(32.dp)
-                .clip(Hx.pillShape)
-                .background(bg)
-                .clickable(interactionSource = source, indication = LocalIndication.current, enabled = enabled && !busy) {
-                    haptics.perform(HetuHaptic.Confirm)
-                    onClick()
-                }
-                .animateContentSize(tween(HxMotion.Short, easing = HxMotion.Emphasized))
-                .padding(horizontal = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            HxSpinningSync(spinning = busy, tint = fg, size = 15.dp)
-            Spacer(Modifier.width(5.dp))
-            Text(if (busy) "更新中" else label, style = MaterialTheme.typography.labelMedium, color = fg)
-        }
-    }
-}
-
 /** A sync glyph that keeps turning while work is in flight and eases to rest after. */
 @Composable
 internal fun HxSpinningSync(spinning: Boolean, tint: Color, size: Dp = 20.dp) {

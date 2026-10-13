@@ -18,16 +18,10 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import io.github.xgl34222220.hetu.ProxyAdblockChainActivity
-import io.github.xgl34222220.hetu.ProxyAppSelectionActivity
-import io.github.xgl34222220.hetu.ProxyBypassRulesActivity
-import io.github.xgl34222220.hetu.ProxyCnIpSettingsActivity
 import io.github.xgl34222220.hetu.ProxyComposeController
-import io.github.xgl34222220.hetu.ProxyCoreActivity
 import io.github.xgl34222220.hetu.ProxyLogViewerActivity
 import io.github.xgl34222220.hetu.ProxyNetworkAutomationActivity
 import io.github.xgl34222220.hetu.ProxyScriptsActivity
-import io.github.xgl34222220.hetu.ProxySharedNetworkSettingsActivity
 import io.github.xgl34222220.hetu.ProxySubStoreActivity
 import io.github.xgl34222220.hetu.ProxyWebPanelsActivity
 import io.github.xgl34222220.hetu.ReferenceFileManagerActivity
@@ -112,7 +106,7 @@ internal fun HetuToolsV2(
                 } catch (cancel: CancellationException) {
                     throw cancel
                 } catch (error: Exception) {
-                    toast(error.message ?: "导出失败")
+                    toast(io.github.xgl34222220.hetu.app.hxErrorMessage(error, "导出失败"))
                 }
             }
         }
@@ -122,34 +116,18 @@ internal fun HetuToolsV2(
         ToolsActions(
             onOpenEntry = openEntry@{ entry ->
                 if (openExternal(entry)) return@openEntry
+                // Apps / Cores / Bypass / Share / CnIp / Diag / Adblock always open their in-module page
+                // (rememberToolsFeatureHost supplies every loader), so only entries without one leave here.
                 val target = when (entry) {
                     ToolsEntry.Files -> ReferenceFileManagerActivity::class.java
                     ToolsEntry.Scripts -> ProxyScriptsActivity::class.java
                     ToolsEntry.Logs -> ProxyLogViewerActivity::class.java
-                    ToolsEntry.Apps -> ProxyAppSelectionActivity::class.java
                     ToolsEntry.NetMatch -> ProxyNetworkAutomationActivity::class.java
-                    ToolsEntry.Share -> ProxySharedNetworkSettingsActivity::class.java
-                    ToolsEntry.Bypass -> ProxyBypassRulesActivity::class.java
                     ToolsEntry.SubStore -> ProxySubStoreActivity::class.java
-                    ToolsEntry.CnIp -> ProxyCnIpSettingsActivity::class.java
-                    ToolsEntry.Cores -> ProxyCoreActivity::class.java
-                    ToolsEntry.Adblock -> ProxyAdblockChainActivity::class.java
                     ToolsEntry.WebUi -> ProxyWebPanelsActivity::class.java
-                    ToolsEntry.Diag, ToolsEntry.Configs, ToolsEntry.NetTest -> null
+                    else -> null
                 }
-                if (target != null) {
-                    context.startActivity(Intent(context, target))
-                } else if (entry == ToolsEntry.Diag) {
-                    scope.launch {
-                        try {
-                            log(controller.diagnostics())
-                        } catch (cancel: CancellationException) {
-                            throw cancel
-                        } catch (error: Exception) {
-                            log(error.message ?: "诊断读取失败")
-                        }
-                    }
-                }
+                if (target != null) context.startActivity(Intent(context, target))
             },
             onOpenEditor = if (onOpenConfigEditor == null) null else { { openConfigEditor?.invoke() } },
             loadConfigs = {
