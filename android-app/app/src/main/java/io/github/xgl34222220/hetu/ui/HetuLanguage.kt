@@ -1221,7 +1221,20 @@ private val vocabularyAudit3Ui = """
 跳到第 %d 行|Go to line %d|跳至第 %d 行|К строке %d
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui).joinToString("\n")
+// 2026-10-13 audit3 settings: notification preview and unsaved-edit prompt, live 资源限制 checks (same rules as hetu-root.sh).
+private val vocabularyAudit3Settings = """
+预览|Preview|預覽|Предпросмотр
+收起预览|Hide preview|收合預覽|Скрыть предпросмотр
+预览 · 示例值|Preview · sample values|預覽 · 範例值|Предпросмотр · примерные значения
+通知设置的修改还没有保存。|Your notification settings have not been saved yet.|通知設定的修改還沒有儲存。|Изменения настроек уведомления ещё не сохранены.
+CPU 核心分配格式无效：请填写 0-7 或 0,2,4-6 这样的核心编号（0-23）|Invalid CPU affinity: enter core numbers such as 0-7 or 0,2,4-6 (0-23)|CPU 核心分配格式無效：請填寫 0-7 或 0,2,4-6 這樣的核心編號（0-23）|Неверная привязка к CPU: укажите номера ядер, например 0-7 или 0,2,4-6 (0-23)
+内存限制格式无效：请填写 128M、1G 这样的值，且不低于 32M|Invalid memory limit: enter a value such as 128M or 1G, at least 32M|記憶體限制格式無效：請填寫 128M、1G 這樣的值，且不低於 32M|Неверный лимит памяти: укажите значение вроде 128M или 1G, не меньше 32M
+内存限制不能超过 16G|The memory limit cannot exceed 16G|記憶體限制不能超過 16G|Лимит памяти не может превышать 16G
+磁盘 I/O 权重应为 0-7|Disk I/O weight must be 0-7|磁碟 I/O 權重應為 0-7|Вес дискового ввода-вывода должен быть от 0 до 7
+本机可用 %s 个 CPU（0-%s），超出的编号不会生效|This device has %s CPUs (0-%s); numbers beyond them have no effect|本機可用 %s 個 CPU（0-%s），超出的編號不會生效|На устройстве доступно CPU: %s (0-%s); номера сверх этого не действуют
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

@@ -17,15 +17,18 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
@@ -43,6 +46,7 @@ import io.github.xgl34222220.hetu.home.HomeRowDims
 import io.github.xgl34222220.hetu.home.HomeType
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.LocalHomeHaptics
+import io.github.xgl34222220.hetu.home.badText
 import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.homeRowPressTint
 import io.github.xgl34222220.hetu.panel.PanelIcons
@@ -144,6 +148,13 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         keyboardType = KeyboardType.Ascii,
                         onEnabled = { putBool("proxyCpuAffinityEnabled", it) },
                         onValue = { putString("proxyCpuAffinity", it) },
+                        validate = HxResourceLimits::cpuError,
+                        advice = { value ->
+                            HxResourceLimits.cpuBeyondDevice(value)?.let {
+                                val cores = Runtime.getRuntime().availableProcessors()
+                                ht(HxResourceLimits.CPU_BEYOND_DEVICE).fill(cores, cores - 1)
+                            }
+                        },
                     )
                     ResourceSetting(
                         title = "内存限制",
@@ -155,6 +166,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         keyboardType = KeyboardType.Ascii,
                         onEnabled = { putBool("proxyMemoryLimitEnabled", it) },
                         onValue = { putString("proxyMemoryLimit", it) },
+                        validate = HxResourceLimits::memoryError,
                     )
                     ResourceSetting(
                         title = "磁盘 I/O 权重",
@@ -166,6 +178,7 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                         keyboardType = KeyboardType.Number,
                         onEnabled = { putBool("proxyIoWeightEnabled", it) },
                         onValue = { putString("proxyIoWeight", it) },
+                        validate = HxResourceLimits::ioError,
                     )
                     // Opt-in: the two values above also become kernel limits (memcg memory.max, io weight).
                     val cgroup = prefs.getBoolean(CoreResourceLimits.PREF_ENABLED, false)
@@ -306,7 +319,12 @@ private class OtherLiveState(
     }
 }
 
-/** A limit: its switch, and under it the value the limit uses. The field rests while the switch is off. */
+/**
+ * A limit: its switch, and under it the value the limit uses. The field rests while the switch is off.
+ * The field edits a draft checked by the start script's own rules ([validate]); only a value the
+ * script accepts reaches prefs (and marks a restart pending), once typing pauses, the field loses
+ * focus or the page closes. An invalid draft shows its error and is never written.
+ */
 @Composable
 private fun ResourceSetting(
     title: String,
@@ -318,13 +336,42 @@ private fun ResourceSetting(
     subtitle: String? = null,
     onEnabled: (Boolean) -> Unit,
     onValue: (String) -> Unit,
+    validate: (String) -> String? = { null },
+    advice: @Composable (String) -> String? = { null },
 ) {
+    val c = LocalHomeColors.current
+    var draft by remember(value) { mutableStateOf(value) }
+    val stored by rememberUpdatedState(value)
+    val latest by rememberUpdatedState(draft)
+    val write by rememberUpdatedState(onValue)
+    val check by rememberUpdatedState(validate)
+    fun commit() { if (latest != stored && check(latest) == null) write(latest) }
+    LaunchedEffect(draft, value) {
+        if (draft != value && validate(draft) == null) { kotlinx.coroutines.delay(RESOURCE_COMMIT_DELAY_MS); commit() }
+    }
+    DisposableEffect(Unit) { onDispose { commit() } }
+    var focused by remember { mutableStateOf(false) }
+    val error = if (enabled) validate(draft) else null
+    val note = if (enabled && error == null) advice(draft) else null
+    val start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start
     Column(Modifier.fillMaxWidth().padding(bottom = 10.dp)) {
         SettingsSwitchRow(ht(title), enabled, onEnabled, subtitle = subtitle, compact = true, icon = icon)
         SettingsInput(
-            value = value, onValueChange = onValue, enabled = enabled, placeholder = hint,
+            value = draft, onValueChange = { draft = it }, enabled = enabled, placeholder = hint, error = error != null,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.padding(start = if (icon != null) HomeRowDims.textStart else HomeRowDims.start, end = HomeRowDims.end + 2.dp),
+            modifier = Modifier.padding(start = start, end = HomeRowDims.end + 2.dp).onFocusChanged {
+                if (focused && !it.hasFocus) commit()
+                focused = it.hasFocus
+            },
         )
+        (error ?: note)?.let { message ->
+            Text(
+                if (error != null) ht(message) else message,
+                Modifier.padding(start = start + 2.dp, end = HomeRowDims.end + 2.dp, top = 6.dp),
+                color = if (error != null) c.badText else c.t2, style = HomeType.note.copy(fontWeight = FontWeight.Medium),
+            )
+        }
     }
 }
+
+private const val RESOURCE_COMMIT_DELAY_MS = 1_200L
