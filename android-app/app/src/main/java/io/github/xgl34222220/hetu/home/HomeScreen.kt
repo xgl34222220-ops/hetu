@@ -444,7 +444,8 @@ private fun RowScope.ControlAction(
     ) {
         if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
         Text(text, color = tint, style = HomeType.control, maxLines = 1)
-        if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
+        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
+        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
     }
 }
 

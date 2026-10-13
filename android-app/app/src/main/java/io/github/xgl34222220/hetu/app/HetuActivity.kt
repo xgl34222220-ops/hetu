@@ -660,7 +660,9 @@ internal fun hxToastTone(message: String): HxTone = when {
 @Composable
 private fun HxToast(message: String, tone: HxTone = hxToastTone(message), onDismiss: () -> Unit, onExpand: (String) -> Unit = {}) {
     val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
-    var drag by remember { mutableStateOf(0f) }
+    // A new message starts unflicked; a released flick that does not dismiss springs back.
+    var drag by remember(message) { mutableStateOf(0f) }
+    val toastMotion = LocalHetuMotionEnabled.current
     val shape = RoundedCornerShape(50)
     var cut by remember(message) { mutableStateOf(false) }
     Row(
@@ -676,6 +678,8 @@ private fun HxToast(message: String, tone: HxTone = hxToastTone(message), onDism
                 onDragStopped = { velocity ->
                     if (drag > 36f || velocity > 900f) {
                         onDismiss()
+                    } else if (toastMotion && drag != 0f) {
+                        androidx.compose.animation.core.animate(drag, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = 520f)) { v, _ -> drag = v }
                     } else {
                         drag = 0f
                     }

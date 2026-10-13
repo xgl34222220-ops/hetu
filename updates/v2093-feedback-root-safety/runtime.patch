@@ -59337,7 +59337,7 @@ index e4053e5..72b8798 100644
      }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
-index e16a145..edac26a 100644
+index e16a145..02ae98f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 @@ -1,5 +1,6 @@
@@ -59356,6 +59356,24 @@ index e16a145..edac26a 100644
              .hxPressScale(source, .94f)
              .heightIn(min = 40.dp)
              .clip(Hx.pillShape)
+@@ -132,7 +135,7 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
+     if (list.isEmpty()) {
+         item(key = "log-empty") {
+             if (vm.logsLoading && vm.logEntries.isEmpty()) {
+-                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
++                HxSkeletonRows(count = 4)
+             } else HxEmpty(Icons.Rounded.Article, if (vm.logEntries.isEmpty()) "暂无日志" else "没有匹配的日志")
+         }
+     }
+@@ -143,7 +146,7 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
+         val shape = RoundedCornerShape(22.dp)
+         Column(
+             Modifier
+-                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
++                .then(hxAnimateItem())
+                 .fillMaxWidth()
+                 .padding(horizontal = Hx.gutter)
+                 .padding(bottom = 9.dp)
 @@ -209,6 +212,56 @@ internal class RankState(dimension: String, sort: String) {
      var sort by mutableStateOf(sort)
      var historical by mutableStateOf(false)
@@ -59574,6 +59592,15 @@ index e16a145..edac26a 100644
      if (rows.isEmpty()) {
          item(key = "rank-empty") { HxEmpty(Icons.Rounded.QueryStats, if (rank.historical) "暂无已采集的历史" else "暂无实时连接") }
      }
+@@ -268,7 +412,7 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
+         val value = if (rank.sort == "traffic") row.upload + row.download else row.connections.toLong()
+         Column(
+             Modifier
+-                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
++                .then(hxAnimateItem())
+                 .fillMaxWidth()
+                 .padding(horizontal = Hx.gutter)
+                 .padding(bottom = 6.dp)
 @@ -309,4 +453,44 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
              )
          }
@@ -59620,7 +59647,7 @@ index e16a145..edac26a 100644
 +    }
  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
-index 4722bed..075399f 100644
+index 4722bed..812986e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt
 @@ -69,6 +69,8 @@ import androidx.compose.ui.unit.sp
@@ -59694,7 +59721,44 @@ index 4722bed..075399f 100644
      val actualMode = vm.state.trafficMode.lowercase()
      val wrongMode = running && enabled && actualMode in listOf("global", "direct")
      val snapshot = rules
-@@ -280,9 +304,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+@@ -194,14 +218,21 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+                     val tint by animateColorAsState(if (wrongMode) c.warn else if (effective) c.good else if (enabled) c.warn else c.textFaint, tween(HxMotion.Medium), label = "shield")
+                     Row(verticalAlignment = Alignment.CenterVertically) {
+                         // While actively protecting, a soft ring breathes around the shield.
+-                        val breathing = rememberInfiniteTransition(label = "shieldBreath")
+-                        val breath by breathing.animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
+-                        val haloStrength by animateFloatAsState(if (effective && !wrongMode) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
++                        // The breath is a frame loop: it exists only while the halo shows and motion is allowed
++                        // (system 「移除动画」 / power saving → a still halo), and is read in the layer only.
++                        val shieldMotion = hxMotion()
++                        val breathState = if (hxAmbientAllowed(shieldMotion, effective && !wrongMode)) {
++                            rememberInfiniteTransition(label = "shieldBreath")
++                                .animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
++                        } else null
++                        val haloStrength by animateFloatAsState(if (effective && !wrongMode) 1f else 0f,
++                            if (shieldMotion) tween(HxMotion.Long) else androidx.compose.animation.core.snap(), label = "shieldHalo")
+                         Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
+                             Box(
+                                 Modifier
+                                     .size(76.dp)
+                                     .graphicsLayer {
++                                        val breath = breathState?.value ?: 0f
+                                         val s = 1f + .12f * breath * haloStrength
+                                         scaleX = s
+                                         scaleY = s
+@@ -229,7 +260,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+                                     effective -> "保护中"
+                                     else -> "正在验证"
+                                 },
+-                                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
++                                transitionSpec = {
++                                    if (shieldMotion) fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short)))
++                                    else androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
++                                },
+                                 label = "adblockTitle",
+                             ) { title ->
+                                 Text(title, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = tint)
+@@ -280,9 +314,27 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                      HxDivider(44.dp)
                      VerifyRow("启动配置注入", injected, when (injected) { true -> "hetu-adblock 已写入运行副本"; false -> "当前运行副本没有广告规则"; null -> "代理启动后检测" }, successColorOverride = verificationSuccessColor)
                      HxDivider(44.dp)
@@ -59724,7 +59788,17 @@ index 4722bed..075399f 100644
                  }
              }
          }
-@@ -504,7 +546,8 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
+@@ -358,7 +410,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
+                         }
+                     }
+                     val sources = snapshot?.sources.orEmpty()
+-                    if (sources.isEmpty()) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
++                    // Sources still loading: placeholder rows in the card's own shape instead of a spinner.
++                    if (sources.isEmpty()) HxSkeletonLines(count = 3, rowHeight = 52.dp, icon = false)
+                     sources.forEachIndexed { index, source ->
+                         if (index > 0) HxDivider(16.dp)
+                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+@@ -504,15 +557,19 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
      }
  }
  @Composable
@@ -59732,9 +59806,22 @@ index 4722bed..075399f 100644
 +private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null,
 +    trailing: (@Composable () -> Unit)? = null) {
      val c = Hx.colors
-     val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
+-    val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
++    val verifyMotion = hxMotion()
++    val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint },
++        if (verifyMotion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "verifyTint")
      Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-@@ -528,6 +571,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
+         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
+             AnimatedContent(
+                 targetState = ok,
+                 transitionSpec = {
+-                    (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f)).togetherWith(fadeOut(tween(100)))
++                    if (verifyMotion) (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f)).togetherWith(fadeOut(tween(100)))
++                    else androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
+                 },
+                 label = "verifyIcon",
+             ) { state ->
+@@ -528,6 +585,10 @@ private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse:
              Text(label, fontSize = 16.sp, lineHeight = 20.sp, fontWeight = FontWeight.SemiBold, color = c.text)
              Text(detail, fontSize = 14.sp, lineHeight = 18.sp, color = c.textMuted)
          }
@@ -60092,7 +60179,7 @@ index 0000000..b779c0c
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
-index 63c8e03..1e31244 100644
+index 63c8e03..2457f83 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt
 @@ -99,11 +99,10 @@ import io.github.xgl34222220.hetu.tools.ToolsIcons
@@ -60139,7 +60226,17 @@ index 63c8e03..1e31244 100644
              form = null
          }
          return
-@@ -353,7 +352,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -208,7 +207,8 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
+             HxSection {
+                 HxGroup(title = ht("配置管理")) {
+                     if (loading && configs.isEmpty()) {
+-                        Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
++                        // First read: rows in the shape of config entries instead of a spinner.
++                        HxSkeletonLines(count = 3)
+                     }
+                     configs.forEach { config ->
+                         // Tap to make it the current config; hold, or use ···, for everything else.
+@@ -353,7 +353,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
                  else vm.controller.updateSubscription(subscription.name, url.trim())
                  onSaved()
              } catch (cancel: CancellationException) { throw cancel }
@@ -60148,7 +60245,7 @@ index 63c8e03..1e31244 100644
              finally { busy = false }
          }
      }
-@@ -387,7 +386,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
+@@ -387,7 +387,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
  }
 
  @Composable
@@ -60157,7 +60254,7 @@ index 63c8e03..1e31244 100644
      val context = LocalContext.current
      val c = LocalHomeColors.current
      val scope = rememberCoroutineScope()
-@@ -395,28 +394,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -395,28 +395,59 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
      var uri by remember { mutableStateOf<Uri?>(null) }
      var fileName by remember { mutableStateOf("") }
      var url by remember { mutableStateOf("") }
@@ -60223,7 +60320,7 @@ index 63c8e03..1e31244 100644
              finally { busy = false }
          }
      }
-@@ -425,10 +455,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -425,10 +456,10 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
          item("mode") {
              HxSection {
                  HomeSegmented(
@@ -60236,7 +60333,7 @@ index 63c8e03..1e31244 100644
                  )
              }
          }
-@@ -443,6 +473,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -443,6 +474,39 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                          )
                          Spacer(Modifier.height(22.dp))
                          HomeFormField("配置名称（可选）", name, { name = it; problem = null }, placeholder = "例如 旅行.yaml", enabled = !busy)
@@ -60276,7 +60373,7 @@ index 63c8e03..1e31244 100644
                      } else {
                          Text(ht("配置文件"), Modifier.padding(horizontal = 2.dp), color = c.t1, style = HomeType.cardLabel)
                          Spacer(Modifier.height(8.dp))
-@@ -475,7 +538,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
+@@ -475,7 +539,7 @@ private fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                      }
                      Row(Modifier.padding(top = 18.dp), verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                          Icon(HomeIcons.Info, null, Modifier.padding(top = 1.dp).size(18.dp), tint = c.t3)
@@ -60285,7 +60382,7 @@ index 63c8e03..1e31244 100644
                      }
                      HomeReveal(problem != null) { HxBanner(problem.orEmpty(), HxTone.Bad, Modifier.padding(top = 14.dp)) }
                  }
-@@ -532,46 +595,6 @@ private fun normalizeConfigName(raw: String): String {
+@@ -532,46 +596,6 @@ private fun normalizeConfigName(raw: String): String {
      return name
  }
 
@@ -60332,7 +60429,7 @@ index 63c8e03..1e31244 100644
  /* ------------------------------------------------------------------ */
  /*  Providers (live subscription usage)                                 */
  /* ------------------------------------------------------------------ */
-@@ -634,18 +657,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
+@@ -634,18 +658,32 @@ class ProxyConfigEditorActivity : ComponentActivity() {
 
  private data class HxConfigSource(val core: ProxyRuntimeProfile.Core, val name: String, val text: String)
 
@@ -60368,7 +60465,7 @@ index 63c8e03..1e31244 100644
      val nav = if (onBackOverride == null) LocalNav.current else null
      val context = LocalContext.current
      val scope = rememberCoroutineScope()
-@@ -663,6 +700,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -663,6 +701,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      var confirmLeave by remember { mutableStateOf(false) }
      var confirmReload by remember { mutableStateOf(false) }
      var showOutline by remember { mutableStateOf(false) }
@@ -60377,7 +60474,7 @@ index 63c8e03..1e31244 100644
      val haptics = io.github.xgl34222220.hetu.ui.rememberHetuHaptics()
      val editorColors = remember(c.dark, c.surface) {
          HetuYamlLanguage.colors(if (c.dark) SchemeDarcula() else SchemeGitHub(), c.dark).apply {
-@@ -678,11 +717,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -678,11 +718,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          loadFailure = null
          source = null
          try {
@@ -60391,7 +60488,7 @@ index 63c8e03..1e31244 100644
          finally { loading = false }
      }
 
-@@ -705,7 +744,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -705,7 +745,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                  val expected = source
                  if (expected != null && !loading && !saving) scope.launch {
                      try {
@@ -60400,7 +60497,7 @@ index 63c8e03..1e31244 100644
                          if (latest.core != expected.core || latest.name != expected.name)
                              conflict = HxConfigSourceConflict(true, latest.name)
                          else if (latest.text != expected.text) conflict = HxConfigSourceConflict(false, latest.name)
-@@ -734,29 +773,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -734,29 +774,69 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          val expected = source ?: return
          val current = editor?.text?.toString() ?: return
          if (saving || validating) return
@@ -60484,7 +60581,7 @@ index 63c8e03..1e31244 100644
              finally { saving = false }
          }
      }
-@@ -765,8 +844,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -765,8 +845,11 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
      Column(Modifier.fillMaxSize().homeDiffuseCanvas().statusBarsPadding().navigationBarsPadding().imePadding()) {
          Box(Modifier.fillMaxWidth().height(HxTopBarHeight).padding(horizontal = 6.dp)) {
              HomeIconButton(HomeIcons.ChevronLeft, "返回", ::leave, Modifier.align(Alignment.CenterStart), glyph = 26.dp)
@@ -60498,7 +60595,7 @@ index 63c8e03..1e31244 100644
                  HomeIcons.Save, "保存", ::save, Modifier.align(Alignment.CenterEnd),
                  enabled = dirty && !saving && !validating, loading = saving, tint = if (dirty) c.accent else c.t3,
              )
-@@ -775,7 +857,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -775,7 +858,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
          Box(Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
              HomeRowLayout(
                  AnnotatedString(source?.name ?: ht("读取配置")),
@@ -60507,7 +60604,7 @@ index 63c8e03..1e31244 100644
                  icon = ToolsIcons.FileCog,
                  iconTint = if (source == null) c.t3 else c.t1,
                  subtitleColor = if (dirty) c.warnText else c.t2,
-@@ -786,8 +868,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -786,8 +869,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
              Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter, vertical = 10.dp).clip(HomeDims.cardShape).background(c.surface).padding(horizontal = 4.dp),
              verticalAlignment = Alignment.CenterVertically,
          ) {
@@ -60518,7 +60615,17 @@ index 63c8e03..1e31244 100644
              ConfigEditorAction(PanelIcons.ListTree, "语法大纲", Modifier.weight(1f), ready) { showOutline = true }
              ConfigEditorAction(HomeIcons.CircleCheck, "校验", Modifier.weight(1f), ready && !validating, validating, ::validate)
          }
-@@ -811,7 +893,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -799,7 +882,8 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+         Box(Modifier.weight(1f).fillMaxWidth().padding(horizontal = HomeDims.gutter).clip(HomeDims.cardShape).background(c.surface)) {
+             val initial = source
+             when {
+-                loading -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
++                // Reading the file: quiet code-line placeholders in the editor card instead of a spinner.
++                loading -> HxSkeletonLines(count = 6, modifier = Modifier.padding(top = 8.dp), rowHeight = 48.dp, icon = false)
+                 loadFailure != null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                     HomeEmptyState(HomeIcons.CircleAlert, "配置读取失败", loadFailure.orEmpty(), topPadding = 0.dp, verbatimSubtitle = true) {
+                         HxButton("重新读取", { loadRevision++ }, icon = HomeIcons.RefreshCw)
+@@ -811,7 +895,7 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                              CodeEditor(viewContext).apply {
                                  setEditorLanguage(HetuYamlLanguage())
                                  setText(initial.text)
@@ -60527,7 +60634,7 @@ index 63c8e03..1e31244 100644
                                  setSoftKeyboardEnabled(true)
                                  typefaceText = Typeface.MONOSPACE
                                  setTextSize(14f)
-@@ -829,14 +911,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
+@@ -829,14 +913,17 @@ internal fun ConfigEditorScreen(vm: HetuViewModel, onBackOverride: (() -> Unit)?
                              }
                          },
                          modifier = Modifier.fillMaxSize().padding(vertical = 10.dp),
@@ -60843,7 +60950,7 @@ index 0000000..4bae890
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..77fb6fc 100644
+index 2b1a624..2c5d41d 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -61312,7 +61419,7 @@ index 2b1a624..77fb6fc 100644
                  }
              }
          }
-@@ -544,15 +653,19 @@ internal fun hxToastTone(message: String): HxTone = when {
+@@ -544,15 +653,21 @@ internal fun hxToastTone(message: String): HxTone = when {
      else -> HxTone.Neutral
  }
 
@@ -61326,7 +61433,10 @@ index 2b1a624..77fb6fc 100644
 +private fun HxToast(message: String, tone: HxTone = hxToastTone(message), onDismiss: () -> Unit, onExpand: (String) -> Unit = {}) {
      val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
 -    val tone = hxToastTone(message)
-     var drag by remember { mutableStateOf(0f) }
+-    var drag by remember { mutableStateOf(0f) }
++    // A new message starts unflicked; a released flick that does not dismiss springs back.
++    var drag by remember(message) { mutableStateOf(0f) }
++    val toastMotion = LocalHetuMotionEnabled.current
      val shape = RoundedCornerShape(50)
 +    var cut by remember(message) { mutableStateOf(false) }
      Row(
@@ -61335,7 +61445,14 @@ index 2b1a624..77fb6fc 100644
              .graphicsLayer {
                  translationY = drag
                  alpha = (1f - drag / 160f).coerceIn(0f, 1f)
-@@ -568,7 +681,7 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -563,12 +678,14 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+                 onDragStopped = { velocity ->
+                     if (drag > 36f || velocity > 900f) {
+                         onDismiss()
++                    } else if (toastMotion && drag != 0f) {
++                        androidx.compose.animation.core.animate(drag, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = 520f)) { v, _ -> drag = v }
+                     } else {
+                         drag = 0f
                      }
                  },
              )
@@ -61344,7 +61461,7 @@ index 2b1a624..77fb6fc 100644
              .homeGlassPanel(shape, c.raised, raised = true)
              .heightIn(min = 48.dp)
              .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
-@@ -588,6 +701,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+@@ -588,6 +705,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
              )
          }
          Spacer(Modifier.width(10.dp))
@@ -62695,7 +62812,7 @@ index d5a6fcd..02d88a1 100644
 
  @Composable
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
-index e337597..13067ef 100644
+index e337597..97aaad6 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxComponents.kt
 @@ -271,8 +271,8 @@ internal fun HxPage(
@@ -62709,7 +62826,18 @@ index e337597..13067ef 100644
 
      val stagger = rememberHomeStagger()
      val entrance = remember(stagger) { HxEntrance(stagger) }
-@@ -1203,3 +1203,20 @@ internal fun HxTextField(
+@@ -466,7 +466,9 @@ private fun HxEmbeddedPage(
+ @Composable
+ internal fun Modifier.hxPressScale(source: MutableInteractionSource, pressedScale: Float = .975f): Modifier {
+     val pressed by source.collectIsPressedAsState()
+-    val scale by animateFloatAsState(if (pressed) pressedScale else 1f, HomeMotion.glide(LocalHomeMotionEnabled.current), label = "press")
++    val motion = LocalHomeMotionEnabled.current
++    // With motion off the surface does not dip at all (the ripple/tint still marks the press).
++    val scale by animateFloatAsState(if (pressed && motion) pressedScale else 1f, HomeMotion.glide(motion), label = "press")
+     return this.graphicsLayer { scaleX = scale; scaleY = scale }
+ }
+
+@@ -1203,3 +1205,20 @@ internal fun HxTextField(
          )
      }
  }
@@ -62837,19 +62965,164 @@ index 9429d88..6cac84b 100644
          "m16 16-3 3 3 3",
          "M3 12h14.5a1 1 0 0 1 0 7H13",
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
-index 241408e..5d22844 100644
+index 241408e..99a599e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
-@@ -272,7 +272,7 @@ internal fun HxDock(
+@@ -69,6 +69,7 @@ import androidx.compose.runtime.staticCompositionLocalOf
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.draw.clip
++import androidx.compose.ui.draw.drawWithContent
+ import androidx.compose.ui.draw.shadow
+ import androidx.compose.ui.geometry.Offset
+ import androidx.compose.ui.graphics.Brush
+@@ -94,6 +95,18 @@ import kotlinx.coroutines.delay
+ /** Whether frosted-glass bars are drawn (user switch 「模糊效果」). */
+ internal val LocalHxBlur = staticCompositionLocalOf { true }
+
++/**
++ * The one motion switch every helper here reads: false when the system animator duration
++ * scale is 0 (「移除动画」), the in-app 动画 switch is off, or power saving / low-RAM degrades
++ * the UI ([HetuAppTheme] folds all three into [io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled]).
++ * With it false every helper renders its final state at once and starts no frame loop.
++ */
++@Composable
++internal fun hxMotion(): Boolean = io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled.current
++
++/** Whether a perpetual (ambient) animation may run: only while it is visibly active and motion is allowed. */
++internal fun hxAmbientAllowed(motion: Boolean, active: Boolean): Boolean = motion && active
++
+ /* ------------------------------------------------------------------ */
+ /*  Depth                                                               */
+ /* ------------------------------------------------------------------ */
+@@ -124,7 +137,9 @@ internal class HxStagger(played: Boolean) {
+ @Composable
+ internal fun rememberHxStagger(): HxStagger {
+     val saved = rememberSaveable { mutableStateOf(false) }
+-    val stagger = remember { HxStagger(saved.value) }
++    // With motion off (system 「移除动画」, the in-app switch, power saving) nothing ever rises.
++    val motion = hxMotion()
++    val stagger = remember { HxStagger(saved.value || !motion) }
+     LaunchedEffect(Unit) {
+         delay(900)
+         stagger.played = true
+@@ -135,7 +150,7 @@ internal fun rememberHxStagger(): HxStagger {
+
+ @Composable
+ internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
+-    if (stagger.played) return this
++    if (stagger.played || !hxMotion()) return this
+     val progress = remember { Animatable(0f) }
+     LaunchedEffect(Unit) {
+         delay(40L * index.coerceAtMost(8))
+@@ -158,6 +173,8 @@ internal fun Modifier.hxEnter(stagger: HxStagger, index: Int): Modifier {
+ /** Each digit rolls up or down to its new value, like an odometer. */
+ @Composable
+ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifier: Modifier = Modifier) {
++    // Same nodes with motion on or off (tests and TalkBack read one tree); only the specs change.
++    val motion = hxMotion()
+     Row(modifier) {
+         val length = text.length
+         text.forEachIndexed { index, char ->
+@@ -165,7 +182,10 @@ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifie
+                 AnimatedContent(
+                     targetState = char,
+                     transitionSpec = {
+-                        if (initialState.isDigit() && targetState.isDigit()) {
++                        if (!motion) {
++                            androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
++                                .using(SizeTransform(clip = true) { _, _ -> androidx.compose.animation.core.snap() })
++                        } else if (initialState.isDigit() && targetState.isDigit()) {
+                             val up = targetState > initialState
+                             (slideInVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { h -> if (up) h else -h } + fadeIn(tween(HxMotion.Medium)))
+                                 .togetherWith(slideOutVertically(tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { h -> if (up) -h else h } + fadeOut(tween(HxMotion.Short)))
+@@ -190,6 +210,7 @@ internal fun HxRollingText(text: String, style: TextStyle, color: Color, modifie
+ @Composable
+ internal fun rememberHxShimmer(): Brush {
+     val c = Hx.colors
++    if (!hxMotion()) return Brush.linearGradient(listOf(c.surfaceMuted, c.surfaceMuted))
+     val transition = rememberInfiniteTransition(label = "shimmer")
+     val x by transition.animateFloat(
+         initialValue = -1f,
+@@ -267,12 +288,13 @@ internal fun HxDock(
+     // Liquid pill: the edge facing the destination leads, the other trails, so the pill
+     // stretches across and settles back into one slot.
+     val forward = rememberHxDirection(index)
+-    val lead = spring<Dp>(dampingRatio = .8f, stiffness = 620f)
+-    val trail = spring<Dp>(dampingRatio = .82f, stiffness = 230f)
++    val motion = hxMotion()
++    val lead: androidx.compose.animation.core.AnimationSpec<Dp> = if (motion) spring(dampingRatio = .8f, stiffness = 620f) else androidx.compose.animation.core.snap()
++    val trail: androidx.compose.animation.core.AnimationSpec<Dp> = if (motion) spring(dampingRatio = .82f, stiffness = 230f) else androidx.compose.animation.core.snap()
      val indicatorLeft by animateDpAsState(itemWidth * index, if (forward) trail else lead, label = "dockLeft")
      val indicatorRight by animateDpAsState(itemWidth * (index + 1), if (forward) lead else trail, label = "dockRight")
-     val hide by animateFloatAsState(if (visible) 0f else 1f, spring(dampingRatio = .9f, stiffness = 380f), label = "dockHide")
+-    val hide by animateFloatAsState(if (visible) 0f else 1f, spring(dampingRatio = .9f, stiffness = 380f), label = "dockHide")
 -    val blur = LocalHxBlur.current && hazeState != null
++    val hide by animateFloatAsState(if (visible) 0f else 1f, if (motion) spring(dampingRatio = .9f, stiffness = 380f) else androidx.compose.animation.core.snap(), label = "dockHide")
 +    val blur = LocalHxBlur.current && io.github.xgl34222220.hetu.ui.LocalHetuGlassEffectsEnabled.current && hazeState != null
      Box(
          modifier
              .graphicsLayer {
-@@ -427,9 +427,6 @@ internal fun rememberHxAurora(active: Boolean): Brush {
+@@ -331,10 +353,10 @@ internal fun HxDock(
+         Row(Modifier.fillMaxSize()) {
+             items.forEach { item ->
+                 val active = item.key == selected
+-                val tint by animateColorAsState(if (active) c.accent else c.text.copy(alpha = .92f), tween(HxMotion.Medium), label = "dockTint")
++                val tint by animateColorAsState(if (active) c.accent else c.text.copy(alpha = .92f), if (motion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "dockTint")
+                 val bounce = remember { Animatable(1f) }
+                 LaunchedEffect(active) {
+-                    if (active) {
++                    if (active && motion) {
+                         bounce.snapTo(.90f)
+                         bounce.animateTo(1f, spring(dampingRatio = .45f, stiffness = Spring.StiffnessMedium))
+                     }
+@@ -383,13 +405,23 @@ internal fun HxDock(
+  */
+ @Composable
+ internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifier: Modifier = Modifier) {
+-    val transition = rememberInfiniteTransition(label = "ring")
+-    val angle by transition.animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "ringAngle")
+-    val breath by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "ringBreath")
+-    val busyAlpha by animateFloatAsState(if (busy) 1f else 0f, tween(HxMotion.Medium), label = "busyAlpha")
+-    val haloAlpha by animateFloatAsState(if (breathing && !busy) 1f else 0f, tween(HxMotion.Long), label = "haloAlpha")
++    val motion = hxMotion()
++    // Perpetual values exist only while something moves; at rest (or with motion off) the
++    // ring asks for no frames at all. They are read in the draw phase only.
++    val spinning = motion && busy
++    val breathingNow = motion && breathing && !busy
++    val angleState = if (spinning) {
++        rememberInfiniteTransition(label = "ring").animateFloat(0f, 360f, infiniteRepeatable(tween(1100, easing = LinearEasing)), label = "ringAngle")
++    } else null
++    val breathState = if (breathingNow) {
++        rememberInfiniteTransition(label = "ringHalo").animateFloat(0f, 1f, infiniteRepeatable(tween(2400), RepeatMode.Reverse), label = "ringBreath")
++    } else null
++    val busyAlpha by animateFloatAsState(if (busy) 1f else 0f, if (motion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "busyAlpha")
++    val haloAlpha by animateFloatAsState(if (breathing && !busy) 1f else 0f, if (motion) tween(HxMotion.Long) else androidx.compose.animation.core.snap(), label = "haloAlpha")
+     androidx.compose.foundation.Canvas(modifier) {
+         val stroke = 3.dp.toPx()
++        val angle = angleState?.value ?: -90f
++        val breath = breathState?.value ?: 0f
+         if (haloAlpha > 0f) {
+             val grow = 1f + breath * .08f
+             drawCircle(
+@@ -415,9 +447,14 @@ internal fun HxPowerRing(busy: Boolean, breathing: Boolean, color: Color, modifi
+ @Composable
+ internal fun rememberHxAurora(active: Boolean): Brush {
+     val c = Hx.colors
+-    val transition = rememberInfiniteTransition(label = "aurora")
+-    val t by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "auroraT")
+-    val strength by animateFloatAsState(if (active) 1f else 0f, tween(700), label = "auroraStrength")
++    val motion = hxMotion()
++    // The drift runs only while the wash is shown and motion is allowed; otherwise it rests mid-way.
++    val t = if (motion && active) {
++        val transition = rememberInfiniteTransition(label = "aurora")
++        val drift by transition.animateFloat(0f, 1f, infiniteRepeatable(tween(9000, easing = LinearEasing), RepeatMode.Reverse), label = "auroraT")
++        drift
++    } else .5f
++    val strength by animateFloatAsState(if (active) 1f else 0f, if (motion) tween(700) else androidx.compose.animation.core.snap(), label = "auroraStrength")
+     val a = c.accentSoft.copy(alpha = .9f * strength)
+     val b = c.goodSoft.copy(alpha = .55f * strength)
+     return Brush.linearGradient(
+@@ -427,9 +464,6 @@ internal fun rememberHxAurora(active: Boolean): Brush {
      )
  }
 
@@ -62859,6 +63132,182 @@ index 241408e..5d22844 100644
  /* ------------------------------------------------------------------ */
  /*  Interaction helpers                                                 */
  /* ------------------------------------------------------------------ */
+@@ -496,18 +530,22 @@ internal fun HxSwipeAction(
+     val actionTint by animateColorAsState(if (armed) Color.White else c.bad, tween(HxMotion.Short), label = "swipeTint")
+     val actionBg by animateColorAsState(if (armed) c.bad else c.badSoft, tween(HxMotion.Short), label = "swipeBg")
+
++    val motion = hxMotion()
+     suspend fun settle(velocity: Float) {
+         if (armed || velocity < -2600f) {
+             haptics.perform(HetuHaptic.Confirm)
+-            animate(offset, -widthPx.toFloat(), animationSpec = tween(HxMotion.Short, easing = HxMotion.Exit)) { v, _ -> offset = v }
++            if (motion) animate(offset, -widthPx.toFloat(), animationSpec = tween(HxMotion.Short, easing = HxMotion.Exit)) { v, _ -> offset = v }
++            else offset = -widthPx.toFloat()
+             armed = false
+             onAction()
+             // Normally the row is gone by now; if the action failed, bring it back.
+             delay(1400)
+-            animate(offset, 0f, animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
++            if (motion) animate(offset, 0f, animationSpec = spring(dampingRatio = .8f, stiffness = Spring.StiffnessMediumLow)) { v, _ -> offset = v }
++            else offset = 0f
+         } else {
+             armed = false
+-            animate(offset, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = Spring.StiffnessMedium)) { v, _ -> offset = v }
++            if (motion) animate(offset, 0f, animationSpec = spring(dampingRatio = .7f, stiffness = Spring.StiffnessMedium)) { v, _ -> offset = v }
++            else offset = 0f
+         }
+     }
+
+@@ -575,3 +613,149 @@ internal fun HxSwipeAction(
+         ) { content() }
+     }
+ }
++
++/* ------------------------------------------------------------------ */
++/*  Motion pass 2026-10: shared, motion-aware building blocks           */
++/* ------------------------------------------------------------------ */
++
++/**
++ * Inline banners, form errors and "unsaved changes" rows that come and go inside a list item.
++ * Expands from the top and fades (enter 220 ms / exit 140 ms on the calm glide spring);
++ * with motion off it appears and disappears in the same frame. The content itself is the
++ * same node either way.
++ */
++@Composable
++internal fun HxVisibility(
++    visible: Boolean,
++    modifier: Modifier = Modifier,
++    content: @Composable () -> Unit,
++) {
++    val motion = hxMotion()
++    androidx.compose.animation.AnimatedVisibility(
++        visible = visible,
++        modifier = modifier,
++        enter = if (motion) {
++            androidx.compose.animation.expandVertically(spring(dampingRatio = .86f, stiffness = 420f), expandFrom = Alignment.Top) +
++                fadeIn(tween(220, easing = HxMotion.Emphasized))
++        } else androidx.compose.animation.EnterTransition.None,
++        exit = if (motion) {
++            androidx.compose.animation.shrinkVertically(spring(dampingRatio = .9f, stiffness = 520f), shrinkTowards = Alignment.Top) +
++                fadeOut(tween(140, easing = HxMotion.Exit))
++        } else androidx.compose.animation.ExitTransition.None,
++        label = "hx-visibility",
++    ) { content() }
++}
++
++/**
++ * Hierarchical content swap (folders, nested pickers): deeper slides in from the right a third
++ * of the width while the old level drifts a sixth the other way; going up mirrors it.
++ * [motion] false → instant swap.
++ */
++internal fun hxHierarchyTransition(deeper: Boolean, motion: Boolean): androidx.compose.animation.ContentTransform {
++    if (!motion) return androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
++    return (androidx.compose.animation.slideInHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) w / 3 else -w / 3 } +
++        fadeIn(tween(HxMotion.Medium)))
++        .togetherWith(
++            androidx.compose.animation.slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) -w / 6 else w / 6 } +
++                fadeOut(tween(HxMotion.Short)),
++        )
++}
++
++/** Width of the [index]th placeholder bar of a skeleton row, so a stack of rows reads as text, not stripes. */
++internal fun hxSkeletonWidth(index: Int, secondLine: Boolean): Float =
++    if (secondLine) (if (index % 2 == 0) .34f else .42f)
++    else when (index % 3) { 0 -> .62f; 1 -> .5f; else -> .7f }
++
++/**
++ * Placeholder rows for a list that is loading inside an existing card or group (configs, rule
++ * sources, the editor). Bars in the shape of an icon and two lines of text, under one slow light
++ * sweep. The sweep is a single infinite transition read in the draw phase only, so it never
++ * recomposes; with motion off the bars are static. Carries no text, so nothing a test or
++ * TalkBack looks for changes while it shows.
++ */
++@Composable
++internal fun HxSkeletonLines(
++    count: Int = 3,
++    modifier: Modifier = Modifier,
++    rowHeight: Dp = 60.dp,
++    icon: Boolean = true,
++) {
++    val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
++    val bar = if (c.dark) Color.White.copy(alpha = .07f) else c.sunken
++    val glow = if (c.dark) Color.White.copy(alpha = .05f) else c.surface.copy(alpha = .9f)
++    val shift = if (hxMotion()) {
++        rememberInfiniteTransition(label = "hx-skeleton").animateFloat(
++            initialValue = -1f,
++            targetValue = 2f,
++            animationSpec = infiniteRepeatable(tween(1500, easing = LinearEasing), RepeatMode.Restart),
++            label = "hx-skeleton-shift",
++        )
++    } else null
++    Column(
++        modifier
++            .fillMaxWidth()
++            .padding(vertical = 4.dp)
++            .hxSkeletonSweep(shift, glow),
++    ) {
++        repeat(count.coerceAtLeast(1)) { i ->
++            Row(
++                Modifier.fillMaxWidth().height(rowHeight).padding(horizontal = 18.dp),
++                verticalAlignment = Alignment.CenterVertically,
++            ) {
++                if (icon) {
++                    Box(Modifier.size(26.dp).clip(RoundedCornerShape(8.dp)).background(bar))
++                    Spacer(Modifier.width(20.dp))
++                }
++                Column(Modifier.weight(1f)) {
++                    Box(Modifier.fillMaxWidth(hxSkeletonWidth(i, false)).height(13.dp).clip(Hx.pillShape).background(bar))
++                    Spacer(Modifier.height(9.dp))
++                    Box(Modifier.fillMaxWidth(hxSkeletonWidth(i, true)).height(10.dp).clip(Hx.pillShape).background(bar))
++                }
++            }
++        }
++    }
++}
++
++/** Draws the skeleton's light band over the bars; reads [shift] only while drawing. */
++private fun Modifier.hxSkeletonSweep(shift: androidx.compose.runtime.State<Float>?, glow: Color): Modifier =
++    if (shift == null) this else this.drawWithContent {
++        drawContent()
++        val band = size.width * .6f
++        val x = shift.value * size.width
++        drawRect(
++            brush = Brush.horizontalGradient(
++                colors = listOf(Color.Transparent, glow, Color.Transparent),
++                startX = x - band / 2f,
++                endX = x + band / 2f,
++            ),
++        )
++    }
++
++/**
++ * A small piece (busy ring, badge, check) that pops in when it is first composed: from
++ * [initialScale] and transparent to rest on a lightly overshooting spring, draw phase only.
++ * Leaves immediately. With [motion] false it is a no-op modifier.
++ */
++@Composable
++internal fun hxPopIn(motion: Boolean = hxMotion(), initialScale: Float = .6f): Modifier {
++    if (!motion) return Modifier
++    val progress = remember { Animatable(0f) }
++    LaunchedEffect(Unit) { progress.animateTo(1f, spring(dampingRatio = .62f, stiffness = 520f)) }
++    return Modifier.graphicsLayer {
++        val p = progress.value
++        alpha = p.coerceIn(0f, 1f)
++        val s = initialScale + (1f - initialScale) * p
++        scaleX = s
++        scaleY = s
++    }
++}
++
++/**
++ * Lazy-list rows of the Hx pages: inserted rows fade in (260 ms) and survivors glide to their
++ * new slot on the calm spring; removed rows leave at once. With motion off the row is placed
++ * directly, with no item animation node at all.
++ */
++@Composable
++internal fun androidx.compose.foundation.lazy.LazyItemScope.hxAnimateItem(motion: Boolean = hxMotion()): Modifier =
++    if (motion) Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
++    else Modifier
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPollCadence.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxPollCadence.kt
 new file mode 100644
 index 0000000..f3d1e7c
@@ -62916,10 +63365,41 @@ index 0000000..7d49de3
 +    return HxStartFailure.Runtime
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
-index fa7fd9d..30163f0 100644
+index fa7fd9d..b857864 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTabbedPage.kt
-@@ -209,13 +209,13 @@ internal fun HxTabbedPage(
+@@ -181,9 +181,13 @@ internal fun HxTabbedPage(
+     }
+
+     // Selection → pager (chip taps, external changes) and pager → selection (swipes).
++    val tabMotion = hxMotion()
+     LaunchedEffect(selected) {
+         val index = tabs.indexOfFirst { it.key == selected }
+-        if (index >= 0 && index != pagerState.targetPage) pagerState.animateScrollToPage(index)
++        if (index >= 0 && index != pagerState.targetPage) {
++            // With motion off a chip tap jumps straight to its page instead of sweeping across.
++            if (tabMotion) pagerState.animateScrollToPage(index) else pagerState.scrollToPage(index)
++        }
+     }
+     val currentSelected by rememberUpdatedState(selected)
+     val currentOnSelect by rememberUpdatedState(onSelect)
+@@ -200,8 +204,13 @@ internal fun HxTabbedPage(
+     val initialSignal = remember { scrollToTopSignal }
+     LaunchedEffect(scrollToTopSignal) {
+         if (scrollToTopSignal != initialSignal) {
+-            listStates[tabs[pagerState.currentPage].key]?.animateScrollToItem(0)
+-            animate(fold, 0f, animationSpec = tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { v, _ -> fold = v }
++            if (tabMotion) {
++                listStates[tabs[pagerState.currentPage].key]?.animateScrollToItem(0)
++                animate(fold, 0f, animationSpec = tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { v, _ -> fold = v }
++            } else {
++                listStates[tabs[pagerState.currentPage].key]?.scrollToItem(0)
++                fold = 0f
++            }
+         }
+     }
+
+@@ -209,13 +218,13 @@ internal fun HxTabbedPage(
      val visibleHeader = with(density) { (headerHeightPx - fold).coerceAtLeast(0f).toDp() }
      val contentTop = statusTop + topBarHeight + tabsHeight + visibleHeader + (if (panelReferenceStyle) 12.dp else 2.dp)
      val pageCanvas = c.canvas
@@ -65900,9 +66380,36 @@ index b7d3a38..4887afc 100644
                              onDismiss()
                          }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
-index a2928ea..5b9b7ca 100644
+index a2928ea..09aff81 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/RulesScreen.kt
+@@ -170,7 +170,7 @@ private fun LazyListScope.ruleSetItems(vm: HetuViewModel, query: String = "", sh
+             set = set,
+             task = vm.ruleSetTasks[set.name],
+             onUpdate = { vm.updateRuleSet(set.name) },
+-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
++            modifier = Modifier.then(hxAnimateItem()),
+         )
+     }
+ }
+@@ -281,7 +281,7 @@ internal fun LazyListScope.providerListItems(vm: HetuViewModel, query: String =
+             p = p,
+             task = vm.providerTasks[p.name],
+             onUpdate = { vm.updateProvider(p.name) },
+-            modifier = Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null),
++            modifier = Modifier.then(hxAnimateItem()),
+         )
+     }
+ }
+@@ -405,7 +405,7 @@ private fun LazyListScope.ruleItems(vm: HetuViewModel, query: String, showSearch
+         item(key = "rules-empty") { PanelReferenceEmpty(Icons.Rounded.Search, if (vm.rules.isEmpty()) "没有规则" else "没有匹配的规则", if (query.isBlank()) null else "尝试其他关键词", LocalHxEmbed.current?.bottom ?: 0.dp) }
+     }
+     itemsIndexed(list, key = { _, rule -> "r:" + rule.index }) { index, rule ->
+-        Box(Modifier.animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)) {
++        Box(Modifier.then(hxAnimateItem())) {
+             RuleRow(rule, first = index == 0, last = index == list.lastIndex)
+         }
+     }
 @@ -471,48 +471,6 @@ private fun RuleRow(rule: ProxyRuleUi, first: Boolean, last: Boolean) {
 
  /* ---------------------------- shared ---------------------------- */
@@ -65954,7 +66461,7 @@ index a2928ea..5b9b7ca 100644
  internal fun HxSpinningSync(spinning: Boolean, tint: Color, size: Dp = 20.dp) {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt
 new file mode 100644
-index 0000000..b0c70e2
+index 0000000..b398c0b
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsConfigLibrary.kt
 @@ -0,0 +1,180 @@
@@ -66056,7 +66563,7 @@ index 0000000..b0c70e2
 +
 +    SettingsGroup(ht("配置选择")) {
 +        when {
-+            loading && configs.isEmpty() -> Box(Modifier.fillMaxWidth().padding(vertical = 22.dp), contentAlignment = Alignment.Center) { HxSpinner(22.dp) }
++            loading && configs.isEmpty() -> HxSkeletonLines(count = 2)
 +            configs.isEmpty() && ProxyCoreConfig.kind(ProxyRuntimeProfile.load(vm.prefs).core) != ProxyCoreConfig.Kind.MIHOMO ->
 +                // Without a native file the selected Mihomo profile is converted for this core at start.
 +                SettingsRow(ht("尚无该核心的原生配置"), subtitle = ht("启动时自动转换 Mihomo 当前配置；也可在 工具 › 配置管理 导入原生配置"), icon = ToolsIcons.FileText)
@@ -66819,9 +67326,18 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..65274bc 100644
+index b41cf98..36ba975 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
+@@ -207,7 +207,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
+             }
+         }
+         item(key = "error") {
+-            AnimatedVisibility(error != null) {
++            HxVisibility(error != null) {
+                 HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
+             }
+         }
 @@ -238,12 +238,16 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
      var refresh by remember { mutableIntStateOf(0) }
      var loading by remember { mutableStateOf(true) }
@@ -66905,11 +67421,15 @@ index b41cf98..65274bc 100644
                                  icon = Icons.Rounded.Router,
                              )
                          }
-@@ -367,9 +373,23 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
-                 AnimatedVisibility(macError != null) {
+@@ -364,12 +370,26 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         item(key = "macs") {
+             SettingsSection {
+                 HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
+-                AnimatedVisibility(macError != null) {
++                HxVisibility(macError != null) {
                      HxBanner(macError.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(top = 10.dp))
                  }
-+                AnimatedVisibility(macDirty && macError == null) {
++                HxVisibility(macDirty && macError == null) {
 +                    HxBanner("MAC 列表有未保存的修改", tone = HxTone.Warn, actionLabel = "保存", onAction = ::saveMacList, modifier = Modifier.padding(top = 10.dp))
 +                }
              }
@@ -66929,6 +67449,25 @@ index b41cf98..65274bc 100644
  }
 
  /* ------------------------------------------------------------------ */
+@@ -464,14 +484,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
+     }
+     BackHandler(enabled = path != root) { goUp() }
+-    // Folders slide in from the right when going deeper and from the left when going up.
++    // Folders slide in from the right when going deeper and from the left when going up
++    // (instant with motion off).
++    val folderMotion = hxMotion()
+     AnimatedContent(
+         targetState = path,
+-        transitionSpec = {
+-            val deeper = targetState.length > initialState.length
+-            (slideInHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) w / 3 else -w / 3 } + fadeIn(tween(HxMotion.Medium)))
+-                .togetherWith(slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) -w / 6 else w / 6 } + fadeOut(tween(HxMotion.Short)))
+-        },
++        transitionSpec = { hxHierarchyTransition(targetState.length > initialState.length, folderMotion) },
+         label = "folder",
+     ) { shown ->
+         FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/WebViewOverrideEngine.kt
 new file mode 100644
 index 0000000..9e29412
@@ -67559,7 +68098,7 @@ index 0000000..6e10b86
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
-index 448efcc..37d87e7 100644
+index 448efcc..c648e8b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeInteractions.kt
 @@ -5,6 +5,8 @@ import androidx.compose.foundation.layout.BoxScope
@@ -67571,7 +68110,18 @@ index 448efcc..37d87e7 100644
  import androidx.compose.foundation.interaction.MutableInteractionSource
  import androidx.compose.material3.ExperimentalMaterial3Api
  import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-@@ -42,6 +44,23 @@ internal fun Modifier.homeTap(
+@@ -16,6 +18,10 @@ import androidx.compose.runtime.remember
+ import androidx.compose.ui.Alignment
+ import androidx.compose.ui.Modifier
+ import androidx.compose.ui.platform.testTag
++import androidx.compose.foundation.layout.Box
++import androidx.compose.foundation.layout.fillMaxSize
++import androidx.compose.ui.graphics.graphicsLayer
++import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.semantics.CustomAccessibilityAction
+ import androidx.compose.ui.semantics.customActions
+ import androidx.compose.ui.semantics.semantics
+@@ -42,6 +48,23 @@ internal fun Modifier.homeTap(
          .clickable(source, indication = null, enabled = enabled, role = role, onClickLabel = onClickLabel, onClick = onClick)
  }
 
@@ -67595,6 +68145,37 @@ index 448efcc..37d87e7 100644
  /** A real nested-scroll refresh gesture; the caller owns its request and completion state. */
  @OptIn(ExperimentalMaterial3Api::class)
  @Composable
+@@ -55,6 +78,13 @@ internal fun HomeRefreshBox(
+ ) {
+     val state = rememberPullToRefreshState()
+     val colors = LocalHomeColors.current
++    val motion = LocalHomeMotionEnabled.current
++    // The page follows the finger a little while it is pulled (rubber-banded past the trigger
++    // point) and eases back once the refresh starts, so at rest — refreshing or not — nothing
++    // is offset. Both values are read in the layer only: pulling never recomposes the page.
++    val follow = androidx.compose.animation.core.animateFloatAsState(
++        if (refreshing || !motion) 0f else 1f, HomeMotion.glide(motion), label = "home-refresh-follow",
++    )
+     PullToRefreshBox(
+         isRefreshing = refreshing,
+         onRefresh = { if (!refreshing) onRefresh() },
+@@ -74,6 +104,14 @@ internal fun HomeRefreshBox(
+                 color = colors.accent,
+             )
+         },
+-        content = content,
+-    )
++    ) {
++        Box(
++            Modifier.fillMaxSize().graphicsLayer {
++                val f = state.distanceFraction
++                val pull = f.coerceIn(0f, 1f) * 22.dp.toPx() + (f - 1f).coerceAtLeast(0f) * 8.dp.toPx()
++                translationY = pull * follow.value
++            },
++            content = content,
++        )
++    }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
 index 36f72fa..c751c37 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeMaterial.kt
@@ -67811,7 +68392,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..719d789 100644
+index e31ca99..fb2a26b 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
@@ -68009,10 +68590,14 @@ index e31ca99..719d789 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -382,63 +448,6 @@ private fun RowScope.ControlAction(
-     }
- }
-
+@@ -378,64 +444,8 @@ private fun RowScope.ControlAction(
+     ) {
+         if (loading && loadingLeads) HomeSpinner(size = 24.dp, color = color, strokeWidth = 3.dp)
+         Text(text, color = tint, style = HomeType.control, maxLines = 1)
+-        if (loading && !loadingLeads) HomeSpinner(size = 18.dp, color = color, strokeWidth = 2.5.dp)
+-    }
+-}
+-
 -/* ------------------------------------------------------------------ */
 -/*  Current node                                                        */
 -/* ------------------------------------------------------------------ */
@@ -68067,13 +68652,12 @@ index e31ca99..719d789 100644
 -            drawCircle(cut, slab * .15f, Offset(size.width * .19f, y + slab / 2f))
 -            drawRoundRect(cut, Offset(size.width * .36f, y + slab * .40f), Size(size.width * .46f, slab * .20f), CornerRadius(slab * .1f, slab * .1f))
 -        }
--    }
--}
--
- /* ------------------------------------------------------------------ */
- /*  Direct probe (本机直测)                                              */
- /* ------------------------------------------------------------------ */
-@@ -485,9 +494,11 @@ private fun MetricCard(
++        // The trailing ring (重启) pops in beside its label instead of appearing in one frame.
++        if (loading && !loadingLeads) HomeSpinner(Modifier.then(io.github.xgl34222220.hetu.hxPopIn(LocalHomeMotionEnabled.current)), size = 18.dp, color = color, strokeWidth = 2.5.dp)
+     }
+ }
+
+@@ -485,9 +495,11 @@ private fun MetricCard(
      onClick: () -> Unit,
      clickLabel: String,
      header: @Composable RowScope.() -> Unit,
@@ -68086,7 +68670,7 @@ index e31ca99..719d789 100644
          Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
              Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
              content()
-@@ -597,20 +608,27 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
+@@ -597,20 +609,27 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () ->
  }
 
  @Composable
@@ -68119,7 +68703,7 @@ index e31ca99..719d789 100644
      }
  }
 
-@@ -623,9 +641,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
+@@ -623,9 +642,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
          modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
          header = { MetricTitle("资源占用") },
      ) {
@@ -78563,6 +79147,161 @@ index 0000000..4499405
 +        assertTrue(vm.testingGroups.isEmpty())
 +        assertTrue(vm.testingNodes.isEmpty())
 +        assertEquals(1, messages.count { it.contains("401") })
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt
+new file mode 100644
+index 0000000..e0df373
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/MotionPass107Test.kt
+@@ -0,0 +1,149 @@
++package io.github.xgl34222220.hetu
++
++import android.animation.ValueAnimator
++import android.app.Application
++import androidx.activity.ComponentActivity
++import androidx.compose.animation.EnterTransition
++import androidx.compose.animation.ExitTransition
++import androidx.compose.foundation.layout.Column
++import androidx.compose.material3.Text
++import androidx.compose.runtime.CompositionLocalProvider
++import androidx.compose.runtime.mutableStateOf
++import androidx.compose.ui.Modifier
++import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.test.junit4.createAndroidComposeRule
++import androidx.compose.ui.test.onAllNodesWithText
++import androidx.compose.ui.test.onNodeWithTag
++import androidx.compose.ui.test.onNodeWithText
++import androidx.test.core.app.ApplicationProvider
++import io.github.xgl34222220.hetu.home.HetuHomeTheme
++import io.github.xgl34222220.hetu.ui.LocalHetuMotionEnabled
++import org.junit.After
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertNotEquals
++import org.junit.Assert.assertTrue
++import org.junit.Before
++import org.junit.Rule
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++import org.robolectric.annotation.GraphicsMode
++
++/**
++ * 2026-10 motion pass: the app's motion switch honours the system 「移除动画」 (animator duration
++ * scale 0), and the shared Hx motion helpers render their final state at once when it is off.
++ */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], qualifiers = "zh-rCN-w393dp-h852dp-mdpi", application = Application::class)
++@GraphicsMode(GraphicsMode.Mode.NATIVE)
++class MotionPass107Test {
++    @get:Rule val rule = createAndroidComposeRule<ComponentActivity>()
++    private val app get() = ApplicationProvider.getApplicationContext<Application>()
++
++    @Before fun prepare() {
++        app.getSharedPreferences("hetu", 0).edit().clear().commit()
++    }
++
++    @After fun restoreScale() = setAnimatorScale(1f)
++
++    private fun setAnimatorScale(scale: Float) {
++        ValueAnimator::class.java.getDeclaredMethod("setDurationScale", Float::class.javaPrimitiveType).invoke(null, scale)
++    }
++
++    @Test fun zeroAnimatorScaleTurnsTheAppThemeMotionSwitchOff() {
++        setAnimatorScale(0f)
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                Text(if (hxMotion()) "动效开启107" else "动效关闭107")
++            }
++        }
++        rule.onNodeWithText("动效关闭107").assertExists()
++    }
++
++    @Test fun normalAnimatorScaleKeepsTheAppThemeMotionSwitchOn() {
++        setAnimatorScale(1f)
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                Text(if (hxMotion()) "动效开启107" else "动效关闭107")
++            }
++        }
++        rule.onNodeWithText("动效开启107").assertExists()
++    }
++
++    @Test fun inAppAnimationSwitchAlsoTurnsMotionOff() {
++        app.getSharedPreferences("hetu", 0).edit().putBoolean("enableAnimations", false).commit()
++        rule.setContent {
++            HetuAppTheme(appearance = "light", dynamic = false) {
++                Text(if (hxMotion()) "动效开启107" else "动效关闭107")
++            }
++        }
++        rule.onNodeWithText("动效关闭107").assertExists()
++    }
++
++    @Test fun inlineRevealLeavesInTheSameMomentWithoutMotion() {
++        val visible = mutableStateOf(true)
++        rule.mainClock.autoAdvance = false
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
++            }
++        }
++        rule.mainClock.advanceTimeByFrame()
++        rule.onNodeWithTag("banner107").assertExists()
++        visible.value = false
++        rule.mainClock.advanceTimeBy(48)
++        rule.onNodeWithTag("banner107").assertDoesNotExist()
++    }
++
++    @Test fun inlineRevealAnimatesItsExitWithMotion() {
++        val visible = mutableStateOf(true)
++        rule.mainClock.autoAdvance = false
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides true) {
++                Column { HxVisibility(visible.value) { Text("横幅107", Modifier.testTag("banner107")) } }
++            }
++        }
++        rule.mainClock.advanceTimeBy(600)
++        rule.onNodeWithTag("banner107").assertExists()
++        visible.value = false
++        rule.mainClock.advanceTimeBy(48)
++        // Still on its way out (shrink + fade), not cut in one frame.
++        rule.onNodeWithTag("banner107").assertExists()
++        rule.mainClock.advanceTimeBy(1200)
++        rule.onNodeWithTag("banner107").assertDoesNotExist()
++    }
++
++    @Test fun skeletonCarriesNoTextAndSettlesWithoutMotion() {
++        rule.setContent {
++            CompositionLocalProvider(LocalHetuMotionEnabled provides false) {
++                HetuHomeTheme(dark = false) { HxSkeletonLines(count = 3, modifier = Modifier.testTag("skeleton107")) }
++            }
++        }
++        rule.waitForIdle()
++        rule.onNodeWithTag("skeleton107").assertExists()
++        assertTrue(rule.onAllNodesWithText("", substring = true).fetchSemanticsNodes().isEmpty())
++    }
++
++    @Test fun hierarchyTransitionIsInstantWithoutMotionAndDirectionalWithIt() {
++        val still = hxHierarchyTransition(deeper = true, motion = false)
++        assertEquals(EnterTransition.None, still.targetContentEnter)
++        assertEquals(ExitTransition.None, still.initialContentExit)
++        val moving = hxHierarchyTransition(deeper = true, motion = true)
++        assertNotEquals(EnterTransition.None, moving.targetContentEnter)
++        assertNotEquals(ExitTransition.None, moving.initialContentExit)
++    }
++
++    @Test fun ambientLoopsRunOnlyWhenActiveAndMotionAllowed() {
++        assertTrue(hxAmbientAllowed(motion = true, active = true))
++        assertFalse(hxAmbientAllowed(motion = false, active = true))
++        assertFalse(hxAmbientAllowed(motion = true, active = false))
++        for (i in 0 until 9) {
++            listOf(false, true).forEach { second ->
++                val w = hxSkeletonWidth(i, second)
++                assertTrue(w > 0f && w <= 1f)
++            }
++        }
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/NetAdblockConfig100Test.kt

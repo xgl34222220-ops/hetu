@@ -181,9 +181,13 @@ internal fun HxTabbedPage(
     }
 
     // Selection → pager (chip taps, external changes) and pager → selection (swipes).
+    val tabMotion = hxMotion()
     LaunchedEffect(selected) {
         val index = tabs.indexOfFirst { it.key == selected }
-        if (index >= 0 && index != pagerState.targetPage) pagerState.animateScrollToPage(index)
+        if (index >= 0 && index != pagerState.targetPage) {
+            // With motion off a chip tap jumps straight to its page instead of sweeping across.
+            if (tabMotion) pagerState.animateScrollToPage(index) else pagerState.scrollToPage(index)
+        }
     }
     val currentSelected by rememberUpdatedState(selected)
     val currentOnSelect by rememberUpdatedState(onSelect)
@@ -200,8 +204,13 @@ internal fun HxTabbedPage(
     val initialSignal = remember { scrollToTopSignal }
     LaunchedEffect(scrollToTopSignal) {
         if (scrollToTopSignal != initialSignal) {
-            listStates[tabs[pagerState.currentPage].key]?.animateScrollToItem(0)
-            animate(fold, 0f, animationSpec = tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { v, _ -> fold = v }
+            if (tabMotion) {
+                listStates[tabs[pagerState.currentPage].key]?.animateScrollToItem(0)
+                animate(fold, 0f, animationSpec = tween(HxMotion.Medium, easing = HxMotion.Emphasized)) { v, _ -> fold = v }
+            } else {
+                listStates[tabs[pagerState.currentPage].key]?.scrollToItem(0)
+                fold = 0f
+            }
         }
     }
 

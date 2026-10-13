@@ -207,7 +207,7 @@ internal fun BypassRulesScreen(vm: HetuViewModel, onBack: () -> Unit) {
             }
         }
         item(key = "error") {
-            AnimatedVisibility(error != null) {
+            HxVisibility(error != null) {
                 HxBanner(error.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(horizontal = HomeDims.gutter))
             }
         }
@@ -370,10 +370,10 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "macs") {
             SettingsSection {
                 HxEditableList("MAC 列表", "MAC 地址", "aa:bb:cc:dd:ee:ff", macs, onEdited = { macError = null })
-                AnimatedVisibility(macError != null) {
+                HxVisibility(macError != null) {
                     HxBanner(macError.orEmpty(), tone = HxTone.Bad, modifier = Modifier.padding(top = 10.dp))
                 }
-                AnimatedVisibility(macDirty && macError == null) {
+                HxVisibility(macDirty && macError == null) {
                     HxBanner("MAC 列表有未保存的修改", tone = HxTone.Warn, actionLabel = "保存", onAction = ::saveMacList, modifier = Modifier.padding(top = 10.dp))
                 }
             }
@@ -484,14 +484,12 @@ internal fun FileManagerScreen(vm: HetuViewModel, onBack: () -> Unit) {
         path = parent.takeIf { it == root || it.startsWith("$root/") } ?: root
     }
     BackHandler(enabled = path != root) { goUp() }
-    // Folders slide in from the right when going deeper and from the left when going up.
+    // Folders slide in from the right when going deeper and from the left when going up
+    // (instant with motion off).
+    val folderMotion = hxMotion()
     AnimatedContent(
         targetState = path,
-        transitionSpec = {
-            val deeper = targetState.length > initialState.length
-            (slideInHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) w / 3 else -w / 3 } + fadeIn(tween(HxMotion.Medium)))
-                .togetherWith(slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> if (deeper) -w / 6 else w / 6 } + fadeOut(tween(HxMotion.Short)))
-        },
+        transitionSpec = { hxHierarchyTransition(targetState.length > initialState.length, folderMotion) },
         label = "folder",
     ) { shown ->
         FileFolderPage(vm, shown, onOpen = { path = it }, onBack = { if (shown == root) onBack() else goUp() })

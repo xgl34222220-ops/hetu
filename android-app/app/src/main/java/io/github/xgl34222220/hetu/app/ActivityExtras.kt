@@ -135,7 +135,7 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
     if (list.isEmpty()) {
         item(key = "log-empty") {
             if (vm.logsLoading && vm.logEntries.isEmpty()) {
-                Box(Modifier.fillMaxWidth().padding(40.dp), contentAlignment = Alignment.Center) { HxSpinner(26.dp) }
+                HxSkeletonRows(count = 4)
             } else HxEmpty(Icons.Rounded.Article, if (vm.logEntries.isEmpty()) "暂无日志" else "没有匹配的日志")
         }
     }
@@ -146,7 +146,7 @@ internal fun LazyListScope.logItems(vm: HetuViewModel, filter: LogFilterState, s
         val shape = RoundedCornerShape(22.dp)
         Column(
             Modifier
-                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
+                .then(hxAnimateItem())
                 .fillMaxWidth()
                 .padding(horizontal = Hx.gutter)
                 .padding(bottom = 9.dp)
@@ -412,7 +412,7 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
         val value = if (rank.sort == "traffic") row.upload + row.download else row.connections.toLong()
         Column(
             Modifier
-                .animateItem(fadeInSpec = tween(HxMotion.Medium), placementSpec = HxMotion.glide(), fadeOutSpec = null)
+                .then(hxAnimateItem())
                 .fillMaxWidth()
                 .padding(horizontal = Hx.gutter)
                 .padding(bottom = 6.dp)

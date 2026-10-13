@@ -218,14 +218,21 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                     val tint by animateColorAsState(if (wrongMode) c.warn else if (effective) c.good else if (enabled) c.warn else c.textFaint, tween(HxMotion.Medium), label = "shield")
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         // While actively protecting, a soft ring breathes around the shield.
-                        val breathing = rememberInfiniteTransition(label = "shieldBreath")
-                        val breath by breathing.animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
-                        val haloStrength by animateFloatAsState(if (effective && !wrongMode) 1f else 0f, tween(HxMotion.Long), label = "shieldHalo")
+                        // The breath is a frame loop: it exists only while the halo shows and motion is allowed
+                        // (system 「移除动画」 / power saving → a still halo), and is read in the layer only.
+                        val shieldMotion = hxMotion()
+                        val breathState = if (hxAmbientAllowed(shieldMotion, effective && !wrongMode)) {
+                            rememberInfiniteTransition(label = "shieldBreath")
+                                .animateFloat(0f, 1f, infiniteRepeatable(tween(2200), RepeatMode.Reverse), label = "shieldBreathValue")
+                        } else null
+                        val haloStrength by animateFloatAsState(if (effective && !wrongMode) 1f else 0f,
+                            if (shieldMotion) tween(HxMotion.Long) else androidx.compose.animation.core.snap(), label = "shieldHalo")
                         Box(Modifier.size(76.dp), contentAlignment = Alignment.Center) {
                             Box(
                                 Modifier
                                     .size(76.dp)
                                     .graphicsLayer {
+                                        val breath = breathState?.value ?: 0f
                                         val s = 1f + .12f * breath * haloStrength
                                         scaleX = s
                                         scaleY = s
@@ -253,7 +260,10 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                                     effective -> "保护中"
                                     else -> "正在验证"
                                 },
-                                transitionSpec = { fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short))) },
+                                transitionSpec = {
+                                    if (shieldMotion) fadeIn(tween(HxMotion.Medium)).togetherWith(fadeOut(tween(HxMotion.Short)))
+                                    else androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
+                                },
                                 label = "adblockTitle",
                             ) { title ->
                                 Text(title, fontSize = 24.sp, lineHeight = 30.sp, fontWeight = FontWeight.Bold, color = tint)
@@ -400,7 +410,8 @@ internal fun AdblockScreen(vm: HetuViewModel) {
                         }
                     }
                     val sources = snapshot?.sources.orEmpty()
-                    if (sources.isEmpty()) Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { HxSpinner() }
+                    // Sources still loading: placeholder rows in the card's own shape instead of a spinner.
+                    if (sources.isEmpty()) HxSkeletonLines(count = 3, rowHeight = 52.dp, icon = false)
                     sources.forEachIndexed { index, source ->
                         if (index > 0) HxDivider(16.dp)
                         Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -549,13 +560,16 @@ private fun DomainList(title: String, domains: List<String>, tone: HxTone, onAdd
 private fun VerifyRow(label: String, ok: Boolean?, detail: String, neutralFalse: Boolean = false, successColorOverride: Color? = null,
     trailing: (@Composable () -> Unit)? = null) {
     val c = Hx.colors
-    val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint }, tween(HxMotion.Medium), label = "verifyTint")
+    val verifyMotion = hxMotion()
+    val tint by animateColorAsState(when (ok) { true -> successColorOverride ?: c.good; false -> if (neutralFalse) c.textFaint else c.warn; null -> c.textFaint },
+        if (verifyMotion) tween(HxMotion.Medium) else androidx.compose.animation.core.snap(), label = "verifyTint")
     Row(Modifier.fillMaxWidth().heightIn(min = 60.dp).padding(horizontal = 17.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(26.dp), contentAlignment = Alignment.Center) {
             AnimatedContent(
                 targetState = ok,
                 transitionSpec = {
-                    (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f)).togetherWith(fadeOut(tween(100)))
+                    if (verifyMotion) (fadeIn(tween(HxMotion.Short)) + scaleIn(HxMotion.pop(), initialScale = .5f)).togetherWith(fadeOut(tween(100)))
+                    else androidx.compose.animation.EnterTransition.None.togetherWith(androidx.compose.animation.ExitTransition.None)
                 },
                 label = "verifyIcon",
             ) { state ->
