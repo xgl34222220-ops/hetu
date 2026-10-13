@@ -167,6 +167,36 @@ final class EbpfMatcher {
         return "未知原因（" + r + "）";
     }
 
+    /** Run modes hetu-root.sh can match with eBPF (tproxy | redirect | enhance); any other records mode-<m> and falls back. */
+    static boolean modeSupported(String modeId) {
+        return "tproxy".equals(modeId) || "redirect".equals(modeId) || "enhance".equals(modeId);
+    }
+
+    /**
+     * True while the switch differs from what the running session was started with. The applied
+     * topology fingerprint ends in {@code |ebpf=1} only when the matcher was on; the settings
+     * signature does not carry the switch, so the 重启后生效 notice asks this as well. Without a
+     * running session or a recorded fingerprint nothing is pending.
+     */
+    static boolean switchPending(boolean running, boolean enabled, String liveFingerprint) {
+        if (!running || liveFingerprint == null || liveFingerprint.isEmpty()) return false;
+        return enabled != liveFingerprint.endsWith("|ebpf=1");
+    }
+
+    /**
+     * The switch's subtitle as translatable parts (each part is one vocabulary entry; the UI
+     * translates and joins them). Unlike {@link #describe} it also covers an unsupported run mode
+     * and a matcher that was switched off but is still active until the next restart.
+     */
+    static String[] describe(boolean enabled, boolean running, String state, String reason, String modeId) {
+        if (!modeSupported(modeId)) return new String[]{"当前运行模式不支持 eBPF 规则匹配（仅 TPROXY / Redirect / Enhance）"};
+        if (!enabled && running && "active".equals(state)) return new String[]{"已关闭，重启代理后停用 eBPF 匹配；本次会话仍由 eBPF 匹配名单"};
+        if (enabled && running && "active".equals(state) && "pins-missing".equals(reason))
+            return new String[]{"已启用但映射丢失：", reasonText(reason)};
+        if (enabled && running && "fallback".equals(state)) return new String[]{"未生效，已回退到 iptables 规则：", reasonText(reason)};
+        return new String[]{describe(enabled, running, state, reason)};
+    }
+
     private static String nz(String value) { return value == null ? "" : value; }
 
     /** Same quoting as RootBridge.quote, kept local so this class stays free of Android types. */

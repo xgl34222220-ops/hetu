@@ -54,6 +54,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
             state = rt.wanState, error = rt.wanError,
         ),
         operationText = vm.operationText,
+        onUpdateProviders = vm::updateAllProviders,
         connection = io.github.xgl34222220.hetu.home.HomeConnectionObservation(
             // A core without a Clash controller has nothing to read: that is not a controller fault.
             controllerReady = vm.state.panelReady || !vm.state.controllerSupported,

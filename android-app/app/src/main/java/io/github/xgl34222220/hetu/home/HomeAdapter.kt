@@ -94,6 +94,7 @@ internal fun HetuHomeV2(
     wanExtras: HomeWanExtras? = null,
     operationText: String? = null,
     connection: HomeConnectionObservation = HomeConnectionObservation(),
+    onUpdateProviders: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -155,6 +156,7 @@ internal fun HetuHomeV2(
     val openConfigs by rememberUpdatedState(onOpenConfigs)
     val viewConfig by rememberUpdatedState(onViewConfig)
     val dismissStartupError by rememberUpdatedState(onDismissStartupError)
+    val updateProviders by rememberUpdatedState(onUpdateProviders)
     val actions = remember(context, prefs) {
         HomeActions(
             onStart = { toggle() },
@@ -190,6 +192,7 @@ internal fun HetuHomeV2(
             loadTargets = { loadTargets(prefs) },
             saveTargets = { config -> saveTargets(prefs, config) },
             resetTargets = { ProxyLatencyTargets.reset(prefs); loadTargets(prefs) },
+            onUpdateProviders = { updateProviders() },
         )
     }
 

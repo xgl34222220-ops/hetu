@@ -358,6 +358,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return request.takeIf { state.running && operation == null }
     }
 
+    /** Why a bulk update did nothing: the proxy is stopped, or another operation still owns it. */
+    private fun runtimeUnavailableText(what: String): String =
+        if (!state.running) "${what}需要代理运行中" else "请等待当前操作完成"
+
     private fun currentRuntimeRequest(request: RuntimeRequest, requireRunning: Boolean = true): Boolean {
         syncRequestSettings()
         return request.generation == runtimeRequestGeneration &&
@@ -438,7 +442,17 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     refreshNow()
                     maybeVerifyEgress()
                 }
-                delay(if (tab == HxTab.Home || tab == HxTab.Panel) 2_000L else 4_000L)
+                // Stopped and idle: probe Root every 8 s instead of every 2 s, but wake within a
+                // second when a tile / boot / network-match start flips the cached running hint.
+                val homeOrPanel = tab == HxTab.Home || tab == HxTab.Panel
+                val wait = HxPollCadence.delayMs(homeOrPanel, state.running, operation != null, ProxyStatusBridge.rootProxyRunning(app))
+                if (wait <= HxPollCadence.activeDelayMs(homeOrPanel)) delay(wait)
+                else {
+                    var waited = 0L
+                    while (waited < wait && operation == null && !state.running && !ProxyStatusBridge.rootProxyRunning(app)) {
+                        delay(HxPollCadence.WakeStepMs); waited += HxPollCadence.WakeStepMs
+                    }
+                }
             }
         }
         ProxyStatusNotificationService.refresh(app)
@@ -948,7 +962,10 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         return true
     }
 
-    fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs)
+    fun settingsPending(): Boolean = ProxyRuntimeSettings.pending(state.running, prefs) ||
+        // The eBPF switch is not part of the settings signature; the session's topology records it.
+        EbpfMatcher.switchPending(state.running, prefs.getBoolean(EbpfMatcher.PREF_ENABLED, false),
+            prefs.getString("proxyRootTopologyFingerprint", "").orEmpty())
 
     fun bumpSettings() { syncRequestSettings(); settingsRevision++ }
 
@@ -1294,7 +1311,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     /** Updates every remote (HTTP) rule-set, three at a time, with per-item status. */
     fun updateAllRuleSets() {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("规则集更新"))
         if (ruleSetsUpdatingAll) return
         val owner = ++requestSequence
         ruleSetsUpdateAllOwner = owner
@@ -1414,7 +1431,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateAllProviders() {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("订阅更新"))
         if (providersUpdatingAll) return
         val owner = ++requestSequence
         providersUpdateAllOwner = owner

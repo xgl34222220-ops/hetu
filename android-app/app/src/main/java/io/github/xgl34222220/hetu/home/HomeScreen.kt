@@ -192,7 +192,7 @@ internal fun HomeScreen(
                 Modifier.padding(top = HomeDims.gap).fillMaxWidth().height(IntrinsicSize.Min).homeEnter(stagger, 5),
                 horizontalArrangement = Arrangement.spacedBy(HomeDims.gap),
             ) {
-                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription)
+                HomeSubscriptionCard(calm, Modifier.weight(1f).fillMaxHeight(), actions.onOpenSubscription, actions.onUpdateProviders)
                 HomeResourceCard(state, Modifier.weight(1f).fillMaxHeight(), onOpenResource)
             }
             Spacer(Modifier.height(8.dp))
@@ -487,9 +487,11 @@ private fun MetricCard(
     onClick: () -> Unit,
     clickLabel: String,
     header: @Composable RowScope.() -> Unit,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
-    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel) {
+    HomeCard(modifier, onClick = onClick, clickLabel = clickLabel, onLongClick = onLongClick, longClickLabel = longClickLabel) {
         Column(Modifier.padding(start = HomeDims.cardPadding, end = HomeDims.cardPadding, top = 12.dp, bottom = 16.dp)) {
             Row(Modifier.fillMaxWidth().heightIn(min = 30.dp).padding(bottom = 6.dp), verticalAlignment = Alignment.CenterVertically, content = header)
             content()
@@ -599,11 +601,12 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> 
 }
 
 @Composable
-private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit) {
+private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen: () -> Unit, onUpdateAll: () -> Unit) {
     val c = LocalHomeColors.current
     val sub = state.subscription
     MetricCard(
         modifier = modifier, onClick = onOpen, clickLabel = "查看订阅",
+        onLongClick = onUpdateAll, longClickLabel = "更新全部订阅",
         header = {
             MetricTitle("订阅")
             Spacer(Modifier.weight(1f))
@@ -612,7 +615,9 @@ private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen:
     ) {
         MetricLine("已用", sub?.let { HomeFormat.bytes(it.usedBytes) })
         MetricLine("总量", sub?.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
-        HomeProgressBar(sub?.usedFraction, Modifier.padding(top = 10.dp))
+        // Under 10 % left: the bar turns to the warning red.
+        val low = (sub?.usedFraction ?: 0f) > .9f
+        HomeProgressBar(sub?.usedFraction, Modifier.padding(top = 10.dp), color = if (low) c.badText else c.accent, track = if (low) c.badSoft else c.accentSoft)
     }
 }
 

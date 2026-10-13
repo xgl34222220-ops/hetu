@@ -119,13 +119,26 @@ internal fun HomeCard(
     clickLabel: String? = null,
     background: Color = LocalHomeColors.current.surface,
     shape: Shape = HomeDims.cardShape,
+    onLongClick: (() -> Unit)? = null,
+    longClickLabel: String? = null,
     content: @Composable ColumnScope.() -> Unit,
 ) {
     val haptics = LocalHomeHaptics.current
     val label = clickLabel?.let { ht(it) }
-    val tappable = if (onClick == null) modifier else modifier.homeTap(onClickLabel = label, role = Role.Button) {
-        haptics(HomeHaptic.Tap)
-        onClick()
+    val tappable = when {
+        onClick == null -> modifier
+        onLongClick == null -> modifier.homeTap(onClickLabel = label, role = Role.Button) {
+            haptics(HomeHaptic.Tap)
+            onClick()
+        }
+        else -> modifier.homeTap(
+            onClickLabel = label, role = Role.Button,
+            onLongClickLabel = longClickLabel?.let { ht(it) },
+            onLongClick = { haptics(HomeHaptic.Confirm); onLongClick() },
+        ) {
+            haptics(HomeHaptic.Tap)
+            onClick()
+        }
     }
     Column(tappable.homeGlassPanel(shape, background), content = content)
 }

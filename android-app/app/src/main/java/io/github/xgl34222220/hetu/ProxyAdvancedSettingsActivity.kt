@@ -17,6 +17,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -69,7 +70,10 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
     var choice by remember { mutableStateOf<String?>(null) }
     val profile = remember(revision) { ProxyRuntimeProfile.load(prefs) }
     // What the running core last reported. Cached by the status probe; blank on a runtime that predates these fields.
-    val live = remember(revision) { OtherLiveState.load(prefs) }
+    // The status probe keeps refreshing these while the page is open; re-read them (prefs only, no Root call).
+    var liveTick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(Unit) { while (true) { kotlinx.coroutines.delay(4_000L); liveTick++ } }
+    val live = remember(revision, liveTick) { OtherLiveState.load(prefs) }
 
     fun changed(key: String) { ProxyRuntimeSettings.markDirty(prefs, key); revision++ }
     fun putBool(key: String, value: Boolean) { prefs.edit().putBoolean(key, value).apply(); changed(key) }
@@ -198,10 +202,13 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                 SettingsGroup(title = ht("规则匹配")) {
                     // Opt-in kernel matcher for the app list and bypass networks; a policy file read at start.
                     val ebpf = prefs.getBoolean(EbpfMatcher.PREF_ENABLED, false)
+                    // TUN / Mihomo eBPF / Mixed always fall back; an already enabled switch can still be turned off.
+                    val modeSupported = EbpfMatcher.modeSupported(profile.mode.id)
                     OtherSwitch(
-                        "eBPF 规则匹配", ebpf, icon = ToolsIcons.Cpu,
-                        subtitle = ht(EbpfMatcher.describe(ebpf, live.running, live.ebpf, live.ebpfReason)),
-                    ) { prefs.edit().putBoolean(EbpfMatcher.PREF_ENABLED, it).apply(); revision++ }
+                        "eBPF 规则匹配", ebpf, enabled = ebpf || modeSupported, icon = ToolsIcons.Cpu,
+                        subtitle = EbpfMatcher.describe(ebpf, live.running, live.ebpf, live.ebpfReason, profile.mode.id)
+                            .map { ht(it) }.joinToString(""),
+                    ) { putBool(EbpfMatcher.PREF_ENABLED, it) }
                 }
             }
         }

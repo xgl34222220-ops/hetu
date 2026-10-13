@@ -271,8 +271,8 @@ internal fun HxPage(
         root -> HomeLargeTitleDims.titleTop
         else -> barHeight
     }
-    // Read on every composition: it is a memory lookup, and the page that changes it sees it at once.
-    val progressive = context.getSharedPreferences("hetu", 0).getString("topBarBlurStyle", "progressive") != "gaussian"
+    // Remembered and kept current by a preference listener, so the page that changes it still sees it at once.
+    val progressive = rememberHxTopBarProgressive(context)
 
     val stagger = rememberHomeStagger()
     val entrance = remember(stagger) { HxEntrance(stagger) }
@@ -1202,4 +1202,21 @@ internal fun HxTextField(
             },
         )
     }
+}
+
+/** 顶栏模糊样式: progressive unless set to gaussian. Read once, then updated by a preference listener. */
+@Composable
+internal fun rememberHxTopBarProgressive(context: android.content.Context): Boolean {
+    val prefs = remember(context) { context.getSharedPreferences("hetu", 0) }
+    fun read() = prefs.getString("topBarBlurStyle", "progressive") != "gaussian"
+    var progressive by remember(prefs) { mutableStateOf(read()) }
+    DisposableEffect(prefs) {
+        val listener = android.content.SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+            if (key == "topBarBlurStyle" || key == null) progressive = read()
+        }
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+        progressive = read()
+        onDispose { prefs.unregisterOnSharedPreferenceChangeListener(listener) }
+    }
+    return progressive
 }

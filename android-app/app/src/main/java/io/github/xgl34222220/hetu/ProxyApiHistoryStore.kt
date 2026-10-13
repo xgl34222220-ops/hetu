@@ -157,12 +157,38 @@ internal object ProxyApiHistoryStore {
             }
         }
     }
-    suspend fun ranking(context: Context, dimension: String, sort: String, since: Long): List<TrafficRank> = withContext(Dispatchers.IO) {
+    /**
+     * Daemon controller totals in slots of [bucketSeconds] from [since] (ms) to [now]: (slot start ms, upload, download),
+     * oldest first, with empty slots as zero so the time axis is continuous.
+     */
+    suspend fun timeDistribution(context: Context, since: Long, bucketSeconds: Long, now: Long = System.currentTimeMillis()): List<Triple<Long, Long, Long>> = withContext(Dispatchers.IO) {
+        if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext emptyList()
+        val bucket = bucketSeconds.coerceAtLeast(60L)
+        val read = gate.withLock {
+            database(context).rawQuery("SELECT (minute / ?) * ? AS slot,sum(upload),sum(download) FROM traffic_minutes WHERE minute>=? GROUP BY slot ORDER BY slot",
+                arrayOf(bucket.toString(), bucket.toString(), (since / 1000).toString())).use { rows ->
+                buildMap { while (rows.moveToNext()) put(rows.getLong(0), rows.getLong(1) to rows.getLong(2)) }
+            }
+        }
+        distributionSlots(read, since / 1000, now / 1000, bucket)
+    }
+
+    /** Continuous slots from the one holding [fromSec] to the one holding [toSec]; at most 400. */
+    internal fun distributionSlots(read: Map<Long, Pair<Long, Long>>, fromSec: Long, toSec: Long, bucket: Long): List<Triple<Long, Long, Long>> {
+        if (toSec < fromSec || bucket <= 0L) return emptyList()
+        val first = (fromSec / bucket) * bucket
+        val last = (toSec / bucket) * bucket
+        val start = maxOf(first, last - 399L * bucket)
+        return generateSequence(start) { it + bucket }.takeWhile { it <= last }
+            .map { slot -> read[slot].let { Triple(slot * 1000L, it?.first ?: 0L, it?.second ?: 0L) } }.toList()
+    }
+
+    suspend fun ranking(context: Context, dimension: String, sort: String, since: Long, limit: Int = 20): List<TrafficRank> = withContext(Dispatchers.IO) {
         if (!context.getSharedPreferences("hetu", 0).getBoolean("proxyApiHistoryEnabled", false)) return@withContext emptyList()
         val column = when(dimension) { "app" -> "app"; "route" -> "route"; else -> "host" }
         val order = if(sort == "traffic") "sum(upload)+sum(download)" else "count(*)"
         gate.withLock {
-            database(context).rawQuery("SELECT $column,count(*),sum(upload),sum(download) FROM connections WHERE seen >= ? GROUP BY $column ORDER BY $order DESC LIMIT 20", arrayOf(since.toString())).use { rows ->
+            database(context).rawQuery("SELECT $column,count(*),sum(upload),sum(download) FROM connections WHERE seen >= ? GROUP BY $column ORDER BY $order DESC LIMIT ?", arrayOf(since.toString(), limit.coerceIn(1, 100).toString())).use { rows ->
                 buildList { while(rows.moveToNext()) add(TrafficRank(rows.getString(0).orEmpty().ifBlank { "—" }, rows.getInt(1), rows.getLong(2), rows.getLong(3))) }
             }
         }

@@ -139,6 +139,10 @@ AUTHORIZED_FILES = frozenset((
     # 2026-10-13 eBPF matcher App side (same authorization): the pure-Java helper (no Android API)
     # for payload/policy deployment fragments, reason text and the hot-update decision.
     PACKAGE + 'EbpfMatcher.java',
+    # 2026-10-13 function polish (audit B7): the log viewer reads only the open file on live refresh,
+    # keeps stable list keys, exports through SAF CreateDocument (no new permission) and pages
+    # earlier lines.
+    PACKAGE + 'ProxyLogViewerActivity.kt',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

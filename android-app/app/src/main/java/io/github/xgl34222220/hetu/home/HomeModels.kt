@@ -284,6 +284,8 @@ internal class HomeActions(
     val loadTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
     val saveTargets: (HomeTargetsConfig) -> Unit = {},
     val resetTargets: () -> HomeTargetsConfig = { HomeTargetsConfig() },
+    /** Long press on the 订阅 card: 更新全部订阅 (the ViewModel explains when it cannot run). */
+    val onUpdateProviders: () -> Unit = {},
 )
 
 /* ------------------------------------------------------------------ */
