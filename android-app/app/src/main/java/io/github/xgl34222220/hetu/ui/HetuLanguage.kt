@@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о�
 这些地址与接口在 Root 层直接放行，不进入 Mihomo。|These addresses and interfaces bypass Mihomo at the Root layer.|這些位址與介面在 Root 層直接放行，不進入 Mihomo。|Эти адреса и интерфейсы обходят Mihomo на уровне Root.
 接口名不能填写 lo。修改后重启代理生效。|The interface cannot be lo. Restart the proxy to apply changes.|介面名稱不能填寫 lo。修改後重新啟動代理生效。|Интерфейс не может быть lo. Перезапустите прокси для применения.
 热点、USB 与局域网转发流量|Hotspot, USB and LAN forwarded traffic|熱點、USB 與區域網路轉送流量|Пересылаемый трафик точки доступа, USB и LAN
-开启后河图接管共享 / 转发流量；接口与 MAC 直连在 Root 层生效，修改后重启代理。|Hetu handles shared and forwarded traffic. Interface and MAC bypass rules apply at the Root layer after restarting the proxy.|開啟後河圖接管共用與轉送流量；介面與 MAC 直連在 Root 層生效，修改後重新啟動代理。|Hetu обрабатывает общий и пересылаемый трафик. Правила обхода интерфейсов и MAC применяются после перезапуска прокси.
 将共享流量纳入透明代理|Route shared traffic through the transparent proxy|將共用流量納入透明代理|Направлять общий трафик через прозрачный прокси
 没有检测到正在共享的接口。|No active sharing interfaces detected.|未偵測到正在共用的介面。|Активные общие интерфейсы не обнаружены.
 没有检测到下游设备。|No connected devices detected.|未偵測到下游裝置。|Подключённые устройства не обнаружены.
@@ -1066,13 +1065,141 @@ Wi‑Fi（名称待网络匹配读取）|Wi‑Fi (name read by network automatio
 尚未获取当前网络|Current network not read yet|尚未取得目前網路|Текущая сеть ещё не определена
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish).joinToString("\n")
+// 2026-10 i18n pass: pages and VM feedback that showed raw Chinese, the %s templates that replace
+// string concatenation, and the short phrases of hxFriendlyError (app/HxFriendlyError.kt).
+private val vocabularyCleanup = """
+同时把上面的内存限制和 I/O 权重交给内核执行（memcg memory.max 与 io 权重，优先 cgroup v2，不支持时用 v1）；核心超出内存上限时可能被系统结束。默认关闭，重启代理后生效|Also let the kernel enforce the memory limit and I/O weight above (memcg memory.max and io weight, cgroup v2 first, v1 as fallback). The core may be killed when it exceeds the memory limit. Off by default; restart the proxy to apply|同時把上面的記憶體限制和 I/O 權重交給核心執行（memcg memory.max 與 io 權重，優先 cgroup v2，不支援時用 v1）；核心超出記憶體上限時可能被系統結束。預設關閉，重新啟動代理後生效|Ядро ОС также применит лимит памяти и вес I/O выше (memcg memory.max и вес io, сначала cgroup v2, иначе v1). Ядро прокси может быть завершено при превышении лимита. По умолчанию выключено; перезапустите прокси для применения
+Root 守护|Root daemon|Root 守護|Root-демон
+卡1 · 蜂窝数据|SIM 1 · Mobile data|卡1 · 行動數據|SIM 1 · Мобильные данные
+默认数据卡在卡槽 1 且使用蜂窝网络时匹配|Matches when the default data SIM is in slot 1 and on mobile data|預設數據卡在卡槽 1 且使用行動網路時符合|Срабатывает, когда SIM для данных в слоте 1 и используются мобильные данные
+卡2 · 蜂窝数据|SIM 2 · Mobile data|卡2 · 行動數據|SIM 2 · Мобильные данные
+默认数据卡在卡槽 2 且使用蜂窝网络时匹配|Matches when the default data SIM is in slot 2 and on mobile data|預設數據卡在卡槽 2 且使用行動網路時符合|Срабатывает, когда SIM для данных в слоте 2 и используются мобильные данные
+最近动作|Recent actions|最近動作|Последние действия
+切换配置…|Switch configuration…|切換設定…|Сменить конфигурацию…
+运行脚本…|Run script…|執行腳本…|Запустить скрипт…
+请选择匹配时使用的配置|Choose the configuration to use on match|請選擇符合時使用的設定|Выберите конфигурацию для срабатывания
+请选择匹配时运行的脚本|Choose the script to run on match|請選擇符合時執行的腳本|Выберите скрипт для срабатывания
+脚本以 Root 运行，最长 12 秒，输出与退出码写入 scripts.log；环境变量 HETU_EVENT / HETU_NETWORK。|Scripts run as Root for up to 12 seconds; output and exit code go to scripts.log. Environment: HETU_EVENT / HETU_NETWORK.|腳本以 Root 執行，最長 12 秒，輸出與結束碼寫入 scripts.log；環境變數 HETU_EVENT / HETU_NETWORK。|Скрипты выполняются от Root до 12 секунд; вывод и код выхода пишутся в scripts.log. Переменные: HETU_EVENT / HETU_NETWORK.
+运行中会校验新配置后重启核心；失败时恢复原配置。|While running, the new configuration is validated and the core restarted; on failure the previous configuration is restored.|執行中會校驗新設定後重新啟動核心；失敗時復原原設定。|Во время работы новая конфигурация проверяется и ядро перезапускается; при ошибке восстанавливается прежняя.
+实测|Measured|實測|Измерено
+文件|File|檔案|Файл
+链接|Link|連結|Ссылка
+剪贴板|Clipboard|剪貼簿|Буфер обмена
+剪贴板内容|Clipboard content|剪貼簿內容|Содержимое буфера
+YAML 文本|YAML text|YAML 文字|Текст YAML
+读取剪贴板|Read clipboard|讀取剪貼簿|Прочитать буфер
+行|lines|行|строк
+请先读取剪贴板|Read the clipboard first|請先讀取剪貼簿|Сначала прочитайте буфер обмена
+导入前先用 Mihomo 校验，通过后设为当前配置；代理运行中会热重载，失败自动切回原配置。支持 UTF-8，最大 4 MiB。|Validated with Mihomo before import, then set as current; a running proxy hot-reloads and falls back to the previous configuration on failure. UTF-8, up to 4 MiB.|匯入前先用 Mihomo 校驗，通過後設為目前設定；代理執行中會熱重載，失敗自動切回原設定。支援 UTF-8，最大 4 MiB。|Перед импортом проверяется Mihomo и становится текущей; работающий прокси перезагружается на лету и при ошибке возвращает прежнюю. UTF-8, до 4 МиБ.
+经由河图代理 · 按当前规则与节点|Through Hetu · current rules and nodes|經由河圖代理 · 依目前規則與節點|Через Hetu · текущие правила и узлы
+代理未运行 · 直连测试|Proxy stopped · direct test|代理未執行 · 直連測試|Прокси остановлен · прямой тест
+准备测试…|Preparing test…|準備測試…|Подготовка теста…
+延迟为首包时间（DNS、握手、TLS 与首字节）。地区来自该服务所在 Cloudflare 的出口报告、同一节点上的其他服务，或直连出口；无法实测时不显示。解锁检测经系统网络（代理规则透明生效）向各服务实测，每项最长 8 秒：解锁、受限（如仅自制剧）、不可用，或失败及原因；有服务自报地区时以其为准。|Latency is time to first byte (DNS, handshake, TLS and first byte). Region comes from the service's Cloudflare exit report, other services on the same node, or the direct exit; hidden when it cannot be measured. Unlock checks query each service through the system network (proxy rules apply transparently), up to 8 seconds each: unlocked, limited (e.g. originals only), unavailable, or failed with a reason; a region reported by the service wins.|延遲為首包時間（DNS、交握、TLS 與首位元組）。地區來自該服務所在 Cloudflare 的出口報告、同一節點上的其他服務，或直連出口；無法實測時不顯示。解鎖檢測經系統網路（代理規則透明生效）向各服務實測，每項最長 8 秒：解鎖、受限（如僅自製劇）、不可用，或失敗及原因；有服務自報地區時以其為準。|Задержка — время до первого байта (DNS, рукопожатие, TLS и первый байт). Регион берётся из отчёта Cloudflare сервиса, других сервисов на том же узле или прямого выхода; скрыт, если измерить нельзя. Проверка разблокировки опрашивает каждый сервис через системную сеть (правила прокси действуют прозрачно), до 8 секунд: доступно, ограничено (например, только оригинальный контент), недоступно или ошибка с причиной; регион, сообщённый сервисом, приоритетен.
+检测解锁…|Checking unlocks…|檢測解鎖…|Проверка разблокировки…
+出口 IP|Exit IP|出口 IP|Внешний IP
+境外|Overseas|境外|Зарубежный
+境内|Domestic|境內|Внутренний
+经当前代理节点连接 Cloudflare 测速服务器（speed.cloudflare.com），依次测量延迟、下载与上传，约 20 秒，会消耗流量。|Connects to the Cloudflare speed test server (speed.cloudflare.com) through the current node and measures latency, download and upload in turn. Takes about 20 seconds and uses data.|經目前代理節點連線 Cloudflare 測速伺服器（speed.cloudflare.com），依序測量延遲、下載與上傳，約 20 秒，會消耗流量。|Подключается к серверу Cloudflare (speed.cloudflare.com) через текущий узел и измеряет задержку, загрузку и отдачу. Около 20 секунд, расходует трафик.
+正在连接测速服务器…|Connecting to the speed test server…|正在連線測速伺服器…|Подключение к серверу теста…
+正在测量延迟…|Measuring latency…|正在測量延遲…|Измерение задержки…
+正在测量下载…|Measuring download…|正在測量下載…|Измерение загрузки…
+正在测量上传…|Measuring upload…|正在測量上傳…|Измерение отдачи…
+覆写脚本|Override scripts|覆寫腳本|Скрипты переопределения
+每次启动前按顺序执行 main(config, profile)，返回修改后的配置；河图必需的端口与接管参数随后写入。任一脚本出错或超时，本次使用未修改的配置启动。未选择配置文件时，配置完全由脚本生成。|Before each start, main(config, profile) runs in order and returns the modified configuration; Hetu's required ports and takeover settings are written afterwards. If any script fails or times out, this start uses the unmodified configuration. With no configuration file selected, the scripts generate the whole configuration.|每次啟動前依序執行 main(config, profile)，傳回修改後的設定；河圖必需的連接埠與接管參數隨後寫入。任一腳本出錯或逾時，本次使用未修改的設定啟動。未選擇設定檔時，設定完全由腳本產生。|Перед каждым запуском по порядку выполняется main(config, profile), возвращающая изменённую конфигурацию; затем Hetu записывает обязательные порты и параметры перехвата. Если скрипт падает или превышает время, запуск идёт с неизменённой конфигурацией. Без выбранного файла конфигурацию полностью создают скрипты.
+上次启动|Last start|上次啟動|Последний запуск
+暂无覆写脚本|No override scripts|暫無覆寫腳本|Скриптов переопределения нет
+新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。|Create a script or import a .js file to add rules, set DNS or merge nodes.|新建腳本或匯入 .js 檔案，可新增規則、設定 DNS、合併節點。|Создайте скрипт или импортируйте .js, чтобы добавить правила, настроить DNS или объединить узлы.
+覆写脚本运行结果|Override script results|覆寫腳本執行結果|Результаты скриптов переопределения
+脚本名称|Script name|腳本名稱|Имя скрипта
+尚无该核心的原生配置|No native configuration for this core yet|尚無該核心的原生設定|Для этого ядра нет собственной конфигурации
+启动时自动转换 Mihomo 当前配置；也可在 工具 › 配置管理 导入原生配置|The current Mihomo configuration is converted at start; you can also import a native one in Tools › Configurations|啟動時自動轉換 Mihomo 目前設定；也可在 工具 › 設定管理 匯入原生設定|При запуске текущая конфигурация Mihomo конвертируется; можно также импортировать собственную в «Инструменты › Конфигурации»
+启动诊断|Startup diagnostics|啟動診斷|Диагностика запуска
+测速历史|Speed test history|測速歷史|История тестов скорости
+还没有测速记录：策略组测速和网速测试完成后会保存在这里|No speed tests yet: group latency tests and speed tests are saved here when they finish|還沒有測速紀錄：策略組測速和網速測試完成後會儲存在這裡|Тестов пока нет: проверки задержки групп и тесты скорости сохраняются здесь после завершения
+最多保留最近 %s 次。节点测速的流量按探测次数估算；网速测试的流量为实测值，未完成或样本过少时标注“估算”。|Keeps the latest %s runs. Node test data use is estimated from the probe count; speed test data use is measured, marked “estimated” when unfinished or with too few samples.|最多保留最近 %s 次。節點測速的流量依探測次數估算；網速測試的流量為實測值，未完成或樣本過少時標註「估算」。|Хранится до %s последних запусков. Трафик проверки узлов оценивается по числу запросов; трафик теста скорости измерен и помечен «оценка», если тест не завершён или выборка мала.
+另有 %s 个节点未显示|%s more nodes not shown|另有 %s 個節點未顯示|Ещё %s узлов не показано
+删除这条记录|Delete this record|刪除這筆紀錄|Удалить эту запись
+已随核心启动|Started with the core|已隨核心啟動|Запущено вместе с ядром
+广告域名在 %s 中按规则拦截；\n该核心不支持实时验证。|Ad domains are blocked by rules in %s;\nthis core cannot verify it live.|廣告網域在 %s 中依規則攔截；\n該核心不支援即時驗證。|Рекламные домены блокируются правилами в %s;\nэто ядро не поддерживает живую проверку.
+当前为%s模式|Current mode: %s|目前為%s模式|Текущий режим: %s
+非规则|non-rule|非規則|не «Правила»
+DNS 路径|DNS path|DNS 路徑|Путь DNS
+拦截实测|Block test|攔截實測|Проверка блокировки
+正在向广告域名发送一次请求…|Sending one request to an ad domain…|正在向廣告網域傳送一次請求…|Отправка запроса к рекламному домену…
+向已拦截域名发一次请求，读取核心的实际判定|Send one request to a blocked domain and read the core's verdict|向已攔截網域傳送一次請求，讀取核心的實際判定|Отправить запрос к заблокированному домену и прочитать решение ядра
+代理启动后可实测|Available once the proxy is running|代理啟動後可實測|Доступно после запуска прокси
+DNS 接管实测|DNS takeover test|DNS 接管實測|Проверка перехвата DNS
+用系统解析器解析一个已拦截域名…|Resolving a blocked domain with the system resolver…|用系統解析器解析一個已攔截網域…|Разрешение заблокированного домена системным резолвером…
+%s 次|%s times|%s 次|%s раз
+已检查 %s 个连接|%s connections checked|已檢查 %s 個連線|Проверено соединений: %s
+日志计数|Log count|日誌計數|Подсчёт по журналу
+未指定接口时兼容旧行为：接管所有转发入口。建议勾选实际的共享接口。|With no interface selected, the old behaviour applies: all forwarding ingress is taken over. Selecting the actual sharing interfaces is recommended.|未指定介面時相容舊行為：接管所有轉送入口。建議勾選實際的共用介面。|Без выбранного интерфейса работает старое поведение: перехватывается весь пересылаемый трафик. Рекомендуется выбрать реальные общие интерфейсы.
+内核状态|Kernel state|核心狀態|Состояние ядра ОС
+gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，内核集合随之热更新|gaoyifan/china-operator-ip (MIT) · bundled offline snapshot + daily core updates; kernel sets update live|gaoyifan/china-operator-ip（MIT）· 內建離線快照 + 核心每日更新，核心集合隨之熱更新|gaoyifan/china-operator-ip (MIT) · встроенный офлайн-снимок + ежедневное обновление ядром; наборы ядра ОС обновляются на лету
+代理已启动|Proxy started|代理已啟動|Прокси запущен
+已重启，设置已生效|Restarted, settings applied|已重新啟動，設定已生效|Перезапущено, настройки применены
+名单已通过 eBPF 热更新，无需重启|Lists updated live via eBPF; no restart needed|名單已透過 eBPF 熱更新，無需重新啟動|Списки обновлены через eBPF без перезапуска
+切换模式失败|Failed to switch mode|切換模式失敗|Не удалось сменить режим
+已断开全部连接|All connections closed|已中斷全部連線|Все соединения закрыты
+开机自启设置失败|Failed to set start on boot|開機自啟設定失敗|Не удалось настроить автозапуск
+当前配置没有在线订阅（proxy-providers）|The current configuration has no online subscriptions (proxy-providers)|目前設定沒有線上訂閱（proxy-providers）|В текущей конфигурации нет онлайн-подписок (proxy-providers)
+操作失败|Operation failed|操作失敗|Операция не удалась
+断开失败|Failed to disconnect|中斷失敗|Не удалось отключить
+日志读取失败|Failed to read logs|日誌讀取失敗|Не удалось прочитать журнал
+未知错误|Unknown error|未知錯誤|Неизвестная ошибка
+正在停止…|Stopping…|正在停止…|Остановка…
+正在启动…|Starting…|正在啟動…|Запуск…
+正在读取核心最新状态，请稍候|Reading the latest core state, please wait|正在讀取核心最新狀態，請稍候|Чтение текущего состояния ядра, подождите
+正在重启…|Restarting…|正在重新啟動…|Перезапуск…
+正在重载配置…|Reloading configuration…|正在重新載入設定…|Перезагрузка конфигурации…
+确认最终运行状态…|Confirming final state…|確認最終執行狀態…|Проверка итогового состояния…
+没有可在线更新的规则集（本地/内联规则集无需更新）|No rule sets to update online (local/inline rule sets need no update)|沒有可線上更新的規則集（本機/內嵌規則集無需更新）|Нет наборов правил для онлайн-обновления (локальные/встроенные не обновляются)
+测速未取得有效结果，已保留上次读数，请检查控制接口后重试|The test returned no valid results; previous readings kept. Check the controller and try again|測速未取得有效結果，已保留上次讀數，請檢查控制介面後重試|Тест не дал результатов; прежние значения сохранены. Проверьте контроллер и повторите
+站点测速失败，请检查网络|Site latency test failed; check the network|站點測速失敗，請檢查網路|Проверка сайтов не удалась; проверьте сеть
+策略组测速失败|Group latency test failed|策略組測速失敗|Проверка группы не удалась
+节点测速请求失败|Node latency request failed|節點測速請求失敗|Запрос проверки узла не удался
+规则读取失败|Failed to read rules|規則讀取失敗|Не удалось прочитать правила
+规则集更新失败|Failed to update rule sets|規則集更新失敗|Не удалось обновить наборы правил
+规则集读取失败|Failed to read rule sets|規則集讀取失敗|Не удалось прочитать наборы правил
+订阅更新失败|Failed to update subscriptions|訂閱更新失敗|Не удалось обновить подписки
+订阅读取失败|Failed to read subscriptions|訂閱讀取失敗|Не удалось прочитать подписки
+重启失败|Restart failed|重新啟動失敗|Перезапуск не удался
+重载失败|Reload failed|重新載入失敗|Перезагрузка не удалась
+配置导入失败|Failed to import configuration|設定匯入失敗|Не удалось импортировать конфигурацию
+导出失败|Export failed|匯出失敗|Экспорт не удался
+无法解析服务器地址，请检查网络或 DNS|Cannot resolve the server address; check the network or DNS|無法解析伺服器位址，請檢查網路或 DNS|Не удаётся разрешить адрес сервера; проверьте сеть или DNS
+连接超时，请检查网络后重试|Connection timed out; check the network and try again|連線逾時，請檢查網路後重試|Время соединения истекло; проверьте сеть и повторите
+无法连接服务器，请确认地址和端口|Cannot connect to the server; check the address and port|無法連線伺服器，請確認位址和連接埠|Не удаётся подключиться; проверьте адрес и порт
+网络不可达，请检查网络连接|Network unreachable; check the connection|網路無法連線，請檢查網路連線|Сеть недоступна; проверьте подключение
+安全连接失败，请检查系统时间或证书|Secure connection failed; check the system time or certificate|安全連線失敗，請檢查系統時間或憑證|Сбой защищённого соединения; проверьте время или сертификат
+文件不存在或无法访问|File not found or not accessible|檔案不存在或無法存取|Файл не найден или недоступен
+没有访问权限|Permission denied|沒有存取權限|Нет доступа
+请求被拒绝，请检查链接或访问令牌（HTTP %s）|Request rejected; check the link or token (HTTP %s)|請求被拒絕，請檢查連結或存取權杖（HTTP %s）|Запрос отклонён; проверьте ссылку или токен (HTTP %s)
+地址不存在，请检查链接（HTTP 404）|Address not found; check the link (HTTP 404)|位址不存在，請檢查連結（HTTP 404）|Адрес не найден; проверьте ссылку (HTTP 404)
+请求过于频繁，请稍后再试（HTTP 429）|Too many requests; try again later (HTTP 429)|請求過於頻繁，請稍後再試（HTTP 429）|Слишком много запросов; повторите позже (HTTP 429)
+服务器出错，请稍后再试（HTTP %s）|Server error; try again later (HTTP %s)|伺服器出錯，請稍後再試（HTTP %s）|Ошибка сервера; повторите позже (HTTP %s)
+读写失败，请重试|Read or write failed; try again|讀寫失敗，請重試|Ошибка чтения или записи; повторите
+其他可管理核心|Other manageable cores|其他可管理核心|Другие управляемые ядра
+不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {
     val index = when { language.startsWith("en") -> 0; language.startsWith("zh-TW") || language.startsWith("zh-HK") || language.contains("Hant") -> 1; language.startsWith("ru") -> 2; else -> return source }
-    return vocabulary[source]?.get(index) ?: source
+    vocabulary[source]?.get(index)?.let { return it }
+    // hxFriendlyError messages: "<phrase> · REASON_CODE", the phrase possibly carrying an HTTP status.
+    val coded = friendlyErrorShape.matchEntire(source) ?: return source
+    val phrase = coded.groupValues[1]
+    val translated = vocabulary[phrase]?.get(index) ?: friendlyHttpStatus.find(phrase)?.let { status ->
+        vocabulary[phrase.replaceRange(status.groups[1]!!.range, "%s")]?.get(index)?.replace("%s", status.groupValues[1])
+    } ?: return source
+    return translated + " · " + coded.groupValues[2]
 }
+
+private val friendlyErrorShape = Regex("""(.+) · ([A-Z][A-Z0-9_]+)""", RegexOption.DOT_MATCHES_ALL)
+private val friendlyHttpStatus = Regex("""（HTTP (\d{3})）""")
 
 @Composable fun ht(source: String): String {
     val setting = LocalHetuLanguage.current

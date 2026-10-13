@@ -427,9 +427,6 @@ internal fun rememberHxAurora(active: Boolean): Brush {
     )
 }
 
-@Suppress("unused")
-private val HxRingShape = CircleShape
-
 /* ------------------------------------------------------------------ */
 /*  Interaction helpers                                                 */
 /* ------------------------------------------------------------------ */

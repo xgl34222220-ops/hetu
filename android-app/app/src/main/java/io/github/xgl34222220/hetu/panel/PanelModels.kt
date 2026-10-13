@@ -535,15 +535,6 @@ internal object PanelLogic {
         if ('\r' in settings.secret || '\n' in settings.secret) put("secret", "Secret 不能包含换行")
     }
 
-    private fun isHttpUrl(raw: String): Boolean {
-        val url = raw.trim()
-        val rest = when {
-            url.startsWith("https://", ignoreCase = true) -> url.substring(8)
-            url.startsWith("http://", ignoreCase = true) -> url.substring(7)
-            else -> return false
-        }
-        return rest.substringBefore('/').isNotEmpty() && url.none { it.isWhitespace() }
-    }
 }
 
 /** Two-letter region code from a node name; the table and the emoji detection live in [HomeRegions]. */

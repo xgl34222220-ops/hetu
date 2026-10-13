@@ -63,6 +63,7 @@ import io.github.xgl34222220.hetu.home.homeEnter
 import io.github.xgl34222220.hetu.home.rememberHomeStagger
 import io.github.xgl34222220.hetu.home.warnText
 import io.github.xgl34222220.hetu.ui.HetuStaggerState
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.ui.ht
 
 /**
@@ -168,13 +169,13 @@ private fun statusLook(state: ToolsAdblockState): StatusLook {
     // Applied by a core that cannot report its chain: say what is known, not 「运行链未确认」.
     if (state.coreManaged) return StatusLook(
         ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("已随核心启动"),
-        ht("广告域名在 ${state.coreLabel} 中按规则拦截；\n该核心不支持实时验证。"),
+        ht("广告域名在 %s 中按规则拦截；\n该核心不支持实时验证。").fill(state.coreLabel),
     )
     return when (state.status) {
         ToolsAdStatus.Protecting -> StatusLook(ToolsFeatureIcons.ShieldCheck, c.good, c.goodText, c.goodSoft, ht("保护中"), ht("广告域名直接 REJECT，\n其余流量照常分流。"))
         ToolsAdStatus.WrongMode -> StatusLook(
             ToolsFeatureIcons.ShieldAlert, c.warn, c.warnText, c.warnSoft,
-            ht("当前为${state.modeLabel.ifBlank { "非规则" }}模式"), ht("广告规则只在「规则」模式下生效。"),
+            ht("当前为%s模式").fill(ht(state.modeLabel.ifBlank { "非规则" })), ht("广告规则只在「规则」模式下生效。"),
         )
         ToolsAdStatus.Waiting -> StatusLook(ToolsFeatureIcons.Shield, c.t2, c.t1, c.sunken, ht("已开启"), ht("启动代理后自动验证运行链。"))
         ToolsAdStatus.Unverified -> StatusLook(ToolsFeatureIcons.ShieldAlert, c.warn, c.warnText, c.warnSoft, ht("运行链未确认"), ht("尚未确认规则模式及广告规则加载；下拉刷新后重试验证。"))
@@ -297,9 +298,9 @@ private fun ChainCard(
         // was never checked (miss 0) and one that sees hostless connections (miss > 0) differ.
         CheckRow(
             state.effective && state.hits > 0, ht("实际拦截"),
-            "%,d ".format(state.shownHits) + ht("次") + when {
+            ht("%s 次").fill("%,d".format(state.shownHits)) + when {
                 !running -> ""
-                state.hitsFromController -> " · " + ht("已检查") + " %,d ".format(state.missCount + state.hits) + ht("个连接")
+                state.hitsFromController -> " · " + ht("已检查 %s 个连接").fill("%,d".format(state.missCount + state.hits))
                 else -> " · " + ht("日志计数")
             },
         )

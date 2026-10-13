@@ -136,7 +136,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
         } catch (cancel: CancellationException) {
             throw cancel
         } catch (error: Exception) {
-            vm.toast(error.message ?: "配置读取失败")
+            vm.toastAs(HxTone.Bad, hxErrorMessage(error, "配置读取失败"))
         } finally {
             loading = false
         }
@@ -154,7 +154,7 @@ internal fun ConfigsScreen(vm: HetuViewModel) {
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                vm.toast(error.message ?: "操作失败")
+                vm.toastAs(HxTone.Bad, hxErrorMessage(error, "操作失败"))
             } finally {
                 busy = false
             }
@@ -352,7 +352,7 @@ private fun ConfigSubscriptionPage(vm: HetuViewModel, subscription: ProxySubscri
                 else vm.controller.updateSubscription(subscription.name, url.trim())
                 onSaved()
             } catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { problem = failure.message ?: "保存失败" }
+            catch (failure: Exception) { problem = hxErrorMessage(failure, "保存失败") }
             finally { busy = false }
         }
     }
@@ -446,7 +446,7 @@ internal fun ConfigImportPage(vm: HetuViewModel, onBack: () -> Unit, onImported:
                 }
                 onImported(message)
             } catch (cancel: CancellationException) { throw cancel }
-            catch (failure: Exception) { problem = failure.message ?: "配置导入失败" }
+            catch (failure: Exception) { problem = hxErrorMessage(failure, "配置导入失败") }
             finally { busy = false }
         }
     }
@@ -721,7 +721,7 @@ internal fun ConfigEditorScreen(
             dirty = false
             problem = null
         } catch (cancel: CancellationException) { throw cancel }
-        catch (failure: Exception) { loadFailure = failure.message ?: "配置读取失败" }
+        catch (failure: Exception) { loadFailure = hxErrorMessage(failure, "配置读取失败") }
         finally { loading = false }
     }
 
@@ -835,7 +835,7 @@ internal fun ConfigEditorScreen(
                 }
             } catch (cancel: CancellationException) { throw cancel }
             catch (changed: HxConfigSourceConflict) { conflict = changed }
-            catch (error: Exception) { problem = error.message ?: "保存失败" }
+            catch (error: Exception) { problem = hxErrorMessage(error, "保存失败") }
             finally { saving = false }
         }
     }

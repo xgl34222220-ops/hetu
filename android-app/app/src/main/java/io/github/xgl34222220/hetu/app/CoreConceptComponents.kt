@@ -1,5 +1,6 @@
 package io.github.xgl34222220.hetu
 
+import io.github.xgl34222220.hetu.ui.ht
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -93,12 +94,12 @@ internal fun CoreManagerPicker(family: String, current: String, statuses: List<P
             HxMenuItem(coreManagerDisplayName(item.id, item.label), { onPick(item.id) }, selected = item.id == current,
                 enabled = item.id !in otherSelected, description = if (item.runtimeReady) "下载与版本管理" else "暂不支持运行")
         }
-        Text("其他可管理核心", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
+        Text(ht("其他可管理核心"), color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp))
         listOf("v2fly", "hysteria").mapNotNull { id -> statuses.firstOrNull { it.id == id } }.forEach { item ->
             HxMenuItem(item.label, { onPick(item.id) }, selected = item.id == current, enabled = item.id !in otherSelected,
                 description = if (item.runtimeReady) "独立核心 · Root TPROXY / Redirect" else "独立核心 · 暂不支持运行")
         }
-        Text("不改变正在运行的代理", color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
+        Text(ht("不改变正在运行的代理"), color = Hx.colors.textFaint, fontSize = 11.sp, modifier = Modifier.padding(14.dp))
     }
     if (anchor != null) HxAnchoredMenu(anchor, onDismiss) { _ -> choices() }
     else HxSheet(onDismiss, title = "选择管理的核心") { choices() }

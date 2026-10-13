@@ -384,6 +384,21 @@ final class RootProxyManager {
         }
     }
 
+    /** 「仅所选应用代理」 has no usable selected app: the start is refused before Root is touched. */
+    static final class AppScopeException extends IOException{
+        AppScopeException(IOException cause){super(cause.getMessage(),cause);}
+    }
+    // RootProxyPolicy (outside this source layer) reports its whitelist refusal only as an
+    // IOException message; it is typed here, once, so callers never match the wording.
+    private RootProxyPolicy loadPolicy(ProxyRuntimeProfile profile)throws IOException{
+        try{return RootProxyPolicy.load(context,prefs,profile);}
+        catch(IOException error){
+            String message=error.getMessage();
+            if(profile.appScope==ProxyRuntimeProfile.AppScope.WHITELIST&&message!=null&&message.startsWith("当前是“仅所选应用代理”"))
+                throw new AppScopeException(error);
+            throw error;
+        }
+    }
     Prepared prepare(ProxyRuntimeProfile profile)throws Exception{
         return prepare(profile,0);
     }
@@ -410,7 +425,7 @@ final class RootProxyManager {
         if(override!=null)source=override.text;
         // Source YAML rule order is authoritative. PROCESS-NAME ... DIRECT remains inside
         // Mihomo and must not be promoted into a pre-Mihomo Root UID bypass.
-        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
+        RootProxyPolicy policy=loadPolicy(profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         String ebpfInterface=profile.mode==ProxyRuntimeProfile.Mode.EBPF?detectDefaultInterface():"";
@@ -470,7 +485,7 @@ final class RootProxyManager {
         // sing-box: a native JSON source is scripted as JSON, a Mihomo YAML source before conversion.
         OverrideScriptStart.Applied override=overrideScripts(profile,selected,source,selected==null||ProxyCoreConfig.looksJson(source),scriptable);
         if(override!=null)source=override.text;
-        RootProxyPolicy policy=RootProxyPolicy.load(context,prefs,profile);
+        RootProxyPolicy policy=loadPolicy(profile);
         ProxyAdblockRules.Snapshot adblock=profile.adblockChain?ProxyAdblockRules.export(context):null;
         int controllerPort=(fixedControllerPort>=29090&&fixedControllerPort<=29149)?fixedControllerPort:chooseControllerPort();
         ProxyCoreConfig.Options options=nativeOptions(profile,controllerPort,adblock);

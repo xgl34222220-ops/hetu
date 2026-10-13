@@ -234,12 +234,29 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     /* ---------------- messages ---------------- */
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 16)
     val messages: SharedFlow<String> = _messages
+    // Tones given explicitly by the caller; the keyword reading (hxToastTone) is only the fallback
+    // for messages posted without one. Bounded: only the most recent texts can still be on screen.
+    private val explicitToastTones = java.util.Collections.synchronizedMap(
+        object : LinkedHashMap<String, HxTone>(16, .75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, HxTone>?) = size > 32
+        },
+    )
     fun toast(text: String) {
-        if (text.isNotBlank()) _messages.tryEmit(text)
+        if (text.isBlank()) return
+        explicitToastTones.remove(text)
+        _messages.tryEmit(text)
     }
+    /** Posts [text] with a fixed colour instead of reading it from the wording. */
+    fun toastAs(tone: HxTone, text: String) {
+        if (text.isBlank()) return
+        explicitToastTones[text] = tone
+        _messages.tryEmit(text)
+    }
+    /** The tone of a posted toast: the caller's explicit tone, else the keyword fallback. */
+    internal fun toastTone(text: String): HxTone = explicitToastTones[text] ?: hxToastTone(text)
 
-    private fun errorText(error: Throwable, fallback: String): String =
-        error.message?.takeIf { it.isNotBlank() } ?: fallback
+    /** JVM network / I/O failures become a short Chinese phrase plus reason code (原文 → 日志). */
+    private fun errorText(error: Throwable, fallback: String): String = hxErrorMessage(error, fallback)
 
     /* ---------------- polling ---------------- */
     private var pollJob: Job? = null
@@ -796,7 +813,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         viewModelScope.launch {
             try { toast(controller.setAutoStart(enabled)) }
             catch (cancel: CancellationException) { throw cancel }
-            catch (error: Exception) { toast(errorText(error, "开机自启设置失败")) }
+            catch (error: Exception) { toastAs(HxTone.Bad, errorText(error, "开机自启设置失败")) }
             finally { autoStartBusy = false; bumpSettings() }
         }
     }
@@ -820,20 +837,22 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     // and the watchdog/status self-heal cadence is unchanged.
                     state = state.copy(running = true, healthObserved = false,
                         message = started.optString("message", state.message))
-                    toast("代理已启动")
+                    toastAs(HxTone.Good, "代理已启动")
                 }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 val reason = errorText(error, "操作失败")
                 // Configuration problems are known before Root is touched; report them at once.
-                val configProblem = !stopping && (reason.contains("占位") || reason.contains("尚未选择配置") || reason.contains("仅所选应用代理"))
+                // Typed by the controller (ProxyStartProblem), never read from the wording.
+                val kind = if (stopping) HxStartFailure.Runtime else hxStartFailure(error)
+                val configProblem = kind != HxStartFailure.Runtime
                 operationText = "确认最终运行状态…"
                 val recovered = if (configProblem || stopping) null else settleStart()
                 if (recovered != null) {
                     state = recovered
                 } else if (!stopping) {
-                    startupError = if (reason.contains("仅所选应用代理")) {
+                    startupError = if (kind == HxStartFailure.AppScope) {
                         "当前应用范围是「仅所选应用代理」，但没有选中任何可用应用。\n\n请到「设置 → 应用名单」至少勾选一个应用，或把应用范围改为其它模式后再启动。"
                     } else if (configProblem) {
                         reason
@@ -842,7 +861,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         if (diagnostics.isBlank()) reason else "$reason\n\n—— Root / Mihomo 诊断 ——\n${diagnostics.trim()}"
                     }
                 } else {
-                    toast(reason)
+                    toastAs(HxTone.Bad, reason)
                 }
             } finally {
                 operation = null
@@ -871,12 +890,12 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             try {
                 val result = controller.restart { operationText = it }
                 prefs.edit().remove("proxyRootRuntimeRefreshPending").remove("proxyRootUpgradeError").apply()
-                toast(if (result.optBoolean("ebpfHotUpdate", false)) "名单已通过 eBPF 热更新，无需重启" else "已重启，设置已生效")
+                toastAs(HxTone.Good, if (result.optBoolean("ebpfHotUpdate", false)) "名单已通过 eBPF 热更新，无需重启" else "已重启，设置已生效")
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
                 ProxyRuntimeSettings.recordFailure(prefs, error)
-                toast(errorText(error, "重启失败"))
+                toastAs(HxTone.Bad, errorText(error, "重启失败"))
             } finally {
                 operation = null
                 operationText = ""
@@ -904,7 +923,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "重载失败"))
+                toastAs(HxTone.Bad, errorText(error, "重载失败"))
             } finally {
                 operation = null
                 operationText = ""
@@ -948,7 +967,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "切换模式失败"))
+                toastAs(HxTone.Bad, errorText(error, "切换模式失败"))
             }
         }
     }
@@ -1019,7 +1038,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             // A failed controller request is not a node timeout. Keep the last
             // measurement, but explain why the real spinner ended without a result.
             if (currentRuntimeRequest(request) && latestNodeProbe[node] == owner)
-                toast(errorText(error, "节点测速请求失败"))
+                toastAs(HxTone.Bad, errorText(error, "节点测速请求失败"))
         }
     }
 
@@ -1078,7 +1097,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request)) toast(errorText(error, "策略组测速失败"))
+                if (currentRuntimeRequest(request)) toastAs(HxTone.Bad, errorText(error, "策略组测速失败"))
             } finally {
                 landed.close()
                 progress.cancel()
@@ -1132,7 +1151,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request)) toast(errorText(error, "测速失败"))
+                if (currentRuntimeRequest(request)) toastAs(HxTone.Bad, errorText(error, "测速失败"))
             } finally {
                 landed.close()
                 progress.cancel()
@@ -1178,7 +1197,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (!quiet) toast(errorText(error, "日志读取失败"))
+                if (!quiet) toastAs(HxTone.Bad, errorText(error, "日志读取失败"))
             } finally {
                 logsLoading = false
             }
@@ -1202,7 +1221,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && owner == latestSiteRead) toast(errorText(error, "测速失败"))
+                if (currentRuntimeRequest(request) && owner == latestSiteRead) toastAs(HxTone.Bad, errorText(error, "测速失败"))
             } finally {
                 if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
             }
@@ -1219,7 +1238,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "断开失败"))
+                toastAs(HxTone.Bad, errorText(error, "断开失败"))
             }
         }
     }
@@ -1233,7 +1252,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                toast(errorText(error, "断开失败"))
+                toastAs(HxTone.Bad, errorText(error, "断开失败"))
             }
         }
     }
@@ -1252,7 +1271,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && latestRulesRead == owner) toast(errorText(error, "规则读取失败"))
+                if (currentRuntimeRequest(request) && latestRulesRead == owner) toastAs(HxTone.Bad, errorText(error, "规则读取失败"))
             } finally {
                 if (latestRulesRead == owner) rulesLoading = false
             }
@@ -1271,7 +1290,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) toast(errorText(error, "规则集读取失败"))
+                if (currentRuntimeRequest(request) && latestRuleSetsRead == owner) toastAs(HxTone.Bad, errorText(error, "规则集读取失败"))
             } finally {
                 if (latestRuleSetsRead == owner) ruleSetsLoading = false
             }
@@ -1372,7 +1391,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && ruleSetsUpdateAllOwner == owner) toast(errorText(error, "规则集更新失败"))
+                if (currentRuntimeRequest(request) && ruleSetsUpdateAllOwner == owner) toastAs(HxTone.Bad, errorText(error, "规则集更新失败"))
             } finally {
                 ruleSetTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                     ruleSetTaskOwners.remove(name)
@@ -1396,7 +1415,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && owner == latestProviderRead) toast(errorText(error, "订阅读取失败"))
+                if (currentRuntimeRequest(request) && owner == latestProviderRead) toastAs(HxTone.Bad, errorText(error, "订阅读取失败"))
             }
         }
     }
@@ -1484,7 +1503,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
-                if (currentRuntimeRequest(request) && providersUpdateAllOwner == owner) toast(errorText(error, "订阅更新失败"))
+                if (currentRuntimeRequest(request) && providersUpdateAllOwner == owner) toastAs(HxTone.Bad, errorText(error, "订阅更新失败"))
             } finally {
                 providerTaskOwners.filterValues { it == owner }.keys.toList().forEach { name ->
                     providerTaskOwners.remove(name)

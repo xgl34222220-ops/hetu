@@ -131,6 +131,20 @@ internal data class ProxyComposeState(
     val controllerSupported: Boolean = true,
 )
 
+/**
+ * A manual start refused before Root is touched: the selected configuration or the app scope
+ * cannot run. Callers branch on the type; the message is the unchanged user-facing text, so a
+ * reworded or translated message never changes how the failure is handled.
+ */
+internal sealed class ProxyStartProblem(message: String, cause: Throwable? = null) : IllegalStateException(message, cause) {
+    class NoConfig : ProxyStartProblem("尚未选择配置")
+    class PlaceholderConfig : ProxyStartProblem(
+        "当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。",
+    )
+    /** 「仅所选应用代理」 with no usable selected app (RootProxyPolicy's own message is kept). */
+    class AppScope(cause: Throwable) : ProxyStartProblem(cause.message ?: "当前是“仅所选应用代理”，但没有可用的已选应用", cause)
+}
+
 internal class ProxyComposeController(context: Context) {
     private val app = context.applicationContext
     private val prefs = app.getSharedPreferences("hetu", Context.MODE_PRIVATE)
@@ -491,13 +505,15 @@ internal class ProxyComposeController(context: Context) {
             prefs.edit().putString("proxyBaseCore", "mihomo").apply()
             profile = ProxyRuntimeProfile.load(prefs)
         }
-        val selected = configs.selected(profile.core) ?: error("尚未选择配置")
-        if (!configs.hasConfiguredSubscription(selected)) {
-            error("当前是河图内置占位配置，尚未填写真实订阅。请到「设置 → 配置与订阅」添加订阅链接，或导入一份完整可运行的 YAML 配置。")
-        }
+        val selected = configs.selected(profile.core) ?: throw ProxyStartProblem.NoConfig()
+        if (!configs.hasConfiguredSubscription(selected)) throw ProxyStartProblem.PlaceholderConfig()
         // The pre-start hook runs inside the single Root start invocation (no extra su when
         // no hook exists); a failing hook still refuses the start before the network changes.
-        root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
+        try {
+            root.startManual(profile, RootProxyManager.Progress { onProgress(it) }, true)
+        } catch (scope: RootProxyManager.AppScopeException) {
+            throw ProxyStartProblem.AppScope(scope)
+        }
     }
 
     suspend fun reload(): String = withContext(Dispatchers.IO) {
@@ -930,19 +946,4 @@ internal class ProxyComposeController(context: Context) {
         return parsed
     }
 
-    private fun yamlScalar(value: String): String {
-        val s = value.trim()
-        if (s.isEmpty()) return ""
-        var quote = '\u0000'
-        var cut = s.length
-        for (i in s.indices) {
-            val c = s[i]
-            if (c == '\'' || c == '"') {
-                if (quote == '\u0000') quote = c else if (quote == c) quote = '\u0000'
-            } else if (c == '#' && quote == '\u0000') { cut = i; break }
-        }
-        var out = s.substring(0, cut).trim()
-        if (out.length >= 2 && ((out.first() == '\'' && out.last() == '\'') || (out.first() == '"' && out.last() == '"'))) out = out.substring(1, out.length - 1)
-        return out.replace("''", "'")
-    }
 }
