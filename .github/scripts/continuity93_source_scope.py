@@ -144,6 +144,9 @@ AUTHORIZED_FILES = frozenset((
     # keeps stable list keys, exports through SAF CreateDocument (no new permission) and pages
     # earlier lines.
     PACKAGE + 'ProxyLogViewerActivity.kt',
+    # 2026-10-13 WeChat message-latency fix: the subscription-exception list of WeChat message
+    # transports (MessagingFilterPolicy) also protects the Hong Kong hk*.weixin.qq.com transports.
+    PACKAGE + 'MessagingFilterPolicy.java',
 ))
 REVISION_FILE = PACKAGE + 'ProxyRuntimeSettings.java'
 REVISION_TEST = TEST_ROOT + 'java/io/github/xgl34222220/hetu/Runtime146ContractTest.kt'

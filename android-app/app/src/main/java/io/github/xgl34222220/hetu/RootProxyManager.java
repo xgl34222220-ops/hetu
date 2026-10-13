@@ -391,7 +391,10 @@ final class RootProxyManager {
     // RootProxyPolicy (outside this source layer) reports its whitelist refusal only as an
     // IOException message; it is typed here, once, so callers never match the wording.
     private RootProxyPolicy loadPolicy(ProxyRuntimeProfile profile)throws IOException{
-        try{return RootProxyPolicy.load(context,prefs,profile);}
+        // 微信直连（绕过核心）: opt-in, the WeChat UID joins the Root direct UIDs (never in 仅所选应用).
+        Set<String> wechatDirect=WechatTransport.kernelDirectPackages(
+                prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT,false),profile.appScope.id);
+        try{return RootProxyPolicy.load(context,prefs,profile,wechatDirect);}
         catch(IOException error){
             String message=error.getMessage();
             if(profile.appScope==ProxyRuntimeProfile.AppScope.WHITELIST&&message!=null&&message.startsWith("当前是“仅所选应用代理”"))
@@ -435,7 +438,7 @@ final class RootProxyManager {
         ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
         source=cleaned.text;
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
-                prefs.getBoolean("proxyRecommendedDns",false));
+                prefs.getBoolean("proxyRecommendedDns",false),true);
         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
         // Private comments carry an already validated routing projection into start/boot.
         // Keep the established startup argument protocol and the user's source untouched.
@@ -1586,6 +1589,7 @@ final class RootProxyManager {
     String diagnostics(){
         RootBridge.requireWorkerThread();
         DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
+        int wechatProxied=0,wechatDirect=0;
         report.section("上次应用闪退（本地记录）",AppCrashReport.read(context),16384);
         report.section("网络事件记录（本地，可独立于 Root 读取）",new ProxyNetworkJournal(context).report(prefs),65536);
         StringBuilder events=new StringBuilder("time=").append(new Date())
@@ -1698,6 +1702,11 @@ final class RootProxyManager {
                 // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
                 if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
                 StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
+                if(wechat){
+                    JSONArray chains=connection.optJSONArray("chains");
+                    if(chains!=null&&chains.length()>0&&!"DIRECT".equalsIgnoreCase(chains.optString(0)))wechatProxied++;
+                    else wechatDirect++;
+                }
                 int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                 destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                         .append(" uid=").append(metadata.optInt("uid",-1))
@@ -1738,6 +1747,15 @@ final class RootProxyManager {
                     +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
             device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
             report.section("系统网络与消息排查线索",device,2500);
+            boolean wechatInstalled=true;
+            try{context.getPackageManager().getApplicationInfo(WechatTransport.PACKAGE,0);}catch(Exception missing){wechatInstalled=false;}
+            Boolean exempt=power==null?null:power.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE);
+            String keepAlive=boundedRootShell(context,"grep -E '^disable-keep-alive:' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true",3000L).output;
+            java.util.List<String> hints=WechatTransport.hints(wechatInstalled,exempt,wechatProxied,wechatDirect,
+                    prefs.getBoolean(WechatTransport.PREF_KERNEL_DIRECT,false),
+                    prefs.getBoolean("proxyCnIpKernelV4",false)||prefs.getBoolean("proxyCnIpKernelV6",false),
+                    profile.appScope.id,keepAlive!=null&&keepAlive.contains("true"));
+            report.section("微信消息延迟排查提示",hints.isEmpty()?"未发现明显问题":String.join("\n",hints),2500);
             MihomoControllerClient controller=new MihomoControllerClient(context);
             String mode14=controller.configs().optString("mode","unknown");
             JSONObject providers14=controller.ruleProviders().optJSONObject("providers");

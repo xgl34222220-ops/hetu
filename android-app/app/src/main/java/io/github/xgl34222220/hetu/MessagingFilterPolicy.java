@@ -12,7 +12,10 @@ final class MessagingFilterPolicy {
     private static final String[] TRANSPORT_HOSTS = {
             "long.weixin.qq.com", "short.weixin.qq.com", "sh2tjlong.weixin.qq.com",
             "szlong.weixin.qq.com", "szshort.weixin.qq.com", "szextshort.weixin.qq.com",
-            "extshort.weixin.qq.com", "minorshort.weixin.qq.com", "dns.weixin.qq.com"
+            "extshort.weixin.qq.com", "minorshort.weixin.qq.com", "dns.weixin.qq.com",
+            // Hong Kong/Macau/overseas-region WeChat accounts are served by the hk* transports.
+            "hklong.weixin.qq.com", "hkshort.weixin.qq.com", "hkextshort.weixin.qq.com",
+            "hkminorshort.weixin.qq.com", "hkshort6.weixin.qq.com", "szminorshort.weixin.qq.com"
     };
 
     static Set<String> subscriptionExceptions(Collection<String> userBlocks) {
