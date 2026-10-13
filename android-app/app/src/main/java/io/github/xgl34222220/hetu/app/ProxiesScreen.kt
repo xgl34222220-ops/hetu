@@ -510,17 +510,13 @@ private fun StrategyNodeCard(
     val delay = vm.delays[node.name] ?: node.lastDelay
     val testing = vm.testingNodes[node.name] == true
     val shape = RoundedCornerShape(15.dp)
-    val selectedLight = Color(0xFFE5ECFF)
-    val selectedDark = androidx.compose.ui.graphics.lerp(c.surfaceMuted, c.accentSoft, .42f)
-    val idleLight = Color(0xFFE7E8F3)
     val bg by animateColorAsState(
-        if (selected) { if (c.dark) selectedDark else selectedLight }
-        else { if (c.dark) c.surfaceMuted else idleLight },
+        if (selected) c.nodeSelected else c.nodeIdle,
         tween(HxMotion.Medium),
         label = "nodeCardBg",
     )
     val border by animateColorAsState(
-        if (selected) { if (c.dark) c.accent.copy(alpha = .55f) else Color(0xFF72A5FF) } else Color.Transparent,
+        if (selected) c.nodeSelectedRim else Color.Transparent,
         tween(HxMotion.Medium),
         label = "nodeCardBorder",
     )

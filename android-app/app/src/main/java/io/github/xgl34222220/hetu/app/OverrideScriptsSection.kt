@@ -55,6 +55,7 @@ import io.github.rosemoe.sora.widget.schemes.SchemeDarcula
 import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomePill
@@ -164,7 +165,11 @@ internal fun OverrideScriptsSection() {
         if (scripts.isEmpty()) {
             SettingsSection {
                 SettingsGroup {
-                    SettingsRow(ht("暂无覆写脚本"), subtitle = ht("新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。"), icon = HxIcons.Code, enabled = false)
+                    // Empty, not unavailable: normal ink and a way forward right in the row.
+                    SettingsRow(ht("暂无覆写脚本"), subtitle = ht("新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。"), icon = HxIcons.Code, iconTint = c.t2) {
+                        HomeButton("新建", { if (!busy) draft = OverrideDraft(null, "", OverrideScriptExamples.BLANK.source) },
+                            kind = HomeButtonKind.Soft, icon = ToolsIcons.Plus, enabled = !busy, height = 40.dp)
+                    }
                 }
             }
         }
@@ -173,7 +178,7 @@ internal fun OverrideScriptsSection() {
             val rowSource = remember(script.id) { MutableInteractionSource() }
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
-                    .clip(HomeDims.cardShape).background(c.surface).heightIn(min = 80.dp)
+                    .homeGlassPanel(HomeDims.cardShape, c.surface).heightIn(min = 80.dp)
                     .homeRowPressTint(rowSource)
                     .clickable(interactionSource = rowSource, indication = null, enabled = !busy, role = Role.Button, onClickLabel = "编辑") {
                         act { val text = withContext(Dispatchers.IO) { store.read(script.id) }; draft = OverrideDraft(script.id, script.name, text) }

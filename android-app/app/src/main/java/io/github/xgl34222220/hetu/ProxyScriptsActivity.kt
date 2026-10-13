@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeButton
 import io.github.xgl34222220.hetu.home.HomeButtonKind
+import io.github.xgl34222220.hetu.home.homeGlassPanel
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIconButton
 import io.github.xgl34222220.hetu.home.HomeMenuDivider
@@ -215,7 +216,10 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
             item("empty") {
                 SettingsSection {
                     SettingsGroup {
-                        SettingsRow(ht("暂无脚本"), subtitle = ht("导入的脚本会列在这里，可以随时手动执行。"), icon = HxIcons.FileTerminal, enabled = false)
+                        // Empty, not unavailable: normal ink and a way forward right in the row.
+                        SettingsRow(ht("暂无脚本"), subtitle = ht("导入的脚本会列在这里，可以随时手动执行。"), icon = HxIcons.FileTerminal, iconTint = c.t2) {
+                            HomeButton("导入", { pickScript() }, kind = HomeButtonKind.Soft, icon = ToolsIcons.Plus, enabled = !busy, height = 40.dp)
+                        }
                     }
                 }
             }
@@ -223,7 +227,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
         items(managedScripts, key = { it.name }) { script ->
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
-                    .clip(HomeDims.cardShape).background(c.surface).heightIn(min = 80.dp)
+                    .homeGlassPanel(HomeDims.cardShape, c.surface).heightIn(min = 80.dp)
                     .padding(start = HomeRowDims.start, end = 8.dp, top = 12.dp, bottom = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

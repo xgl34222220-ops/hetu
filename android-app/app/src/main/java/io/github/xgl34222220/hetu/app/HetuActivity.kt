@@ -23,6 +23,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.semantics.LiveRegionMode
+import androidx.compose.ui.semantics.liveRegion
+import androidx.compose.ui.semantics.semantics
 import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import kotlinx.coroutines.CancellationException
@@ -565,6 +568,7 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
     val motion = LocalHetuMotionEnabled.current
     var floatingMessage by remember { mutableStateOf<String?>(null) }
     var shownMessage by remember { mutableStateOf("") }
+    var expandedMessage by remember { mutableStateOf<String?>(null) }
     val haptics = rememberHetuHaptics()
     LaunchedEffect(vm) {
         vm.messages.collectLatest { message ->
@@ -587,7 +591,20 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
             fadeOut(tween(150)) +
             scaleOut(tween(180), targetScale = .9f) else ExitTransition.None,
     ) {
-        HxToast(shownMessage, onDismiss = { floatingMessage = null })
+        HxToast(shownMessage, onDismiss = { floatingMessage = null }, onExpand = { full ->
+            floatingMessage = null
+            expandedMessage = full
+        })
+    }
+    // A message cut at two lines opens here in full, with copy.
+    expandedMessage?.let { full ->
+        val context = androidx.compose.ui.platform.LocalContext.current
+        HxSheet(onDismiss = { expandedMessage = null }, title = ht("完整信息"), showClose = true) {
+            androidx.compose.foundation.text.selection.SelectionContainer {
+                Text(ht(full), Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), color = io.github.xgl34222220.hetu.home.LocalHomeColors.current.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 22.sp))
+            }
+            HxButton(ht("复制"), onClick = { hxCopy(context, "河图", full) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), filled = false)
+        }
     }
 }
 
@@ -638,13 +655,15 @@ internal fun hxToastTone(message: String): HxTone = when {
 
 /** Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss. */
 @Composable
-private fun HxToast(message: String, onDismiss: () -> Unit) {
+private fun HxToast(message: String, onDismiss: () -> Unit, onExpand: (String) -> Unit = {}) {
     val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
     val tone = hxToastTone(message)
     var drag by remember { mutableStateOf(0f) }
     val shape = RoundedCornerShape(50)
+    var cut by remember(message) { mutableStateOf(false) }
     Row(
         Modifier
+            .semantics { liveRegion = LiveRegionMode.Polite }
             .graphicsLayer {
                 translationY = drag
                 alpha = (1f - drag / 160f).coerceIn(0f, 1f)
@@ -660,7 +679,7 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
                     }
                 },
             )
-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = { if (cut) onExpand(message) else onDismiss() })
             .homeGlassPanel(shape, c.raised, raised = true)
             .heightIn(min = 48.dp)
             .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
@@ -680,6 +699,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
             )
         }
         Spacer(Modifier.width(10.dp))
-        Text(message, color = c.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), maxLines = 2)
+        Text(
+            ht(message),
+            color = c.t1,
+            style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
+            maxLines = 2,
+            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            onTextLayout = { cut = it.hasVisualOverflow },
+        )
     }
 }

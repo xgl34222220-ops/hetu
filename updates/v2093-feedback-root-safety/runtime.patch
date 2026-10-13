@@ -55030,10 +55030,19 @@ index 48280df..b453abf 100644
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
-index 9aa0aba..924ab59 100644
+index 9aa0aba..ed33c7f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyNetworkAutomationActivity.kt
-@@ -79,11 +79,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
+@@ -5,6 +5,8 @@ import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.home.HomeIcons
+ import io.github.xgl34222220.hetu.home.HomeRowLayout
+ import io.github.xgl34222220.hetu.home.HomeStatusDot
++import io.github.xgl34222220.hetu.home.HomePill
++import io.github.xgl34222220.hetu.home.HomeTone
+ import io.github.xgl34222220.hetu.home.LocalHomeColors
+ import io.github.xgl34222220.hetu.panel.PanelIcons
+ import io.github.xgl34222220.hetu.tools.ToolsIcons
+@@ -79,11 +81,14 @@ private fun ProxyNetworkAutomationPage(onBack: () -> Unit) {
      fun setEnabled(value: Boolean) {
          prefs.edit().putBoolean("networkMatchEnabled", value).apply()
          if (value) service("START") else context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
@@ -55048,7 +55057,17 @@ index 9aa0aba..924ab59 100644
          scope.launch { delay(550); refresh() }
      }
      fun currentAction(key: String, def: String): String = when (prefs.getString(key, def)) {
-@@ -343,8 +346,21 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -339,12 +344,31 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+     val enabled = remember(revision) { prefs.getBoolean("networkMatchEnabled", false) }
+     val mobile = remember(revision) { prefs.getBoolean("networkMatchMobile", false) }
+     val environment = remember(revision) { prefs.getString("networkMatchLastEnvironment", "尚未获取当前网络").orEmpty() }
++    // The service records "environment|matched|action" after each evaluation; only trust it for the environment shown.
++    val matched = remember(revision, environment) {
++        prefs.getString("networkMatchLastSig", "").orEmpty().split('|')
++            .takeIf { it.size >= 3 && it.dropLast(2).joinToString("|") == environment }
++            ?.let { it[it.size - 2].toBooleanStrictOrNull() }
++    }
+     val ssidOriginal = remember(revision) { prefs.getStringSet("networkMatchSsids", emptySet()).orEmpty().sorted() }
      val bssidOriginal = remember(revision) { prefs.getStringSet("networkMatchBssids", emptySet()).orEmpty().sorted() }
      val ssids = remember(ssidOriginal) { mutableStateListOf<HxEditEntry>().apply { ssidOriginal.forEach { add(HxEditEntry(it)) } } }
      val bssids = remember(bssidOriginal) { mutableStateListOf<HxEditEntry>().apply { bssidOriginal.forEach { add(HxEditEntry(it)) } } }
@@ -55071,7 +55090,7 @@ index 9aa0aba..924ab59 100644
 
      fun refresh() { revision++ }
      fun service(action: String) {
-@@ -354,6 +370,8 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -354,6 +378,8 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
      fun evaluate() {
          prefs.edit().putBoolean("networkMatchForceEval", true).apply()
          if (prefs.getBoolean("networkMatchEnabled", false)) service("EVAL")
@@ -55080,7 +55099,7 @@ index 9aa0aba..924ab59 100644
          scope.launch { delay(550); refresh() }
      }
      val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
-@@ -370,10 +388,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -370,10 +396,37 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
          }
          if (needs.isNotEmpty()) permissionLauncher.launch(needs.toTypedArray()) else evaluate()
      }
@@ -55122,7 +55141,7 @@ index 9aa0aba..924ab59 100644
      }
      fun save() {
          val bad = values(bssids).firstOrNull { !it.matches(Regex("(?i)^[0-9a-f]{2}(?::[0-9a-f]{2}){5}$")) }
-@@ -381,9 +426,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -381,9 +434,15 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
              vm.toast("BSSID 格式无效：$bad")
              return
          }
@@ -55138,10 +55157,22 @@ index 9aa0aba..924ab59 100644
              .apply()
          vm.toast("匹配条件已保存")
          refresh()
-@@ -411,6 +462,20 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -407,9 +466,29 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                 SettingsGroup {
+                     HomeRowLayout(
+                         AnnotatedString(ht("当前环境")), subtitle = environment,
+-                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) HxIcons.Signal else PanelIcons.Globe,
++                        icon = if (environment.startsWith("Wi")) ToolsIcons.Wifi else if (environment.contains("移动")) ToolsIcons.RadioTower else PanelIcons.Globe,
                          iconTint = home.accent,
-                         trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
-                     )
+-                        trailing = { HomeStatusDot(if (enabled) home.good else home.t3, pulse = enabled) },
++                        trailing = {
++                            when {
++                                !enabled -> HomePill(ht("未开启"), tone = HomeTone.Neutral)
++                                matched == true -> HomePill(ht("已匹配"), tone = HomeTone.Good)
++                                matched == false -> HomePill(ht("未匹配"), tone = HomeTone.Neutral)
++                            }
++                        },
++                    )
 +                    SettingsDivider()
 +                    val owns = daemon?.ownsNetworkMatch() == true
 +                    HomeRowLayout(
@@ -55155,11 +55186,10 @@ index 9aa0aba..924ab59 100644
 +                        icon = HxIcons.Radio,
 +                        iconTint = home.accent,
 +                        trailing = { HomeStatusDot(if (owns) home.good else home.t3, pulse = owns) },
-+                    )
+                     )
                  }
              }
-         }
-@@ -426,6 +491,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -426,6 +505,7 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          } else {
                              prefs.edit().putBoolean("networkMatchEnabled", false).apply()
                              context.stopService(Intent(context, ProxyNetworkMatchService::class.java))
@@ -55167,20 +55197,20 @@ index 9aa0aba..924ab59 100644
                              refresh()
                          }
                      }, subtitle = ht(if (enabled) "监听服务正在运行" else "关闭后不会自动启停代理"), icon = HxIcons.Radio)
-@@ -435,6 +501,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -435,6 +515,12 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                          refresh()
                          evaluate()
                      }, subtitle = ht("使用蜂窝网络时视为匹配"), icon = ToolsIcons.RadioTower)
 +                    SettingsDivider()
 +                    SettingsSwitchRow(ht("卡1 · 蜂窝数据"), "1" in simSlots, { toggleSlot("1", it) },
-+                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
++                        subtitle = ht("默认数据卡在卡槽 1 且使用蜂窝网络时匹配"), icon = HxIcons.Smartphone)
 +                    SettingsDivider()
 +                    SettingsSwitchRow(ht("卡2 · 蜂窝数据"), "2" in simSlots, { toggleSlot("2", it) },
-+                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Signal)
++                        subtitle = ht("默认数据卡在卡槽 2 且使用蜂窝网络时匹配"), icon = HxIcons.Smartphone)
                  }
              }
          }
-@@ -448,6 +520,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -448,6 +534,10 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      SettingsNavRow(ht("条件失配"), compact = true, icon = HxIcons.CircleStop, value = ht(actionLabel("networkUnmatchAction", "none")), dropdown = true) {
                          actionKey = "networkUnmatchAction"
                      }
@@ -55191,7 +55221,7 @@ index 9aa0aba..924ab59 100644
                  }
              }
          }
-@@ -457,6 +533,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -457,6 +547,9 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "bssid") {
              SettingsSection { HxEditableList("Wi‑Fi BSSID（留空不限）", "BSSID", "AA:BB:CC:DD:EE:FF", bssids) }
          }
@@ -55201,13 +55231,13 @@ index 9aa0aba..924ab59 100644
          item(key = "note") {
              HxBanner(
                  ht("部分 Android 版本读取 SSID / BSSID 需要附近设备或定位权限；权限不足时不会猜测 Wi‑Fi 名称。"),
-@@ -471,15 +550,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -471,15 +564,40 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
              title = if (key == "networkMatchAction") ht("匹配成功动作") else ht("失配动作"),
              referenceRadios = true,
              trailingReferenceRadios = key == "networkUnmatchAction",
 -            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理"))),
 -            selected = prefs.getString(key, if (key == "networkMatchAction") "start" else "none"),
-+            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动 Root 代理")), HxChoice("stop", ht("停止 Root 代理")),
++            choices = listOf(HxChoice("none", ht("不操作")), HxChoice("start", ht("启动代理")), HxChoice("stop", ht("停止代理")),
 +                HxChoice("switch", ht("切换配置…")), HxChoice("script", ht("运行脚本…"))),
 +            selected = NetworkMatchRules.parseAction(prefs.getString(key, if (key == "networkMatchAction") "start" else "none")).kind,
              onPick = { value ->
@@ -56048,10 +56078,18 @@ index 7ebf26f..7b4be3f 100644
      private static final Set<String> RESTART_KEYS = Collections.unmodifiableSet(new HashSet<>(Arrays.asList(
              "proxyBaseCore","proxyBaseMode","proxyBaseIpv6","proxyAppScope","proxyDnsHijack",
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
-index e5290b9..0a177cf 100644
+index e5290b9..92c20f3 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyScriptsActivity.kt
-@@ -179,25 +179,26 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+@@ -49,6 +49,7 @@ import androidx.compose.ui.unit.dp
+ import androidx.compose.ui.unit.sp
+ import io.github.xgl34222220.hetu.home.HomeButton
+ import io.github.xgl34222220.hetu.home.HomeButtonKind
++import io.github.xgl34222220.hetu.home.homeGlassPanel
+ import io.github.xgl34222220.hetu.home.HomeDims
+ import io.github.xgl34222220.hetu.home.HomeIconButton
+ import io.github.xgl34222220.hetu.home.HomeMenuDivider
+@@ -179,25 +180,26 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
              }
          },
      ) {
@@ -56095,7 +56133,28 @@ index e5290b9..0a177cf 100644
                  }
              }
          }
-@@ -244,6 +245,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+@@ -214,7 +216,10 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+             item("empty") {
+                 SettingsSection {
+                     SettingsGroup {
+-                        SettingsRow(ht("暂无脚本"), subtitle = ht("导入的脚本会列在这里，可以随时手动执行。"), icon = HxIcons.FileTerminal, enabled = false)
++                        // Empty, not unavailable: normal ink and a way forward right in the row.
++                        SettingsRow(ht("暂无脚本"), subtitle = ht("导入的脚本会列在这里，可以随时手动执行。"), icon = HxIcons.FileTerminal, iconTint = c.t2) {
++                            HomeButton("导入", { pickScript() }, kind = HomeButtonKind.Soft, icon = ToolsIcons.Plus, enabled = !busy, height = 40.dp)
++                        }
+                     }
+                 }
+             }
+@@ -222,7 +227,7 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
+         items(managedScripts, key = { it.name }) { script ->
+             Row(
+                 Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
+-                    .clip(HomeDims.cardShape).background(c.surface).heightIn(min = 80.dp)
++                    .homeGlassPanel(HomeDims.cardShape, c.surface).heightIn(min = 80.dp)
+                     .padding(start = HomeRowDims.start, end = 8.dp, top = 12.dp, bottom = 12.dp),
+                 verticalAlignment = Alignment.CenterVertically,
+             ) {
+@@ -244,6 +249,9 @@ private fun ProxyScriptsScreen(onBack: () -> Unit) {
                  HomeIconButton(ToolsIcons.Trash2, "删除", { if (!busy) deleteTarget = script }, enabled = !busy, tint = c.t2, glyph = 22.dp)
              }
          }
@@ -58148,13 +58207,21 @@ index 0000000..bb43799
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt
 new file mode 100644
-index 0000000..07fab10
+index 0000000..bf80c61
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/StartupConfigViewer.kt
-@@ -0,0 +1,156 @@
+@@ -0,0 +1,187 @@
 +package io.github.xgl34222220.hetu
 +
++import androidx.compose.foundation.ScrollState
 +import androidx.compose.foundation.horizontalScroll
++import androidx.compose.ui.draw.drawWithContent
++import androidx.compose.ui.geometry.Offset
++import androidx.compose.ui.geometry.Size
++import androidx.compose.ui.graphics.BlendMode
++import androidx.compose.ui.graphics.Brush
++import androidx.compose.ui.graphics.CompositingStrategy
++import androidx.compose.ui.graphics.graphicsLayer
 +import androidx.compose.foundation.layout.Arrangement
 +import androidx.compose.foundation.layout.Column
 +import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -58203,6 +58270,7 @@ index 0000000..07fab10
 +    color: Color,
 +    modifier: Modifier = Modifier,
 +    annotated: ((String) -> AnnotatedString)? = null,
++    wrap: Boolean = false,
 +) {
 +    val chunks = remember(text) { startupConfigChunks(text) }
 +    key(text) {
@@ -58226,6 +58294,7 @@ index 0000000..07fab10
 +                        // The final paragraph can exceed the viewport height. An end
 +                        // anchor exposes its bottom; then reveal the end of a long line.
 +                        state.scrollToItem(chunks.size)
++                        if (wrap) return@launch
 +                        // Lazy placement and text measurement can finish after the vertical
 +                        // scroll request. Await the real viewport and glyph measurement,
 +                        // rather than deriving an offset from their initial zero values.
@@ -58248,21 +58317,22 @@ index 0000000..07fab10
 +                    SelectionContainer {
 +                        // The outer modifier measures the clipped horizontal viewport,
 +                        // while TextLayoutResult measures the full paragraph inside it.
-+                        val scroll = Modifier.onSizeChanged {
-+                            if (index == chunks.lastIndex) tailViewportWidth = it.width
-+                        }.horizontalScroll(when (index) {
++                        val sideways = when (index) {
 +                            chunks.lastIndex -> tailScroll
 +                            0 -> headScroll
 +                            else -> rememberScrollState()
-+                        })
++                        }
++                        val scroll = if (wrap) Modifier.fillMaxWidth() else Modifier.onSizeChanged {
++                            if (index == chunks.lastIndex) tailViewportWidth = it.width
++                        }.startupConfigMoreRight(sideways).horizontalScroll(sideways)
 +                        val onLayout: (TextLayoutResult) -> Unit = { layout ->
 +                            if (index == chunks.lastIndex) {
 +                                val end = part.indexOfLast { it != '\n' && it != '\r' }.coerceAtLeast(0)
 +                                tailEndX = layout.getBoundingBox(end).right
 +                            }
 +                        }
-+                        if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)
-+                        else Text(remember(part, annotated) { annotated(part) }, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)
++                        if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = wrap, onTextLayout = onLayout)
++                        else Text(remember(part, annotated) { annotated(part) }, scroll, color = color, style = style, softWrap = wrap, onTextLayout = onLayout)
 +                    }
 +                }
 +                if (chunks.size > 1) item(key = "end") { Spacer(Modifier.height(1.dp)) }
@@ -58270,6 +58340,26 @@ index 0000000..07fab10
 +        }
 +    }
 +}
++
++/** Fades the right edge of a line while more of it lies to the right, so a cut line reads as "scroll on". */
++private fun Modifier.startupConfigMoreRight(state: ScrollState): Modifier =
++    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
++        drawContent()
++        if (state.value < state.maxValue) {
++            val edge = 28.dp.toPx().coerceAtMost(size.width)
++            drawRect(
++                Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - edge, endX = size.width),
++                topLeft = Offset(size.width - edge, 0f), size = Size(edge, size.height), blendMode = BlendMode.DstIn,
++            )
++        }
++    }
++
++private val startupSecretLine = Regex("""(?m)^(\s*(?:-\s*)?secret\s*:\s*)(['"]?)[^'"\r\n#]+\2""")
++private val startupUrlQuery = Regex("""(https?://[^\s'"?#]+)\?[^\s'"#,}\]]+""")
++
++/** Display copy with subscription-URL queries and `secret:` values hidden; copy and export keep the original. */
++internal fun maskStartupSecrets(text: String): String =
++    startupUrlQuery.replace(startupSecretLine.replace(text) { it.groupValues[1] + it.groupValues[2] + "••••••" + it.groupValues[2] }) { it.groupValues[1] + "?••••••" }
 +
 +private data class StartupConfigChunk(val start: Int, val end: Int)
 +
@@ -58569,10 +58659,26 @@ index e4053e5..72b8798 100644
      }
 
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
-index e16a145..82106ba 100644
+index e16a145..cda7674 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt
-@@ -209,6 +209,31 @@ internal class RankState(dimension: String, sort: String) {
+@@ -1,5 +1,6 @@
+ package io.github.xgl34222220.hetu
+
++import androidx.compose.material3.minimumInteractiveComponentSize
+ import androidx.compose.foundation.horizontalScroll
+ import androidx.compose.foundation.rememberScrollState
+
+@@ -63,6 +64,8 @@ internal fun HxToggleChip(label: String, selected: Boolean, onChange: (Boolean)
+     val source = remember { MutableInteractionSource() }
+     Box(
+         Modifier
++            // Drawn 40 dp tall; the slot around it is the 48 dp touch target.
++            .minimumInteractiveComponentSize()
+             .hxPressScale(source, .94f)
+             .heightIn(min = 40.dp)
+             .clip(Hx.pillShape)
+@@ -209,6 +212,31 @@ internal class RankState(dimension: String, sort: String) {
      var sort by mutableStateOf(sort)
      var historical by mutableStateOf(false)
      var history by mutableStateOf<List<TrafficRank>>(emptyList())
@@ -58604,7 +58710,7 @@ index e16a145..82106ba 100644
  }
 
  @Composable
-@@ -218,20 +243,38 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
+@@ -218,20 +246,38 @@ internal fun rememberRankState(vm: HetuViewModel): RankState {
          RankState(
              vm.prefs.getString("overviewRankDimension", "host").orEmpty().ifBlank { "host" },
              vm.prefs.getString("overviewRankSort", "count").orEmpty().ifBlank { "count" },
@@ -58649,7 +58755,7 @@ index e16a145..82106ba 100644
          }
      }
      return state
-@@ -241,24 +284,43 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
+@@ -241,24 +287,43 @@ internal fun LazyListScope.rankItems(vm: HetuViewModel, rank: RankState) {
      val historyEnabled = vm.prefs.getBoolean("proxyApiHistoryEnabled", false)
      item(key = "rank-controls") {
          Column(Modifier.padding(horizontal = Hx.gutter).padding(bottom = 10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -59858,7 +59964,7 @@ index 0000000..4bae890
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
-index 2b1a624..265b68d 100644
+index 2b1a624..a2e299c 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuActivity.kt
 @@ -5,6 +5,9 @@ import io.github.xgl34222220.hetu.home.homeDiffuseCanvas
@@ -59871,7 +59977,17 @@ index 2b1a624..265b68d 100644
  import android.content.Intent
  import android.os.Bundle
  import androidx.activity.ComponentActivity
-@@ -30,6 +33,10 @@ import androidx.activity.compose.setContent
+@@ -20,6 +23,9 @@ import androidx.compose.runtime.rememberCoroutineScope
+ import androidx.compose.ui.graphics.graphicsLayer
+ import androidx.compose.ui.platform.LocalDensity
+ import androidx.compose.ui.platform.testTag
++import androidx.compose.ui.semantics.LiveRegionMode
++import androidx.compose.ui.semantics.liveRegion
++import androidx.compose.ui.semantics.semantics
+ import dev.chrisbanes.haze.hazeSource
+ import dev.chrisbanes.haze.rememberHazeState
+ import kotlinx.coroutines.CancellationException
+@@ -30,6 +36,10 @@ import androidx.activity.compose.setContent
  import androidx.activity.enableEdgeToEdge
  import androidx.compose.animation.AnimatedContent
  import androidx.compose.animation.EnterExitState
@@ -59882,7 +59998,7 @@ index 2b1a624..265b68d 100644
  import androidx.compose.animation.core.animateFloat
  import androidx.compose.animation.core.animateDpAsState
  import androidx.compose.ui.draw.drawWithContent
-@@ -89,13 +96,17 @@ import androidx.compose.runtime.getValue
+@@ -89,13 +99,17 @@ import androidx.compose.runtime.getValue
  import androidx.compose.runtime.mutableStateListOf
  import androidx.compose.runtime.mutableStateOf
  import androidx.compose.runtime.remember
@@ -59900,7 +60016,7 @@ index 2b1a624..265b68d 100644
  import androidx.compose.ui.unit.dp
  import androidx.lifecycle.ViewModelProvider
  import kotlinx.coroutines.flow.collectLatest
-@@ -113,6 +124,7 @@ class HetuActivity : ComponentActivity() {
+@@ -113,6 +127,7 @@ class HetuActivity : ComponentActivity() {
          enableEdgeToEdge()
          vm = ViewModelProvider(this)[HetuViewModel::class.java]
          if (savedInstanceState == null) applyStartPage(intent)
@@ -59908,7 +60024,7 @@ index 2b1a624..265b68d 100644
          setContent {
              HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
                  val revision = vm.settingsRevision
-@@ -122,6 +134,7 @@ class HetuActivity : ComponentActivity() {
+@@ -122,6 +137,7 @@ class HetuActivity : ComponentActivity() {
                  CompositionLocalProvider(LocalDensity provides scaledDensity) {
                      HetuRoot(vm, requestedRoute) { requestedRoute = null }
                  }
@@ -59916,7 +60032,7 @@ index 2b1a624..265b68d 100644
              }
          }
      }
-@@ -153,10 +166,8 @@ class HetuActivity : ComponentActivity() {
+@@ -153,10 +169,8 @@ class HetuActivity : ComponentActivity() {
              "strategy", "proxies", "strategysheet" -> vm.openPanel("proxies")
              "connections" -> vm.openPanel("conn")
              "providers", "subscriptions" -> vm.openPanel("providers")
@@ -59929,7 +60045,7 @@ index 2b1a624..265b68d 100644
              "rules" -> vm.openPanel("rules")
              "home" -> vm.tab = HxTab.Home
          }
-@@ -167,6 +178,30 @@ class HetuActivity : ComponentActivity() {
+@@ -167,6 +181,30 @@ class HetuActivity : ComponentActivity() {
      }
  }
 
@@ -59960,7 +60076,7 @@ index 2b1a624..265b68d 100644
  /* ------------------------------------------------------------------ */
  /*  Navigation                                                          */
  /* ------------------------------------------------------------------ */
-@@ -178,16 +213,10 @@ internal sealed class HxRoute(val key: String) {
+@@ -178,16 +216,10 @@ internal sealed class HxRoute(val key: String) {
      data object Providers : HxRoute("providers")
      data object Adblock : HxRoute("adblock")
      data object Network : HxRoute("network")
@@ -59977,7 +60093,7 @@ index 2b1a624..265b68d 100644
      data object Notifications : HxRoute("notifications")
      data object Theme : HxRoute("theme")
      data object DefaultPanelSettings : HxRoute("default-panel-settings")
-@@ -195,6 +224,7 @@ internal sealed class HxRoute(val key: String) {
+@@ -195,6 +227,7 @@ internal sealed class HxRoute(val key: String) {
      data object StartupDownloadSettings : HxRoute("startup-download-settings")
      data object PublicIp : HxRoute("public-ip")
      data object Resources : HxRoute("resources")
@@ -59985,7 +60101,7 @@ index 2b1a624..265b68d 100644
  }
 
  internal class HxNav {
-@@ -232,6 +262,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -232,6 +265,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      val routeHolder = rememberSaveableStateHolder()
      val scope = rememberCoroutineScope()
      val c = Hx.colors
@@ -59994,7 +60110,7 @@ index 2b1a624..265b68d 100644
      LaunchedEffect(startRoute) {
          if (startRoute != null) {
              nav.openRequested(startRoute)
-@@ -243,11 +275,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -243,11 +278,20 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      // Predictive back: the page follows the finger (shrinks toward the swipe edge with
      // rounded corners); releasing completes the normal return transition from there.
      val settingsRevision = vm.settingsRevision
@@ -60016,7 +60132,7 @@ index 2b1a624..265b68d 100644
      LaunchedEffect(nav.current) {
          if (nav.forward) {
              gestureRoute = null
-@@ -255,6 +296,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -255,6 +299,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          }
      }
      PredictiveBackHandler(enabled = nav.stack.size > 1 && predictiveBackEnabled) { events ->
@@ -60024,7 +60140,7 @@ index 2b1a624..265b68d 100644
          gestureRoute = nav.current
          try {
              events.collect { event ->
-@@ -263,8 +305,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -263,8 +308,10 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
              }
              nav.pop()
          } catch (cancel: CancellationException) {
@@ -60037,7 +60153,7 @@ index 2b1a624..265b68d 100644
                  gestureRoute = null
              }
              throw cancel
-@@ -277,13 +321,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -277,13 +324,13 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
          Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
              AnimatedContent(
                  targetState = nav.current,
@@ -60053,7 +60169,7 @@ index 2b1a624..265b68d 100644
                      label = "routeDim",
                  ) { phase ->
                      when (phase) {
-@@ -300,7 +344,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -300,7 +347,7 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              if (dim > 0f) drawRect(androidx.compose.ui.graphics.Color.Black.copy(alpha = dim))
                          }
                          .then(
@@ -60062,7 +60178,7 @@ index 2b1a624..265b68d 100644
                                  val p = backProgress.value
                                  val scale = 1f - .1f * p
                                  scaleX = scale
-@@ -313,22 +357,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -313,22 +360,16 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                  ) {
                      routeHolder.SaveableStateProvider(route.key) {
                          when (route) {
@@ -60086,7 +60202,7 @@ index 2b1a624..265b68d 100644
                              HxRoute.Notifications -> NotificationSettingsScreen(vm) { nav.pop() }
                              HxRoute.Theme -> HxThemeLabScreen(vm) { nav.pop() }
                              HxRoute.DefaultPanelSettings -> SettingsScreen(vm, 0.dp, "defaultPanel") { nav.pop() }
-@@ -336,13 +374,17 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -336,13 +377,17 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
                              HxRoute.StartupDownloadSettings -> SettingsScreen(vm, 0.dp, "startupDownload") { nav.pop() }
                              HxRoute.PublicIp -> HomePublicIpScreen(vm) { nav.pop() }
                              HxRoute.Resources -> HomeResourcesScreen(vm) { nav.pop() }
@@ -60105,7 +60221,7 @@ index 2b1a624..265b68d 100644
          }
 
          vm.startupError?.takeUnless { vm.tab == HxTab.Home && nav.stack.size == 1 }?.let { text ->
-@@ -351,7 +393,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
+@@ -351,7 +396,8 @@ internal fun HetuRoot(vm: HetuViewModel, startRoute: HxRoute? = null, onStartRou
      }
  }
 
@@ -60115,7 +60231,7 @@ index 2b1a624..265b68d 100644
      val duration = HxMotion.Route
      val ease = HxMotion.Emphasized
      // Card-stack navigation: the new page covers the old one from the right edge; the old
-@@ -372,12 +415,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
+@@ -372,12 +418,14 @@ private fun routeTransition(forward: Boolean): ContentTransform {
  }
 
  @Composable
@@ -60132,7 +60248,7 @@ index 2b1a624..265b68d 100644
      val settingsTick = vm.settingsRevision
      val showPanelDock = remember(settingsTick) { vm.prefs.getBoolean("showPanelDock", true) }
      val dockTabs = remember(settingsTick, vm.tab) {
-@@ -389,17 +434,24 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -389,17 +437,24 @@ private fun MainTabs(vm: HetuViewModel) {
          }
      }
      // Resolve only the fixed navigation labels; route keys and user content stay unchanged.
@@ -60166,7 +60282,7 @@ index 2b1a624..265b68d 100644
      // The concept's collapsed Tools/Settings pages retain their root navigation.
      // Other root pages keep their existing scroll behavior; child routes own no dock.
      var dockVisible by remember { mutableStateOf(true) }
-@@ -417,16 +469,22 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -417,16 +472,22 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
      }
@@ -60192,7 +60308,7 @@ index 2b1a624..265b68d 100644
                      val order = listOf("Home", "Panel", "Tools", "Settings")
                      val forward = order.indexOf(targetState) > order.indexOf(initialState)
                      (fadeIn(tween(HxMotion.Medium, delayMillis = 30, easing = HxMotion.Emphasized)) +
-@@ -435,6 +493,7 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -435,6 +496,7 @@ private fun MainTabs(vm: HetuViewModel) {
                              fadeOut(tween(110)) +
                                  slideOutHorizontally(tween(HxMotion.Long, easing = HxMotion.Emphasized)) { w -> (if (forward) -w else w) / 20 },
                          )
@@ -60200,7 +60316,7 @@ index 2b1a624..265b68d 100644
                  },
                  label = "tab",
              ) { tab ->
-@@ -449,12 +508,14 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -449,12 +511,14 @@ private fun MainTabs(vm: HetuViewModel) {
              }
          }
          val selectedIndex = dockTabs.indexOf(vm.tab).coerceAtLeast(0)
@@ -60218,7 +60334,7 @@ index 2b1a624..265b68d 100644
          if (!detailVisible) HetuGlassDock(
              items = items,
              selected = selectedIndex,
-@@ -463,15 +524,45 @@ private fun MainTabs(vm: HetuViewModel) {
+@@ -463,17 +527,48 @@ private fun MainTabs(vm: HetuViewModel) {
                  if (next == vm.tab) vm.reselect++ else vm.tab = next
              },
              hazeState = dockHaze,
@@ -60265,8 +60381,11 @@ index 2b1a624..265b68d 100644
 +    val motion = LocalHetuMotionEnabled.current
      var floatingMessage by remember { mutableStateOf<String?>(null) }
      var shownMessage by remember { mutableStateOf("") }
++    var expandedMessage by remember { mutableStateOf<String?>(null) }
      val haptics = rememberHetuHaptics()
-@@ -489,12 +580,12 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
+     LaunchedEffect(vm) {
+         vm.messages.collectLatest { message ->
+@@ -489,14 +584,27 @@ internal fun BoxScope.HxToastHost(vm: HetuViewModel, extraBottom: Dp = 24.dp) {
      AnimatedVisibility(
          visible = floatingMessage != null,
          modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = navBottom + extraBottom, start = 24.dp, end = 24.dp),
@@ -60281,9 +60400,25 @@ index 2b1a624..265b68d 100644
 -            scaleOut(tween(180), targetScale = .9f),
 +            scaleOut(tween(180), targetScale = .9f) else ExitTransition.None,
      ) {
-         HxToast(shownMessage, onDismiss = { floatingMessage = null })
+-        HxToast(shownMessage, onDismiss = { floatingMessage = null })
++        HxToast(shownMessage, onDismiss = { floatingMessage = null }, onExpand = { full ->
++            floatingMessage = null
++            expandedMessage = full
++        })
++    }
++    // A message cut at two lines opens here in full, with copy.
++    expandedMessage?.let { full ->
++        val context = androidx.compose.ui.platform.LocalContext.current
++        HxSheet(onDismiss = { expandedMessage = null }, title = ht("完整信息"), showClose = true) {
++            androidx.compose.foundation.text.selection.SelectionContainer {
++                Text(ht(full), Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 6.dp), color = io.github.xgl34222220.hetu.home.LocalHomeColors.current.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 22.sp))
++            }
++            HxButton(ht("复制"), onClick = { hxCopy(context, "河图", full) }, modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 10.dp), filled = false)
++        }
      }
-@@ -513,6 +604,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
+ }
+
+@@ -513,6 +621,7 @@ internal fun ComponentActivity.hxHost(content: @Composable (HetuViewModel) -> Un
                  Box(Modifier.fillMaxSize().homeDiffuseCanvas()) {
                      content(vm)
                      HxToastHost(vm)
@@ -60291,6 +60426,47 @@ index 2b1a624..265b68d 100644
                  }
              }
          }
+@@ -546,13 +655,15 @@ internal fun hxToastTone(message: String): HxTone = when {
+
+ /** Floating toast: a mark in the colour of its tone, then the message. Tap or flick down to dismiss. */
+ @Composable
+-private fun HxToast(message: String, onDismiss: () -> Unit) {
++private fun HxToast(message: String, onDismiss: () -> Unit, onExpand: (String) -> Unit = {}) {
+     val c = io.github.xgl34222220.hetu.home.LocalHomeColors.current
+     val tone = hxToastTone(message)
+     var drag by remember { mutableStateOf(0f) }
+     val shape = RoundedCornerShape(50)
++    var cut by remember(message) { mutableStateOf(false) }
+     Row(
+         Modifier
++            .semantics { liveRegion = LiveRegionMode.Polite }
+             .graphicsLayer {
+                 translationY = drag
+                 alpha = (1f - drag / 160f).coerceIn(0f, 1f)
+@@ -568,7 +679,7 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+                     }
+                 },
+             )
+-            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onDismiss)
++            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = { if (cut) onExpand(message) else onDismiss() })
+             .homeGlassPanel(shape, c.raised, raised = true)
+             .heightIn(min = 48.dp)
+             .padding(start = 12.dp, end = 20.dp, top = 9.dp, bottom = 9.dp),
+@@ -588,6 +699,13 @@ private fun HxToast(message: String, onDismiss: () -> Unit) {
+             )
+         }
+         Spacer(Modifier.width(10.dp))
+-        Text(message, color = c.t1, style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium), maxLines = 2)
++        Text(
++            ht(message),
++            color = c.t1,
++            style = io.github.xgl34222220.hetu.home.HomeType.note.copy(fontSize = 15.sp, lineHeight = 21.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Medium),
++            maxLines = 2,
++            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
++            onTextLayout = { cut = it.hasVisualOverflow },
++        )
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HetuJsLanguage.kt
 new file mode 100644
 index 0000000..57df735
@@ -60903,6 +61079,29 @@ index 250b8a8..76fa249 100644
 +    /** Offer 「重启代理」, which applies what a hot reload would have applied. */
 +    val offerRestart: Boolean = false,
 +)
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt
+index 9429d88..6cac84b 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxLucide.kt
+@@ -58,6 +58,18 @@ internal object HxIcons {
+         "M4.393 15.269A7 7 0 1 1 15.71 8h1.79a4.5 4.5 0 0 1 2.436 8.284",
+     ) }
+
++    val Eye: ImageVector by lazy { vector("Eye",
++        "M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0",
++        "M9 12a3 3 0 1 0 6 0a3 3 0 1 0 -6 0Z",
++    ) }
++
++    val EyeOff: ImageVector by lazy { vector("EyeOff",
++        "M10.733 5.076a10.744 10.744 0 0 1 11.205 6.575 1 1 0 0 1 0 .696 10.747 10.747 0 0 1-1.444 2.49",
++        "M14.084 14.158a3 3 0 0 1-4.242-4.242",
++        "M17.479 17.499a10.75 10.75 0 0 1-15.417-5.151 1 1 0 0 1 0-.696 10.75 10.75 0 0 1 4.446-5.143",
++        "M2 2L22 22",
++    ) }
++
+     val TextWrap: ImageVector by lazy { vector("TextWrap",
+         "m16 16-3 3 3 3",
+         "M3 12h14.5a1 1 0 0 1 0 7H13",
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
 index 241408e..465541e 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxMotionKit.kt
@@ -60937,7 +61136,7 @@ index fa7fd9d..30163f0 100644
                  state = pagerState,
                  modifier = Modifier.fillMaxSize().nestedScroll(foldConnection),
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
-index 5a9c877..ad5f3b7 100644
+index 5a9c877..6802546 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/HxTheme.kt
 @@ -3,6 +3,10 @@ package io.github.xgl34222220.hetu
@@ -60951,7 +61150,19 @@ index 5a9c877..ad5f3b7 100644
  import io.github.xgl34222220.hetu.ui.rememberHetuLanguage
  import io.github.xgl34222220.hetu.ui.HetuHaptic
  import io.github.xgl34222220.hetu.ui.rememberHetuHaptics
-@@ -278,6 +282,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
+@@ -112,6 +116,11 @@ private val DarkHx = HxColors(
+
+ internal val LocalHx = staticCompositionLocalOf { LightHx }
+
++/* Node cards of the 策略组 page: one place for the selected / idle fills and the selected rim, light and dark. */
++internal val HxColors.nodeSelected: Color get() = if (dark) androidx.compose.ui.graphics.lerp(surfaceMuted, accentSoft, .42f) else Color(0xFFE5ECFF)
++internal val HxColors.nodeIdle: Color get() = if (dark) surfaceMuted else Color(0xFFE7E8F3)
++internal val HxColors.nodeSelectedRim: Color get() = if (dark) accent.copy(alpha = .55f) else Color(0xFF72A5FF)
++
+ internal object Hx {
+     val colors: HxColors
+         @Composable get() = LocalHx.current
+@@ -278,6 +287,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
      }
 
      val language = rememberHetuLanguage()
@@ -60961,7 +61172,7 @@ index 5a9c877..ad5f3b7 100644
      // The home design kit draws every page of the four tabs, so its palette, haptics and motion
      // switch are provided here once, derived from the same appearance and accent as [LocalHx].
      val palette = remember(colors.accent, dark, pureBlack) { homeColors(dark = dark, accent = colors.accent, pureBlack = dark && pureBlack) }
-@@ -311,7 +318,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
+@@ -311,7 +323,9 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
          LocalHetuLanguage provides language,
          LocalHomeColors provides palette,
          LocalHomeHaptics provides homeHaptics,
@@ -60972,7 +61183,7 @@ index 5a9c877..ad5f3b7 100644
      ) {
          MaterialTheme(
              colorScheme = schemeFrom(unified),
-@@ -320,4 +329,4 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
+@@ -320,4 +334,4 @@ internal fun HetuAppTheme(appearance: String, dynamic: Boolean, accentHex: Strin
              content = content,
          )
      }
@@ -63236,10 +63447,10 @@ index 0000000..e526ede
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
 new file mode 100644
-index 0000000..77f75d6
+index 0000000..9173a5f
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/OverrideScriptsSection.kt
-@@ -0,0 +1,351 @@
+@@ -0,0 +1,356 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.graphics.Typeface
@@ -63297,6 +63508,7 @@ index 0000000..77f75d6
 +import io.github.rosemoe.sora.widget.schemes.SchemeGitHub
 +import io.github.xgl34222220.hetu.home.HomeButton
 +import io.github.xgl34222220.hetu.home.HomeButtonKind
++import io.github.xgl34222220.hetu.home.homeGlassPanel
 +import io.github.xgl34222220.hetu.home.HomeDims
 +import io.github.xgl34222220.hetu.home.HomeIconButton
 +import io.github.xgl34222220.hetu.home.HomePill
@@ -63406,7 +63618,11 @@ index 0000000..77f75d6
 +        if (scripts.isEmpty()) {
 +            SettingsSection {
 +                SettingsGroup {
-+                    SettingsRow(ht("暂无覆写脚本"), subtitle = ht("新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。"), icon = HxIcons.Code, enabled = false)
++                    // Empty, not unavailable: normal ink and a way forward right in the row.
++                    SettingsRow(ht("暂无覆写脚本"), subtitle = ht("新建脚本或导入 .js 文件，可添加规则、设置 DNS、合并节点。"), icon = HxIcons.Code, iconTint = c.t2) {
++                        HomeButton("新建", { if (!busy) draft = OverrideDraft(null, "", OverrideScriptExamples.BLANK.source) },
++                            kind = HomeButtonKind.Soft, icon = ToolsIcons.Plus, enabled = !busy, height = 40.dp)
++                    }
 +                }
 +            }
 +        }
@@ -63415,7 +63631,7 @@ index 0000000..77f75d6
 +            val rowSource = remember(script.id) { MutableInteractionSource() }
 +            Row(
 +                Modifier.fillMaxWidth().padding(horizontal = HomeDims.gutter).padding(bottom = 10.dp)
-+                    .clip(HomeDims.cardShape).background(c.surface).heightIn(min = 80.dp)
++                    .homeGlassPanel(HomeDims.cardShape, c.surface).heightIn(min = 80.dp)
 +                    .homeRowPressTint(rowSource)
 +                    .clickable(interactionSource = rowSource, indication = null, enabled = !busy, role = Role.Button, onClickLabel = "编辑") {
 +                        act { val text = withContext(Dispatchers.IO) { store.read(script.id) }; draft = OverrideDraft(script.id, script.name, text) }
@@ -63613,10 +63829,30 @@ index 820f6b5..3f00dcf 100644
              }
          },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
-index b7d3a38..7f0816b 100644
+index b7d3a38..93ea7e5 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ProxiesScreen.kt
-@@ -836,6 +836,10 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+@@ -510,17 +510,13 @@ private fun StrategyNodeCard(
+     val delay = vm.delays[node.name] ?: node.lastDelay
+     val testing = vm.testingNodes[node.name] == true
+     val shape = RoundedCornerShape(15.dp)
+-    val selectedLight = Color(0xFFE5ECFF)
+-    val selectedDark = androidx.compose.ui.graphics.lerp(c.surfaceMuted, c.accentSoft, .42f)
+-    val idleLight = Color(0xFFE7E8F3)
+     val bg by animateColorAsState(
+-        if (selected) { if (c.dark) selectedDark else selectedLight }
+-        else { if (c.dark) c.surfaceMuted else idleLight },
++        if (selected) c.nodeSelected else c.nodeIdle,
+         tween(HxMotion.Medium),
+         label = "nodeCardBg",
+     )
+     val border by animateColorAsState(
+-        if (selected) { if (c.dark) c.accent.copy(alpha = .55f) else Color(0xFF72A5FF) } else Color.Transparent,
++        if (selected) c.nodeSelectedRim else Color.Transparent,
+         tween(HxMotion.Medium),
+         label = "nodeCardBorder",
+     )
+@@ -836,6 +832,10 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
      val c = Hx.colors
      var draft by remember { mutableStateOf(PanelApiDraft11.read(vm.prefs)) }
      var error by remember { mutableStateOf<String?>(null) }
@@ -63627,7 +63863,7 @@ index b7d3a38..7f0816b 100644
 
      HxSheet(onDismiss = onDismiss, containerColor = c.canvas) {
          Column(
-@@ -876,10 +880,28 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+@@ -876,10 +876,28 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
              ApiSettingCard(
                  icon = Icons.Rounded.Hub,
                  title = "流量与连接历史",
@@ -63658,7 +63894,7 @@ index b7d3a38..7f0816b 100644
 
              ApiSettingCard(
                  icon = Icons.Rounded.Settings,
-@@ -949,6 +971,9 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
+@@ -949,6 +967,9 @@ internal fun ApiSettingsSheet(vm: HetuViewModel, onDismiss: () -> Unit) {
                          val problem = draft.validationError()
                          if (problem != null) error = problem else {
                              draft.save(vm.prefs)
@@ -63961,7 +64197,7 @@ index 2b4638e..e745381 100644
          )
          "mode" -> HxChoiceSheet(
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
-index ce5f550..94de2a1 100644
+index ce5f550..a6246a1 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsStartupConfigScreen.kt
 @@ -1,19 +1,17 @@
@@ -63986,7 +64222,7 @@ index ce5f550..94de2a1 100644
  import androidx.compose.runtime.Composable
  import androidx.compose.runtime.LaunchedEffect
  import androidx.compose.runtime.getValue
-@@ -47,11 +45,29 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -47,11 +45,34 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
      var text by remember { mutableStateOf("") }
      var busy by remember { mutableStateOf(false) }
      var message by remember { mutableStateOf("") }
@@ -63994,7 +64230,12 @@ index ce5f550..94de2a1 100644
 +    // 启动诊断: reference cleanup and where ports / DNS / fake-IP came from, recorded at prepare.
 +    var diagnostics by remember { mutableStateOf(prefs.getString("proxyStartupDiagnostics", "").orEmpty()) }
      val c = LocalHomeColors.current
-
++    // Display only: copy and export always use the untouched original.
++    var wrap by remember { mutableStateOf(false) }
++    var reveal by remember { mutableStateOf(false) }
++    val masked = remember(text) { maskStartupSecrets(text) }
++    val hidesSecrets = masked != text
++
 +    fun copy() {
 +        try {
 +            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
@@ -64008,7 +64249,7 @@ index ce5f550..94de2a1 100644
 +            message = "复制失败，剪贴板暂不可用；可改用导出"
 +        }
 +    }
-+
+
      fun load(regenerate: Boolean) {
          if (busy) return
          busy = true
@@ -64016,7 +64257,7 @@ index ce5f550..94de2a1 100644
          scope.launch {
              try {
                  text = withContext(Dispatchers.IO) {
-@@ -59,6 +75,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -59,6 +80,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                      manager.startupConfig()
                  }
                  message = if (regenerate) "启动配置已重新生成（未重启代理）" else ""
@@ -64024,7 +64265,7 @@ index ce5f550..94de2a1 100644
              } catch (cancel: CancellationException) { throw cancel }
              catch (error: Exception) { message = error.message ?: "尚未生成启动配置" }
              finally { busy = false }
-@@ -67,6 +84,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -67,6 +89,7 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
      LaunchedEffect(Unit) { load(false) }
      val exporter = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("text/yaml")) { uri ->
          if (uri != null) scope.launch {
@@ -64032,7 +64273,19 @@ index ce5f550..94de2a1 100644
              try {
                  withContext(Dispatchers.IO) {
                      context.contentResolver.openOutputStream(uri)?.use { it.write(text.toByteArray(Charsets.UTF_8)) }
-@@ -87,26 +105,34 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+@@ -77,7 +100,10 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
+             catch (error: Exception) { message = error.message ?: "导出失败" }
+         }
+     }
+-    HxPage(title = ht("启动配置"), subtitle = ht("河图生成的最终 Mihomo 运行副本"), largeTitle = false, onBack = onBack) {
++    HxPage(title = ht("启动配置"), subtitle = ht("河图生成的最终 Mihomo 运行副本"), largeTitle = false, onBack = onBack, actions = {
++        if (hidesSecrets) HxBarAction(if (reveal) HxIcons.EyeOff else HxIcons.Eye, if (reveal) "隐藏密钥" else "显示密钥", onClick = { reveal = !reveal })
++        HxBarAction(HxIcons.TextWrap, if (wrap) "不换行" else "自动换行", onClick = { wrap = !wrap })
++    }) {
+         item(key = "actions") {
+             SettingsSection {
+                 SettingsGroup {
+@@ -87,26 +113,38 @@ internal fun SettingsStartupConfigScreen(onBack: () -> Unit) {
                                  if (busy) HxSpinner(18.dp)
                              }
                          }
@@ -64048,6 +64301,10 @@ index ce5f550..94de2a1 100644
          if (message.isNotBlank()) item(key = "message") {
 -            HxBanner(message, tone = HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
 +            HxBanner(message, tone = if (copyFailed) HxTone.Bad else HxTone.Accent, modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
++        }
++        if (hidesSecrets && !reveal) item(key = "masked") {
++            HxBanner(ht("已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享"), tone = HxTone.Neutral,
++                modifier = Modifier.padding(horizontal = HomeDims.gutter).padding(bottom = HomeDims.gap))
 +        }
 +        if (diagnostics.isNotBlank()) item(key = "diagnostics") {
 +            SettingsSection {
@@ -64071,8 +64328,8 @@ index ce5f550..94de2a1 100644
 -                        )
 -                    }
 +                    StartupConfigViewer(
-+                        if (busy && text.isBlank()) ht("正在读取启动配置…") else text.ifBlank { ht("暂无启动配置") },
-+                        color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono,
++                        if (busy && text.isBlank()) ht("正在读取启动配置…") else (if (reveal) text else masked).ifBlank { ht("暂无启动配置") },
++                        color = if (text.isBlank()) c.t2 else c.t1, style = HomeType.mono, wrap = wrap,
 +                    )
                  }
              }
@@ -64514,7 +64771,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..e1fa2eb 100644
+index b41cf98..8cdf00f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -238,7 +238,8 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
@@ -64540,6 +64797,15 @@ index b41cf98..e1fa2eb 100644
      }
 
      fun saveMacs(values: List<String>): Boolean {
+@@ -291,7 +292,7 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
+         largeTitle = false,
+         subtitle = ht("热点、USB 与局域网转发流量"),
+         onBack = onBack,
+-        refreshing = loading,
++        refreshing = loading && snapshot.interfaces.isNotEmpty(),
+         onRefresh = { refresh++ },
+         actions = {
+             HxBarAction(Icons.Rounded.Refresh, "刷新", onClick = { refresh++ }, busy = loading)
 @@ -321,14 +322,14 @@ internal fun SharedNetworkScreen(vm: HetuViewModel, onBack: () -> Unit) {
                      when {
                          loading && snapshot.interfaces.isEmpty() -> SettingsRow(ht("正在读取接口…"), icon = Icons.Rounded.Cable) { HxSpinner(18.dp) }
@@ -64959,7 +65225,7 @@ index 0ceaa23..42638f4 100644
 +    )
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
-index 9afc132..ca3dd97 100644
+index 9afc132..b98c58f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeComponents.kt
 @@ -1,6 +1,7 @@
@@ -64978,7 +65244,15 @@ index 9afc132..ca3dd97 100644
  import androidx.compose.runtime.Stable
  import androidx.compose.runtime.State
  import androidx.compose.runtime.derivedStateOf
-@@ -313,15 +315,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
+@@ -76,6 +78,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
+ import androidx.compose.ui.semantics.Role
+ import androidx.compose.ui.semantics.contentDescription
+ import androidx.compose.ui.semantics.semantics
++import androidx.compose.ui.semantics.stateDescription
+ import androidx.compose.ui.text.TextStyle
+ import androidx.compose.ui.text.font.FontWeight
+ import androidx.compose.ui.text.input.KeyboardType
+@@ -313,15 +316,22 @@ internal fun HomeRegionCode(code: String, modifier: Modifier = Modifier) {
   */
  @Composable
  internal fun HomeStatusDot(color: Color, modifier: Modifier = Modifier, size: Dp = 8.dp, pulse: Boolean = false) {
@@ -65008,7 +65282,27 @@ index 9afc132..ca3dd97 100644
          drawCircle(tint, radius)
      }
  }
-@@ -724,16 +733,17 @@ internal class HomeBarGlass internal constructor(
+@@ -506,13 +516,18 @@ internal fun HomeIconButton(
+     val c = LocalHomeColors.current
+     val haptics = LocalHomeHaptics.current
+     val spoken = ht(label)
++    val working = ht("处理中")
+     val angle = homeSpinAngle(spinning)
+     Box(
+         modifier
+             .size(HomeDims.touch)
+             .clip(CircleShape)
+             .homeTap(enabled = enabled && !loading, onClickLabel = spoken, role = Role.Button) { haptics(HomeHaptic.Tap); onClick() }
+-            .semantics { contentDescription = spoken },
++            .semantics {
++                contentDescription = spoken
++                // The spinner alone says nothing to a screen reader.
++                if (loading) stateDescription = working
++            },
+         contentAlignment = Alignment.Center,
+     ) {
+         if (loading) HomeSpinner(size = 20.dp, color = c.t2)
+@@ -724,16 +739,17 @@ internal class HomeBarGlass internal constructor(
 
  @Composable
  internal fun rememberHomeBarGlass(lifted: Boolean): HomeBarGlass {
@@ -65030,7 +65324,7 @@ index 9afc132..ca3dd97 100644
  }
 
  /**
-@@ -747,7 +757,8 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
+@@ -747,7 +763,8 @@ internal fun HomeBarBackdrop(glass: HomeBarGlass, modifier: Modifier = Modifier)
      if (!glass.active) return
      val c = LocalHomeColors.current
      val line = c.line
@@ -65328,7 +65622,7 @@ index a6f5728..59d48c7 100644
                  onOpenResource = { destination = HomeDestination.Resource },
                  onOpenSpeedSource = { speedSheet = true },
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
-index e31ca99..9e17adc 100644
+index e31ca99..57c2f50 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeScreen.kt
 @@ -50,7 +50,6 @@ import androidx.compose.ui.platform.testTag
@@ -65400,7 +65694,7 @@ index e31ca99..9e17adc 100644
 -            HomeNodeCard(state, actions.onOpenNode, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
 -            HomeProbeCard(state, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 +            // WebUI · 日志 take the place the 当前节点 row used to hold.
-+            HomeShortcutRow(actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
++            HomeShortcutRow(state.status.isLive, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 2))
 +            HomeProbeCard(calm, onOpenTargets, actions.onProbe, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 3))
 
              Row(
@@ -65443,25 +65737,51 @@ index e31ca99..9e17adc 100644
  /** [HomeFormat.uptime] in the app language. */
  @Composable
  internal fun homeUptimeText(seconds: Long): String = when {
-@@ -288,7 +315,7 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+@@ -256,7 +283,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+         HomeStatusGlyph(glyph, Modifier.align(Alignment.BottomEnd).offset(x = 21.dp, y = 26.dp).size(116.dp), animate = motion, tint = tint)
+         Column(Modifier.padding(start = 20.dp, top = 12.dp, end = 104.dp, bottom = 14.dp)) {
+             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+-                HomeStatusDot(tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
++                HomeStatusDot(if (status is HomeStatus.PendingRestart && glyph == HomeGlyphMode.On) c.warn else tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
+                 HomeRollingText(title, c.t1, HomeType.heroStatus, alignment = Alignment.CenterStart)
+             }
+             HomeRollingText(line, c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
+@@ -275,7 +302,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
+ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+     val c = LocalHomeColors.current
+     Row(
+-        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 25.dp),
++        Modifier.homeTap(onClickLabel = ht(label), role = Role.Button, onClick = onClick).heightIn(min = 32.dp),
+         verticalAlignment = Alignment.CenterVertically,
+         horizontalArrangement = Arrangement.spacedBy(2.dp),
+     ) {
+@@ -287,8 +314,14 @@ private fun HeroLink(text: String, label: String, onClick: () -> Unit) {
+ /** A running core becomes a healthy local glyph only after both observations succeeded. */
  internal fun HomeUiState.homeHeroGlyphMode(): HomeGlyphMode {
      if (status !is HomeStatus.Running && status !is HomeStatus.PendingRestart) return status.glyphMode()
++    // Settings waiting for a restart are not a fault: the banner below says so, the ring stays on and
++    // only a real controller/takeover problem raises the mark.
++    if (status is HomeStatus.PendingRestart) return when (connection.health) {
++        HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
++        else -> HomeGlyphMode.On
++    }
      return when (connection.health) {
 -        HomeConnectionHealth.LocalReady -> HomeGlyphMode.On
 +        HomeConnectionHealth.LocalReady, HomeConnectionHealth.Verified -> HomeGlyphMode.On
          HomeConnectionHealth.Unconfirmed -> HomeGlyphMode.Unconfirmed
          HomeConnectionHealth.ControllerUnavailable, HomeConnectionHealth.TakeoverDegraded -> HomeGlyphMode.Attention
      }
-@@ -347,6 +374,38 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
+@@ -347,6 +380,39 @@ private fun HomeControlCard(state: HomeUiState, actions: HomeActions, modifier:
      }
  }
 
 +/** WebUI and 日志, side by side where 当前节点 used to sit. WebUI opens the default dashboard; 日志 the log page. */
 +@Composable
-+private fun HomeShortcutRow(actions: HomeActions, modifier: Modifier = Modifier) {
++private fun HomeShortcutRow(live: Boolean, actions: HomeActions, modifier: Modifier = Modifier) {
 +    Row(modifier.fillMaxWidth().height(IntrinsicSize.Min), horizontalArrangement = Arrangement.spacedBy(HomeDims.gap)) {
-+        HomeShortcutCard("WebUI", ht("Web 界面"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
-+        HomeShortcutCard(ht("日志"), ht("查看"), "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
++        // Subtitles say something the title does not: whether the panel can answer, and which log opens.
++        HomeShortcutCard("WebUI", ht(if (live) "打开面板" else "代理未运行"), "home-webui", actions.onOpenWebUi, Modifier.weight(1f).fillMaxHeight())
++        HomeShortcutCard(ht("日志"), "core.log", "home-logs", actions.onOpenLogs, Modifier.weight(1f).fillMaxHeight())
 +    }
 +}
 +
@@ -65491,7 +65811,7 @@ index e31ca99..9e17adc 100644
  @Composable
  private fun ControlDivider() {
      Box(Modifier.width(1.dp).height(24.dp).background(LocalHomeColors.current.line2))
-@@ -382,63 +441,6 @@ private fun RowScope.ControlAction(
+@@ -382,63 +448,6 @@ private fun RowScope.ControlAction(
      }
  }
 
@@ -65555,6 +65875,53 @@ index e31ca99..9e17adc 100644
  /* ------------------------------------------------------------------ */
  /*  Direct probe (本机直测)                                              */
  /* ------------------------------------------------------------------ */
+@@ -605,12 +614,16 @@ private fun HomeSubscriptionCard(state: HomeUiState, modifier: Modifier, onOpen:
+         header = {
+             MetricTitle("订阅")
+             Spacer(Modifier.weight(1f))
+-            Text(sub?.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
++            if (sub != null) Text(sub.remainingPercent?.let { ht("剩余 %d%%").fill(it) } ?: ht("总量未知"), color = c.t3, style = HomeType.caption, maxLines = 1)
+         },
+     ) {
+-        MetricLine("已用", sub?.let { HomeFormat.bytes(it.usedBytes) })
+-        MetricLine("总量", sub?.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
+-        HomeProgressBar(sub?.usedFraction, Modifier.padding(top = 10.dp))
++        if (sub == null) {
++            MetricEmpty("暂无订阅流量信息")
++        } else {
++            MetricLine("已用", HomeFormat.bytes(sub.usedBytes))
++            MetricLine("总量", sub.takeIf { it.totalBytes > 0L }?.let { HomeFormat.bytes(it.totalBytes) })
++            HomeProgressBar(sub.usedFraction, Modifier.padding(top = 10.dp))
++        }
+     }
+ }
+
+@@ -623,9 +636,22 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: ()
+         modifier = modifier, onClick = onOpen, clickLabel = "查看资源占用",
+         header = { MetricTitle("资源占用") },
+     ) {
+-        MetricLine("内存", res.memoryBytes?.takeIf { live }?.let(HomeFormat::bytes))
+-        MetricLine("CPU", cpu?.let(HomeFormat::percent))
+-        HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
++        if (!live) {
++            MetricEmpty("代理未运行")
++        } else {
++            MetricLine("内存", res.memoryBytes?.let(HomeFormat::bytes))
++            MetricLine("CPU", cpu?.let(HomeFormat::percent))
++            HomeProgressBar(cpu?.let { (it / 100f).coerceIn(.03f, 1f) }, Modifier.padding(top = 10.dp))
++        }
++    }
++}
++
++/** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
++@Composable
++private fun MetricEmpty(text: String) {
++    val c = LocalHomeColors.current
++    Box(Modifier.fillMaxWidth().height(75.dp), contentAlignment = Alignment.CenterStart) {
++        Text(ht(text), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
+     }
+ }
+
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
 index 552f3dd..cad6ae2 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/home/HomeStatusGlyph.kt
@@ -68553,7 +68920,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..fab9089 100644
+index 578ce9d..8c27eea 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -439,6 +439,8 @@ CPU 核心分配|CPU affinity|CPU 核心分配|Привязка к ядрам CP
@@ -68592,7 +68959,7 @@ index 578ce9d..fab9089 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,6 +991,17 @@ private val vocabularyConnection = """
+@@ -969,9 +991,34 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -68609,7 +68976,25 @@ index 578ce9d..fab9089 100644
 +Web 界面|Web interface|Web 介面|Веб-интерфейс
  """.trimIndent()
 
- private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
+-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection).joinToString("\n")
++// 2026-10 UI polish (toast detail, home metric empties, network-match status, startup-config viewer).
++private val vocabularyUiPolish = """
++完整信息|Full message|完整訊息|Полное сообщение
++暂无订阅流量信息|No subscription usage yet|暫無訂閱流量資訊|Нет данных о трафике подписки
++未开启|Off|未開啟|Выключено
++已匹配|Matched|已匹配|Совпало
++未匹配|Not matched|未匹配|Не совпало
++停止代理|Stop proxy|停止代理|Остановить прокси
++隐藏密钥|Hide secrets|隱藏密鑰|Скрыть секреты
++显示密钥|Show secrets|顯示密鑰|Показать секреты
++不换行|No wrap|不換行|Без переноса
++已隐藏订阅链接参数与 secret；复制和导出的是完整内容，请勿公开分享|Subscription URL parameters and secret are hidden; copy and export contain everything, so do not share them publicly|已隱藏訂閱連結參數與 secret；複製和匯出的是完整內容，請勿公開分享|Параметры ссылок подписки и secret скрыты; копирование и экспорт содержат всё — не публикуйте их
++""".trimIndent()
++
++private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish).joinToString("\n")
+     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
+
+ fun translateHetuText(source: String, language: String): String {
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
 index af5647d..18e1fce 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuMotion.kt
@@ -80153,6 +80538,60 @@ index 0000000..2f458a1
 +        app.getSharedPreferences("hetu", 0).edit().putString("proxyUiLastConfig", "another-config").commit()
 +        val other = HetuViewModel(app).also { extraVms += it }
 +        assertTrue("A different configuration never shows the cached cards", other.state.groups.isEmpty())
++    }
++}
+diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish106Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish106Test.kt
+new file mode 100644
+index 0000000..eaa1fdc
+--- /dev/null
++++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/UiPolish106Test.kt
+@@ -0,0 +1,48 @@
++package io.github.xgl34222220.hetu
++
++import android.app.Application
++import io.github.xgl34222220.hetu.home.HomeConnectionObservation
++import io.github.xgl34222220.hetu.home.HomeGlyphMode
++import io.github.xgl34222220.hetu.home.HomeStatus
++import io.github.xgl34222220.hetu.home.HomeUiState
++import io.github.xgl34222220.hetu.home.homeHeroGlyphMode
++import org.junit.Assert.assertEquals
++import org.junit.Assert.assertFalse
++import org.junit.Assert.assertTrue
++import org.junit.Test
++import org.junit.runner.RunWith
++import org.robolectric.RobolectricTestRunner
++import org.robolectric.annotation.Config
++
++/** 2026-10 UI polish: startup-config masking (display only) and the pending-restart hero glyph. */
++@RunWith(RobolectricTestRunner::class)
++@Config(sdk = [35], application = Application::class)
++class UiPolish106Test {
++    @Test fun startupViewerHidesSubscriptionQueriesAndSecretsButNothingElse() {
++        val text = "mixed-port: 7890\nsecret: abc123\n  secret: \"q w\" # note\n" +
++            "proxy-providers:\n  a: {url: \"https://sub.example.com/api/v1/client?token=T0K&flag=1\", interval: 3600}\n" +
++            "  b:\n    url: https://sub.example.org/s/path?x=1\n    path: ./a.yaml\n"
++        val masked = maskStartupSecrets(text)
++        assertFalse(masked.contains("abc123"))
++        assertFalse(masked.contains("q w"))
++        assertFalse(masked.contains("T0K"))
++        assertFalse(masked.contains("x=1"))
++        assertTrue(masked.contains("secret: ••••••\n"))
++        assertTrue(masked.contains("secret: \"••••••\" # note"))
++        assertTrue(masked.contains("url: \"https://sub.example.com/api/v1/client?••••••\", interval: 3600}"))
++        assertTrue(masked.contains("url: https://sub.example.org/s/path?••••••\n"))
++        assertTrue(masked.contains("mixed-port: 7890\n") && masked.contains("path: ./a.yaml\n"))
++        // Nothing to hide: the viewer shows the original bytes.
++        val plain = "mode: rule\r\nexternal-controller: 127.0.0.1:9090\r\nrules: [MATCH,DIRECT]\r\n"
++        assertEquals(plain, maskStartupSecrets(plain))
++    }
++
++    @Test fun pendingRestartKeepsTheRingOnUnlessTheConnectionIsReallyUnhealthy() {
++        val pending = HomeUiState(status = HomeStatus.PendingRestart(600))
++        assertEquals(HomeGlyphMode.On, pending.homeHeroGlyphMode())
++        val degraded = pending.copy(connection = HomeConnectionObservation(controllerReady = true, takeoverHealthy = false))
++        assertEquals(HomeGlyphMode.Attention, degraded.homeHeroGlyphMode())
++        // Running keeps its stricter reading.
++        assertEquals(HomeGlyphMode.Unconfirmed, HomeUiState(status = HomeStatus.Running(600)).homeHeroGlyphMode())
 +    }
 +}
 diff --git a/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml b/android-app/app/src/test/resources/multicore/golden/hysteria-converted.yaml

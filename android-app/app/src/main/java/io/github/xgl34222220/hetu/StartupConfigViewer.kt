@@ -1,6 +1,14 @@
 package io.github.xgl34222220.hetu
 
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.BlendMode
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -49,6 +57,7 @@ internal fun StartupConfigViewer(
     color: Color,
     modifier: Modifier = Modifier,
     annotated: ((String) -> AnnotatedString)? = null,
+    wrap: Boolean = false,
 ) {
     val chunks = remember(text) { startupConfigChunks(text) }
     key(text) {
@@ -72,6 +81,7 @@ internal fun StartupConfigViewer(
                         // The final paragraph can exceed the viewport height. An end
                         // anchor exposes its bottom; then reveal the end of a long line.
                         state.scrollToItem(chunks.size)
+                        if (wrap) return@launch
                         // Lazy placement and text measurement can finish after the vertical
                         // scroll request. Await the real viewport and glyph measurement,
                         // rather than deriving an offset from their initial zero values.
@@ -94,21 +104,22 @@ internal fun StartupConfigViewer(
                     SelectionContainer {
                         // The outer modifier measures the clipped horizontal viewport,
                         // while TextLayoutResult measures the full paragraph inside it.
-                        val scroll = Modifier.onSizeChanged {
-                            if (index == chunks.lastIndex) tailViewportWidth = it.width
-                        }.horizontalScroll(when (index) {
+                        val sideways = when (index) {
                             chunks.lastIndex -> tailScroll
                             0 -> headScroll
                             else -> rememberScrollState()
-                        })
+                        }
+                        val scroll = if (wrap) Modifier.fillMaxWidth() else Modifier.onSizeChanged {
+                            if (index == chunks.lastIndex) tailViewportWidth = it.width
+                        }.startupConfigMoreRight(sideways).horizontalScroll(sideways)
                         val onLayout: (TextLayoutResult) -> Unit = { layout ->
                             if (index == chunks.lastIndex) {
                                 val end = part.indexOfLast { it != '\n' && it != '\r' }.coerceAtLeast(0)
                                 tailEndX = layout.getBoundingBox(end).right
                             }
                         }
-                        if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)
-                        else Text(remember(part, annotated) { annotated(part) }, scroll, color = color, style = style, softWrap = false, onTextLayout = onLayout)
+                        if (annotated == null) Text(part, scroll, color = color, style = style, softWrap = wrap, onTextLayout = onLayout)
+                        else Text(remember(part, annotated) { annotated(part) }, scroll, color = color, style = style, softWrap = wrap, onTextLayout = onLayout)
                     }
                 }
                 if (chunks.size > 1) item(key = "end") { Spacer(Modifier.height(1.dp)) }
@@ -116,6 +127,26 @@ internal fun StartupConfigViewer(
         }
     }
 }
+
+/** Fades the right edge of a line while more of it lies to the right, so a cut line reads as "scroll on". */
+private fun Modifier.startupConfigMoreRight(state: ScrollState): Modifier =
+    graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }.drawWithContent {
+        drawContent()
+        if (state.value < state.maxValue) {
+            val edge = 28.dp.toPx().coerceAtMost(size.width)
+            drawRect(
+                Brush.horizontalGradient(listOf(Color.Black, Color.Transparent), startX = size.width - edge, endX = size.width),
+                topLeft = Offset(size.width - edge, 0f), size = Size(edge, size.height), blendMode = BlendMode.DstIn,
+            )
+        }
+    }
+
+private val startupSecretLine = Regex("""(?m)^(\s*(?:-\s*)?secret\s*:\s*)(['"]?)[^'"\r\n#]+\2""")
+private val startupUrlQuery = Regex("""(https?://[^\s'"?#]+)\?[^\s'"#,}\]]+""")
+
+/** Display copy with subscription-URL queries and `secret:` values hidden; copy and export keep the original. */
+internal fun maskStartupSecrets(text: String): String =
+    startupUrlQuery.replace(startupSecretLine.replace(text) { it.groupValues[1] + it.groupValues[2] + "••••••" + it.groupValues[2] }) { it.groupValues[1] + "?••••••" }
 
 private data class StartupConfigChunk(val start: Int, val end: Int)
 
