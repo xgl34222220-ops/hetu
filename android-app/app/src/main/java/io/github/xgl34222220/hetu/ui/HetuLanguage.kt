@@ -1183,7 +1183,30 @@ gaoyifan/china-operator-ip（MIT）· 内置离线快照 + 核心每日更新，
 不改变正在运行的代理|Does not change the running proxy|不改變正在執行的代理|Не меняет работающий прокси
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup).joinToString("\n")
+private val vocabularyPolish2 = """
+测试中断|Test interrupted|測試中斷|Тест прерван
+等待流量数据|Waiting for traffic data|等待流量資料|Ожидание данных трафика
+已隐藏上行与下行|Upload and download are hidden|已隱藏上行與下行|Отдача и загрузка скрыты
+查看完整原因|Show full reason|查看完整原因|Показать причину полностью
+切换节点需要代理运行中|Switching nodes requires the proxy to be running|切換節點需要代理執行中|Для смены узла прокси должен работать
+测速需要代理运行中|Latency tests require the proxy to be running|測速需要代理執行中|Для теста задержки прокси должен работать
+订阅更新需要代理运行中|Updating subscriptions requires the proxy to be running|訂閱更新需要代理執行中|Для обновления подписок прокси должен работать
+规则集更新需要代理运行中|Updating rule sets requires the proxy to be running|規則集更新需要代理執行中|Для обновления наборов правил прокси должен работать
+请等待当前操作完成|Please wait for the current operation to finish|請等待目前操作完成|Дождитесь завершения текущей операции
+流量分布|Traffic distribution|流量分布|Распределение трафика
+每 5 分钟|Every 5 minutes|每 5 分鐘|Каждые 5 минут
+每小时|Hourly|每小時|Каждый час
+每 6 小时|Every 6 hours|每 6 小時|Каждые 6 часов
+每天|Daily|每天|Ежедневно
+峰值 %s|Peak %s|峰值 %s|Пик %s
+↓ 下行|↓ Download|↓ 下行|↓ Загрузка
+↑ 上行|↑ Upload|↑ 上行|↑ Отдача
+日志导出失败|Log export failed|日誌匯出失敗|Не удалось экспортировать журнал
+日志清空失败|Failed to clear log|日誌清空失敗|Не удалось очистить журнал
+导入失败|Import failed|匯入失敗|Ошибка импорта
+"""
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

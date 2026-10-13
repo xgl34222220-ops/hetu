@@ -153,12 +153,15 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
     var exits by remember { mutableStateOf<ExitIps?>(null) }
     var exitTesting by remember { mutableStateOf(false) }
     val availableLabel = ht("可用")
+    val interruptedLabel = ht("测试中断")
+    var runFailed by remember { mutableStateOf(false) }
     val unlockIds = remember { NetworkUnlock.checkIds }
 
     LaunchedEffect(runId) {
         if (runId == 0) return@LaunchedEffect
         testing = true
         summary = ""
+        runFailed = false
         rows.forEach { (id, holder) -> holder.value = NetRowState(testing = true, unlocking = id in unlockIds) }
         exits = null
         exitTesting = true
@@ -193,13 +196,12 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
         } catch (_: Exception) {
             rows.values.forEach { if (it.value.testing || it.value.unlocking) it.value = it.value.copy(testing = false, unlocking = false) }
             exitTesting = false
+            runFailed = true
         } finally {
             testing = false
             val done = rows.values.mapNotNull { it.value.result }
-            if (done.isNotEmpty()) {
-                val ok = done.count { it.ok && !it.blocked }
-                summary = "$ok/${NetworkTest.sites.size} $availableLabel"
-            }
+            // A run that failed outright (no network, port probe error) says so instead of leaving dashes.
+            summary = hxNetTestSummary(done.count { it.ok && !it.blocked }, NetworkTest.sites.size, done.size, runFailed, availableLabel, interruptedLabel)
         }
     }
 
@@ -270,7 +272,7 @@ internal fun NetworkTestScreen(onBack: () -> Unit) {
                         },
                         Modifier.weight(1f), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis,
                     )
-                    if (summary.isNotBlank()) Text(summary, color = c.t2, style = HomeType.noteStrong)
+                    if (summary.isNotBlank()) Text(summary, color = if (runFailed) c.badText else c.t2, style = HomeType.noteStrong, maxLines = 1)
                 }
             }
             item(key = "conn-exit") { ExitIpCard(exits, exitTesting) }
@@ -365,14 +367,14 @@ private fun NetSiteRow(site: NetSite, holder: MutableState<NetRowState>) {
             }
         }
         Column(Modifier.widthIn(min = 64.dp), horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.Center) {
-            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1)
+            if (regionText.isNotEmpty()) Text(regionText, color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.SemiBold), maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (state.testing) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     HomeSpinner(size = 12.dp, color = c.t3, strokeWidth = 1.5.dp)
                     Spacer(Modifier.width(6.dp))
-                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
+                    Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }
-            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1)
+            } else Text(status, color = statusColor, style = HomeType.delay, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
@@ -456,7 +458,7 @@ private fun SpeedHeroCard(speed: SpeedUiState, active: Boolean, onToggle: () -> 
                     SpeedPhase.Download -> ht("正在测量下载…")
                     SpeedPhase.Upload -> ht("正在测量上传…")
                     SpeedPhase.Done -> ht("下载速率")
-                    SpeedPhase.Failed -> speed.error ?: ht("测速失败")
+                    SpeedPhase.Failed -> speed.error?.let { ht(it) } ?: ht("测速失败")
                 },
                 color = if (speed.phase == SpeedPhase.Failed) c.badText else c.t3, style = HomeType.caption,
             )

@@ -122,7 +122,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
                     } catch (cancel: CancellationException) {
                         throw cancel
                     } catch (error: Exception) {
-                        error.message ?: "导入失败"
+                        io.github.xgl34222220.hetu.hxErrorMessage(error, "导入失败")
                     }
                     request.second(message)
                 }
@@ -262,7 +262,7 @@ internal fun rememberToolsFeatureHost(onChanged: () -> Unit = {}, onOpenDiagnost
             repairSessionRecord = {
                 try { proxy.repairSessionRecord() }
                 catch (cancel: kotlinx.coroutines.CancellationException) { throw cancel }
-                catch (error: Exception) { error.message ?: "运行记录未修复，请查看网络诊断" }
+                catch (error: Exception) { io.github.xgl34222220.hetu.hxErrorMessage(error, "运行记录未修复，请查看网络诊断") }
             },
             runPreflight = {
                 val (passed, message) = ToolsRuntimeBridge.preflight(app)

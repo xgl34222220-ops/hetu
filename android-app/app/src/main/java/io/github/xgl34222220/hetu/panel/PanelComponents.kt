@@ -221,6 +221,7 @@ internal fun PanelTabStrip(selected: PanelTab, onSelect: (PanelTab) -> Unit, mod
         modifier
             .fillMaxWidth()
             .onSizeChanged { viewport = it.width }
+            .panelHorizontalEdgeFade(scroll)
             .horizontalScroll(scroll)
             .panelGutter()
             .drawBehind {
@@ -492,8 +493,8 @@ internal fun PanelDelayLabel(delay: PanelDelay?, modifier: Modifier = Modifier, 
 internal fun RowScope.PanelStat(value: String, unit: String?, label: String, valueColor: Color = LocalHomeColors.current.t1, style: TextStyle = PanelType.stat) {
     val c = LocalHomeColors.current
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1)
-        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1)
+        Text(if (unit == null) value else "$value $unit", color = valueColor, style = style, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(ht(label), Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.note, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -503,7 +504,7 @@ internal fun PanelSectionHeader(title: String, modifier: Modifier = Modifier, co
     Row(modifier.fillMaxWidth().heightIn(min = 40.dp).padding(start = 6.dp), verticalAlignment = Alignment.CenterVertically) {
         Text(ht(title), color = c.accent, style = HomeType.rowTitle, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Spacer(Modifier.weight(1f))
-        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1)
+        if (count != null) Text(count, Modifier.padding(end = 4.dp), color = c.t2, style = HomeType.value.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis)
         if (trailing != null) trailing()
     }
 }
@@ -653,8 +654,18 @@ internal class PanelTrendSeries(val values: List<Float>, val color: Color, val f
  * the baseline; every series draws itself in from the left once per [reveal] run.
  */
 @Composable
-internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }) {
+internal fun PanelTrendChart(series: List<PanelTrendSeries>, modifier: Modifier = Modifier, height: Dp = 148.dp, reveal: () -> Float = { 1f }, emptyLabel: String? = null) {
     val base = LocalHomeColors.current.line2
+    // No curve to draw: say why (series hidden / nothing sampled yet) instead of a blank area.
+    if (emptyLabel != null) {
+        val c = LocalHomeColors.current
+        Box(modifier.fillMaxWidth().height(height).drawBehind {
+            drawLine(base, Offset(0f, size.height - .5f), Offset(size.width, size.height - .5f), strokeWidth = 1.dp.toPx())
+        }, contentAlignment = Alignment.Center) {
+            Text(ht(emptyLabel), color = c.t3, style = HomeType.note, maxLines = 2, overflow = TextOverflow.Ellipsis)
+        }
+        return
+    }
     Canvas(modifier.fillMaxWidth().height(height)) {
         val w = size.width
         val h = size.height

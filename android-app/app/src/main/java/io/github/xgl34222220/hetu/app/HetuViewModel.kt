@@ -992,7 +992,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
 
     fun select(group: String, node: String) {
         if (refuseRestoredGroups()) return
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("切换节点"))
         if (pendingSelection.containsKey(group)) return
         val current = state.groups.firstOrNull { it.name == group } ?: return
         if (current.now == node || current.nodes.none { it.name == node }) return
@@ -1045,7 +1045,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun testNode(node: String) {
         if (refuseRestoredGroups()) return
         if (latencyUnsupported()) return
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingNodes[node] == true) return
         val owner = ++requestSequence
         holdNodeProbes(owner, listOf(node))
@@ -1057,7 +1057,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun testGroup(group: ProxyGroupUi) {
         if (refuseRestoredGroups()) return
         if (latencyUnsupported()) return
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingGroups[group.name] == true) return
         val targets = group.nodes.map { it.name }.filter { it.uppercase() !in setOf("DIRECT", "REJECT", "REJECT-DROP", "PASS", "COMPATIBLE") }.distinct()
         if (targets.isEmpty()) return
@@ -1114,7 +1114,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     fun testAll() {
         if (refuseRestoredGroups()) return
         if (latencyUnsupported()) return
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("测速"))
         if (testingAll) return
         val owner = ++requestSequence
         val targets = (state.groups.flatMap { it.nodes.map { node -> node.name } } +
@@ -1188,12 +1188,19 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     var logsLoading by mutableStateOf(false)
         private set
 
+    /** Raw text behind [logEntries]: an unchanged quiet re-read skips parsing and list recomposition. */
+    private var lastRuntimeLog: String? = null
+
     fun loadLogs(quiet: Boolean = false) {
         if (logsLoading) return
         logsLoading = true
         viewModelScope.launch {
             try {
-                logEntries = refParseLogs19(inspector.runtimeLog())
+                val raw = inspector.runtimeLog()
+                if (!hxLogUnchanged(quiet, lastRuntimeLog, raw)) {
+                    logEntries = refParseLogs19(raw)
+                    lastRuntimeLog = raw
+                }
             } catch (cancel: CancellationException) {
                 throw cancel
             } catch (error: Exception) {
@@ -1298,7 +1305,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateRuleSet(name: String) {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("规则集更新"))
         if (ruleSetTasks[name]?.running == true) return
         val owner = ++requestSequence
         ruleSetTaskOwners[name] = owner
@@ -1421,7 +1428,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
     }
 
     fun updateProvider(name: String) {
-        val request = activeRuntimeRequest() ?: return
+        val request = activeRuntimeRequest() ?: return toast(runtimeUnavailableText("订阅更新"))
         if (providerTasks[name]?.running == true) return
         val owner = ++requestSequence
         providerTaskOwners[name] = owner
