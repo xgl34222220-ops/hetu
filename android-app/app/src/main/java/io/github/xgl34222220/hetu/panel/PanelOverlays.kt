@@ -1,5 +1,7 @@
 package io.github.xgl34222220.hetu.panel
 
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -126,7 +128,12 @@ internal fun PanelSheetBody(
         is PanelOverlay.NodeInfo -> NodeInfoSheet(overlay.node, data, onClose = { onOverlay(null) }, onTest = { actions.onTestNode(overlay.node) }, onCopy = { actions.onCopy("节点名称", overlay.node) })
         is PanelOverlay.ConnectionDetail -> {
             val conn = data.connections.firstOrNull { it.id == overlay.id }
-            if (conn != null) ConnectionSheet(conn, data, onClose = { onOverlay(null) }) { actions.onCloseConnection(conn.id); onOverlay(null) }
+            if (conn != null) ConnectionSheet(
+                conn, data, onClose = { onOverlay(null) },
+                onCopyHost = { actions.onCopy("主机", conn.host) },
+                onOnlyApp = { onView(view.copy(connApp = conn.appKey)); onOverlay(null) },
+                onShowRule = { onView(view.withTab(PanelTab.Rules).copy(ruleFocus = conn.rule)); onOverlay(null) },
+            ) { actions.onCloseConnection(conn.id); onOverlay(null) }
             else HomeSheetContent(title = "连接已结束", onClose = { onOverlay(null) }) {
                 Text(ht("这个连接已经关闭，列表会在下次刷新时更新。"), Modifier.padding(horizontal = 6.dp), color = LocalHomeColors.current.t2, style = HomeType.body)
             }
@@ -312,7 +319,15 @@ private fun NodeInfoSheet(name: String, data: PanelData, onClose: () -> Unit, on
 
 /** 连接详情: who (app, package, rule), where (chain, network), how much (totals, rates); footer 断开此连接. */
 @Composable
-private fun ConnectionSheet(conn: PanelConnection, data: PanelData, onClose: () -> Unit, onDisconnect: () -> Unit) {
+private fun ConnectionSheet(
+    conn: PanelConnection,
+    data: PanelData,
+    onClose: () -> Unit,
+    onCopyHost: () -> Unit = {},
+    onOnlyApp: () -> Unit = {},
+    onShowRule: () -> Unit = {},
+    onDisconnect: () -> Unit,
+) {
     val c = LocalHomeColors.current
     HomeSheetContent(
         title = conn.host,
@@ -322,6 +337,15 @@ private fun ConnectionSheet(conn: PanelConnection, data: PanelData, onClose: () 
         footer = { PanelDangerButton("断开此连接", onDisconnect, Modifier.weight(1f), soft = true, icon = PanelIcons.Unlink) },
     ) {
         Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            // Audit4 G6: copy the host, narrow the list to this app, or jump to the matched rule.
+            Row(
+                Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 2.dp),
+                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                PanelChip("复制主机", onCopyHost, height = 34.dp, leading = { Icon(HomeIcons.Copy, null, Modifier.size(16.dp), tint = c.t1) })
+                PanelChip("只看此应用", onOnlyApp, height = 34.dp, leading = { Icon(PanelIcons.Funnel, null, Modifier.size(16.dp), tint = c.t1) })
+                if (conn.rule.isNotBlank()) PanelChip("查看匹配规则", onShowRule, height = 34.dp, leading = { Icon(PanelIcons.Route, null, Modifier.size(16.dp), tint = c.t1) })
+            }
             HomeSheetGroup {
                 DetailRow("应用") {
                     if (conn.app.isBlank()) Text(ht(PanelLogic.UnattributedApp), color = c.t3, style = HomeType.label)

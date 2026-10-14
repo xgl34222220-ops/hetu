@@ -717,6 +717,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                     if (owner == latestProviderRead && currentRuntimeRequest(request, requireRunning = false)) {
                         lastProviderRefreshAt = now
                         if (fresh.isNotEmpty() || providers.isEmpty()) providers = fresh
+                        HxSubscriptionAlerts.check(app, providers)
                     }
                 }
                 if (coreVersion.isBlank()) {
@@ -794,6 +795,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                         p.await()?.let {
                             if (providerOwner == latestProviderRead && currentRuntimeRequest(request)) {
                                 providers = it
+                                HxSubscriptionAlerts.check(app, providers)
                                 lastProviderRefreshAt = SystemClock.elapsedRealtime()
                             }
                         }
@@ -832,6 +834,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         val stopping = state.running
         invalidateRuntimeRequests()
         operation = if (stopping) HxRunOp.Stop else HxRunOp.Start
+        if (!stopping) directSiteDelays = emptyMap()
         viewModelScope.launch {
             operationText = if (stopping) "正在停止…" else "正在启动…"
             try {
@@ -1260,6 +1263,58 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         }
     }
 
+    /**
+     * Audit4 G8: 启动代理 / 停止代理 launcher shortcut. Reads the real runtime flag the QS tile reads
+     * (the first poll may not have landed on a cold start), then uses the normal guarded [toggle].
+     */
+    fun shortcutRun(start: Boolean) {
+        val running = ProxyStatusBridge.rootProxyRunning(app)
+        when {
+            operation != null -> toast("请等待当前操作完成")
+            running == start -> toast(if (start) "代理已在运行" else "代理未运行")
+            else -> {
+                if (state.running != running) state = state.copy(running = running)
+                toggle()
+            }
+        }
+    }
+
+    /** Audit4 G5: results of the last direct 本机直测 made while the proxy was stopped (memory only). */
+    var directSiteDelays by mutableStateOf<Map<String, Long>>(emptyMap())
+        private set
+
+    /** Home ↻: the proxy-path probe while running; a direct test while stopped (Audit4 G5). */
+    fun probeSites() {
+        if (state.running || operation != null) measureSites() else measureSitesDirect()
+    }
+
+    /**
+     * Audit4 G5: stopped-state 本机直测. A separate direct request (hxDirectSiteLatencies), so the
+     * runtime-bound [measureSites] path and its probe identity are unchanged. Nothing is persisted:
+     * the saved last results stay those of the proxy path.
+     */
+    fun measureSitesDirect() {
+        if (state.running || operation != null || siteTesting) return
+        val owner = beginSiteRead()
+        siteProbeOwner = owner
+        siteTesting = true
+        viewModelScope.launch {
+            try {
+                val measured = hxDirectSiteLatencies(app)
+                if (owner == latestSiteRead && !state.running && operation == null && measured.isNotEmpty()) {
+                    directSiteDelays = measured
+                    if (measured.values.none { it > 0L }) toast("站点测速失败，请检查网络")
+                }
+            } catch (cancel: CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                if (owner == latestSiteRead) toastAs(HxTone.Bad, errorText(error, "测速失败"))
+            } finally {
+                if (siteProbeOwner == owner) { siteProbeOwner = null; siteTesting = false }
+            }
+        }
+    }
+
     fun measureSites() {
         val request = activeRuntimeRequest() ?: return
         if (siteTesting) return
@@ -1466,6 +1521,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 val fresh = repo.providers()
                 if (currentRuntimeRequest(request) && owner == latestProviderRead) {
                     providers = fresh
+                    HxSubscriptionAlerts.check(app, providers)
                     lastProviderRefreshAt = SystemClock.elapsedRealtime()
                 }
             } catch (cancel: CancellationException) {
@@ -1488,6 +1544,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (!currentRuntimeRequest(request) || providerTaskOwners[name] != owner) return@launch
                 beginProviderRead()
                 if (fresh != null) providers = providers.map { if (it.name == name) fresh else it }
+                if (fresh != null) HxSubscriptionAlerts.check(app, providers)
                 providerTasks[name] = HxTask(ok = true, message = "已更新")
                 refreshNow()
             } catch (cancel: CancellationException) {
@@ -1552,6 +1609,7 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
                 if (!currentRuntimeRequest(request) || providersUpdateAllOwner != owner) return@launch
                 if (readOwner == latestProviderRead) {
                     providers = fresh
+                    HxSubscriptionAlerts.check(app, providers)
                     lastProviderRefreshAt = SystemClock.elapsedRealtime()
                 }
                 toast(if (failed == 0) "全部 $ok 个订阅已更新" else "已更新 $ok 个，$failed 个失败")

@@ -237,7 +237,7 @@ internal fun PanelScreen(
                 )
                 PanelTab.Subscriptions -> panelSubscriptionsTab(PanelLogic.subscriptions(data, view), view.needle, stagger, actions.onUpdateSubscription)
                 PanelTab.Connections -> panelConnectionsTab(data, view, stagger, onView, onOpen = { onOverlay(PanelOverlay.ConnectionDetail(it)) }, onCloseAll = { onOverlay(PanelOverlay.CloseAllDialog) })
-                PanelTab.Rules -> panelRulesTab(PanelLogic.rules(data, view), view.needle, data.ruleTotal, stagger)
+                PanelTab.Rules -> panelRulesTab(PanelLogic.rules(data, view), view.needle, data.ruleTotal, stagger, view.ruleFocus) { onView(view.copy(ruleFocus = null)) }
                 PanelTab.RuleSets -> panelRuleSetsTab(PanelLogic.ruleSets(data, view), view.needle, stagger, actions.onUpdateRuleSet)
                 PanelTab.Logs -> panelLogsTab(PanelLogic.logs(data, view), view, stagger, onView, onOrderMenu = { onOverlay(PanelOverlay.LogOrderMenu) }, orderMenu = { menu(PanelOverlay.LogOrderMenu) })
             }

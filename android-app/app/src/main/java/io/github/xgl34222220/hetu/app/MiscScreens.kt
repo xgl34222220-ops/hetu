@@ -68,6 +68,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.HomePill
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
@@ -512,6 +513,34 @@ internal fun AboutScreen(vm: HetuViewModel) {
         }
     }
 
+    // Audit4 G9: 检查更新 runs only when tapped; a newer release adds 打开发布页 (no in-app install).
+    var updateChecking by remember { mutableStateOf(false) }
+    var updateStatus by remember { mutableStateOf<String?>(null) }
+    var updateRelease by remember { mutableStateOf<HetuUpdateCheck.Release?>(null) }
+    fun checkUpdate() {
+        if (updateChecking) return
+        updateChecking = true
+        scope.launch {
+            try {
+                val release = HetuUpdateCheck.fetchLatest()
+                if (HetuUpdateCheck.isNewer(release.version, BuildConfig.VERSION_NAME)) {
+                    updateRelease = release
+                    updateStatus = null
+                } else {
+                    updateRelease = null
+                    updateStatus = "已是最新版本"
+                }
+            } catch (cancel: kotlinx.coroutines.CancellationException) {
+                throw cancel
+            } catch (error: Exception) {
+                updateRelease = null
+                updateStatus = if (error is HetuUpdateCheck.NoRelease) "还没有发布版本" else hxErrorMessage(error, "检查更新失败")
+            } finally {
+                updateChecking = false
+            }
+        }
+    }
+
     val aboutList = androidx.compose.foundation.lazy.rememberLazyListState()
     val arrive = rememberHomeReveal(Unit, 620)
     HxPage(title = ht("关于"), onBack = { nav.pop() }, listState = aboutList, largeTitle = false) {
@@ -596,6 +625,31 @@ internal fun AboutScreen(vm: HetuViewModel) {
                     SettingsNavRow("Lucide Icons", subtitle = "ISC", icon = HxIcons.Scale) { openAsset("Lucide", "licenses/lucide.txt") }
                     SettingsDivider()
                     SettingsNavRow("china-operator-ip", subtitle = "MIT · CNIP", icon = HxIcons.Scale) { openAsset("china-operator-ip", "licenses/china-operator-ip.txt") }
+                }
+            }
+        }
+        item(key = "update") {
+            SettingsSection {
+                SettingsGroup(title = ht("更新")) {
+                    val release = updateRelease
+                    SettingsNavRow(
+                        ht("检查更新"),
+                        subtitle = when {
+                            updateChecking -> ht("正在检查…")
+                            release != null -> ht("发现新版本 %s").fill(release.version)
+                            updateStatus != null -> ht(updateStatus!!)
+                            else -> ht("当前版本 %s").fill(BuildConfig.VERSION_NAME)
+                        },
+                        icon = HomeIcons.RefreshCw,
+                    ) { checkUpdate() }
+                    if (release != null) {
+                        SettingsDivider()
+                        SettingsNavRow(ht("打开发布页"), subtitle = release.name, icon = ToolsIcons.Link) {
+                            runCatching {
+                                context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(release.url)))
+                            }.onFailure { vm.toast("没有可打开链接的应用") }
+                        }
+                    }
                 }
             }
         }

@@ -320,6 +320,10 @@ internal data class PanelViewState(
     val logFilter: PanelLogFilter = PanelLogFilter.All,
     val logOrder: PanelLogOrder = PanelLogOrder.Newest,
     val openLogs: Set<Int> = emptySet(),
+    /** Audit4 G6: 只看此应用 from a connection's details ([PanelConnection.appKey]); null = every app. */
+    val connApp: String? = null,
+    /** Audit4 G6: 查看匹配规则 from a connection's details ([PanelConnection.rule]); null = every rule. */
+    val ruleFocus: String? = null,
 ) {
     /** Effective search text: empty unless the search field is open. */
     val needle: String get() = if (searching) query.trim() else ""
@@ -481,6 +485,7 @@ internal object PanelLogic {
         val q = view.needle
         val filtered = data.connections.filter { c ->
             (view.connFilter == PanelConnFilter.All || (view.connFilter == PanelConnFilter.Direct) == c.isDirect) &&
+                (view.connApp == null || c.appKey == view.connApp) &&
                 (q.isEmpty() || c.host.contains(q, ignoreCase = true) || c.app.contains(q, ignoreCase = true))
         }
         return when (view.connSort) {
@@ -498,11 +503,26 @@ internal object PanelLogic {
 
     /** Number next to “连接详情”: the core's total, or the visible count once a filter or search narrows the list. */
     fun connectionCount(data: PanelData, view: PanelViewState, visible: Int): Int =
-        if (view.needle.isNotEmpty() || view.connFilter != PanelConnFilter.All) visible else maxOf(data.connectionTotal, visible)
+        if (view.needle.isNotEmpty() || view.connFilter != PanelConnFilter.All || view.connApp != null) visible else maxOf(data.connectionTotal, visible)
 
     fun rules(data: PanelData, view: PanelViewState): List<PanelRule> {
         val q = view.needle
-        return data.rules.filter { q.isEmpty() || it.type.contains(q, true) || it.payload.contains(q, true) || it.policy.contains(q, true) }
+        val focus = view.ruleFocus
+        return data.rules.filter {
+            (focus == null || ruleMatches(it, focus)) &&
+                (q.isEmpty() || it.type.contains(q, true) || it.payload.contains(q, true) || it.policy.contains(q, true))
+        }
+    }
+
+    /**
+     * Audit4 G6: whether [rule] is the one a connection reports as matched. A connection carries
+     * “TYPE · payload” (see PanelDataProjector), MATCH without a payload; the core reports the
+     * same type names in /rules and in /connections, compared without case.
+     */
+    fun ruleMatches(rule: PanelRule, connectionRule: String): Boolean {
+        val type = connectionRule.substringBefore(" · ").trim()
+        val payload = if (" · " in connectionRule) connectionRule.substringAfter(" · ").trim() else ""
+        return type.isNotEmpty() && rule.type.trim().equals(type, ignoreCase = true) && rule.payload.trim() == payload
     }
 
     fun ruleSets(data: PanelData, view: PanelViewState): List<PanelRuleSet> =
