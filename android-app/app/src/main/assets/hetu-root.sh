@@ -1750,11 +1750,12 @@ install_redirect6(){
 # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
 # otherwise every root socket as before (and with them the system resolver).
 dns_owner_return(){
-  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT" || return 1
-  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; fi
-  # Network validation (connectivity/captive-portal probes) must not depend on the core:
-  # the resolver attributes NetworkMonitor's queries to the network stack UID.
-  "$1" -t nat -A "$DNSOUT" -m owner --uid-owner "$NETSTACK_UID" -j RETURN
+  if [ "$SYSTEM_DNS" = captured ]; then
+    core_return "$1" nat "$DNSOUT" || return 1
+    # Network validation (connectivity/captive-portal probes) must not depend on the core:
+    # the resolver attributes NetworkMonitor's queries to the network stack UID.
+    "$1" -t nat -A "$DNSOUT" -m owner --uid-owner "$NETSTACK_UID" -j RETURN
+  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
 }
 # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
 # application and is root, so it needs a rule of its own.

@@ -36148,7 +36148,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..0d2f7e0 100755
+index ae832da..42ef229 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -37367,7 +37367,7 @@ index ae832da..0d2f7e0 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,41 +1716,45 @@ install_mangle6(){
+@@ -761,40 +1716,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -37419,16 +37419,15 @@ index ae832da..0d2f7e0 100755
  # otherwise every root socket as before (and with them the system resolver).
  dns_owner_return(){
 -  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT"
--  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
-+  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT" || return 1
-+  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; fi
-+  # Network validation (connectivity/captive-portal probes) must not depend on the core:
-+  # the resolver attributes NetworkMonitor's queries to the network stack UID.
-+  "$1" -t nat -A "$DNSOUT" -m owner --uid-owner "$NETSTACK_UID" -j RETURN
++  if [ "$SYSTEM_DNS" = captured ]; then
++    core_return "$1" nat "$DNSOUT" || return 1
++    # Network validation (connectivity/captive-portal probes) must not depend on the core:
++    # the resolver attributes NetworkMonitor's queries to the network stack UID.
++    "$1" -t nat -A "$DNSOUT" -m owner --uid-owner "$NETSTACK_UID" -j RETURN
+   else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
- # application and is root, so it needs a rule of its own.
-@@ -822,12 +1781,12 @@ remove_dot_guard(){
+@@ -822,12 +1782,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -37443,7 +37442,7 @@ index ae832da..0d2f7e0 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +1800,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +1801,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -37465,7 +37464,7 @@ index ae832da..0d2f7e0 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +1825,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +1826,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -37509,7 +37508,7 @@ index ae832da..0d2f7e0 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1884,128 @@ v6_disable_guard_ready(){
+@@ -921,16 +1885,128 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -37643,7 +37642,7 @@ index ae832da..0d2f7e0 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +2036,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +2037,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -37652,7 +37651,7 @@ index ae832da..0d2f7e0 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1019,20 +2094,403 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2095,403 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -38064,7 +38063,7 @@ index ae832da..0d2f7e0 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +2503,45 @@ probe_core_owner(){
+@@ -1045,9 +2504,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -38111,7 +38110,7 @@ index ae832da..0d2f7e0 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +2552,29 @@ core_identity_prepare(){
+@@ -1058,14 +2553,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -38145,7 +38144,7 @@ index ae832da..0d2f7e0 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +2588,9 @@ core_launch(){
+@@ -1079,8 +2589,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -38157,7 +38156,7 @@ index ae832da..0d2f7e0 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +2657,21 @@ core_tune(){
+@@ -1147,6 +2658,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -38179,7 +38178,7 @@ index ae832da..0d2f7e0 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,16 +2750,90 @@ google_firewall_maintain(){ (
+@@ -1225,16 +2751,90 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -38270,7 +38269,7 @@ index ae832da..0d2f7e0 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +2841,16 @@ start(){
+@@ -1242,8 +2842,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -38280,15 +38279,15 @@ index ae832da..0d2f7e0 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2860,91 @@ start(){
+@@ -1253,75 +2861,91 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -38418,7 +38417,7 @@ index ae832da..0d2f7e0 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2956,90 @@ start(){
+@@ -1333,19 +2957,90 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -38514,7 +38513,7 @@ index ae832da..0d2f7e0 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +3101,12 @@ status(){
+@@ -1407,6 +3102,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -38527,7 +38526,7 @@ index ae832da..0d2f7e0 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +3187,22 @@ status(){
+@@ -1487,13 +3188,22 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -38552,7 +38551,7 @@ index ae832da..0d2f7e0 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +3326,8 @@ health_collect(){
+@@ -1617,6 +3327,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -38561,7 +38560,7 @@ index ae832da..0d2f7e0 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +3377,18 @@ health_restore_table(){
+@@ -1666,16 +3378,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -38582,7 +38581,7 @@ index ae832da..0d2f7e0 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +3437,7 @@ health_repair(){ (
+@@ -1724,7 +3438,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -38591,7 +38590,7 @@ index ae832da..0d2f7e0 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +3470,481 @@ health_json(){ (
+@@ -1757,6 +3471,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -39073,7 +39072,7 @@ index ae832da..0d2f7e0 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +3962,26 @@ case "${1:-status}" in
+@@ -1774,10 +3963,26 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;

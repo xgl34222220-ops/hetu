@@ -19,7 +19,7 @@ assets/hetu-root.sh and run under /bin/sh against temporary fixtures:
   place (Mihomo POST /restart), then restart the core, each step behind an exponential backoff.
 * network change: an App repair-network call leaves a kick that makes the watchdog re-probe.
 * rule shapes: preserve_existing_tcp never lets a fake-IP destination go direct, the network
-  stack UID 1073 stays out of DNS takeover; cgroup memory limit uses memory.high (+50 % max).
+  stack UID 1073 stays out of DNS takeover (captured resolver); cgroup memory limit uses memory.high (+50 % max).
 """
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -485,13 +485,13 @@ class RuleShapes(ShellCase):
         self.assertEqual(self.rules(False, 'preserve_existing_tcp', 'xt4', 'HETU_MOUT'),
                          ['xt4 -t mangle -A HETU_MOUT -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark 0x10/0x10 -j RETURN'])
 
-    def test_network_stack_dns_stays_out_of_takeover_in_both_resolver_modes(self):
+    def test_network_stack_dns_stays_out_of_takeover_when_the_resolver_is_captured(self):
         captured = self.rules(True, 'dns_owner_return', 'xt4')
         self.assertEqual(captured[-1], 'xt4 -t nat -A HETU_DNSOUT -m owner --uid-owner 1073 -j RETURN')
         self.assertIn('--gid-owner 3005', captured[0])
+        # Without the core identity every root socket is exempt as in runtime 152 (rules kept identical).
         exempt = self.rules(False, 'dns_owner_return', 'xt4')
-        self.assertEqual(exempt, ['xt4 -t nat -A HETU_DNSOUT -m owner --uid-owner 0 -j RETURN',
-                                  'xt4 -t nat -A HETU_DNSOUT -m owner --uid-owner 1073 -j RETURN'])
+        self.assertEqual(exempt, ['xt4 -t nat -A HETU_DNSOUT -m owner --uid-owner 0 -j RETURN'])
 
     def test_memory_limit_uses_memory_high_with_a_hard_ceiling_above_it(self):
         root = self.dir / 'cg2'
