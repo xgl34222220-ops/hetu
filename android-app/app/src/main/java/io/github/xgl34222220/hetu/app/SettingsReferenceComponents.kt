@@ -125,9 +125,10 @@ internal fun SettingsNavRow(
     compact: Boolean = false,
     rootReference: Boolean = false,
     rowMinHeight: Dp? = null,
+    modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {
-    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, rootReference = rootReference, rowMinHeight = rowMinHeight) {
+    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, modifier = modifier, rootReference = rootReference, rowMinHeight = rowMinHeight) {
         HxRowValue(value, dropdown)
     }
 }

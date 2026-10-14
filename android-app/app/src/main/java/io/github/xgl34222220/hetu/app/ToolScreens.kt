@@ -1106,15 +1106,14 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         item(key = "template") {
             SettingsSection {
                 SettingsGroup(title = ht("通知内容")) {
-                  Column(offDim) {
-                    Column(Modifier.padding(start = 18.dp, end = 18.dp)) {
+                    Column(Modifier.padding(start = 18.dp, end = 18.dp).then(offDim)) {
                         SettingsInput(value = template, onValueChange = { template = it.take(320) }, label = "模板", singleLine = false)
                         Text(ht("可用变量：点一下，加到模板末尾"), Modifier.padding(top = 12.dp, bottom = 8.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
                     }
                     // Every variable the service understands, one tap away from the template. One
                     // line that slides under the card's edges, so the buttons below stay close.
                     Row(
-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                     ) {
                         HomePill(
@@ -1132,7 +1131,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     }
                     // The notification as the service would render the two templates, with stand-in values.
                     HxVisibility(showPreview) {
-                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
+                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim)) {
                             Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
                             Text(
                                 hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
@@ -1144,7 +1143,6 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                             )
                         }
                     }
-                  }
                 }
             }
         }
@@ -1152,16 +1150,14 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
             item(key = "action$index") {
                 SettingsSection {
                     SettingsGroup(title = "快捷按钮 ${index + 1}") {
-                      Column(offDim) {
-                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true) {
+                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true, modifier = offDim) {
                             picker = "action" to index
                         }
                         SettingsInput(
                             value = labels[index], onValueChange = { labels[index] = it.take(12) },
                             label = "按钮文字（可空，最多 12 字）", placeholder = actionOptions.firstOrNull { it.first == actions[index] }?.second.orEmpty(),
-                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp),
+                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp).then(offDim),
                         )
-                      }
                     }
                 }
             }

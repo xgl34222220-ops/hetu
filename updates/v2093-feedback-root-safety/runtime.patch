@@ -67558,6 +67558,22 @@ index 0000000..b398c0b
 +        )
 +    }
 +}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+index bb42974..966d773 100644
+--- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsReferenceComponents.kt
+@@ -125,9 +125,10 @@ internal fun SettingsNavRow(
+     compact: Boolean = false,
+     rootReference: Boolean = false,
+     rowMinHeight: Dp? = null,
++    modifier: Modifier = Modifier,
+     onClick: () -> Unit,
+ ) {
+-    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, rootReference = rootReference, rowMinHeight = rowMinHeight) {
++    SettingsRow(title, subtitle, icon, iconTint, onClick = onClick, compact = compact, modifier = modifier, rootReference = rootReference, rowMinHeight = rowMinHeight) {
+         HxRowValue(value, dropdown)
+     }
+ }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
 index 2b4638e..d399249 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/SettingsScreen.kt
@@ -68271,7 +68287,7 @@ index 0000000..65065ca
 +    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
-index b41cf98..8802ebd 100644
+index b41cf98..229870f 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ToolScreens.kt
 @@ -54,12 +54,14 @@ import androidx.compose.runtime.setValue
@@ -68516,16 +68532,20 @@ index b41cf98..8802ebd 100644
                      )
                  }
              }
-@@ -1050,6 +1106,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1050,16 +1106,21 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
          item(key = "template") {
              SettingsSection {
                  SettingsGroup(title = ht("通知内容")) {
-+                  Column(offDim) {
-                     Column(Modifier.padding(start = 18.dp, end = 18.dp)) {
+-                    Column(Modifier.padding(start = 18.dp, end = 18.dp)) {
++                    Column(Modifier.padding(start = 18.dp, end = 18.dp).then(offDim)) {
                          SettingsInput(value = template, onValueChange = { template = it.take(320) }, label = "模板", singleLine = false)
                          Text(ht("可用变量：点一下，加到模板末尾"), Modifier.padding(top = 12.dp, bottom = 8.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
-@@ -1060,6 +1117,11 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
-                         Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
+                     }
+                     // Every variable the service understands, one tap away from the template. One
+                     // line that slides under the card's edges, so the buttons below stay close.
+                     Row(
+-                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp),
++                        Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim),
                          horizontalArrangement = Arrangement.spacedBy(6.dp),
                      ) {
 +                        HomePill(
@@ -68536,13 +68556,13 @@ index b41cf98..8802ebd 100644
                          NotificationVariables.forEach { variable ->
                              HomePill(
                                  variable, tone = HomeTone.Neutral, height = 28.dp,
-@@ -1068,6 +1130,21 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1068,6 +1129,20 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                              )
                          }
                      }
 +                    // The notification as the service would render the two templates, with stand-in values.
 +                    HxVisibility(showPreview) {
-+                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp)) {
++                        Column(Modifier.fillMaxWidth().padding(start = 18.dp, end = 18.dp, bottom = 14.dp).then(offDim)) {
 +                            Text(ht("预览 · 示例值"), Modifier.padding(bottom = 6.dp), color = c.t2, style = HomeType.caption.copy(fontWeight = FontWeight.Medium))
 +                            Text(
 +                                hxNotificationPreview(titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE }, previewValues),
@@ -68554,27 +68574,26 @@ index b41cf98..8802ebd 100644
 +                            )
 +                        }
 +                    }
-+                  }
                  }
              }
          }
-@@ -1075,6 +1152,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1075,13 +1150,13 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              item(key = "action$index") {
                  SettingsSection {
                      SettingsGroup(title = "快捷按钮 ${index + 1}") {
-+                      Column(offDim) {
-                         SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true) {
+-                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true) {
++                        SettingsNavRow(ht("动作"), icon = HxIcons.SquareCheckBig, value = ht(actionOptions.firstOrNull { it.first == actions[index] }?.second ?: actions[index]), dropdown = true, modifier = offDim) {
                              picker = "action" to index
                          }
-@@ -1083,6 +1161,7 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+                         SettingsInput(
+                             value = labels[index], onValueChange = { labels[index] = it.take(12) },
                              label = "按钮文字（可空，最多 12 字）", placeholder = actionOptions.firstOrNull { it.first == actions[index] }?.second.orEmpty(),
-                             modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp),
+-                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp),
++                            modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp).then(offDim),
                          )
-+                      }
                      }
                  }
-             }
-@@ -1118,4 +1197,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
+@@ -1118,4 +1193,15 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
              )
          }
      }
