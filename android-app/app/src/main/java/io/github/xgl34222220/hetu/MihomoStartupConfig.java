@@ -106,6 +106,17 @@ final class MihomoStartupConfig {
     static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
             ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
             boolean recommendedDns,boolean wechatTransport)throws IOException{
+        return generate(source,profile,controllerSecret,controllerPort,appScope,appPackages,directPackages,ebpfInterface,
+                recommendedDns,wechatTransport,Collections.emptyList());
+    }
+
+    /**
+     * [validationHosts] (the Root start passes CaptivePortalBypass.hosts): Android's network-validation
+     * probe hosts get real addresses and go DIRECT first, so Wi-Fi validation never depends on the core.
+     */
+    static Result generate(String source,ProxyRuntimeProfile profile,String controllerSecret,int controllerPort,
+            ProxyRuntimeProfile.AppScope appScope,Set<String> appPackages,Set<String> directPackages,String ebpfInterface,
+            boolean recommendedDns,boolean wechatTransport,List<String> validationHosts)throws IOException{
         if(source==null||source.trim().isEmpty())throw new IOException("源配置为空");
         if(controllerSecret==null||controllerSecret.trim().isEmpty())throw new IOException("控制接口密钥为空");
         if(controllerPort<1024||controllerPort>65535)throw new IOException("控制接口端口无效");
@@ -189,6 +200,11 @@ final class MihomoStartupConfig {
             WechatTransport.Result rules=WechatTransport.insertDirectRules(fake.yaml);
             yaml=trimOne(rules.yaml);
             wechatNote="# hetu-wechat-transport: fake-ip="+fake.state+" rules="+rules.state+"\n";
+        }
+        if(validationHosts!=null&&!validationHosts.isEmpty()){
+            CaptivePortalBypass.Result probe=CaptivePortalBypass.apply(yaml,validationHosts);
+            yaml=trimOne(probe.yaml);
+            wechatNote+="# hetu-validation-bypass: "+probe.state+"\n";
         }
 
         int tp=0,rp=0;

@@ -130,6 +130,42 @@ EBPF_REASON=""
 # 1 only while capture rules are built for an active matcher; the Kill Switch guard never uses it.
 EBPF_RULES=0
 
+# Self-heal (2026-10 network-loss fix). State: $RUN/state/start.args (what a restart replays),
+# $RUN/state/selfheal-budget, $RUN/selfheal-state, $RUN/liveness.kick, $RUN/cgroup-escape.
+# The App process (and its uid_/pid_ cgroup) may be frozen
+# by the cached-app freezer / Millet or killed as a process group; the core, watchdog and monitor
+# leave that cgroup (root cgroup, v2 plus Android's v1 hierarchies) and run in their own session.
+# The watchdog probes the core (frozen state, controller, DNS) and the proxy egress, restarts the
+# core from the saved start arguments, and removes capture (Kill Switch: keeps its guards) when a
+# restart is impossible. Every action is logged to $WATCHDOG_LOG.
+CG_ESCAPE_GATE=/system/bin
+CG_ESCAPE_V1="/acct /dev/freezer /sys/fs/cgroup/freezer /dev/cpuctl /dev/memcg"
+CG_ESCAPED=""
+SETSID=""
+SETSID_CHECKED=0
+# Android's network stack (NetworkMonitor validation) resolves outside DNS takeover.
+NETSTACK_UID=1073
+WD_HTTP_TOOLS="curl wget nc"
+WD_HTTP_TIMEOUT=3
+WD_LIVE_GRACE=60
+WD_LIVE_EVERY=15
+WD_LIVE_RETRY=5
+WD_LIVE_LIMIT=3
+WD_DNS_EVERY=60
+WD_DNS_LIMIT=3
+WD_EGRESS_GRACE=180
+WD_EGRESS_EVERY=120
+WD_EGRESS_RETRY=30
+WD_EGRESS_LIMIT=3
+WD_EGRESS_BACKOFF=300
+WD_EGRESS_BACKOFF_MAX=3600
+WD_RESTART_MAX=3
+WD_RESTART_WINDOW=1800
+WD_LOG_MAX=65536
+WD_PROXY_URL=http://www.gstatic.com/generate_204
+WD_DIRECT_URLS="http://connectivitycheck.gstatic.com/generate_204 http://connect.rom.miui.com/generate_204"
+WD_HEAL_REASON=""
+
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
 fail(){ MSG="$1"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$MSG" > "$START_ERROR" 2>/dev/null || true; printf '{"ok":false,"message":"%s"}\n' "$MSG"; exit 1; }
@@ -858,11 +894,18 @@ core_cgroup(){
     [ "$START_CG_IO" != 1 ] || printf '+io\n' > "$CG_V2/cgroup.subtree_control" 2>/dev/null || true
     if mkdir -p "$CG_DIR" 2>/dev/null; then
       cg_record "$CG_DIR"
-      if [ "$START_CG_MEM" = 1 ] && [ -e "$CG_DIR/memory.max" ] && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.max" 2>/dev/null; then CG_MEM_DONE=1; fi
+      CG_MEM_HIGH=0
+      # memory.high throttles and reclaims at the limit instead of OOM-killing or wedging the core
+      # in memcg reclaim; memory.max stays as a hard ceiling 50 % above it.
+      if [ "$START_CG_MEM" = 1 ] && [ -e "$CG_DIR/memory.max" ] && [ -e "$CG_DIR/memory.high" ] && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.high" 2>/dev/null; then
+        printf '%s\n' "$((START_MEM_BYTES + START_MEM_BYTES / 2))" > "$CG_DIR/memory.max" 2>/dev/null || true
+        CG_MEM_DONE=1; CG_MEM_HIGH=1
+      elif [ "$START_CG_MEM" = 1 ] && [ -e "$CG_DIR/memory.max" ] && printf '%s\n' "$START_MEM_BYTES" > "$CG_DIR/memory.max" 2>/dev/null; then CG_MEM_DONE=1; fi
       if [ "$START_CG_IO" = 1 ] && [ -e "$CG_DIR/io.weight" ] && printf 'default %s\n' "$(( (8-START_IO)*25 ))" > "$CG_DIR/io.weight" 2>/dev/null; then CG_IO_DONE=1; fi
       if [ "$CG_MEM_DONE$CG_IO_DONE" != 00 ]; then
         if cg_join "$CG_DIR" "$CG_PID"; then
           [ "$CG_MEM_DONE" != 1 ] || CG_REPORT="${CG_REPORT}memcg=v2:$START_MEM_BYTES "
+          [ "$CG_MEM_DONE$CG_MEM_HIGH" != 11 ] || CG_REPORT="${CG_REPORT}memhigh=v2 "
           [ "$CG_IO_DONE" != 1 ] || CG_REPORT="${CG_REPORT}iocg=v2:$(( (8-START_IO)*25 )) "
         else CG_MEM_DONE=0; CG_IO_DONE=0; fi
       fi
@@ -1617,8 +1660,12 @@ local_destination_return(){
 # only Hetu-selected TCP flows in our private conntrack bit and preserve older
 # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
 # continue through TPROXY. DNS NAT and UDP keep their independent policies.
+# A fake-IP destination has no real peer: such a flow (e.g. a conntrack entry recreated
+# without our connmark after a long sleep) must keep going to the core, never direct.
 preserve_existing_tcp(){
-  "$1" -t mangle -A "$2" -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$MARK/$MASK" -j RETURN
+  PET_FAKE=$(fake_range "$1"); PET_FAKE=${PET_FAKE%%,*}
+  if [ -n "$PET_FAKE" ]; then "$1" -t mangle -A "$2" -p tcp -m conntrack --ctstate ESTABLISHED ! --ctorigdst "$PET_FAKE" -m connmark ! --mark "$MARK/$MASK" -j RETURN
+  else "$1" -t mangle -A "$2" -p tcp -m conntrack --ctstate ESTABLISHED -m connmark ! --mark "$MARK/$MASK" -j RETURN; fi
 }
 remember_local_tcp(){
   "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
@@ -1703,8 +1750,11 @@ install_redirect6(){
 # Who is left out of DNS takeover: the core alone when it runs as root:net_admin,
 # otherwise every root socket as before (and with them the system resolver).
 dns_owner_return(){
-  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT"
-  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
+  if [ "$SYSTEM_DNS" = captured ]; then core_return "$1" nat "$DNSOUT" || return 1
+  else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN || return 1; fi
+  # Network validation (connectivity/captive-portal probes) must not depend on the core:
+  # the resolver attributes NetworkMonitor's queries to the network stack UID.
+  "$1" -t nat -A "$DNSOUT" -m owner --uid-owner "$NETSTACK_UID" -j RETURN
 }
 # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
 # application and is root, so it needs a rule of its own.
@@ -2044,6 +2094,324 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
     [ "$DNS" = off ] || L_DNS="$DP"
     printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
   } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
+# ---- self-heal helpers (watchdog) --------------------------------------------------------
+# setsid only when it keeps the PID of a background child (it forks for a group leader).
+detach_probe(){
+  [ "$SETSID_CHECKED" != 1 ] || return 0
+  SETSID_CHECKED=1; SETSID=""
+  has setsid || return 0
+  DP_FILE="$RUN/.setsid.$$"
+  setsid sh -c 'printf "%s\n" "$$"' 2>/dev/null > "$DP_FILE" &
+  DP_PID=$!
+  wait "$DP_PID" 2>/dev/null
+  [ "$(cat "$DP_FILE" 2>/dev/null)" != "$DP_PID" ] || SETSID=setsid
+  rm -f "$DP_FILE"
+  return 0
+}
+# Move a process into the root cgroup of every hierarchy that freezes or kills Android apps by
+# cgroup (v2 uid_/pid_ groups, v1 acct/freezer/cpuctl/memcg). Children inherit it. Best effort.
+cg_escape(){
+  CE_PID="$1"; CG_ESCAPED=""
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  CE_V2=$(awk '$3=="cgroup2" {print $2; exit}' "$CG_MOUNTS" 2>/dev/null)
+  if [ -n "$CE_V2" ] && [ -e "$CE_V2/cgroup.procs" ] && printf '%s\n' "$CE_PID" 2>/dev/null > "$CE_V2/cgroup.procs"; then CG_ESCAPED="v2"; fi
+  for CE_D in $CG_ESCAPE_V1; do
+    [ "$CE_D" != "$CE_V2" ] || continue
+    [ -e "$CE_D/cgroup.procs" ] || [ -e "$CE_D/tasks" ] || continue
+    if { cg_join "$CE_D" "$CE_PID"; } 2>/dev/null; then CG_ESCAPED="${CG_ESCAPED:+$CG_ESCAPED,}${CE_D#/}"; fi
+  done
+  return 0
+}
+wd_log(){ { wd_log_body "$@"; } 2>/dev/null; return 0; }
+wd_log_body(){
+  printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$*" >> "$WATCHDOG_LOG" || return 0
+  WL_SIZE=$(wc -c < "$WATCHDOG_LOG" 2>/dev/null || echo 0)
+  case "$WL_SIZE" in ''|*[!0-9]*) return 0;; esac
+  [ "$WL_SIZE" -le "$WD_LOG_MAX" ] || { tail -n 300 "$WATCHDOG_LOG" > "$WATCHDOG_LOG.new.$$" 2>/dev/null && mv -f "$WATCHDOG_LOG.new.$$" "$WATCHDOG_LOG" 2>/dev/null; } || rm -f "$WATCHDOG_LOG.new.$$"
+  return 0
+}
+wd_now(){ read -r WD_NOW WD_NOW_REST < /proc/uptime 2>/dev/null || WD_NOW=0; WD_NOW=${WD_NOW%%.*}; case "$WD_NOW" in ''|*[!0-9]*) WD_NOW=0;; esac; }
+# Best effort user-visible notice that does not need the App process (cmd notification).
+wd_notify(){
+  { printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$RUN/selfheal-state"; } 2>/dev/null || true
+  has cmd || return 0
+  cmd notification post -S bigtext -t '河图' hetu-selfheal "$2" >/dev/null 2>&1 &
+  return 0
+}
+# $1 method, $2 path, $3 body file, $4 "hold" keeps the request side open (nc) for slow answers.
+# Returns 0 when the core answered (any HTTP status, WD_CODE), 1 when it did not, 2 without a tool.
+wd_http(){
+  WH_URL="http://127.0.0.1:$WD_CP$2"; WD_CODE=000; : > "$3"
+  for WH_TOOL in $WD_HTTP_TOOLS; do
+    case "$WH_TOOL" in
+      curl) has curl || continue
+        if [ -n "$WD_SECRET" ]; then WD_CODE=$(curl -sS -m "$WD_HTTP_TIMEOUT" -X "$1" -H "Authorization: Bearer $WD_SECRET" -o "$3" -w '%{http_code}' "$WH_URL" 2>/dev/null); WH_RC=$?
+        else WD_CODE=$(curl -sS -m "$WD_HTTP_TIMEOUT" -X "$1" -o "$3" -w '%{http_code}' "$WH_URL" 2>/dev/null); WH_RC=$?; fi
+        case "$WD_CODE" in [1-5][0-9][0-9]) return 0;; esac
+        WD_CODE=000
+        # Accepted and closed by the peer: the process is running its accept loop.
+        case "$WH_RC" in 52|56) return 0;; esac
+        return 1;;
+      wget) [ "$1" = GET ] || continue
+        WH_BB=""
+        for WH_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WH_B" ] && { WH_BB="$WH_B"; break; }; done
+        [ -n "$WH_BB" ] || continue
+        if [ -n "$WD_SECRET" ]; then timeout "$((WD_HTTP_TIMEOUT+1))" "$WH_BB" wget -S -q -T "$WD_HTTP_TIMEOUT" -O "$3" --header "Authorization: Bearer $WD_SECRET" "$WH_URL" 2> "$3.hdr"
+        else timeout "$((WD_HTTP_TIMEOUT+1))" "$WH_BB" wget -S -q -T "$WD_HTTP_TIMEOUT" -O "$3" "$WH_URL" 2> "$3.hdr"; fi
+        WD_CODE=$(awk '$1 ~ /^HTTP\// {c=$2} END {print c}' "$3.hdr" 2>/dev/null); rm -f "$3.hdr"
+        case "$WD_CODE" in [1-5][0-9][0-9]) return 0;; esac
+        WD_CODE=000; return 1;;
+      nc) has nc || continue
+        WH_HOLD=0; [ "${4:-}" != hold ] || WH_HOLD="$WD_HTTP_TIMEOUT"
+        { printf '%s %s HTTP/1.0\r\nHost: 127.0.0.1\r\nContent-Length: 0\r\n' "$1" "$2"
+          [ -z "$WD_SECRET" ] || printf 'Authorization: Bearer %s\r\n' "$WD_SECRET"
+          printf '\r\n'; [ "$WH_HOLD" = 0 ] || sleep "$WH_HOLD"; } 2>/dev/null \
+          | timeout "$((WD_HTTP_TIMEOUT+1))" nc -w "$WD_HTTP_TIMEOUT" 127.0.0.1 "$WD_CP" > "$3.raw" 2>/dev/null
+        WD_CODE=$(head -n 1 "$3.raw" 2>/dev/null | awk '{print $2}')
+        awk 'b {print; next} /^\r?$/ {b=1}' "$3.raw" > "$3" 2>/dev/null; rm -f "$3.raw"
+        case "$WD_CODE" in [1-5][0-9][0-9]) return 0;; esac
+        WD_CODE=000; return 1;;
+    esac
+  done
+  return 2
+}
+# DNS over TCP to the core's DNS listener (any answer, NXDOMAIN included, proves it is serving).
+wd_dns_probe(){
+  case "$WD_DP" in ''|0|*[!0-9]*) return 2;; esac
+  case " $WD_DNS_PROTOS " in *" tcp "*) ;; *) return 2;; esac
+  has nc || return 2
+  WDP_N=$(printf '\000\047\110\124\001\000\000\001\000\000\000\000\000\000\015hetu-liveness\007invalid\000\000\001\000\001' \
+    | timeout "$((WD_HTTP_TIMEOUT+1))" nc -w "$WD_HTTP_TIMEOUT" 127.0.0.1 "$WD_DP" 2>/dev/null | wc -c)
+  case "$WDP_N" in ''|*[!0-9]*) return 1;; esac
+  [ "$WDP_N" -gt 0 ]
+}
+# 0 when the core is frozen (cgroup v2 freezer, v1 freezer) or stopped; WD_FROZEN_HOW says how.
+wd_core_frozen(){
+  WD_FROZEN_HOW=""
+  WCF_STATE=$(sed 's/^.*) //' "/proc/$1/stat" 2>/dev/null | awk '{print $1}')
+  [ "$WCF_STATE" != T ] || { WD_FROZEN_HOW=stopped; return 0; }
+  WCF_V2=$(awk '$3=="cgroup2" {print $2; exit}' "$CG_MOUNTS" 2>/dev/null)
+  WCF_P=$(sed -n 's/^0:://p' "/proc/$1/cgroup" 2>/dev/null | head -n 1)
+  if [ -n "$WCF_V2" ] && [ -n "$WCF_P" ] && grep -qx 'frozen 1' "$WCF_V2${WCF_P%/}/cgroup.events" 2>/dev/null; then WD_FROZEN_HOW="cgroup2:$WCF_P"; return 0; fi
+  WCF_FZ=$(awk -F: '$2 ~ /(^|,)freezer(,|$)/ {print $3; exit}' "/proc/$1/cgroup" 2>/dev/null)
+  if [ -n "$WCF_FZ" ]; then
+    for WCF_D in /dev/freezer /sys/fs/cgroup/freezer; do
+      grep -q FROZEN "$WCF_D${WCF_FZ%/}/freezer.state" 2>/dev/null && { WD_FROZEN_HOW="freezer:$WCF_FZ"; return 0; }
+    done
+  fi
+  return 1
+}
+# Session facts the probes need; the controller secret comes from the private startup copy.
+wd_selfheal_init(){
+  WD_CP=$(sed -n 's/^CONTROLLER_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); port "$WD_CP" || WD_CP=0
+  WD_DP=$(sed -n 's/^ACTIVE_DNS_PORT=//p' "$SESSION" 2>/dev/null | head -n 1); port "$WD_DP" || WD_DP=0
+  WD_DNS_PROTOS=$(sed -n 's/^DNS_PROTOS=//p' "$SESSION" 2>/dev/null | head -n 1)
+  WD_TMP="$RUN/.wd.$$"
+  WD_CFG=$(sed -n '2p' "$RUN/state/start.args" 2>/dev/null)
+  WD_SECRET=""
+  if [ -n "$WD_CFG" ] && [ -r "$WD_CFG" ]; then
+    WD_SECRET=$(sed -n "s/^secret:[[:space:]]*'\\(.*\\)'[[:space:]]*\$/\\1/p" "$WD_CFG" 2>/dev/null | head -n 1 | sed "s/''/'/g")
+    [ -n "$WD_SECRET" ] || WD_SECRET=$(sed -n 's/^secret:[[:space:]]*"\(.*\)"[[:space:]]*$/\1/p' "$WD_CFG" 2>/dev/null | head -n 1)
+    [ -n "$WD_SECRET" ] || WD_SECRET=$(grep -o '"secret"[[:space:]]*:[[:space:]]*"[^"]*"' "$WD_CFG" 2>/dev/null | head -n 1 | sed 's/.*"\([^"]*\)"$/\1/')
+  fi
+  WD_KIND=$(core_kind 2>/dev/null)
+  WD_EG_ON=0
+  if [ "$WD_CP" != 0 ] && [ -n "$WD_SECRET" ] && kind_has_api "$WD_KIND"; then WD_EG_ON=1; fi
+  wd_now
+  WD_LIVE_AT=$((WD_NOW+WD_LIVE_GRACE)); WD_LIVE_FAIL=0; WD_DNS_AT=$((WD_NOW+WD_LIVE_GRACE+WD_DNS_EVERY)); WD_DNS_FAIL=0
+  WD_EG_AT=$((WD_NOW+WD_EGRESS_GRACE)); WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_TARGET=""; WD_EG_NEXT_ACTION=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"
+  WD_NET_SIG=$(wd_net_sig)
+  WD_NOTOOL=0
+}
+wd_net_sig(){ ip -o -4 addr show scope global 2>/dev/null | awk '{printf "%s=%s ", $2, $4}'; }
+wd_net_watch(){
+  WNW_SIG=$(wd_net_sig)
+  [ "$WNW_SIG" != "$WD_NET_SIG" ] || return 0
+  WD_NET_SIG="$WNW_SIG"; wd_now
+  wd_log "network change (${WNW_SIG:-offline}): re-checking core liveness"
+  WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
+}
+wd_liveness(){
+  WD_LIVE_REASON=""
+  if wd_core_frozen "$COREPID"; then
+    WLV_HOW="$WD_FROZEN_HOW"
+    cg_escape "$COREPID"; kill -CONT "$COREPID" 2>/dev/null || true
+    sleep 0.3
+    if wd_core_frozen "$COREPID"; then WD_LIVE_REASON="frozen:$WLV_HOW"; return 1; fi
+    wd_log "self-heal: core $COREPID was frozen ($WLV_HOW); moved to the root cgroup (${CG_ESCAPED:-none}) and resumed"
+  fi
+  if [ "$WD_CP" != 0 ]; then
+    WD_HTTP_TIMEOUT=3; wd_http GET /version "$WD_TMP.live"; WLV_RC=$?; rm -f "$WD_TMP.live"
+    case "$WLV_RC" in
+      0) return 0;;
+      2) [ "$WD_NOTOOL" = 1 ] || { WD_NOTOOL=1; wd_log "liveness: no curl/wget/nc to probe the controller"; }; return 0;;
+    esac
+    WD_LIVE_REASON="controller-$WD_CP-no-answer"; return 1
+  fi
+  WD_HTTP_TIMEOUT=3; wd_dns_probe
+  [ "$?" != 1 ] || { WD_LIVE_REASON="dns-$WD_DP-no-answer"; return 1; }
+  return 0
+}
+# At most WD_RESTART_MAX restarts per WD_RESTART_WINDOW seconds and boot; a manual start resets it.
+wd_restart_allowed(){
+  wd_now; WRA_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
+  WRA_C=0; WRA_S="$WD_NOW"; WRA_B=""
+  if [ -r "$RUN/state/selfheal-budget" ]; then read -r WRA_B WRA_C WRA_S < "$RUN/state/selfheal-budget" 2>/dev/null || true; fi
+  case "$WRA_C:$WRA_S" in *[!0-9:]*|:*|*:) WRA_C=0; WRA_S="$WD_NOW";; esac
+  if [ "$WRA_B" != "$WRA_BOOT" ] || [ $((WD_NOW-WRA_S)) -ge "$WD_RESTART_WINDOW" ] || [ "$WD_NOW" -lt "$WRA_S" ]; then WRA_C=0; WRA_S="$WD_NOW"; fi
+  [ "$WRA_C" -lt "$WD_RESTART_MAX" ] || return 1
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  { printf '%s %s %s\n' "$WRA_BOOT" "$((WRA_C+1))" "$WRA_S" > "$RUN/state/selfheal-budget"; } 2>/dev/null || true
+}
+# Re-run the recorded start (same arguments, fresh environment) in this watchdog's root cgroup.
+# Success: a new session with its own watchdog owns everything. Failure after the start began
+# changing the network: its rollback removed capture (Kill Switch: kept its guards).
+wd_restart_core(){
+  [ -r "$RUN/state/start.args" ] || { wd_log "self-heal: no saved start arguments, cannot restart the core"; return 1; }
+  rm -f "$WATCHDOG_PID"
+  # Output goes to a file: background children of start must not hold a pipe open.
+  (
+    unset HETU_BOOT_RESTORE_ID HETU_AUTOMATIC_RECOVERY_ID HETU_START_CANCEL_TOKEN HETU_GMS_APPIDS HETU_PRIVATE_DNS_MODE
+    HETU_SELFHEAL_RESTART=1; export HETU_SELFHEAL_RESTART
+    set --
+    while IFS= read -r WRC_A || [ -n "$WRC_A" ]; do set -- "$@" "$WRC_A"; done < "$RUN/state/start.args"
+    exec "$0" start "$@"
+  ) </dev/null > "$WD_TMP.restart" 2>/dev/null
+  WRC_OUT=$(cat "$WD_TMP.restart" 2>/dev/null); rm -f "$WD_TMP.restart"
+  case "$WRC_OUT" in *'"ok":true'*) wd_log "self-heal: core restarted ($(cat "$PIDFILE" 2>/dev/null || echo '?'))"; return 0;; esac
+  wd_log "self-heal: core restart failed: $(printf '%s' "$WRC_OUT" | tr -d '\n\r' | cut -c1-240)"
+  [ -f "$WATCHDOG_PID" ] || printf '%s\n' "$$" > "$WATCHDOG_PID" 2>/dev/null || true
+  # A rollback that already ended the session's core has also restored (or guarded) the network.
+  if [ "$(cat "$PIDFILE" 2>/dev/null)" != "$COREPID" ]; then wd_heal_notice rollback; fi
+  return 1
+}
+wd_heal_notice(){
+  if [ "$KILL" = 1 ]; then
+    wd_notify "core-unresponsive restart-failed killswitch-active ($1)" "河图核心无响应且自动重启失败。Kill Switch 已开启，网络保持阻断；请打开河图重新启动或停止代理。"
+  else
+    wd_notify "core-unresponsive restart-failed network-restored ($1)" "河图核心无响应且自动重启失败，已自动恢复直连网络（代理已停止）。请打开河图重新启动代理。"
+  fi
+}
+# The core stopped answering: restart it; when that is impossible end it so the core-exit path
+# below removes capture (or keeps the Kill Switch guards) exactly as for a crashed core.
+wd_recover(){
+  WD_HEAL_REASON="$1"
+  wd_log "self-heal: core $COREPID unresponsive ($1)"
+  cg_escape "$COREPID"; kill -CONT "$COREPID" 2>/dev/null || true
+  if wd_restart_allowed; then
+    wd_log "self-heal: restarting the core"
+    if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
+  else
+    wd_log "self-heal: restart limit reached ($WD_RESTART_MAX per ${WD_RESTART_WINDOW}s)"
+  fi
+  if [ "$(cat "$PIDFILE" 2>/dev/null)" = "$COREPID" ] && core_maybe_alive "$COREPID" && kill -0 "$COREPID" 2>/dev/null; then
+    wd_log "self-heal: ending unresponsive core $COREPID"
+    kill -9 "$COREPID" 2>/dev/null || true
+  fi
+  WD_LIVE_FAIL=0
+}
+# Proxy egress: the delay of the group the rules end in (MATCH, else the first non-builtin target).
+wd_egress_target(){
+  WD_EG_TARGET=""
+  WD_HTTP_TIMEOUT=4; wd_http GET /configs "$WD_TMP.eg" || return 1
+  case "$WD_CODE" in 200) ;; 401|403) WD_EG_ON=0; wd_log "egress check off: the controller refused the session secret"; return 1;; *) return 1;; esac
+  WET_MODE=$(tr ',' '\n' < "$WD_TMP.eg" | sed -n 's/^[{[:space:]]*"mode"[[:space:]]*:[[:space:]]*"\([A-Za-z]*\)".*/\1/p' | head -n 1)
+  case "$WET_MODE" in [Dd]irect) return 1;; [Gg]lobal) WD_EG_TARGET=GLOBAL; return 0;; esac
+  wd_http GET /rules "$WD_TMP.eg" && [ "$WD_CODE" = 200 ] || return 1
+  WD_EG_TARGET=$(tr '{' '\n' < "$WD_TMP.eg" | awk '
+    function f(k,  i, s) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); i = index(s, "\""); return i ? substr(s, 1, i - 1) : "" }
+    { p = f("proxy"); if (p == "") next
+      gsub(/\\u0026/, "\\&", p); gsub(/\\u003c/, "<", p); gsub(/\\u003e/, ">", p)
+      builtin = (p ~ /^(DIRECT|REJECT|REJECT-DROP|REJECT-TINY|PASS|COMPATIBLE|direct|block|dns-out)$/)
+      if (!builtin && first == "") first = p
+      if (f("type") == "Match" && !builtin) m = p }
+    END { if (m != "") print m; else if (first != "") print first }')
+  rm -f "$WD_TMP.eg"
+  [ -n "$WD_EG_TARGET" ]
+}
+wd_urlenc(){ printf '%s' "$1" | od -An -v -tx1 | tr -d ' \n' | sed 's/../%&/g'; }
+# 0 = delay measured, 1 = failed/timeout, 2 = unusable answer (target gone, secret refused).
+wd_delay(){
+  WD_HTTP_TIMEOUT=8
+  wd_http GET "/proxies/$(wd_urlenc "$1")/delay?timeout=5000&url=$(wd_urlenc "$2")" "$WD_TMP.dl" hold; WDL_RC=$?
+  WDL_BODY=$(cat "$WD_TMP.dl" 2>/dev/null); rm -f "$WD_TMP.dl"
+  [ "$WDL_RC" != 2 ] || return 2
+  case "$WD_CODE" in
+    200) case "$WDL_BODY" in *'"delay":'[1-9]*) return 0;; esac; return 1;;
+    401|403) WD_EG_ON=0; return 2;;
+    400|404) return 2;;
+  esac
+  return 1
+}
+wd_egress_tick(){
+  WD_EG_AT=$((WD_NOW+WD_EGRESS_EVERY))
+  [ -n "$WD_EG_TARGET" ] || wd_egress_target || { WD_EG_AT=$((WD_NOW+900)); return 0; }
+  wd_delay "$WD_EG_TARGET" "$WD_PROXY_URL"; WET_RC=$?
+  case "$WET_RC" in
+    0) if [ "$WD_EG_FAIL" != 0 ] || [ "$WD_EG_LEVEL" != 0 ]; then wd_log "proxy egress recovered via $WD_EG_TARGET"; fi
+       WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"; return 0;;
+    2) WD_EG_TARGET=""; return 0;;
+  esac
+  # Proxy failed. Only a working direct path makes it a proxy-side outage worth acting on.
+  WET_DIRECT=1
+  for WET_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WET_U" && { WET_DIRECT=0; break; }; done
+  if [ "$WET_DIRECT" != 0 ]; then WD_EG_FAIL=0; return 0; fi
+  WD_EG_FAIL=$((WD_EG_FAIL+1)); WD_EG_AT=$((WD_NOW+WD_EGRESS_RETRY))
+  wd_log "proxy egress probe failed via $WD_EG_TARGET while direct works ($WD_EG_FAIL/$WD_EGRESS_LIMIT)"
+  [ "$WD_EG_FAIL" -ge "$WD_EGRESS_LIMIT" ] || return 0
+  WD_EG_FAIL=0; WD_EG_AT=$((WD_NOW+WD_EGRESS_EVERY))
+  if [ "$WD_NOW" -lt "$WD_EG_NEXT_ACTION" ]; then wd_log "proxy egress still down; next self-heal action in $((WD_EG_NEXT_ACTION-WD_NOW))s (backoff)"; return 0; fi
+  WD_EG_LEVEL=$((WD_EG_LEVEL+1))
+  WD_EG_NEXT_ACTION=$((WD_NOW+WD_EG_BACKOFF)); WD_EG_BACKOFF=$((WD_EG_BACKOFF*2)); [ "$WD_EG_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_EG_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
+  WD_HTTP_TIMEOUT=4
+  if [ "$WD_EG_LEVEL" = 1 ]; then
+    wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
+    wd_log "self-heal: proxy egress down; closed all core connections (HTTP $WD_CODE)"
+  elif [ "$WD_EG_LEVEL" = 2 ] && [ "$WD_KIND" = mihomo ]; then
+    wd_http POST /restart "$WD_TMP.act"; rm -f "$WD_TMP.act"
+    wd_log "self-heal: proxy egress still down; core reloaded in place (POST /restart, HTTP $WD_CODE)"
+    WD_EG_TARGET=""; WD_LIVE_AT=$((WD_NOW+WD_LIVE_GRACE))
+  else
+    WD_EG_LEVEL=3
+    if wd_restart_allowed; then
+      wd_log "self-heal: proxy egress still down; restarting the core"
+      if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
+    else
+      wd_log "self-heal: proxy egress still down; restart limit reached, waiting (backoff ${WD_EG_BACKOFF}s)"
+    fi
+  fi
+}
+wd_selfheal_tick(){
+  wd_now
+  if [ -f "$RUN/liveness.kick" ]; then
+    rm -f "$RUN/liveness.kick"
+    wd_log "network change reported: re-checking core liveness"
+    WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
+  fi
+  if [ "$WD_NOW" -ge "$WD_LIVE_AT" ]; then
+    WD_LIVE_AT=$((WD_NOW+WD_LIVE_EVERY))
+    if wd_liveness; then
+      [ "$WD_LIVE_FAIL" = 0 ] || wd_log "core liveness recovered after $WD_LIVE_FAIL failed probe(s)"
+      WD_LIVE_FAIL=0
+    else
+      WD_LIVE_FAIL=$((WD_LIVE_FAIL+1)); WD_LIVE_AT=$((WD_NOW+WD_LIVE_RETRY))
+      wd_log "core liveness probe failed ($WD_LIVE_REASON) $WD_LIVE_FAIL/$WD_LIVE_LIMIT"
+      [ "$WD_LIVE_FAIL" -lt "$WD_LIVE_LIMIT" ] || { wd_recover "$WD_LIVE_REASON"; return 0; }
+    fi
+  fi
+  [ "$WD_LIVE_FAIL" = 0 ] || return 0
+  # The controller answers but the DNS listener may still be wedged.
+  if [ "$WD_CP" != 0 ] && [ "$WD_NOW" -ge "$WD_DNS_AT" ]; then
+    WD_DNS_AT=$((WD_NOW+WD_DNS_EVERY)); WD_HTTP_TIMEOUT=3; wd_dns_probe; WDT_RC=$?
+    if [ "$WDT_RC" = 1 ]; then
+      WD_DNS_FAIL=$((WD_DNS_FAIL+1)); WD_DNS_AT=$((WD_NOW+WD_LIVE_EVERY))
+      wd_log "core DNS probe failed (port $WD_DP) $WD_DNS_FAIL/$WD_DNS_LIMIT"
+      [ "$WD_DNS_FAIL" -lt "$WD_DNS_LIMIT" ] || { WD_DNS_FAIL=0; wd_recover "dns-$WD_DP-no-answer"; return 0; }
+    else WD_DNS_FAIL=0; fi
+  fi
+  if [ "$WD_EG_ON" = 1 ] && [ "$WD_NOW" -ge "$WD_EG_AT" ]; then wd_egress_tick; fi
+  return 0
+}
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
   [ -n "$WD_GENERATION" ] && [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
@@ -2055,13 +2423,19 @@ watchdog(){
   cnip_load_session
   share_load_session
   printf '%s\n' "$WD_GENERATION" > "$RUN/watchdog.ready.$$" || exit 0
+  # Out of the App's cgroup even when started by an older path; repair-network calls from here
+  # are not network-change reports.
+  cg_escape "$$"
+  HETU_WATCHDOG_CALL=1; export HETU_WATCHDOG_CALL
+  wd_selfheal_init
   MISS=0; H_TICK=0
   while [ "$MISS" -lt 3 ]; do
     [ "$WD_GENERATION" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
     if core_maybe_alive "$COREPID" && kill -0 "$COREPID" >/dev/null 2>&1; then
       MISS=0; H_TICK=$((H_TICK+1))
       if [ "$H_TICK" -ge 6 ]; then H_TICK=0; core_log_rotate; "$0" repair-network "$COREPID" >/dev/null 2>&1 || true
-        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; fi
+        [ "$CNIP_STATE" != ipset ] || "$0" cnip-reload auto >/dev/null 2>&1 || true; wd_net_watch; fi
+      wd_selfheal_tick
       sleep 2
     else MISS=$((MISS+1)); sleep 0.20; fi
   done
@@ -2084,7 +2458,9 @@ watchdog(){
     rm -f "$PIDFILE"
     date '+%Y-%m-%dT%H:%M:%S%z core exited; '"$RESULT" > "$CRASH_STATE" 2>/dev/null || true
     printf '%s core=%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$COREPID" "$RESULT" >> "$WATCHDOG_LOG" 2>/dev/null || true
+    [ -z "$WD_HEAL_REASON" ] || wd_heal_notice "$RESULT"
   fi
+  rm -f "${WD_TMP:-$RUN/.wd.$$}".* 2>/dev/null
   [ "$(cat "$WATCHDOG_PID" 2>/dev/null)" != "$$" ] || rm -f "$WATCHDOG_PID"
   rm -f "$RUN/watchdog.ready.$$"
 }
@@ -2105,7 +2481,8 @@ start_watchdog(){
   stopwatchdog
   WD_GENERATION="$$-$(health_core_birth "$$")"
   printf '%s\n' "$WD_GENERATION" > "$RUN/generation" || return 1
-  "$0" watchdog "$@" "$WD_GENERATION" >/dev/null 2>&1 &
+  detach_probe
+  $SETSID "$0" watchdog "$@" "$WD_GENERATION" </dev/null >/dev/null 2>&1 &
   WD_CHILD=$!
   printf '%s\n' "$WD_CHILD" > "$WATCHDOG_PID" || return 1
   WD_N=0
@@ -2186,15 +2563,17 @@ core_launch_native(){
     *) return 1;;
   esac
   core_env
-  if [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" "$@" >>"$LOG" 2>&1 &
-  else "$START_BIN" "$@" >>"$LOG" 2>&1 & fi
+  detach_probe
+  if [ -n "$CORE_RUNNER" ]; then $SETSID "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" "$@" >>"$LOG" 2>&1 &
+  else $SETSID "$START_BIN" "$@" >>"$LOG" 2>&1 & fi
   START_PID=$!
 }
 core_launch(){
   [ -z "${START_MEM_BYTES:-}" ] || { GOMEMLIMIT="$START_MEM_BYTES"; export GOMEMLIMIT; }
+  detach_probe
   if [ "${START_KIND:-mihomo}" != mihomo ]; then core_launch_native "$START_KIND" "${START_PAYLOAD:-$START_CFG}" || return 1
-  elif [ -n "$CORE_RUNNER" ]; then "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 &
-  else "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & fi
+  elif [ -n "$CORE_RUNNER" ]; then $SETSID "$CORE_RUNNER" setuidgid "$CORE_SPEC" "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 &
+  else $SETSID "$START_BIN" -d "$RUN" -f "$START_CFG" >>"$LOG" 2>&1 & fi
   [ "${START_KIND:-mihomo}" != mihomo ] || START_PID=$!
   [ -n "$CORE_RUNNER" ] || return 0
   # setuidgid replaces itself with the core; identity checks wait for that, briefly.
@@ -2424,6 +2803,18 @@ capture_unwind(){
   SWEEP_ONLY=""
 }
 
+# What a watchdog restart replays, the self-heal budget (reset by every start that is not itself a
+# self-heal restart) and where this session's processes ended up in the cgroup tree.
+start_selfheal_record(){ { start_selfheal_body "$@"; } 2>/dev/null; return 0; }
+start_selfheal_body(){
+  mkdir -p "$RUN/state" 2>/dev/null || true
+  { for SSR_A in "$@"; do printf '%s\n' "$SSR_A"; done; } > "$RUN/state/start.args.new.$$" 2>/dev/null && mv -f "$RUN/state/start.args.new.$$" "$RUN/state/start.args" 2>/dev/null || rm -f "$RUN/state/start.args.new.$$"
+  [ -n "${HETU_SELFHEAL_RESTART:-}" ] || rm -f "$RUN/state/selfheal-budget" "$RUN/selfheal-state" 2>/dev/null
+  SSR_CG=$(tr '\n' ' ' < "/proc/$START_PID/cgroup" 2>/dev/null | cut -c1-400)
+  printf 'shell=%s setsid=%s core=%s\n' "${START_CG_ESCAPED:-none}" "${SETSID:-no}" "$SSR_CG" > "$RUN/cgroup-escape" 2>/dev/null || true
+  wd_log "session start core=$START_PID cgroup-escape=${START_CG_ESCAPED:-none} setsid=${SETSID:-no}${HETU_SELFHEAL_RESTART:+ (self-heal restart)}"
+  return 0
+}
 start(){
   START_BIN="$1"; START_CFG="$2"; START_MODE="$3"; START_TP="$4"; START_RP="$5"; START_V6="$6"; START_TCP="$7"; START_UDP="$8"; START_DNS="$9"; START_QUIC="${10}"; START_DP="${11}"; START_CP="${12}"; START_SCOPE="${13}"; START_UIDS="${14}"; START_SHARE="${15}"; START_KILL="${16}"; START_CIDRS="${17}"; START_IFACES="${18}"; START_DIRECT_UIDS="${19}"; START_PREVALIDATED="${20:-0}"; START_FAST_CAPS="${21:-0}"; START_DIRECT_GIDS="${22:-}"; START_SHARED_MACS="${23:-}"
   START_VENDOR_CLEAN="${30:-0}"
@@ -2440,6 +2831,9 @@ start(){
   # Neither protocol captured is the same as DNS takeover switched off.
   [ -n "$DNS_PROTOS" ] || START_DNS=off
   mkdir -p "$RUN" || fail "无法创建运行目录"
+  # Before anything is spawned: the core, watchdog and monitor inherit the root cgroup, so freezing
+  # or killing the App (its uid_/pid_ cgroup) never freezes or kills them.
+  cg_escape "$$"; START_CG_ESCAPED="$CG_ESCAPED"
   acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
   if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
     BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
@@ -2582,6 +2976,7 @@ start(){
   # Record exactly what this session installed, not mutable app preferences.
   health_record || { fail "无法记录网络完整性基线，已停止本次启动"; }
   start_stage "start-watchdog"
+  start_selfheal_record "$@"
   rm -f "$RUN/google-firewall-at"
   if [ "$START_VENDOR_CLEAN" = 1 ]; then google_firewall_cleanup; fi
   start_watchdog "$START_PID" "$START_KILL" "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || { fail "运行守护未确认就绪，已中止启动"; }
@@ -3134,7 +3529,8 @@ start_monitor(){
   SMO_GEN=$(cat "$RUN/generation" 2>/dev/null) || return 1
   [ -n "$SMO_GEN" ] || return 1
   mkdir -p "$MONITOR_DIR" 2>/dev/null || return 1
-  "$0" monitor "$SMO_GEN" </dev/null >/dev/null 2>&1 &
+  detach_probe
+  $SETSID "$0" monitor "$SMO_GEN" </dev/null >/dev/null 2>&1 &
   SMO_CHILD=$!
   printf '%s\n' "$SMO_CHILD" > "$MONITOR_PID" || return 1
   printf '%s started pid=%s generation=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$SMO_CHILD" "$SMO_GEN" >> "$MONITOR_DIR/monitor.log" 2>/dev/null || true
@@ -3456,6 +3852,8 @@ monitor_main(){
     rm -rf "$MONITOR_LOCK"; mkdir "$MONITOR_LOCK" 2>/dev/null || exit 0
   fi
   printf '%s\n' "$$" > "$MONITOR_LOCK/pid" || { rm -rf "$MONITOR_LOCK"; exit 0; }
+  # monitor-ensure runs from the App's su: leave its cgroup like the watchdog does.
+  cg_escape "$$"
   MON_CHILD=""; MON_SLEEP=""; MON_TMP=""
   trap 'monitor_release' EXIT
   trap 'monitor_term' TERM INT HUP
@@ -3473,7 +3871,8 @@ monitor_main(){
   while :; do
     [ "$MON_GEN" = "$(cat "$RUN/generation" 2>/dev/null)" ] || exit 0
     [ "$(cat "$MONITOR_PID" 2>/dev/null)" = "$$" ] || exit 0
-    { core_maybe_alive "$MON_CORE" && kill -0 "$MON_CORE" 2>/dev/null; } || exit 0
+    # Core gone and no watchdog left to restore the network: run the status self-heal ourselves.
+    { core_maybe_alive "$MON_CORE" && kill -0 "$MON_CORE" 2>/dev/null; } || { watchdog_alive || "$0" status >/dev/null 2>&1; exit 0; }
     [ -r "$MONITOR_POLICY" ] || exit 0
     MM_SIG=$(cksum < "$MONITOR_POLICY" 2>/dev/null | awk '{print $1 ":" $2}')
     if [ "$MM_SIG" != "$MON_POLICY_SIG" ]; then monitor_load_policy; MON_CAND=""; fi
@@ -3575,7 +3974,9 @@ case "${1:-status}" in
   # Hot update of the eBPF matcher maps (direct UIDs, app-scope UIDs, bypass networks); no arguments
   # re-syncs the recorded lists. iptables rules are never rebuilt here.
   ebpf-update) { [ "$#" = 1 ] || [ "$#" = 4 ]; } || fail "参数错误"; root; shift; ebpf_update "$@";;
-  repair-network) [ "$#" = 2 ] || exit 1; root; health_repair "$2";;
+  # Called by the App on every network change (and by the watchdog itself every ~12 s): an App call
+  # also asks the watchdog to re-verify that the core answers, not only the rules.
+  repair-network) [ "$#" = 2 ] || exit 1; root; [ -n "${HETU_WATCHDOG_CALL:-}" ] || { : > "$RUN/liveness.kick"; } 2>/dev/null || true; health_repair "$2";;
   monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
   monitor-status) root; monitor_status_json;;
   monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;

@@ -28,6 +28,8 @@ final class RootProxyManager {
     private static final String SCRIPT=ROOT+"/hetu-root.sh";
     private static final String HEALTH_CHECKER=ROOT+"/run/state/hetu-health-checker.sh";
     private static final String OLD_HETU_SCRIPT=ROOT+"/proxy-root.sh";
+    /** Default 内存限制 (GOMEMLIMIT soft target / cgroup memory.high): 100M made large rule sets GC-thrash. */
+    static final String DEFAULT_MEMORY_LIMIT="256M";
     /** hetu-root.sh keeps plain root as the core identity while this file exists in ROOT/policy. */
     static final String SYSTEM_DNS_DIRECT_MARKER="system-dns-direct";
     private static final String LEGACY_ROOT="/data/adb/bichen/proxy";
@@ -447,7 +449,7 @@ final class RootProxyManager {
         ConfigReferenceCleaner.Result cleaned=ConfigReferenceCleaner.mihomo(source);
         source=cleaned.text;
         MihomoStartupConfig.Result generated=MihomoStartupConfig.generate(source,profile,controllerSecret(),controllerPort,profile.appScope,tunPackages,policy.directPackages,ebpfInterface,
-                prefs.getBoolean("proxyRecommendedDns",false),true);
+                prefs.getBoolean("proxyRecommendedDns",false),true,validationHosts());
         RootFakeIpRanges fakeIps=RootFakeIpRanges.parse(generated.yaml,profile);
         // Private comments carry an already validated routing projection into start/boot.
         // Keep the established startup argument protocol and the user's source untouched.
@@ -1153,7 +1155,7 @@ final class RootProxyManager {
         String dnsUdp=bit(prefs.getBoolean("proxyDnsHijackUdp",true));
         String perf=bit(prefs.getBoolean("proxyPerformanceMode",false));
         String cpu=prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"";
-        String mem=cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):"");
+        String mem=cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit",DEFAULT_MEMORY_LIMIT):"");
         String ioWeight=cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):"");
         String vendorClean=bit(prefs.getBoolean("proxyVendorFirewallCleanup",false));
         JSONObject result;
@@ -1360,7 +1362,7 @@ final class RootProxyManager {
                 bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                 bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                 bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
-                cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit","100M"):""),
+                cgroupTuning(prefs.getBoolean("proxyMemoryLimitEnabled",false)?prefs.getString("proxyMemoryLimit",DEFAULT_MEMORY_LIMIT):""),
                 cgroupTuning(prefs.getBoolean("proxyIoWeightEnabled",false)?prefs.getString("proxyIoWeight","4"):""),bit(prefs.getBoolean("proxyVendorFirewallCleanup",false))};
     }
 
@@ -2041,6 +2043,16 @@ final class RootProxyManager {
             }
         }
         return RootCommandReply.read(r.code,r.output);
+    }
+
+    /** Network-validation probe hosts (defaults plus Settings.Global captive_portal_*_url) that bypass the core. */
+    private List<String> validationHosts(){
+        ArrayList<String> values=new ArrayList<>();
+        for(String key:CaptivePortalBypass.SETTINGS_KEYS){
+            try{values.add(android.provider.Settings.Global.getString(context.getContentResolver(),key));}
+            catch(RuntimeException ignored){}
+        }
+        return CaptivePortalBypass.hosts(values);
     }
 
     private String privateDnsMode(){

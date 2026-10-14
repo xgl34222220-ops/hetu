@@ -45,6 +45,12 @@ final class AdblockDnsPolicy {
             for (int dot = a.indexOf('.'); dot >= 0 && dot < a.length() - 1; dot = a.indexOf('.', dot + 1))
                 allowParents.add(a.substring(dot + 1));
         }
+        // Network-validation probe hosts are never answered empty (and neither are their parents).
+        for (String probe : CaptivePortalBypass.DEFAULT_HOSTS) {
+            allowSet.add(probe);
+            for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
+                allowParents.add(probe.substring(dot + 1));
+        }
         TreeSet<String> out = new TreeSet<>();
         if (block != null) for (String raw : block) {
             String d = normalizeDomain(raw);
