@@ -31,6 +31,19 @@ final class AdblockDnsPolicy {
     /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
     static final List<String> VALIDATION_PROBE_HOSTS =
             Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
+    /**
+     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo, AOSP
+     * fallback). Exact hosts; CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either.
+     */
+    static final List<String> VALIDATION_PROBE_EXTRA_HOSTS =
+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com", "connectivitycheck.android.com",
+                    "conn1.oppomobile.com", "conn2.oppomobile.com", "wifi.vivo.com.cn"));
+    /**
+     * 3.0.0: probe domains taken with every subdomain (ColorOS conn-service-cn-0N.allawntech.com, www.google.cn,
+     * www.googleapis.cn). All three are served inside mainland China; google.com itself is never among them.
+     */
+    static final List<String> VALIDATION_PROBE_SUFFIXES =
+            Collections.unmodifiableList(Arrays.asList("allawntech.com", "google.cn", "googleapis.cn"));
 
     /**
      * Domains that may be answered empty at DNS. A blocked suffix is kept out when an allow entry
@@ -49,7 +62,10 @@ final class AdblockDnsPolicy {
                 allowParents.add(a.substring(dot + 1));
         }
         // Network-validation probe hosts are never answered empty (and neither are their parents).
-        for (String probe : VALIDATION_PROBE_HOSTS) {
+        ArrayList<String> probes = new ArrayList<>(VALIDATION_PROBE_HOSTS);
+        probes.addAll(VALIDATION_PROBE_EXTRA_HOSTS);
+        probes.addAll(VALIDATION_PROBE_SUFFIXES);
+        for (String probe : probes) {
             allowSet.add(probe);
             for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
                 allowParents.add(probe.substring(dot + 1));

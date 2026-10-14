@@ -1314,7 +1314,15 @@ private val vocabularyAudit4Func = """
 """.trimIndent()
 
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
+// 2026-10-14 3.0.0 network recovery (opt-in Wi-Fi re-toggle after stop/start).
+private val vocabularyNetRecovery300 = """
+网络恢复|Network recovery|網路恢復|Восстановление сети
+Wi‑Fi 仍无法联网时重开|Restart Wi‑Fi if it still has no internet|Wi‑Fi 仍無法連網時重開|Перезапускать Wi‑Fi, если интернета всё ещё нет
+启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效|After the proxy starts or stops, DNS caches are flushed and the system re-checks its networks; when this is on and Wi‑Fi still shows no internet, Root turns Wi‑Fi off and on once. Off by default; applies at once|啟動或停止代理後會清除 DNS 快取並讓系統重新偵測網路；開啟後，若 Wi‑Fi 仍顯示無法連線到網路，再用 Root 關閉並重新開啟一次 Wi‑Fi。預設關閉，立即生效|После запуска или остановки прокси очищается кэш DNS и система заново проверяет сети; если включено и Wi‑Fi всё ещё без интернета, Root один раз выключает и включает Wi‑Fi. По умолчанию выключено, действует сразу
+""".trimIndent()
+
+
+private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

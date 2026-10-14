@@ -211,6 +211,19 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
             }
         }
 
+        item(key = "recovery") {
+            SettingsSection {
+                SettingsGroup(title = ht("网络恢复")) {
+                    // 3.0.0: opt-in last resort after stop/start; DNS flush and re-validation always run.
+                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, false)
+                    OtherSwitch(
+                        "Wi‑Fi 仍无法联网时重开", toggle, icon = HomeIcons.Server,
+                        subtitle = ht("启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效"),
+                    ) { prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++ }
+                }
+            }
+        }
+
         item(key = "matcher") {
             SettingsSection {
                 SettingsGroup(title = ht("规则匹配")) {

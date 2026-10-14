@@ -1,5 +1,5 @@
 diff --git a/android-app/app/build.gradle.kts b/android-app/app/build.gradle.kts
-index 8a43698..bfa360c 100644
+index 8a43698..332542d 100644
 --- a/android-app/app/build.gradle.kts
 +++ b/android-app/app/build.gradle.kts
 @@ -17,8 +17,8 @@ android {
@@ -8,8 +8,8 @@ index 8a43698..bfa360c 100644
          targetSdk = 35
 -        versionCode = 2092
 -        versionName = "0.12.19-v20-glass"
-+        versionCode = 2097
-+        versionName = "2.2.2"
++        versionCode = 2098
++        versionName = "3.0.0"
      }
 
      // Explicit CI debug identity. No private key is committed or exported.
@@ -36148,7 +36148,7 @@ literal 0
 HcmV?d00001
 
 diff --git a/android-app/app/src/main/assets/hetu-root.sh b/android-app/app/src/main/assets/hetu-root.sh
-index ae832da..42ef229 100755
+index ae832da..17de5d2 100755
 --- a/android-app/app/src/main/assets/hetu-root.sh
 +++ b/android-app/app/src/main/assets/hetu-root.sh
 @@ -1,5 +1,5 @@
@@ -36211,7 +36211,7 @@ index ae832da..42ef229 100755
  # xt_owner sees the credentials of the process that created a socket. Android resolves
  # names in netd, which is root, so "root sockets are the core" also exempts the system
  # resolver from DNS takeover. The core therefore runs as root with the net_admin group
-@@ -69,15 +100,131 @@ V6FWD=HETU_V6FWD
+@@ -69,15 +100,150 @@ V6FWD=HETU_V6FWD
  KOUT=HETU_KOUT
  KFWD=HETU_KFWD
 
@@ -36280,6 +36280,25 @@ index ae832da..42ef229 100755
 +WD_PROXY_URL=http://www.gstatic.com/generate_204
 +WD_DIRECT_URLS="http://connectivitycheck.gstatic.com/generate_204 http://connect.rom.miui.com/generate_204"
 +WD_HEAL_REASON=""
++# Data-plane probe (3.0.0, real-device outage on ColorOS: core and controller alive, the Google group's
++# node stalled, the MATCH-group delay check saw nothing). As root the watchdog asks the core's DNS for a
++# fake IP and fetches it, so the request really goes TPROXY/REDIRECT -> core -> proxy; a CN host with a
++# fake IP (normally DIRECT) and the proxy groups' own delay tell a dead node from a broken data plane.
++WD_DP_GRACE=120
++WD_DP_EVERY=90
++WD_DP_RETRY=30
++WD_DP_LIMIT=2
++WD_DP_TIMEOUT=6
++WD_DP_HOST=www.gstatic.com
++WD_DP_PATH=/generate_204
++WD_DP_CN_HOSTS="www.baidu.com www.qq.com www.taobao.com"
++WD_DP_GROUP_MAX=12
++WD_DP_BUDGET=30
++# After a stop, apps may still hold fake IPs from the core's DNS: for a short window they get a TCP reset /
++# ICMP unreachable instead of a hang, so they resolve again at once. Not a HETU_ chain: no sweep, status
++# check or stop verification treats it as capture.
++FAKE_REJECT_CHAIN=HXFAKE_REJECT
++FAKE_REJECT_SECONDS=120
 +
  ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 -start_stage(){ mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
@@ -36346,7 +36365,7 @@ index ae832da..42ef229 100755
  # Status polling must never sit behind Android/netd's xtables lock for 15 seconds.
  xt4q(){ command iptables -w 1 "$@"; }
  xt6q(){ command ip6tables -w 1 "$@"; }
-@@ -89,9 +236,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
+@@ -89,9 +255,121 @@ scope(){ case "${1:-}" in core|blacklist|whitelist) return 0;; *) return 1;; esa
  bool(){ case "${1:-}" in 0|1) return 0;; *) return 1;; esac; }
 
  release_lock(){
@@ -36470,7 +36489,7 @@ index ae832da..42ef229 100755
 
  acquire_lock(){
    [ "$LOCK_HELD" != 1 ] || return 0
-@@ -99,10 +358,53 @@ acquire_lock(){
+@@ -99,10 +377,53 @@ acquire_lock(){
    N=0
    while ! mkdir "$LOCK_DIR" >/dev/null 2>&1; do
      OWNER=$(cat "$LOCK_DIR/pid" 2>/dev/null || true)
@@ -36526,7 +36545,7 @@ index ae832da..42ef229 100755
  }
 
  state_value(){ [ -r "$NET_STATE" ] || return 1; sed -n "s/^${1}=//p" "$NET_STATE" 2>/dev/null | head -n 1; }
-@@ -188,15 +490,19 @@ $CLEAN_LOOKUP
+@@ -188,15 +509,19 @@ $CLEAN_LOOKUP
  -N $3
  "*) return 1;; *) return 0;; esac
  }
@@ -36550,7 +36569,7 @@ index ae832da..42ef229 100755
  }
  cleanlegacy(){
    ip rule del pref "$LEGACY_PREF" fwmark "$LEGACY_MARK/$LEGACY_MASK" table "$LEGACY_TABLE" >/dev/null 2>&1 || true
-@@ -233,7 +539,8 @@ cleanup4(){
+@@ -233,7 +558,8 @@ cleanup4(){
    unhook xt4 filter OUTPUT "$QUICOUT"; unhook xt4 filter FORWARD "$QUICFWD"
    unhook xt4 filter OUTPUT "$DOTOUT"
    unhook xt4 filter OUTPUT "$WROUT"; unhook xt4 filter FORWARD "$WRFWD"
@@ -36560,7 +36579,7 @@ index ae832da..42ef229 100755
    if [ -n "$MARK" ] && [ -n "$MASK" ] && [ -n "$TABLE" ] && [ -n "$PREF" ]; then
      ip rule del pref "$PREF" fwmark "$MARK/$MASK" table "$TABLE" >/dev/null 2>&1 || true
      ip route del local 0.0.0.0/0 dev lo table "$TABLE" >/dev/null 2>&1 || true
-@@ -248,13 +555,138 @@ cleanup6(){
+@@ -248,13 +574,248 @@ cleanup6(){
    unhook xt6 filter OUTPUT "$DOTOUT"
    unhook xt6 filter OUTPUT "$WROUT"; unhook xt6 filter FORWARD "$WRFWD"
    unhook xt6 filter OUTPUT "$V6OUT"; unhook xt6 filter FORWARD "$V6FWD"
@@ -36680,6 +36699,8 @@ index ae832da..42ef229 100755
 +  cancel_boot || return 1
 +  acquire_lock || return 1
 +  printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
++  ST_FAKE4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
++  ST_FAKE6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)
 +  stopwatchdog
 +  SC_FAILED=0
 +  stopcore || SC_FAILED=1
@@ -36687,7 +36708,115 @@ index ae832da..42ef229 100755
 +  restorev6 || SC_FAILED=1
 +  net_sysctl_restore; cgroup_release
 +  [ "$SC_FAILED" = 0 ] || return 1
++  stop_verify
 +  rm -f "$SESSION"
++  fake_reject_arm "$ST_FAKE4" "$ST_FAKE6"
++  net_recover_async stop
++}
++# 3.0.0 post-stop audit, independent of net.state: no fwmark rule or route of a Hetu table
++# (20260-20299), no HETU_/BICHEN_ chain or hook, no eBPF pin directory. Anything left gets one more
++# sweep; the result goes to watchdog.log. Android only (the host fixtures keep their exact calls).
++stop_leftovers(){
++  SL_OUT=""
++  for SL_F in 4 6; do
++    if [ "$SL_F" = 6 ] && ! v6supported; then continue; fi
++    [ -z "$(ip -"$SL_F" rule show 2>/dev/null | owned_policy_rules)" ] || SL_OUT="$SL_OUT ip$SL_F-rule"
++    if ip -"$SL_F" route show table all 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "table" && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= 20260 && $(i+1) + 0 <= 20299) f = 1 } END { exit !f }'; then SL_OUT="$SL_OUT ip$SL_F-table"; fi
++  done
++  for SL_BIN in xt4q xt6q; do
++    if [ "$SL_BIN" = xt6q ] && ! has ip6tables; then continue; fi
++    for SL_T in mangle nat filter; do
++      if "$SL_BIN" -t "$SL_T" -S 2>/dev/null | grep -Eq '(^-N |^-A | -j | -g )(HETU_|BICHEN_)'; then SL_OUT="$SL_OUT $SL_BIN-$SL_T"; fi
++    done
++  done
++  [ ! -d "$EBPF_PIN" ] || SL_OUT="$SL_OUT ebpf-pin"
++  printf '%s' "${SL_OUT# }"
++}
++stop_verify(){
++  [ -d "$CG_ESCAPE_GATE" ] || return 0
++  SV_LEFT=$(stop_leftovers)
++  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean (no Hetu ip rule, table 20260-20299 route, HETU_ chain or eBPF pin)"; return 0; fi
++  wd_log "stop-verify: left after stop: $SV_LEFT; sweeping once more"
++  cleanup_confirmed || true; ebpf_unload || true
++  SV_LEFT=$(stop_leftovers)
++  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean after the second sweep"; else wd_log "stop-verify: still left after the second sweep: $SV_LEFT"; fi
++  return 0
++}
++# Fake-IP reset window after a stop ($1 v4 range, $2 v6 range of the stopped session; first CIDR of a list).
++fake_reject_arm(){
++  [ -d "$CG_ESCAPE_GATE" ] || return 0
++  FRA_ON=0
++  for FRA_F in 4 6; do
++    if [ "$FRA_F" = 4 ]; then FRA_BIN=xt4q; FRA_R="${1%%,*}"; FRA_U=icmp-port-unreachable
++    else has ip6tables && v6supported || continue; FRA_BIN=xt6q; FRA_R="${2%%,*}"; FRA_U=icmp6-port-unreachable; fi
++    case "$FRA_R" in */*) ;; *) continue;; esac
++    case "$FRA_R" in *[!0-9A-Fa-f.:/]*) continue;; esac
++    fake_reject_drop "$FRA_BIN"
++    if "$FRA_BIN" -t filter -N "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 &&
++      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p tcp -j REJECT --reject-with tcp-reset >/dev/null 2>&1 &&
++      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p udp -j REJECT --reject-with "$FRA_U" >/dev/null 2>&1 &&
++      "$FRA_BIN" -t filter -I OUTPUT 1 -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; then FRA_ON=1
++    else fake_reject_drop "$FRA_BIN"; fi
++  done
++  [ "$FRA_ON" = 1 ] || return 0
++  FRA_TOKEN="$$-$(cat /proc/sys/kernel/random/uuid 2>/dev/null | cut -c1-8)"
++  { printf '%s\n' "$FRA_TOKEN" > "$RUN/fake-reject"; } 2>/dev/null || true
++  wd_log "stop: connections to the fake-IP range (${1%%,*}${2:+ ${2%%,*}}) are reset for ${FAKE_REJECT_SECONDS}s so apps resolve again"
++  detach_probe
++  $SETSID "$0" fake-reject-expire "$FRA_TOKEN" </dev/null >/dev/null 2>&1 &
++  cg_escape "$!"
++  return 0
++}
++fake_reject_drop(){
++  while "$1" -t filter -C OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; do "$1" -t filter -D OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || break; done
++  "$1" -t filter -F "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true; "$1" -t filter -X "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true
++}
++# Ends the window early (every start) or on time (fake-reject-expire); only after a window was opened.
++fake_reject_remove(){
++  [ -f "$RUN/fake-reject" ] || return 0
++  rm -f "$RUN/fake-reject"
++  fake_reject_drop xt4q
++  if has ip6tables; then fake_reject_drop xt6q; fi
++  return 0
++}
++fake_reject_expire(){
++  sleep "$FAKE_REJECT_SECONDS"
++  [ "$(cat "$RUN/fake-reject" 2>/dev/null)" = "$1" ] || return 0
++  fake_reject_remove
++  wd_log "fake-IP reset window ended"
++}
++# 3.0.0: after a stop or start the system resolver may still hold the core's answers (fake IPs) and
++# NetworkMonitor may keep a network "无法连接到网络" in its back-off. Flush every network's DNS cache and
++# ask for a re-evaluation (Android 13+ `cmd connectivity reevaluate <netId>`). Best effort, logged.
++# The App additionally reports every network to ConnectivityManager (NetworkRevalidation).
++net_recover(){
++  NR_NETS=$(timeout 8 dumpsys connectivity 2>/dev/null | net_recover_ids)
++  NR_OUT=""
++  for NR_ID in $NR_NETS; do
++    NR_F=no; NR_R=no
++    if has ndc && NR_X=$(timeout 3 ndc resolver flushnet "$NR_ID" 2>&1); then case "$NR_X" in *[Ee]rror*|*[Uu]nknown*|*[Ff]ail*|*[Uu]sage*) ;; *) NR_F=ok;; esac; fi
++    if has cmd && NR_X=$(timeout 4 cmd connectivity reevaluate "$NR_ID" 2>&1); then case "$NR_X" in *[Ee]rror*|*[Uu]nknown*|*[Ff]ail*|*[Ee]xception*|*[Uu]sage*) ;; *) NR_R=ok;; esac; fi
++    NR_OUT="$NR_OUT net$NR_ID:flush=$NR_F,reevaluate=$NR_R"
++  done
++  wd_log "$1: system network recovery${NR_OUT:- (no network listed by dumpsys connectivity)}"
++}
++# netIds (network{N}) of the NetworkAgentInfo lines of `dumpsys connectivity` on stdin, unique, at most 16.
++net_recover_ids(){ awk '/NetworkAgentInfo/ { if (match($0, /[{ ]network[{][0-9]+[}]/)) print substr($0, RSTART + 9, RLENGTH - 10) }' | sort -un | head -n 16; }
++net_recover_async(){
++  [ -d "$CG_ESCAPE_GATE" ] || return 0
++  detach_probe
++  $SETSID "$0" net-recover "$1" </dev/null >/dev/null 2>&1 &
++  cg_escape "$!"
++  return 0
++}
++# Probe URLs NetworkMonitor uses on this ROM, best effort (the App keeps them for the next start).
++probe_urls(){
++  {
++    if has device_config; then for PU_K in captive_portal_http_url captive_portal_https_url captive_portal_fallback_url captive_portal_other_fallback_urls; do timeout 3 device_config get connectivity "$PU_K" 2>/dev/null; done; fi
++    if has dumpsys; then timeout 6 dumpsys network_stack 2>/dev/null | grep -i -E 'https?://' | head -n 2000; timeout 6 dumpsys connectivity 2>/dev/null | grep -i -E 'https?://' | head -n 500; fi
++    if has logcat; then timeout 4 logcat -d -t 4000 2>/dev/null | grep -i -E 'NetworkMonitor|captive|validat' | grep -i -E 'https?://' | head -n 500; fi
++  } | grep -o -E 'https?://[A-Za-z0-9._-]+(:[0-9]+)?/[A-Za-z0-9._/-]*' | grep -i -E '/(generate_?204|gen_204)' | sort -u | head -n 32
++  return 0
 +}
 +cancel_boot(){
 +  CB_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
@@ -36701,7 +36830,7 @@ index ae832da..42ef229 100755
 
  # Cheap built-in prefilter: do not fork readlink for every Android process.
  # Same-inode catches renamed comm; tracked PIDs always bypass this prefilter.
-@@ -286,8 +718,21 @@ findcorepid(){
+@@ -286,8 +847,21 @@ findcorepid(){
  }
  stopwatchdog(){
    [ -f "$WATCHDOG_PID" ] || return 0; W=$(cat "$WATCHDOG_PID" 2>/dev/null || true)
@@ -36724,7 +36853,7 @@ index ae832da..42ef229 100755
  }
  stopcore(){
    # Terminate every Hetu-private core in parallel. Older revisions waited up to
-@@ -296,6 +741,8 @@ stopcore(){
+@@ -296,6 +870,8 @@ stopcore(){
    STOP_PIDS=""
    if [ -f "$PIDFILE" ]; then
      P=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -36733,7 +36862,7 @@ index ae832da..42ef229 100755
      case "$P" in ''|*[!0-9]*) ;; *) if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then STOP_PIDS="$P"; fi;; esac
    fi
    # Recover orphaned Hetu cores left by a killed/reinstalled app. Match only the
-@@ -320,6 +767,14 @@ stopcore(){
+@@ -320,6 +896,14 @@ stopcore(){
    for P in $STOP_PIDS; do
      if pidcore "$P" && kill -0 "$P" >/dev/null 2>&1; then kill -9 "$P" >/dev/null 2>&1 || true; fi
    done
@@ -36748,7 +36877,7 @@ index ae832da..42ef229 100755
    rm -f "$PIDFILE" "$MODEFILE"
  }
 
-@@ -362,6 +817,138 @@ v6disabled(){
+@@ -362,6 +946,138 @@ v6disabled(){
    [ "$V6_FOUND" = 1 ]
  }
 
@@ -36887,7 +37016,7 @@ index ae832da..42ef229 100755
  split_safe_uids(){
    LIST="$1"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
    for U in "$@"; do case "$U" in ''|*[!0-9-]*) return 1;; esac; case "$U" in *-*) A=${U%-*}; B=${U#*-};; *) A=$U; B=$U;; esac; case "$A$B" in *[!0-9]*) return 1;; esac; [ "$A" -ge 10000 ] && [ "$B" -ge "$A" ] || return 1; done
-@@ -456,6 +1043,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
+@@ -456,6 +1172,97 @@ first_mac(){ LIST="$1"; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; printf '%
  iface_out(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -o "$X" -j RETURN || return 1; done; }
  iface_in(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -i "$X" -j RETURN || return 1; done; }
  shared_mac_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for X in "$@"; do "$BIN" -t "$T" -A "$C" -m mac --mac-source "$X" -j RETURN || return 1; done; }
@@ -36985,7 +37114,7 @@ index ae832da..42ef229 100755
  # Once the system resolver is answered by the core, any process can be handed an address
  # from the fake-IP range, and such an address exists only inside the core. An owner-based
  # exemption therefore keeps its direct path for every real address and lets these through.
-@@ -473,8 +1151,8 @@ core_return(){
+@@ -473,8 +1280,8 @@ core_return(){
    [ -n "$CORE_GID" ] || return 0
    "$1" -t "$2" -A "$3" -m owner --uid-owner 0 --gid-owner "$CORE_GID" -j RETURN
  }
@@ -36996,7 +37125,7 @@ index ae832da..42ef229 100755
  direct_gid_returns(){ BIN="$1"; T="$2"; C="$3"; LIST="$4"; [ -z "$LIST" ] && return 0; OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS; for G in "$@"; do owner_return "$BIN" "$T" "$C" --gid-owner "$G" || return 1; done; }
  system_uid_return(){ BIN="$1"; T="$2"; C="$3"; S="$4"; [ "$S" = whitelist ] && return 0; owner_return "$BIN" "$T" "$C" --uid-owner 0-9999 || return 1; }
  # 仅所选应用: the listed UIDs are marked one by one, so a fake-IP flow from any other
-@@ -498,12 +1176,14 @@ append_scoped(){
+@@ -498,12 +1305,14 @@ append_scoped(){
  # so the concrete scoped rule helpers below keep the rule shape explicit and audit-friendly.
  scoped_mark(){
    BIN="$1"; T="$2"; C="$3"; S="$4"; LIST="$5"; PROTO="$6"; DPORT="$7"; MARKV="$8"
@@ -37013,7 +37142,7 @@ index ae832da..42ef229 100755
    else if [ -n "$DPORT" ]; then "$BIN" -t "$T" -A "$C" -p "$PROTO" --dport "$DPORT" -j REDIRECT --to-ports "$TO" || return 1; else "$BIN" -t "$T" -A "$C" -p "$PROTO" -j REDIRECT --to-ports "$TO" || return 1; fi; fi
  }
  # Explicit protocol disabling should report an unavailable UDP path immediately.
-@@ -511,17 +1191,21 @@ scoped_redirect(){
+@@ -511,17 +1320,21 @@ scoped_redirect(){
  # REJECT (the default ICMP/ICMPv6 port-unreachable) permits prompt error handling.
  scoped_reject_quic(){
    BIN="$1"; C="$2"; S="$3"; LIST="$4"
@@ -37038,7 +37167,7 @@ index ae832da..42ef229 100755
      OLDIFS=$IFS; IFS=,; set -- $LIST; IFS=$OLDIFS
      for U in "$@"; do "$BIN" -t filter -A "$C" -m owner --uid-owner "$U" -p udp -j REJECT || return 1; done
    else
-@@ -533,15 +1217,281 @@ bypass4(){
+@@ -533,15 +1346,281 @@ bypass4(){
    C="$1"; T="$2"; CIDRS="$3"
    OLDIFS=$IFS; IFS=,; set -- $LAN_RETURN_V4; IFS=$OLDIFS
    for NET in "$@"; do xt4 -t "$T" -A "$C" -d "$NET" -j RETURN || return 1; done
@@ -37320,7 +37449,7 @@ index ae832da..42ef229 100755
  probetp4(){ P="$1"; xt4 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt4 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt4 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probetp6(){ P="$1"; has ip6tables || return 1; xt6 -t mangle -N HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -A HETU_PROBE -p udp -j TPROXY --on-port "$P" --tproxy-mark "$PROBE_MARK/$PROBE_MASK" >/dev/null 2>&1; R=$?; xt6 -t mangle -F HETU_PROBE >/dev/null 2>&1 || true; xt6 -t mangle -X HETU_PROBE >/dev/null 2>&1 || true; return "$R"; }
  probe_tcp_ownership(){
-@@ -710,8 +1660,12 @@ local_destination_return(){
+@@ -710,8 +1789,12 @@ local_destination_return(){
  # only Hetu-selected TCP flows in our private conntrack bit and preserve older
  # unowned streams. Never return every ESTABLISHED flow: proxied ACK/data must
  # continue through TPROXY. DNS NAT and UDP keep their independent policies.
@@ -37334,7 +37463,7 @@ index ae832da..42ef229 100755
  }
  remember_local_tcp(){
    "$1" -t mangle -A "$2" -p tcp -m mark --mark "$MARK/$MASK" -j CONNMARK --set-xmark "$MARK/$MASK"
-@@ -731,22 +1685,23 @@ install_mangle4(){
+@@ -731,22 +1814,23 @@ install_mangle4(){
    direct_gid_returns xt4 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt4 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt4 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt4 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt4 mangle "$MPRE" "$IFACES" || return 1
@@ -37367,7 +37496,7 @@ index ae832da..42ef229 100755
    xt4 -t mangle -A OUTPUT -j "$MOUT" || return 1; xt4 -t mangle -A PREROUTING -j "$MPRE" || return 1
  }
 
-@@ -761,40 +1716,45 @@ install_mangle6(){
+@@ -761,40 +1845,45 @@ install_mangle6(){
    direct_gid_returns xt6 mangle "$MOUT" "$DGIDS" || return 1
    iface_out xt6 mangle "$MOUT" "$IFACES" || return 1; blacklist_returns xt6 mangle "$MOUT" "$S" "$UIDS" || return 1
    xt6 -t mangle -A "$MPRE" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; iface_in xt6 mangle "$MPRE" "$IFACES" || return 1
@@ -37427,7 +37556,7 @@ index ae832da..42ef229 100755
    else "$1" -t nat -A "$DNSOUT" -m owner --uid-owner 0 -j RETURN; fi
  }
  # 仅所选应用 redirects DNS per listed UID; the resolver asks on behalf of every
-@@ -822,12 +1782,12 @@ remove_dot_guard(){
+@@ -822,12 +1911,12 @@ remove_dot_guard(){
  install_dns_redirect4(){
    P="$1"; S="$2"; UIDS="$3"; SHARE="$4"; IFACES="$5"; MACS="${6:-}"; xt4 -t nat -N "$DNSOUT" || return 1; xt4 -t nat -A "$DNSOUT" -m mark --mark "$BYPASS_MARK/$BYPASS_MASK" -j RETURN || return 1; dns_owner_return xt4 || return 1; iface_out xt4 nat "$DNSOUT" "$IFACES" || return 1; blacklist_returns xt4 nat "$DNSOUT" "$S" "$UIDS" || return 1
    for X in $DNS_PROTOS; do scoped_redirect xt4 nat "$DNSOUT" "$S" "$UIDS" "$X" 53 "$P" || return 1; dns_resolver_redirect xt4 "$S" "$X" "$P" || return 1; done; xt4 -t nat -I OUTPUT 1 -j "$DNSOUT" || return 1
@@ -37442,7 +37571,7 @@ index ae832da..42ef229 100755
  }
 
  install_udp_leak_guard4(){
-@@ -841,15 +1801,17 @@ install_udp_leak_guard4(){
+@@ -841,15 +1930,17 @@ install_udp_leak_guard4(){
    iface_out xt4 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt4 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass4 "$WROUT" filter "$CIDRS" || return 1
@@ -37464,7 +37593,7 @@ index ae832da..42ef229 100755
      xt4 -t filter -I FORWARD 1 -j "$WRFWD" || return 1
    fi
  }
-@@ -864,31 +1826,33 @@ install_udp_leak_guard6(){
+@@ -864,31 +1955,33 @@ install_udp_leak_guard6(){
    iface_out xt6 filter "$WROUT" "$IFACES" || return 1
    blacklist_returns xt6 filter "$WROUT" "$S" "$UIDS" || return 1
    bypass6 "$WROUT" filter "$CIDRS" || return 1
@@ -37508,7 +37637,7 @@ index ae832da..42ef229 100755
  }
 
  # Disable native IPv6 for applications, not the underlying Android network.
-@@ -921,16 +1885,128 @@ v6_disable_guard_ready(){
+@@ -921,16 +2014,128 @@ v6_disable_guard_ready(){
    fi
  }
 
@@ -37642,7 +37771,7 @@ index ae832da..42ef229 100755
  hexport(){ printf '%04X' "$1" 2>/dev/null; }
  # One ss invocation per readiness/port-check sample. /proc is a bounded fallback.
  LISTEN_SNAPSHOT_VALID=0
-@@ -961,7 +2037,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
+@@ -961,7 +2166,7 @@ udp_listen(){ [ "$LISTEN_SNAPSHOT_VALID" = 1 ] || listen_snapshot || return 1; c
 
  ready(){
    listen_snapshot || return 1
@@ -37651,7 +37780,7 @@ index ae832da..42ef229 100755
    case "$M" in tproxy) [ "$TCP" = 0 ] || tcp_listen "$TP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; redirect) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1;; enhance) [ "$TCP" = 0 ] || tcp_listen "$RP" || return 1; [ "$UDP" = 0 ] || udp_listen "$TP" || return 1;; tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || return 1;; esac
    if [ "$DNS" = tproxy ] || [ "$DNS" = redirect ]; then tcp_listen "$DP" || return 1; udp_listen "$DP" || return 1; fi; return 0
  }
-@@ -1019,20 +2095,403 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
+@@ -1019,20 +2224,643 @@ write_session(){ M="$1"; V6="$2"; DNS="$3"; DP="$4"; S="$5"; SHARE="$6"; KILL="$
      [ "$DNS" = off ] || L_DNS="$DP"
      printf 'LISTENER_TCP_PORT=%s\nLISTENER_UDP_PORT=%s\nACTIVE_DNS_PORT=%s\n' "$L_TCP" "$L_UDP" "$L_DNS"
    } > "$SESSION.new.$$" && mv -f "$SESSION.new.$$" "$SESSION"; }
@@ -37783,6 +37912,37 @@ index ae832da..42ef229 100755
 +  WD_EG_AT=$((WD_NOW+WD_EGRESS_GRACE)); WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_TARGET=""; WD_EG_NEXT_ACTION=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"
 +  WD_NET_SIG=$(wd_net_sig)
 +  WD_NOTOOL=0
++  # Data-plane probe: needs the controller (WD_EG_ON: the verdict uses the group delays and DIRECT), the
++  # core's DNS listener, TCP capture and a root flow to a fake IP that is really captured. The watchdog is
++  # uid 0: the uid 0-9999 RETURN rules let it go direct unless owner_return added `! -d <fake range>`,
++  # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
++  # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
++  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
++  WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
++  WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
++  if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
++    [ "$(sed -n 's/^TCP=//p' "$SESSION" 2>/dev/null | head -n 1)" = 1 ]; then
++    case "$(sed -n 's/^MODE=//p' "$SESSION" 2>/dev/null | head -n 1)" in tproxy|redirect|enhance) WD_DP_ON=1;; esac
++  fi
++}
++# fake_range as the session's rules were built: the v4 fake range when the resolver was captured, else empty.
++wd_session_fake_range(){
++  WSF_SD="$SYSTEM_DNS"; WSF_F4="$FAKE_IP_V4"
++  SYSTEM_DNS=$(sed -n 's/^SYSTEM_DNS=//p' "$SESSION" 2>/dev/null | head -n 1)
++  FAKE_IP_V4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
++  WSF_OUT=$(fake_range xt4q)
++  SYSTEM_DNS="$WSF_SD"; FAKE_IP_V4="$WSF_F4"
++  printf '%s' "$WSF_OUT"
++}
++# Android only: no live uid 0-9999 RETURN rule of a HETU_ chain may lack the `! -d <fake>` exclusion
++# (unreadable tables do not veto; the session facts above already decided).
++wd_root_fake_captured(){
++  [ -d "$CG_ESCAPE_GATE" ] || return 0
++  for WRC_T in mangle nat; do
++    WRC_S=$(xt4q -t "$WRC_T" -S 2>/dev/null) || continue
++    if printf '%s\n' "$WRC_S" | grep -E '^-A (HETU_|BICHEN_)' | grep -e '--uid-owner 0-9999' | grep -e '-j RETURN' | grep -qv -e '! -d '; then return 1; fi
++  done
++  return 0
 +}
 +wd_net_sig(){ ip -o -4 addr show scope global 2>/dev/null | awk '{printf "%s=%s ", $2, $4}'; }
 +wd_net_watch(){
@@ -37791,6 +37951,7 @@ index ae832da..42ef229 100755
 +  WD_NET_SIG="$WNW_SIG"; wd_now
 +  wd_log "network change (${WNW_SIG:-offline}): re-checking core liveness"
 +  WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
++  WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
 +}
 +wd_liveness(){
 +  WD_LIVE_REASON=""
@@ -37948,6 +38109,7 @@ index ae832da..42ef229 100755
 +    rm -f "$RUN/liveness.kick"
 +    wd_log "network change reported: re-checking core liveness"
 +    WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
++    WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
 +  fi
 +  if [ "$WD_NOW" -ge "$WD_LIVE_AT" ]; then
 +    WD_LIVE_AT=$((WD_NOW+WD_LIVE_EVERY))
@@ -37970,8 +38132,215 @@ index ae832da..42ef229 100755
 +      [ "$WD_DNS_FAIL" -lt "$WD_DNS_LIMIT" ] || { WD_DNS_FAIL=0; wd_recover "dns-$WD_DP-no-answer"; return 0; }
 +    else WD_DNS_FAIL=0; fi
 +  fi
-+  if [ "$WD_EG_ON" = 1 ] && [ "$WD_NOW" -ge "$WD_EG_AT" ]; then wd_egress_tick; fi
++  # One egress check, not two: the data-plane probe when it can run, else the controller delay check.
++  if [ "$WD_DP_ON" = 1 ]; then
++    [ "$WD_NOW" -lt "$WD_DP_AT" ] || wd_dataplane_tick
++  elif [ "$WD_EG_ON" = 1 ] && [ "$WD_NOW" -ge "$WD_EG_AT" ]; then wd_egress_tick; fi
 +  return 0
++}
++# ---- data-plane probe (3.0.0) -----------------------------------------------------------
++# A/IN query for $1 over TCP to the core's DNS listener; WD_RES_IP = the first A record.
++wd_resolve(){
++  WD_RES_IP=""
++  WRS_Q=$(printf '%s' "$1" | awk -F. '{ for (i = 1; i <= NF; i++) if (length($i) > 0 && length($i) < 64) printf "\\%03o%s", length($i), $i }')
++  # Length prefix = 12 header + encoded QNAME (length octet per label + root 0) + 4 (QTYPE, QCLASS).
++  WRS_QL=$(printf '%s' "$1" | awk -F. '{ n = 1; for (i = 1; i <= NF; i++) if (length($i) > 0 && length($i) < 64) n += length($i) + 1; print n }')
++  WRS_LEN=$((WRS_QL + 16))
++  WRS_BYTES=$( { printf "\\$(printf %03o $((WRS_LEN / 256)))\\$(printf %03o $((WRS_LEN % 256)))"
++      printf '\110\124\001\000\000\001\000\000\000\000\000\000'; printf "$WRS_Q"; printf '\000\000\001\000\001'; } 2>/dev/null \
++    | timeout "$((WD_HTTP_TIMEOUT+1))" nc -w "$WD_HTTP_TIMEOUT" 127.0.0.1 "$WD_DP" 2>/dev/null | od -An -v -tu1)
++  WD_RES_IP=$(printf '%s\n' "$WRS_BYTES" | awk '
++    { for (i = 1; i <= NF; i++) b[++n] = $i + 0 }
++    function skip(p) { while (p <= n) { if (b[p] == 0) return p + 1; if (b[p] >= 192) return p + 2; p += b[p] + 1 } return n + 1 }
++    END { o = 3; if (n < o + 12) exit; qd = b[o+4] * 256 + b[o+5]; an = b[o+6] * 256 + b[o+7]; p = o + 12
++      for (q = 0; q < qd; q++) p = skip(p) + 4
++      for (a = 0; a < an && p <= n; a++) { p = skip(p); t = b[p] * 256 + b[p+1]; l = b[p+8] * 256 + b[p+9]
++        if (t == 1 && l == 4 && p + 13 <= n) { print b[p+10] "." b[p+11] "." b[p+12] "." b[p+13]; exit }
++        p += 10 + l } }')
++  [ -n "$WD_RES_IP" ]
++}
++# 0 when IPv4 $1 lies inside CIDR $2.
++wd_in_cidr(){
++  awk -v ip="$1" -v c="$2" 'function v(a,  x) { if (split(a, x, ".") != 4) return -1; return ((x[1] * 256 + x[2]) * 256 + x[3]) * 256 + x[4] }
++    BEGIN { if (split(c, y, "/") != 2) exit 1; m = y[2] + 0; if (m < 1 || m > 32) exit 1; s = 2 ^ (32 - m)
++      if (v(ip) < 0 || v(y[1]) < 0) exit 1; exit !(int(v(ip) / s) == int(v(y[1]) / s)) }'
++}
++# HTTP GET http://$1$3 with Host $2 as root (captured like any app). 0 = an HTTP answer arrived,
++# 1 = none within WD_DP_TIMEOUT, 2 = no tool (curl, busybox wget, nc).
++wd_fetch(){
++  WF_T="$WD_DP_TIMEOUT"
++  if has curl; then
++    WF_C=$(curl -sS -m "$WF_T" -o /dev/null -w '%{http_code}' -H "Host: $2" "http://$1$3" 2>/dev/null)
++    case "$WF_C" in [1-5][0-9][0-9]) return 0;; esac; return 1
++  fi
++  WF_BB=""
++  for WF_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WF_B" ] && { WF_BB="$WF_B"; break; }; done
++  if [ -n "$WF_BB" ]; then
++    WF_C=$(timeout "$((WF_T+1))" "$WF_BB" wget -S -q -T "$WF_T" -O /dev/null --header "Host: $2" "http://$1$3" 2>&1 | awk '$1 ~ /^HTTP\// {c=$2} END {print c}')
++    case "$WF_C" in [1-5][0-9][0-9]) return 0;; esac; return 1
++  fi
++  has nc || return 2
++  # The request side stays open until the first answer bytes arrive (or WF_T), not always the full WF_T.
++  WF_O="${WD_TMP:-/tmp/.hetu-wf.$$}.fetch"; : > "$WF_O" 2>/dev/null || return 1
++  { printf 'GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: hetu-watchdog\r\nConnection: close\r\n\r\n' "$3" "$2"
++    WF_I=0; while [ "$WF_I" -lt $((WF_T*5)) ] && [ ! -s "$WF_O" ]; do sleep 0.2 2>/dev/null || sleep 1; WF_I=$((WF_I+1)); done
++    [ ! -s "$WF_O" ] || sleep 0.2 2>/dev/null || true; } 2>/dev/null \
++    | timeout "$((WF_T+1))" nc -w "$WF_T" "$1" 80 > "$WF_O" 2>/dev/null
++  WF_L=$(head -n 1 "$WF_O" 2>/dev/null); rm -f "$WF_O"
++  case "$WF_L" in HTTP/*' '[1-5][0-9][0-9]*) return 0;; esac
++  return 1
++}
++# Selector/URLTest/Fallback/LoadBalance groups from GET /proxies -> "$WD_TMP.groups" (type TAB name TAB now).
++wd_groups(){
++  : > "$WD_TMP.groups"
++  WD_HTTP_TIMEOUT=4; wd_http GET /proxies "$WD_TMP.gr" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.gr"; return 1; }
++  tr '{' '\n' < "$WD_TMP.gr" | awk -v max="${WD_DP_GROUP_MAX:-12}" '
++    function f(k,  i, s) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); i = index(s, "\""); return i ? substr(s, 1, i - 1) : "" }
++    function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); return x }
++    { t = f("type"); n = u(f("name")); if (t !~ /^(Selector|URLTest|Fallback|LoadBalance)$/ || n == "" || n == "GLOBAL" || (n in seen)) next
++      seen[n] = 1; if (++c <= max) print t "\t" n "\t" u(f("now")) }' > "$WD_TMP.groups" 2>/dev/null
++  rm -f "$WD_TMP.gr"
++  return 0
++}
++# Delay of each group's current choice through the core (no TPROXY involved). WD_DP_BAD lists the groups
++# that fail ("group→node"), WD_DP_SCANNED how many were measured.
++wd_scan_groups(){
++  WD_DP_BAD=""; WD_DP_SCANNED=0; WSG_N=0
++  wd_groups || return 0
++  wd_budget_start
++  while IFS= read -r WSG_L; do
++    wd_budget_left || { wd_log "data-plane probe: group scan stopped (${WD_BUDGET_WHY})"; break; }
++    WSG_R=${WSG_L#*"$WD_TAB"}; WSG_G=${WSG_R%%"$WD_TAB"*}; WSG_NOW=${WSG_R#*"$WD_TAB"}
++    case "$WSG_NOW" in DIRECT|REJECT|REJECT-DROP|PASS) continue;; esac
++    wd_delay "$WSG_G" "$WD_PROXY_URL" </dev/null; WSG_RC=$?
++    [ "$WSG_RC" != 2 ] || continue
++    WD_DP_SCANNED=$((WD_DP_SCANNED+1))
++    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
++  done < "$WD_TMP.groups"
++  return 0
++}
++# Elapsed-time budget for the per-group loops (each delay call may take ~9 s): at most WD_DP_BUDGET s
++# from wd_budget_start, and never while the core is gone.
++wd_budget_start(){ wd_uptime; WD_BUDGET_T0="$WD_UP"; }
++wd_budget_left(){
++  WD_BUDGET_WHY=""
++  if [ -n "${COREPID:-}" ] && ! kill -0 "$COREPID" 2>/dev/null; then WD_BUDGET_WHY="core $COREPID gone"; return 1; fi
++  wd_uptime
++  [ $((WD_UP-WD_BUDGET_T0)) -lt "${WD_DP_BUDGET:-30}" ] || { WD_BUDGET_WHY="${WD_DP_BUDGET:-30}s budget used"; return 1; }
++  return 0
++}
++wd_uptime(){ read -r WD_UP WD_UP_REST < /proc/uptime 2>/dev/null || WD_UP=0; WD_UP=${WD_UP%%.*}; case "$WD_UP" in ''|*[!0-9]*) WD_UP=0;; esac; }
++# One probe. WD_DP_CLASS: ok | proxy-down | dataplane-down | offline | skip (no verdict) | unavailable.
++wd_dp_probe(){
++  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_SCANNED=0
++  [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
++  case " $WD_DNS_PROTOS " in *" tcp "*) ;; *) WD_DP_CLASS=unavailable; WD_DP_WHY=dns-without-tcp; return 0;; esac
++  has nc || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-nc; return 0; }
++  WD_HTTP_TIMEOUT=3
++  # No answer at all is the DNS listener probe's business.
++  wd_resolve "$WD_DP_HOST" || { WD_DP_DETAIL="no DNS answer for $WD_DP_HOST"; return 0; }
++  WDP_IP="$WD_RES_IP"
++  wd_in_cidr "$WDP_IP" "$WD_FAKE4" || { WD_DP_CLASS=unavailable; WD_DP_WHY="$WD_DP_HOST-real-ip-$WDP_IP"; return 0; }
++  wd_fetch "$WDP_IP" "$WD_DP_HOST" "$WD_DP_PATH"; WDP_RC=$?
++  [ "$WDP_RC" != 2 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-http-tool; return 0; }
++  [ "$WDP_RC" != 0 ] || { WD_DP_CLASS=ok; return 0; }
++  WD_DP_DETAIL="$WD_DP_HOST via $WDP_IP no answer"
++  # The network itself: DIRECT through the core, no proxy node and no TPROXY involved.
++  if [ "$WD_EG_ON" = 1 ]; then
++    WDP_DIRECT=1
++    for WDP_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WDP_U" && { WDP_DIRECT=0; break; }; done
++    [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
++    [ "$WDP_DIRECT" = 0 ] || { WD_DP_CLASS=offline; WD_DP_DETAIL="$WD_DP_DETAIL; DIRECT fails too"; return 0; }
++  fi
++  # A CN host the core answers with a fake IP: TPROXY -> core -> (normally) DIRECT.
++  WDP_CN=""
++  for WDP_H in $WD_DP_CN_HOSTS; do
++    wd_resolve "$WDP_H" && wd_in_cidr "$WD_RES_IP" "$WD_FAKE4" || continue
++    if wd_fetch "$WD_RES_IP" "$WDP_H" /; then WDP_CN=ok; else WDP_CN=fail; fi
++    WD_DP_DETAIL="$WD_DP_DETAIL; $WDP_H via $WD_RES_IP $WDP_CN"; break
++  done
++  wd_scan_groups
++  # The controller refused the secret meanwhile: no verdict to act on.
++  [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
++  [ -z "$WD_DP_BAD" ] || WD_DP_DETAIL="$WD_DP_DETAIL; no answer through $WD_DP_BAD"
++  WD_DP_CLASS=$(wd_dp_classify "$WDP_CN" "$WD_DP_BAD" "$WD_DP_SCANNED")
++  [ "$WD_DP_CLASS" != skip ] || WD_DP_DETAIL="$WD_DP_DETAIL; no CN host with a fake IP and every proxy group answers through the controller"
++  return 0
++}
++# $1 CN fetch through the data plane (ok | fail | empty), $2 failing groups, $3 groups measured.
++# A failing group wins (proxy-down); dataplane-down only when the CN fetch failed and no group is bad.
++wd_dp_classify(){
++  if [ -n "$2" ]; then echo proxy-down
++  elif [ "$1" = fail ]; then echo dataplane-down
++  elif [ "$1" = ok ] || [ "${3:-0}" = 0 ]; then echo proxy-down
++  else echo skip; fi
++}
++wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
++wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
++# Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
++# switch), tell the user once per outage. The core is not restarted for this: a new core reaches the
++# same node.
++wd_proxy_heal(){
++  WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
++  WPH_N=0
++  if [ -s "$WD_TMP.groups" ]; then
++    wd_budget_start
++    while IFS= read -r WPH_L; do
++      WPH_T=${WPH_L%%"$WD_TAB"*}; WPH_R=${WPH_L#*"$WD_TAB"}; WPH_G=${WPH_R%%"$WD_TAB"*}
++      case "$WPH_T" in URLTest|Fallback|LoadBalance) ;; *) continue;; esac
++      wd_budget_left || { wd_log "self-heal: group re-test stopped (${WD_BUDGET_WHY})"; break; }
++      WD_HTTP_TIMEOUT=8; wd_http GET "/group/$(wd_urlenc "$WPH_G")/delay?timeout=5000&url=$(wd_urlenc "$WD_PROXY_URL")" "$WD_TMP.act" hold </dev/null
++      rm -f "$WD_TMP.act"; WPH_N=$((WPH_N+1))
++    done < "$WD_TMP.groups"
++  fi
++  wd_log "self-heal: proxy node not responding (${WD_DP_BAD:-$WD_DP_DETAIL}); closed core connections, re-tested $WPH_N auto-select group(s)"
++  if [ "$WD_DP_NOTIFIED" = 0 ]; then
++    WD_DP_NOTIFIED=1
++    wd_notify "proxy-down ${WD_DP_BAD:-unknown}" "代理节点无响应${WD_DP_BAD:+：$WD_DP_BAD}。已断开旧连接并让自动选择的节点组重新测速切换；手动选择的节点请在河图中更换。"
++  fi
++}
++# Broken data plane (core alive, its outbounds fine, captured requests go nowhere): re-check the capture
++# rules first, then the existing restart path with its budget.
++wd_dataplane_heal(){
++  WD_DP_LEVEL=$((WD_DP_LEVEL+1))
++  if [ "$WD_DP_LEVEL" = 1 ]; then
++    wd_repair_rules
++    WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
++    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules and closed core connections"
++    return 0
++  fi
++  if wd_restart_allowed; then
++    wd_log "self-heal: data plane still down; restarting the core"
++    if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
++  else
++    wd_log "self-heal: data plane still down; restart limit reached ($WD_RESTART_MAX per ${WD_RESTART_WINDOW}s), waiting"
++  fi
++}
++wd_dataplane_tick(){
++  WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
++  wd_dp_probe; WDT_C="$WD_DP_CLASS"
++  case "$WDT_C" in
++    unavailable)
++      WD_DP_ON=0; WD_EG_AT="$WD_NOW"
++      wd_log "data-plane probe unavailable ($WD_DP_WHY); using the proxy-group delay check"; return 0;;
++    skip) return 0;;
++    ok)
++      if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
++      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
++      wd_egress_state ok; return 0;;
++    offline)
++      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL); nothing to heal"
++      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline; return 0;;
++  esac
++  if [ "$WDT_C" = "$WD_DP_LAST" ]; then WD_DP_FAIL=$((WD_DP_FAIL+1)); else WD_DP_FAIL=1; WD_DP_LAST="$WDT_C"; fi
++  wd_egress_state "$WDT_C"
++  wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL) $WD_DP_FAIL/$WD_DP_LIMIT"
++  WD_DP_AT=$((WD_NOW+WD_DP_RETRY))
++  [ "$WD_DP_FAIL" -ge "$WD_DP_LIMIT" ] || return 0
++  WD_DP_FAIL=0; WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
++  if [ "$WD_NOW" -lt "$WD_DP_NEXT" ]; then wd_log "data-plane probe: $WDT_C persists; next self-heal action in $((WD_DP_NEXT-WD_NOW))s (backoff)"; return 0; fi
++  WD_DP_NEXT=$((WD_NOW+WD_DP_BACKOFF)); WD_DP_BACKOFF=$((WD_DP_BACKOFF*2)); [ "$WD_DP_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_DP_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
++  if [ "$WDT_C" = proxy-down ]; then wd_proxy_heal; else wd_dataplane_heal; fi
 +}
  watchdog(){
 -  COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"
@@ -38063,7 +38432,7 @@ index ae832da..42ef229 100755
 
  # The combined owner match must exist before the core is started under the new identity.
  probe_core_owner(){
-@@ -1045,9 +2504,45 @@ probe_core_owner(){
+@@ -1045,9 +2873,45 @@ probe_core_owner(){
  # Decide how the core is started. Leaves CORE_RUNNER empty when the old identity (plain
  # root) has to stay: no usable BusyBox setuidgid, no combined owner match, or the user
  # asked for the system resolver to be left alone ($BASE/policy/system-dns-direct).
@@ -38110,7 +38479,7 @@ index ae832da..42ef229 100755
    CI_MAGISK=$(magisk --path 2>/dev/null || true)
    for CI_BB in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox "${CI_MAGISK:+$CI_MAGISK/.magisk/busybox}"; do
      [ -n "$CI_BB" ] && [ -x "$CI_BB" ] || continue
-@@ -1058,14 +2553,29 @@ core_identity_prepare(){
+@@ -1058,14 +2922,29 @@ core_identity_prepare(){
    done
    [ -n "$CORE_RUNNER" ] || return 0
    if ! probe_core_owner xt4; then CORE_RUNNER=""; CORE_SPEC=""; return 0; fi
@@ -38144,7 +38513,7 @@ index ae832da..42ef229 100755
    [ -n "$CORE_RUNNER" ] || return 0
    # setuidgid replaces itself with the core; identity checks wait for that, briefly.
    CL_N=0
-@@ -1079,8 +2589,9 @@ core_launch(){
+@@ -1079,8 +2958,9 @@ core_launch(){
  core_identity_confirm(){
    CORE_GID=""; SYSTEM_DNS=exempt
    [ -n "$CORE_RUNNER" ] || return 0
@@ -38156,7 +38525,7 @@ index ae832da..42ef229 100755
    CORE_GID="$CORE_GROUP_ID"
    [ "$START_DNS" != off ] || return 0
    case "$START_MODE" in tun|ebpf) ;; *) SYSTEM_DNS=captured;; esac
-@@ -1147,6 +2658,21 @@ core_tune(){
+@@ -1147,6 +3027,21 @@ core_tune(){
  }
 
  google_firewall_uids(){
@@ -38178,7 +38547,7 @@ index ae832da..42ef229 100755
    # Resolve each installed user/profile. Android can reassign app UIDs after reset.
    GF_USERS=$(pm list users 2>/dev/null | sed -n 's/.*UserInfo{\([0-9][0-9]*\):.*/\1/p')
    [ -n "$GF_USERS" ] || GF_USERS=0
-@@ -1225,16 +2751,90 @@ google_firewall_maintain(){ (
+@@ -1225,16 +3120,90 @@ google_firewall_maintain(){ (
    google_firewall_cleanup
  ); }
 
@@ -38269,7 +38638,7 @@ index ae832da..42ef229 100755
    acquire_lock || fail "另一个代理网络事务正在执行，请稍后重试"
    if [ -n "${HETU_BOOT_RESTORE_ID:-}" ]; then
      BOOT_NOW=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null || true)
-@@ -1242,8 +2842,16 @@ start(){
+@@ -1242,8 +3211,16 @@ start(){
        [ "$BOOT_NOW" != "$(cat "$BASE/boot/stopped-boot" 2>/dev/null || true)" ] || fail "开机恢复已取消"
      # A manual/app start may have won while the boot worker waited for this lock.
      BOOT_PID=$(cat "$PIDFILE" 2>/dev/null || true)
@@ -38279,15 +38648,15 @@ index ae832da..42ef229 100755
 +      if [ "$H_STATE" = healthy ]; then ok "Root 代理已在运行"; return 0; fi
 +    fi
 +    recovery_claim "$HETU_BOOT_RESTORE_ID" || fail "本次开机自动恢复预算已耗尽或已撤销"
-+  fi
+   fi
 +  if [ -n "${HETU_AUTOMATIC_RECOVERY_ID:-}" ] && [ -z "${HETU_BOOT_RESTORE_ID:-}" ]; then
 +    recovery_claim "$HETU_AUTOMATIC_RECOVERY_ID" || fail "本次自动恢复预算已耗尽或已撤销"
-   fi
++  fi
 +  transaction_begin || fail "无法建立启动事务截止时间或请求已撤销"
    : > "$START_TIMING"
    rm -f "$START_ERROR"; start_stage "preflight"
    if [ "$START_FAST_CAPS" != 1 ]; then
-@@ -1253,75 +2861,91 @@ start(){
+@@ -1253,75 +3230,91 @@ start(){
    fi
    start_stage "ipv6-dns-capability"
    select_dns6_policy
@@ -38317,7 +38686,8 @@ index ae832da..42ef229 100755
 +    atomic_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv6 启动保护安装失败"
 +  fi
    start_stage "cleanup-network"
-   stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+-  stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
++  fake_reject_remove; stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
 +  net_sysctl_restore
    start_stage "stop-old-core"
 -  stopcore; rm -f "$CRASH_STATE" "$SESSION"
@@ -38417,7 +38787,7 @@ index ae832da..42ef229 100755
      case "$PRIVATE_DNS" in off|opportunistic|hostname) ;; *) PRIVATE_DNS=unknown;; esac
      if [ "$PRIVATE_DNS" != hostname ]; then
        # Optional: a kernel without tcp-reset REJECT simply runs without the guard.
-@@ -1333,19 +2957,90 @@ start(){
+@@ -1333,19 +3326,91 @@ start(){
    fi
    # Finish the immutable session before its integrity snapshot. Updating it after
    # health_record would invalidate every status check and disable owned-rule repair.
@@ -38455,6 +38825,7 @@ index ae832da..42ef229 100755
    rm -f "$START_ERROR"; start_stage "running"
 -  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS"
 +  START_ACTIVE=0
++  net_recover_async start
 +  DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE,ebpf=$EBPF_STATE${EBPF_REASON:+,ebpfReason=$EBPF_REASON}"
    if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
  }
@@ -38513,7 +38884,7 @@ index ae832da..42ef229 100755
  status(){
    root
    STATUS_RUNNING=false; STATUS_PID=0
-@@ -1407,6 +3102,12 @@ status(){
+@@ -1407,6 +3472,12 @@ status(){
      STRICT6=true
      [ "$SHAREV" != 1 ] || xt6q -t filter -C FORWARD -j "$V6FWD" >/dev/null 2>&1 || STRICT6=false
    fi
@@ -38526,7 +38897,7 @@ index ae832da..42ef229 100755
 
    MODE4=false; MODE6=false
    case "$STATUS_MODE" in
-@@ -1487,13 +3188,22 @@ status(){
+@@ -1487,13 +3558,24 @@ status(){
    if [ "$STATUS_RUNNING" = true ] && [ "$H_STATE" = healthy ] && [ "$WD" = true ]; then HEALTH=true; fi
    SM=""; ST=""; if loadnet >/dev/null 2>&1; then SM="$MARK"; ST="$TABLE"; fi
    SP=$(state_value PREF 2>/dev/null || true)
@@ -38540,7 +38911,9 @@ index ae832da..42ef229 100755
 +    if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
 +  fi
 +  ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
-+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON"
++  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | offline), else empty.
++  EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
++  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
  }
 
  # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -38551,7 +38924,7 @@ index ae832da..42ef229 100755
         $1=="-A" && $2 ~ /^(OUTPUT|PREROUTING|FORWARD)$/ && NF==4 && $3=="-j" && $4 ~ /^HETU_(MOUT|MPRE|NOUT|NPRE|DNSOUT|DNSPRE|DOTOUT|QUICOUT|QUICFWD|WROUT|WRFWD|V6OUT|V6FWD)$/ {print}'
  }
  health_record(){ (
-@@ -1617,6 +3327,8 @@ health_collect(){
+@@ -1617,6 +3699,8 @@ health_collect(){
    fi
    H_MODE=$(sed -n 's/^MODE=//p' "$SESSION")
    case "$H_MODE" in tun|ebpf) ip link show hetu0 >/dev/null 2>&1 || health_fault native-device;; esac
@@ -38560,7 +38933,7 @@ index ae832da..42ef229 100755
    H_SOCKETS=$(ss -lnut 2>/dev/null); H_SS=$?
    if [ "$H_SS" != 0 ]; then health_unknown socket-read
    else
-@@ -1666,16 +3378,18 @@ health_restore_table(){
+@@ -1666,16 +3750,18 @@ health_restore_table(){
    H_E="$1"; H_KEY=${H_E##*/}; H_F=${H_KEY%%-*}; H_T=${H_KEY#*-}
    H_RAW=$("xt${H_F}q" -t "$H_T" -S 2>/dev/null) || return 1
    H_BATCH="$RUN/.repair-$H_KEY.$$"; printf '*%s\n' "$H_T" > "$H_BATCH" || return 1
@@ -38581,7 +38954,7 @@ index ae832da..42ef229 100755
    while IFS= read -r H_LINE; do
      case "$H_LINE" in '-A OUTPUT '*|'-A PREROUTING '*|'-A FORWARD '*)
        H_COUNT=$(printf '%s\n' "$H_RAW" | grep -Fxc -- "$H_LINE")
-@@ -1724,7 +3438,7 @@ health_repair(){ (
+@@ -1724,7 +3810,7 @@ health_repair(){ (
    pidcore "$H_PID" && kill -0 "$H_PID" 2>/dev/null || exit 0
    # Missing metadata or listeners cannot safely be reconstructed from preferences.
    # Keep the core and its existing connections; report instead of restart-looping.
@@ -38590,7 +38963,7 @@ index ae832da..42ef229 100755
    printf '%s\n' "$H_NOW" > "$RUN/network-repair-at"
    printf '%s pid=%s before=%s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$H_PID" "$H_REASON" >> "$RUN/network-repair.log"
    if [ -s "$RUN/network-manifest/net" ]; then
-@@ -1757,6 +3471,481 @@ health_json(){ (
+@@ -1757,6 +3843,481 @@ health_json(){ (
    printf '{"ok":true,"networkIntegrity":"%s","networkFault":"%s","sessionManifestState":"%s","baselineRepairAvailable":%s,"ipv6DnsPolicy":"%s","dataPlaneHealthy":%s}\n' "$H_STATE" "$H_REASON" "$H_MANIFEST_STATE" "$H_REPAIR_AVAILABLE" "$H_DNS6" "$([ "$H_STATE" = healthy ] && echo true || echo false)"
  ); }
 
@@ -39072,7 +39445,7 @@ index ae832da..42ef229 100755
  case "${1:-status}" in
    repair-session) [ "$#" = 1 ] || fail "参数错误"; health_repair_session;;
    preflight) { [ "$#" = 19 ] || [ "$#" = 20 ]; } || fail "参数错误"; preflight "$2" "$3" "$4" "$5" "$6" "$7" "$8" "$9" "${10}" "${11}" "${12}" "${13}" "${14}" "${15}" "${16}" "${17}" "${18}" "${19}" "${20:-}";;
-@@ -1774,10 +3963,26 @@ case "${1:-status}" in
+@@ -1774,10 +4335,31 @@ case "${1:-status}" in
        *) fail "启动参数数量错误：收到 $#，预期 23/24/31（含操作名）";;
      esac
      root; shift; start "$@";;
@@ -39095,6 +39468,11 @@ index ae832da..42ef229 100755
 +  # also asks the watchdog to re-verify that the core answers, not only the rules.
 +  repair-network) [ "$#" = 2 ] || exit 1; root; [ -n "${HETU_WATCHDOG_CALL:-}" ] || { : > "$RUN/liveness.kick"; } 2>/dev/null || true; health_repair "$2";;
 +  monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
++  # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
++  # end of the post-stop fake-IP reset window.
++  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2";;
++  probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
++  fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_expire "$2";;
 +  monitor-status) root; monitor_status_json;;
 +  monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;
 +  traffic-take) [ "$#" = 1 ] || fail "参数错误"; root; traffic_take;;
@@ -49738,10 +50116,10 @@ index 0000000..faa5a76
 +HSPLtop/yukonga/miuix/kmp/utils/MiuixIndication$MiuixIndicationInstance$onAttach$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
 new file mode 100644
-index 0000000..7aa5b84
+index 0000000..6f84189
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
-@@ -0,0 +1,325 @@
+@@ -0,0 +1,341 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.util.*;
@@ -49775,6 +50153,19 @@ index 0000000..7aa5b84
 +    /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
 +    static final List<String> VALIDATION_PROBE_HOSTS =
 +            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
++    /**
++     * 3.0.0: vendor-independent probe hosts of other ROMs (Huawei/Honor, OPPO/OnePlus/realme, vivo, AOSP
++     * fallback). Exact hosts; CaptivePortalBypass.EXTRA_HOSTS reuses them. Never DNS-blocked either.
++     */
++    static final List<String> VALIDATION_PROBE_EXTRA_HOSTS =
++            Collections.unmodifiableList(Arrays.asList("connectivitycheck.platform.hicloud.com", "connectivitycheck.android.com",
++                    "conn1.oppomobile.com", "conn2.oppomobile.com", "wifi.vivo.com.cn"));
++    /**
++     * 3.0.0: probe domains taken with every subdomain (ColorOS conn-service-cn-0N.allawntech.com, www.google.cn,
++     * www.googleapis.cn). All three are served inside mainland China; google.com itself is never among them.
++     */
++    static final List<String> VALIDATION_PROBE_SUFFIXES =
++            Collections.unmodifiableList(Arrays.asList("allawntech.com", "google.cn", "googleapis.cn"));
 +
 +    /**
 +     * Domains that may be answered empty at DNS. A blocked suffix is kept out when an allow entry
@@ -49793,7 +50184,10 @@ index 0000000..7aa5b84
 +                allowParents.add(a.substring(dot + 1));
 +        }
 +        // Network-validation probe hosts are never answered empty (and neither are their parents).
-+        for (String probe : VALIDATION_PROBE_HOSTS) {
++        ArrayList<String> probes = new ArrayList<>(VALIDATION_PROBE_HOSTS);
++        probes.addAll(VALIDATION_PROBE_EXTRA_HOSTS);
++        probes.addAll(VALIDATION_PROBE_SUFFIXES);
++        for (String probe : probes) {
 +            allowSet.add(probe);
 +            for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
 +                allowParents.add(probe.substring(dot + 1));
@@ -52210,7 +52604,7 @@ index 17eab36..a7bd311 100644
          try{Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING,StandardCopyOption.ATOMIC_MOVE);}
          catch(AtomicMoveNotSupportedException unsupported){Files.move(source.toPath(),target.toPath(),StandardCopyOption.REPLACE_EXISTING);}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
-index 65d651c..37240e1 100644
+index 65d651c..530ad49 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ProxyAdvancedSettingsActivity.kt
 @@ -17,14 +17,19 @@ import androidx.compose.foundation.shape.RoundedCornerShape
@@ -52298,10 +52692,23 @@ index 65d651c..37240e1 100644
                  }
              }
          }
-@@ -184,6 +210,36 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
+@@ -184,6 +210,49 @@ private fun OtherProxySettingsPage(onBack: () -> Unit) {
                  }
              }
          }
++
++        item(key = "recovery") {
++            SettingsSection {
++                SettingsGroup(title = ht("网络恢复")) {
++                    // 3.0.0: opt-in last resort after stop/start; DNS flush and re-validation always run.
++                    val toggle = prefs.getBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, false)
++                    OtherSwitch(
++                        "Wi‑Fi 仍无法联网时重开", toggle, icon = HomeIcons.Server,
++                        subtitle = ht("启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效"),
++                    ) { prefs.edit().putBoolean(NetworkRevalidation.PREF_WIFI_TOGGLE, it).apply(); revision++ }
++                }
++            }
++        }
 +
 +        item(key = "matcher") {
 +            SettingsSection {
@@ -52335,7 +52742,7 @@ index 65d651c..37240e1 100644
      }
 
      if (choice == "dns") {
-@@ -239,6 +295,8 @@ private class OtherLiveState(
+@@ -239,6 +308,8 @@ private class OtherLiveState(
      private val tuningReport: String,
      private val firewall: String,
      val firewallDetail: String,
@@ -52344,7 +52751,7 @@ index 65d651c..37240e1 100644
  ) {
      /** `applied` or `failed` for one of `priority`, `cpu`, `memory`, `io`; null when the core is stopped or the control was off. */
      fun tuning(key: String): String? = if (!running) null else field(tuningReport, key)?.substringBefore(':')
-@@ -256,11 +314,18 @@ private class OtherLiveState(
+@@ -256,11 +327,18 @@ private class OtherLiveState(
              tuningReport = prefs.getString("proxyRootTuning", "").orEmpty(),
              firewall = prefs.getString("proxyRootVendorFirewall", "").orEmpty(),
              firewallDetail = prefs.getString("proxyRootVendorFirewallDetail", "").orEmpty(),
@@ -52364,7 +52771,7 @@ index 65d651c..37240e1 100644
  @Composable
  private fun ResourceSetting(
      title: String,
-@@ -272,13 +337,43 @@ private fun ResourceSetting(
+@@ -272,13 +350,43 @@ private fun ResourceSetting(
      subtitle: String? = null,
      onEnabled: (Boolean) -> Unit,
      onValue: (String) -> Unit,
@@ -57670,7 +58077,7 @@ index 93a3d3d..3462cef 100644
 
      static boolean restoreInProgress(Context context){
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
-index 9cd82da..bf08c25 100644
+index 9cd82da..0dd08ab 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/RootProxyManager.java
 @@ -21,17 +21,87 @@ final class RootProxyManager {
@@ -58624,7 +59031,7 @@ index 9cd82da..bf08c25 100644
                  .putInt(ProxyRuntimeSettings.APPLIED_RUNTIME_REVISION_KEY,ProxyRuntimeSettings.RUNTIME_REVISION)
                  .remove(ProxyRuntimeSettings.DIRTY_KEY)
                  .putString("proxyRootEffectiveIpv6",profile.ipv6.id)
-@@ -749,11 +1288,18 @@ final class RootProxyManager {
+@@ -749,11 +1288,20 @@ final class RootProxyManager {
                  .remove("proxyRootBootError")
                  .apply();
          }
@@ -58634,6 +59041,8 @@ index 9cd82da..bf08c25 100644
 +        checkStartIntent();
          if(!bootWarning.isEmpty())result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+bootWarning);
          ensureContinuityService(true);
++        // 3.0.0: flush DNS caches / re-validate networks from the system side once the core is ready.
++        NetworkRevalidation.kick(context,"start");
          trace.outcome="ready";
          return result;
 +        }catch(Exception failure){
@@ -58643,7 +59052,7 @@ index 9cd82da..bf08c25 100644
          }finally{
              try{
                  // A repeated Start/boot request is not a new startup; keep the
-@@ -761,10 +1307,49 @@ final class RootProxyManager {
+@@ -761,10 +1309,49 @@ final class RootProxyManager {
                  if(!"alreadyRunning".equals(trace.outcome))prefs.edit()
                          .putString("proxyRootLastStartupTiming",trace.finish())
                          .putLong("proxyRootLastStartupAt",System.currentTimeMillis()).apply();
@@ -58694,7 +59103,7 @@ index 9cd82da..bf08c25 100644
      private static String[] prependStart(String[] args){
          String[] out=new String[args.length+1];out[0]="start";System.arraycopy(args,0,out,1,args.length);return out;
      }
-@@ -777,8 +1362,16 @@ final class RootProxyManager {
+@@ -777,8 +1364,16 @@ final class RootProxyManager {
                  bit(policy.sharedNetwork),bit(policy.killSwitch),policy.cidrs,policy.interfaces,policy.directUidRanges,"0","0",policy.directGidRanges,policy.sharedBypassMacs,
                  bit(prefs.getBoolean("proxyDnsHijackTcp",true)),bit(prefs.getBoolean("proxyDnsHijackUdp",true)),
                  bit(prefs.getBoolean("proxyPerformanceMode",false)),prefs.getBoolean("proxyCpuAffinityEnabled",false)?prefs.getString("proxyCpuAffinity","0-7"):"",
@@ -58713,7 +59122,7 @@ index 9cd82da..bf08c25 100644
      }
 
      private void installAutostart(Prepared p,String[] args)throws Exception{
-@@ -789,10 +1382,12 @@ final class RootProxyManager {
+@@ -789,10 +1384,12 @@ final class RootProxyManager {
      }
 
      private String refreshAutostart(Prepared p,String[] args){
@@ -58728,7 +59137,7 @@ index 9cd82da..bf08c25 100644
              return "";
          }catch(Exception error){
              String detail=error.getMessage()==null?error.getClass().getSimpleName():error.getMessage();
-@@ -802,20 +1397,40 @@ final class RootProxyManager {
+@@ -802,20 +1399,40 @@ final class RootProxyManager {
      }
 
      boolean adoptBootRuntime()throws Exception{
@@ -58774,7 +59183,7 @@ index 9cd82da..bf08c25 100644
                  if(!RootBridge.hasRoot(context))throw new IOException("无法取得 Root 权限，请在 Root 管理器中授权河图");
                  ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
                  ProxyRuntimeProfile.Core bootCore=profile.core;
-@@ -825,19 +1440,26 @@ final class RootProxyManager {
+@@ -825,19 +1442,26 @@ final class RootProxyManager {
                  Prepared p=prepare(profile,prefs.getInt("proxyControllerPort",MihomoStartupConfig.CONTROLLER_PORT));
                  // Copy the last successfully deployed config. Enabling must not change a
                  // live proxy or claim unvalidated settings are boot-ready.
@@ -58805,7 +59214,7 @@ index 9cd82da..bf08c25 100644
              prefs.edit().putString("proxyRootAutoStartError",error.getMessage()==null?error.getClass().getSimpleName():error.getMessage()).apply();
              throw error;
          }finally{CONTROL_LOCK.unlock();}
-@@ -845,31 +1467,40 @@ final class RootProxyManager {
+@@ -845,31 +1469,42 @@ final class RootProxyManager {
 
      JSONObject stop()throws Exception{return stop(null);}
      JSONObject stop(Progress progress)throws Exception{
@@ -58854,6 +59263,8 @@ index 9cd82da..bf08c25 100644
 +                    .putBoolean("proxyAdblockCounterArmed",false).putLong("proxyRootHealthProbeElapsed",0L)
 +                    .remove("proxyRootSessionOwner").apply();
              ensureContinuityService(false);
++            // 3.0.0: a Wi-Fi already marked "无法连接到网络" must not stay in NetworkMonitor backoff after stop.
++            NetworkRevalidation.kick(context,"stop");
              return r;
 -        }finally{
 -            CONTROL_LOCK.unlock();
@@ -58862,7 +59273,7 @@ index 9cd82da..bf08c25 100644
      }
      private int liveControllerPort(JSONObject state){
          int port=state.optInt("controllerPort",0);
-@@ -879,7 +1510,7 @@ final class RootProxyManager {
+@@ -879,7 +1514,7 @@ final class RootProxyManager {
          // while the live Mihomo still listened on the old controller port. The deployed
          // Root startup config is authoritative because preflight does not replace CONFIG.
          try{
@@ -58871,7 +59282,7 @@ index 9cd82da..bf08c25 100644
              String output=result.output==null?"":result.output;
              int found=0;
              try(BufferedReader reader=new BufferedReader(new StringReader(output))){
-@@ -939,7 +1570,7 @@ final class RootProxyManager {
+@@ -939,7 +1574,7 @@ final class RootProxyManager {
                      +"; chmod 700 "+RootBridge.quote(temporary)+"; chown 0:0 "+RootBridge.quote(temporary)
                      +"; test \"$(sha256sum "+RootBridge.quote(temporary)+" | cut -d ' ' -f 1)\" = "+RootBridge.quote(digest)
                      +"; mv -f "+RootBridge.quote(temporary)+" "+RootBridge.quote(HEALTH_CHECKER)+"; fi; exec "+RootBridge.quote(HEALTH_CHECKER)+" "+RootBridge.quote(action);
@@ -58880,7 +59291,7 @@ index 9cd82da..bf08c25 100644
              return RootCommandReply.read(reply.code,reply.output);
          }finally{HEALTH_CHECKER_LOCK.unlock();}
      }
-@@ -1015,13 +1646,14 @@ final class RootProxyManager {
+@@ -1015,13 +1650,14 @@ final class RootProxyManager {
      String diagnostics(){
          RootBridge.requireWorkerThread();
          DiagnosticReport report=new DiagnosticReport(prefs.getString("proxyControllerSecret",""));
@@ -58896,7 +59307,7 @@ index 9cd82da..bf08c25 100644
                      +RootBridge.quote(RootAutostart.BASE+"/status")+" 2>/dev/null; tail -c 16384 "
                      +RootBridge.quote(RootAutostart.BASE+"/restore.log")+" 2>/dev/null; true",4000L);
              report.section("Root 开机脚本状态与恢复记录",boot.output,18000);
-@@ -1059,7 +1691,7 @@ final class RootProxyManager {
+@@ -1059,7 +1695,7 @@ final class RootProxyManager {
              String cmd=String.join("\n",
                      "id",
                      "echo '--- actual core token ---'; cat "+RootBridge.quote(CORE_TOKEN)+" 2>/dev/null; echo",
@@ -58905,7 +59316,7 @@ index 9cd82da..bf08c25 100644
                      "echo '--- shell startup stages (uptime seconds) ---'; tail -n 24 "+RootBridge.quote(ROOT+"/run/startup-timing")+" 2>/dev/null || true",
                      "echo '--- session ---'; cat "+RootBridge.quote(ROOT+"/run/session.state")+" 2>/dev/null || true",
                      "echo '--- transport config ---'; grep -E '^(disable-keep-alive|keep-alive-idle|keep-alive-interval|find-process-mode|mode|ipv6):' "+RootBridge.quote(CONFIG)+" 2>/dev/null || true",
-@@ -1071,22 +1703,22 @@ final class RootProxyManager {
+@@ -1071,22 +1707,22 @@ final class RootProxyManager {
                      "echo '--- policy ---'; ip rule show 2>/dev/null | tail -n 24; ip -6 rule show 2>/dev/null | tail -n 24",
                      "echo '--- Hetu chains ---'; iptables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70; ip6tables-save 2>/dev/null | grep -E 'HETU|BICHEN' | tail -n 70",
                      "true");
@@ -58933,7 +59344,7 @@ index 9cd82da..bf08c25 100644
                      +" 2>/dev/null; cat "+RootBridge.quote(ROOT+"/run/google-firewall-detail")
                      +" 2>/dev/null; tail -n 30 "+RootBridge.quote(ROOT+"/run/google-firewall.log")+" 2>/dev/null; true",3000L);
              report.section("Google 服务防火墙修复（chains 为空 = 本机没有这些厂商链，开关不起作用）",google.output,5000);
-@@ -1099,7 +1731,7 @@ final class RootProxyManager {
+@@ -1099,7 +1735,7 @@ final class RootProxyManager {
                      +"echo '--- resolver DoT guard ---'; iptables -w 1 -t filter -nvxL HETU_DOTOUT 2>/dev/null; "
                      +"echo '--- tuning ---'; cat "+RootBridge.quote(ROOT+"/run/tuning-status")+" 2>/dev/null; true";
              String probe=DnsTakeoverProbe.run(prefs.getString("proxyRootFakeIpV4",""),4000L).describe();
@@ -58942,7 +59353,7 @@ index 9cd82da..bf08c25 100644
          }catch(Exception error){report.section("DNS 接管",String.valueOf(error),1000);}
          try{
              int wechatUid=-1;
-@@ -1127,6 +1759,11 @@ final class RootProxyManager {
+@@ -1127,6 +1763,11 @@ final class RootProxyManager {
                  // Independent quotas keep busy browsers from hiding GMS/Play or WeChat evidence.
                  if(wechat ? count>=25 : googleConnection ? googleCount>=25 : !affected||otherCount>=10)continue;
                  StringBuilder destinationText=wechat?matched:googleConnection?googleConnections:other;
@@ -58954,7 +59365,7 @@ index 9cd82da..bf08c25 100644
                  int number=wechat?++count:googleConnection?++googleCount:++otherCount;
                  destinationText.append("#").append(number).append(" process=").append(metadata.optString("process"))
                          .append(" uid=").append(metadata.optInt("uid",-1))
-@@ -1147,7 +1784,7 @@ final class RootProxyManager {
+@@ -1147,7 +1788,7 @@ final class RootProxyManager {
          try{
              String cmd="echo '--- recent core log ---'; tail -c 9000 "+RootBridge.quote(ROOT+"/run/core.log")
                      +" 2>/dev/null; echo; echo '--- last crash ---'; tail -c 1500 "+RootBridge.quote(ROOT+"/run/last-crash")+" 2>/dev/null; true";
@@ -58963,7 +59374,7 @@ index 9cd82da..bf08c25 100644
              report.section("最近核心日志",logs.output,10000);
          }catch(Exception e){report.section("最近核心日志",String.valueOf(e),1000);}
          try {
-@@ -1157,7 +1794,7 @@ final class RootProxyManager {
+@@ -1157,7 +1798,7 @@ final class RootProxyManager {
              String runtime14="awk 'BEGIN{dns=0} /^[^ #]/{dns=($0 ~ /^dns[ ]*:/)} "
                      +"/^(mode|ipv6|disable-keep-alive|keep-alive-idle|keep-alive-interval):/{print} "
                      +"dns && /^  (enable|ipv6|enhanced-mode|fake-ip-filter-mode|respect-rules|prefer-h3):/{print}' "+RootBridge.quote(CONFIG)+" 2>/dev/null; true";
@@ -58972,7 +59383,7 @@ index 9cd82da..bf08c25 100644
              String privateDns=android.provider.Settings.Global.getString(context.getContentResolver(),"private_dns_mode");
              android.os.PowerManager power=(android.os.PowerManager)context.getSystemService(Context.POWER_SERVICE);
              String device="privateDnsMode="+String.valueOf(privateDns)+"\nappScope="+profile.appScope.id
-@@ -1167,6 +1804,15 @@ final class RootProxyManager {
+@@ -1167,6 +1808,15 @@ final class RootProxyManager {
                      +"\nwechatBatteryExempt="+power.isIgnoringBatteryOptimizations("com.tencent.mm");
              device+="\n以上是排查线索，不等于已定位微信延迟原因。分应用绕过、私人DNS、配置内置分流可使同一YAML实际走不同路径。";
              report.section("系统网络与消息排查线索",device,2500);
@@ -58988,7 +59399,7 @@ index 9cd82da..bf08c25 100644
              MihomoControllerClient controller=new MihomoControllerClient(context);
              String mode14=controller.configs().optString("mode","unknown");
              JSONObject providers14=controller.ruleProviders().optJSONObject("providers");
-@@ -1194,6 +1840,31 @@ final class RootProxyManager {
+@@ -1194,6 +1844,31 @@ final class RootProxyManager {
      }
      File startupFile(){return new File(context.getFilesDir(),"hetu/run/state/startup-config");}
 
@@ -59020,7 +59431,7 @@ index 9cd82da..bf08c25 100644
      private void writeStartupCopy(String text)throws IOException{
          File target=startupFile(),dir=target.getParentFile();
          if(!dir.isDirectory()&&!dir.mkdirs())throw new IOException("无法创建启动状态目录");
-@@ -1207,10 +1878,14 @@ final class RootProxyManager {
+@@ -1207,10 +1882,14 @@ final class RootProxyManager {
          catch(Exception e){if(!tmp.renameTo(target)){tmp.delete();throw new IOException("无法保存最终启动配置");}}
      }
 
@@ -59037,7 +59448,7 @@ index 9cd82da..bf08c25 100644
          if(r.ok())return;
          String d=r.output==null?"":r.output.trim().replace('\n',' ');
          if(d.length()>600)d=d.substring(d.length()-600);
-@@ -1224,6 +1899,10 @@ final class RootProxyManager {
+@@ -1224,6 +1903,10 @@ final class RootProxyManager {
          if(bytes.length>4*1024*1024)throw new IOException("YAML 配置超过 4 MiB");
          ProxyRuntimeProfile profile=ProxyRuntimeProfile.load(prefs);
          ensureRuntimeBase(profile.core);
@@ -59048,7 +59459,7 @@ index 9cd82da..bf08c25 100644
          File stage=new File(context.getCacheDir(),"hetu-config-validator");
          if(!stage.isDirectory()&&!stage.mkdirs())throw new IOException("无法创建 YAML 校验缓存目录");
          File source=File.createTempFile("editor-", ".yaml", stage);
-@@ -1241,7 +1920,7 @@ final class RootProxyManager {
+@@ -1241,7 +1924,7 @@ final class RootProxyManager {
                  +"; "+RootBridge.quote(BIN)+" -t -d "+RootBridge.quote(workDir)+" -f "+RootBridge.quote(rootFile)
                  +"; rc=$?; rm -f "+RootBridge.quote(rootFile)+"; rm -rf "+RootBridge.quote(workDir)+"; exit \"$rc\"";
          try{
@@ -59057,7 +59468,7 @@ index 9cd82da..bf08c25 100644
              if(result.ok())return;
              String detail=result.output==null?"":result.output.trim();
              if(detail.length()>1200)detail=detail.substring(detail.length()-1200);
-@@ -1251,11 +1930,46 @@ final class RootProxyManager {
+@@ -1251,11 +1934,46 @@ final class RootProxyManager {
          }
      }
 
@@ -59105,7 +59516,7 @@ index 9cd82da..bf08c25 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-@@ -1269,14 +1983,131 @@ final class RootProxyManager {
+@@ -1269,14 +1987,136 @@ final class RootProxyManager {
      }
 
      private JSONObject runJson(String...args)throws Exception{return runJsonWithTimeout(55000L,args);}
@@ -59174,14 +59585,19 @@ index 9cd82da..bf08c25 100644
          return RootCommandReply.read(r.code,r.output);
      }
 
-+    /** Network-validation probe hosts (defaults plus Settings.Global captive_portal_*_url) that bypass the core. */
++    /**
++     * Network-validation probe hosts that bypass the core: the vendor-independent list (3.0.0), Settings.Global
++     * captive_portal_*_url and the probe URLs NetworkRevalidation last read as Root (cached; read after a start,
++     * never on the start path).
++     */
 +    private List<String> validationHosts(){
 +        ArrayList<String> values=new ArrayList<>();
 +        for(String key:CaptivePortalBypass.SETTINGS_KEYS){
 +            try{values.add(android.provider.Settings.Global.getString(context.getContentResolver(),key));}
 +            catch(RuntimeException ignored){}
 +        }
-+        return CaptivePortalBypass.hosts(values);
++        values.addAll(NetworkRevalidation.cachedProbeUrls(context));
++        return CaptivePortalBypass.validationEntries(values);
 +    }
 +
 +    private String privateDnsMode(){
@@ -59240,7 +59656,7 @@ index 9cd82da..bf08c25 100644
      private void quiesceLegacyRuntime(Progress progress){
          try{
              RootBridge.requireWorkerThread();
-@@ -1289,7 +2120,7 @@ final class RootProxyManager {
+@@ -1289,7 +2129,7 @@ final class RootProxyManager {
                      +"case \"$cmdline $exe\" in *"+RootBridge.quote(legacyBin)+"*) kill \"$pid\" >/dev/null 2>&1 || true;; esac; done; "
                      +"rm -f "+RootBridge.quote(LEGACY_ROOT+"/run/core.pid")+" "+RootBridge.quote(legacyWatchdog)+" >/dev/null 2>&1 || true; fi; "
                      +"printf 'legacy=%s\\n' \"$legacy\"; exit 0";
@@ -59249,7 +59665,7 @@ index 9cd82da..bf08c25 100644
              if(r.ok()&&r.output!=null&&r.output.contains("legacy=1")){
                  stage(progress,"已隔离旧辟尘运行进程，继续由河图接管…");
              }else if(!r.ok()){
-@@ -1313,7 +2144,7 @@ final class RootProxyManager {
+@@ -1313,7 +2153,7 @@ final class RootProxyManager {
                      +"if [ -d "+RootBridge.quote(LEGACY_MODULE_UPDATE)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_MODULE_UPDATE)+"; fi; "
                      +"if [ -e "+RootBridge.quote(LEGACY_ROOT)+" ]; then legacy=1; rm -rf "+RootBridge.quote(LEGACY_ROOT)+"; fi; "
                      +"echo legacy=$legacy; exit 0";
@@ -59258,7 +59674,7 @@ index 9cd82da..bf08c25 100644
              if(!r.ok()){
                  String detail=r.output==null?"未知 Root 错误":r.output.trim();
                  prefs.edit().putString("hetuLegacyCleanupWarning","河图已运行，但旧安装清理失败："+detail).apply();
-@@ -1333,13 +2164,28 @@ final class RootProxyManager {
+@@ -1333,13 +2173,28 @@ final class RootProxyManager {
      }
 
      private void installRuntimeFiles(Prepared p,boolean includeConfig,String probedCoreToken)throws Exception{
@@ -59288,7 +59704,7 @@ index 9cd82da..bf08c25 100644
          File binary=deployCore?coreFile(p.profile.core,stage):null;
          File cfg=new File(stage,"startup-config");
          File adblock=p.adblock==null?null:p.adblock.file;
-@@ -1366,13 +2212,47 @@ final class RootProxyManager {
+@@ -1366,13 +2221,47 @@ final class RootProxyManager {
          if(prefs.getBoolean("proxyDnsSystemResolver",true))cmd.append("; rm -f ").append(RootBridge.quote(resolverMarker));
          else cmd.append("; : > ").append(RootBridge.quote(resolverMarker)).append("; chmod 600 ").append(RootBridge.quote(resolverMarker))
                  .append("; chown 0:0 ").append(RootBridge.quote(resolverMarker));
@@ -59336,7 +59752,7 @@ index 9cd82da..bf08c25 100644
          if(adblock!=null){
              String dst=ROOT+"/run/ruleset/hetu-adblock.txt",tmp=dst+".new";
              String allowDst=ROOT+"/run/ruleset/hetu-adblock-allow.txt",allowTmp=allowDst+".new";
-@@ -1384,7 +2264,12 @@ final class RootProxyManager {
+@@ -1384,7 +2273,12 @@ final class RootProxyManager {
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(dst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append(" ] || [ \"$(sha256sum ").append(RootBridge.quote(allowDst)).append(" 2>/dev/null | cut -d ' ' -f 1)\" != ")
@@ -59350,7 +59766,7 @@ index 9cd82da..bf08c25 100644
                      .append(" cp ").append(RootBridge.quote(adblock.getAbsolutePath())).append(' ').append(RootBridge.quote(tmp))
                      .append("; chmod 600 ").append(RootBridge.quote(tmp)).append("; chown 0:0 ").append(RootBridge.quote(tmp));
              if(adblockAllow!=null){
-@@ -1393,6 +2278,13 @@ final class RootProxyManager {
+@@ -1393,6 +2287,13 @@ final class RootProxyManager {
                          .append("; test \"$(sha256sum ").append(RootBridge.quote(allowTmp)).append(" | cut -d ' ' -f 1)\" = ")
                          .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblockAllow)));
              }
@@ -59364,7 +59780,7 @@ index 9cd82da..bf08c25 100644
              cmd.append("; test \"$(sha256sum ").append(RootBridge.quote(tmp)).append(" | cut -d ' ' -f 1)\" = ")
                      .append(RootBridge.quote(RuntimeCompatibility14.sha256(adblock)))
                      .append("; mv -f ").append(RootBridge.quote(allowTmp)).append(' ').append(RootBridge.quote(allowDst))
-@@ -1412,14 +2304,61 @@ final class RootProxyManager {
+@@ -1412,14 +2313,61 @@ final class RootProxyManager {
                      .append("; chmod 600 ").append(RootBridge.quote(configTmp)).append("; chown 0:0 ").append(RootBridge.quote(configTmp))
                      .append("; mv -f ").append(RootBridge.quote(configTmp)).append(' ').append(RootBridge.quote(CONFIG));
          }
@@ -60979,10 +61395,10 @@ index 0000000..b779c0c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
 new file mode 100644
-index 0000000..7b8ce79
+index 0000000..6dc54f1
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
-@@ -0,0 +1,226 @@
+@@ -0,0 +1,260 @@
 +package io.github.xgl34222220.hetu
 +
 +import java.util.Locale
@@ -61000,10 +61416,24 @@ index 0000000..7b8ce79
 + * Hosts: the probe hosts the AOSP/Xiaomi/Qualcomm ROMs use that answer from mainland China, plus the
 + * hosts of Settings.Global captive_portal_*_url. Google search hosts (google.com, android.com) are
 + * never sent DIRECT: that would cut off Google for users who need the proxy to reach it.
++ *
++ * 3.0.0 (real-device diagnostic on ColorOS / OnePlus PLK110): NetworkMonitor there probes
++ * conn-service-cn-0N.allawntech.com, www.google.cn and www.googleapis.cn, none of which were bypassed, so a
++ * stalled proxy node made Wi-Fi "无法连接到网络" for the whole phone. [validationEntries] therefore adds a
++ * vendor-independent list for every ROM: [EXTRA_HOSTS] (exact) and [DEFAULT_SUFFIXES] (written "+.domain",
++ * every subdomain: fake-ip-filter '+.domain', rule DOMAIN-SUFFIX,domain,DIRECT), plus probe URLs read as Root
++ * from device_config / dumpsys / logcat when available. Only the probe host connectivitycheck.android.com
++ * goes DIRECT, never android.com, google.com, googleapis.com or youtube.com.
 + */
 +object CaptivePortalBypass {
 +    /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
 +    @JvmField val DEFAULT_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_HOSTS.toList()
++
++    /** Exact probe hosts of other ROMs (AdblockDnsPolicy.VALIDATION_PROBE_EXTRA_HOSTS). */
++    @JvmField val EXTRA_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_EXTRA_HOSTS.toList()
++
++    /** Probe domains taken with every subdomain (AdblockDnsPolicy.VALIDATION_PROBE_SUFFIXES). */
++    @JvmField val DEFAULT_SUFFIXES: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_SUFFIXES.toList()
 +
 +    /** Settings.Global keys whose URLs name the probe hosts. */
 +    @JvmField val SETTINGS_KEYS: List<String> = listOf(
@@ -61020,6 +61450,23 @@ index 0000000..7b8ce79
 +        val out = LinkedHashSet(DEFAULT_HOSTS)
 +        settingValues?.forEach { value ->
 +            value?.split(',')?.forEach { url -> host(url)?.let { out.add(it) } }
++        }
++        return out.toList()
++    }
++
++    /**
++     * Everything the Root start bypasses: defaults, [EXTRA_HOSTS], [DEFAULT_SUFFIXES] as "+.domain", then the
++     * hosts of [settingValues] (Settings.Global values and URLs discovered as Root) not already covered.
++     */
++    @JvmStatic
++    fun validationEntries(settingValues: Collection<String?>?): List<String> {
++        val out = LinkedHashSet<String>()
++        out.addAll(DEFAULT_HOSTS)
++        out.addAll(EXTRA_HOSTS)
++        DEFAULT_SUFFIXES.forEach { out.add("+.$it") }
++        for (h in hosts(settingValues)) {
++            if (DEFAULT_SUFFIXES.any { h == it || h.endsWith(".$it") }) continue
++            out.add(h)
 +        }
 +        return out.toList()
 +    }
@@ -61126,14 +61573,17 @@ index 0000000..7b8ce79
 +        val out = StringBuilder()
 +        for (i in lines.indices) {
 +            out.append(if (i == index && rest == "[]") "rules:" else lines[i])
-+            if (i == index) for (h in hosts) out.append('\n').append(listIndent).append("- DOMAIN,").append(h).append(",DIRECT")
++            if (i == index) for (h in hosts) {
++                if (h.startsWith("+.")) out.append('\n').append(listIndent).append("- DOMAIN-SUFFIX,").append(h.substring(2)).append(",DIRECT")
++                else out.append('\n').append(listIndent).append("- DOMAIN,").append(h).append(",DIRECT")
++            }
 +            if (i < lines.size - 1) out.append('\n')
 +        }
 +        return Result(out.toString(), "inserted")
 +    }
 +
 +    private fun entries(hosts: List<String>, rule: Boolean): List<String> =
-+        if (rule) hosts.map { "DOMAIN,$it,real-ip" } else hosts
++        if (rule) hosts.map { if (it.startsWith("+.")) "DOMAIN-SUFFIX,${it.substring(2)},real-ip" else "DOMAIN,$it,real-ip" } else hosts
 +
 +    /* ------------------------------ YAML helpers (same conventions as WechatTransport) ------------------------------ */
 +
@@ -65921,6 +66371,93 @@ index 0000000..4bf546b
 +        "google" to "M12.48 10.92v3.28h7.84c-.24 1.84-.853 3.187-1.787 4.133-1.147 1.147-2.933 2.4-6.053 2.4-4.827 0-8.6-3.893-8.6-8.72s3.773-8.72 8.6-8.72c2.6 0 4.507 1.027 5.907 2.347l2.307-2.307C18.747 1.44 16.133 0 12.48 0 5.867 0 .307 5.387.307 12s5.56 12 12.173 12c3.573 0 6.267-1.173 8.373-3.36 2.16-2.16 2.84-5.213 2.84-7.667 0-.76-.053-1.467-.173-2.053H12.48z",
 +        "baidu" to "M9.154 0C7.71 0 6.54 1.658 6.54 3.707c0 2.051 1.171 3.71 2.615 3.71 1.446 0 2.614-1.659 2.614-3.71C11.768 1.658 10.6 0 9.154 0zm7.025.594C14.86.58 13.347 2.589 13.2 3.927c-.187 1.745.25 3.487 2.179 3.735 1.933.25 3.175-1.806 3.422-3.364.252-1.555-.995-3.364-2.362-3.674a1.218 1.218 0 0 0-.261-.03zM3.582 5.535a2.811 2.811 0 0 0-.156.008c-2.118.19-2.428 3.24-2.428 3.24-.287 1.41.686 4.425 3.297 3.864 2.617-.561 2.262-3.68 2.183-4.362-.125-1.018-1.292-2.773-2.896-2.75zm16.534 1.753c-2.308 0-2.617 2.119-2.617 3.616 0 1.43.121 3.425 2.988 3.362 2.867-.063 2.553-3.238 2.553-3.988 0-.745-.62-2.99-2.924-2.99zm-8.264 2.478c-1.424.014-2.708.925-3.323 1.947-1.118 1.868-2.863 3.05-3.112 3.363-.25.309-3.61 2.116-2.864 5.42.746 3.301 3.365 3.237 3.365 3.237s1.93.19 4.171-.31c2.24-.495 4.17.123 4.17.123s5.233 1.748 6.665-1.616c1.43-3.364-.808-5.109-.808-5.109s-2.99-2.306-4.736-4.798c-1.072-1.665-2.348-2.268-3.528-2.257zm-2.234 3.84l1.542.024v8.197H7.758c-1.47-.291-2.055-1.292-2.13-1.462-.072-.173-.488-.976-.268-2.343.635-2.049 2.447-2.196 2.447-2.196h1.81zm3.964 2.39v3.881c.096.413.612.488.612.488h1.614v-4.343h1.689v5.782h-3.915c-1.517-.39-1.59-1.465-1.59-1.465v-4.317zm-5.458 1.147c-.66.197-.978.708-1.05.928-.076.22-.247.78-.1 1.269.294 1.095 1.248 1.144 1.248 1.144h1.37v-3.34z",
 +    )
++}
+diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
+new file mode 100644
+index 0000000..329f54e
+--- /dev/null
++++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
+@@ -0,0 +1,81 @@
++package io.github.xgl34222220.hetu
++
++import android.content.Context
++import android.net.ConnectivityManager
++import android.net.NetworkCapabilities
++
++/**
++ * 3.0.0 system-side recovery after a Root start, restart or stop (real-device report: stop/restart during an
++ * outage did not bring the network back because Wi-Fi stayed "无法连接到网络" in NetworkMonitor's backoff).
++ *
++ * hetu-root.sh already flushes every network's resolver cache and asks for re-evaluation as Root
++ * (`ndc resolver flushnet`, `cmd connectivity reevaluate`). From the App, every network with INTERNET
++ * (no VPN) is reported with the opposite of its VALIDATED state, which makes ConnectivityService force
++ * a re-evaluation without changing anything else. Only when the user turned on [PREF_WIFI_TOGGLE] and a
++ * Wi-Fi network is still not validated [WIFI_TOGGLE_DELAY_MS] later is Wi-Fi switched off and on as Root.
++ *
++ * After a start the probe URLs NetworkMonitor uses are also read as Root (`hetu-root.sh probe-urls`:
++ * device_config, dumpsys network_stack / connectivity, logcat) at most once per [PROBE_URL_TTL_MS]; the next
++ * start bypasses their hosts too (CaptivePortalBypass.validationEntries). Never on the start path itself.
++ */
++object NetworkRevalidation {
++    const val PREF_WIFI_TOGGLE = "proxyWifiToggleRecovery"
++    const val PREF_LAST = "proxyNetworkRevalidateLast"
++    private const val PREF_PROBE_URLS = "proxyProbeUrlsCache"
++    private const val PREF_PROBE_URLS_AT = "proxyProbeUrlsAt"
++    private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
++    const val WIFI_TOGGLE_DELAY_MS = 12_000L
++    const val PROBE_URL_TTL_MS = 24L * 60 * 60 * 1000
++
++    @JvmStatic
++    fun kick(context: Context, reason: String) {
++        val app = context.applicationContext ?: context
++        Thread({ runCatching { recover(app, reason) } }, "hetu-revalidate").apply { isDaemon = true }.start()
++    }
++
++    /** Probe URLs last read as Root (one per line); empty until a start has read them. */
++    @JvmStatic
++    fun cachedProbeUrls(context: Context): List<String> =
++        context.getSharedPreferences("hetu", 0).getString(PREF_PROBE_URLS, "").orEmpty()
++            .lines().map { it.trim() }.filter { it.startsWith("http://") || it.startsWith("https://") }.take(32)
++
++    /** Networks with INTERNET (VPN excluded) and whether each is validated. */
++    private fun networks(cm: ConnectivityManager) = runCatching {
++        @Suppress("DEPRECATION")
++        cm.allNetworks.mapNotNull { n ->
++            val caps = cm.getNetworkCapabilities(n) ?: return@mapNotNull null
++            if (!caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) return@mapNotNull null
++            if (caps.hasTransport(NetworkCapabilities.TRANSPORT_VPN)) return@mapNotNull null
++            Triple(n, caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED), caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI))
++        }
++    }.getOrDefault(emptyList())
++
++    private fun recover(app: Context, reason: String) {
++        val prefs = app.getSharedPreferences("hetu", 0)
++        val cm = app.getSystemService(ConnectivityManager::class.java) ?: return
++        val reported = StringBuilder()
++        for ((network, validated, wifi) in networks(cm)) {
++            // Reporting the opposite of the current state is what forces NetworkMonitor to re-evaluate.
++            val ok = runCatching { cm.reportNetworkConnectivity(network, !validated) }.isSuccess
++            reported.append(if (wifi) " wifi" else " net").append(if (validated) "=valid" else "=invalid").append(if (ok) "" else "(report-failed)")
++        }
++        var toggled = ""
++        if (prefs.getBoolean(PREF_WIFI_TOGGLE, false)) {
++            Thread.sleep(WIFI_TOGGLE_DELAY_MS)
++            if (networks(cm).any { it.third && !it.second }) {
++                val r = runCatching { RootBridge.rootShell(app, "svc wifi disable; sleep 2; svc wifi enable", 15_000L) }.getOrNull()
++                toggled = if (r != null && r.ok()) " wifi-toggled" else " wifi-toggle-failed"
++            }
++        }
++        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + toggled).apply()
++        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) refreshProbeUrls(app)
++    }
++
++    private fun refreshProbeUrls(app: Context) {
++        val r = runCatching { RootBridge.rootShell(app, "sh " + RootBridge.quote(SCRIPT) + " probe-urls", 20_000L) }.getOrNull() ?: return
++        if (!r.ok()) return
++        val urls = r.output.lines().map { it.trim() }.filter { it.startsWith("http://") || it.startsWith("https://") }.distinct().take(32)
++        app.getSharedPreferences("hetu", 0).edit()
++            .putString(PREF_PROBE_URLS, urls.joinToString("\n")).putLong(PREF_PROBE_URLS_AT, System.currentTimeMillis()).apply()
++    }
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkTestEngine.kt
 new file mode 100644
@@ -75813,7 +76350,7 @@ index fa7fa0d..b79bcff 100644
                          fontWeight = if (active) FontWeight.SemiBold else FontWeight.Medium, maxLines = 1)
                  }
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
-index 578ce9d..f54ad2e 100644
+index 578ce9d..198bd43 100644
 --- a/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/ui/HetuLanguage.kt
 @@ -312,7 +312,6 @@ CNAME 追踪防护|CNAME tracking protection|CNAME 追蹤防護|Защита о
@@ -75860,7 +76397,7 @@ index 578ce9d..f54ad2e 100644
  切换 WAN 和 LAN|Switch between WAN and LAN|切換 WAN 和 LAN|Переключить WAN и LAN
  上一个匹配|Previous match|上一個相符項目|Предыдущее совпадение
  下一个匹配|Next match|下一個相符項目|Следующее совпадение
-@@ -969,16 +990,348 @@ private val vocabularyConnection = """
+@@ -969,16 +990,356 @@ private val vocabularyConnection = """
  控制接口异常 · 连接状态未确认|Controller unavailable · Connections unconfirmed|控制介面異常 · 連線狀態未確認|Контроллер недоступен · Соединения не подтверждены
  接管检查异常 · 出口未验证|Takeover degraded · Internet unverified|接管檢查異常 · 出口未驗證|Перехват нарушен · Интернет не проверен
  接管检查通过 · 出口未验证|Local takeover checked · Internet unverified|接管檢查通過 · 出口未驗證|Локальный перехват проверен · Интернет не проверен
@@ -76189,7 +76726,15 @@ index 578ce9d..f54ad2e 100644
 +""".trimIndent()
 +
 +
-+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
++// 2026-10-14 3.0.0 network recovery (opt-in Wi-Fi re-toggle after stop/start).
++private val vocabularyNetRecovery300 = """
++网络恢复|Network recovery|網路恢復|Восстановление сети
++Wi‑Fi 仍无法联网时重开|Restart Wi‑Fi if it still has no internet|Wi‑Fi 仍無法連網時重開|Перезапускать Wi‑Fi, если интернета всё ещё нет
++启动或停止代理后会刷新 DNS 缓存并让系统重新检测网络；开启后，若 Wi‑Fi 仍显示无法连接到网络，再用 Root 关闭并重新打开一次 Wi‑Fi。默认关闭，立即生效|After the proxy starts or stops, DNS caches are flushed and the system re-checks its networks; when this is on and Wi‑Fi still shows no internet, Root turns Wi‑Fi off and on once. Off by default; applies at once|啟動或停止代理後會清除 DNS 快取並讓系統重新偵測網路；開啟後，若 Wi‑Fi 仍顯示無法連線到網路，再用 Root 關閉並重新開啟一次 Wi‑Fi。預設關閉，立即生效|После запуска или остановки прокси очищается кэш DNS и система заново проверяет сети; если включено и Wi‑Fi всё ещё без интернета, Root один раз выключает и включает Wi‑Fi. По умолчанию выключено, действует сразу
++""".trimIndent()
++
++
++private val vocabulary = listOf(vocabularyNetRecovery300, vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui, vocabularyAudit4Func).joinToString("\n")
      .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
  fun translateHetuText(source: String, language: String): String {

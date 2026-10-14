@@ -1294,6 +1294,8 @@ final class RootProxyManager {
         checkStartIntent();
         if(!bootWarning.isEmpty())result.put("warning",(result.optString("warning","").isEmpty()?"":result.optString("warning")+"；")+bootWarning);
         ensureContinuityService(true);
+        // 3.0.0: flush DNS caches / re-validate networks from the system side once the core is ready.
+        NetworkRevalidation.kick(context,"start");
         trace.outcome="ready";
         return result;
         }catch(Exception failure){
@@ -1499,6 +1501,8 @@ final class RootProxyManager {
                     .putBoolean("proxyAdblockCounterArmed",false).putLong("proxyRootHealthProbeElapsed",0L)
                     .remove("proxyRootSessionOwner").apply();
             ensureContinuityService(false);
+            // 3.0.0: a Wi-Fi already marked "无法连接到网络" must not stay in NetworkMonitor backoff after stop.
+            NetworkRevalidation.kick(context,"stop");
             return r;
         }finally{STOP_DEADLINE.remove();CONTROL_LOCK.unlock();}
     }
@@ -2045,14 +2049,19 @@ final class RootProxyManager {
         return RootCommandReply.read(r.code,r.output);
     }
 
-    /** Network-validation probe hosts (defaults plus Settings.Global captive_portal_*_url) that bypass the core. */
+    /**
+     * Network-validation probe hosts that bypass the core: the vendor-independent list (3.0.0), Settings.Global
+     * captive_portal_*_url and the probe URLs NetworkRevalidation last read as Root (cached; read after a start,
+     * never on the start path).
+     */
     private List<String> validationHosts(){
         ArrayList<String> values=new ArrayList<>();
         for(String key:CaptivePortalBypass.SETTINGS_KEYS){
             try{values.add(android.provider.Settings.Global.getString(context.getContentResolver(),key));}
             catch(RuntimeException ignored){}
         }
-        return CaptivePortalBypass.hosts(values);
+        values.addAll(NetworkRevalidation.cachedProbeUrls(context));
+        return CaptivePortalBypass.validationEntries(values);
     }
 
     private String privateDnsMode(){

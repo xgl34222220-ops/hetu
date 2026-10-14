@@ -70,7 +70,8 @@ SELFHEAL_VARS = ('CG_ESCAPE_GATE', 'CG_ESCAPE_V1', 'CG_ESCAPED', 'SETSID', 'SETS
 HELPERS = ('has', 'port', 'kind_has_api', 'cg_join', 'detach_probe', 'cg_escape', 'wd_log', 'wd_log_body', 'wd_now',
            'wd_notify', 'wd_http', 'wd_dns_probe', 'wd_core_frozen', 'wd_selfheal_init', 'wd_net_sig', 'wd_net_watch',
            'wd_liveness', 'wd_restart_allowed', 'wd_restart_core', 'wd_heal_notice', 'wd_recover', 'wd_egress_target',
-           'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick')
+           'wd_urlenc', 'wd_delay', 'wd_egress_tick', 'wd_selfheal_tick', 'fake_range', 'wd_session_fake_range',
+           'wd_root_fake_captured')
 
 
 class Controller:
@@ -551,6 +552,200 @@ class SourceGuards(unittest.TestCase):
                 continue
             cmd = [path, 'sh', '-n', str(SCRIPT)] if shell == 'busybox' else [path, '-n', str(SCRIPT)]
             subprocess.run(cmd, check=True, timeout=30)
+
+
+DIAG = REPO.parents[1] / 'files/uploads/hetu-diag.txt'
+
+
+class DataPlaneHelpers(ShellCase):
+    """3.0.0 data-plane probe helpers: DNS query bytes, CIDR match, verdict, gating."""
+
+    def stub_nc(self, response=b''):
+        fake = self.dir / 'bin'
+        fake.mkdir(exist_ok=True)
+        rec = self.dir / 'nc.stdin'
+        resp = self.dir / 'nc.resp'
+        resp.write_bytes(response)
+        (fake / 'nc').write_text('#!/bin/sh\ncat > %s\ncat %s\n' % (shq(rec), shq(resp)))
+        (fake / 'nc').chmod(0o755)
+        return {'PATH': str(fake) + ':' + os.environ['PATH']}, rec
+
+    @staticmethod
+    def query(name):
+        qname = b''.join(bytes([len(l)]) + l.encode() for l in name.strip('.').split('.')) + b'\x00'
+        body = b'HT\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00' + qname + b'\x00\x01\x00\x01'
+        return len(body).to_bytes(2, 'big') + body
+
+    def test_resolve_sends_one_tcp_query_with_the_right_length_and_reads_the_first_a_record(self):
+        q = self.query('www.gstatic.com')[2:]
+        cname = b'\xc0\x0c\x00\x05\x00\x01\x00\x00\x00\x3c\x00\x02\xc0\x10'
+        a = b'\xc0\x0c\x00\x01\x00\x01\x00\x00\x00\x3c\x00\x04\xc6\x12\x00\x07'
+        answer = b'HT\x81\x80\x00\x01\x00\x02\x00\x00\x00\x00' + q[12:] + cname + a
+        env, rec = self.stub_nc(len(answer).to_bytes(2, 'big') + answer)
+        for name in ('www.gstatic.com', 'www.gstatic.com.'):
+            with self.subTest(name=name):
+                r = self.sh('WD_DP=5353; WD_HTTP_TIMEOUT=2; wd_resolve %s; echo "rc=$? ip=$WD_RES_IP"' % shq(name),
+                            extra=function('wd_resolve'), env=env)
+                self.assertIn('rc=0 ip=198.18.0.7', r.stdout, r.stderr)
+                sent = rec.read_bytes()
+                self.assertEqual(sent, self.query('www.gstatic.com'), 'trailing dot adds no empty label')
+                self.assertEqual(int.from_bytes(sent[:2], 'big'), 33)
+                self.assertEqual(len(sent), 35)
+        env, rec = self.stub_nc(b'')
+        r = self.sh('WD_DP=5353; WD_HTTP_TIMEOUT=2; wd_resolve www.baidu.com; echo "rc=$? ip=[$WD_RES_IP]"',
+                    extra=function('wd_resolve'), env=env)
+        self.assertIn('rc=1 ip=[]', r.stdout, r.stderr)
+        self.assertEqual(rec.read_bytes(), self.query('www.baidu.com'))
+
+    def test_in_cidr(self):
+        cases = [('198.18.0.7', '198.18.0.0/16', 0), ('198.19.0.1', '198.18.0.0/16', 1), ('198.19.255.255', '198.18.0.0/15', 0),
+                 ('28.0.0.1', '28.0.0.0/8', 0), ('10.0.0.1', '10.0.0.1/32', 0), ('10.0.0.2', '10.0.0.1/32', 1),
+                 ('198.18.0.7', '198.18.0.0', 1), ('198.18.0.7', '198.18.0.0/0', 1), ('198.18.0.7', '198.18.0.0/33', 1),
+                 ('1.2.3', '1.2.0.0/16', 1), ('1.2.3.4', 'x/16', 1)]
+        body = ''.join('wd_in_cidr %s %s; echo "$?"\n' % (shq(ip), shq(c)) for ip, c, _ in cases)
+        r = self.sh(body, extra=function('wd_in_cidr'))
+        self.assertEqual([int(x) for x in r.stdout.split()], [rc for _, _, rc in cases], r.stderr)
+
+    def test_classify_every_branch(self):
+        cases = [(('', 'G→n', '3'), 'proxy-down'), (('fail', 'G→n', '1'), 'proxy-down'), (('fail', '', '3'), 'dataplane-down'),
+                 (('ok', '', '3'), 'proxy-down'), (('', '', '0'), 'proxy-down'), (('', '', ''), 'proxy-down'),
+                 (('', '', '3'), 'skip')]
+        body = ''.join('wd_dp_classify %s %s %s\n' % tuple(shq(a) for a in args) for args, _ in cases)
+        r = self.sh(body, extra=function('wd_dp_classify'))
+        self.assertEqual(r.stdout.split(), [want for _, want in cases], r.stderr)
+
+    def gate_session(self, **over):
+        c = self.controller()
+        values = {'MODE': 'tproxy', 'CONTROLLER_PORT': c.port, 'ACTIVE_DNS_PORT': 1053, 'DNS_PROTOS': 'tcp udp',
+                  'SYSTEM_DNS': 'captured', 'FAKE_IP_V4': FAKE4 + ',28.0.0.0/8', 'TCP': 1}
+        values.update(over)
+        self.session(cp=values['CONTROLLER_PORT'], dp=values['ACTIVE_DNS_PORT'])
+        (self.run_dir / 'session.state').write_text(''.join('%s=%s\n' % kv for kv in values.items()))
+
+    def dp_on(self, extra='', gate=False):
+        pre = 'SYSTEM_DNS=exempt; FAKE_IP_V4=""; '
+        if gate:
+            g = self.dir / 'android'
+            g.mkdir(exist_ok=True)
+            pre += 'CG_ESCAPE_GATE=%s; ' % shq(g)
+        r = self.sh(pre + 'COREPID=$$; wd_selfheal_init; echo "on=$WD_DP_ON fake=$WD_FAKE4"', extra=extra)
+        return r.stdout.strip() + r.stderr
+
+    def test_dp_on_gating(self):
+        self.gate_session()
+        self.assertIn('on=1 fake=%s' % FAKE4, self.dp_on())
+        for over in ({'MODE': 'tun'}, {'TCP': 0}, {'SYSTEM_DNS': 'exempt'}, {'FAKE_IP_V4': ''}, {'CONTROLLER_PORT': 0},
+                     {'ACTIVE_DNS_PORT': 0}):
+            with self.subTest(over=over):
+                self.gate_session(**over)
+                self.assertIn('on=0', self.dp_on())
+        self.gate_session(MODE='redirect')
+        self.assertIn('on=1', self.dp_on())
+        # Android: a live uid 0-9999 RETURN without the fake-range exclusion lets root flows go direct.
+        self.gate_session()
+        leaky = ('xt4q(){ [ "$2" = mangle ] && printf "%s\\n" "-A HETU_MOUT -m owner --uid-owner 0-9999 -j RETURN"; return 0; }\n')
+        self.assertIn('on=0', self.dp_on(extra=leaky, gate=True))
+        tight = ('xt4q(){ [ "$2" = mangle ] && printf "%s\\n" "-A HETU_MOUT ! -d 198.18.0.0/16 -m owner --uid-owner 0-9999 -j RETURN"; return 0; }\n')
+        self.assertIn('on=1', self.dp_on(extra=tight, gate=True))
+
+
+class NetRecover(unittest.TestCase):
+    def test_ids_from_the_colorOS_dumpsys_lines(self):
+        if not DIAG.exists():
+            self.skipTest('diagnostic upload not present')
+        lines = DIAG.read_text(errors='replace').splitlines(True)[3442:3456]
+        body = function('net_recover_ids') + 'net_recover_ids'
+        r = subprocess.run(['/bin/sh', '-c', body], input=''.join(lines), capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.stdout.split(), ['286', '290', '301', '302'], r.stderr)
+        r = subprocess.run(['/bin/sh', '-c', body], input='  NetworkAgentInfo{network{7} x}\nNetworkRequest network{9}\n'
+                           '  NetworkAgentInfo{network{7} again}\n', capture_output=True, text=True, timeout=20)
+        self.assertEqual(r.stdout.split(), ['7'], 'unique, only NetworkAgentInfo lines')
+
+
+class FakeReject(ShellCase):
+    def arm(self, gate=True, v4=FAKE4 + ',28.0.0.0/8', v6='fc00::/18'):
+        calls = self.dir / 'xt.calls'
+        hooked = self.dir / 'hooked'
+        spawned = self.dir / 'spawned'
+        self0 = self.dir / 'hetu-root.sh'
+        self0.write_text('#!/bin/sh\necho "$*" >> %s\n' % shq(spawned))
+        self0.chmod(0o755)
+        g = self.dir / 'android'
+        g.mkdir(exist_ok=True)
+        stub = ('xt4q(){ echo "$*" >> %s; case "$*" in *"-C OUTPUT"*) [ -f %s ]; return;; *"-I OUTPUT"*) : > %s;; *"-D OUTPUT"*) rm -f %s;; esac; return 0; }\n'
+                'has(){ [ "$1" != ip6tables ] && command -v "$1" >/dev/null 2>&1; }\nv6supported(){ return 0; }\n'
+                % (shq(calls), shq(hooked), shq(hooked), shq(hooked)))
+        stub += ''.join(function(n) for n in ('fake_reject_arm', 'fake_reject_drop', 'fake_reject_remove'))
+        stub += top_assignment('FAKE_REJECT_CHAIN') + top_assignment('FAKE_REJECT_SECONDS')
+        body = 'CG_ESCAPE_V1=""; '
+        if gate:
+            body += 'CG_ESCAPE_GATE=%s; ' % shq(g)
+        body += 'fake_reject_arm %s %s; echo "rc=$?"' % (shq(v4), shq(v6))
+        r = subprocess.run(['/bin/sh', '-c', self.prelude(stub) + body, str(self0)], capture_output=True, text=True, timeout=30)
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        return calls, hooked, spawned, stub, self0
+
+    def test_arm_installs_reset_rules_and_spawns_the_expiry_then_remove_clears_them(self):
+        calls, hooked, spawned, stub, self0 = self.arm()
+        text = calls.read_text()
+        for want in ('-t filter -N HXFAKE_REJECT',
+                     '-t filter -A HXFAKE_REJECT -d %s -p tcp -j REJECT --reject-with tcp-reset' % FAKE4,
+                     '-t filter -A HXFAKE_REJECT -d %s -p udp -j REJECT --reject-with icmp-port-unreachable' % FAKE4,
+                     '-t filter -I OUTPUT 1 -j HXFAKE_REJECT'):
+            self.assertIn(want, text)
+        self.assertNotIn('28.0.0.0', text, 'only the first CIDR of a list')
+        self.assertTrue(hooked.exists())
+        token = (self.run_dir / 'fake-reject').read_text().strip()
+        self.assertTrue(token)
+        for _ in range(50):
+            if spawned.exists():
+                break
+            time.sleep(0.1)
+        self.assertEqual(spawned.read_text().strip(), 'fake-reject-expire ' + token)
+        self.assertIn('are reset for 120s', self.log_text())
+        calls.unlink()
+        r = subprocess.run(['/bin/sh', '-c', self.prelude(stub) + 'fake_reject_remove; echo "rc=$?"', str(self0)],
+                           capture_output=True, text=True, timeout=30)
+        self.assertIn('rc=0', r.stdout, r.stderr)
+        text = calls.read_text()
+        for want in ('-t filter -D OUTPUT -j HXFAKE_REJECT', '-t filter -F HXFAKE_REJECT', '-t filter -X HXFAKE_REJECT'):
+            self.assertIn(want, text)
+        self.assertFalse(hooked.exists())
+        self.assertFalse((self.run_dir / 'fake-reject').exists())
+        calls.unlink()
+        subprocess.run(['/bin/sh', '-c', self.prelude(stub) + 'fake_reject_remove', str(self0)], timeout=30)
+        self.assertFalse(calls.exists(), 'no window opened: remove touches nothing')
+
+    def test_arm_does_nothing_off_android_or_without_a_range(self):
+        for kw in ({'gate': False}, {'v4': '', 'v6': ''}, {'v4': 'bogus', 'v6': ''}, {'v4': '198.18.0.0/16;x', 'v6': ''}):
+            with self.subTest(**kw):
+                calls, hooked, spawned, _, _ = self.arm(**kw)
+                self.assertFalse(hooked.exists())
+                self.assertFalse((self.run_dir / 'fake-reject').exists())
+                self.assertFalse(spawned.exists())
+                if calls.exists():
+                    self.assertNotIn('-N HXFAKE_REJECT', calls.read_text())
+                    calls.unlink()
+
+
+class Phase300SourceGuards(unittest.TestCase):
+    def test_stop_transaction_verifies_before_dropping_the_session(self):
+        stop = function('stop_transaction')
+        self.assertIn('stop_verify', stop)
+        self.assertLess(stop.index('[ "$SC_FAILED" = 0 ] || return 1'), stop.index('stop_verify'))
+        self.assertLess(stop.index('stop_verify'), stop.index('rm -f "$SESSION"'))
+        self.assertLess(stop.index('rm -f "$SESSION"'), stop.index('fake_reject_arm "$ST_FAKE4" "$ST_FAKE6"'))
+        self.assertIn('net_recover_async stop', stop)
+        self.assertIn('fake_reject_remove; stopwatchdog; cleanup', function('start'))
+
+    def test_detached_helpers_escape_the_app_cgroup_with_their_own_pid(self):
+        for name, cmd in (('fake_reject_arm', '$SETSID "$0" fake-reject-expire "$FRA_TOKEN"'),
+                          ('net_recover_async', '$SETSID "$0" net-recover "$1"')):
+            body = function(name)
+            self.assertIn(cmd, body)
+            self.assertIn('cg_escape "$!"', body)
+            self.assertLess(body.index('detach_probe'), body.index(cmd))
+            self.assertLess(body.index(cmd), body.index('cg_escape "$!"'))
 
 
 if __name__ == '__main__':

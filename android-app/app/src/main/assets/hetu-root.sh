@@ -165,6 +165,25 @@ WD_LOG_MAX=65536
 WD_PROXY_URL=http://www.gstatic.com/generate_204
 WD_DIRECT_URLS="http://connectivitycheck.gstatic.com/generate_204 http://connect.rom.miui.com/generate_204"
 WD_HEAL_REASON=""
+# Data-plane probe (3.0.0, real-device outage on ColorOS: core and controller alive, the Google group's
+# node stalled, the MATCH-group delay check saw nothing). As root the watchdog asks the core's DNS for a
+# fake IP and fetches it, so the request really goes TPROXY/REDIRECT -> core -> proxy; a CN host with a
+# fake IP (normally DIRECT) and the proxy groups' own delay tell a dead node from a broken data plane.
+WD_DP_GRACE=120
+WD_DP_EVERY=90
+WD_DP_RETRY=30
+WD_DP_LIMIT=2
+WD_DP_TIMEOUT=6
+WD_DP_HOST=www.gstatic.com
+WD_DP_PATH=/generate_204
+WD_DP_CN_HOSTS="www.baidu.com www.qq.com www.taobao.com"
+WD_DP_GROUP_MAX=12
+WD_DP_BUDGET=30
+# After a stop, apps may still hold fake IPs from the core's DNS: for a short window they get a TCP reset /
+# ICMP unreachable instead of a hang, so they resolve again at once. Not a HETU_ chain: no sweep, status
+# check or stop verification treats it as capture.
+FAKE_REJECT_CHAIN=HXFAKE_REJECT
+FAKE_REJECT_SECONDS=120
 
 ok(){ printf '{"ok":true,"message":"%s"}\n' "$1"; }
 start_stage(){ transaction_current || fail "启动事务已超时或被撤销"; mkdir -p "$RUN" >/dev/null 2>&1 || true; printf '%s %s\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" "$1" > "$START_STATE" 2>/dev/null || true; STAGE_UPTIME=unknown; read -r STAGE_UPTIME STAGE_UNUSED < /proc/uptime 2>/dev/null || true; printf '%s %s\n' "$STAGE_UPTIME" "$1" >> "$START_TIMING" 2>/dev/null || true; }
@@ -669,6 +688,8 @@ stop_transaction(){
   cancel_boot || return 1
   acquire_lock || return 1
   printf 'stopped-%s\n' "$$" > "$RUN/generation" || return 1
+  ST_FAKE4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
+  ST_FAKE6=$(sed -n 's/^FAKE_IP_V6=//p' "$SESSION" 2>/dev/null | head -n 1)
   stopwatchdog
   SC_FAILED=0
   stopcore || SC_FAILED=1
@@ -676,7 +697,115 @@ stop_transaction(){
   restorev6 || SC_FAILED=1
   net_sysctl_restore; cgroup_release
   [ "$SC_FAILED" = 0 ] || return 1
+  stop_verify
   rm -f "$SESSION"
+  fake_reject_arm "$ST_FAKE4" "$ST_FAKE6"
+  net_recover_async stop
+}
+# 3.0.0 post-stop audit, independent of net.state: no fwmark rule or route of a Hetu table
+# (20260-20299), no HETU_/BICHEN_ chain or hook, no eBPF pin directory. Anything left gets one more
+# sweep; the result goes to watchdog.log. Android only (the host fixtures keep their exact calls).
+stop_leftovers(){
+  SL_OUT=""
+  for SL_F in 4 6; do
+    if [ "$SL_F" = 6 ] && ! v6supported; then continue; fi
+    [ -z "$(ip -"$SL_F" rule show 2>/dev/null | owned_policy_rules)" ] || SL_OUT="$SL_OUT ip$SL_F-rule"
+    if ip -"$SL_F" route show table all 2>/dev/null | awk '{ for (i = 1; i < NF; i++) if ($i == "table" && $(i+1) ~ /^[0-9]+$/ && $(i+1) + 0 >= 20260 && $(i+1) + 0 <= 20299) f = 1 } END { exit !f }'; then SL_OUT="$SL_OUT ip$SL_F-table"; fi
+  done
+  for SL_BIN in xt4q xt6q; do
+    if [ "$SL_BIN" = xt6q ] && ! has ip6tables; then continue; fi
+    for SL_T in mangle nat filter; do
+      if "$SL_BIN" -t "$SL_T" -S 2>/dev/null | grep -Eq '(^-N |^-A | -j | -g )(HETU_|BICHEN_)'; then SL_OUT="$SL_OUT $SL_BIN-$SL_T"; fi
+    done
+  done
+  [ ! -d "$EBPF_PIN" ] || SL_OUT="$SL_OUT ebpf-pin"
+  printf '%s' "${SL_OUT# }"
+}
+stop_verify(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  SV_LEFT=$(stop_leftovers)
+  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean (no Hetu ip rule, table 20260-20299 route, HETU_ chain or eBPF pin)"; return 0; fi
+  wd_log "stop-verify: left after stop: $SV_LEFT; sweeping once more"
+  cleanup_confirmed || true; ebpf_unload || true
+  SV_LEFT=$(stop_leftovers)
+  if [ -z "$SV_LEFT" ]; then wd_log "stop-verify: clean after the second sweep"; else wd_log "stop-verify: still left after the second sweep: $SV_LEFT"; fi
+  return 0
+}
+# Fake-IP reset window after a stop ($1 v4 range, $2 v6 range of the stopped session; first CIDR of a list).
+fake_reject_arm(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  FRA_ON=0
+  for FRA_F in 4 6; do
+    if [ "$FRA_F" = 4 ]; then FRA_BIN=xt4q; FRA_R="${1%%,*}"; FRA_U=icmp-port-unreachable
+    else has ip6tables && v6supported || continue; FRA_BIN=xt6q; FRA_R="${2%%,*}"; FRA_U=icmp6-port-unreachable; fi
+    case "$FRA_R" in */*) ;; *) continue;; esac
+    case "$FRA_R" in *[!0-9A-Fa-f.:/]*) continue;; esac
+    fake_reject_drop "$FRA_BIN"
+    if "$FRA_BIN" -t filter -N "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 &&
+      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p tcp -j REJECT --reject-with tcp-reset >/dev/null 2>&1 &&
+      "$FRA_BIN" -t filter -A "$FAKE_REJECT_CHAIN" -d "$FRA_R" -p udp -j REJECT --reject-with "$FRA_U" >/dev/null 2>&1 &&
+      "$FRA_BIN" -t filter -I OUTPUT 1 -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; then FRA_ON=1
+    else fake_reject_drop "$FRA_BIN"; fi
+  done
+  [ "$FRA_ON" = 1 ] || return 0
+  FRA_TOKEN="$$-$(cat /proc/sys/kernel/random/uuid 2>/dev/null | cut -c1-8)"
+  { printf '%s\n' "$FRA_TOKEN" > "$RUN/fake-reject"; } 2>/dev/null || true
+  wd_log "stop: connections to the fake-IP range (${1%%,*}${2:+ ${2%%,*}}) are reset for ${FAKE_REJECT_SECONDS}s so apps resolve again"
+  detach_probe
+  $SETSID "$0" fake-reject-expire "$FRA_TOKEN" </dev/null >/dev/null 2>&1 &
+  cg_escape "$!"
+  return 0
+}
+fake_reject_drop(){
+  while "$1" -t filter -C OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1; do "$1" -t filter -D OUTPUT -j "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || break; done
+  "$1" -t filter -F "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true; "$1" -t filter -X "$FAKE_REJECT_CHAIN" >/dev/null 2>&1 || true
+}
+# Ends the window early (every start) or on time (fake-reject-expire); only after a window was opened.
+fake_reject_remove(){
+  [ -f "$RUN/fake-reject" ] || return 0
+  rm -f "$RUN/fake-reject"
+  fake_reject_drop xt4q
+  if has ip6tables; then fake_reject_drop xt6q; fi
+  return 0
+}
+fake_reject_expire(){
+  sleep "$FAKE_REJECT_SECONDS"
+  [ "$(cat "$RUN/fake-reject" 2>/dev/null)" = "$1" ] || return 0
+  fake_reject_remove
+  wd_log "fake-IP reset window ended"
+}
+# 3.0.0: after a stop or start the system resolver may still hold the core's answers (fake IPs) and
+# NetworkMonitor may keep a network "无法连接到网络" in its back-off. Flush every network's DNS cache and
+# ask for a re-evaluation (Android 13+ `cmd connectivity reevaluate <netId>`). Best effort, logged.
+# The App additionally reports every network to ConnectivityManager (NetworkRevalidation).
+net_recover(){
+  NR_NETS=$(timeout 8 dumpsys connectivity 2>/dev/null | net_recover_ids)
+  NR_OUT=""
+  for NR_ID in $NR_NETS; do
+    NR_F=no; NR_R=no
+    if has ndc && NR_X=$(timeout 3 ndc resolver flushnet "$NR_ID" 2>&1); then case "$NR_X" in *[Ee]rror*|*[Uu]nknown*|*[Ff]ail*|*[Uu]sage*) ;; *) NR_F=ok;; esac; fi
+    if has cmd && NR_X=$(timeout 4 cmd connectivity reevaluate "$NR_ID" 2>&1); then case "$NR_X" in *[Ee]rror*|*[Uu]nknown*|*[Ff]ail*|*[Ee]xception*|*[Uu]sage*) ;; *) NR_R=ok;; esac; fi
+    NR_OUT="$NR_OUT net$NR_ID:flush=$NR_F,reevaluate=$NR_R"
+  done
+  wd_log "$1: system network recovery${NR_OUT:- (no network listed by dumpsys connectivity)}"
+}
+# netIds (network{N}) of the NetworkAgentInfo lines of `dumpsys connectivity` on stdin, unique, at most 16.
+net_recover_ids(){ awk '/NetworkAgentInfo/ { if (match($0, /[{ ]network[{][0-9]+[}]/)) print substr($0, RSTART + 9, RLENGTH - 10) }' | sort -un | head -n 16; }
+net_recover_async(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  detach_probe
+  $SETSID "$0" net-recover "$1" </dev/null >/dev/null 2>&1 &
+  cg_escape "$!"
+  return 0
+}
+# Probe URLs NetworkMonitor uses on this ROM, best effort (the App keeps them for the next start).
+probe_urls(){
+  {
+    if has device_config; then for PU_K in captive_portal_http_url captive_portal_https_url captive_portal_fallback_url captive_portal_other_fallback_urls; do timeout 3 device_config get connectivity "$PU_K" 2>/dev/null; done; fi
+    if has dumpsys; then timeout 6 dumpsys network_stack 2>/dev/null | grep -i -E 'https?://' | head -n 2000; timeout 6 dumpsys connectivity 2>/dev/null | grep -i -E 'https?://' | head -n 500; fi
+    if has logcat; then timeout 4 logcat -d -t 4000 2>/dev/null | grep -i -E 'NetworkMonitor|captive|validat' | grep -i -E 'https?://' | head -n 500; fi
+  } | grep -o -E 'https?://[A-Za-z0-9._-]+(:[0-9]+)?/[A-Za-z0-9._/-]*' | grep -i -E '/(generate_?204|gen_204)' | sort -u | head -n 32
+  return 0
 }
 cancel_boot(){
   CB_BOOT=$(cat /proc/sys/kernel/random/boot_id 2>/dev/null) || return 1
@@ -2223,6 +2352,37 @@ wd_selfheal_init(){
   WD_EG_AT=$((WD_NOW+WD_EGRESS_GRACE)); WD_EG_FAIL=0; WD_EG_LEVEL=0; WD_EG_TARGET=""; WD_EG_NEXT_ACTION=0; WD_EG_BACKOFF="$WD_EGRESS_BACKOFF"
   WD_NET_SIG=$(wd_net_sig)
   WD_NOTOOL=0
+  # Data-plane probe: needs the controller (WD_EG_ON: the verdict uses the group delays and DIRECT), the
+  # core's DNS listener, TCP capture and a root flow to a fake IP that is really captured. The watchdog is
+  # uid 0: the uid 0-9999 RETURN rules let it go direct unless owner_return added `! -d <fake range>`,
+  # which it does only while fake_range is non-empty (captured resolver + fake range in this session).
+  # Otherwise WD_DP_ON stays 0 and the controller delay check (egress) stays in charge.
+  WD_TAB=$(printf '\t'); WD_DP_ON=0; WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NEXT=0; WD_DP_NOTIFIED=0
+  WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_AT=$((WD_NOW+${WD_DP_GRACE:-120}))
+  WD_FAKE4=$(wd_session_fake_range); WD_FAKE4="${WD_FAKE4%%,*}"
+  if [ "$WD_EG_ON" = 1 ] && [ "$WD_DP" != 0 ] && [ -n "$WD_FAKE4" ] && wd_root_fake_captured "$WD_FAKE4" &&
+    [ "$(sed -n 's/^TCP=//p' "$SESSION" 2>/dev/null | head -n 1)" = 1 ]; then
+    case "$(sed -n 's/^MODE=//p' "$SESSION" 2>/dev/null | head -n 1)" in tproxy|redirect|enhance) WD_DP_ON=1;; esac
+  fi
+}
+# fake_range as the session's rules were built: the v4 fake range when the resolver was captured, else empty.
+wd_session_fake_range(){
+  WSF_SD="$SYSTEM_DNS"; WSF_F4="$FAKE_IP_V4"
+  SYSTEM_DNS=$(sed -n 's/^SYSTEM_DNS=//p' "$SESSION" 2>/dev/null | head -n 1)
+  FAKE_IP_V4=$(sed -n 's/^FAKE_IP_V4=//p' "$SESSION" 2>/dev/null | head -n 1)
+  WSF_OUT=$(fake_range xt4q)
+  SYSTEM_DNS="$WSF_SD"; FAKE_IP_V4="$WSF_F4"
+  printf '%s' "$WSF_OUT"
+}
+# Android only: no live uid 0-9999 RETURN rule of a HETU_ chain may lack the `! -d <fake>` exclusion
+# (unreadable tables do not veto; the session facts above already decided).
+wd_root_fake_captured(){
+  [ -d "$CG_ESCAPE_GATE" ] || return 0
+  for WRC_T in mangle nat; do
+    WRC_S=$(xt4q -t "$WRC_T" -S 2>/dev/null) || continue
+    if printf '%s\n' "$WRC_S" | grep -E '^-A (HETU_|BICHEN_)' | grep -e '--uid-owner 0-9999' | grep -e '-j RETURN' | grep -qv -e '! -d '; then return 1; fi
+  done
+  return 0
 }
 wd_net_sig(){ ip -o -4 addr show scope global 2>/dev/null | awk '{printf "%s=%s ", $2, $4}'; }
 wd_net_watch(){
@@ -2231,6 +2391,7 @@ wd_net_watch(){
   WD_NET_SIG="$WNW_SIG"; wd_now
   wd_log "network change (${WNW_SIG:-offline}): re-checking core liveness"
   WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
+  WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
 }
 wd_liveness(){
   WD_LIVE_REASON=""
@@ -2388,6 +2549,7 @@ wd_selfheal_tick(){
     rm -f "$RUN/liveness.kick"
     wd_log "network change reported: re-checking core liveness"
     WD_LIVE_AT=0; WD_EG_FAIL=0; WD_EG_TARGET=""; [ "$WD_EG_AT" -le $((WD_NOW+20)) ] || WD_EG_AT=$((WD_NOW+20))
+    WD_DP_FAIL=0; [ "$WD_DP_AT" -le $((WD_NOW+20)) ] || WD_DP_AT=$((WD_NOW+20))
   fi
   if [ "$WD_NOW" -ge "$WD_LIVE_AT" ]; then
     WD_LIVE_AT=$((WD_NOW+WD_LIVE_EVERY))
@@ -2410,8 +2572,215 @@ wd_selfheal_tick(){
       [ "$WD_DNS_FAIL" -lt "$WD_DNS_LIMIT" ] || { WD_DNS_FAIL=0; wd_recover "dns-$WD_DP-no-answer"; return 0; }
     else WD_DNS_FAIL=0; fi
   fi
-  if [ "$WD_EG_ON" = 1 ] && [ "$WD_NOW" -ge "$WD_EG_AT" ]; then wd_egress_tick; fi
+  # One egress check, not two: the data-plane probe when it can run, else the controller delay check.
+  if [ "$WD_DP_ON" = 1 ]; then
+    [ "$WD_NOW" -lt "$WD_DP_AT" ] || wd_dataplane_tick
+  elif [ "$WD_EG_ON" = 1 ] && [ "$WD_NOW" -ge "$WD_EG_AT" ]; then wd_egress_tick; fi
   return 0
+}
+# ---- data-plane probe (3.0.0) -----------------------------------------------------------
+# A/IN query for $1 over TCP to the core's DNS listener; WD_RES_IP = the first A record.
+wd_resolve(){
+  WD_RES_IP=""
+  WRS_Q=$(printf '%s' "$1" | awk -F. '{ for (i = 1; i <= NF; i++) if (length($i) > 0 && length($i) < 64) printf "\\%03o%s", length($i), $i }')
+  # Length prefix = 12 header + encoded QNAME (length octet per label + root 0) + 4 (QTYPE, QCLASS).
+  WRS_QL=$(printf '%s' "$1" | awk -F. '{ n = 1; for (i = 1; i <= NF; i++) if (length($i) > 0 && length($i) < 64) n += length($i) + 1; print n }')
+  WRS_LEN=$((WRS_QL + 16))
+  WRS_BYTES=$( { printf "\\$(printf %03o $((WRS_LEN / 256)))\\$(printf %03o $((WRS_LEN % 256)))"
+      printf '\110\124\001\000\000\001\000\000\000\000\000\000'; printf "$WRS_Q"; printf '\000\000\001\000\001'; } 2>/dev/null \
+    | timeout "$((WD_HTTP_TIMEOUT+1))" nc -w "$WD_HTTP_TIMEOUT" 127.0.0.1 "$WD_DP" 2>/dev/null | od -An -v -tu1)
+  WD_RES_IP=$(printf '%s\n' "$WRS_BYTES" | awk '
+    { for (i = 1; i <= NF; i++) b[++n] = $i + 0 }
+    function skip(p) { while (p <= n) { if (b[p] == 0) return p + 1; if (b[p] >= 192) return p + 2; p += b[p] + 1 } return n + 1 }
+    END { o = 3; if (n < o + 12) exit; qd = b[o+4] * 256 + b[o+5]; an = b[o+6] * 256 + b[o+7]; p = o + 12
+      for (q = 0; q < qd; q++) p = skip(p) + 4
+      for (a = 0; a < an && p <= n; a++) { p = skip(p); t = b[p] * 256 + b[p+1]; l = b[p+8] * 256 + b[p+9]
+        if (t == 1 && l == 4 && p + 13 <= n) { print b[p+10] "." b[p+11] "." b[p+12] "." b[p+13]; exit }
+        p += 10 + l } }')
+  [ -n "$WD_RES_IP" ]
+}
+# 0 when IPv4 $1 lies inside CIDR $2.
+wd_in_cidr(){
+  awk -v ip="$1" -v c="$2" 'function v(a,  x) { if (split(a, x, ".") != 4) return -1; return ((x[1] * 256 + x[2]) * 256 + x[3]) * 256 + x[4] }
+    BEGIN { if (split(c, y, "/") != 2) exit 1; m = y[2] + 0; if (m < 1 || m > 32) exit 1; s = 2 ^ (32 - m)
+      if (v(ip) < 0 || v(y[1]) < 0) exit 1; exit !(int(v(ip) / s) == int(v(y[1]) / s)) }'
+}
+# HTTP GET http://$1$3 with Host $2 as root (captured like any app). 0 = an HTTP answer arrived,
+# 1 = none within WD_DP_TIMEOUT, 2 = no tool (curl, busybox wget, nc).
+wd_fetch(){
+  WF_T="$WD_DP_TIMEOUT"
+  if has curl; then
+    WF_C=$(curl -sS -m "$WF_T" -o /dev/null -w '%{http_code}' -H "Host: $2" "http://$1$3" 2>/dev/null)
+    case "$WF_C" in [1-5][0-9][0-9]) return 0;; esac; return 1
+  fi
+  WF_BB=""
+  for WF_B in /data/adb/ksu/bin/busybox /data/adb/ap/bin/busybox /data/adb/magisk/busybox; do [ -x "$WF_B" ] && { WF_BB="$WF_B"; break; }; done
+  if [ -n "$WF_BB" ]; then
+    WF_C=$(timeout "$((WF_T+1))" "$WF_BB" wget -S -q -T "$WF_T" -O /dev/null --header "Host: $2" "http://$1$3" 2>&1 | awk '$1 ~ /^HTTP\// {c=$2} END {print c}')
+    case "$WF_C" in [1-5][0-9][0-9]) return 0;; esac; return 1
+  fi
+  has nc || return 2
+  # The request side stays open until the first answer bytes arrive (or WF_T), not always the full WF_T.
+  WF_O="${WD_TMP:-/tmp/.hetu-wf.$$}.fetch"; : > "$WF_O" 2>/dev/null || return 1
+  { printf 'GET %s HTTP/1.0\r\nHost: %s\r\nUser-Agent: hetu-watchdog\r\nConnection: close\r\n\r\n' "$3" "$2"
+    WF_I=0; while [ "$WF_I" -lt $((WF_T*5)) ] && [ ! -s "$WF_O" ]; do sleep 0.2 2>/dev/null || sleep 1; WF_I=$((WF_I+1)); done
+    [ ! -s "$WF_O" ] || sleep 0.2 2>/dev/null || true; } 2>/dev/null \
+    | timeout "$((WF_T+1))" nc -w "$WF_T" "$1" 80 > "$WF_O" 2>/dev/null
+  WF_L=$(head -n 1 "$WF_O" 2>/dev/null); rm -f "$WF_O"
+  case "$WF_L" in HTTP/*' '[1-5][0-9][0-9]*) return 0;; esac
+  return 1
+}
+# Selector/URLTest/Fallback/LoadBalance groups from GET /proxies -> "$WD_TMP.groups" (type TAB name TAB now).
+wd_groups(){
+  : > "$WD_TMP.groups"
+  WD_HTTP_TIMEOUT=4; wd_http GET /proxies "$WD_TMP.gr" && [ "$WD_CODE" = 200 ] || { rm -f "$WD_TMP.gr"; return 1; }
+  tr '{' '\n' < "$WD_TMP.gr" | awk -v max="${WD_DP_GROUP_MAX:-12}" '
+    function f(k,  i, s) { i = index($0, "\"" k "\":\""); if (!i) return ""; s = substr($0, i + length(k) + 4); i = index(s, "\""); return i ? substr(s, 1, i - 1) : "" }
+    function u(x) { gsub(/\\u0026/, "\\&", x); gsub(/\\u003c/, "<", x); gsub(/\\u003e/, ">", x); return x }
+    { t = f("type"); n = u(f("name")); if (t !~ /^(Selector|URLTest|Fallback|LoadBalance)$/ || n == "" || n == "GLOBAL" || (n in seen)) next
+      seen[n] = 1; if (++c <= max) print t "\t" n "\t" u(f("now")) }' > "$WD_TMP.groups" 2>/dev/null
+  rm -f "$WD_TMP.gr"
+  return 0
+}
+# Delay of each group's current choice through the core (no TPROXY involved). WD_DP_BAD lists the groups
+# that fail ("group→node"), WD_DP_SCANNED how many were measured.
+wd_scan_groups(){
+  WD_DP_BAD=""; WD_DP_SCANNED=0; WSG_N=0
+  wd_groups || return 0
+  wd_budget_start
+  while IFS= read -r WSG_L; do
+    wd_budget_left || { wd_log "data-plane probe: group scan stopped (${WD_BUDGET_WHY})"; break; }
+    WSG_R=${WSG_L#*"$WD_TAB"}; WSG_G=${WSG_R%%"$WD_TAB"*}; WSG_NOW=${WSG_R#*"$WD_TAB"}
+    case "$WSG_NOW" in DIRECT|REJECT|REJECT-DROP|PASS) continue;; esac
+    wd_delay "$WSG_G" "$WD_PROXY_URL" </dev/null; WSG_RC=$?
+    [ "$WSG_RC" != 2 ] || continue
+    WD_DP_SCANNED=$((WD_DP_SCANNED+1))
+    if [ "$WSG_RC" = 1 ]; then WD_DP_BAD="${WD_DP_BAD:+$WD_DP_BAD, }$WSG_G${WSG_NOW:+→$WSG_NOW}"; WSG_N=$((WSG_N+1)); [ "$WSG_N" -lt 3 ] || break; fi
+  done < "$WD_TMP.groups"
+  return 0
+}
+# Elapsed-time budget for the per-group loops (each delay call may take ~9 s): at most WD_DP_BUDGET s
+# from wd_budget_start, and never while the core is gone.
+wd_budget_start(){ wd_uptime; WD_BUDGET_T0="$WD_UP"; }
+wd_budget_left(){
+  WD_BUDGET_WHY=""
+  if [ -n "${COREPID:-}" ] && ! kill -0 "$COREPID" 2>/dev/null; then WD_BUDGET_WHY="core $COREPID gone"; return 1; fi
+  wd_uptime
+  [ $((WD_UP-WD_BUDGET_T0)) -lt "${WD_DP_BUDGET:-30}" ] || { WD_BUDGET_WHY="${WD_DP_BUDGET:-30}s budget used"; return 1; }
+  return 0
+}
+wd_uptime(){ read -r WD_UP WD_UP_REST < /proc/uptime 2>/dev/null || WD_UP=0; WD_UP=${WD_UP%%.*}; case "$WD_UP" in ''|*[!0-9]*) WD_UP=0;; esac; }
+# One probe. WD_DP_CLASS: ok | proxy-down | dataplane-down | offline | skip (no verdict) | unavailable.
+wd_dp_probe(){
+  WD_DP_CLASS=skip; WD_DP_DETAIL=""; WD_DP_WHY=""; WD_DP_BAD=""; WD_DP_SCANNED=0
+  [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
+  case " $WD_DNS_PROTOS " in *" tcp "*) ;; *) WD_DP_CLASS=unavailable; WD_DP_WHY=dns-without-tcp; return 0;; esac
+  has nc || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-nc; return 0; }
+  WD_HTTP_TIMEOUT=3
+  # No answer at all is the DNS listener probe's business.
+  wd_resolve "$WD_DP_HOST" || { WD_DP_DETAIL="no DNS answer for $WD_DP_HOST"; return 0; }
+  WDP_IP="$WD_RES_IP"
+  wd_in_cidr "$WDP_IP" "$WD_FAKE4" || { WD_DP_CLASS=unavailable; WD_DP_WHY="$WD_DP_HOST-real-ip-$WDP_IP"; return 0; }
+  wd_fetch "$WDP_IP" "$WD_DP_HOST" "$WD_DP_PATH"; WDP_RC=$?
+  [ "$WDP_RC" != 2 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-http-tool; return 0; }
+  [ "$WDP_RC" != 0 ] || { WD_DP_CLASS=ok; return 0; }
+  WD_DP_DETAIL="$WD_DP_HOST via $WDP_IP no answer"
+  # The network itself: DIRECT through the core, no proxy node and no TPROXY involved.
+  if [ "$WD_EG_ON" = 1 ]; then
+    WDP_DIRECT=1
+    for WDP_U in $WD_DIRECT_URLS; do wd_delay DIRECT "$WDP_U" && { WDP_DIRECT=0; break; }; done
+    [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
+    [ "$WDP_DIRECT" = 0 ] || { WD_DP_CLASS=offline; WD_DP_DETAIL="$WD_DP_DETAIL; DIRECT fails too"; return 0; }
+  fi
+  # A CN host the core answers with a fake IP: TPROXY -> core -> (normally) DIRECT.
+  WDP_CN=""
+  for WDP_H in $WD_DP_CN_HOSTS; do
+    wd_resolve "$WDP_H" && wd_in_cidr "$WD_RES_IP" "$WD_FAKE4" || continue
+    if wd_fetch "$WD_RES_IP" "$WDP_H" /; then WDP_CN=ok; else WDP_CN=fail; fi
+    WD_DP_DETAIL="$WD_DP_DETAIL; $WDP_H via $WD_RES_IP $WDP_CN"; break
+  done
+  wd_scan_groups
+  # The controller refused the secret meanwhile: no verdict to act on.
+  [ "$WD_EG_ON" = 1 ] || { WD_DP_CLASS=unavailable; WD_DP_WHY=no-controller; return 0; }
+  [ -z "$WD_DP_BAD" ] || WD_DP_DETAIL="$WD_DP_DETAIL; no answer through $WD_DP_BAD"
+  WD_DP_CLASS=$(wd_dp_classify "$WDP_CN" "$WD_DP_BAD" "$WD_DP_SCANNED")
+  [ "$WD_DP_CLASS" != skip ] || WD_DP_DETAIL="$WD_DP_DETAIL; no CN host with a fake IP and every proxy group answers through the controller"
+  return 0
+}
+# $1 CN fetch through the data plane (ok | fail | empty), $2 failing groups, $3 groups measured.
+# A failing group wins (proxy-down); dataplane-down only when the CN fetch failed and no group is bad.
+wd_dp_classify(){
+  if [ -n "$2" ]; then echo proxy-down
+  elif [ "$1" = fail ]; then echo dataplane-down
+  elif [ "$1" = ok ] || [ "${3:-0}" = 0 ]; then echo proxy-down
+  else echo skip; fi
+}
+wd_egress_state(){ { printf '%s %s %s\n' "$1" "$COREPID" "$(date +%s)" > "$RUN/egress-state.new.$$" && mv -f "$RUN/egress-state.new.$$" "$RUN/egress-state"; } 2>/dev/null || true; }
+wd_repair_rules(){ "$0" repair-network "$COREPID" >/dev/null 2>&1 || true; }
+# Dead node: close the core's connections, let url-test/fallback/load-balance groups re-measure (and
+# switch), tell the user once per outage. The core is not restarted for this: a new core reaches the
+# same node.
+wd_proxy_heal(){
+  WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
+  WPH_N=0
+  if [ -s "$WD_TMP.groups" ]; then
+    wd_budget_start
+    while IFS= read -r WPH_L; do
+      WPH_T=${WPH_L%%"$WD_TAB"*}; WPH_R=${WPH_L#*"$WD_TAB"}; WPH_G=${WPH_R%%"$WD_TAB"*}
+      case "$WPH_T" in URLTest|Fallback|LoadBalance) ;; *) continue;; esac
+      wd_budget_left || { wd_log "self-heal: group re-test stopped (${WD_BUDGET_WHY})"; break; }
+      WD_HTTP_TIMEOUT=8; wd_http GET "/group/$(wd_urlenc "$WPH_G")/delay?timeout=5000&url=$(wd_urlenc "$WD_PROXY_URL")" "$WD_TMP.act" hold </dev/null
+      rm -f "$WD_TMP.act"; WPH_N=$((WPH_N+1))
+    done < "$WD_TMP.groups"
+  fi
+  wd_log "self-heal: proxy node not responding (${WD_DP_BAD:-$WD_DP_DETAIL}); closed core connections, re-tested $WPH_N auto-select group(s)"
+  if [ "$WD_DP_NOTIFIED" = 0 ]; then
+    WD_DP_NOTIFIED=1
+    wd_notify "proxy-down ${WD_DP_BAD:-unknown}" "代理节点无响应${WD_DP_BAD:+：$WD_DP_BAD}。已断开旧连接并让自动选择的节点组重新测速切换；手动选择的节点请在河图中更换。"
+  fi
+}
+# Broken data plane (core alive, its outbounds fine, captured requests go nowhere): re-check the capture
+# rules first, then the existing restart path with its budget.
+wd_dataplane_heal(){
+  WD_DP_LEVEL=$((WD_DP_LEVEL+1))
+  if [ "$WD_DP_LEVEL" = 1 ]; then
+    wd_repair_rules
+    WD_HTTP_TIMEOUT=4; wd_http DELETE /connections "$WD_TMP.act"; rm -f "$WD_TMP.act"
+    wd_log "self-heal: data plane down ($WD_DP_DETAIL); re-checked the capture rules and closed core connections"
+    return 0
+  fi
+  if wd_restart_allowed; then
+    wd_log "self-heal: data plane still down; restarting the core"
+    if wd_restart_core; then rm -f "$RUN/watchdog.ready.$$" "$WD_TMP".*; exit 0; fi
+  else
+    wd_log "self-heal: data plane still down; restart limit reached ($WD_RESTART_MAX per ${WD_RESTART_WINDOW}s), waiting"
+  fi
+}
+wd_dataplane_tick(){
+  WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
+  wd_dp_probe; WDT_C="$WD_DP_CLASS"
+  case "$WDT_C" in
+    unavailable)
+      WD_DP_ON=0; WD_EG_AT="$WD_NOW"
+      wd_log "data-plane probe unavailable ($WD_DP_WHY); using the proxy-group delay check"; return 0;;
+    skip) return 0;;
+    ok)
+      if [ -n "$WD_DP_LAST" ] || [ "$WD_DP_LEVEL" != 0 ]; then wd_log "data-plane probe: requests through the core work again"; fi
+      WD_DP_FAIL=0; WD_DP_LAST=""; WD_DP_LEVEL=0; WD_DP_NOTIFIED=0; WD_DP_BACKOFF="$WD_EGRESS_BACKOFF"; WD_DP_NEXT=0
+      wd_egress_state ok; return 0;;
+    offline)
+      [ "$WD_DP_LAST" = offline ] || wd_log "data-plane probe: no network ($WD_DP_DETAIL); nothing to heal"
+      WD_DP_FAIL=0; WD_DP_LAST=offline; wd_egress_state offline; return 0;;
+  esac
+  if [ "$WDT_C" = "$WD_DP_LAST" ]; then WD_DP_FAIL=$((WD_DP_FAIL+1)); else WD_DP_FAIL=1; WD_DP_LAST="$WDT_C"; fi
+  wd_egress_state "$WDT_C"
+  wd_log "data-plane probe: $WDT_C ($WD_DP_DETAIL) $WD_DP_FAIL/$WD_DP_LIMIT"
+  WD_DP_AT=$((WD_NOW+WD_DP_RETRY))
+  [ "$WD_DP_FAIL" -ge "$WD_DP_LIMIT" ] || return 0
+  WD_DP_FAIL=0; WD_DP_AT=$((WD_NOW+WD_DP_EVERY))
+  if [ "$WD_NOW" -lt "$WD_DP_NEXT" ]; then wd_log "data-plane probe: $WDT_C persists; next self-heal action in $((WD_DP_NEXT-WD_NOW))s (backoff)"; return 0; fi
+  WD_DP_NEXT=$((WD_NOW+WD_DP_BACKOFF)); WD_DP_BACKOFF=$((WD_DP_BACKOFF*2)); [ "$WD_DP_BACKOFF" -le "$WD_EGRESS_BACKOFF_MAX" ] || WD_DP_BACKOFF="$WD_EGRESS_BACKOFF_MAX"
+  if [ "$WDT_C" = proxy-down ]; then wd_proxy_heal; else wd_dataplane_heal; fi
 }
 watchdog(){
   COREPID="$1"; KILL="$2"; S="$3"; UIDS="$4"; SHARE="$5"; CIDRS="$6"; IFACES="$7"; DUIDS="$8"; DGIDS="${9:-}"; MACS="${10:-}"; WD_GENERATION="${11:-}"
@@ -2886,7 +3255,7 @@ start(){
     atomic_kill_guard 6 "$START_SCOPE" "$START_UIDS" "$START_SHARE" "$START_CIDRS" "$START_IFACES" "$START_DIRECT_UIDS" "$START_DIRECT_GIDS" "$START_SHARED_MACS" || fail "IPv6 启动保护安装失败"
   fi
   start_stage "cleanup-network"
-  stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
+  fake_reject_remove; stopwatchdog; cleanup; restorev6 || fail "上次 IPv6 状态尚未恢复，请重试停止后再启动"
   net_sysctl_restore
   start_stage "stop-old-core"
   stopcore || fail "旧核心未确认退出"; rm -f "$CRASH_STATE" "$SESSION"
@@ -2986,6 +3355,7 @@ start(){
   start_monitor >/dev/null 2>&1 || printf '%s monitor not started\n' "$(date '+%Y-%m-%dT%H:%M:%S%z')" >> "$WATCHDOG_LOG" 2>/dev/null || true
   rm -f "$START_ERROR"; start_stage "running"
   START_ACTIVE=0
+  net_recover_async start
   DESC="systemDns=$SYSTEM_DNS,tcp=$START_TCP,udp=$START_UDP,dns=$START_DNS,ipv6=$START_V6,scope=$START_SCOPE,share=$START_SHARE,kill=$START_KILL,quicBlock=$START_QUIC,directUids=$START_DIRECT_UIDS,directGids=$START_DIRECT_GIDS,sharedMacs=$START_SHARED_MACS,sharedIfaces=$SHR_IFACES,sharedMacMode=$SHR_MODE,ebpf=$EBPF_STATE${EBPF_REASON:+,ebpfReason=$EBPF_REASON}"
   if [ -n "$MARK" ]; then ok "Root $START_MODE 已启动（$DESC，mark=$MARK，table=$TABLE）"; else ok "Root $START_MODE 已启动（$DESC）"; fi
 }
@@ -3197,7 +3567,9 @@ status(){
     if { [ "$CN4_ON" = 1 ] && ! cnip_set_exists "$CN_SET4"; } || { [ "$CN6_ON" = 1 ] && ! cnip_set_exists "$CN_SET6"; }; then CNIP_STATE=degraded; CNIPR="${CNIPR:+$CNIPR,}set-missing"; fi
   fi
   ebpf_load_session; [ "$EBPF_STATE" != active ] || [ -d "$EBPF_PIN" ] || EBPF_REASON=pins-missing
-  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON"
+  # Latest data-plane probe verdict of this core (ok | proxy-down | dataplane-down | offline), else empty.
+  EGV=""; if [ "$STATUS_RUNNING" = true ] && [ -r "$RUN/egress-state" ]; then EGV=$(awk -v p="$STATUS_PID" '$2 == p {print $1; exit}' "$RUN/egress-state" 2>/dev/null | tr -cd 'a-z-'); fi
+  printf '{"ok":true,"runtimeSchema":4,"networkIntegrity":"%s","networkFault":"%s","running":%s,"pid":%s,"mode":"%s","ipv4Rules":%s,"ipv6Rules":%s,"ipv6Mode":"%s","ipv6DisableGuard":%s,"dnsMode":"%s","ipv6DnsPolicy":"%s","dnsIpv4Rule":%s,"dnsIpv6Rule":%s,"dnsListenerReady":%s,"dataPlaneHealthy":%s,"killSwitchActive":%s,"ipv6DisabledByHetu":%s,"watchdog":%s,"recoveredStaleRules":%s,"staleRules":%s,"mark":"%s","table":"%s","pref":"%s","controllerPort":%s,"appScope":"%s","directUidRanges":"%s","directGidRanges":"%s","sharedBypassMacs":"%s","sharedNetwork":"%s","killSwitchRequested":"%s","systemDns":"%s","coreGroup":"%s","dotGuard":%s,"privateDns":"%s","vendorFirewall":"%s","vendorFirewallDetail":"%s","tuning":"%s","log":"%s","configCheckLog":"%s","cnip":"%s","cnipReason":"%s","cnipV4Entries":%s,"cnipV6Entries":%s,"cnipTcpOnly":%s,"sharedScoped":%s,"sharedInterfaces":"%s","sharedMacMode":"%s","sharedOnlyMacs":"%s","sharedDroppedInterfaces":"%s","ebpf":"%s","ebpfReason":"%s","egress":"%s"}\n' "$H_STATE" "$H_REASON" "$STATUS_RUNNING" "$STATUS_PID" "$STATUS_MODE" "$IPV4OK" "$IPV6OK" "$IPV6V" "$DISABLE6" "$DNSV" "$DNS6POLICY" "$DNS4" "$DNS6" "$DNSREADY" "$HEALTH" "$([ "$K4" = true ] || [ "$K6" = true ] && echo true || echo false)" "$V6OFF" "$WD" "$STATUS_HEALED" "$STALE" "$SM" "$ST" "$SP" "$CPV" "$SCOPEV" "$DIRECTV" "$DIRECTGIDV" "$SHAREMACV" "$SHAREV" "$KILLV" "$SYSDNSV" "$COREGIDV" "$DOTV" "$PDNSV" "$GFV" "$GFDV" "$TUNEV" "$LOG" "$CHECKLOG" "$CNIP_STATE" "$CNIPR" "$CNIP4N" "$CNIP6N" "$([ "$CNIP_STATE" = ipset ] && [ "$CN_TCPONLY" = 1 ] && echo true || echo false)" "$([ "$SHR_SCOPED" = 1 ] && echo true || echo false)" "$SHR_IFACES" "$SHR_MODE" "$SHR_ONLY" "$SHR_DROPPED" "$EBPF_STATE" "$EBPF_REASON" "$EGV"
 }
 
 # Session-bound network integrity. No remote reachability failure restarts the core.
@@ -3979,6 +4351,11 @@ case "${1:-status}" in
   # also asks the watchdog to re-verify that the core answers, not only the rules.
   repair-network) [ "$#" = 2 ] || exit 1; root; [ -n "${HETU_WATCHDOG_CALL:-}" ] || { : > "$RUN/liveness.kick"; } 2>/dev/null || true; health_repair "$2";;
   monitor) [ "$#" = 2 ] || exit 0; root; monitor_main "$2";;
+  # 3.0.0 system-side recovery (stop/start spawn it detached), probe URL discovery for the App, and the
+  # end of the post-stop fake-IP reset window.
+  net-recover) [ "$#" = 2 ] || exit 0; root; net_recover "$2";;
+  probe-urls) [ "$#" = 1 ] || fail "参数错误"; root; probe_urls;;
+  fake-reject-expire) [ "$#" = 2 ] || exit 0; root; fake_reject_expire "$2";;
   monitor-status) root; monitor_status_json;;
   monitor-ensure) [ "$#" = 1 ] || fail "参数错误"; root; monitor_ensure;;
   traffic-take) [ "$#" = 1 ] || fail "参数错误"; root; traffic_take;;

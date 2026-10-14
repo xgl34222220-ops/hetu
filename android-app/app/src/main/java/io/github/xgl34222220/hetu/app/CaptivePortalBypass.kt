@@ -15,10 +15,24 @@ import java.util.Locale
  * Hosts: the probe hosts the AOSP/Xiaomi/Qualcomm ROMs use that answer from mainland China, plus the
  * hosts of Settings.Global captive_portal_*_url. Google search hosts (google.com, android.com) are
  * never sent DIRECT: that would cut off Google for users who need the proxy to reach it.
+ *
+ * 3.0.0 (real-device diagnostic on ColorOS / OnePlus PLK110): NetworkMonitor there probes
+ * conn-service-cn-0N.allawntech.com, www.google.cn and www.googleapis.cn, none of which were bypassed, so a
+ * stalled proxy node made Wi-Fi "无法连接到网络" for the whole phone. [validationEntries] therefore adds a
+ * vendor-independent list for every ROM: [EXTRA_HOSTS] (exact) and [DEFAULT_SUFFIXES] (written "+.domain",
+ * every subdomain: fake-ip-filter '+.domain', rule DOMAIN-SUFFIX,domain,DIRECT), plus probe URLs read as Root
+ * from device_config / dumpsys / logcat when available. Only the probe host connectivitycheck.android.com
+ * goes DIRECT, never android.com, google.com, googleapis.com or youtube.com.
  */
 object CaptivePortalBypass {
     /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
     @JvmField val DEFAULT_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_HOSTS.toList()
+
+    /** Exact probe hosts of other ROMs (AdblockDnsPolicy.VALIDATION_PROBE_EXTRA_HOSTS). */
+    @JvmField val EXTRA_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_EXTRA_HOSTS.toList()
+
+    /** Probe domains taken with every subdomain (AdblockDnsPolicy.VALIDATION_PROBE_SUFFIXES). */
+    @JvmField val DEFAULT_SUFFIXES: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_SUFFIXES.toList()
 
     /** Settings.Global keys whose URLs name the probe hosts. */
     @JvmField val SETTINGS_KEYS: List<String> = listOf(
@@ -35,6 +49,23 @@ object CaptivePortalBypass {
         val out = LinkedHashSet(DEFAULT_HOSTS)
         settingValues?.forEach { value ->
             value?.split(',')?.forEach { url -> host(url)?.let { out.add(it) } }
+        }
+        return out.toList()
+    }
+
+    /**
+     * Everything the Root start bypasses: defaults, [EXTRA_HOSTS], [DEFAULT_SUFFIXES] as "+.domain", then the
+     * hosts of [settingValues] (Settings.Global values and URLs discovered as Root) not already covered.
+     */
+    @JvmStatic
+    fun validationEntries(settingValues: Collection<String?>?): List<String> {
+        val out = LinkedHashSet<String>()
+        out.addAll(DEFAULT_HOSTS)
+        out.addAll(EXTRA_HOSTS)
+        DEFAULT_SUFFIXES.forEach { out.add("+.$it") }
+        for (h in hosts(settingValues)) {
+            if (DEFAULT_SUFFIXES.any { h == it || h.endsWith(".$it") }) continue
+            out.add(h)
         }
         return out.toList()
     }
@@ -141,14 +172,17 @@ object CaptivePortalBypass {
         val out = StringBuilder()
         for (i in lines.indices) {
             out.append(if (i == index && rest == "[]") "rules:" else lines[i])
-            if (i == index) for (h in hosts) out.append('\n').append(listIndent).append("- DOMAIN,").append(h).append(",DIRECT")
+            if (i == index) for (h in hosts) {
+                if (h.startsWith("+.")) out.append('\n').append(listIndent).append("- DOMAIN-SUFFIX,").append(h.substring(2)).append(",DIRECT")
+                else out.append('\n').append(listIndent).append("- DOMAIN,").append(h).append(",DIRECT")
+            }
             if (i < lines.size - 1) out.append('\n')
         }
         return Result(out.toString(), "inserted")
     }
 
     private fun entries(hosts: List<String>, rule: Boolean): List<String> =
-        if (rule) hosts.map { "DOMAIN,$it,real-ip" } else hosts
+        if (rule) hosts.map { if (it.startsWith("+.")) "DOMAIN-SUFFIX,${it.substring(2)},real-ip" else "DOMAIN,$it,real-ip" } else hosts
 
     /* ------------------------------ YAML helpers (same conventions as WechatTransport) ------------------------------ */
 
