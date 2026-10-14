@@ -80295,7 +80295,7 @@ index 0000000..f6bad29
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt
 new file mode 100644
-index 0000000..337baa0
+index 0000000..ff84c01
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt
 @@ -0,0 +1,386 @@
@@ -80682,12 +80682,12 @@ index 0000000..337baa0
 +        }
 +        val table = source("ui/HetuLanguage.kt")
 +        assertTrue(table.contains("private val vocabularyAudit4Func = \"\"\""))
-+        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Func).joinToString"))
++        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func).joinToString"))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt
 new file mode 100644
-index 0000000..e85c10d
+index 0000000..cd25ec1
 --- /dev/null
 +++ b/android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt
 @@ -0,0 +1,230 @@
@@ -80918,7 +80918,7 @@ index 0000000..e85c10d
 +        assertEquals("Set secret", translateHetuText("设置密钥", "en"))
 +        assertEquals("上次啟動失敗", translateHetuText("上次启动失败", "zh-TW"))
 +        val table = source("ui/HetuLanguage.kt")
-+        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Ui).joinToString"))
++        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Ui, "))
 +    }
 +}
 diff --git a/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt b/android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt

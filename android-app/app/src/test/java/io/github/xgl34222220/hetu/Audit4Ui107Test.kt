@@ -225,6 +225,6 @@ class Audit4Ui107Test {
         assertEquals("Set secret", translateHetuText("设置密钥", "en"))
         assertEquals("上次啟動失敗", translateHetuText("上次启动失败", "zh-TW"))
         val table = source("ui/HetuLanguage.kt")
-        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Ui).joinToString"))
+        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Ui, "))
     }
 }

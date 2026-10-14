@@ -381,6 +381,6 @@ class Audit4Func107Test {
         }
         val table = source("ui/HetuLanguage.kt")
         assertTrue(table.contains("private val vocabularyAudit4Func = \"\"\""))
-        assertTrue(table.contains("vocabularyLastGood, vocabularyAudit4Func).joinToString"))
+        assertTrue(table.contains("vocabularyAudit4Ui, vocabularyAudit4Func).joinToString"))
     }
 }

@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "721728758d53eb690591d0f11ff3817ec96bf9f79245254e9b58c4c2edb9c185",
+  "patchSha256": "6b6d881ed40a4db2b4a9ac9a996d39ead985c9d5b1ded03fd1065a6b44c511f6",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -600,8 +600,8 @@
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/AdblockProbe93Test.kt": "9d1613b5013b8d74e92a4edc94cb53b79f393823372645b1bc9f8cc43f43f9cb",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Settings107Test.kt": "9481bba7dcf0dcfe14dffa06b52370f2f6e74e5529df4b3860f6973d584330e4",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit3Ui107Test.kt": "1175fa2fb216092256a7c0629e50f181a0d530e5ac26a4f22f74bba286a7c198",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt": "b10f8d0d419c6a75b9e6cbfe1ad4331fd6115f4d871fc1a9e0ae023ccc6506b6",
-    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt": "eff7ddc191cfa78da1623b2542bc03334cf3b121cd82ca46e53324952690b36b",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Func107Test.kt": "1c58639d26b12758ceb13552afa09a4470dc3192f270a171f10db48e24366f38",
+    "android-app/app/src/test/java/io/github/xgl34222220/hetu/Audit4Ui107Test.kt": "befb278c5dda7f4a2bbc367261f6414e0cfe9a55df101cf54010fd48fcc7dfef",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/BootRecoverySafety93Test.kt": "d80929b139ae0abc95ba422d5c0c71e4a4bb7505bfa0ad81a576c640fb03a6d8",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConceptStateCoverageTest.kt": "c0705d3e07febf290c7d0ea5ab2184e22330a0253d9d122b18c3da03995fef5a",
     "android-app/app/src/test/java/io/github/xgl34222220/hetu/ConfigHygiene103Test.java": "e1be54c0a5cafb874bfebed081a08e6e167dd5e37ff1ea8ede8e53dcc48ca7c4",
