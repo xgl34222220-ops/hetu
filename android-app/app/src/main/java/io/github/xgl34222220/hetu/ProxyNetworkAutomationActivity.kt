@@ -4,7 +4,6 @@ import androidx.compose.ui.text.AnnotatedString
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomeRowLayout
-import io.github.xgl34222220.hetu.home.HomeStatusDot
 import io.github.xgl34222220.hetu.home.HomePill
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.LocalHomeColors
@@ -210,15 +209,22 @@ internal fun HxNetworkMatchScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     val owns = daemon?.ownsNetworkMatch() == true
                     HomeRowLayout(
                         AnnotatedString(ht("Root 守护")),
+                        // Audit4 U10: the same pill language as 当前环境 above, and every line through ht().
                         subtitle = when {
-                            daemon == null -> "代理运行时由 Root 守护执行匹配，App 被杀也不中断"
-                            owns -> "正在执行网络匹配" + (daemon?.lastAction?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "")
-                            daemon?.alive == true -> "运行中（未启用网络匹配）"
-                            else -> "未运行：由 App 前台服务执行匹配"
+                            daemon == null -> ht("代理运行时由 Root 守护执行匹配，App 被杀也不中断")
+                            owns -> ht("正在执行网络匹配") + (daemon?.lastAction?.takeIf { it.isNotBlank() }?.let { "：$it" } ?: "")
+                            daemon?.alive == true -> ht("运行中（未启用网络匹配）")
+                            else -> ht("未运行：由 App 前台服务执行匹配")
                         },
                         icon = HxIcons.Radio,
                         iconTint = home.accent,
-                        trailing = { HomeStatusDot(if (owns) home.good else home.t3, pulse = owns) },
+                        trailing = {
+                            when {
+                                owns -> HomePill(ht("执行中"), tone = HomeTone.Good)
+                                daemon?.alive == true -> HomePill(ht("待命"), tone = HomeTone.Neutral)
+                                daemon != null -> HomePill(ht("未运行"), tone = HomeTone.Neutral)
+                            }
+                        },
                     )
                 }
             }

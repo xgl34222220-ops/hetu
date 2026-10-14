@@ -73,5 +73,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning,
         onStartLastGood = vm::startLastGood,
+        onOpenControllerKey = vm::openPanelApi,
+        onOpenDiagnostics = { vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Diag) },
     )
 }

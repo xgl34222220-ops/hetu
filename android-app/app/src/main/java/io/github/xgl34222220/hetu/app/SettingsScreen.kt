@@ -611,9 +611,10 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
     val tileShape = RoundedCornerShape(18.dp)
     Row(Modifier.fillMaxWidth().selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         listOf(
-            Triple("system", ht("跟随系统"), ht("与系统设置保持一致")),
-            Triple("light", ht("浅色模式"), ht("始终使用浅色主题")),
-            Triple("dark", ht("深色模式"), ht("始终使用深色主题")),
+            // Audit4 U13: one short line under each title instead of three lines repeating it.
+            Triple("system", ht("跟随系统"), ht("随系统切换")),
+            Triple("light", ht("浅色模式"), ht("始终浅色")),
+            Triple("dark", ht("深色模式"), ht("始终深色")),
         ).forEach { (value, label, note) ->
             val active = selected == value
             val source = remember { MutableInteractionSource() }
@@ -646,7 +647,7 @@ internal fun SettingsThemeModeChoices(selected: String, onSelect: (String) -> Un
                 Spacer(Modifier.height(10.dp))
                 Text(label, color = c.t1, style = HomeType.noteStrong.copy(fontSize = 15.sp, fontWeight = FontWeight.Bold), maxLines = 2, textAlign = TextAlign.Center)
                 Spacer(Modifier.height(2.dp))
-                Text(note, color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 2, textAlign = TextAlign.Center)
+                Text(note, color = c.t2, style = HomeType.badge.copy(fontWeight = FontWeight.Medium), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
             }
         }
     }
@@ -778,7 +779,7 @@ internal fun HxThemeLabScreen(vm: HetuViewModel, onBack: () -> Unit) {
                     SettingsDivider()
                     SettingsSwitchRow(ht("悬浮底栏"), floating, { setBool("floatingBottomBar", it) }, subtitle = ht("关闭后底栏吸附屏幕底部"), icon = HxIcons.PanelBottom)
                     SettingsDivider()
-                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht("为底栏加入通透的折射与高光"), icon = HxIcons.Sparkles, enabled = blur)
+                    SettingsSwitchRow(ht("底栏液态玻璃"), liquid, { setBool("liquidGlass", it) }, subtitle = ht(if (blur) "为底栏加入通透的折射与高光" else "需先开启模糊效果"), icon = HxIcons.Sparkles, enabled = blur)
                 }
             }
         }

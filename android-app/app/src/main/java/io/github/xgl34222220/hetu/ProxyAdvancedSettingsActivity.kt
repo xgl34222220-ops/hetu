@@ -27,6 +27,7 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -359,7 +360,8 @@ private fun ResourceSetting(
         SettingsInput(
             value = draft, onValueChange = { draft = it }, enabled = enabled, placeholder = hint, error = error != null,
             keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-            modifier = Modifier.padding(start = start, end = HomeRowDims.end + 2.dp).onFocusChanged {
+            // Audit4 U6: a limit that is off reads as off (the value is kept for when it is turned on).
+            modifier = Modifier.padding(start = start, end = HomeRowDims.end + 2.dp).alpha(if (enabled) 1f else .38f).onFocusChanged {
                 if (focused && !it.hasFocus) commit()
                 focused = it.hasFocus
             },

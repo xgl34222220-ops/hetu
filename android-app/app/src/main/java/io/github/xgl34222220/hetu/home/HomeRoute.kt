@@ -38,7 +38,8 @@ internal enum class HomeDestination { Main, IpDetail, Targets, Resource }
  * - 本机直测 › 滑杆图标 → [HomeDestination.Targets]
  * - 资源占用 card → [HomeDestination.Resource]
  * - 网速 card → 网速数据来源 sheet
- * - [HomeStatus.StartFailed] → 启动失败 sheet (dismiss calls [HomeActions.onDismissStartFailure])
+ * - [HomeStatus.StartFailed] → 启动失败 sheet. Swiping it away only hides it (audit4 U4): the home page keeps a
+ *   「查看原因」 strip until the next start or its ×, which calls [HomeActions.onDismissStartFailure].
  *
  * @param onDetailVisibleChange true while a sub-page is shown; use it to hide the dock and to let
  *        the shell's own BackHandler stand down (same idea as `panelDetailVisible` in RefProxyShell).
@@ -57,6 +58,9 @@ internal fun HomeRoute(
     var destination by rememberSaveable { mutableStateOf(HomeDestination.Main) }
     var ipSide by rememberSaveable { mutableStateOf(HomeNetSide.Wan) }
     var speedSheet by rememberSaveable { mutableStateOf(false) }
+    val failure = state.status as? HomeStatus.StartFailed
+    // Hidden per failure text: a new failure opens its sheet again.
+    var failureSheetHidden by rememberSaveable(failure?.detail) { mutableStateOf(false) }
     var targets by remember { mutableStateOf(HomeTargetsConfig()) }
     var feedback by remember { mutableStateOf<HomeTargetsFeedback?>(null) }
 
@@ -97,6 +101,7 @@ internal fun HomeRoute(
                 onOpenSpeedSource = { speedSheet = true },
                 contentPadding = contentPadding,
                 motion = animate,
+                onShowStartFailure = { failureSheetHidden = false },
             )
             HomeDestination.IpDetail -> HomeIpDetailScreen(
                 state = state,
@@ -147,9 +152,8 @@ internal fun HomeRoute(
         }
     }
 
-    val failure = state.status as? HomeStatus.StartFailed
-    if (failure != null && destination == HomeDestination.Main) {
-        HomeModalSheet(onDismiss = actions.onDismissStartFailure) {
+    if (failure != null && !failureSheetHidden && destination == HomeDestination.Main) {
+        HomeModalSheet(onDismiss = { failureSheetHidden = true }) {
             HomeStartFailedSheetContent(
                 detail = failure.detail,
                 lastGood = state.lastGood,

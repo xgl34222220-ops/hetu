@@ -97,7 +97,11 @@ internal fun LazyListScope.panelSubscriptionsTab(items: List<PanelSubscription>,
                             HomePill(ht("重试"), height = 30.dp, style = HomeType.buttonSmall, onClick = { onUpdate(sub.name) })
                         }
                         PanelUpdate.Idle -> {
-                            sub.remainingPercent?.let { HomePill("$it%", height = 28.dp, style = HomeType.delay.copy(fontWeight = FontWeight.Bold)) }
+                            // Audit4 U11: say which share it is (remaining, as on 首页); 10 % or less turns red like the home bar.
+                            sub.remainingPercent?.let {
+                                HomePill(ht("剩余 %d%%").fill(it), height = 28.dp, tone = if (it <= 10) HomeTone.Bad else HomeTone.Accent,
+                                    style = HomeType.delay.copy(fontWeight = FontWeight.Bold))
+                            }
                             HomeIconButton(HomeIcons.RefreshCw, "更新订阅", { onUpdate(sub.name) }, Modifier.padding(start = 2.dp).size(40.dp))
                         }
                     }

@@ -98,6 +98,9 @@ internal fun HetuHomeV2(
     lastGood: HomeLastGood? = null,
     lastGoodRunning: String? = null,
     onStartLastGood: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 设置密钥 / 诊断工具; both fall back to [onOpenNode] when the host has no deeper link. */
+    onOpenControllerKey: () -> Unit = onOpenNode,
+    onOpenDiagnostics: () -> Unit = onOpenNode,
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -163,6 +166,8 @@ internal fun HetuHomeV2(
     val dismissStartupError by rememberUpdatedState(onDismissStartupError)
     val updateProviders by rememberUpdatedState(onUpdateProviders)
     val startLastGood by rememberUpdatedState(onStartLastGood)
+    val openControllerKey by rememberUpdatedState(onOpenControllerKey)
+    val openDiagnostics by rememberUpdatedState(onOpenDiagnostics)
     val actions = remember(context, prefs) {
         HomeActions(
             onStart = { toggle() },
@@ -200,6 +205,9 @@ internal fun HetuHomeV2(
             resetTargets = { ProxyLatencyTargets.reset(prefs); loadTargets(prefs) },
             onUpdateProviders = { updateProviders() },
             onStartLastGood = { startLastGood() },
+            onOpenControllerKey = { openControllerKey() },
+            onOpenDiagnostics = { openDiagnostics() },
+            onRetryController = { refreshIp() },
         )
     }
 

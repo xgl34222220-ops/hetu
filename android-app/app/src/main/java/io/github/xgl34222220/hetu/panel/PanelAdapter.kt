@@ -585,7 +585,8 @@ internal fun NewUiPanel(vm: io.github.xgl34222220.hetu.HetuViewModel, bottom: Dp
                     .putString("panelOverviewRankSort", if (next.rankMode == PanelRankMode.Total) "traffic" else "connections")
                     .putInt("panelOverviewRankCount", next.rankCount).apply()
                 view = next
-            }, contentPadding = PaddingValues(bottom = bottom))
+            }, contentPadding = PaddingValues(bottom = bottom),
+                apiRequest = vm.panelApiRequest, onApiRequestConsumed = { vm.panelApiRequest = false })
         }
     }
 }

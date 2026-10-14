@@ -71,6 +71,7 @@ import io.github.xgl34222220.hetu.home.HomeIcons
 import io.github.xgl34222220.hetu.home.HomePill
 import io.github.xgl34222220.hetu.home.HomeTone
 import io.github.xgl34222220.hetu.home.HomeType
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.LocalHomeColors
 import io.github.xgl34222220.hetu.home.homeFloat
 import io.github.xgl34222220.hetu.home.homeRowPressTint
@@ -493,12 +494,14 @@ internal fun AboutScreen(vm: HetuViewModel) {
     val scope = rememberCoroutineScope()
     val c = LocalHomeColors.current
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
-    // Asset read stays off the main thread; the row simply shows the hash once it is known.
-    val revision by produceState("", context) {
-        value = withContext(Dispatchers.IO) {
-            runCatching { context.assets.open("mihomo-revision.txt").bufferedReader().use { it.readText().trim() } }.getOrDefault("")
-        }
+    // Asset and file reads stay off the main thread; the row fills in once they are known.
+    val bundled by produceState(HxBundledCoreInfo(), context) {
+        value = withContext(Dispatchers.IO) { HxBundledCoreVersion.read(context, vm.prefs) }
     }
+    val revision = bundled.revision
+    // Audit4 U12: a version people can read first, the source revision second.
+    val coreVersion = HxBundledCoreVersion.versionFor(bundled, vm.coreVersion)
+    LaunchedEffect(bundled, vm.coreVersion) { HxBundledCoreVersion.remember(vm.prefs, bundled, vm.coreVersion) }
 
     fun openAsset(title: String, path: String) {
         scope.launch {
@@ -566,8 +569,17 @@ internal fun AboutScreen(vm: HetuViewModel) {
         item(key = "info") {
             SettingsSection {
                 SettingsGroup(title = ht("信息")) {
-                    SettingsRow(ht("内置核心"), subtitle = "Mihomo", icon = ToolsIcons.Cpu) {
-                        if (revision.isNotBlank()) Text(revision.take(12), color = c.t3, style = HomeType.mono.copy(fontSize = 12.sp), maxLines = 1)
+                    SettingsRow(
+                        ht("内置核心"),
+                        subtitle = if (revision.isBlank()) "Mihomo" else "Mihomo · " + ht("修订 %s").fill(revision.take(7)),
+                        icon = ToolsIcons.Cpu,
+                    ) {
+                        Text(
+                            coreVersion.ifBlank { ht("启动后显示版本") },
+                            color = if (coreVersion.isBlank()) c.t3 else c.t2,
+                            style = if (coreVersion.isBlank()) HomeType.caption else HomeType.value.copy(fontWeight = FontWeight.Medium),
+                            maxLines = 1,
+                        )
                     }
                     SettingsDivider()
                     SettingsRow(ht("运行目录"), subtitle = "/data/adb/hetu", icon = ToolsIcons.Folder)

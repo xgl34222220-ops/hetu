@@ -1244,7 +1244,33 @@ private val vocabularyLastGood = """
 已用上次可启动的版本启动，源配置未修改|Started with the last working version; source config unchanged|已用上次可啟動的版本啟動，來源設定未修改|Запущена последняя рабочая версия; исходная конфигурация не изменена
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood).joinToString("\n")
+// 2026-10-14 audit4 UI: controller-error fix button, start failure kept on 首页, stopped-state placeholders,
+// switched-off settings, Root 守护 row, theme notes and the bundled core version on 关于 (U3–U6, U10–U13).
+private val vocabularyAudit4Ui = """
+设置密钥|Set secret|設定密鑰|Задать секрет
+可改用上次可启动的版本启动|You can start with the last working version instead|可改用上次可啟動的版本啟動|Можно запустить последнюю рабочую версию
+修改配置后可重新启动|Fix the config, then start again|修改設定後可重新啟動|Исправьте конфигурацию и запустите снова
+查看原因|View reason|查看原因|Причина
+忽略启动失败|Dismiss start failure|忽略啟動失敗|Скрыть ошибку запуска
+上次启动失败|Last start failed|上次啟動失敗|Последний запуск не удался
+代理未运行，启动后查询公网 IP|Proxy not running; the public IP is looked up after it starts|代理未執行，啟動後查詢公網 IP|Прокси не запущен; публичный IP определяется после запуска
+%s · 上次|%s · last|%s · 上次|%s · прошлый
+已关闭：下面的设置仍可修改，开启后生效|Off: the settings below can still be changed and apply once it is on|已關閉：下面的設定仍可修改，開啟後生效|Выключено: настройки ниже можно менять, они применятся после включения
+需先开启模糊效果|Turn on blur effects first|需先開啟模糊效果|Сначала включите размытие
+随系统切换|Follows the system|隨系統切換|Как в системе
+始终浅色|Always light|始終淺色|Всегда светлая
+始终深色|Always dark|始終深色|Всегда тёмная
+代理运行时由 Root 守护执行匹配，App 被杀也不中断|While the proxy runs, the Root daemon does the matching, even if the app is killed|代理執行時由 Root 守護執行比對，App 被終止也不中斷|Пока прокси работает, сопоставление выполняет Root-демон, даже если приложение закрыто
+正在执行网络匹配|Running network matching|正在執行網路比對|Выполняет сопоставление сетей
+运行中（未启用网络匹配）|Running (network matching off)|執行中（未啟用網路比對）|Работает (сопоставление сетей выключено)
+未运行：由 App 前台服务执行匹配|Not running: the app's foreground service does the matching|未執行：由 App 前景服務執行比對|Не запущен: сопоставление выполняет служба приложения
+执行中|Active|執行中|Активен
+待命|Standby|待命|Ожидание
+修订 %s|Revision %s|修訂 %s|Ревизия %s
+启动后显示版本|Version shown after start|啟動後顯示版本|Версия появится после запуска
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Ui).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {
