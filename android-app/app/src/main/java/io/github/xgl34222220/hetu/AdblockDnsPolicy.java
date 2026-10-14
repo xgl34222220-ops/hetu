@@ -28,6 +28,9 @@ final class AdblockDnsPolicy {
     /** Mihomo's own fake-ip-filter defaults, kept when Hetu has to create the list. */
     static final List<String> MIHOMO_DEFAULT_FAKE_IP_FILTER =
             Collections.unmodifiableList(Arrays.asList("dns.msftnsci.com", "www.msftnsci.com", "www.msftconnecttest.com"));
+    /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
+    static final List<String> VALIDATION_PROBE_HOSTS =
+            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
 
     /**
      * Domains that may be answered empty at DNS. A blocked suffix is kept out when an allow entry
@@ -46,7 +49,7 @@ final class AdblockDnsPolicy {
                 allowParents.add(a.substring(dot + 1));
         }
         // Network-validation probe hosts are never answered empty (and neither are their parents).
-        for (String probe : CaptivePortalBypass.DEFAULT_HOSTS) {
+        for (String probe : VALIDATION_PROBE_HOSTS) {
             allowSet.add(probe);
             for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
                 allowParents.add(probe.substring(dot + 1));

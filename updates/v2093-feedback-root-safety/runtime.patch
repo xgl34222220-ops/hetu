@@ -49738,10 +49738,10 @@ index 0000000..faa5a76
 +HSPLtop/yukonga/miuix/kmp/utils/MiuixIndication$MiuixIndicationInstance$onAttach$1;->invokeSuspend(Ljava/lang/Object;)Ljava/lang/Object;
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
 new file mode 100644
-index 0000000..0dfc566
+index 0000000..7aa5b84
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java
-@@ -0,0 +1,322 @@
+@@ -0,0 +1,325 @@
 +package io.github.xgl34222220.hetu;
 +
 +import java.util.*;
@@ -49772,6 +49772,9 @@ index 0000000..0dfc566
 +    /** Mihomo's own fake-ip-filter defaults, kept when Hetu has to create the list. */
 +    static final List<String> MIHOMO_DEFAULT_FAKE_IP_FILTER =
 +            Collections.unmodifiableList(Arrays.asList("dns.msftnsci.com", "www.msftnsci.com", "www.msftconnecttest.com"));
++    /** Android network-validation probe hosts (CaptivePortalBypass.DEFAULT_HOSTS): never DNS-blocked. */
++    static final List<String> VALIDATION_PROBE_HOSTS =
++            Collections.unmodifiableList(Arrays.asList("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn"));
 +
 +    /**
 +     * Domains that may be answered empty at DNS. A blocked suffix is kept out when an allow entry
@@ -49790,7 +49793,7 @@ index 0000000..0dfc566
 +                allowParents.add(a.substring(dot + 1));
 +        }
 +        // Network-validation probe hosts are never answered empty (and neither are their parents).
-+        for (String probe : CaptivePortalBypass.DEFAULT_HOSTS) {
++        for (String probe : VALIDATION_PROBE_HOSTS) {
 +            allowSet.add(probe);
 +            for (int dot = probe.indexOf('.'); dot >= 0 && dot < probe.length() - 1; dot = probe.indexOf('.', dot + 1))
 +                allowParents.add(probe.substring(dot + 1));
@@ -60966,10 +60969,10 @@ index 0000000..b779c0c
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
 new file mode 100644
-index 0000000..404f046
+index 0000000..7b8ce79
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt
-@@ -0,0 +1,225 @@
+@@ -0,0 +1,226 @@
 +package io.github.xgl34222220.hetu
 +
 +import java.util.Locale
@@ -60989,7 +60992,8 @@ index 0000000..404f046
 + * never sent DIRECT: that would cut off Google for users who need the proxy to reach it.
 + */
 +object CaptivePortalBypass {
-+    @JvmField val DEFAULT_HOSTS: List<String> = listOf("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn")
++    /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
++    @JvmField val DEFAULT_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_HOSTS.toList()
 +
 +    /** Settings.Global keys whose URLs name the probe hosts. */
 +    @JvmField val SETTINGS_KEYS: List<String> = listOf(

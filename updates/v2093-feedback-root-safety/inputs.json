@@ -212,7 +212,7 @@
     "updates/v2092-rule-mode-continuity/inputs.json": "51cb6b1ebb37a5b7879fdd7c780741552cbe9a7b2bad69e717221124cc122213",
     "updates/v2092-rule-mode-continuity/runtime.patch": "054856ab79f5be356eac7a7be03f2c5990f9fa1b24bc5156d0a27b6a5f79034e"
   },
-  "patchSha256": "5250c956d1d1643e9eeed5d07b4198f7220eb4b6d90db51d3ab2f64824957208",
+  "patchSha256": "5bfe53d65c0adfde30964b40109e75ccd26813205bef83dd48cedd388e8bbce6",
   "authorizedFiles": [
     "android-app/app/build.gradle.kts",
     "android-app/app/proguard-rules.pro",
@@ -436,7 +436,7 @@
     "android-app/app/src/main/assets/hetu-root.sh": "3c5bfc8b9422325b1259199c5f3ba8438c34ffa8b3c9b8c75ab41ffb3f8bac47",
     "android-app/app/src/main/assets/licenses/china-operator-ip.txt": "8091a04f3f0478d860381a3da277677f8f162597f2f8855888b4cd985c80bed2",
     "android-app/app/src/main/baseline-prof.txt": "a7357e8b7dc27bfde749eedfdfa13aa8547c0287a3b1f1dd3830e6c0a4683c22",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "107d23f15a63c5e076d9568f39d04d70663668849d9b056dcb2f3f55fb135b19",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/AdblockDnsPolicy.java": "c4bd1682c34d93c465594843354cb02cb17d44e335af329c7ddeba77d4336392",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/BundledCoreTemplates.java": "959505c17ac7bfe28f4a88c5b54e3323c11090c27e9e30b43a5b775bfabdc6f6",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/ConfigReferenceCleaner.java": "42abec6c799194e627bc640d841d47b7417b7dd723b1251298f0f5f21329ad9b",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/CoreJson.java": "7e3f1b5995259b94e9fcf8fca0924b452d9d8d1b1d4dadd33cb19b31ab711fb6",
@@ -476,7 +476,7 @@
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ActivityExtras.kt": "aac07397903d5bdaf3fefbc1bd5793a321867035baedf8455d3e9f344917745c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockScreen.kt": "f54948096336f366d2ed9f9f5430c879fc559bf6490138bb01e00d924a73c5f9",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/AdblockVerification.kt": "227d0e04ea02a1ee52b457cb6a602989b906ddb60cd1956560dc13303327626c",
-    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt": "609bd8c4214f6b507d03a23fb59888ed4e10bd4da8075cbcdca03524e3dc86d0",
+    "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/CaptivePortalBypass.kt": "92e2c2ed26bae7b0031ac27048e70a228d0eda3bb9d12f252351c0ca45af94a4",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigScreens.kt": "e9fd29d82c74f3ced15d3cec8a81ee9df18274317673abb73925e75d9587911c",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConfigTransaction.kt": "9640bff23128a1daa0c51979a254a26e6116e4d370fca5e1c45a5abd0846891a",
     "android-app/app/src/main/java/io/github/xgl34222220/hetu/app/ConnectionsScreen.kt": "38ee506fbcf58f868c3844776642cd688ef403c69b660d0f7a34a598fc6276c3",

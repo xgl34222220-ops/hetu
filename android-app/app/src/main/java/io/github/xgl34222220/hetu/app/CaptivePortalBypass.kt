@@ -17,7 +17,8 @@ import java.util.Locale
  * never sent DIRECT: that would cut off Google for users who need the proxy to reach it.
  */
 object CaptivePortalBypass {
-    @JvmField val DEFAULT_HOSTS: List<String> = listOf("connectivitycheck.gstatic.com", "connect.rom.miui.com", "www.qualcomm.cn")
+    /** Same list as AdblockDnsPolicy.VALIDATION_PROBE_HOSTS (that pure-Java class is also compiled alone by host tests). */
+    @JvmField val DEFAULT_HOSTS: List<String> = AdblockDnsPolicy.VALIDATION_PROBE_HOSTS.toList()
 
     /** Settings.Global keys whose URLs name the probe hosts. */
     @JvmField val SETTINGS_KEYS: List<String> = listOf(
