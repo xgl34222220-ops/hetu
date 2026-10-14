@@ -299,7 +299,32 @@ internal class HomeActions(
     val onUpdateProviders: () -> Unit = {},
     /** Audit G1: 「用上次可启动的版本启动」 in the start-failure sheet. */
     val onStartLastGood: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 设置密钥 — 面板 › 策略 with the 测速与 API sheet open. */
+    val onOpenControllerKey: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 诊断工具 (the local credential does not match the running core). */
+    val onOpenDiagnostics: () -> Unit = {},
+    /** Audit4 U3: 控制接口异常 › 重试 — read the controller again now. */
+    val onRetryController: () -> Unit = {},
 )
+
+/**
+ * Audit4 U3: what the 控制接口异常 banner offers, read from the controller error the shell composes
+ * (ProxyComposeController / MihomoControllerClient wording). A custom API answering 401, or any 403,
+ * is fixed in 测速与 API (address, port, secret); a local 401 means the app credential does not match
+ * the running core, which 诊断工具 explains; anything else (timeout, refused, 5xx) is worth a retry.
+ */
+internal enum class HomeControllerFix(val label: String) {
+    ApiSettings("设置密钥"),
+    Diagnostics("诊断工具"),
+    Retry("重试"),
+}
+
+internal fun homeControllerFix(error: String): HomeControllerFix = when {
+    "403" in error -> HomeControllerFix.ApiSettings
+    "401" in error && "自定义" in error -> HomeControllerFix.ApiSettings
+    "401" in error -> HomeControllerFix.Diagnostics
+    else -> HomeControllerFix.Retry
+}
 
 /* ------------------------------------------------------------------ */
 /*  Formatting                                                          */

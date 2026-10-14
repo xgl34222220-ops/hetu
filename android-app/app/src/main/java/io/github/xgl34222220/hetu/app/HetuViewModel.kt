@@ -91,6 +91,15 @@ internal class HetuViewModel(application: Application) : AndroidViewModel(applic
         tabState = HxTab.Panel
     }
 
+    /** Audit4 U3: one-shot request for 面板 › 策略 to open its 测速与 API sheet (consumed by PanelRoute). */
+    var panelApiRequest by mutableStateOf(false)
+
+    /** Audit4 U3: 首页 控制接口异常 › 设置密钥. */
+    fun openPanelApi() {
+        openPanel("proxies")
+        panelApiRequest = true
+    }
+
     fun setDefaultPanelSection(section: String) {
         val value = section.takeIf { key -> HxPanelSections.any { it.first == key } } ?: "overview"
         prefs.edit().putString("defaultPanelSection", value).apply()

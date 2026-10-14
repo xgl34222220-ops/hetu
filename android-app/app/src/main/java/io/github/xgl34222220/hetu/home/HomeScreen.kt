@@ -92,6 +92,8 @@ internal fun HomeScreen(
     modifier: Modifier = Modifier,
     contentPadding: PaddingValues = PaddingValues(bottom = HomeDims.dockClearance),
     motion: Boolean = true,
+    /** Audit4 U4: reopens the 启动失败 sheet after it was swiped away. */
+    onShowStartFailure: () -> Unit = {},
 ) {
     val c = LocalHomeColors.current
     // The 1 s traffic sample and the resource samples only feed two cards. Every other card
@@ -150,8 +152,14 @@ internal fun HomeScreen(
             HomeHeroCard(calm, actions, animate, Modifier.homeEnter(stagger, 0))
             HomeControlCard(calm, actions, Modifier.padding(top = HomeDims.gap).homeEnter(stagger, 1))
             if (state.status.isLive && state.connection.health == HomeConnectionHealth.ControllerUnavailable) {
+                // Audit4 U3: the button names the fix (secret, diagnostics or a plain retry), not just 「面板」.
+                val fix = homeControllerFix(state.connection.controllerError)
                 HomeNotice(state.connection.controllerError.ifBlank { ht("控制接口异常 · 连接状态未确认") }, HomeIcons.TriangleAlert,
-                    Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = "面板", onAction = actions.onOpenNode)
+                    Modifier.padding(top = 10.dp), tone = HomeTone.Bad, actionLabel = fix.label, onAction = when (fix) {
+                        HomeControllerFix.ApiSettings -> actions.onOpenControllerKey
+                        HomeControllerFix.Diagnostics -> actions.onOpenDiagnostics
+                        HomeControllerFix.Retry -> actions.onRetryController
+                    })
             } else if (state.status.isLive && state.connection.health == HomeConnectionHealth.TakeoverDegraded && state.connection.runtimeMessage.isNotBlank()) {
                 HomeNotice(state.connection.runtimeMessage, HomeIcons.TriangleAlert, Modifier.padding(top = 10.dp), tone = HomeTone.Warn)
             }
@@ -168,6 +176,16 @@ internal fun HomeScreen(
                     height = 44.dp,
                     corner = 22.dp,
                     textStyle = HomeType.button,
+                )
+            }
+            // Audit4 U4: a failed start stays visible after its sheet is closed, until the next start or ×.
+            // Never at the same time as the 上次可启动 strip below (that one needs a live core).
+            HomeReveal(state.status is HomeStatus.StartFailed) {
+                HomeNotice(
+                    ht(if (state.lastGood != null) "可改用上次可启动的版本启动" else "修改配置后可重新启动"),
+                    HomeIcons.CircleAlert, Modifier.padding(top = 10.dp).testTag("home-start-failed-notice"), tone = HomeTone.Bad,
+                    actionLabel = "查看原因", onAction = onShowStartFailure,
+                    onClose = actions.onDismissStartFailure, closeLabel = "忽略启动失败",
                 )
             }
             // Audit G1: the session runs from the 「上次可启动」 copy, not from the (failing) source file.
@@ -266,7 +284,8 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
         is HomeStatus.Running -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
         is HomeStatus.PendingRestart -> ht("已运行 %s").fill(homeUptimeText(status.uptimeSeconds))
         HomeStatus.Starting, HomeStatus.Restarting, HomeStatus.Stopping -> state.statusDetail?.takeIf { it.isNotBlank() }?.let { ht(it) } ?: ht("请稍候…")
-        HomeStatus.NotRunning, is HomeStatus.StartFailed -> ht("尚未启动代理")
+        HomeStatus.NotRunning -> ht("尚未启动代理")
+        is HomeStatus.StartFailed -> ht("上次启动失败")
     }
     val tint by animateColorAsState(
         when (glyph) {
@@ -294,7 +313,7 @@ private fun HomeHeroCard(state: HomeUiState, actions: HomeActions, motion: Boole
                 HomeStatusDot(if (status is HomeStatus.PendingRestart && glyph == HomeGlyphMode.On) c.warn else tint, size = 10.dp, pulse = glyph == HomeGlyphMode.On)
                 HomeRollingText(title, c.t1, HomeType.heroStatus, alignment = Alignment.CenterStart)
             }
-            HomeRollingText(line, c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
+            HomeRollingText(line, if (status is HomeStatus.StartFailed) c.badText else c.t1, HomeType.heroLine, Modifier.padding(top = 3.dp), alignment = Alignment.CenterStart)
             if (status is HomeStatus.Running || status is HomeStatus.PendingRestart) {
                 Text(ht(state.connection.health.caption), Modifier.padding(top = 5.dp, bottom = 3.dp).testTag("home-connection-caption"), color = c.t1,
                     style = HomeType.caption, maxLines = 2, overflow = TextOverflow.Ellipsis)
@@ -480,10 +499,12 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)) {
             state.probes.forEachIndexed { index, probe ->
                 if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(1.dp).fillMaxHeight().background(c.line2))
+                // Audit4 U5: stopped, the last saved result stays readable (dimmed, marked 上次) instead of a dash.
+                val stale = !live && probe.delayMs != null
                 Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && live) .45f else 1f), contentAlignment = Alignment.Center) {
-                        val delay = probe.delayMs.takeIf { live }
+                    Text(if (stale) ht("%s · 上次").fill(probe.name) else probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && live) .45f else if (stale) .55f else 1f), contentAlignment = Alignment.Center) {
+                        val delay = probe.delayMs
                         if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                         else HomeDelayText(delay)
                     }
@@ -578,7 +599,10 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
             HomePill(ht("详情"), height = 22.dp)
         },
     ) {
-        if (wan) {
+        if (wan && !live) {
+            // Audit4 U5: nothing is queried while the core is stopped; say so instead of two dashes.
+            MetricEmpty("代理未运行，启动后查询公网 IP", MetricEmptyShort)
+        } else if (wan) {
             val ip = state.wan.ip.takeIf { live }
             MetricLine("IP", ip, addressStyle(ip))
             when {
@@ -589,7 +613,7 @@ private fun HomeNetworkCard(state: HomeUiState, modifier: Modifier, onOpen: () -
                 else -> MetricLine("地区", null, placeholder = {
                     Icon(HomeIcons.Hourglass, null, Modifier.size(15.dp), tint = c.t2)
                     Spacer(Modifier.width(5.dp))
-                    Text(ht(if (live) "正在查询" else "等待连接"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
+                    Text(ht("正在查询"), color = c.t2, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 1)
                 })
             }
         } else {
@@ -611,8 +635,12 @@ private fun HomeSpeedCard(state: HomeUiState, modifier: Modifier, onOpen: () -> 
             Text(ht(state.speedSource.short), color = c.t3, style = HomeType.caption, maxLines = 1)
         },
     ) {
-        MetricLine("上行", state.uploadBytesPerSecond?.takeIf { live }?.let(HomeFormat::speed))
-        MetricLine("下行", state.downloadBytesPerSecond?.takeIf { live }?.let(HomeFormat::speed))
+        if (!live) {
+            MetricEmpty("代理未运行", MetricEmptyShort)
+        } else {
+            MetricLine("上行", state.uploadBytesPerSecond?.let(HomeFormat::speed))
+            MetricLine("下行", state.downloadBytesPerSecond?.let(HomeFormat::speed))
+        }
     }
 }
 
@@ -662,12 +690,15 @@ private fun HomeResourceCard(state: HomeUiState, modifier: Modifier, onOpen: () 
 
 /** Stands in for two metric lines and their bar (same 75 dp) when there is nothing to show. */
 @Composable
-private fun MetricEmpty(text: String) {
+private fun MetricEmpty(text: String, height: Dp = 75.dp) {
     val c = LocalHomeColors.current
-    Box(Modifier.fillMaxWidth().height(75.dp), contentAlignment = Alignment.CenterStart) {
+    Box(Modifier.fillMaxWidth().height(height), contentAlignment = Alignment.CenterStart) {
         Text(ht(text), color = c.t3, style = HomeType.rowSub.copy(fontSize = 15.sp), maxLines = 2, overflow = TextOverflow.Ellipsis)
     }
 }
+
+/** Two [MetricLine]s without a bar (2 × 30 dp): the WAN and 网速 cards keep their height when empty. */
+private val MetricEmptyShort = 60.dp
 
 /* ------------------------------------------------------------------ */
 /*  Sheets that belong to the home page                                 */

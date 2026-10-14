@@ -666,6 +666,9 @@ internal fun HomeNotice(
     actionLabel: String? = null,
     onAction: (() -> Unit)? = null,
     filled: Boolean = true,
+    /** Audit4: an optional × after the action that clears what the strip reports. */
+    onClose: (() -> Unit)? = null,
+    closeLabel: String = "关闭提示",
 ) {
     val c = LocalHomeColors.current
     val haptics = LocalHomeHaptics.current
@@ -675,7 +678,7 @@ internal fun HomeNotice(
             .heightIn(min = if (filled) 44.dp else 28.dp)
             .clip(HomeDims.controlShape)
             .let { if (filled) it.background(tone.soft()) else it }
-            .padding(start = if (filled) 14.dp else 4.dp, end = if (actionLabel == null) 14.dp else 4.dp),
+            .padding(start = if (filled) 14.dp else 4.dp, end = if (actionLabel == null && onClose == null) 14.dp else 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Icon(icon, null, Modifier.size(18.dp), tint = tone.foreground())
@@ -686,6 +689,13 @@ internal fun HomeNotice(
                 Modifier.heightIn(min = 40.dp).clip(HomeDims.badgeShape).homeTap(role = Role.Button) { haptics(HomeHaptic.Tap); onAction() }.padding(horizontal = 10.dp),
                 contentAlignment = Alignment.Center,
             ) { Text(ht(actionLabel), color = c.accent, style = HomeType.noteStrong.copy(fontWeight = FontWeight.Bold), maxLines = 1) }
+        }
+        if (onClose != null) {
+            Box(
+                Modifier.size(40.dp).clip(HomeDims.badgeShape)
+                    .homeTap(onClickLabel = ht(closeLabel), role = Role.Button) { haptics(HomeHaptic.Tap); onClose() },
+                contentAlignment = Alignment.Center,
+            ) { Icon(HomeIcons.X, ht(closeLabel), Modifier.size(16.dp), tint = tone.foreground()) }
         }
     }
 }
