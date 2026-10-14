@@ -1069,7 +1069,7 @@
     ".github/workflows/v2093-build.yml": "9491b7ea4f743d7f78ddeebd109449440fe7041b01b24b00ae59b3a3714a844d",
     "tools/qa/netfilter_model93.py": "a74b517bc29e817a27d35fda03cefddcb40ad3e5a1d19d5e5371320100bf4e3c",
     "tools/qa/test_adblock93.py": "3b44d2d6d62bb5035827180ccc7dc8af5a212e5b841dcdee39305dc2347270b5",
-    "tools/qa/test_app_recovery93.py": "d315f66ce2f8717b010fbd6b6021765238fb5d422cda26f604d26bbd08366e9a",
+    "tools/qa/test_app_recovery93.py": "bd196f195d409736bbd05c0a466a75e239991a0db1681dceea1bec3dbcbaa2db",
     "tools/qa/test_baseline_profile93.py": "c3c8d3aa0d5e8c974afa0516f0bd1ae7859c8fcbbad030c665f40d6258fb4389",
     "tools/qa/test_cnip93.py": "50870a1963f664c5eb24125e073c2a7747344d24b80177a716034a11a9402be6",
     "tools/qa/test_core_identity_dns.py": "033f03fe73e3f1d32f7f9ba87f3b413256806fa230e46968da0dfd357b4fc451",
