@@ -66374,10 +66374,10 @@ index 0000000..4bf546b
 +}
 diff --git a/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
 new file mode 100644
-index 0000000..329f54e
+index 0000000..776020c
 --- /dev/null
 +++ b/android-app/app/src/main/java/io/github/xgl34222220/hetu/app/NetworkRevalidation.kt
-@@ -0,0 +1,81 @@
+@@ -0,0 +1,86 @@
 +package io.github.xgl34222220.hetu
 +
 +import android.content.Context
@@ -66405,6 +66405,7 @@ index 0000000..329f54e
 +    private const val PREF_PROBE_URLS_AT = "proxyProbeUrlsAt"
 +    private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
 +    const val WIFI_TOGGLE_DELAY_MS = 12_000L
++    const val PROBE_URL_DELAY_MS = 60_000L
 +    const val PROBE_URL_TTL_MS = 24L * 60 * 60 * 1000
 +
 +    @JvmStatic
@@ -66448,7 +66449,11 @@ index 0000000..329f54e
 +            }
 +        }
 +        prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + toggled).apply()
-+        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) refreshProbeUrls(app)
++        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) {
++            // Kept well away from the start transaction: the start path stays a single su invocation.
++            Thread.sleep(PROBE_URL_DELAY_MS)
++            refreshProbeUrls(app)
++        }
 +    }
 +
 +    private fun refreshProbeUrls(app: Context) {

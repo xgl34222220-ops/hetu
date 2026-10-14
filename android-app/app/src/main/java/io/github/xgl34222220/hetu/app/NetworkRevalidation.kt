@@ -25,6 +25,7 @@ object NetworkRevalidation {
     private const val PREF_PROBE_URLS_AT = "proxyProbeUrlsAt"
     private const val SCRIPT = "/data/adb/hetu/hetu-root.sh"
     const val WIFI_TOGGLE_DELAY_MS = 12_000L
+    const val PROBE_URL_DELAY_MS = 60_000L
     const val PROBE_URL_TTL_MS = 24L * 60 * 60 * 1000
 
     @JvmStatic
@@ -68,7 +69,11 @@ object NetworkRevalidation {
             }
         }
         prefs.edit().putString(PREF_LAST, System.currentTimeMillis().toString() + " " + reason + reported + toggled).apply()
-        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) refreshProbeUrls(app)
+        if (reason == "start" && System.currentTimeMillis() - prefs.getLong(PREF_PROBE_URLS_AT, 0L) > PROBE_URL_TTL_MS) {
+            // Kept well away from the start transaction: the start path stays a single su invocation.
+            Thread.sleep(PROBE_URL_DELAY_MS)
+            refreshProbeUrls(app)
+        }
     }
 
     private fun refreshProbeUrls(app: Context) {
