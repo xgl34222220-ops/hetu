@@ -127,6 +127,9 @@ class HetuActivity : ComponentActivity() {
         enableEdgeToEdge()
         vm = ViewModelProvider(this)[HetuViewModel::class.java]
         if (savedInstanceState == null) applyStartPage(intent)
+        if (savedInstanceState == null) applyShortcut(intent)
+        // Audit4 G8: (re)publish the launcher shortcuts in the app language; binder work off the main thread.
+        Thread({ HxLauncherShortcuts.publish(applicationContext) }, "hetu-shortcuts").start()
         val launchArt = savedInstanceState == null
         setContent {
             HetuAppTheme(appearance = vm.appearance, dynamic = vm.dynamicColor, accentHex = vm.accentHex, pureBlack = vm.pureBlack) {
@@ -146,6 +149,7 @@ class HetuActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
         applyStartPage(intent)
+        applyShortcut(intent)
     }
 
     override fun onStart() {
@@ -173,6 +177,20 @@ class HetuActivity : ComponentActivity() {
             "configs" -> vm.openTools(io.github.xgl34222220.hetu.tools.ToolsEntry.Configs)
             "rules" -> vm.openPanel("rules")
             "home" -> vm.tab = HxTab.Home
+        }
+    }
+
+    /** Audit4 G8: a launcher shortcut. Consumed once, so a recreation never repeats a start or stop. */
+    private fun applyShortcut(intent: Intent?) {
+        val action = intent?.getStringExtra(HxLauncherShortcuts.EXTRA) ?: return
+        intent.removeExtra(HxLauncherShortcuts.EXTRA)
+        when (action) {
+            HxLauncherShortcuts.START, HxLauncherShortcuts.STOP -> {
+                requestedRoute = HxRoute.Main
+                vm.tab = HxTab.Home
+                vm.shortcutRun(start = action == HxLauncherShortcuts.START)
+            }
+            HxLauncherShortcuts.NET_TEST -> requestedRoute = HxRoute.NetTest
         }
     }
 

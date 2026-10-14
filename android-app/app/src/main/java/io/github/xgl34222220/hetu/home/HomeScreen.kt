@@ -465,6 +465,11 @@ private fun RowScope.ControlAction(
 private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe: () -> Unit, modifier: Modifier = Modifier) {
     val c = LocalHomeColors.current
     val live = state.status.isLive
+    // Audit4 G5: stopped (not starting/stopping), the same targets can be tested directly; the
+    // values then show a fresh direct result or, dimmed, the last result instead of dashes.
+    val directAllowed = !live && !state.status.isBusy
+    val canProbe = live || directAllowed
+    val offline = if (live) null else state.probeSource.takeIf { it != HomeProbeSource.Live }
     HomeCard(modifier.fillMaxWidth()) {
         Row(Modifier.fillMaxWidth().padding(start = HomeDims.cardPadding, end = 4.dp, top = 6.dp), verticalAlignment = Alignment.Top) {
             Column(Modifier.weight(1f).padding(top = 8.dp)) {
@@ -473,17 +478,27 @@ private fun HomeProbeCard(state: HomeUiState, onOpenTargets: () -> Unit, onProbe
                     ht("由河图进程直接请求，未指定代理节点；结果不代表其他应用的代理路径。"),
                     Modifier.padding(top = 2.dp), color = c.t2, style = HomeType.caption,
                 )
+                if (offline != null) Text(
+                    ht(if (offline == HomeProbeSource.Direct) "直连（代理未运行）" else "上次结果（代理未运行）"),
+                    Modifier.padding(top = 2.dp), color = if (offline == HomeProbeSource.Direct) c.accent else c.t3,
+                    style = HomeType.caption, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                )
             }
             HomeIconButton(HomeIcons.SlidersHorizontal, "测速目标", onOpenTargets, tint = if (live) c.t1 else c.t2)
-            HomeIconButton(HomeIcons.RefreshCw, "重新测速", { if (!state.probing) onProbe() }, enabled = live, spinning = state.probing && live, tint = if (state.probing) c.accent else c.t1)
+            HomeIconButton(HomeIcons.RefreshCw, if (live) "重新测速" else "直连测速", { if (!state.probing) onProbe() }, enabled = canProbe, spinning = state.probing && canProbe, tint = if (state.probing) c.accent else c.t1)
         }
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(start = 8.dp, end = 8.dp, top = 10.dp, bottom = 14.dp)) {
             state.probes.forEachIndexed { index, probe ->
                 if (index > 0) Box(Modifier.padding(vertical = 6.dp).width(1.dp).fillMaxHeight().background(c.line2))
                 Column(Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(probe.name, color = c.t2, style = HomeType.rowSub, maxLines = 1, overflow = TextOverflow.Ellipsis)
-                    Box(Modifier.heightIn(min = 30.dp).alpha(if (state.probing && live) .45f else 1f), contentAlignment = Alignment.Center) {
-                        val delay = probe.delayMs.takeIf { live }
+                    val dim = when {
+                        state.probing && canProbe -> .45f
+                        offline == HomeProbeSource.Last -> .5f
+                        else -> 1f
+                    }
+                    Box(Modifier.heightIn(min = 30.dp).alpha(dim), contentAlignment = Alignment.Center) {
+                        val delay = probe.delayMs.takeIf { live || offline != null }
                         if (delay == null) Text(HomeFormat.Dash, color = c.t2, style = HomeType.metric)
                         else HomeDelayText(delay)
                     }

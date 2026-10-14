@@ -840,10 +840,16 @@ internal fun DiagnosticsScreen(vm: HetuViewModel, onBack: () -> Unit) {
     var sheet by remember { mutableStateOf<Pair<String, String>?>(null) }
     var confirmRecover by remember { mutableStateOf(false) }
     // WeChat installed but battery-optimized: the most common cause of late WeChat pushes on its own.
-    val wechatBatteryHint = remember {
+    fun wechatBatteryHintNow(): Boolean {
         val installed = runCatching { context.packageManager.getApplicationInfo(WechatTransport.PACKAGE, 0) }.isSuccess
         val power = context.getSystemService(android.content.Context.POWER_SERVICE) as? android.os.PowerManager
-        WechatTransport.batteryHint(installed, power?.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE)) != null
+        return WechatTransport.batteryHint(installed, power?.isIgnoringBatteryOptimizations(WechatTransport.PACKAGE)) != null
+    }
+    var wechatBatteryHint by remember { mutableStateOf(wechatBatteryHintNow()) }
+    // Audit4 G10: re-read on every return to the page, so the hint goes away once WeChat's battery
+    // setting was changed to Unrestricted from 打开微信设置 (it was computed only once before).
+    androidx.lifecycle.compose.LifecycleEventEffect(androidx.lifecycle.Lifecycle.Event.ON_RESUME) {
+        wechatBatteryHint = wechatBatteryHintNow()
     }
 
     fun task(key: String, block: suspend () -> Unit) {
@@ -1044,6 +1050,17 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
         }
     }
 
+    // Audit4 G7: applied at once (not part of the ✓ draft), so it never triggers 「放弃修改？」.
+    var subscriptionAlerts by remember { mutableStateOf(HxSubscriptionAlerts.enabled(prefs)) }
+    fun setSubscriptionAlerts(on: Boolean) {
+        subscriptionAlerts = on
+        prefs.edit().putBoolean(HxSubscriptionAlerts.PREF_ENABLED, on).apply()
+        if (on) HxSubscriptionAlerts.check(context, vm.providers)
+    }
+    val alertPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) setSubscriptionAlerts(true) else vm.toast("没有通知权限，无法发送订阅提醒")
+    }
+
     fun save() {
         val edit = prefs.edit()
             .putString(ProxyStatusNotificationService.PREF_TITLE_TEMPLATE, titleTemplate.ifBlank { ProxyStatusNotificationService.DEFAULT_TITLE_TEMPLATE })
@@ -1155,6 +1172,22 @@ internal fun NotificationSettingsScreen(vm: HetuViewModel, onBack: () -> Unit) {
                             modifier = Modifier.padding(start = 18.dp, end = 18.dp, top = 2.dp, bottom = 14.dp),
                         )
                     }
+                }
+            }
+        }
+        item(key = "subscription-alerts") {
+            SettingsSection {
+                SettingsGroup(title = ht("订阅提醒")) {
+                    SettingsSwitchRow(ht("订阅到期/流量提醒"), subscriptionAlerts, { on ->
+                        if (on && android.os.Build.VERSION.SDK_INT >= 33 &&
+                            androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) !=
+                            android.content.pm.PackageManager.PERMISSION_GRANTED
+                        ) {
+                            alertPermission.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                        } else {
+                            setSubscriptionAlerts(on)
+                        }
+                    }, subtitle = ht("到期前 3 天内或剩余流量不足 10% 时发一条通知，每个订阅每天最多一次；立即生效"), icon = HxIcons.Bell)
                 }
             }
         }

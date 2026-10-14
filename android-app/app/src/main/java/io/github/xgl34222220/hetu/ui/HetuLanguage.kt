@@ -1244,7 +1244,49 @@ private val vocabularyLastGood = """
 已用上次可启动的版本启动，源配置未修改|Started with the last working version; source config unchanged|已用上次可啟動的版本啟動，來源設定未修改|Запущена последняя рабочая версия; исходная конфигурация не изменена
 """.trimIndent()
 
-private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood).joinToString("\n")
+// 2026-10-14 audit4 functions: stopped 本机直测, connection details actions, subscription alerts, launcher shortcuts, update check, restore undo.
+private val vocabularyAudit4Func = """
+直连（代理未运行）|Direct (proxy not running)|直連（代理未執行）|Напрямую (прокси не запущен)
+上次结果（代理未运行）|Last result (proxy not running)|上次結果（代理未執行）|Последний результат (прокси не запущен)
+直连测速|Direct test|直連測速|Прямой тест
+复制主机|Copy host|複製主機|Копировать хост
+只看此应用|Only this app|只看此應用|Только это приложение
+查看匹配规则|Show matched rule|查看匹配規則|Показать сработавшее правило
+应用：%s|App: %s|應用：%s|Приложение: %s
+匹配规则：%s|Matched rule: %s|匹配規則：%s|Сработавшее правило: %s
+没有找到这条规则|This rule was not found|沒有找到這條規則|Правило не найдено
+规则列表可能已经变化，或这条连接由内置规则匹配|The rule list may have changed, or a built-in rule matched this connection|規則列表可能已經變化，或這條連線由內建規則匹配|Список правил мог измениться, или соединение совпало со встроенным правилом
+订阅提醒|Subscription alerts|訂閱提醒|Напоминания о подписке
+订阅到期/流量提醒|Expiry / data alerts|訂閱到期/流量提醒|Срок и трафик подписки
+到期前 3 天内或剩余流量不足 10% 时发一条通知，每个订阅每天最多一次；立即生效|Notifies within 3 days of expiry or when less than 10% of data is left, at most once a day per subscription; applies at once|到期前 3 天內或剩餘流量不足 10% 時發一則通知，每個訂閱每天最多一次；立即生效|Уведомление за 3 дня до окончания или когда осталось меньше 10% трафика, не чаще раза в день для каждой подписки; действует сразу
+没有通知权限，无法发送订阅提醒|No notification permission, so subscription alerts cannot be sent|沒有通知權限，無法傳送訂閱提醒|Нет разрешения на уведомления, напоминания о подписке не отправить
+订阅即将到期|Subscription expiring soon|訂閱即將到期|Подписка скоро закончится
+%s 已过期|%s has expired|%s 已過期|Срок %s истёк
+%s 今天到期|%s expires today|%s 今天到期|%s истекает сегодня
+%s 将在 %d 天后到期|%s expires in %d days|%s 將在 %d 天後到期|%s истекает через %d дн.
+订阅流量不足|Subscription data running low|訂閱流量不足|Заканчивается трафик подписки
+%s 剩余 %s（%d%%）|%s: %s left (%d%%)|%s 剩餘 %s（%d%%）|%s: осталось %s (%d%%)
+启动河图代理|Start the Hetu proxy|啟動河圖代理|Запустить прокси Hetu
+停止河图代理|Stop the Hetu proxy|停止河圖代理|Остановить прокси Hetu
+连通性与网速测试|Connectivity and speed test|連通性與網速測試|Проверка связи и скорости
+代理已在运行|The proxy is already running|代理已在執行|Прокси уже запущен
+正在检查…|Checking…|正在檢查…|Проверка…
+发现新版本 %s|New version %s available|發現新版本 %s|Доступна новая версия %s
+当前版本 %s|Current version %s|目前版本 %s|Текущая версия %s
+已是最新版本|You have the latest version|已是最新版本|Установлена последняя версия
+还没有发布版本|No release has been published yet|還沒有發佈版本|Релизы ещё не опубликованы
+打开发布页|Open release page|開啟發佈頁|Открыть страницу релиза
+没有可打开链接的应用|No app can open this link|沒有可開啟連結的應用程式|Нет приложения для открытия ссылки
+检查更新失败|Update check failed|檢查更新失敗|Не удалось проверить обновления
+撤销上次恢复|Undo last restore|復原上次還原|Отменить последнее восстановление
+恢复于 %s · 回到恢复前的设置，并删除恢复新增的配置副本|Restored %s · returns to the settings before it and removes the config copies it added|還原於 %s · 回到還原前的設定，並刪除還原新增的設定檔副本|Восстановлено %s · вернуть прежние настройки и удалить добавленные копии конфигураций
+撤销上次恢复？|Undo the last restore?|復原上次還原？|Отменить последнее восстановление?
+恢复之前的设置会写回；恢复之后又改过的设置保持不变。恢复时新增的配置副本会删除（已被选中或改过的除外），你原有的配置不受影响。正在运行的代理不会自动重启。|Settings from before the restore are written back; settings changed after it stay as they are. Config copies the restore added are deleted (unless selected or edited); your own configs are not affected. A running proxy is not restarted.|還原之前的設定會寫回；還原之後又改過的設定保持不變。還原時新增的設定檔副本會刪除（已被選取或改過的除外），你原有的設定檔不受影響。正在執行的代理不會自動重新啟動。|Настройки до восстановления будут возвращены; изменённые после него останутся. Добавленные копии конфигураций удаляются (кроме выбранных или изменённых); ваши конфигурации не затрагиваются. Запущенный прокси не перезапускается.
+已撤销上次恢复|Last restore undone|已復原上次還原|Последнее восстановление отменено
+撤销失败|Undo failed|復原失敗|Не удалось отменить
+""".trimIndent()
+
+private val vocabulary = listOf(vocabularyBase, vocabularyHomePanel, vocabularyTools, vocabularySettings, vocabularyConnection, vocabularyUiPolish, vocabularyFuncPolish, vocabularyCleanup, vocabularyPolish2, vocabularyWechat, vocabularyAudit3Ui, vocabularyAudit3Settings, vocabularyLastGood, vocabularyAudit4Func).joinToString("\n")
     .lineSequence().map { it.replace("\\n", "\n").split('|') }.associate { it[0] to it.drop(1) }
 
 fun translateHetuText(source: String, language: String): String {

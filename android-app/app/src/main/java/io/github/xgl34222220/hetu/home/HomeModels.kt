@@ -199,7 +199,12 @@ internal data class HomeUiState(
     val lastGood: HomeLastGood? = null,
     /** Audit G1: set while the running session was started from that copy (its config name). */
     val lastGoodRunning: String? = null,
+    /** Audit4 G5: where [probes] come from while the proxy is not live (fresh direct test or last result). */
+    val probeSource: HomeProbeSource = HomeProbeSource.Live,
 )
+
+/** Audit4 G5: origin of the 本机直测 values. Live = the running proxy path (unchanged behaviour). */
+internal enum class HomeProbeSource { Live, Direct, Last }
 
 /** Audit G1: what the 「上次可启动」 copy is: the config it came from and when it was kept (epoch ms). */
 internal data class HomeLastGood(val config: String, val savedAt: Long) {

@@ -45,7 +45,7 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         groups = vm.state.groups, trafficMode = vm.state.trafficMode,
         startupError = vm.startupError, corePid = rt.pid, coreVersion = vm.coreVersion,
         bottomPadding = bottom, onToggle = vm::toggle, onReload = vm::reload,
-        onRestart = vm::restart, onDelay = vm::measureSites, onRefresh = vm::pullRefresh,
+        onRestart = vm::restart, onDelay = vm::probeSites, onRefresh = vm::pullRefresh,
         onTrafficMode = vm::setTrafficMode, onOpenNode = { vm.openPanel("proxies") },
         onOpenSubscription = { vm.openPanel("providers") },
         onOpenBasicSettings = { nav.push(HxRoute.Network) },
@@ -73,5 +73,6 @@ internal fun NewUiHome(vm: HetuViewModel, bottom: Dp, onDetail: (Boolean) -> Uni
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning,
         onStartLastGood = vm::startLastGood,
+        directProbes = if (vm.state.running) emptyMap() else vm.directSiteDelays,
     )
 }

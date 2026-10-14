@@ -98,6 +98,8 @@ internal fun HetuHomeV2(
     lastGood: HomeLastGood? = null,
     lastGoodRunning: String? = null,
     onStartLastGood: () -> Unit = {},
+    /** Audit4 G5: results of a direct (no proxy) 本机直测 made while the proxy is stopped. */
+    directProbes: Map<String, Long> = emptyMap(),
 ) {
     val context = LocalContext.current
     val prefs = remember(context) { context.getSharedPreferences("hetu", Context.MODE_PRIVATE) }
@@ -134,6 +136,13 @@ internal fun HetuHomeV2(
         connection = connection,
         lastGood = lastGood,
         lastGoodRunning = lastGoodRunning?.takeIf { status.isLive },
+        probes = if (!status.isLive && directProbes.isNotEmpty()) mapped.probes.map { p -> p.copy(delayMs = directProbes[p.name]?.let { if (it > 0L) it else HomeDelay.Timeout }) } else mapped.probes,
+        probeSource = when {
+            status.isLive -> HomeProbeSource.Live
+            directProbes.isNotEmpty() -> HomeProbeSource.Direct
+            mapped.probes.any { it.delayMs != null } -> HomeProbeSource.Last
+            else -> HomeProbeSource.Live
+        },
         statusDetail = operationText?.trim()?.takeIf { it.isNotEmpty() && status.isBusy },
         wan = if (wanExtras == null) mapped.wan else mapped.wan.copy(
             city = wanExtras.city.known(),

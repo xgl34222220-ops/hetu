@@ -63,6 +63,7 @@ import androidx.compose.ui.unit.sp
 import io.github.xgl34222220.hetu.home.HomeDims
 import io.github.xgl34222220.hetu.home.HomeHaptic
 import io.github.xgl34222220.hetu.home.HomeIcons
+import io.github.xgl34222220.hetu.home.fill
 import io.github.xgl34222220.hetu.home.HomeMotion
 import io.github.xgl34222220.hetu.home.HomePop
 import io.github.xgl34222220.hetu.home.HomeReveal
@@ -93,6 +94,10 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
     var choice by remember { mutableStateOf<String?>(null) }
     var subPage by remember { mutableStateOf(initialSubPage) }
     var restoreUri by remember { mutableStateOf<Uri?>(null) }
+    // Audit4 G12: 撤销上次恢复 — the snapshot taken right before the last restore.
+    var undoTick by remember { mutableIntStateOf(0) }
+    var confirmUndo by remember { mutableStateOf(false) }
+    val restoreUndo = remember(undoTick, subPage) { HxRestoreUndo.info(context) }
     val density = LocalDensity.current
     var firstGroupHeightPx by remember { mutableIntStateOf(0) }
 
@@ -155,6 +160,16 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                             "选择文件", onClick = { launchDocumentPicker(vm::toast) { importer.launch(arrayOf("application/json", "text/plain", "application/octet-stream")) } },
                             modifier = Modifier.fillMaxWidth().padding(start = 14.dp, end = 14.dp, top = 4.dp, bottom = 10.dp), filled = false,
                         )
+                        restoreUndo?.let { undo ->
+                            SettingsDivider()
+                            SettingsNavRow(
+                                ht("撤销上次恢复"),
+                                subtitle = ht("恢复于 %s · 回到恢复前的设置，并删除恢复新增的配置副本").fill(
+                                    java.text.SimpleDateFormat("MM-dd HH:mm", java.util.Locale.ROOT).format(java.util.Date(undo.restoredAt)),
+                                ),
+                                icon = HomeIcons.RefreshCw,
+                            ) { confirmUndo = true }
+                        }
                     }
                 }
             }
@@ -352,7 +367,7 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                 restoreUri = null
                 scope.launch {
                     try {
-                        val count = HetuSettingsBackup.restore(context, uri)
+                        val count = HxRestoreUndo.restoreWithSnapshot(context, uri)
                         vm.toast("已恢复 $count 项，请检查设置后手动应用")
                         vm.reloadAppearance()
                         bump()
@@ -360,6 +375,8 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
                         throw cancel
                     } catch (error: Exception) {
                         vm.toast(error.message ?: "恢复失败")
+                    } finally {
+                        undoTick++
                     }
                 }
             },
@@ -367,6 +384,36 @@ internal fun SettingsScreen(vm: HetuViewModel, bottomPadding: Dp, initialSubPage
         ) {
             Text(
                 ht("备份内的设置与配置将写入当前应用。同名同内容配置会复用；同名不同内容配置将保留为副本。正在运行的代理不会自动重启。"),
+                Modifier.fillMaxWidth(), color = c.t2, style = HomeType.body.copy(fontSize = 15.sp, lineHeight = 22.sp), textAlign = TextAlign.Center,
+            )
+        }
+    }
+
+    if (confirmUndo) {
+        SettingsDialog(
+            title = ht("撤销上次恢复？"),
+            confirmLabel = "撤销",
+            onConfirm = {
+                confirmUndo = false
+                scope.launch {
+                    try {
+                        HxRestoreUndo.undo(context)
+                        vm.toastAs(HxTone.Good, "已撤销上次恢复")
+                        vm.reloadAppearance()
+                        bump()
+                    } catch (cancel: CancellationException) {
+                        throw cancel
+                    } catch (error: Exception) {
+                        vm.toastAs(HxTone.Bad, hxErrorMessage(error, "撤销失败"))
+                    } finally {
+                        undoTick++
+                    }
+                }
+            },
+            onDismiss = { confirmUndo = false },
+        ) {
+            Text(
+                ht("恢复之前的设置会写回；恢复之后又改过的设置保持不变。恢复时新增的配置副本会删除（已被选中或改过的除外），你原有的配置不受影响。正在运行的代理不会自动重启。"),
                 Modifier.fillMaxWidth(), color = c.t2, style = HomeType.body.copy(fontSize = 15.sp, lineHeight = 22.sp), textAlign = TextAlign.Center,
             )
         }

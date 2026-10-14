@@ -156,9 +156,18 @@ internal fun LazyListScope.panelConnectionsTab(
             PanelChip("按应用", { onView(view.copy(groupByApp = !view.groupByApp)) }, selected = view.groupByApp, selectedColor = c.t1, selectedFill = c.surface)
         }
     }
+    // Audit4 G6: 只看此应用 from a connection's details; tap the chip to show every app again.
+    view.connApp?.let { app ->
+        item(key = "conn-app-filter") {
+            PanelFocusChip(
+                ht("应用：%s").fill(if (app == PanelLogic.UnattributedApp) ht(app) else app),
+                Modifier.panelGutter().padding(bottom = PanelDims.gap),
+            ) { onView(view.copy(connApp = null)) }
+        }
+    }
     if (list.isEmpty()) {
         item(key = "conn-empty") {
-            val narrowed = view.needle.isNotEmpty() || view.connFilter != PanelConnFilter.All
+            val narrowed = view.needle.isNotEmpty() || view.connFilter != PanelConnFilter.All || view.connApp != null
             if (narrowed) PanelEmptyState(PanelIcons.SearchX, "没有匹配的连接", if (view.needle.isNotEmpty()) "尝试其他关键词" else "当前筛选下没有连接")
             else PanelEmptyState(PanelIcons.Unlink, "暂无连接", "新的连接建立后会显示在这里")
         }
@@ -280,10 +289,22 @@ internal fun policyColor(policy: String): Color {
 }
 
 /** 规则 tab: one card per rule, in config order. */
-internal fun LazyListScope.panelRulesTab(items: List<PanelRule>, query: String, total: Int, stagger: HetuStaggerState) {
+internal fun LazyListScope.panelRulesTab(
+    items: List<PanelRule>,
+    query: String,
+    total: Int,
+    stagger: HetuStaggerState,
+    focus: String? = null,
+    onClearFocus: () -> Unit = {},
+) {
+    // Audit4 G6: the rule a connection matched (查看匹配规则); tap the chip to list every rule again.
+    if (focus != null) item(key = "rules-focus") {
+        PanelFocusChip(ht("匹配规则：%s").fill(focus), Modifier.panelGutter().padding(bottom = PanelDims.gap), onClearFocus)
+    }
     if (items.isEmpty()) {
         item(key = "rules-empty") {
-            if (query.isEmpty()) PanelEmptyState(PanelIcons.Route, "没有规则", "当前配置没有分流规则") else PanelEmptyState(PanelIcons.SearchX, "没有匹配的规则", "尝试其他关键词")
+            if (focus != null) PanelEmptyState(PanelIcons.SearchX, "没有找到这条规则", "规则列表可能已经变化，或这条连接由内置规则匹配")
+            else if (query.isEmpty()) PanelEmptyState(PanelIcons.Route, "没有规则", "当前配置没有分流规则") else PanelEmptyState(PanelIcons.SearchX, "没有匹配的规则", "尝试其他关键词")
         }
         return
     }
@@ -458,5 +479,18 @@ internal fun LazyListScope.panelLogsTab(
                 }
             }
         }
+    }
+}
+
+/** Audit4 G6: an active narrowing (one app, one rule) shown above a list; tapping it clears it. */
+@Composable
+private fun PanelFocusChip(text: String, modifier: Modifier, onClear: () -> Unit) {
+    val c = LocalHomeColors.current
+    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        PanelChip(
+            text, onClear, Modifier.weight(1f, fill = false), selected = true, height = 34.dp,
+            leading = { Icon(PanelIcons.Funnel, null, Modifier.size(15.dp), tint = c.accent) },
+            trailingIcon = HomeIcons.X,
+        )
     }
 }
